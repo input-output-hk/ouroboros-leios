@@ -1,0 +1,4 @@
+packages:
+  .,
+  ../cardano-haskell/ouroboros-network/io-classes,
+  ../cardano-haskell/ouroboros-network/io-sim
