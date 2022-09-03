@@ -3,15 +3,20 @@ module ExamplesTCP where
 
 import Data.Word
 
-import SimTCPLinks
-import Viz
-import VizSimTCP
-import VizChart
+import Control.Monad.Class.MonadTime (Time, DiffTime)
 
 import System.Random (mkStdGen, random)
 
 import qualified Graphics.Rendering.Chart.Easy as Chart
 import           Graphics.Rendering.Chart.Easy ((.=))
+
+import ModelTCP
+import SimTCPLinks
+import Viz
+import VizSim
+import VizSimTCP
+import PlotTCP
+import VizChart
 
 
 ------------------------------------------------------------------------------
@@ -20,34 +25,41 @@ import           Graphics.Rendering.Chart.Easy ((.=))
 
 example1 :: IO ()
 example1 =
---    writeAnimationFrames (\n -> "example1/frame-" ++ show n ++ ".png") 55 $
+--    writeAnimationFrames (\n -> "output/tcp-chart-1/frame-" ++ show n ++ ".png") 55 $
     vizualise $
-      scaleVizualisation 2.0 $
-      timedVizualisation 0.1 $
-      besideVizualisations
-        (examplesVizualisation $
-          traceTcpLinks1 tcpprops trafficPattern)
-        (chartVizualisation (500, 500) chart1)
+      slowmoVizualisation 0.1 $
+      Viz (tcpSimVizModel (traceTcpLinks1 tcpprops trafficPattern))
+          (aboveVizRender
+             (labelVizRender title)
+             (besideVizRender
+               (aboveVizRender
+                  labelTimeVizRender
+                  (tcpSimVizRender examplesTcpSimVizConfig))
+               (chartVizRender (500, 500) 25 chart)))
   where
     tcpprops       = mkTcpConnProps 0.3 (kilobytes 1000)
     trafficPattern = mkUniformTrafficPattern 20 (kilobytes 100) 0
 
-chart1 :: Chart.EC (Chart.Layout Double Double) ()
-chart1 = do
-    Chart.layout_title .= "Amplitude Modulation"
-    Chart.setColors [Chart.opaque Chart.blue, Chart.opaque Chart.red]
-    Chart.plot (Chart.line "am" [signal [0,(0.5)..400]])
-    Chart.plot (Chart.points "am points" (signal [0,7..400]))
-    return ()
-  where
-    signal :: [Double] -> [(Double,Double)]
-    signal xs = [ (x,(sin (x*3.14159/45) + 1) / 2 * (sin (x*3.14159/5))) | x <- xs ]
+    title = "Sending 20x 100kb messages over TCP"
 
+    chart :: Time -> FrameNo -> TcpSimVizModel
+          -> Chart.EC (Chart.Layout DiffTime Bytes) ()
+    chart now _ (SimVizModel _ TcpSimVizState {vizTcpEvents}) = do
+        Chart.layout_title .= "Cumulative kb transmitted"
+        Chart.setColors [Chart.opaque Chart.blue, Chart.opaque Chart.red]
+        Chart.plot (Chart.line "kb sent"
+                      (tcpDataSeries BySegment DataSent (Just now) ds))
+        Chart.plot (Chart.line "kb received"
+                      (tcpDataSeries BySegment DataRecv (Just now) ds))
+        return ()
+      where
+        ds = reverse vizTcpEvents
 
+{-
 example2 :: IO ()
 example2 =
     vizualise $
-      timedVizualisation 0.2 $
+      slowmoVizualisation 0.2 $
       aboveVizualisations
         (viewportVizualisation 1000 350 $
          examplesVizualisation $
@@ -64,7 +76,7 @@ example2 =
 example3 :: IO ()
 example3 =
     vizualise $
-      timedVizualisation 0.2 $
+      slowmoVizualisation 0.2 $
       aboveVizualisations
         (viewportVizualisation 1000 350 $
          examplesVizualisation $
@@ -77,18 +89,18 @@ example3 =
 
     trafficPattern1 = mkUniformTrafficPattern 15 (kilobytes 100) 1.2
     trafficPattern2 = mkUniformTrafficPattern 30 (kilobytes  50) 0.6
-
+-}
 
 examplesVizualisation :: TcpSimTrace -> Vizualisation
 examplesVizualisation =
-    tcpSimVizualisation config
-  where
-    config :: TcpSimVizConfig TestMessage
-    config =
-      TcpSimVizConfig {
-        messageColor
-      }
+    tcpSimVizualisation examplesTcpSimVizConfig
 
+examplesTcpSimVizConfig :: TcpSimVizConfig TestMessage
+examplesTcpSimVizConfig =
+    TcpSimVizConfig {
+      messageColor
+    }
+  where
     messageColor :: TestMessage -> (Double, Double, Double)
     messageColor (TestMessage msgid _) =
         (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)

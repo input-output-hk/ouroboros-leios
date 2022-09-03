@@ -52,6 +52,7 @@ library
 
                        cairo,
                        gtk3,
+                       colour,
                        Chart,
                        Chart-cairo,
                        gnuplot

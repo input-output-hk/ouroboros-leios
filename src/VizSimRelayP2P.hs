@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -7,27 +8,21 @@ import           Data.Maybe
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
+import           Control.Monad.Class.MonadTime (Time, diffTime)
+
 import qualified Graphics.Rendering.Cairo as Cairo
+import qualified Graphics.Rendering.Chart.Easy as Chart
+import           Graphics.Rendering.Chart.Easy ((.=))
+import qualified Data.Colour.SRGB as Colour
 
 import ModelTCP (TcpMsgForecast(..), segmentSize)
-import SimRelay (RelaySimTrace, TestBlock, TestBlockRelayMessage)
+import SimRelay (TestBlock, TestBlockRelayMessage)
 import Viz
+import VizChart
 import VizSim
 import VizSimTCP (lineMessageInFlight)
 import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), relaySimVizModel,
                     recentRate)
-
-
--- | Make an overall vizualisation model for the tcp simulation given a
--- simulation trace.
-relayP2PSimVizualisation :: RelayP2PSimVizConfig
-                         -> RelaySimTrace
-                         -> Vizualisation
-relayP2PSimVizualisation vizConfig trace =
-    Viz (relaySimVizModel trace)
-        (relayP2PSimVizRender vizConfig)
-    -- Note: The vizualisation model is the same as the relay one,
-    -- only the vizualisation rendering is different
 
 
 ------------------------------------------------------------------------------
@@ -41,31 +36,36 @@ data RelayP2PSimVizConfig =
      }
 
 relayP2PSimVizRender :: RelayP2PSimVizConfig
+                     -> (Int, Int)
                      -> VizRender RelaySimVizModel
-relayP2PSimVizRender vizConfig =
+relayP2PSimVizRender vizConfig renderSize =
     VizRender {
-      vizSize     = (500,500),
-      renderModel = relayP2PSimVizRenderModel vizConfig
+      renderSize,
+      renderClip    = True,
+      renderChanged = \_t _fn _m -> True,
+      renderModel   = \ t _fn  m -> relayP2PSimVizRenderModel vizConfig t m
     }
 
 relayP2PSimVizRenderModel :: RelayP2PSimVizConfig
+                          -> Time
                           -> SimVizModel event RelaySimVizState
                           -> Cairo.Render ()
 relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                             nodeMessageColor,
                             ptclMessageColor
                           }
-                          (SimVizModel now _events
+                          now
+                          (SimVizModel _events
                              RelaySimVizState {
                                vizNodePos,
                                vizNodeLinks,
                                vizMsgsInTransit,
                                vizMsgsAtNodeQueue,
                                vizMsgsAtNodeBuffer,
-                               vizMsgsAtNodeRecentQueue,
-                               vizMsgsAtNodeRecentBuffer,
-                               vizMsgsAtNodeTotalQueue,
-                               vizMsgsAtNodeTotalBuffer,
+--                               vizMsgsAtNodeRecentQueue,
+--                               vizMsgsAtNodeRecentBuffer,
+--                               vizMsgsAtNodeTotalQueue,
+--                               vizMsgsAtNodeTotalBuffer,
                                vizNumMsgsGenerated
                              }) = do
     renderLinks
@@ -110,15 +110,15 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
         | (node, (x,y)) <- Map.toList vizNodePos
         , let qmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
               bmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
-              nqmsgs  = length qmsgs
-              nbmsgs  = length bmsgs
+--              nqmsgs  = length qmsgs
+--              nbmsgs  = length bmsgs
               (r,g,b) = case qmsgs ++ bmsgs of
                           msgs@(_:_) -> nodeMessageColor (last msgs)
                           _          -> (0.7,0.7,0.7)
-              rqmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentQueue)
-              rbmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentBuffer)
-              tqmsgs  = fromMaybe 0 (Map.lookup node vizMsgsAtNodeTotalQueue)
-              tbmsgs  = fromMaybe 0 (Map.lookup node vizMsgsAtNodeTotalBuffer)
+--              rqmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentQueue)
+--              rbmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentBuffer)
+--              tqmsgs  = fromMaybe 0 (Map.lookup node vizMsgsAtNodeTotalQueue)
+--              tbmsgs  = fromMaybe 0 (Map.lookup node vizMsgsAtNodeTotalBuffer)
         ]
       Cairo.restore
 
@@ -215,4 +215,37 @@ classifyInFlightMsgs msgs
     -- single TCP segment. All substantive payloads will be bigger than this.
     control (_msg, msgforecast, _msgforecasts) =
       msgSize msgforecast <= segmentSize
+
+------------------------------------------------------------------------------
+-- The charts
+--
+
+chartDiffusionLatency :: RelayP2PSimVizConfig
+                      -> VizRender RelaySimVizModel
+chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
+    chartVizRender (640, 1060) 25 $ \_ _
+      (SimVizModel _ RelaySimVizState {
+                       vizNodePos,
+                       vizMsgsDiffusionLatency
+                     }) -> do
+      Chart.layout_title .= "Diffusion latency: time to reach fraction of stake"
+      Chart.layout_y_axis . Chart.laxis_generate .=
+        Chart.scaledAxis Chart.def { Chart._la_nLabels = 10 } (0, 1)
+
+      sequence_
+        [ Chart.plot $ Chart.liftEC $ do
+            Chart.plot_lines_values .= [timeseries]
+            let (r,g,b) = nodeMessageColor blk
+                colour  = Chart.opaque (Colour.sRGB r g b)
+            Chart.plot_lines_style . Chart.line_color .= colour
+        | let nnodes = Map.size vizNodePos
+        , (blk, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
+        , let timeseries =
+                [ (latency, percent)
+                | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
+                , let !latency = arrival `diffTime` created
+                      !percent = Chart.Percent
+                                   (fromIntegral n / fromIntegral nnodes)
+                ]
+        ]
 

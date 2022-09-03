@@ -5,7 +5,7 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 
 -- Example of an drawing graphics onto a canvas.
-import Graphics.UI.Gtk
+import Graphics.UI.Gtk as Gtk
 import Graphics.Rendering.Cairo as Cairo hiding (RectangleInt(..))
 import Graphics.UI.Gtk.Gdk.EventM
 
@@ -23,6 +23,7 @@ run act = do
     set window
       [ containerChild  := canvas
       , windowResizable := True
+--      , widgetAppPaintable := True
       ]
     windowSetDefaultSize window 500 500
 
@@ -32,6 +33,26 @@ run act = do
     backgroundRef <- newIORef Nothing
     on canvas configureEvent $ liftIO $ do
       print "Configure!"
+      mbwindow <- widgetGetWindow canvas
+      case mbwindow of
+        Nothing -> print "No draw window!"
+        Just win -> do
+          print "Got draw window!"
+          w <- drawWindowGetWidth  win
+          h <- drawWindowGetHeight win
+          print (w,h)
+          background <- Gtk.renderWithDrawWindow win $
+            withTargetSurface $ \mainSurface ->
+               liftIO $ createSimilarSurface mainSurface ContentColor w h
+          renderWith background $ do
+            setSourceRGB 1 1 1
+            Cairo.rectangle 0 0 (fromIntegral w) (fromIntegral h)
+            fill
+            setSourceRGB 0 0 0
+            act
+          liftIO $ writeIORef backgroundRef (Just background)
+          print "Render!"
+{-
       oldbackground <- readIORef backgroundRef
       case oldbackground of
         Nothing -> return ()
@@ -39,9 +60,18 @@ run act = do
           print "Discarding old background!"
           surfaceFinish background
       writeIORef backgroundRef Nothing
+-}
       return True
 
     on canvas draw $ do
+      mbackground <- liftIO $ readIORef backgroundRef
+      case mbackground of
+        Just background -> do
+          liftIO $ print "Paint!"
+          setSourceSurface background 0 0
+          paint
+        Nothing -> return ()
+{-
       background <- do
          mbbackground <- liftIO $ readIORef backgroundRef
          case mbbackground of
@@ -64,6 +94,11 @@ run act = do
              return background
       setSourceSurface background 0 0
       paint
+
+    Gtk.timeoutAdd
+      (Gtk.widgetQueueDraw canvas >> return True)
+      (1000 `div` 25)
+-}
 
     widgetShowAll window
     mainGUI

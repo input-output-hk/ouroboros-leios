@@ -14,9 +14,9 @@ example1 :: IO ()
 example1 =
 --  writeAnimationFrames (\n -> "relay1/frame-" ++ show n ++ ".png") 120 $
   vizualise $
-    scaleVizualisation 2.0 $
-    viewportVizualisation 500 650 $
-    timedVizualisation 0.1 $
+--    scaleVizualisation 2.0 $
+--    viewportVizualisation 500 650 $
+    slowmoVizualisation 0.1 $
     examplesVizualisation $
       traceRelayLink1
         (mkTcpConnProps 0.3 (kilobytes 1000))
@@ -27,9 +27,9 @@ example2 :: IO ()
 example2 =
 --  writeAnimationFrames (\n -> "relay2/frame-" ++ show n ++ ".png") 120 $
   vizualise $
-    scaleVizualisation 2.0 $
-    viewportVizualisation 1000 650 $
-    timedVizualisation 0.1 $
+--    scaleVizualisation 2.0 $
+--    viewportVizualisation 1000 650 $
+    slowmoVizualisation 0.1 $
     examplesVizualisation $
       traceRelayLink4
         (mkTcpConnProps 0.3 (kilobytes 1000))
@@ -40,9 +40,9 @@ example3 :: IO ()
 example3 =
 --  writeAnimationFrames (\n -> "relay3/frame-" ++ show n ++ ".png") 120 $
   vizualise $
-    scaleVizualisation 2.0 $
-    viewportVizualisation 1000 650 $
-    timedVizualisation 0.1 $
+--    scaleVizualisation 2.0 $
+--    viewportVizualisation 1000 650 $
+    slowmoVizualisation 0.1 $
     examplesVizualisation $
       traceRelayLink4Asymmetric
         (mkTcpConnProps 0.2 (kilobytes 1000))

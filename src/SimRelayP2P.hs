@@ -18,7 +18,6 @@ import Control.Monad.IOSim as IOSim
 
 import System.Random (StdGen, split)
 
-import RelayProtocol
 import ChanTCP
 import SimTCPLinks (LabelNode(..), NodeId(..),
                     simTracer, labelDirToLabelLink, selectTimedEvents)

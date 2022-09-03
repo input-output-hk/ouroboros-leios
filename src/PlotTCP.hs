@@ -10,8 +10,8 @@ module PlotTCP where
 
 import Control.Monad.Class.MonadTime
 
-import Graphics.Gnuplot.Simple as Gnuplot
-import qualified Graphics.Gnuplot.Value.Tuple as Gnuplot.Tuple
+--import Graphics.Gnuplot.Simple as Gnuplot
+--import qualified Graphics.Gnuplot.Value.Tuple as Gnuplot.Tuple
 --import qualified Graphics.Gnuplot.Terminal.PNG as Gnuplot.PNG
 
 import ModelTCP
@@ -24,12 +24,17 @@ import SimTCPLinks
 data DataSentOrReceived = DataSent | DataRecv
 data ByMessageOrSegment = ByMessage | BySegment
 
-tcpDataSeries :: ByMessageOrSegment -> DataSentOrReceived
-              -> [TcpEvent a] -> [Maybe (DiffTime, Bytes)]
-tcpDataSeries ByMessage DataSent = toDataSeries . selectSends . selectByMessage
-tcpDataSeries ByMessage DataRecv = toDataSeries . selectRecvs . selectByMessage
-tcpDataSeries BySegment DataSent = toDataSeries . selectSends . selectBySegment
-tcpDataSeries BySegment DataRecv = toDataSeries . selectRecvs . selectBySegment
+tcpDataSeries :: ByMessageOrSegment -> DataSentOrReceived -> Maybe Time
+              -> [TcpEvent a] -> [[(DiffTime, Bytes)]]
+tcpDataSeries bymessageorsegment sendorrecv horizon =
+    toDataSeries'
+  . maybe id (selectEventsBeforeTime sendorrecv) horizon
+  . (case sendorrecv of
+       DataSent -> selectSends
+       DataRecv -> selectRecvs)
+  . (case bymessageorsegment of
+       ByMessage -> selectByMessage
+       BySegment -> selectBySegment)
 
 selectByMessage, selectBySegment :: [TcpEvent a] -> [TcpMsgForecast]
 selectByMessage events = [ msgforecast
@@ -59,12 +64,29 @@ toDataSeries = go 0 0
       | x1 >  x0  = Nothing : Just (x1, a) : Just (x2, a+dy) : go (a+dy) x2 ts
       | otherwise = error "toDataSeries: non-monotonic x values"
 
+toDataSeries' :: [(Time, Time, Bytes)] -> [[(DiffTime, Bytes)]]
+toDataSeries' = go [] 0 0
+  where
+    go [] !_ !_  [] = []
+    go ps !_ !_  [] = reverse ps : []
+    go ps !a !x0 ((Time x1, Time x2, dy) : ts)
+      | x1 == x0  =              go ((x2, a+dy):(x1, a):ps) (a+dy) x2 ts
+      | x1 >  x0  = reverse ps : go ((x2, a+dy):(x1, a):[]) (a+dy) x2 ts
+      | otherwise = error "toDataSeries: non-monotonic x values"
+
+selectEventsBeforeTime :: DataSentOrReceived -> Time
+                       -> [(Time, Time, Bytes)] -> [(Time, Time, Bytes)]
+selectEventsBeforeTime DataSent horizon es =
+    [ (t1, t2, b) | (t1, t2, b) <- es, t1 <= horizon ]
+selectEventsBeforeTime DataRecv horizon es =
+    [ (t1, t2, b) | (t1, t2, b) <- es, t2 <= horizon ]
+
 selectTcpLinkTrace :: NodeId -> NodeId
                    -> [(Time, TcpSimEvent)]
                    -> [TcpEvent TestMessage]
 selectTcpLinkTrace a b t =
   [ e | (_, TcpSimEventTcp (LabelLink a' b' e)) <- t, a == a', b == b' ]
-
+{-
 plotTrace :: ByMessageOrSegment -> [TcpEvent a] -> IO ()
 plotTrace bymessageorsegment trace =
     Gnuplot.plotListsStyle
@@ -119,4 +141,4 @@ example2 =
     tcpprops       = mkTcpConnProps 0.3 (kilobytes 1000)
     trafficPattern = mkUniformTrafficPattern 20 (kilobytes 100) 0
 
-
+-}

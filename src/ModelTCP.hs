@@ -58,7 +58,7 @@ data TcpConnProps = TcpConnProps {
   deriving Show
 
 newtype Bytes = Bytes { fromBytes :: Int }
-  deriving (Eq, Ord, Num, Show)
+  deriving (Eq, Ord, Enum, Num, Real, Integral, Show)
 
 data TcpState = TcpState {
        -- | The congestion window size.

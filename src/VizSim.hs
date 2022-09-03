@@ -5,7 +5,7 @@ module VizSim where
 
 import           Data.Foldable as Foldable
 
-import           Control.Monad.Class.MonadTime (Time(Time), addTime)
+import           Control.Monad.Class.MonadTime (Time, DiffTime)
 
 import Viz
 
@@ -15,7 +15,6 @@ import Viz
 --
 data SimVizModel event vizstate =
        SimVizModel
-         !Time
           [(Time, event)]
          !vizstate
 
@@ -32,15 +31,18 @@ simVizModel accumEventVizState pruneVisState initVizState trace =
     }
   where
     initModel :: SimVizModel event vizstate
-    initModel = SimVizModel (Time 0) trace initVizState
+    initModel = SimVizModel trace initVizState
 
-    stepModel :: Float -> SimVizModel event vizstate -> SimVizModel event vizstate
-    stepModel delta (SimVizModel now events vstate) =
-        SimVizModel now' events' vstate'
+    stepModel :: DiffTime
+              -> Time
+              -> FrameNo
+              -> SimVizModel event vizstate
+              -> SimVizModel event vizstate
+    stepModel _delta now _frameno (SimVizModel events vstate) =
+        SimVizModel events' vstate'
       where
-        now'                   = realToFrac delta `addTime` now
-        (deltaEvents, events') = span (\(ts, _) -> ts <= now') events
-        vstate'                = pruneVisState now'
+        (deltaEvents, events') = span (\(ts, _) -> ts <= now) events
+        vstate'                = pruneVisState now
                                $ foldl' (\s (t, e) -> accumEventVizState t e s)
                                         vstate
                                         deltaEvents

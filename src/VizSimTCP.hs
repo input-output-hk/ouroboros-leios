@@ -46,7 +46,8 @@ data TcpSimVizState =
        vizNodeLinks     :: Set (NodeId, NodeId),
        vizMsgsInTransit :: Map (NodeId, NodeId)
                                [(TestMessage, TcpMsgForecast, [TcpMsgForecast])],
-       vizMsgsAtNode    :: Map NodeId [TestMessage]
+       vizMsgsAtNode    :: Map NodeId [TestMessage],
+       vizTcpEvents     :: [TcpEvent TestMessage] -- for plotting charts
      }
 
 
@@ -65,7 +66,8 @@ tcpSimVizModel =
         vizNodePos       = Map.empty,
         vizNodeLinks     = Set.empty,
         vizMsgsInTransit = Map.empty,
-        vizMsgsAtNode    = Map.empty
+        vizMsgsAtNode    = Map.empty,
+        vizTcpEvents     = []
       }
 
     accumEventVizState :: TcpSimEvent
@@ -82,12 +84,13 @@ tcpSimVizModel =
 
     accumEventVizState (TcpSimEventTcp
                          (LabelLink nfrom nto
-                           (TcpSendMsg msg msgforecast msgforecasts))) vs =
+                           event@(TcpSendMsg msg msgforecast msgforecasts))) vs =
         vs {
           vizMsgsInTransit =
             Map.insertWith (flip (++)) (nfrom, nto)
                            [(msg, msgforecast, msgforecasts)]
-                           (vizMsgsInTransit vs)
+                           (vizMsgsInTransit vs),
+          vizTcpEvents = event : vizTcpEvents vs
         }
 
     accumEventVizState (TcpSimEventNode (LabelNode nid (MsgArrive msg))) vs =
@@ -126,17 +129,20 @@ tcpSimVizRender :: TcpSimVizConfig TestMessage
                 -> VizRender TcpSimVizModel
 tcpSimVizRender vizConfig =
     VizRender {
-      vizSize     = (500,500),
-      renderModel = tcpSimVizRenderModel vizConfig
+      renderSize    = (500,500),
+      renderChanged = \_t _fn _m -> True,
+      renderModel   = \ t _fn  m -> tcpSimVizRenderModel vizConfig t m,
+      renderClip    = True
     }
 
 tcpSimVizRenderModel :: TcpSimVizConfig TestMessage
+                     -> Time
                      -> SimVizModel event TcpSimVizState
                      -> Cairo.Render ()
 tcpSimVizRenderModel config@TcpSimVizConfig {
                        messageColor
-                     }
-                     (SimVizModel now _events
+                     } now
+                     (SimVizModel _events
                         TcpSimVizState {
                           vizNodePos,
                           vizNodeLinks,

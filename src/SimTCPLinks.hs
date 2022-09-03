@@ -193,8 +193,8 @@ traceTcpLinks1 tcpprops trafficPattern =
     runSimTrace $ do
       traceWith tracer $
         TcpSimEventSetup
-          [(NodeId 0, (50,  70)),
-           (NodeId 1, (450, 70))]
+          [(NodeId 0, (50,  50)),
+           (NodeId 1, (450, 50))]
           [(NodeId 0, NodeId 1)]
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_

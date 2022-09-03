@@ -32,7 +32,7 @@ data P2PTopographyCharacteristics =
 
        -- | Size of the world on screen in notional pixels. The world positions
        -- will be scaled to fit these dimensions.
-       p2pScreenDimensions :: (Double, Double),
+       p2pScreenDimensions :: (Int, Int),
 
        -- ^ Number of nodes, e.g. 100, 1000, 10,000
        p2pNumNodes        :: Int,
@@ -88,8 +88,8 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
     toScreenPos = \(x,y) -> (realToFrac x * sx, realToFrac y * sy)
       where
         sx, sy :: Double
-        sx = widthPixels  / realToFrac widthSeconds
-        sy = heightPixels / realToFrac heightSeconds
+        sx = fromIntegral widthPixels  / realToFrac widthSeconds
+        sy = fromIntegral heightPixels / realToFrac heightSeconds
 
     nodePositionsTime :: Map NodeId (DiffTime, DiffTime)
     nodePositionsTime =

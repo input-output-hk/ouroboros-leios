@@ -17,7 +17,6 @@ import qualified Graphics.Rendering.Cairo as Cairo
 
 import ModelTCP
 import SimTCPLinks (NodeId(..), LabelNode(..), LabelLink(..))
-import RelayProtocol (BlockRelayMessage, BlockTTL)
 import SimRelay
 import Viz
 import VizSim
@@ -49,18 +48,19 @@ type RelaySimVizModel =
 -- | The vizualisation state within the data model for the tcp simulation
 data RelaySimVizState =
      RelaySimVizState {
-       vizNodePos       :: Map NodeId (Double, Double),
-       vizNodeLinks     :: Set (NodeId, NodeId),
-       vizMsgsInTransit :: Map (NodeId, NodeId)
+       vizNodePos       :: !(Map NodeId (Double, Double)),
+       vizNodeLinks     :: !(Set (NodeId, NodeId)),
+       vizMsgsInTransit :: !(Map (NodeId, NodeId)
                                [(TestBlockRelayMessage,
-                                 TcpMsgForecast, [TcpMsgForecast])],
-       vizMsgsAtNodeQueue  :: Map NodeId [TestBlock],
-       vizMsgsAtNodeBuffer :: Map NodeId [TestBlock],
-       vizMsgsAtNodeRecentQueue  :: Map NodeId RecentRate,
-       vizMsgsAtNodeRecentBuffer :: Map NodeId RecentRate,
-       vizMsgsAtNodeTotalQueue   :: Map NodeId Int,
-       vizMsgsAtNodeTotalBuffer  :: Map NodeId Int,
-       vizNumMsgsGenerated :: Int
+                                 TcpMsgForecast, [TcpMsgForecast])]),
+       vizMsgsAtNodeQueue  :: !(Map NodeId [TestBlock]),
+       vizMsgsAtNodeBuffer :: !(Map NodeId [TestBlock]),
+       vizMsgsAtNodeRecentQueue  :: !(Map NodeId RecentRate),
+       vizMsgsAtNodeRecentBuffer :: !(Map NodeId RecentRate),
+       vizMsgsAtNodeTotalQueue   :: !(Map NodeId Int),
+       vizMsgsAtNodeTotalBuffer  :: !(Map NodeId Int),
+       vizNumMsgsGenerated       :: !Int,
+       vizMsgsDiffusionLatency   :: !(Map TestBlockId (TestBlock, Time, [Time]))
      }
 
 
@@ -85,7 +85,8 @@ relaySimVizModel =
         vizMsgsAtNodeRecentBuffer = Map.empty,
         vizMsgsAtNodeTotalQueue   = Map.empty,
         vizMsgsAtNodeTotalBuffer  = Map.empty,
-        vizNumMsgsGenerated = 0
+        vizNumMsgsGenerated       = 0,
+        vizMsgsDiffusionLatency   = Map.empty
       }
 
     accumEventVizState :: Time
@@ -132,7 +133,10 @@ relaySimVizModel =
             Map.alter (Just . recentAdd now . fromMaybe recentEmpty)
                       nid (vizMsgsAtNodeRecentBuffer vs),
           vizMsgsAtNodeTotalBuffer =
-            Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+            Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs),
+          vizMsgsDiffusionLatency =
+            Map.adjust (\(blk, created, arrivals) -> (blk, created, (now:arrivals)))
+                       (testBlockId msg) (vizMsgsDiffusionLatency vs)
         }
     accumEventVizState _now (RelaySimEventNode (LabelNode nid (RelayNodeEventRemove msg))) vs =
         vs {
@@ -152,7 +156,9 @@ relaySimVizModel =
                       nid (vizMsgsAtNodeRecentBuffer vs),
           vizMsgsAtNodeTotalBuffer =
             Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs),
-          vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
+          vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1,
+          vizMsgsDiffusionLatency =
+            Map.insert (testBlockId msg) (msg, now, [now]) (vizMsgsDiffusionLatency vs)
         }
 
     pruneVisState :: Time
@@ -167,11 +173,16 @@ relaySimVizModel =
           vizMsgsAtNodeRecentQueue =
             Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentQueue vs),
           vizMsgsAtNodeRecentBuffer =
-            Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs)
+            Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs),
+          vizMsgsDiffusionLatency =
+            Map.filter (\(_,t,_) -> t >= secondsAgo10) (vizMsgsDiffusionLatency vs)
         }
       where
         secondsAgo1 :: Time
         secondsAgo1 = addTime (-1) now
+
+        secondsAgo10 :: Time
+        secondsAgo10 = addTime (-10) now
 
 
 newtype RecentRate = RecentRate (MinQueue Time)
@@ -209,11 +220,14 @@ relaySimVizRender :: RelaySimVizConfig
                   -> VizRender RelaySimVizModel
 relaySimVizRender vizConfig =
     VizRender {
-      vizSize     = (500,500),
-      renderModel = relaySimVizRenderModel vizConfig
+      renderSize    = (500,500),
+      renderClip    = True,
+      renderChanged = \_t _fn _m -> True,
+      renderModel   = \ t _fn  m -> relaySimVizRenderModel vizConfig t m
     }
 
 relaySimVizRenderModel :: RelaySimVizConfig
+                       -> Time
                        -> SimVizModel event RelaySimVizState
                        -> Cairo.Render ()
 relaySimVizRenderModel RelaySimVizConfig {
@@ -222,7 +236,8 @@ relaySimVizRenderModel RelaySimVizConfig {
                          nodeMessageText,
                          ptclMessageText
                        }
-                       (SimVizModel now _events
+                       now
+                       (SimVizModel _events
                           RelaySimVizState {
                             vizNodePos,
                             vizNodeLinks,
