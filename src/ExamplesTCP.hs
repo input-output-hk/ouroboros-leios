@@ -23,10 +23,8 @@ import VizChart
 -- Example sim visualisations
 --
 
-example1 :: IO ()
+example1 :: Vizualisation
 example1 =
---    writeAnimationFrames (\n -> "output/tcp-chart-1/frame-" ++ show n ++ ".png") 55 $
-    vizualise $
       slowmoVizualisation 0.1 $
       Viz (tcpSimVizModel (traceTcpLinks1 tcpprops trafficPattern))
           (aboveVizRender
@@ -55,16 +53,14 @@ example1 =
       where
         ds = reverse vizTcpEvents
 
-{-
-example2 :: IO ()
+example2 :: Vizualisation
 example2 =
-    vizualise $
       slowmoVizualisation 0.2 $
-      aboveVizualisations
-        (viewportVizualisation 1000 350 $
+      aboveVizualisation
+        (--viewportVizualisation 1000 350 $
          examplesVizualisation $
            traceTcpLinks4 tcpprops1 tcpprops1 tcpprops1 trafficPattern)
-        (viewportVizualisation 1000 400 $
+        (--viewportVizualisation 1000 400 $
          examplesVizualisation $
            traceTcpLinks4 tcpprops2 tcpprops2 tcpprops2 trafficPattern)
   where
@@ -73,15 +69,14 @@ example2 =
 
     trafficPattern = mkUniformTrafficPattern 15 (kilobytes 100) 0
 
-example3 :: IO ()
+example3 :: Vizualisation
 example3 =
-    vizualise $
       slowmoVizualisation 0.2 $
-      aboveVizualisations
-        (viewportVizualisation 1000 350 $
+      aboveVizualisation
+        (--viewportVizualisation 1000 350 $
          examplesVizualisation $
            traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern1)
-        (viewportVizualisation 1000 680 $
+        (--viewportVizualisation 1000 680 $
          examplesVizualisation $
            traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern2)
   where
@@ -89,7 +84,6 @@ example3 =
 
     trafficPattern1 = mkUniformTrafficPattern 15 (kilobytes 100) 1.2
     trafficPattern2 = mkUniformTrafficPattern 30 (kilobytes  50) 0.6
--}
 
 examplesVizualisation :: TcpSimTrace -> Vizualisation
 examplesVizualisation =

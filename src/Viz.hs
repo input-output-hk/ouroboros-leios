@@ -74,10 +74,34 @@ instance Contravariant VizRender where
       }
 
 
+data GtkVizConfig =
+     GtkVizConfig {
+       gtkVizFPS :: Int,
+
+       -- | If @True@, use client side CPU-based Cairo rendering. Otherwise
+       -- use Gtk+ offscreen Cairo rendering, which may use GPU acceleration.
+       --
+       -- For X11-based desktops, the Gtk+ offscreen rendering may actually
+       -- use more CPU time as it generates load on the X11 server, which
+       -- may or may not itself use GPU acceleration.
+       gtkVizCpuRendering :: Bool
+     }
+
+defaultGtkVizConfig :: GtkVizConfig
+defaultGtkVizConfig =
+    GtkVizConfig {
+      gtkVizFPS          = 25,
+      gtkVizCpuRendering = False
+    }
+
 -- | Animate the vizualisation in a Gtk+ window.
 --
-vizualise :: Vizualisation -> IO ()
-vizualise (Viz vizmodel vizrender) = do
+vizualise :: GtkVizConfig -> Vizualisation -> IO ()
+vizualise GtkVizConfig {
+            gtkVizFPS,
+            gtkVizCpuRendering
+          }
+          (Viz vizmodel vizrender) = do
     _ <- Gtk.initGUI
     window <- Gtk.windowNew
     canvas <- Gtk.drawingAreaNew
@@ -100,19 +124,12 @@ vizualise (Viz vizmodel vizrender) = do
     surfaceRef <- newIORef Nothing
     modelRef   <- newIORef (stepModelInitial vizmodel)
 
-    _ <- flip Gtk.timeoutAdd (1000 `div` fps) $ do
+    _ <- flip Gtk.timeoutAdd (1000 `div` gtkVizFPS) $ do
 
           (time, frameno, model) <- liftIO $ readIORef modelRef
-          let (time', frameno', model') =
-                stepModelWithTime vizmodel fps (time, frameno, model)
+          let (!time', !frameno', !model') =
+                stepModelWithTime vizmodel gtkVizFPS (time, frameno, model)
           writeIORef modelRef (time', frameno', model')
-
-          msurface <- liftIO $ readIORef surfaceRef
-          case msurface of
-            Nothing -> return ()
-            Just surface ->
-              Cairo.renderWith surface $
-                renderFrame vizrender False time' frameno' model'
           Gtk.widgetQueueDraw canvas
           return True
 
@@ -123,9 +140,12 @@ vizualise (Viz vizmodel vizrender) = do
         Just drawwindow -> do
           w <- Gtk.drawWindowGetWidth  drawwindow
           h <- Gtk.drawWindowGetHeight drawwindow
-          surface <- Gtk.renderWithDrawWindow drawwindow $
-            Cairo.withTargetSurface $ \mainSurface ->
-               liftIO $ Cairo.createSimilarSurface mainSurface Cairo.ContentColor w h
+          surface <- if gtkVizCpuRendering
+            then Cairo.createImageSurface Cairo.FormatRGB24 w h
+            else Gtk.renderWithDrawWindow drawwindow $
+                   Cairo.withTargetSurface $ \mainSurface ->
+                      liftIO $ Cairo.createSimilarSurface
+                                 mainSurface Cairo.ContentColor w h
           (time, frameno, model) <- readIORef modelRef
           Cairo.renderWith surface $ do
             Cairo.setSourceRGB 1 1 1
@@ -139,15 +159,15 @@ vizualise (Viz vizmodel vizrender) = do
       msurface <- liftIO $ readIORef surfaceRef
       case msurface of
         Just surface -> do
+          (time, frameno, model) <- liftIO $ readIORef modelRef
+          Cairo.renderWith surface $ do
+            renderFrame vizrender True time frameno model
           Cairo.setSourceSurface surface 0 0
           Cairo.paint
         Nothing -> return ()
 
     Gtk.widgetShowAll window
     Gtk.mainGUI
-  where
-    fps :: Num a => a
-    fps = 25
 
 stepModelInitial :: VizModel model
                  -> (Time, FrameNo, model)

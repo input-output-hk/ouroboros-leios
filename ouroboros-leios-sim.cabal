@@ -22,18 +22,24 @@ library
                        ModelTCP,
                        ChanTCP,
 
-                       SimTCPLinks,
-                       PlotTCP,
                        Viz,
                        VizSim,
+                       VizChart,
+                       VizUtils,
+
+                       SimTCPLinks,
+                       PlotTCP,
+                       VizSimTCP,
                        ExamplesTCP,
 
                        RelayProtocol,
                        SimRelay,
-                       ExamplesRelay
+                       VizSimRelay,
+                       ExamplesRelay,
 
-                       P2P
+                       P2P,
                        SimRelayP2P,
+                       VizSimRelayP2P,
                        ExamplesRelayP2P
 
 
@@ -59,3 +65,12 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall
+
+executable ouroboros-net-vis
+  main-is:             src/Main.hs
+  build-depends:       base,
+                       ouroboros-leios-sim,
+                       optparse-applicative
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+

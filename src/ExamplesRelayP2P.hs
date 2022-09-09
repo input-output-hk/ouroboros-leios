@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 module ExamplesRelayP2P where
 
 import Data.Word
@@ -13,11 +15,8 @@ import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P
 
 
-
-example1 :: IO ()
+example1 :: Vizualisation
 example1 =
---  writeAnimationFrames (\n -> "output/p2p-relay-4/frame-" ++ show n ++ ".png") 180 $
-  vizualise $
     slowmoVizualisation 0.1 $
     let trace =
           traceRelayP2P
@@ -32,21 +31,23 @@ example1 =
                   (kilobytes 96)
                   rng
                   -- average seconds between blocks:
-                  (0.2 * p2pNumNodes p2pTopographyCharacteristics)
+                  (0.2 * fromIntegral p2pNumNodes)
                   5.0
              })
      in Viz (relaySimVizModel trace)
             (aboveVizRender
                labelTimeVizRender
               (besideVizRender
-                 (relayP2PSimVizRender config (p2pScreenDimensions p2pTopographyCharacteristics))
+                 (relayP2PSimVizRender config p2pScreenDimensions)
                  (chartDiffusionLatency config)))
   where
+    p2pScreenDimensions = (1280, 1060)
+    p2pNumNodes         = 100
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
         p2pWorldDimensions  = (0.600, 0.300),
-        p2pScreenDimensions = (1280, 1060),
-        p2pNumNodes         = 100,
+        p2pScreenDimensions,
+        p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5
       }

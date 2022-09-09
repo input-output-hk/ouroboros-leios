@@ -10,10 +10,8 @@ import VizSimRelay
 import SimRelay
 
 
-example1 :: IO ()
+example1 :: Vizualisation
 example1 =
---  writeAnimationFrames (\n -> "relay1/frame-" ++ show n ++ ".png") 120 $
-  vizualise $
 --    scaleVizualisation 2.0 $
 --    viewportVizualisation 500 650 $
     slowmoVizualisation 0.1 $
@@ -23,10 +21,8 @@ example1 =
         (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
 
-example2 :: IO ()
+example2 :: Vizualisation
 example2 =
---  writeAnimationFrames (\n -> "relay2/frame-" ++ show n ++ ".png") 120 $
-  vizualise $
 --    scaleVizualisation 2.0 $
 --    viewportVizualisation 1000 650 $
     slowmoVizualisation 0.1 $
@@ -36,10 +32,8 @@ example2 =
         (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
 
-example3 :: IO ()
+example3 :: Vizualisation
 example3 =
---  writeAnimationFrames (\n -> "relay3/frame-" ++ show n ++ ".png") 120 $
-  vizualise $
 --    scaleVizualisation 2.0 $
 --    viewportVizualisation 1000 650 $
     slowmoVizualisation 0.1 $
