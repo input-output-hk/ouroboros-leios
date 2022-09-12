@@ -1,0 +1,97 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
+module Main where
+
+import Data.Maybe
+import Control.Applicative
+
+import qualified Options.Applicative as Opts
+
+import Viz
+
+import qualified ExamplesTCP
+import qualified ExamplesRelay
+import qualified ExamplesRelayP2P
+
+main :: IO ()
+main = do
+    CliCmd {
+      cliVizName,
+      cliOutputFramesDir,
+      cliOutputSeconds,
+      cliCpuRendering
+    } <- Opts.execParser cli
+    let viz = namedViz cliVizName
+    case cliOutputFramesDir of
+      Nothing ->
+          vizualise config viz
+        where
+          config = defaultGtkVizConfig {
+                     gtkVizCpuRendering = cliCpuRendering
+                   }
+
+      Just outdir ->
+        writeAnimationFrames
+          (\n -> outdir ++ "/frame-" ++ show n ++ ".png")
+          (fromMaybe 60 cliOutputSeconds)
+          viz
+
+cli :: Opts.ParserInfo CliCmd
+cli =
+    Opts.info
+      (Opts.helper <*> options)
+      (Opts.fullDesc
+    <> Opts.header "Vizualisations of Ouroboros-related network simulations"
+    <> Opts.progDesc "Either show a visualisation in a window, or output \
+                    \ animation frames to a directory.")
+
+
+data CliCmd = 
+     CliCmd {
+       cliVizName         :: VizName,
+       cliOutputFramesDir :: Maybe FilePath,
+       cliOutputSeconds   :: Maybe Int,
+       cliCpuRendering    :: Bool
+     }
+
+options :: Opts.Parser CliCmd
+options =
+    CliCmd
+      <$> Opts.argument
+            (Opts.eitherReader readVizName)
+            (Opts.metavar "VIZNAME")
+      <*> optional
+           (Opts.strOption
+             (Opts.long    "frames-dir"
+           <> Opts.metavar "DIR"
+           <> Opts.help    "Output animation frames to directory"))
+      <*> optional
+           (Opts.option Opts.auto
+             (Opts.long    "seconds"
+           <> Opts.metavar "SEC"
+           <> Opts.help    "Output N seconds of animation"))
+      <*> Opts.switch
+           (Opts.long    "cpu-render"
+         <> Opts.help    "Use CPU-based client side Cairo rendering")
+
+data VizName = VizTCP1 | VizTCP2 | VizTCP3
+             | VizRelay1 | VizRelay2
+             | VizRelayP2P1
+             
+readVizName :: String -> Either String VizName
+readVizName "tcp-1"   = Right VizTCP1
+readVizName "tcp-2"   = Right VizTCP2
+readVizName "tcp-3"   = Right VizTCP3
+readVizName "relay-1" = Right VizRelay1
+readVizName "relay-2" = Right VizRelay2
+readVizName "p2p-1"   = Right VizRelayP2P1
+readVizName _         = Left "unknown vizualisation"
+
+namedViz :: VizName -> Vizualisation
+namedViz VizTCP1 = ExamplesTCP.example1
+namedViz VizTCP2 = ExamplesTCP.example2
+namedViz VizTCP3 = ExamplesTCP.example3
+namedViz VizRelay1 = ExamplesRelay.example1
+namedViz VizRelay2 = ExamplesRelay.example2
+namedViz VizRelayP2P1 = ExamplesRelayP2P.example1
+
