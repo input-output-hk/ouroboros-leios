@@ -115,8 +115,11 @@ vizualise GtkVizConfig {
       Gtk.windowSetDefaultSize window w h
 
     _ <- Gtk.on window Gtk.keyPressEvent $ Gtk.tryEvent $ do
-      "Escape" <- Gtk.eventKeyName
-      liftIO $ Gtk.widgetDestroy window
+      name <- Gtk.eventKeyName
+      case name of
+        "Escape" -> liftIO $ Gtk.widgetDestroy window
+        "F11"    -> liftIO $ Gtk.windowFullscreen window
+        _        -> return ()
 
     _ <- Gtk.on window Gtk.objectDestroy $ do
       liftIO Gtk.mainQuit
