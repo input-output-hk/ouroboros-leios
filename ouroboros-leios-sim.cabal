@@ -26,6 +26,7 @@ library
                        VizSim,
                        VizChart,
                        VizUtils,
+                       ExamplesLayout,
 
                        SimTCPLinks,
                        PlotTCP,

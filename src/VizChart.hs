@@ -9,7 +9,6 @@
 module VizChart where
 
 import           Data.Functor
-import           Data.Bifunctor
 import           Data.List
 import           Data.Ord
 
@@ -26,23 +25,18 @@ import Viz
 
 chartVizRender :: forall model x y.
                   (Chart.PlotValue x, Chart.PlotValue y)
-               => (Int, Int)
-               -> Int
+               => FrameNo
                -> (Time -> FrameNo -> model -> Chart.EC (Chart.Layout x y) ())
                -> VizRender model
-chartVizRender renderSize skipFrames chart =
+chartVizRender skipFrames chart =
     VizRender {
-      renderSize,
+      renderReqSize = (500, 500),
       renderChanged = \_t frameno _model -> frameno `mod` skipFrames == 0,
-      renderModel,
-      renderClip = True
+      renderModel
     }
   where
-    renderModel :: Time -> FrameNo -> model -> Cairo.Render ()
-    renderModel t nf model = renderChart size (chart t nf model)
-
-    size :: (Double, Double)
-    size = bimap fromIntegral fromIntegral renderSize
+    renderModel :: Time -> FrameNo -> model -> (Double,Double) -> Cairo.Render ()
+    renderModel t nf model size = renderChart size (chart t nf model)
 
 renderChart :: (Chart.Default r, Chart.ToRenderable r)
             => (Double, Double) -> Chart.EC r () -> Cairo.Render ()

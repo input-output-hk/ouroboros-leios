@@ -25,16 +25,6 @@ import VizSimTCP (TcpSimVizConfig(..), renderMessagesInFlight,
 import VizUtils
 
 
--- | Make an overall vizualisation model for the relay simulation given a
--- simulation trace.
-relaySimVizualisation :: RelaySimVizConfig
-                      -> RelaySimTrace
-                      -> Vizualisation
-relaySimVizualisation vizConfig trace =
-    Viz (relaySimVizModel trace)
-        (relaySimVizRender vizConfig)
-
-
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
@@ -220,10 +210,9 @@ relaySimVizRender :: RelaySimVizConfig
                   -> VizRender RelaySimVizModel
 relaySimVizRender vizConfig =
     VizRender {
-      renderSize    = (500,500),
-      renderClip    = True,
+      renderReqSize = (500,500),
       renderChanged = \_t _fn _m -> True,
-      renderModel   = \ t _fn  m -> relaySimVizRenderModel vizConfig t m
+      renderModel   = \ t _fn  m _ -> relaySimVizRenderModel vizConfig t m
     }
 
 relaySimVizRenderModel :: RelaySimVizConfig

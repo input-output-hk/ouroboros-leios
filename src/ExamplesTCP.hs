@@ -2,6 +2,7 @@
 module ExamplesTCP where
 
 import Data.Word
+import Data.Functor.Contravariant
 
 import Control.Monad.Class.MonadTime (Time, DiffTime)
 
@@ -26,15 +27,21 @@ import VizChart
 example1 :: Vizualisation
 example1 =
       slowmoVizualisation 0.1 $
-      Viz (tcpSimVizModel (traceTcpLinks1 tcpprops trafficPattern))
-          (aboveVizRender
-             (labelVizRender title)
-             (besideVizRender
-               (aboveVizRender
-                  labelTimeVizRender
-                  (tcpSimVizRender examplesTcpSimVizConfig))
-               (chartVizRender (500, 500) 25 chart)))
+      Viz model $
+        LayoutAbove
+          [ LayoutReqSize 100 25 $ layoutLabel title
+          , LayoutBeside
+              [ LayoutAbove
+                  [ layoutLabelTime
+                  , LayoutScaleFit $ Layout $
+                      tcpSimVizRender examplesTcpSimVizConfig
+                  ]
+              , Layout $ chartVizRender 25 chart
+              ]
+          ]
   where
+    model          = tcpSimVizModel trace
+      where trace  = traceTcpLinks1 tcpprops trafficPattern
     tcpprops       = mkTcpConnProps 0.3 (kilobytes 1000)
     trafficPattern = mkUniformTrafficPattern 20 (kilobytes 100) 0
 
@@ -55,15 +62,25 @@ example1 =
 
 example2 :: Vizualisation
 example2 =
-      slowmoVizualisation 0.2 $
-      aboveVizualisation
-        (--viewportVizualisation 1000 350 $
-         examplesVizualisation $
-           traceTcpLinks4 tcpprops1 tcpprops1 tcpprops1 trafficPattern)
-        (--viewportVizualisation 1000 400 $
-         examplesVizualisation $
-           traceTcpLinks4 tcpprops2 tcpprops2 tcpprops2 trafficPattern)
+    slowmoVizualisation 0.2 $
+    Viz model $
+      LayoutAbove
+        [ layoutLabelTime
+        , LayoutReqSize 1000 400 $
+          Layout $ contramap fst $
+            tcpSimVizRender examplesTcpSimVizConfig
+        , LayoutReqSize 1000 400 $
+          Layout $ contramap snd $
+            tcpSimVizRender examplesTcpSimVizConfig
+        ]
   where
+    model     = pairVizModel
+                  (tcpSimVizModel trace1)
+                  (tcpSimVizModel trace2)
+      where
+        trace1 = traceTcpLinks4 tcpprops1 tcpprops1 tcpprops1 trafficPattern
+        trace2 = traceTcpLinks4 tcpprops2 tcpprops2 tcpprops2 trafficPattern
+
     tcpprops1 = mkTcpConnProps 0.3 (kilobytes 1000)
     tcpprops2 = mkTcpConnProps 0.3 (kilobytes 10000)
 
@@ -71,23 +88,29 @@ example2 =
 
 example3 :: Vizualisation
 example3 =
-      slowmoVizualisation 0.2 $
-      aboveVizualisation
-        (--viewportVizualisation 1000 350 $
-         examplesVizualisation $
-           traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern1)
-        (--viewportVizualisation 1000 680 $
-         examplesVizualisation $
-           traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern2)
+    slowmoVizualisation 0.2 $
+    Viz model $
+      LayoutAbove
+        [ layoutLabelTime
+        , LayoutReqSize 1000 400 $
+          Layout $ contramap fst $
+            tcpSimVizRender examplesTcpSimVizConfig
+        , LayoutReqSize 1000 680 $
+          Layout $ contramap snd $
+            tcpSimVizRender examplesTcpSimVizConfig
+        ]
   where
+    model     = pairVizModel
+                  (tcpSimVizModel trace1)
+                  (tcpSimVizModel trace2)
+      where
+        trace1 = traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern1
+        trace2 = traceTcpLinks4 tcpprops tcpprops tcpprops trafficPattern2
+
     tcpprops = mkTcpConnProps 0.3 (kilobytes 1000)
 
     trafficPattern1 = mkUniformTrafficPattern 15 (kilobytes 100) 1.2
     trafficPattern2 = mkUniformTrafficPattern 30 (kilobytes  50) 0.6
-
-examplesVizualisation :: TcpSimTrace -> Vizualisation
-examplesVizualisation =
-    tcpSimVizualisation examplesTcpSimVizConfig
 
 examplesTcpSimVizConfig :: TcpSimVizConfig TestMessage
 examplesTcpSimVizConfig =

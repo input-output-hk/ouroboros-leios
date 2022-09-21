@@ -38,12 +38,11 @@ data RelayP2PSimVizConfig =
 relayP2PSimVizRender :: RelayP2PSimVizConfig
                      -> (Int, Int)
                      -> VizRender RelaySimVizModel
-relayP2PSimVizRender vizConfig renderSize =
+relayP2PSimVizRender vizConfig renderReqSize =
     VizRender {
-      renderSize,
-      renderClip    = True,
+      renderReqSize,
       renderChanged = \_t _fn _m -> True,
-      renderModel   = \ t _fn  m -> relayP2PSimVizRenderModel vizConfig t m
+      renderModel   = \ t _fn  m _ -> relayP2PSimVizRenderModel vizConfig t m
     }
 
 relayP2PSimVizRenderModel :: RelayP2PSimVizConfig
@@ -223,7 +222,7 @@ classifyInFlightMsgs msgs
 chartDiffusionLatency :: RelayP2PSimVizConfig
                       -> VizRender RelaySimVizModel
 chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
-    chartVizRender (640, 1060) 25 $ \_ _
+    chartVizRender 25 $ \_ _
       (SimVizModel _ RelaySimVizState {
                        vizNodePos,
                        vizMsgsDiffusionLatency

@@ -12,52 +12,59 @@ import SimRelay
 
 example1 :: Vizualisation
 example1 =
---    scaleVizualisation 2.0 $
---    viewportVizualisation 500 650 $
     slowmoVizualisation 0.1 $
-    examplesVizualisation $
-      traceRelayLink1
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+    Viz model $
+      LayoutScaleFit $
+      LayoutReqSize 500 650 $
+      Layout $ relaySimVizRender examplesRelaySimVizConfig
+  where
+    model = relaySimVizModel trace
+      where
+        trace = traceRelayLink1
+                  (mkTcpConnProps 0.3 (kilobytes 1000))
+                  (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
 
 example2 :: Vizualisation
 example2 =
---    scaleVizualisation 2.0 $
---    viewportVizualisation 1000 650 $
     slowmoVizualisation 0.1 $
-    examplesVizualisation $
-      traceRelayLink4
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+    Viz model $
+      LayoutScaleFit $
+      LayoutReqSize 1000 650 $
+      Layout $ relaySimVizRender examplesRelaySimVizConfig
+  where
+    model = relaySimVizModel trace
+      where
+        trace = traceRelayLink4
+                  (mkTcpConnProps 0.3 (kilobytes 1000))
+                  (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
 
 example3 :: Vizualisation
 example3 =
---    scaleVizualisation 2.0 $
---    viewportVizualisation 1000 650 $
     slowmoVizualisation 0.1 $
-    examplesVizualisation $
-      traceRelayLink4Asymmetric
-        (mkTcpConnProps 0.2 (kilobytes 1000))
-        (mkTcpConnProps 0.3 (kilobytes 1000))
-        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
-
-
-examplesVizualisation :: RelaySimTrace
-                      -> Vizualisation
-examplesVizualisation =
-    relaySimVizualisation config
+    Viz model $
+      LayoutScaleFit $
+      LayoutReqSize 1000 650 $
+      Layout $ relaySimVizRender examplesRelaySimVizConfig
   where
-    config :: RelaySimVizConfig
-    config =
-      RelaySimVizConfig {
-        nodeMessageColor = testNodeMessageColor,
-        ptclMessageColor = testPtclMessageColor,
-        nodeMessageText  = testNodeMessageText,
-        ptclMessageText  = testPtclMessageText
-      }
+    model = relaySimVizModel trace
+      where
+        trace = traceRelayLink4Asymmetric
+                  (mkTcpConnProps 0.2 (kilobytes 1000))
+                  (mkTcpConnProps 0.3 (kilobytes 1000))
+                  (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
+
+examplesRelaySimVizConfig :: RelaySimVizConfig
+examplesRelaySimVizConfig =
+    RelaySimVizConfig {
+      nodeMessageColor = testNodeMessageColor,
+      ptclMessageColor = testPtclMessageColor,
+      nodeMessageText  = testNodeMessageText,
+      ptclMessageText  = testPtclMessageText
+    }
+  where
     testPtclMessageColor :: BlockRelayMessage TestBlock TestBlockId BlockTTL
                          -> (Double, Double, Double)
     testPtclMessageColor (MsgRespBlock blk) = testNodeMessageColor blk

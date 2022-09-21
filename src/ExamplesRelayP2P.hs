@@ -18,7 +18,20 @@ import VizSimRelayP2P
 example1 :: Vizualisation
 example1 =
     slowmoVizualisation 0.1 $
-    let trace =
+    Viz model $
+      LayoutAbove
+        [ layoutLabelTime
+        , LayoutBeside
+            [ LayoutScaleFit $
+              Layout $ relayP2PSimVizRender config p2pScreenDimensions
+            , LayoutReqSize 400 300 $
+              Layout $ chartDiffusionLatency config
+            ]
+        ]
+  where
+    model = relaySimVizModel trace
+      where
+        trace =
           traceRelayP2P
             (mkStdGen 4)
             p2pTopographyCharacteristics
@@ -34,13 +47,7 @@ example1 =
                   (0.2 * fromIntegral p2pNumNodes)
                   5.0
              })
-     in Viz (relaySimVizModel trace)
-            (aboveVizRender
-               labelTimeVizRender
-              (besideVizRender
-                 (relayP2PSimVizRender config p2pScreenDimensions)
-                 (chartDiffusionLatency config)))
-  where
+
     p2pScreenDimensions = (1280, 1060)
     p2pNumNodes         = 100
     p2pTopographyCharacteristics =

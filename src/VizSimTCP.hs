@@ -19,16 +19,6 @@ import VizSim
 import VizUtils
 
 
--- | Make an overall vizualisation model for the tcp simulation given a
--- simulation trace.
-tcpSimVizualisation :: TcpSimVizConfig TestMessage
-                    -> TcpSimTrace
-                    -> Vizualisation
-tcpSimVizualisation vizConfig trace =
-    Viz (tcpSimVizModel trace)
-        (tcpSimVizRender vizConfig)
-
-
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
@@ -129,10 +119,9 @@ tcpSimVizRender :: TcpSimVizConfig TestMessage
                 -> VizRender TcpSimVizModel
 tcpSimVizRender vizConfig =
     VizRender {
-      renderSize    = (500,500),
+      renderReqSize = (500,500),
       renderChanged = \_t _fn _m -> True,
-      renderModel   = \ t _fn  m -> tcpSimVizRenderModel vizConfig t m,
-      renderClip    = True
+      renderModel   = \ t _fn  m _ -> tcpSimVizRenderModel vizConfig t m
     }
 
 tcpSimVizRenderModel :: TcpSimVizConfig TestMessage

@@ -5,13 +5,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTSyntax #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Viz where
 
+import           Data.List
+import           Data.Tree as Tree (Tree(..))
 import qualified Data.Time as Time
 import           Data.IORef
+import           Data.Ratio
 import           Data.Functor.Contravariant
 
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Class.MonadTime (Time(Time), DiffTime, diffTime, addTime)
 
@@ -25,8 +30,8 @@ import           Graphics.UI.Gtk (AttrOp((:=)))
 --
 
 data Vizualisation where
-       Viz :: VizModel  model
-           -> VizRender model
+       Viz :: VizModel model
+           -> Layout (VizRender model)
            -> Vizualisation
 
 data VizModel model =
@@ -37,21 +42,24 @@ data VizModel model =
 
 data VizRender model =
      VizRender {
-       renderSize    :: (Int, Int),
+       renderReqSize :: (Int, Int),
        renderChanged :: Time -> FrameNo -> model -> Bool,
-       renderModel   :: Time -> FrameNo -> model -> Cairo.Render (),
-       renderClip    :: Bool
+       renderModel   :: Time -> FrameNo -> model
+                     -> (Double,Double) -> Cairo.Render ()
      }
-   | VizRenderBeside {
-       renderSize    :: (Int, Int),
-       renderLeft    :: VizRender model,
-       renderRight   :: VizRender model
-     }
-   | VizRenderAbove {
-       renderSize    :: (Int, Int),
-       renderAbove   :: VizRender model,
-       renderBelow   :: VizRender model
-     }
+
+data Layout a =
+       Layout        a
+     | LayoutReqSize !Int !Int (Layout a)
+     | LayoutExpand            (Layout a)
+     | LayoutFixed             (Layout a)
+     | LayoutAspect            (Layout a) -- ^ Preserve the aspect ratio
+     | LayoutScaleBy !Double   (Layout a)
+     | LayoutScaleFit          (Layout a)
+     | LayoutBeside            [Layout a]
+     | LayoutAbove             [Layout a]
+     | LayoutOver              [Layout a]
+  deriving Functor
 
 type FrameNo = Int
 
@@ -61,17 +69,308 @@ instance Contravariant VizRender where
         renderChanged = \t fn m -> renderChanged t fn (f m),
         renderModel   = \t fn m -> renderModel   t fn (f m)
       }
-    contramap f vizrender@VizRenderBeside {renderLeft, renderRight} =
-      vizrender {
-        renderLeft  = contramap f renderLeft,
-        renderRight = contramap f renderRight
-      }
 
-    contramap f vizrender@VizRenderAbove {renderAbove, renderBelow} =
-      vizrender {
-        renderAbove = contramap f renderAbove,
-        renderBelow = contramap f renderBelow
-      }
+stepModelInitial :: VizModel model
+                 -> (Time, FrameNo, model)
+stepModelInitial VizModel {initModel, stepModel} =
+    (time, frameno, model)
+  where
+    !frameno  = 0
+    !time     = Time 0
+    !timestep = 0
+    !model    = stepModel timestep time frameno initModel
+
+stepModelWithTime :: VizModel model
+                  -> Int
+                  -> (Time, FrameNo, model)
+                  -> (Time, FrameNo, model)
+stepModelWithTime VizModel {stepModel} fps (time, frameno, model) =
+    (time', frameno', model')
+  where
+    !frameno' = frameno + 1
+
+    !time'    | frameno' `mod` fps == 0
+              = Time (fromIntegral (frameno' `div` fps) :: DiffTime)
+              | otherwise
+              = addTime (1 / fromIntegral fps :: DiffTime) time
+
+    !timestep = time' `diffTime` time
+
+    !model'   = stepModel timestep time' frameno' model
+
+data LayoutTile a = LayoutTile !Tile a
+
+data Tile =
+     Tile {
+       tileX     :: !Int,
+       tileY     :: !Int,
+       tileW     :: !Int,
+       tileH     :: !Int,
+       tileScale :: !Double, -- ^ Scale the content
+       tileClear :: !Bool    -- ^ Should the tile be cleared before drawing
+     }
+
+
+-- | Perform layout for a given size (w,h), yielding a set of tiles.
+--
+layoutTiles :: forall a.
+               (Int,Int)
+            -> Layout a
+            -> Tree LayoutProperties
+            -> [LayoutTile a]
+layoutTiles allocToplevel =
+    allocate (0, 0) allocToplevel 1.0 True
+  where
+    allocate :: (Int, Int)
+             -> (Int, Int)
+             -> Double
+             -> Bool
+             -> Layout a
+             -> Tree LayoutProperties
+             -> [LayoutTile a]
+    allocate (x,y) (w,h) scale clear layout (Tree.Node props lps) =
+      case (layout, lps) of
+        (Layout a, []) ->
+            [LayoutTile (Tile x y w h scale clear) a]
+
+        (LayoutReqSize _rw _rh l, [lp]) ->
+            -- changes the requested size, not the allocated size
+            allocate (x,y) (w,h) scale clear l lp
+
+        (LayoutExpand l, [lp]) ->
+            allocate (x,y) (w,h) scale clear l lp
+
+        (LayoutFixed l, [lp]) ->
+            allocate (x,y) (w,h) scale clear l lp
+
+        (LayoutAspect l, [lp]) ->
+            allocate (x,y) (w',h') scale clear l lp
+          where
+            (w',h') = preserveAspect (rw,rh) (w,h)
+            (rw,rh) = reqSize props
+
+        (LayoutScaleBy s l, [lp]) ->
+            allocate (x,y) (w,h) (scale * s) clear l lp
+
+        (LayoutScaleFit l, [lp]) ->
+            allocate (x,y) (w,h) (scale * s) clear l lp
+          where
+            s       = min (fromIntegral w' / fromIntegral rw)
+                          (fromIntegral h' / fromIntegral rh)
+            (w',h') = preserveAspect (rw,rh) (w,h)
+            (rw,rh) = reqSize props
+
+        (LayoutAbove ls, _) ->
+          concat
+            [ allocate (x,y') (w,h') scale clear l lp
+            | (y', h', l, lp) <- zip4 ys hs ls lps
+            ]
+          where
+            rh = sum (map (snd . reqSize . Tree.rootLabel) lps)
+            ys = scanl (+) y hs
+            hs | h <= rh
+               = takeUpTo h (map (snd . reqSize . Tree.rootLabel) lps)
+
+               | otherwise
+               = [ if expand
+                     then rh' + dh + (if i < dhrem then 1 else 0)
+                     else rh'
+                 | let (nexpand,
+                        iprops)   = enumerateExpanding (map rootLabel lps)
+                       extra      = h - rh
+                       (dh,dhrem) = divMod extra nexpand
+                 , (i, LayoutProps {
+                         reqSize = (_rw', rh'),
+                         expand
+                       }) <- iprops
+                 ]
+
+        (LayoutBeside ls, _) ->
+          concat
+            [ allocate (x',y) (w',h) scale clear l lp
+            | (x', w', l, lp) <- zip4 xs ws ls lps
+            ]
+          where
+            rw = sum (map (fst . reqSize . Tree.rootLabel) lps)
+
+            xs = scanl (+) x ws
+            ws | w <= rw
+               = takeUpTo w (map (fst . reqSize . Tree.rootLabel) lps)
+
+               | otherwise
+               = [ if expand
+                     then rw' + dw + (if i < dwrem then 1 else 0)
+                     else rw'
+                 | let (nexpand,
+                        iprops)   = enumerateExpanding (map rootLabel lps)
+                       extra      = w - rw
+                       (dw,dwrem) = divMod extra nexpand
+                 , (i, LayoutProps {
+                         reqSize = (rw', _rh'),
+                         expand
+                       }) <- iprops
+                 ]
+
+        (LayoutOver [], [])             -> []
+        (LayoutOver (l:ls), (lp:lps'))  ->
+          concat $
+              allocate (x,y) (w,h) scale clear l  lp
+          : [ allocate (x,y) (w,h) scale False l' lp'
+            | (l', lp') <- zip ls lps' ]
+
+        _ -> error "layoutTiles: inconsistent layout properties"
+
+    -- enumerate all the elemets with expand=True, and count the number of them
+    enumerateExpanding :: [LayoutProperties] -> (Int, [(Int, LayoutProperties)])
+    enumerateExpanding =
+        mapAccumL
+          (\i p -> let i' | expand p  = i+1
+                          | otherwise = i
+                   in (i', (i, p)))
+          0
+
+takeUpTo :: Int -> [Int] -> [Int]
+takeUpTo n = go 0
+  where
+    go !_ []     = []
+    go !a (x:xs)
+      | a + x >= n = x : [] -- inclusive
+      | otherwise  = x : go (a+x) xs
+
+data LayoutProperties =
+     LayoutProps {
+       reqSize :: !(Int, Int),
+       expand  :: !Bool
+     }
+
+-- | Collect the bottom-up layout properties: requested size and expansion.
+layoutProperties :: forall a.
+                    (a -> (Int, Int))
+                 -> Layout a -> Tree LayoutProperties
+layoutProperties reqSizeBase =
+    bottomUp
+  where
+    bottomUp :: Layout a -> Tree LayoutProperties
+    bottomUp (Layout a) =
+        Tree.Node
+          LayoutProps {
+            reqSize = reqSizeBase a,
+            expand  = True
+          } []
+
+    bottomUp (LayoutExpand l) =
+        Tree.Node p { expand = True } [lp]
+      where
+        lp@(Tree.Node p _) = bottomUp l
+
+    bottomUp (LayoutFixed l) =
+        Tree.Node p { expand = False } [lp]
+      where
+        lp@(Tree.Node p _) = bottomUp l
+
+    bottomUp (LayoutAspect l) =
+        Tree.Node p [lp]
+      where
+        lp@(Tree.Node p _) = bottomUp l
+
+    bottomUp (LayoutReqSize w h l) =
+        Tree.Node p { reqSize = (w,h) } [lp]
+      where
+        lp@(Tree.Node p _) = bottomUp l
+
+    bottomUp (LayoutScaleBy s l) =
+        Tree.Node p { reqSize = (w',h') } [lp]
+      where
+        lp@(Tree.Node p@LayoutProps{ reqSize = (w,h) } _) = bottomUp l
+        w' = round (s * fromIntegral w)
+        h' = round (s * fromIntegral h)
+
+    bottomUp (LayoutScaleFit l) =
+        Tree.Node p [lp]
+      where
+        lp@(Tree.Node p _) = bottomUp l
+
+    bottomUp (LayoutAbove  ls) = bottomUpAcc max (+) ls
+    bottomUp (LayoutBeside ls) = bottomUpAcc (+) max ls
+    bottomUp (LayoutOver   ls) = bottomUpAcc (+) (+) ls
+
+    bottomUpAcc accW accH ls =
+        Tree.Node
+          LayoutProps {
+            reqSize = foldl1'
+                         (\(aw,ah) (w', h') ->
+                             let !aw' = accW aw w'
+                                 !ah' = accH ah h'
+                              in (aw',ah'))
+                         [ reqSize p | Tree.Node p _ <- props ],
+            expand  = or [ expand  p | Tree.Node p _ <- props ]
+          }
+          props
+      where
+        props = map bottomUp ls
+
+preserveAspect :: (Int,Int) -> (Int,Int) -> (Int,Int)
+preserveAspect (reqX, reqY) (allocX, allocY)
+  | allocX % allocY >= reqX % reqY =
+    -- wider then taller, so use full allocation for height, and scale width
+    let !allocX' = floor $
+                   toRational reqX
+                 * toRational allocY
+                 / toRational reqY
+     in (allocX', allocY)
+
+  | otherwise =
+    -- taller than wide, so use full allocation for width, and scale height
+    let !allocY' = floor $
+                   toRational reqY
+                 * toRational allocX
+                 / toRational reqX
+     in (allocX, allocY')
+
+
+renderTiles :: forall model.
+               [LayoutTile (VizRender model)]
+            -> Bool -> Time -> FrameNo -> model
+            -> Cairo.Render ()
+renderTiles tiles forceRender time frame model =
+    sequence_
+      [ when (shouldRender tile) $ renderTile tile
+      | tile <- tiles ]
+  where
+    shouldRender (LayoutTile _ VizRender {renderChanged}) =
+      forceRender || renderChanged time frame model
+
+    renderTile :: LayoutTile (VizRender model) -> Cairo.Render ()
+    renderTile (LayoutTile tile VizRender {renderModel}) =
+        renderWithinTile tile $
+          renderModel time frame model
+
+    renderWithinTile :: Tile
+                     -> ((Double, Double) -> Cairo.Render ())
+                     -> Cairo.Render ()
+    renderWithinTile Tile {
+                       tileX, tileY,
+                       tileW, tileH,
+                       tileScale,
+                       tileClear
+                     } render = do
+      Cairo.save
+      Cairo.rectangle (fromIntegral tileX) (fromIntegral tileY)
+                      (fromIntegral tileW) (fromIntegral tileH)
+      when tileClear $ do
+        Cairo.setSourceRGB 1 1 1
+        Cairo.fillPreserve
+        Cairo.setSourceRGB 0 0 0
+      Cairo.clip
+      Cairo.translate (fromIntegral tileX) (fromIntegral tileY)
+      if tileScale == 1.0
+        then 
+          render (fromIntegral tileW, fromIntegral tileH)
+        else do
+          Cairo.scale tileScale tileScale
+          render ( fromIntegral tileW / tileScale
+                 , fromIntegral tileH / tileScale )
+      Cairo.restore
 
 
 data GtkVizConfig =
@@ -111,8 +410,9 @@ vizualise GtkVizConfig {
       , Gtk.windowResizable := True
       , Gtk.windowTitle     := ("Visualisation" :: String)
       ]
-    let (w,h) = renderSize vizrender in
-      Gtk.windowSetDefaultSize window w h
+    let LayoutProps { reqSize = (w,h) } =
+          Tree.rootLabel (layoutProperties renderReqSize vizrender)
+     in Gtk.windowSetDefaultSize window w h
 
     _ <- Gtk.on window Gtk.keyPressEvent $ Gtk.tryEvent $ do
       name <- Gtk.eventKeyName
@@ -124,9 +424,10 @@ vizualise GtkVizConfig {
     _ <- Gtk.on window Gtk.objectDestroy $ do
       liftIO Gtk.mainQuit
 
-    surfaceRef <- newIORef Nothing
-    modelRef   <- newIORef (stepModelInitial vizmodel)
+    -- The model state
+    modelRef <- newIORef (stepModelInitial vizmodel)
 
+    -- Iterate the model forward on a timer
     _ <- flip Gtk.timeoutAdd (1000 `div` gtkVizFPS) $ do
 
           (time, frameno, model) <- liftIO $ readIORef modelRef
@@ -135,6 +436,11 @@ vizualise GtkVizConfig {
           writeIORef modelRef (time', frameno', model')
           Gtk.widgetQueueDraw canvas
           return True
+
+    -- The rendering state: an off-screen surface, and the layout tiles
+    -- These both match the current size of the screen, which changes on
+    -- the Gtk.configureEvent.
+    renderRef <- newIORef Nothing
 
     _ <- Gtk.on canvas Gtk.configureEvent $ liftIO $ do
       mdrawwindow <- Gtk.widgetGetWindow canvas
@@ -149,22 +455,24 @@ vizualise GtkVizConfig {
                    Cairo.withTargetSurface $ \mainSurface ->
                       liftIO $ Cairo.createSimilarSurface
                                  mainSurface Cairo.ContentColor w h
+          let viztiles = layoutTiles (w,h) vizrender
+                                     (layoutProperties renderReqSize vizrender)
           (time, frameno, model) <- readIORef modelRef
           Cairo.renderWith surface $ do
             Cairo.setSourceRGB 1 1 1
             Cairo.rectangle 0 0 (fromIntegral w) (fromIntegral h)
             Cairo.fill
-            renderFrame vizrender True time frameno model
-          writeIORef surfaceRef (Just surface)
+            renderTiles viztiles True time frameno model
+          writeIORef renderRef (Just (viztiles, surface))
       return True
 
     _ <- Gtk.on canvas Gtk.draw $ do
-      msurface <- liftIO $ readIORef surfaceRef
-      case msurface of
-        Just surface -> do
+      renderState <- liftIO $ readIORef renderRef
+      case renderState of
+        Just (viztiles, surface) -> do
           (time, frameno, model) <- liftIO $ readIORef modelRef
           Cairo.renderWith surface $ do
-            renderFrame vizrender True time frameno model
+            renderTiles viztiles False time frameno model
           Cairo.setSourceSurface surface 0 0
           Cairo.paint
         Nothing -> return ()
@@ -172,73 +480,24 @@ vizualise GtkVizConfig {
     Gtk.widgetShowAll window
     Gtk.mainGUI
 
-stepModelInitial :: VizModel model
-                 -> (Time, FrameNo, model)
-stepModelInitial VizModel {initModel, stepModel} =
-    (time, frameno, model)
-  where
-    !frameno  = 0
-    !time     = Time 0
-    !timestep = 0
-    !model    = stepModel timestep time frameno initModel
 
-stepModelWithTime :: VizModel model
-                  -> Int
-                  -> (Time, FrameNo, model)
-                  -> (Time, FrameNo, model)
-stepModelWithTime VizModel {stepModel} fps (time, frameno, model) =
-    (time', frameno', model')
-  where
-    !frameno' = frameno + 1
 
-    !time'    | frameno' `mod` fps == 0
-              = Time (fromIntegral (frameno' `div` fps) :: DiffTime)
-              | otherwise
-              = addTime (1 / fromIntegral fps :: DiffTime) time
+data AnimVizConfig =
+     AnimVizConfig {
+       animVizFrameFiles :: Int -> FilePath,
+       animVizDuration   :: Int,
+       animVizFPS        :: Int,
+       animVizResolution :: Maybe (Int, Int)
+     }
 
-    !timestep = time' `diffTime` time
-
-    !model'   = stepModel timestep time' frameno' model
-
-renderFrame :: forall model.
-               VizRender model -> Bool -> Time -> FrameNo -> model
-            -> Cairo.Render ()
-renderFrame vizrender forceRender time frame model =
-    go 0 0 vizrender
-  where
-    go :: Int -> Int -> VizRender model -> Cairo.Render ()
-
-    go x y VizRender {
-             renderSize = (w,h),
-             renderChanged,
-             renderModel,
-             renderClip
-           }
-      | forceRender || renderChanged time frame model = do
-          Cairo.save
-          Cairo.rectangle (fromIntegral x) (fromIntegral y)
-                          (fromIntegral w) (fromIntegral h)
-          Cairo.setSourceRGB 1 1 1
-          if renderClip
-            then Cairo.fillPreserve >> Cairo.clip
-            else Cairo.fill
-          Cairo.translate (fromIntegral x) (fromIntegral y)
-          renderModel time frame model
-          Cairo.restore
-
-      | otherwise = return ()
-
-    go x y VizRenderAbove {renderAbove, renderBelow} = do
-        go x y  renderAbove
-        go x y' renderBelow
-      where
-        y' = y + snd (renderSize renderAbove)
-
-    go x y VizRenderBeside {renderLeft, renderRight} = do
-        go x  y renderLeft
-        go x' y renderRight
-      where
-        x' = x + fst (renderSize renderLeft)
+defaultAnimVizConfig :: AnimVizConfig
+defaultAnimVizConfig =
+    AnimVizConfig {
+      animVizFrameFiles   = \n -> "viz-frame-" ++ show n ++ ".png",
+      animVizDuration     = 60,
+      animVizFPS          = 25,
+      animVizResolution   = Nothing
+    }
 
 -- | Write n seconds of animation frame files (at 25 fps) for the given
 -- vizualisation.
@@ -247,26 +506,37 @@ renderFrame vizrender forceRender time frame model =
 --
 -- > ffmpeg -i example/frame-%d.png -vf format=yuv420p example.mp4
 --
-writeAnimationFrames :: (Int -> FilePath) -> Int -> Vizualisation -> IO ()
-writeAnimationFrames frameFilename runningtime
-                     (Viz vizmodel (vizrender :: VizRender model)) =
+writeAnimationFrames :: AnimVizConfig -> Vizualisation -> IO ()
+writeAnimationFrames AnimVizConfig {
+                       animVizFrameFiles = frameFilename,
+                       animVizDuration   = runningtime,
+                       animVizFPS        = fps,
+                       animVizResolution
+                     }
+                     (Viz vizmodel (vizrender :: Layout (VizRender model))) =
     let (time, frameno, model) = stepModelInitial vizmodel in
     go time frameno model
   where
-    fps :: Num a => a
-    fps      = 25
     frameMax = runningtime * fps
+
+    props     = layoutProperties renderReqSize vizrender
+    viztiles  = layoutTiles (width, height) vizrender props
+    (width,
+     height)  = case animVizResolution of
+                  Just (w,h) -> (w,h)
+                  Nothing    -> (w,h)
+                    where
+                      LayoutProps { reqSize = (w,h) } = rootLabel props
 
     go :: Time -> FrameNo -> model -> IO ()
     go _     !frameno _ | frameno >= frameMax = return ()
     go !time !frameno !model = do
-      let (width, height) = renderSize vizrender
       Cairo.withImageSurface Cairo.FormatRGB24 width height $ \surface -> do
         Cairo.renderWith surface $ do
           Cairo.rectangle 0 0 (fromIntegral width) (fromIntegral height)
           Cairo.setSourceRGB 1 1 1
           Cairo.fill
-          renderFrame vizrender True time frameno model
+          renderTiles viztiles True time frameno model
         Cairo.surfaceWriteToPNG surface (frameFilename frameno)
 
       let (time', frameno', model') =
@@ -281,32 +551,6 @@ nullVizModel =
      stepModel = \_ _ _ () -> ()
    }
 
-aboveVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
-aboveVizualisation (Viz vizmodela (vizrendera :: VizRender modela))
-                    (Viz vizmodelb (vizrenderb :: VizRender modelb)) =
-    Viz (pairVizModel vizmodela vizmodelb)
-         VizRenderAbove {
-           renderSize  = (max wa wb, ha + hb),
-           renderAbove = contramap fst vizrendera,
-           renderBelow = contramap snd vizrenderb
-         }
-  where
-    (wa,ha) = renderSize vizrendera
-    (wb,hb) = renderSize vizrenderb
-
-besideVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
-besideVizualisation (Viz vizmodela (vizrendera :: VizRender modela))
-                     (Viz vizmodelb (vizrenderb :: VizRender modelb)) =
-    Viz (pairVizModel vizmodela vizmodelb)
-         VizRenderBeside {
-           renderSize  = (wa + wb, max ha hb),
-           renderLeft  = contramap fst vizrendera,
-           renderRight = contramap snd vizrenderb
-         }
-  where
-    (wa,ha) = renderSize vizrendera
-    (wb,hb) = renderSize vizrenderb
-
 pairVizModel :: VizModel modela -> VizModel modelb -> VizModel (modela, modelb)
 pairVizModel vizmodela vizmodelb =
     VizModel {
@@ -316,41 +560,28 @@ pairVizModel vizmodela vizmodelb =
                                         stepModel vizmodelb dt t fn mb)
     }
 
-besideVizRender :: VizRender model
-                -> VizRender model
-                -> VizRender model
-besideVizRender renderLeft renderRight =
-     VizRenderBeside {
-       renderSize  = (wa + wb, max ha hb),
-       renderLeft,
-       renderRight
-     }
-  where
-    (wa,ha) = renderSize renderLeft
-    (wb,hb) = renderSize renderRight
+aboveVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
+aboveVizualisation (Viz vizmodela (vizrendera :: Layout (VizRender modela)))
+                   (Viz vizmodelb (vizrenderb :: Layout (VizRender modelb))) =
+    Viz (pairVizModel vizmodela vizmodelb)
+        (LayoutAbove [ fmap (contramap fst) vizrendera
+                     , fmap (contramap snd) vizrenderb ])
 
-aboveVizRender :: VizRender model
-               -> VizRender model
-               -> VizRender model
-aboveVizRender renderAbove renderBelow =
-     VizRenderAbove {
-       renderSize  = (max wa wb, ha + hb),
-       renderAbove,
-       renderBelow
-     }
-  where
-    (wa,ha) = renderSize renderAbove
-    (wb,hb) = renderSize renderBelow
-
+besideVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
+besideVizualisation (Viz vizmodela (vizrendera :: Layout (VizRender modela)))
+                    (Viz vizmodelb (vizrenderb :: Layout (VizRender modelb))) =
+    Viz (pairVizModel vizmodela vizmodelb)
+        (LayoutBeside [ fmap (contramap fst) vizrendera
+                      , fmap (contramap snd) vizrenderb ])
 
 slowmoVizualisation :: DiffTime -> Vizualisation -> Vizualisation
 slowmoVizualisation dilation
-                   (Viz vizmodel (vizrender :: VizRender model)) =
+                   (Viz vizmodel (vizrender :: Layout (VizRender model))) =
     Viz vizmodel {
           initModel = (Time 0, initModel vizmodel),
           stepModel = stepModel'
         }
-        (adjustVizRenderTime vizrender)
+        (fmap adjustVizRenderTime vizrender)
   where
     stepModel' :: DiffTime -> Time -> FrameNo
                -> (Time, model) -> (Time, model)
@@ -363,118 +594,45 @@ slowmoVizualisation dilation
         now' :: Time
         now' = Time (now * dilation)
 
+    adjustVizRenderTime :: VizRender model -> VizRender (Time, model)
     adjustVizRenderTime vr@VizRender {renderChanged, renderModel} =
       vr {
         renderChanged = \_t fn (t, m) -> renderChanged t fn m,
         renderModel   = \_t fn (t, m) -> renderModel   t fn m
       }
-    adjustVizRenderTime vr@VizRenderBeside {renderLeft, renderRight} =
-      vr {
-        renderLeft  = adjustVizRenderTime renderLeft,
-        renderRight = adjustVizRenderTime renderRight
-      }
 
-    adjustVizRenderTime vr@VizRenderAbove {renderAbove, renderBelow} =
-      vr {
-        renderAbove = adjustVizRenderTime renderAbove,
-        renderBelow = adjustVizRenderTime renderBelow
-      }
-
-labelTimeVizRender :: VizRender model
-labelTimeVizRender =
-    VizRender {
-      renderSize    = (400, 20),
-      renderChanged = \_t _fn _m -> True,
-      renderClip    = False,
+layoutLabelTime :: Layout (VizRender model)
+layoutLabelTime =
+    LayoutFixed $ Layout VizRender {
+      renderReqSize = (400, 20),
+      renderChanged = \_t _fn _ -> True,
       renderModel
     }
   where
-    renderModel :: Time -> FrameNo -> model -> Cairo.Render ()
-    renderModel (Time t) _fn _m = do
+    renderModel :: Time -> FrameNo -> model -> (Double,Double) -> Cairo.Render ()
+    renderModel (Time t) _fn _m (_w,_h) = do
       Cairo.moveTo 5 20
       Cairo.setFontSize 20
       Cairo.setSourceRGB 0 0 0
       Cairo.showText $
-        Time.formatTime Time.defaultTimeLocale "Time (sec): %-2ES" t
+        Time.formatTime Time.defaultTimeLocale "Time (sec): %-2Es" t
 
-labelVizRender :: String -> VizRender model
-labelVizRender label =
-    VizRender {
-      renderSize    = (1000, 30),
-      renderChanged = \_t _fn _m -> False,
-      renderClip    = False,
-      renderModel   = \_t _fn _m -> do
+layoutLabel :: String -> Layout (VizRender model)
+layoutLabel label =
+    LayoutFixed $ Layout VizRender {
+      renderReqSize = (400, 30),
+      renderChanged = \_t _fn _ -> False,
+      renderModel   = \_t _fn _m (w,h) -> do
         Cairo.selectFontFace ("Sans" :: String)
                              Cairo.FontSlantNormal
                              Cairo.FontWeightBold
-        Cairo.setFontSize 25
+        Cairo.setFontSize (h-5)
         Cairo.TextExtents {
-          Cairo.textExtentsWidth  = w,
-          Cairo.textExtentsHeight = h 
+          Cairo.textExtentsWidth  = tw,
+          Cairo.textExtentsHeight = th
         } <- Cairo.textExtents label
-        Cairo.moveTo (max 0 ((1000 - w) / 2)) h
+        Cairo.moveTo (max 5 ((w - tw) / 2)) th
         Cairo.setSourceRGB 0 0 0
         Cairo.showText label
     }
 
-{-
-scaleVizualisation :: Double -> Vizualisation -> Vizualisation
-scaleVizualisation s (Viz vizmodel (vizrender :: VizRender model rstate)) =
-    Viz vizmodel vizrender {
-      vizSize     = (round (s * fromIntegral w),
-                     round (s * fromIntegral h)),
-      renderModel = renderModelScaled
-    }
-  where
-    (w,h) = vizSize vizrender
-    renderModelScaled :: model -> rstate -> Cairo.Render rstate
-    renderModelScaled m rst = do
-      Cairo.save
-      Cairo.scale s s
-      rst' <- renderModel vizrender m rst
-      Cairo.restore
-      return rst'
-
-viewportVizualisation :: Int -> Int -> Vizualisation -> Vizualisation
-viewportVizualisation width height (Viz vizmodel vizrender) =
-    Viz vizmodel vizrender { vizSize = (width, height) }
-
-occasionalVizualisation :: forall model rstate.
-                           (Int, Int)
-                        -> rstate
-                        -> (model -> rstate -> (rstate, Maybe (Cairo.Render ())))
-                        -> VizRender model (rstate, Maybe Cairo.Surface)
-occasionalVizualisation vizSize@(w,h) initRender' renderModel' =
-    VizRender {
-      vizSize,
-      initRender = (initRender', Nothing),
-      renderModel
-    }
-  where
-    renderModel :: model
-                -> (rstate, Maybe Cairo.Surface)
-                -> Cairo.Render (rstate, Maybe Cairo.Surface)
-    renderModel model (rst, msurface) =
-      case renderModel' model rst of
-        (rst', Just render) -> do
-          surface <- Cairo.withTargetSurface $ \mainSurface ->
-            liftIO $ Cairo.createSimilarSurface
-                       mainSurface Cairo.ContentColor w h
-          Cairo.renderWith surface $ do
-            Cairo.setSourceRGB 1 1 1
-            Cairo.rectangle 0 0 (fromIntegral w) (fromIntegral h)
-            Cairo.fill
-            Cairo.setSourceRGB 0 0 0
-            render
-          Cairo.setSourceSurface surface 0 0
-          Cairo.paint
-          return (rst', Just surface)
-
-        (rst', Nothing)
-          | Just surface <- msurface -> do
-              Cairo.setSourceSurface surface 0 0
-              Cairo.paint
-              return (rst', msurface)
-
-          | otherwise -> return (rst', msurface)
--}

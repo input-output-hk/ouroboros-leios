@@ -19,7 +19,8 @@ main = do
       cliVizName,
       cliOutputFramesDir,
       cliOutputSeconds,
-      cliCpuRendering
+      cliCpuRendering,
+      cliVizSize
     } <- Opts.execParser cli
     let viz = namedViz cliVizName
     case cliOutputFramesDir of
@@ -31,10 +32,14 @@ main = do
                    }
 
       Just outdir ->
-        writeAnimationFrames
-          (\n -> outdir ++ "/frame-" ++ show n ++ ".png")
-          (fromMaybe 60 cliOutputSeconds)
-          viz
+        writeAnimationFrames config viz
+          where
+            config =
+              defaultAnimVizConfig {
+                animVizFrameFiles = \n -> outdir ++ "/frame-" ++ show n ++ ".png",
+                animVizDuration   = fromMaybe 60 cliOutputSeconds,
+                animVizResolution = cliVizSize
+              }
 
 cli :: Opts.ParserInfo CliCmd
 cli =
@@ -51,7 +56,8 @@ data CliCmd =
        cliVizName         :: VizName,
        cliOutputFramesDir :: Maybe FilePath,
        cliOutputSeconds   :: Maybe Int,
-       cliCpuRendering    :: Bool
+       cliCpuRendering    :: Bool,
+       cliVizSize         :: Maybe (Int,Int)
      }
 
 options :: Opts.Parser CliCmd
@@ -73,6 +79,21 @@ options =
       <*> Opts.switch
            (Opts.long    "cpu-render"
          <> Opts.help    "Use CPU-based client side Cairo rendering")
+      <*> optional sizeOptions
+  where
+    sizeOptions :: Opts.Parser (Int,Int)
+    sizeOptions =
+          Opts.flag' (1280, 720)
+             (Opts.long "720p"
+           <> Opts.help "Use 720p resolution")
+      <|> Opts.flag' (1920, 1080)
+             (Opts.long "1080p"
+           <> Opts.help "Use 1080p resolution")
+      <|> Opts.option Opts.auto
+             (Opts.long "resolution"
+           <> Opts.metavar "(W,H)"
+           <> Opts.help "Use a specific resolution")
+
 
 data VizName = VizTCP1 | VizTCP2 | VizTCP3
              | VizRelay1 | VizRelay2
