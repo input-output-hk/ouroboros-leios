@@ -8,11 +8,10 @@ import           Data.Maybe
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
-import           Control.Monad.Class.MonadTime (Time, diffTime)
+import           Control.Monad.Class.MonadTime (Time, DiffTime, diffTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
-import           Graphics.Rendering.Chart.Easy ((&), (.~))
 import qualified Data.Colour.SRGB as Colour
 
 import ModelTCP (TcpMsgForecast(..), segmentSize)
@@ -226,25 +225,32 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
                        vizNodePos,
                        vizMsgsDiffusionLatency
                      }) ->
-      Chart.def
-    & Chart.layout_title .~ "Diffusion latency: time to reach fraction of stake"
-    & Chart.layout_y_axis . Chart.laxis_generate .~
-        Chart.scaledAxis Chart.def { Chart._la_nLabels = 10 } (0, 1)
-    & Chart.layout_plots .~
-        [ Chart.toPlot $
-            Chart.def
-          & Chart.plot_lines_values .~ [timeseries]
-          & Chart.plot_lines_style . Chart.line_color .~
-              let (r,g,b) = nodeMessageColor blk
-              in Chart.opaque (Colour.sRGB r g b)
-        | let nnodes = Map.size vizNodePos
-        , (blk, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
-        , let timeseries =
-                [ (latency, percent)
-                | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
-                , let !latency = arrival `diffTime` created
-                      !percent = Chart.Percent
-                                   (fromIntegral n / fromIntegral nnodes)
-                ]
-        ]
+      (Chart.def :: Chart.Layout DiffTime Chart.Percent) {
+        Chart._layout_title = "Diffusion latency: time to reach fraction of stake"
+      , Chart._layout_y_axis =
+          (Chart.def :: Chart.LayoutAxis Chart.Percent) {
+            Chart._laxis_generate =
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = 10 } (0, 1)
+          }
+      , Chart._layout_plots =
+          [ Chart.toPlot $
+              Chart.def {
+                Chart._plot_lines_values = [timeseries]
+              , Chart._plot_lines_style =
+                  let (r,g,b) = nodeMessageColor blk
+                  in Chart.def {
+                       Chart._line_color = Chart.opaque (Colour.sRGB r g b)
+                     }
+              }
+          | let nnodes = Map.size vizNodePos
+          , (blk, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
+          , let timeseries =
+                  [ (latency, percent)
+                  | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
+                  , let !latency = arrival `diffTime` created
+                        !percent = Chart.Percent
+                                     (fromIntegral n / fromIntegral nnodes)
+                  ]
+          ]
+      }
 

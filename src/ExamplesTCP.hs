@@ -9,7 +9,6 @@ import Control.Monad.Class.MonadTime (Time, DiffTime)
 import System.Random (mkStdGen, random)
 
 import qualified Graphics.Rendering.Chart.Easy as Chart
-import           Graphics.Rendering.Chart.Easy ((&), (.~))
 
 import ModelTCP
 import SimTCPLinks
@@ -50,25 +49,30 @@ example1 =
     chart :: Time -> FrameNo -> TcpSimVizModel
           -> Chart.Layout DiffTime Bytes
     chart now _ (SimVizModel _ TcpSimVizState {vizTcpEvents}) =
-        Chart.def
-      & Chart.layout_title .~ "Cumulative kb transmitted"
-      & Chart.layout_plots .~
-        [ Chart.toPlot $
-            Chart.def
-          & Chart.plot_lines_title .~ "kb sent"
-          & Chart.plot_lines_style . Chart.line_color .~
-              Chart.opaque Chart.blue
-          & Chart.plot_lines_values .~
-              tcpDataSeries BySegment DataSent (Just now) ds
+      Chart.def {
+        Chart._layout_title = "Cumulative kb transmitted"
+      , Chart._layout_plots =
+        [ Chart.toPlot Chart.def {
+            Chart._plot_lines_title  = "kb sent"
+          , Chart._plot_lines_style  = Chart.def {
+                                         Chart._line_color =
+                                           Chart.opaque Chart.blue
+                                       }
+          , Chart._plot_lines_values = tcpDataSeries BySegment DataSent
+                                                     (Just now) ds
+          }
 
-        , Chart.toPlot $
-            Chart.def
-          & Chart.plot_lines_title .~ "kb received"
-          & Chart.plot_lines_style . Chart.line_color .~
-              Chart.opaque Chart.red
-          & Chart.plot_lines_values .~
-              tcpDataSeries BySegment DataRecv (Just now) ds
+        , Chart.toPlot Chart.def {
+            Chart._plot_lines_title  = "kb received"
+          , Chart._plot_lines_style  = Chart.def {
+                                         Chart._line_color =
+                                           Chart.opaque Chart.red
+                                       }
+          , Chart._plot_lines_values = tcpDataSeries BySegment DataRecv
+                                                     (Just now) ds
+          }
         ]
+      }
       where
         ds = reverse vizTcpEvents
 
