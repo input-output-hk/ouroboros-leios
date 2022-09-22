@@ -254,3 +254,71 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
           ]
       }
 
+chartBandwidthInbound :: VizRender RelaySimVizModel
+chartBandwidthInbound =
+    chartVizRender 25 $ \_ _
+      (SimVizModel _ RelaySimVizState {
+                       vizMsgsAtNodeRecentQueue
+                     }) ->
+      (Chart.def :: Chart.Layout Double Double) {
+        Chart._layout_title  = "Distribution of frequency of block arrival"
+      , Chart._layout_x_axis =
+          Chart.def {
+            Chart._laxis_generate =
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = maxX } (0, maxX)
+          }
+      , Chart._layout_y_axis =
+          Chart.def {
+            Chart._laxis_generate =
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = 5 } (0, 0.5)
+          }
+      , Chart._layout_plots =
+          [ Chart.histToPlot $
+            Chart.defaultNormedPlotHist {
+              Chart._plot_hist_values =
+                map ((fromIntegral :: Int -> Double) . recentRate)
+                    (Map.elems vizMsgsAtNodeRecentQueue)
+            , Chart._plot_hist_range = Just (0, maxX)
+            , Chart._plot_hist_bins  = maxX
+            }
+          | not (Map.null vizMsgsAtNodeRecentQueue)
+          ]
+      }
+  where
+    maxX :: Num a => a
+    maxX = 15
+
+chartBandwidthCPU :: VizRender RelaySimVizModel
+chartBandwidthCPU =
+    chartVizRender 25 $ \_ _
+      (SimVizModel _ RelaySimVizState {
+                       vizMsgsAtNodeRecentBuffer
+                     }) ->
+      (Chart.def :: Chart.Layout Double Double) {
+        Chart._layout_title  = "Distribution of frequency of block processing"
+      , Chart._layout_x_axis =
+          Chart.def {
+            Chart._laxis_generate =
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = maxX } (0, maxX)
+          }
+      , Chart._layout_y_axis =
+          Chart.def {
+            Chart._laxis_generate =
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = 5 } (0, 0.5)
+          }
+      , Chart._layout_plots =
+          [ Chart.histToPlot $
+            Chart.defaultNormedPlotHist {
+              Chart._plot_hist_values =
+                map ((fromIntegral :: Int -> Double) . recentRate)
+                    (Map.elems vizMsgsAtNodeRecentBuffer)
+            , Chart._plot_hist_range = Just (0, maxX)
+            , Chart._plot_hist_bins  = maxX
+            }
+          | not (Map.null vizMsgsAtNodeRecentBuffer)
+          ]
+      }
+  where
+    maxX :: Num a => a
+    maxX = 15
+

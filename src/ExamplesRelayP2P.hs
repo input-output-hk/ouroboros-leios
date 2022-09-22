@@ -24,8 +24,14 @@ example1 =
         , LayoutBeside
             [ LayoutScaleFit $
               Layout $ relayP2PSimVizRender config p2pScreenDimensions
-            , LayoutReqSize 400 300 $
-              Layout $ chartDiffusionLatency config
+            , LayoutAbove
+                [ LayoutReqSize 400 300 $
+                  Layout $ chartDiffusionLatency config
+                , LayoutReqSize 400 300 $
+                  Layout chartBandwidthInbound
+                , LayoutReqSize 400 300 $
+                  Layout chartBandwidthCPU
+                ]
             ]
         ]
   where
