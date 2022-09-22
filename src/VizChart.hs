@@ -26,7 +26,7 @@ import Viz
 chartVizRender :: forall model x y.
                   (Chart.PlotValue x, Chart.PlotValue y)
                => FrameNo
-               -> (Time -> FrameNo -> model -> Chart.EC (Chart.Layout x y) ())
+               -> (Time -> FrameNo -> model -> Chart.Layout x y)
                -> VizRender model
 chartVizRender skipFrames chart =
     VizRender {
@@ -36,17 +36,10 @@ chartVizRender skipFrames chart =
     }
   where
     renderModel :: Time -> FrameNo -> model -> (Double,Double) -> Cairo.Render ()
-    renderModel t nf model size = renderChart size (chart t nf model)
-
-renderChart :: (Chart.Default r, Chart.ToRenderable r)
-            => (Double, Double) -> Chart.EC r () -> Cairo.Render ()
-renderChart (width, height) =
-    void
-  . Chart.runBackend (Chart.defaultEnv Chart.bitmapAlignmentFns)
-  . flip Chart.render (width, height)
-  . Chart.toRenderable
-  . Chart.execEC
-
+    renderModel t nf model size =
+      void $
+        Chart.runBackend (Chart.defaultEnv Chart.bitmapAlignmentFns) $
+          Chart.render (Chart.toRenderable (chart t nf model)) size
 
 instance Chart.PlotValue Bytes where
   toValue (Bytes b) = Chart.toValue b

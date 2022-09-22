@@ -12,7 +12,7 @@ import           Control.Monad.Class.MonadTime (Time, diffTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
-import           Graphics.Rendering.Chart.Easy ((.=))
+import           Graphics.Rendering.Chart.Easy ((&), (.~))
 import qualified Data.Colour.SRGB as Colour
 
 import ModelTCP (TcpMsgForecast(..), segmentSize)
@@ -21,8 +21,7 @@ import Viz
 import VizChart
 import VizSim
 import VizSimTCP (lineMessageInFlight)
-import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), relaySimVizModel,
-                    recentRate)
+import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), recentRate)
 
 
 ------------------------------------------------------------------------------
@@ -226,17 +225,18 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
       (SimVizModel _ RelaySimVizState {
                        vizNodePos,
                        vizMsgsDiffusionLatency
-                     }) -> do
-      Chart.layout_title .= "Diffusion latency: time to reach fraction of stake"
-      Chart.layout_y_axis . Chart.laxis_generate .=
+                     }) ->
+      Chart.def
+    & Chart.layout_title .~ "Diffusion latency: time to reach fraction of stake"
+    & Chart.layout_y_axis . Chart.laxis_generate .~
         Chart.scaledAxis Chart.def { Chart._la_nLabels = 10 } (0, 1)
-
-      sequence_
-        [ Chart.plot $ Chart.liftEC $ do
-            Chart.plot_lines_values .= [timeseries]
-            let (r,g,b) = nodeMessageColor blk
-                colour  = Chart.opaque (Colour.sRGB r g b)
-            Chart.plot_lines_style . Chart.line_color .= colour
+    & Chart.layout_plots .~
+        [ Chart.toPlot $
+            Chart.def
+          & Chart.plot_lines_values .~ [timeseries]
+          & Chart.plot_lines_style . Chart.line_color .~
+              let (r,g,b) = nodeMessageColor blk
+              in Chart.opaque (Colour.sRGB r g b)
         | let nnodes = Map.size vizNodePos
         , (blk, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
         , let timeseries =

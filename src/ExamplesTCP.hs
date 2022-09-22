@@ -9,7 +9,7 @@ import Control.Monad.Class.MonadTime (Time, DiffTime)
 import System.Random (mkStdGen, random)
 
 import qualified Graphics.Rendering.Chart.Easy as Chart
-import           Graphics.Rendering.Chart.Easy ((.=))
+import           Graphics.Rendering.Chart.Easy ((&), (.~))
 
 import ModelTCP
 import SimTCPLinks
@@ -48,15 +48,27 @@ example1 =
     title = "Sending 20x 100kb messages over TCP"
 
     chart :: Time -> FrameNo -> TcpSimVizModel
-          -> Chart.EC (Chart.Layout DiffTime Bytes) ()
-    chart now _ (SimVizModel _ TcpSimVizState {vizTcpEvents}) = do
-        Chart.layout_title .= "Cumulative kb transmitted"
-        Chart.setColors [Chart.opaque Chart.blue, Chart.opaque Chart.red]
-        Chart.plot (Chart.line "kb sent"
-                      (tcpDataSeries BySegment DataSent (Just now) ds))
-        Chart.plot (Chart.line "kb received"
-                      (tcpDataSeries BySegment DataRecv (Just now) ds))
-        return ()
+          -> Chart.Layout DiffTime Bytes
+    chart now _ (SimVizModel _ TcpSimVizState {vizTcpEvents}) =
+        Chart.def
+      & Chart.layout_title .~ "Cumulative kb transmitted"
+      & Chart.layout_plots .~
+        [ Chart.toPlot $
+            Chart.def
+          & Chart.plot_lines_title .~ "kb sent"
+          & Chart.plot_lines_style . Chart.line_color .~
+              Chart.opaque Chart.blue
+          & Chart.plot_lines_values .~
+              tcpDataSeries BySegment DataSent (Just now) ds
+
+        , Chart.toPlot $
+            Chart.def
+          & Chart.plot_lines_title .~ "kb received"
+          & Chart.plot_lines_style . Chart.line_color .~
+              Chart.opaque Chart.red
+          & Chart.plot_lines_values .~
+              tcpDataSeries BySegment DataRecv (Just now) ds
+        ]
       where
         ds = reverse vizTcpEvents
 
