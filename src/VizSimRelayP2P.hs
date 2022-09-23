@@ -226,11 +226,17 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
                        vizMsgsDiffusionLatency
                      }) ->
       (Chart.def :: Chart.Layout DiffTime Chart.Percent) {
-        Chart._layout_title = "Diffusion latency: time to reach fraction of stake"
+        Chart._layout_title = "Diffusion latency"
+      , Chart._layout_title_style = Chart.def { Chart._font_size   = 15 }
       , Chart._layout_y_axis =
           (Chart.def :: Chart.LayoutAxis Chart.Percent) {
             Chart._laxis_generate =
               Chart.scaledAxis Chart.def { Chart._la_nLabels = 10 } (0, 1)
+          , Chart._laxis_title = "Stake fraction reached"
+          }
+      , Chart._layout_x_axis =
+          Chart.def {
+            Chart._laxis_title = "Time (seconds)"
           }
       , Chart._layout_plots =
           [ Chart.toPlot $
@@ -254,33 +260,41 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
           ]
       }
 
-chartBandwidthInbound :: VizRender RelaySimVizModel
-chartBandwidthInbound =
+chartBandwidth :: VizRender RelaySimVizModel
+chartBandwidth =
     chartVizRender 25 $ \_ _
       (SimVizModel _ RelaySimVizState {
-                       vizMsgsAtNodeRecentQueue
+                       vizMsgsAtNodeRecentQueue,
+                       vizMsgsAtNodeRecentBuffer
                      }) ->
       (Chart.def :: Chart.Layout Double Double) {
-        Chart._layout_title  = "Distribution of frequency of block arrival"
+        Chart._layout_title  = "Distribution of block frequency"
+      , Chart._layout_title_style = Chart.def { Chart._font_size   = 15 }
       , Chart._layout_x_axis =
           Chart.def {
             Chart._laxis_generate =
               Chart.scaledAxis Chart.def { Chart._la_nLabels = maxX } (0, maxX)
+          , Chart._laxis_title = "Count of events within last second"
           }
       , Chart._layout_y_axis =
           Chart.def {
             Chart._laxis_generate =
-              Chart.scaledAxis Chart.def { Chart._la_nLabels = 5 } (0, 0.5)
+              Chart.scaledAxis Chart.def { Chart._la_nLabels = 4 } (0, 0.35)
+          , Chart._laxis_title = "Number of nodes in each bin (normalised)"
           }
       , Chart._layout_plots =
-          [ Chart.histToPlot $
-            Chart.defaultNormedPlotHist {
-              Chart._plot_hist_values =
-                map ((fromIntegral :: Int -> Double) . recentRate)
-                    (Map.elems vizMsgsAtNodeRecentQueue)
-            , Chart._plot_hist_range = Just (0, maxX)
-            , Chart._plot_hist_bins  = maxX
-            }
+          [ bandwidthHistPlot
+              "CPU (block validation completion)"
+              Chart.red
+              (map ((fromIntegral :: Int -> Double) . recentRate)
+                   (Map.elems vizMsgsAtNodeRecentBuffer))
+          | not (Map.null vizMsgsAtNodeRecentBuffer)
+          ]
+       ++ [ bandwidthHistPlot
+              "Network (block arrival)"
+              Chart.blue
+              (map ((fromIntegral :: Int -> Double) . recentRate)
+                   (Map.elems vizMsgsAtNodeRecentQueue))
           | not (Map.null vizMsgsAtNodeRecentQueue)
           ]
       }
@@ -288,37 +302,20 @@ chartBandwidthInbound =
     maxX :: Num a => a
     maxX = 15
 
-chartBandwidthCPU :: VizRender RelaySimVizModel
-chartBandwidthCPU =
-    chartVizRender 25 $ \_ _
-      (SimVizModel _ RelaySimVizState {
-                       vizMsgsAtNodeRecentBuffer
-                     }) ->
-      (Chart.def :: Chart.Layout Double Double) {
-        Chart._layout_title  = "Distribution of frequency of block processing"
-      , Chart._layout_x_axis =
-          Chart.def {
-            Chart._laxis_generate =
-              Chart.scaledAxis Chart.def { Chart._la_nLabels = maxX } (0, maxX)
-          }
-      , Chart._layout_y_axis =
-          Chart.def {
-            Chart._laxis_generate =
-              Chart.scaledAxis Chart.def { Chart._la_nLabels = 5 } (0, 0.5)
-          }
-      , Chart._layout_plots =
-          [ Chart.histToPlot $
-            Chart.defaultNormedPlotHist {
-              Chart._plot_hist_values =
-                map ((fromIntegral :: Int -> Double) . recentRate)
-                    (Map.elems vizMsgsAtNodeRecentBuffer)
-            , Chart._plot_hist_range = Just (0, maxX)
-            , Chart._plot_hist_bins  = maxX
-            }
-          | not (Map.null vizMsgsAtNodeRecentBuffer)
-          ]
+    bandwidthHistPlot title color values =
+      Chart.histToPlot $
+      Chart.defaultNormedPlotHist {
+        Chart._plot_hist_title  = title
+      , Chart._plot_hist_values = values
+      , Chart._plot_hist_range = Just (0, maxX)
+      , Chart._plot_hist_bins  = maxX
+      , Chart._plot_hist_fill_style = Chart.def {
+                                        Chart._fill_color =
+                                          Chart.withOpacity color 0.4
+                                      }
+      , Chart._plot_hist_line_style = Chart.def {
+                                        Chart._line_color =
+                                          Chart.opaque color
+                                      }
       }
-  where
-    maxX :: Num a => a
-    maxX = 15
 
