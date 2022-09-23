@@ -23,10 +23,10 @@ import ModelTCP
 import Viz
 
 
-chartVizRender :: forall model x y.
-                  (Chart.PlotValue x, Chart.PlotValue y)
+chartVizRender :: forall model renderable.
+                  (Chart.ToRenderable renderable)
                => FrameNo
-               -> (Time -> FrameNo -> model -> Chart.Layout x y)
+               -> (Time -> FrameNo -> model -> renderable)
                -> VizRender model
 chartVizRender skipFrames chart =
     VizRender {

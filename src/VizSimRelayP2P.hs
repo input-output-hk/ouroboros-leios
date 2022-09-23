@@ -6,6 +6,8 @@ module VizSimRelayP2P where
 
 import           Data.Maybe
 import qualified Data.Map.Strict as Map
+import           Data.Ix
+import           Data.Array.Unboxed
 
 import           Control.Monad.Class.MonadTime (Time, DiffTime, diffTime)
 
@@ -184,6 +186,7 @@ data MsgsInFlightClassification =
      | MsgsInFlightControl
      | MsgsInFlightNonBallistic
      | MsgsInFlightBallistic
+  deriving (Eq, Ord, Enum, Bounded, Ix)
 
 classifyInFlightMsgs :: [(msg, TcpMsgForecast, [TcpMsgForecast])]
                      -> MsgsInFlightClassification
@@ -309,3 +312,57 @@ chartBandwidth =
                                       }
       }
 
+chartLinkUtilisation :: VizRender RelaySimVizModel
+chartLinkUtilisation =
+    chartVizRender 25 $ \_ _
+      (SimVizModel _ RelaySimVizState {
+                       vizMsgsInTransit
+                     }) ->
+      let counts :: UArray MsgsInFlightClassification Int
+          counts = accumArray
+                     (\i () -> i+1) 0
+                     (minBound, maxBound)
+                   $ [ (classifyInFlightMsgs msgs, ())
+                     | msgs <- Map.elems vizMsgsInTransit ]
+
+       in (Chart.def :: Chart.PieLayout) {
+            Chart._pie_title = "TCP link usage"
+          , Chart._pie_title_style = Chart.def { Chart._font_size   = 15 }
+          , Chart._pie_plot =
+              Chart.def {
+                Chart._pie_data =
+                  [ let v = counts ! MsgsInFlightNone in
+                    Chart.def {
+                      Chart._pitem_label = "Idle (" ++ show v ++ ")"
+                    , Chart._pitem_value = fromIntegral v
+                    }
+                  , let v = counts ! MsgsInFlightControl in
+                    Chart.def {
+                      Chart._pitem_label = "Control messages (" ++ show v ++ ")"
+                    , Chart._pitem_value = fromIntegral v
+                    }
+                  , let v = counts ! MsgsInFlightNonBallistic in
+                    Chart.def {
+                      Chart._pitem_label = "Non-ballistic delivery (" ++ show v ++ ")"
+                    , Chart._pitem_value = fromIntegral v
+                    }
+                  , let v = counts ! MsgsInFlightBallistic in
+                    Chart.def {
+                      Chart._pitem_label = "Ballistic delivery (" ++ show v ++ ")"
+                    , Chart._pitem_value = fromIntegral v
+                    }
+                  ]
+              , Chart._pie_colors =
+                  [ lightBlueShade 0.9
+                  , lightBlueShade 0.7
+                  , lightBlueShade 0.3
+                  , lightBlueShade 0
+                  ]
+              }
+          }
+  where
+    lightBlueShade :: Double -> Chart.AlphaColour Double
+    lightBlueShade x =
+      Chart.withOpacity Chart.white x
+        `Chart.atop`
+      Chart.opaque Chart.blue

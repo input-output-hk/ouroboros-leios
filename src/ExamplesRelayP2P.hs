@@ -29,6 +29,8 @@ example1 =
                   Layout $ chartDiffusionLatency config
                 , LayoutReqSize 400 300 $
                   Layout chartBandwidth
+                , LayoutReqSize 400 300 $
+                  Layout chartLinkUtilisation
                 ]
             ]
         ]
