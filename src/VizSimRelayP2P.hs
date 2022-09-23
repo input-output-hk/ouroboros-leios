@@ -6,7 +6,6 @@ module VizSimRelayP2P where
 
 import           Data.Maybe
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 
 import           Control.Monad.Class.MonadTime (Time, DiffTime, diffTime)
 
@@ -55,7 +54,6 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                           (SimVizModel _events
                              RelaySimVizState {
                                vizNodePos,
-                               vizNodeLinks,
                                vizMsgsInTransit,
                                vizMsgsAtNodeQueue,
                                vizMsgsAtNodeBuffer,
@@ -136,30 +134,30 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
             MsgsInFlightControl -> return ()
 
             -- We draw with a dotted line
-            MsgsInFlightNonBalistic ->
+            MsgsInFlightNonBallistic ->
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo fromPos
-                  uncurry Cairo.lineTo toPos
+                  uncurry Cairo.moveTo (vizNodePos Map.! fromNode)
+                  uncurry Cairo.lineTo (vizNodePos Map.! toNode)
                   Cairo.setSourceRGB r g b
                   Cairo.setLineWidth 1
                   Cairo.setDash [10,5] 0
                   Cairo.stroke
 
             -- We draw with a full line
-            MsgsInFlightBalistic ->
+            MsgsInFlightBallistic ->
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo fromPos
-                  uncurry Cairo.lineTo toPos
+                  uncurry Cairo.moveTo (vizNodePos Map.! fromNode)
+                  uncurry Cairo.lineTo (vizNodePos Map.! toNode)
                   Cairo.setSourceRGB r g b
                   Cairo.setDash [] 0
                   Cairo.setLineWidth 2
                   Cairo.stroke
 
-        | (fromPos, toPos, msgs) <- linksAndMsgs
+        | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         ]
       Cairo.restore
       -- draw the messages in flight on top
@@ -169,44 +167,36 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
              Cairo.fillPreserve
              Cairo.setSourceRGB 0 0 0
              Cairo.stroke
-        | (fromPos, toPos, msgs) <- linksAndMsgs
+        | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         , (msg, msgforecast, _msgforecasts) <- msgs
         , now >= msgSendTrailingEdge msgforecast
         , now <= msgRecvTrailingEdge msgforecast
         , (r,g,b) <- maybeToList (ptclMessageColor msg)
-        , let (_msgTrailingEdge@(x,y), _msgLeadingEdge) =
+        , let fromPos = vizNodePos Map.! fromNode
+              toPos   = vizNodePos Map.! toNode
+              (_msgTrailingEdge@(x,y), _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
         ]
       Cairo.restore
-      where
-        linksAndMsgs =
-          [ (fromPos, toPos, msgs)
-          | (fromNode, toNode) <- Set.toList vizNodeLinks
-          , let (fromPos, toPos) = (vizNodePos Map.! fromNode,
-                                    vizNodePos Map.! toNode)
-                msgs = Map.findWithDefault
-                         [] (fromNode, toNode)
-                         vizMsgsInTransit
-          ]
 
 data MsgsInFlightClassification =
        MsgsInFlightNone
      | MsgsInFlightControl
-     | MsgsInFlightNonBalistic
-     | MsgsInFlightBalistic
+     | MsgsInFlightNonBallistic
+     | MsgsInFlightBallistic
 
 classifyInFlightMsgs :: [(msg, TcpMsgForecast, [TcpMsgForecast])]
                      -> MsgsInFlightClassification
 classifyInFlightMsgs []   = MsgsInFlightNone
 classifyInFlightMsgs msgs
   | all control msgs      = MsgsInFlightControl
-  | all balistic msgs     = MsgsInFlightBalistic
-  | otherwise             = MsgsInFlightNonBalistic
+  | all ballistic msgs    = MsgsInFlightBallistic
+  | otherwise             = MsgsInFlightNonBallistic
   where
     -- We rely on contiguous forecast fragments having been merged,
     -- see mergeAdjacentForecasts
-    balistic (_msg, _msgforecast, _msgforecasts@[_]) = True
-    balistic _                                       = False
+    ballistic (_msg, _msgforecast, _msgforecasts@[_]) = True
+    ballistic _                                       = False
 
     -- We arbitrarily define a control message to be one that's less than a
     -- single TCP segment. All substantive payloads will be bigger than this.
