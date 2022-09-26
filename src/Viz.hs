@@ -414,11 +414,36 @@ vizualise GtkVizConfig {
           Tree.rootLabel (layoutProperties renderReqSize vizrender)
      in Gtk.windowSetDefaultSize window w h
 
+    fullscreenRef <- newIORef False
+    maximisedRef  <- newIORef False
+    _ <- Gtk.on window Gtk.windowStateEvent $ Gtk.tryEvent $ do
+       state <- Gtk.eventWindowState
+       liftIO $ writeIORef fullscreenRef (Gtk.WindowStateFullscreen `elem` state)
+       liftIO $ writeIORef maximisedRef  (Gtk.WindowStateMaximized `elem` state)
+    let toggleFullscreen = do
+          previouslyFullscreen <- readIORef fullscreenRef
+          Gtk.set window [ Gtk.windowDecorated := previouslyFullscreen ]
+          if previouslyFullscreen
+            then Gtk.windowUnfullscreen window
+            else Gtk.windowFullscreen   window
+        toggleMaximised = do
+          previouslyFullscreen <- readIORef fullscreenRef
+          previouslyMaximised  <- readIORef maximisedRef
+          case (previouslyFullscreen, previouslyMaximised) of
+            (True, _) -> do
+              Gtk.set window [ Gtk.windowDecorated := True ]
+              Gtk.windowUnfullscreen window
+              Gtk.windowMaximize     window
+            (False, True)  -> Gtk.windowUnmaximize window
+            (False, False) -> Gtk.windowMaximize   window
+
     _ <- Gtk.on window Gtk.keyPressEvent $ Gtk.tryEvent $ do
       name <- Gtk.eventKeyName
       case name of
         "Escape" -> liftIO $ Gtk.widgetDestroy window
-        "F11"    -> liftIO $ Gtk.windowFullscreen window
+        "F11"    -> liftIO $ toggleMaximised
+        "F5"     -> liftIO $ toggleFullscreen
+        "f"      -> liftIO $ toggleFullscreen
         _        -> return ()
 
     _ <- Gtk.on window Gtk.objectDestroy $ do
