@@ -19,7 +19,7 @@ import Control.Tracer as Tracer
 
 import Control.Monad.IOSim as IOSim
 
-import System.Random (StdGen, uniformR)
+import System.Random (StdGen, uniformR, uniform)
 
 import Chan
 import RelayProtocol
@@ -141,7 +141,7 @@ relayNode tracer
                 gendelay  = realToFrac (- log u * lambda :: Double) :: DiffTime
             threadDelay gendelay
             now <- getCurrentTime
-            let (blkidn, rng'') = uniformR (0,9999) rng'
+            let (blkidn, rng'') = uniform rng'
                 blkid = TestBlockId blkidn
                 blk = TestBlock { 
                         testBlockId     = blkid,

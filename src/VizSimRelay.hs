@@ -12,6 +12,7 @@ import qualified Data.PQueue.Min as PQ
 import           Data.PQueue.Min (MinQueue)
 
 import           Control.Monad.Class.MonadTime (Time, addTime)
+import           Control.Exception (assert)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 
@@ -148,6 +149,7 @@ relaySimVizModel =
             Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs),
           vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1,
           vizMsgsDiffusionLatency =
+            assert (not (testBlockId msg `Map.member` vizMsgsDiffusionLatency vs)) $
             Map.insert (testBlockId msg) (msg, now, [now]) (vizMsgsDiffusionLatency vs)
         }
 
