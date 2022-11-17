@@ -81,6 +81,64 @@ example1 =
         p2pNodeLinksRandom  = 5
       }
 
+
+example2 :: Vizualisation
+example2 =
+    slowmoVizualisation 0.5 $
+    Viz model $
+      LayoutAbove
+        [ layoutLabelTime
+        , LayoutAbove
+            [ LayoutReqSize 400 300 $
+              Layout $ chartDiffusionLatency config
+            , LayoutReqSize 400 300 $
+              Layout $ chartDiffusionImperfection
+                         p2pTopography
+                         0.1
+                         (96 / 1000)
+                         config
+            , LayoutReqSize 400 300 $
+              Layout chartBandwidth
+            , LayoutReqSize 400 300 $
+              Layout chartLinkUtilisation
+            ]
+        ]
+  where
+    model = relaySimVizModel trace
+      where
+        trace =
+          traceRelayP2P
+            rng0
+            p2pTopography
+            (\latency -> mkTcpConnProps latency (kilobytes 1000))
+            (\rng ->
+             RelayNodeConfig {
+               blockProcessingDelay = const 0.1, -- 100ms
+               blockGeneration      =
+                 PoissonGenerationPattern
+                  (kilobytes 96)
+                  rng
+                  -- average seconds between blocks:
+                  (0.5 * fromIntegral p2pNumNodes)
+                  10.0
+             })
+
+    p2pTopography =
+      genArbitraryP2PTopography p2pTopographyCharacteristics rng0
+
+    rng0 = mkStdGen 4 --TODO: make a param
+
+    p2pScreenDimensions = (1280, 1060)
+    p2pNumNodes         = 200
+    p2pTopographyCharacteristics =
+      P2PTopographyCharacteristics {
+        p2pWorldDimensions  = (0.600, 0.300),
+        p2pScreenDimensions,
+        p2pNumNodes,
+        p2pNodeLinksClose   = 5,
+        p2pNodeLinksRandom  = 5
+      }
+
 config :: RelayP2PSimVizConfig
 config =
   RelayP2PSimVizConfig {

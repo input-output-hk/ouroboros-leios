@@ -106,8 +106,8 @@ options =
 
 data VizName = VizTCP1 | VizTCP2 | VizTCP3
              | VizRelay1 | VizRelay2
-             | VizRelayP2P1
-             
+             | VizRelayP2P1 | VizRelayP2P2
+
 readVizName :: String -> Either String VizName
 readVizName "tcp-1"   = Right VizTCP1
 readVizName "tcp-2"   = Right VizTCP2
@@ -115,6 +115,7 @@ readVizName "tcp-3"   = Right VizTCP3
 readVizName "relay-1" = Right VizRelay1
 readVizName "relay-2" = Right VizRelay2
 readVizName "p2p-1"   = Right VizRelayP2P1
+readVizName "p2p-2"   = Right VizRelayP2P2
 readVizName _         = Left "unknown vizualisation"
 
 namedViz :: VizName -> Vizualisation
@@ -124,4 +125,5 @@ namedViz VizTCP3 = ExamplesTCP.example3
 namedViz VizRelay1 = ExamplesRelay.example1
 namedViz VizRelay2 = ExamplesRelay.example2
 namedViz VizRelayP2P1 = ExamplesRelayP2P.example1
+namedViz VizRelayP2P2 = ExamplesRelayP2P.example2
 
