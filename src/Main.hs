@@ -28,7 +28,8 @@ main = do
           vizualise config viz
         where
           config = defaultGtkVizConfig {
-                     gtkVizCpuRendering = cliCpuRendering
+                     gtkVizCpuRendering = cliCpuRendering,
+                     gtkVizResolution   = cliVizSize
                    }
 
       Just outdir ->

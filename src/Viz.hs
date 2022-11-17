@@ -377,6 +377,8 @@ data GtkVizConfig =
      GtkVizConfig {
        gtkVizFPS :: Int,
 
+       gtkVizResolution :: Maybe (Int, Int),
+
        -- | If @True@, use client side CPU-based Cairo rendering. Otherwise
        -- use Gtk+ offscreen Cairo rendering, which may use GPU acceleration.
        --
@@ -390,6 +392,7 @@ defaultGtkVizConfig :: GtkVizConfig
 defaultGtkVizConfig =
     GtkVizConfig {
       gtkVizFPS          = 25,
+      gtkVizResolution   = Nothing,
       gtkVizCpuRendering = False
     }
 
@@ -398,6 +401,7 @@ defaultGtkVizConfig =
 vizualise :: GtkVizConfig -> Vizualisation -> IO ()
 vizualise GtkVizConfig {
             gtkVizFPS,
+            gtkVizResolution,
             gtkVizCpuRendering
           }
           (Viz vizmodel vizrender) = do
@@ -410,9 +414,14 @@ vizualise GtkVizConfig {
       , Gtk.windowResizable := True
       , Gtk.windowTitle     := ("Visualisation" :: String)
       ]
-    let LayoutProps { reqSize = (w,h) } =
-          Tree.rootLabel (layoutProperties renderReqSize vizrender)
-     in Gtk.windowSetDefaultSize window w h
+    let (width, height) =
+          case gtkVizResolution of
+            Just (w,h) -> (w,h)
+            Nothing    -> (w,h)
+              where
+                LayoutProps { reqSize = (w,h) } = rootLabel props
+                props = layoutProperties renderReqSize vizrender
+     in Gtk.windowSetDefaultSize window width height
 
     fullscreenRef <- newIORef False
     maximisedRef  <- newIORef False
@@ -480,8 +489,8 @@ vizualise GtkVizConfig {
                    Cairo.withTargetSurface $ \mainSurface ->
                       liftIO $ Cairo.createSimilarSurface
                                  mainSurface Cairo.ContentColor w h
-          let viztiles = layoutTiles (w,h) vizrender
-                                     (layoutProperties renderReqSize vizrender)
+          let props    = layoutProperties renderReqSize vizrender
+              viztiles = layoutTiles (w,h) vizrender props
           (time, frameno, model) <- readIORef modelRef
           Cairo.renderWith surface $ do
             Cairo.setSourceRGB 1 1 1
