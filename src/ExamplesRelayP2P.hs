@@ -23,12 +23,13 @@ example1 =
         [ layoutLabelTime
         , LayoutBeside
             [ LayoutScaleFit $
+              LayoutScaleBy 0.8 $
               Layout $ relayP2PSimVizRender config p2pScreenDimensions
             , LayoutBeside
                 [ LayoutAbove
-                    [ LayoutReqSize 400 300 $
+                    [ LayoutReqSize 350 300 $
                       Layout $ chartDiffusionLatency config
-                    , LayoutReqSize 400 300 $
+                    , LayoutReqSize 350 300 $
                       Layout $ chartDiffusionImperfection
                                  p2pTopography
                                  0.1
@@ -36,9 +37,9 @@ example1 =
                                  config
                     ]
                 , LayoutAbove
-                    [ LayoutReqSize 400 300 $
+                    [ LayoutReqSize 350 300 $
                       Layout chartBandwidth
-                    , LayoutReqSize 400 300 $
+                    , LayoutReqSize 350 300 $
                       Layout chartLinkUtilisation
                     ]
                 ]
