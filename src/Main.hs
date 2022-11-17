@@ -19,6 +19,7 @@ main = do
       cliVizName,
       cliOutputFramesDir,
       cliOutputSeconds,
+      cliOutputStartTime,
       cliCpuRendering,
       cliVizSize
     } <- Opts.execParser cli
@@ -39,6 +40,7 @@ main = do
               defaultAnimVizConfig {
                 animVizFrameFiles = \n -> outdir ++ "/frame-" ++ show n ++ ".png",
                 animVizDuration   = fromMaybe 60 cliOutputSeconds,
+                animVizStartTime  = fromMaybe 0  cliOutputStartTime,
                 animVizResolution = cliVizSize
               }
 
@@ -57,6 +59,7 @@ data CliCmd =
        cliVizName         :: VizName,
        cliOutputFramesDir :: Maybe FilePath,
        cliOutputSeconds   :: Maybe Int,
+       cliOutputStartTime :: Maybe Int,
        cliCpuRendering    :: Bool,
        cliVizSize         :: Maybe (Int,Int)
      }
@@ -77,6 +80,11 @@ options =
              (Opts.long    "seconds"
            <> Opts.metavar "SEC"
            <> Opts.help    "Output N seconds of animation"))
+      <*> optional
+           (Opts.option Opts.auto
+             (Opts.long    "skip-seconds"
+           <> Opts.metavar "SEC"
+           <> Opts.help    "Skip the first N seconds of animation"))
       <*> Opts.switch
            (Opts.long    "cpu-render"
          <> Opts.help    "Use CPU-based client side Cairo rendering")

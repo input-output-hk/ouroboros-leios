@@ -520,6 +520,7 @@ data AnimVizConfig =
      AnimVizConfig {
        animVizFrameFiles :: Int -> FilePath,
        animVizDuration   :: Int,
+       animVizStartTime  :: Int,
        animVizFPS        :: Int,
        animVizResolution :: Maybe (Int, Int)
      }
@@ -529,6 +530,7 @@ defaultAnimVizConfig =
     AnimVizConfig {
       animVizFrameFiles   = \n -> "viz-frame-" ++ show n ++ ".png",
       animVizDuration     = 60,
+      animVizStartTime    = 0,
       animVizFPS          = 25,
       animVizResolution   = Nothing
     }
@@ -544,14 +546,16 @@ writeAnimationFrames :: AnimVizConfig -> Vizualisation -> IO ()
 writeAnimationFrames AnimVizConfig {
                        animVizFrameFiles = frameFilename,
                        animVizDuration   = runningtime,
+                       animVizStartTime  = starttime,
                        animVizFPS        = fps,
                        animVizResolution
                      }
                      (Viz vizmodel (vizrender :: Layout (VizRender model))) =
-    let (time, frameno, model) = stepModelInitial vizmodel in
+    let (time, frameno, model) = skipFrames (stepModelInitial vizmodel) in
     go time frameno model
   where
-    frameMax = runningtime * fps
+    frameStart = starttime * fps
+    frameMax   = frameStart + runningtime * fps
 
     props     = layoutProperties renderReqSize vizrender
     viztiles  = layoutTiles (width, height) vizrender props
@@ -562,6 +566,14 @@ writeAnimationFrames AnimVizConfig {
                     where
                       LayoutProps { reqSize = (w,h) } = rootLabel props
 
+    skipFrames :: (Time, FrameNo, model) -> (Time, FrameNo, model)
+    skipFrames (!time, !frameno, !model)
+      | frameno >= frameStart
+      = (time, frameno, model)
+
+      | otherwise
+      = skipFrames (stepModelWithTime vizmodel fps (time, frameno, model))
+
     go :: Time -> FrameNo -> model -> IO ()
     go _     !frameno _ | frameno >= frameMax = return ()
     go !time !frameno !model = do
@@ -571,7 +583,7 @@ writeAnimationFrames AnimVizConfig {
           Cairo.setSourceRGB 1 1 1
           Cairo.fill
           renderTiles viztiles True time frameno model
-        Cairo.surfaceWriteToPNG surface (frameFilename frameno)
+        Cairo.surfaceWriteToPNG surface (frameFilename (frameno - frameStart))
 
       let (time', frameno', model') =
             stepModelWithTime vizmodel fps (time, frameno, model)
