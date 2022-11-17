@@ -11,8 +11,8 @@ import Data.Dynamic
 import Control.Monad
 import Control.Monad.Class.MonadTime
 import Control.Monad.Class.MonadTimer
-import Control.Monad.Class.MonadSTM
 import Control.Monad.Class.MonadAsync
+import Control.Concurrent.Class.MonadSTM
 import Control.Tracer as Tracer
 
 import Control.Monad.IOSim as IOSim

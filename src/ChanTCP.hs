@@ -18,7 +18,7 @@ import           Data.PQueue.Prio.Min (MinPQueue)
 import Control.Monad
 import Control.Monad.Class.MonadTime
 import Control.Monad.Class.MonadTimer
-import Control.Monad.Class.MonadSTM
+import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadAsync
 import Control.Exception (assert)
 import Control.Tracer as Tracer
