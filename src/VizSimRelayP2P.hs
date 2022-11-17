@@ -22,6 +22,7 @@ import VizChart
 import VizSim
 import VizSimTCP (lineMessageInFlight)
 import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), recentRate)
+import P2P
 
 
 ------------------------------------------------------------------------------
@@ -242,7 +243,7 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
                      }
               }
           | let nnodes = Map.size vizNodePos
-          , (blk, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
+          , (blk, _nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
           , let timeseries =
                   [ (latency, percent)
                   | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
@@ -252,6 +253,57 @@ chartDiffusionLatency RelayP2PSimVizConfig {nodeMessageColor} =
                   ]
           ]
       }
+
+chartDiffusionImperfection :: P2PTopography
+                           -> DiffTime
+                           -> DiffTime
+                           -> RelayP2PSimVizConfig
+                           -> VizRender RelaySimVizModel
+chartDiffusionImperfection p2ptopography processingDelay serialisationDelay
+                           RelayP2PSimVizConfig {nodeMessageColor} =
+    chartVizRender 25 $ \_ _
+      (SimVizModel _ RelaySimVizState { vizMsgsDiffusionLatency }) ->
+      (Chart.def :: Chart.Layout DiffTime DiffTime) {
+        Chart._layout_title  = "Diffusion latency imperfection"
+      , Chart._layout_title_style = Chart.def { Chart._font_size   = 15 }
+      , Chart._layout_y_axis =
+          Chart.def {
+            Chart._laxis_title = "Time behind perfect (seconds)"
+          }
+      , Chart._layout_x_axis =
+          Chart.def {
+            Chart._laxis_title = "Time (seconds)"
+          }
+      , Chart._layout_plots =
+          [ Chart.toPlot $
+              Chart.def {
+                Chart._plot_lines_values = [timeseries]
+              , Chart._plot_lines_style =
+                  let (r,g,b) = nodeMessageColor blk
+                  in Chart.def {
+                       Chart._line_color = Chart.opaque (Colour.sRGB r g b)
+                     }
+              }
+          | (blk, nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
+          , let timeseries =
+                  [ (latencyActual, imperfection)
+                  | (arrivalActual, latencyIdeal)
+                      <- zip (reverse arrivals)
+                             (p2pGraphIdealDiffusionTimesFromNode
+                                idealDiffusionTimes nid)
+                  , let !latencyActual = arrivalActual `diffTime` created
+                        !imperfection  = latencyActual - latencyIdeal
+                  ]
+          ]
+      }
+  where
+    idealDiffusionTimes :: P2PIdealDiffusionTimes
+    idealDiffusionTimes =
+        p2pGraphIdealDiffusionTimes
+          p2ptopography
+          (\_ -> processingDelay)
+          (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
+
 
 chartBandwidth :: VizRender RelaySimVizModel
 chartBandwidth =

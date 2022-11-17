@@ -24,13 +24,23 @@ example1 =
         , LayoutBeside
             [ LayoutScaleFit $
               Layout $ relayP2PSimVizRender config p2pScreenDimensions
-            , LayoutAbove
-                [ LayoutReqSize 400 300 $
-                  Layout $ chartDiffusionLatency config
-                , LayoutReqSize 400 300 $
-                  Layout chartBandwidth
-                , LayoutReqSize 400 300 $
-                  Layout chartLinkUtilisation
+            , LayoutBeside
+                [ LayoutAbove
+                    [ LayoutReqSize 400 300 $
+                      Layout $ chartDiffusionLatency config
+                    , LayoutReqSize 400 300 $
+                      Layout $ chartDiffusionImperfection
+                                 p2pTopography
+                                 0.1
+                                 (96 / 1000)
+                                 config
+                    ]
+                , LayoutAbove
+                    [ LayoutReqSize 400 300 $
+                      Layout chartBandwidth
+                    , LayoutReqSize 400 300 $
+                      Layout chartLinkUtilisation
+                    ]
                 ]
             ]
         ]
@@ -39,8 +49,8 @@ example1 =
       where
         trace =
           traceRelayP2P
-            (mkStdGen 4)
-            p2pTopographyCharacteristics
+            rng0
+            p2pTopography
             (\latency -> mkTcpConnProps latency (kilobytes 1000))
             (\rng ->
              RelayNodeConfig {
@@ -53,6 +63,11 @@ example1 =
                   (0.2 * fromIntegral p2pNumNodes)
                   5.0
              })
+
+    p2pTopography =
+      genArbitraryP2PTopography p2pTopographyCharacteristics rng0
+
+    rng0 = mkStdGen 4 --TODO: make a param
 
     p2pScreenDimensions = (1280, 1060)
     p2pNumNodes         = 100

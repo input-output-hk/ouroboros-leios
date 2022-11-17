@@ -7,6 +7,7 @@ module SimTCPLinks where
 
 import Data.Bifoldable
 import Data.Dynamic
+import Data.Ix
 
 import Control.Monad
 import Control.Monad.Class.MonadTime
@@ -55,7 +56,7 @@ instance MessageSize TestMessage where
   messageSizeBytes (TestMessage _ bytes) = bytes
 
 newtype NodeId = NodeId Int
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Ix, Show)
 
 mkTcpConnProps :: DiffTime     -- ^ latency in seconds
                -> Bytes        -- ^ sender serialisation bandwidth in bytes per sec

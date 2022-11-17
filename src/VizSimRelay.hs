@@ -51,7 +51,7 @@ data RelaySimVizState =
        vizMsgsAtNodeTotalQueue   :: !(Map NodeId Int),
        vizMsgsAtNodeTotalBuffer  :: !(Map NodeId Int),
        vizNumMsgsGenerated       :: !Int,
-       vizMsgsDiffusionLatency   :: !(Map TestBlockId (TestBlock, Time, [Time]))
+       vizMsgsDiffusionLatency   :: !(Map TestBlockId (TestBlock, NodeId, Time, [Time]))
      }
 
 
@@ -126,7 +126,8 @@ relaySimVizModel =
           vizMsgsAtNodeTotalBuffer =
             Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs),
           vizMsgsDiffusionLatency =
-            Map.adjust (\(blk, created, arrivals) -> (blk, created, (now:arrivals)))
+            Map.adjust (\(blk, nid', created, arrivals) ->
+                           (blk, nid', created, (now:arrivals)))
                        (testBlockId msg) (vizMsgsDiffusionLatency vs)
         }
     accumEventVizState _now (RelaySimEventNode (LabelNode nid (RelayNodeEventRemove msg))) vs =
@@ -150,7 +151,8 @@ relaySimVizModel =
           vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1,
           vizMsgsDiffusionLatency =
             assert (not (testBlockId msg `Map.member` vizMsgsDiffusionLatency vs)) $
-            Map.insert (testBlockId msg) (msg, now, [now]) (vizMsgsDiffusionLatency vs)
+            Map.insert (testBlockId msg) (msg, nid, now, [now])
+                       (vizMsgsDiffusionLatency vs)
         }
 
     pruneVisState :: Time
@@ -167,7 +169,7 @@ relaySimVizModel =
           vizMsgsAtNodeRecentBuffer =
             Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs),
           vizMsgsDiffusionLatency =
-            Map.filter (\(_,t,_) -> t >= secondsAgo10) (vizMsgsDiffusionLatency vs)
+            Map.filter (\(_,_,t,_) -> t >= secondsAgo10) (vizMsgsDiffusionLatency vs)
         }
       where
         secondsAgo1 :: Time

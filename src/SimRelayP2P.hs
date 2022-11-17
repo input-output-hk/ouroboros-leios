@@ -26,15 +26,13 @@ import SimRelay
 
 
 traceRelayP2P :: StdGen
-              -> P2PTopographyCharacteristics
+              -> P2PTopography
               -> (DiffTime -> TcpConnProps)
               -> (StdGen -> RelayNodeConfig)
               -> RelaySimTrace
-traceRelayP2P rng0 p2pTopographyCharacteristics tcpprops relayConfig =
+traceRelayP2P rng0 P2PTopography {p2pNodes, p2pLinks} tcpprops relayConfig =
     selectTimedEvents $
     runSimTrace $ do
-      let P2PTopography {p2pNodes, p2pLinks} =
-            genArbitraryP2PTopography p2pTopographyCharacteristics rng0
       traceWith tracer $
         RelaySimEventSetup
           [ (nid, (round x, round y))
