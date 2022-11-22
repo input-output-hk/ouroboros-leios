@@ -22,9 +22,8 @@ example1 =
       LayoutAbove
         [ layoutLabelTime
         , LayoutBeside
-            [ LayoutScaleFit $
-              LayoutScaleBy 0.8 $
-              Layout $ relayP2PSimVizRender config p2pScreenDimensions
+            [ LayoutReqSize 1200 1000 $
+              Layout $ relayP2PSimVizRender config
             , LayoutBeside
                 [ LayoutAbove
                     [ LayoutReqSize 350 300 $
@@ -70,12 +69,10 @@ example1 =
 
     rng0 = mkStdGen 4 --TODO: make a param
 
-    p2pScreenDimensions = (1280, 1060)
     p2pNumNodes         = 100
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
         p2pWorldDimensions  = (0.600, 0.300),
-        p2pScreenDimensions,
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5
@@ -128,12 +125,10 @@ example2 =
 
     rng0 = mkStdGen 4 --TODO: make a param
 
-    p2pScreenDimensions = (1280, 1060)
     p2pNumNodes         = 200
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
         p2pWorldDimensions  = (0.600, 0.300),
-        p2pScreenDimensions,
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5

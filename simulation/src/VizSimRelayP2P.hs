@@ -18,6 +18,7 @@ import qualified Data.Colour.SRGB as Colour
 import ModelTCP (TcpMsgForecast(..), segmentSize)
 import SimRelay (TestBlock, TestBlockRelayMessage)
 import Viz
+import VizUtils
 import VizChart
 import VizSim
 import VizSimTCP (lineMessageInFlight)
@@ -36,18 +37,19 @@ data RelayP2PSimVizConfig =
      }
 
 relayP2PSimVizRender :: RelayP2PSimVizConfig
-                     -> (Int, Int)
                      -> VizRender RelaySimVizModel
-relayP2PSimVizRender vizConfig renderReqSize =
+relayP2PSimVizRender vizConfig =
     VizRender {
-      renderReqSize,
+      renderReqSize = (500, 500), -- nominal, should be overridden
       renderChanged = \_t _fn _m -> True,
-      renderModel   = \ t _fn  m _ -> relayP2PSimVizRenderModel vizConfig t m
+      renderModel   = \ t _fn  m sz ->
+                        relayP2PSimVizRenderModel vizConfig t m sz
     }
 
 relayP2PSimVizRenderModel :: RelayP2PSimVizConfig
                           -> Time
                           -> SimVizModel event RelaySimVizState
+                          -> (Double, Double)
                           -> Cairo.Render ()
 relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                             nodeMessageColor,
@@ -56,6 +58,7 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                           now
                           (SimVizModel _events
                              RelaySimVizState {
+                               vizWorldSize,
                                vizNodePos,
                                vizMsgsInTransit,
                                vizMsgsAtNodeQueue,
@@ -65,7 +68,8 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
 --                               vizMsgsAtNodeTotalQueue,
 --                               vizMsgsAtNodeTotalBuffer,
                                vizNumMsgsGenerated
-                             }) = do
+                             })
+                          screenSize = do
     renderLinks
     renderNodes
     renderGenCount
@@ -105,8 +109,9 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
 -}
              Cairo.newPath
 
-        | (node, (x,y)) <- Map.toList vizNodePos
-        , let qmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
+        | (node, pos) <- Map.toList vizNodePos
+        , let (x,y)   = simPointToPixel vizWorldSize screenSize pos
+              qmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
               bmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
 --              nqmsgs  = length qmsgs
 --              nbmsgs  = length bmsgs
@@ -141,8 +146,10 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo (vizNodePos Map.! fromNode)
-                  uncurry Cairo.lineTo (vizNodePos Map.! toNode)
+                  uncurry Cairo.moveTo (simPointToPixel vizWorldSize screenSize
+                                         (vizNodePos Map.! fromNode))
+                  uncurry Cairo.lineTo (simPointToPixel vizWorldSize screenSize
+                                         (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setLineWidth 1
                   Cairo.setDash [10,5] 0
@@ -153,8 +160,10 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo (vizNodePos Map.! fromNode)
-                  uncurry Cairo.lineTo (vizNodePos Map.! toNode)
+                  uncurry Cairo.moveTo (simPointToPixel vizWorldSize screenSize
+                                         (vizNodePos Map.! fromNode))
+                  uncurry Cairo.lineTo (simPointToPixel vizWorldSize screenSize
+                                         (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setDash [] 0
                   Cairo.setLineWidth 2
@@ -175,8 +184,10 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
         , now >= msgSendTrailingEdge msgforecast
         , now <= msgRecvTrailingEdge msgforecast
         , (r,g,b) <- maybeToList (ptclMessageColor msg)
-        , let fromPos = vizNodePos Map.! fromNode
-              toPos   = vizNodePos Map.! toNode
+        , let fromPos = simPointToPixel vizWorldSize screenSize
+                                        (vizNodePos Map.! fromNode)
+              toPos   = simPointToPixel vizWorldSize screenSize
+                                        (vizNodePos Map.! toNode)
               (_msgTrailingEdge@(x,y), _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
         ]

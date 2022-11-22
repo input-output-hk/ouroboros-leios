@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module VizUtils where
 
 import qualified Graphics.Rendering.Cairo as Cairo
@@ -71,3 +73,14 @@ angleV (x,y) = atan (y / x)
 midpointV :: (Double, Double) -> (Double, Double) -> (Double, Double)
 midpointV a b = scaleV 0.5 (addV a b)
 
+-- | Given the world size, world position, and screen size, return the
+-- position in screen coordinates.
+--
+simPointToPixel :: (Double, Double) -- ^ Sim world dimensions
+                -> (Double, Double) -- ^ Screen size
+                -> (Double, Double) -- ^ Sim world position
+                -> (Double, Double) -- ^ Screen coordinates
+simPointToPixel (!ww, !wh) (!sw, !sh) (!wx, !wy) = (sx, sy)
+  where
+    !sx = wx/ww * sw
+    !sy = wy/wh * sh

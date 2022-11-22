@@ -7,6 +7,9 @@
 module SimRelay where
 
 import qualified Data.Set as Set
+import           Data.Set (Set)
+import qualified Data.Map.Strict as Map
+import           Data.Map.Strict (Map)
 import           Data.Foldable
 
 import Control.Monad
@@ -33,7 +36,9 @@ type RelaySimTrace = [(Time, RelaySimEvent)]
 
 data RelaySimEvent =
        -- | Declare the nodes and links
-       RelaySimEventSetup [(NodeId, (Int, Int))] [(NodeId, NodeId)]
+       RelaySimEventSetup !(Double, Double)              -- overall "world" size
+                          !(Map NodeId (Double, Double)) -- nodes and locations
+                          !(Set (NodeId, NodeId))        -- links between nodes
 
        -- | An event at a node
      | RelaySimEventNode (LabelNode (RelayNodeEvent TestBlock))
@@ -190,10 +195,8 @@ relayNode tracer
         _ <- atomically completion -- "relayNode: completions should not block"
         traceWith tracer (RelayNodeEventEnterBuffer blk)
 
-symmetric :: Ord a => [(a, a)] -> [(a, a)]
-symmetric xys = nodups $ xys ++ [ (y,x) | (x,y) <- xys ]
-  where
-    nodups = Set.toList . Set.fromList 
+symmetric :: Ord a => Set (a, a) -> Set (a, a)
+symmetric xys = xys <> Set.map (\(x,y) -> (y,x)) xys
 
 traceRelayLink1 :: TcpConnProps
                 -> PacketGenerationPattern
@@ -203,9 +206,12 @@ traceRelayLink1 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          [(NodeId 0, (50,  100)),
-           (NodeId 1, (450, 100))]
-          [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
+          (500, 500)
+          (Map.fromList
+            [(NodeId 0, (50,  100)),
+             (NodeId 1, (450, 100))])
+          (Set.fromList
+            [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)])
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
         (relayNode (nodeTracer na) configNode0 [] [inChan])
@@ -237,11 +243,13 @@ traceRelayLink4 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          [(NodeId 0, ( 50, 250)),
-           (NodeId 1, (450, 70)),
-           (NodeId 2, (550, 430)),
-           (NodeId 3, (950, 250))]
-          (symmetric
+          (1000, 500)
+          (Map.fromList
+            [(NodeId 0, ( 50, 250)),
+             (NodeId 1, (450, 70)),
+             (NodeId 2, (550, 430)),
+             (NodeId 3, (950, 250))])
+          (symmetric $ Set.fromList
             [(NodeId 0, NodeId 1),
              (NodeId 1, NodeId 3),
              (NodeId 0, NodeId 2),
@@ -285,11 +293,13 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          [(NodeId 0, ( 50, 70)),
-           (NodeId 1, (450, 400)),
-           (NodeId 2, (500, 70)),
-           (NodeId 3, (950, 70))]
-          (symmetric
+          (1000, 500)
+          (Map.fromList
+            [(NodeId 0, ( 50, 70)),
+             (NodeId 1, (450, 400)),
+             (NodeId 2, (500, 70)),
+             (NodeId 3, (950, 70))])
+          (symmetric $ Set.fromList
             [(NodeId 0, NodeId 1),
              (NodeId 1, NodeId 3),
              (NodeId 0, NodeId 2),
