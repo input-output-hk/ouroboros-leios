@@ -35,10 +35,6 @@ data P2PTopographyCharacteristics =
        -- | Size of the world (in seconds): (Circumference, pole-to-pole)
        p2pWorldDimensions :: (DiffTime, DiffTime),
 
-       -- | Size of the world on screen in notional pixels. The world positions
-       -- will be scaled to fit these dimensions.
-       p2pScreenDimensions :: (Int, Int),
-
        -- ^ Number of nodes, e.g. 100, 1000, 10,000
        p2pNumNodes        :: Int,
 
@@ -70,13 +66,12 @@ genArbitraryP2PTopography :: P2PTopographyCharacteristics
                           -> P2PTopography
 genArbitraryP2PTopography P2PTopographyCharacteristics{
                             p2pWorldDimensions  = (widthSeconds, heightSeconds),
-                            p2pScreenDimensions = (widthPixels,  heightPixels),
                             p2pNumNodes,
                             p2pNodeLinksClose,
                             p2pNodeLinksRandom
                           } rng0 =
     P2PTopography {
-      p2pNodes = nodePositionsPixels,
+      p2pNodes = nodePositions,
       p2pLinks = nodeLinks
     }
   where
@@ -85,16 +80,14 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
 
     (rngNodes, rngLinks) = Random.split rng0
 
-    nodePositionsPixels :: Map NodeId Point
-    nodePositionsPixels =
-        Map.map toScreenPos nodePositionsTime
+    nodePositions :: Map NodeId Point
+    nodePositions =
+        Map.map toNormalisedPoint nodePositionsTime
 
-    toScreenPos :: (DiffTime, DiffTime) -> Point
-    toScreenPos = \(x,y) -> (realToFrac x * sx, realToFrac y * sy)
-      where
-        sx, sy :: Double
-        sx = fromIntegral widthPixels  / realToFrac widthSeconds
-        sy = fromIntegral heightPixels / realToFrac heightSeconds
+    -- map the time-based positions into positions on a unit square
+    toNormalisedPoint :: (DiffTime, DiffTime) -> Point
+    toNormalisedPoint = \(x,y) -> (realToFrac x / realToFrac widthSeconds,
+                                   realToFrac y / realToFrac heightSeconds)
 
     nodePositionsTime :: Map NodeId (DiffTime, DiffTime)
     nodePositionsTime =
@@ -165,7 +158,6 @@ exampleTopographyCharacteristics1 :: P2PTopographyCharacteristics
 exampleTopographyCharacteristics1 =
   P2PTopographyCharacteristics {
     p2pWorldDimensions  = (0.600, 0.300),
-    p2pScreenDimensions = (1920, 1080),
     p2pNumNodes         = 50,
     p2pNodeLinksClose   = 5,
     p2pNodeLinksRandom  = 5

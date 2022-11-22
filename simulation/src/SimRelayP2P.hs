@@ -35,9 +35,9 @@ traceRelayP2P rng0 P2PTopography {p2pNodes, p2pLinks} tcpprops relayConfig =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          [ (nid, (round x, round y))
-          | (nid, (x,y)) <- Map.toList p2pNodes ]
-          (Map.keys p2pLinks)
+          (1.0, 1.0) -- world size
+          p2pNodes
+          (Map.keysSet p2pLinks)
       tcplinks <-
         sequence
           [ do (inChan, outChan) <- newConnectionTCP (linkTracer na nb)

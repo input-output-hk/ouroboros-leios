@@ -14,7 +14,6 @@ example1 :: Vizualisation
 example1 =
     slowmoVizualisation 0.1 $
     Viz model $
-      LayoutScaleFit $
       LayoutReqSize 500 650 $
       Layout $ relaySimVizRender examplesRelaySimVizConfig
   where
@@ -29,7 +28,6 @@ example2 :: Vizualisation
 example2 =
     slowmoVizualisation 0.1 $
     Viz model $
-      LayoutScaleFit $
       LayoutReqSize 1000 650 $
       Layout $ relaySimVizRender examplesRelaySimVizConfig
   where
@@ -44,7 +42,6 @@ example3 :: Vizualisation
 example3 =
     slowmoVizualisation 0.1 $
     Viz model $
-      LayoutScaleFit $
       LayoutReqSize 1000 650 $
       Layout $ relaySimVizRender examplesRelaySimVizConfig
   where
