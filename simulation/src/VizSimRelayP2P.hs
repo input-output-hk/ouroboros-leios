@@ -390,17 +390,17 @@ chartLinkUtilisation =
                     }
                   , let v = counts ! MsgsInFlightControl in
                     Chart.def {
-                      Chart._pitem_label = "Control messages (" ++ show v ++ ")"
+                      Chart._pitem_label = "Control (" ++ show v ++ ")"
                     , Chart._pitem_value = fromIntegral v
                     }
                   , let v = counts ! MsgsInFlightNonBallistic in
                     Chart.def {
-                      Chart._pitem_label = "Non-ballistic delivery (" ++ show v ++ ")"
+                      Chart._pitem_label = "Non-ballistic (" ++ show v ++ ")"
                     , Chart._pitem_value = fromIntegral v
                     }
                   , let v = counts ! MsgsInFlightBallistic in
                     Chart.def {
-                      Chart._pitem_label = "Ballistic delivery (" ++ show v ++ ")"
+                      Chart._pitem_label = "Ballistic (" ++ show v ++ ")"
                     , Chart._pitem_value = fromIntegral v
                     }
                   ]
