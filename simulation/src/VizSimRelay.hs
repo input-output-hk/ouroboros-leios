@@ -189,14 +189,14 @@ relaySimVizModel =
           vizMsgsAtNodeRecentBuffer =
             Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs),
           vizMsgsDiffusionLatency =
-            Map.filter (\(_,_,t,_) -> t >= secondsAgo10) (vizMsgsDiffusionLatency vs)
+            Map.filter (\(_,_,t,_) -> t >= secondsAgo15) (vizMsgsDiffusionLatency vs)
         }
       where
         secondsAgo1 :: Time
         secondsAgo1 = addTime (-1) now
 
-        secondsAgo10 :: Time
-        secondsAgo10 = addTime (-10) now
+        secondsAgo15 :: Time
+        secondsAgo15 = addTime (-15) now
 
 
 -- | The shortest distance between two points, given that the world may be
