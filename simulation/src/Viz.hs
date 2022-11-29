@@ -647,6 +647,14 @@ slowmoVizualisation dilation
         renderModel   = \_t fn (t, m) -> renderModel   t fn m
       }
 
+nullVizRender :: VizRender model
+nullVizRender =
+    VizRender {
+      renderReqSize = (4, 0),
+      renderChanged = \_t _fn _ -> False,
+      renderModel   = \_t _fn _m _s -> return ()
+    }
+
 layoutLabelTime :: Layout (VizRender model)
 layoutLabelTime =
     LayoutFixed $ Layout VizRender {
