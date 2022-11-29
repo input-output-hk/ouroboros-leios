@@ -15,6 +15,7 @@ import Control.Monad.Class.MonadTime.SI
 --import qualified Graphics.Gnuplot.Terminal.PNG as Gnuplot.PNG
 
 import ModelTCP
+import SimTypes
 import SimTCPLinks
 
 ------------------------------------------------------------------------------

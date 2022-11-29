@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module P2P where
 
@@ -17,23 +18,23 @@ import Control.Monad.Class.MonadTime.SI (DiffTime)
 import qualified System.Random as Random
 import           System.Random (StdGen)
 
-import SimTCPLinks (NodeId(..)) -- TODO move this definition to some common module
+import SimTypes (NodeId(..), Point(..), WorldShape(..))
 
 
 data P2PTopography =
      P2PTopography {
-       p2pNodes :: Map NodeId Point,
-       p2pLinks :: Map (NodeId, NodeId) Latency
+       p2pNodes      :: !(Map NodeId Point),
+       p2pLinks      :: !(Map (NodeId, NodeId) Latency),
+       p2pWorldShape :: !WorldShape
      }
   deriving (Show)
 
-type Point = (Double,Double)
-type Latency = DiffTime
+type Latency = Double -- ^ Double rather than DiffTime for efficiency
 
 data P2PTopographyCharacteristics =
      P2PTopographyCharacteristics {
        -- | Size of the world (in seconds): (Circumference, pole-to-pole)
-       p2pWorldDimensions :: (DiffTime, DiffTime),
+       p2pWorldShape      :: !WorldShape,
 
        -- ^ Number of nodes, e.g. 100, 1000, 10,000
        p2pNumNodes        :: Int,
@@ -65,14 +66,17 @@ genArbitraryP2PTopography :: P2PTopographyCharacteristics
                           -> StdGen
                           -> P2PTopography
 genArbitraryP2PTopography P2PTopographyCharacteristics{
-                            p2pWorldDimensions  = (widthSeconds, heightSeconds),
+                            p2pWorldShape = p2pWorldShape@WorldShape {
+                              worldDimensions = (widthSeconds, heightSeconds)
+                            },
                             p2pNumNodes,
                             p2pNodeLinksClose,
                             p2pNodeLinksRandom
                           } rng0 =
     P2PTopography {
-      p2pNodes = nodePositions,
-      p2pLinks = nodeLinks
+      p2pNodes     = nodePositions,
+      p2pLinks     = nodeLinks,
+      p2pWorldShape
     }
   where
     nodes :: [NodeId]
@@ -82,50 +86,40 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
 
     nodePositions :: Map NodeId Point
     nodePositions =
-        Map.map toNormalisedPoint nodePositionsTime
-
-    -- map the time-based positions into positions on a unit square
-    toNormalisedPoint :: (DiffTime, DiffTime) -> Point
-    toNormalisedPoint = \(x,y) -> (realToFrac x / realToFrac widthSeconds,
-                                   realToFrac y / realToFrac heightSeconds)
-
-    nodePositionsTime :: Map NodeId (DiffTime, DiffTime)
-    nodePositionsTime =
         Map.fromList $ snd $ mapAccumL genNodePos rngNodes nodes
       where
-        genNodePos :: StdGen -> NodeId -> (StdGen, (NodeId, (DiffTime, DiffTime)))
+        genNodePos :: StdGen -> NodeId -> (StdGen, (NodeId, Point))
         genNodePos rng nodeid =
-            (rng'', (nodeid, (realToFrac x, realToFrac y)))
+            (rng'', (nodeid, Point x y))
           where
             x, y :: Double
-            (x, !rng')  = Random.uniformR (0, realToFrac widthSeconds)  rng
-            (y, !rng'') = Random.uniformR (0, realToFrac heightSeconds) rng'
+            (x, !rng')  = Random.uniformR (0, widthSeconds)  rng
+            (y, !rng'') = Random.uniformR (0, heightSeconds) rng'
 
-    linkDistances :: Map (Int, Int) DiffTime
+    linkDistances :: Map (NodeId, NodeId) Latency
     linkDistances =
       Map.fromList
         [ ((n1, n2), distance)
-        | NodeId n1 <- nodes
-        , NodeId n2 <- nodes
+        | n1 <- nodes
+        , n2 <- nodes
         , n1 <= n2
-        , let Just (x1,y1) = Map.lookup (NodeId n1) nodePositionsTime
-              Just (x2,y2) = Map.lookup (NodeId n2) nodePositionsTime
+        , let Just (Point x1 y1) = Map.lookup n1 nodePositions
+              Just (Point x2 y2) = Map.lookup n2 nodePositions
 
               dx, dy :: Double
               dx = realToFrac (x1-x2)
               dy = realToFrac (y1-y2)
 
-              distance :: DiffTime
+              distance :: Latency
               distance =
-                realToFrac $
                   sqrt (dx*dx + dy*dy)
               --TODO: shortest path across date line!s
         ]
 
-    linkDistance :: NodeId -> NodeId -> DiffTime
-    linkDistance (NodeId n1) (NodeId n2)
+    linkDistance :: NodeId -> NodeId -> Latency
+    linkDistance n1 n2
       | n1 <= n2  = let Just d = Map.lookup (n1, n2) linkDistances in d
-      | otherwise = linkDistance (NodeId n2) (NodeId n1)
+      | otherwise = linkDistance n2 n1
 
     nodeLinks :: Map (NodeId, NodeId) Latency
     nodeLinks =
@@ -157,7 +151,9 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
 exampleTopographyCharacteristics1 :: P2PTopographyCharacteristics
 exampleTopographyCharacteristics1 =
   P2PTopographyCharacteristics {
-    p2pWorldDimensions  = (0.600, 0.300),
+    p2pWorldShape       = WorldShape {
+                            worldDimensions  = (0.600, 0.300)
+                          },
     p2pNumNodes         = 50,
     p2pNodeLinksClose   = 5,
     p2pNodeLinksRandom  = 5
@@ -201,10 +197,12 @@ p2pGraphIdealDiffusionTimes P2PTopography { p2pNodes, p2pLinks }
     P2PIdealDiffusionTimes p2pGraph $
       allPairsMinWeights
         p2pGraph
-        (\(a,b) -> let linkLatency, msgLatency :: DiffTime
+        (\(a,b) -> let linkLatency :: Latency
                        linkLatency = p2pLinks Map.! (NodeId a, NodeId b)
+                       msgLatency :: DiffTime
                        msgLatency  = communicationDelay
-                                       (NodeId a) (NodeId b) linkLatency
+                                       (NodeId a) (NodeId b)
+                                       (realToFrac linkLatency)
                     in realToFrac msgLatency
         )
         (realToFrac . processingDelay . NodeId)

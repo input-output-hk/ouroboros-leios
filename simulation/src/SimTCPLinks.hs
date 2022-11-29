@@ -7,7 +7,6 @@ module SimTCPLinks where
 
 import Data.Bifoldable
 import Data.Dynamic
-import Data.Ix
 
 import Control.Monad
 import Control.Monad.Class.MonadTime.SI
@@ -23,6 +22,7 @@ import Control.Monad.IOSim as IOSim
 import Chan
 import ModelTCP
 import ChanTCP
+import SimTypes
 
 ------------------------------------------------------------------------------
 -- Simulations
@@ -41,9 +41,6 @@ data TcpSimEvent =
      | TcpSimEventTcp (LabelLink (TcpEvent TestMessage))
   deriving Show
 
-data LabelNode e = LabelNode NodeId        e  deriving Show
-data LabelLink e = LabelLink NodeId NodeId e  deriving Show
-
 data NodeEvent msg =
        MsgArrive msg
      | MsgDepart msg
@@ -56,9 +53,6 @@ type MsgId = Int
 
 instance MessageSize TestMessage where
   messageSizeBytes (TestMessage _ bytes) = bytes
-
-newtype NodeId = NodeId Int
-  deriving (Eq, Ord, Ix, Show)
 
 mkTcpConnProps :: DiffTime     -- ^ latency in seconds
                -> Bytes        -- ^ sender serialisation bandwidth in bytes per sec

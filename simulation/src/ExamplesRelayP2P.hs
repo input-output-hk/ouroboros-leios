@@ -6,9 +6,10 @@ import Data.Word
 import System.Random (mkStdGen, uniform)
 
 import RelayProtocol
+import SimTypes
 import SimTCPLinks (mkTcpConnProps, kilobytes)
 import SimRelay
-import P2P
+import P2P (P2PTopographyCharacteristics(..), genArbitraryP2PTopography)
 import SimRelayP2P
 import Viz
 import VizSimRelay (relaySimVizModel)
@@ -72,7 +73,9 @@ example1 =
     p2pNumNodes         = 100
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
-        p2pWorldDimensions  = (0.600, 0.300),
+        p2pWorldShape       = WorldShape {
+                                worldDimensions = (0.600, 0.300)
+                              },
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5
@@ -128,7 +131,9 @@ example2 =
     p2pNumNodes         = 200
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
-        p2pWorldDimensions  = (0.600, 0.300),
+        p2pWorldShape       = WorldShape {
+                                worldDimensions = (0.600, 0.300)
+                              },
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5
