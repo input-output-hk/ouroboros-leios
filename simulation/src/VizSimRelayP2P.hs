@@ -307,7 +307,10 @@ chartDiffusionImperfection :: P2PTopography
                            -> RelayP2PSimVizConfig
                            -> VizRender RelaySimVizModel
 chartDiffusionImperfection p2ptopography processingDelay serialisationDelay
-                           RelayP2PSimVizConfig {nodeMessageColor} =
+                           RelayP2PSimVizConfig {nodeMessageColor}
+  | Map.size (p2pNodes p2ptopography) > 100
+              = nullVizRender
+  | otherwise =
     chartVizRender 25 $ \_ _
       (SimVizModel _ RelaySimVizState { vizMsgsDiffusionLatency }) ->
       (Chart.def :: Chart.Layout DiffTime DiffTime) {
