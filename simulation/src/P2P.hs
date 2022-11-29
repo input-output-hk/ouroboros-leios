@@ -67,7 +67,8 @@ genArbitraryP2PTopography :: P2PTopographyCharacteristics
                           -> P2PTopography
 genArbitraryP2PTopography P2PTopographyCharacteristics{
                             p2pWorldShape = p2pWorldShape@WorldShape {
-                              worldDimensions = (widthSeconds, heightSeconds)
+                              worldDimensions = (widthSeconds, heightSeconds),
+                              worldIsCylinder
                             },
                             p2pNumNodes,
                             p2pNodeLinksClose,
@@ -96,39 +97,16 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
             (x, !rng')  = Random.uniformR (0, widthSeconds)  rng
             (y, !rng'') = Random.uniformR (0, heightSeconds) rng'
 
-    linkDistances :: Map (NodeId, NodeId) Latency
-    linkDistances =
-      Map.fromList
-        [ ((n1, n2), distance)
-        | n1 <- nodes
-        , n2 <- nodes
-        , n1 <= n2
-        , let Just (Point x1 y1) = Map.lookup n1 nodePositions
-              Just (Point x2 y2) = Map.lookup n2 nodePositions
-
-              dx, dy :: Double
-              dx = realToFrac (x1-x2)
-              dy = realToFrac (y1-y2)
-
-              distance :: Latency
-              distance =
-                  sqrt (dx*dx + dy*dy)
-              --TODO: shortest path across date line!s
-        ]
-
-    linkDistance :: NodeId -> NodeId -> Latency
-    linkDistance n1 n2
-      | n1 <= n2  = let Just d = Map.lookup (n1, n2) linkDistances in d
-      | otherwise = linkDistance n2 n1
-
     nodeLinks :: Map (NodeId, NodeId) Latency
     nodeLinks =
       Map.fromList
         [ ((nid,nid'), latency)
         | (nid, rng) <- zip nodes (unfoldr (Just . Random.split) rngLinks)
+        , let Just p  = Map.lookup nid  nodePositions
         , nid' <- pickNodeLinksClose  nid
                ++ pickNodeLinksRandom nid rng
-        , let latency = linkDistance nid nid'
+        , let Just p'  = Map.lookup nid' nodePositions
+              !latency = linkLatency p p'
         ]
 
     pickNodeLinksClose :: NodeId -> [NodeId]
@@ -136,7 +114,7 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
         take p2pNodeLinksClose
       $ map fst
       $ sortBy (compare `on` snd)
-        [ (nid', linkDistance nid nid')
+        [ (nid', linkLatencyCached nid nid')
         | nid' <- nodes
         , nid' /= nid
         ]
@@ -148,11 +126,62 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
         | nid' <- Random.randomRs (0, p2pNumNodes-1) rng
         , nid /= NodeId nid' ]
 
+    linkLatenciesCached :: Map (NodeId, NodeId) Latency
+    linkLatenciesCached =
+      Map.fromList
+        [ ((n1, n2), latency)
+        | n1 <- nodes
+        , n2 <- nodes
+        , n1 <= n2
+        , let Just p1  = Map.lookup n1 nodePositions
+              Just p2  = Map.lookup n2 nodePositions
+              !latency = linkLatencySquared p1 p2
+        ]
+
+    linkLatencyCached :: NodeId -> NodeId -> Latency
+    linkLatencyCached n1 n2
+      | n1 <= n2  = let Just d = Map.lookup (n1, n2) linkLatenciesCached in d
+      | otherwise = linkLatencyCached n2 n1
+
+    linkLatency :: Point -> Point -> Latency
+    linkLatency p1 p2 =
+        sqrt (linkLatencySquared p1 p2)
+
+    linkLatencySquared :: Point -> Point -> Latency
+    linkLatencySquared p1 p2
+      | worldIsCylinder = min d2 d2'
+      | otherwise       = d2
+      where
+        (d2, d2') = linkPathLatenciesSquared widthSeconds p1 p2
+
+-- | The latencies of the two different paths between two points: direct
+-- and the other way around the world.
+linkPathLatenciesSquared :: Latency -> Point -> Point -> (Latency, Latency)
+linkPathLatenciesSquared widthSeconds (Point x1 y1) (Point x2 y2) =
+    (d2, d2')
+  where
+    d2              = pointToPointLatencySquared
+                        (Point x1 y1) (Point x2 y2)
+    d2' | x1 <= x2  = pointToPointLatencySquared
+                        (Point (x1 + widthSeconds) y1) (Point x2 y2)
+        | otherwise = pointToPointLatencySquared
+                        (Point x1 y1) (Point (x2 + widthSeconds) y2)
+
+-- | The square of the distance between two points.
+-- Why squared? For efficiency, avoiding a square root.
+pointToPointLatencySquared :: Point -> Point -> Latency
+pointToPointLatencySquared (Point x1 y1) (Point x2 y2) =
+    dx*dx + dy*dy
+  where
+    dx = x1-x2
+    dy = y1-y2
+
 exampleTopographyCharacteristics1 :: P2PTopographyCharacteristics
 exampleTopographyCharacteristics1 =
   P2PTopographyCharacteristics {
     p2pWorldShape       = WorldShape {
-                            worldDimensions  = (0.600, 0.300)
+                            worldDimensions  = (0.600, 0.300),
+                            worldIsCylinder  = True
                           },
     p2pNumNodes         = 50,
     p2pNodeLinksClose   = 5,

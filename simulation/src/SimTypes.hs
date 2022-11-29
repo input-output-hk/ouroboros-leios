@@ -15,7 +15,12 @@ data Point = Point !Double !Double deriving Show
 data WorldShape = WorldShape {
        -- | The dimensions of the world in simulation world coordinates
        -- (Circumference, pole-to-pole)
-       worldDimensions :: !(Double, Double)
+       worldDimensions :: !(Double, Double),
+
+       -- | If the world is a cylinder, and so wraps around from the East edge
+       -- to the West edge, or if the world is a rectangle, with no wrapping at
+       -- the edges. This affects the latencies.
+       worldIsCylinder :: !Bool
      }
   deriving (Show)
 

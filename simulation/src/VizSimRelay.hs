@@ -6,8 +6,6 @@ module VizSimRelay where
 import           Data.Maybe
 import qualified Data.Map.Strict as Map
 import           Data.Map (Map)
-import qualified Data.Set as Set
-import           Data.Set (Set)
 import qualified Data.PQueue.Min as PQ
 import           Data.PQueue.Min (MinQueue)
 
@@ -19,6 +17,7 @@ import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
 import SimTypes
 import SimRelay
+import P2P (linkPathLatenciesSquared)
 import Viz
 import VizSim
 import VizSimTCP (TcpSimVizConfig(..), renderMessagesInFlight,
@@ -30,18 +29,18 @@ import VizUtils
 -- The vizualisation model
 --
 
--- | The vizualisation data model for the tcp simulation
+-- | The vizualisation data model for the relay simulation
 type RelaySimVizModel =
        SimVizModel
          RelaySimEvent
          RelaySimVizState
 
--- | The vizualisation state within the data model for the tcp simulation
+-- | The vizualisation state within the data model for the relay simulation
 data RelaySimVizState =
      RelaySimVizState {
        vizWorldShape    :: !WorldShape,
        vizNodePos       :: !(Map NodeId Point),
-       vizNodeLinks     :: !(Set (NodeId, NodeId)),
+       vizNodeLinks     :: !(Map (NodeId, NodeId) LinkPoints),
        vizMsgsInTransit :: !(Map (NodeId, NodeId)
                                [(TestBlockRelayMessage,
                                  TcpMsgForecast, [TcpMsgForecast])]),
@@ -54,6 +53,23 @@ data RelaySimVizState =
        vizNumMsgsGenerated       :: !Int,
        vizMsgsDiffusionLatency   :: !(Map TestBlockId (TestBlock, NodeId, Time, [Time]))
      }
+
+-- | The end points where the each link, including the case where the link
+-- wraps around on a cylindrical world.
+data LinkPoints =
+       -- | The link goes directly from the node point to node point, without
+       -- wrapping around across the West\/East edge.
+       LinkPointsNoWrap {-# UNPACK #-} !Point {-# UNPACK #-} !Point
+
+       -- The link does cross the West\/East edge. The points provided are the
+       -- starting node point, two virtual points outside the world rectangle
+       -- indicating where a node following a straight line would be, and the
+       -- final node point. So if one draws lines between the two pairs of
+       -- points (with appropriate clipping) then it will look like it wraps
+       -- around.
+     | LinkPointsWrap   {-# UNPACK #-} !Point {-# UNPACK #-} !Point
+                        {-# UNPACK #-} !Point {-# UNPACK #-} !Point
+  deriving (Show)
 
 
 -- | Make the vizualisation model for the relay simulation from a simulation
@@ -68,9 +84,9 @@ relaySimVizModel =
   where
     initVizState =
       RelaySimVizState {
-        vizWorldShape    = WorldShape (0,0),
+        vizWorldShape    = WorldShape (0,0) False,
         vizNodePos       = Map.empty,
-        vizNodeLinks     = Set.empty,
+        vizNodeLinks     = Map.empty,
         vizMsgsInTransit = Map.empty,
         vizMsgsAtNodeQueue  = Map.empty,
         vizMsgsAtNodeBuffer = Map.empty,
@@ -90,7 +106,11 @@ relaySimVizModel =
         vs {
           vizWorldShape = shape,
           vizNodePos    = nodes,
-          vizNodeLinks  = links
+          vizNodeLinks  = Map.fromSet
+                            (\(n1,n2) -> linkPoints shape
+                                                    (nodes Map.! n1)
+                                                    (nodes Map.! n2))
+                            links
         }
 
     accumEventVizState _now (RelaySimEventTcp
@@ -177,6 +197,24 @@ relaySimVizModel =
 
         secondsAgo10 :: Time
         secondsAgo10 = addTime (-10) now
+
+
+-- | The shortest distance between two points, given that the world may be
+-- considered to be a cylinder.
+--
+-- These points are computed in normalised (unit square) coordinates
+--
+linkPoints :: WorldShape -> Point -> Point -> LinkPoints
+linkPoints WorldShape { worldDimensions = (widthSeconds,_), worldIsCylinder }
+           p1@(Point x1 y1) p2@(Point x2 y2)
+  | not worldIsCylinder || d2 < d2'
+              = LinkPointsNoWrap (Point x1 y1) (Point x2 y2)
+  | x1 <= x2  = LinkPointsWrap   (Point x1 y1) (Point (x2-widthSeconds) y2)
+                                 (Point (x1+widthSeconds) y1) (Point x2 y2)
+  | otherwise = LinkPointsWrap   (Point x1 y1) (Point (x2+widthSeconds) y2)
+                                 (Point (x1-widthSeconds) y1) (Point x2 y2)
+  where
+    (d2, d2') = linkPathLatenciesSquared widthSeconds p1 p2
 
 
 newtype RecentRate = RecentRate (MinQueue Time)
@@ -333,7 +371,7 @@ relaySimVizRenderModel RelaySimVizConfig {
       where
         linksAndMsgs =
           [ (fromPos, toPos, msgs)
-          | (fromNode, toNode) <- Set.toList vizNodeLinks
+          | (fromNode, toNode) <- Map.keys vizNodeLinks
           , let (fromPos, toPos) =
                   translateLineNormal displace
                     (simPointToPixel worldDimensions screenSize (vizNodePos Map.! fromNode),
@@ -342,7 +380,7 @@ relaySimVizRenderModel RelaySimVizConfig {
                 -- so they don't overlap each other, but for unidirectional
                 -- links we can draw it centrally.
                 displace
-                  | Set.notMember (toNode, fromNode) vizNodeLinks =   0
+                  | Map.notMember (toNode, fromNode) vizNodeLinks =   0
                   | otherwise                                     = -10
 
                 msgs = Map.findWithDefault
