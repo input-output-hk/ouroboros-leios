@@ -3,6 +3,8 @@
 module ExamplesRelayP2P where
 
 import Data.Word
+import Data.Functor.Contravariant
+
 import System.Random (mkStdGen, uniform)
 
 import RelayProtocol
@@ -85,27 +87,51 @@ example1 =
 
 example2 :: Vizualisation
 example2 =
-    slowmoVizualisation 0.5 $
-    Viz model $
+    slowmoVizualisation 0.2 $
+    Viz (pairVizModel model1 model2) $
       LayoutAbove
-        [ layoutLabelTime
-        , LayoutAbove
-            [ LayoutReqSize 400 300 $
-              Layout $ chartDiffusionLatency config
-            , LayoutReqSize 400 300 $
-              Layout $ chartDiffusionImperfection
-                         p2pTopography
-                         0.1
-                         (96 / 1000)
-                         config
-            , LayoutReqSize 400 300 $
-              Layout chartBandwidth
-            , LayoutReqSize 400 300 $
-              Layout chartLinkUtilisation
+        [ layoutLabel 18 "Flat vs cylindrical world topology"
+        , LayoutReqSize 0 40 $
+          layoutLabel 10 $ "Left side is a flat rectangular world.\n"
+                        ++ "Right is a cylindrical world, i.e. the east and "
+                        ++ "west edges are connected."
+        , layoutLabelTime
+        , LayoutBeside
+            [ fmap (contramap fst) $
+              LayoutAbove
+                [ LayoutReqSize 900 600 $
+                  Layout $ relayP2PSimVizRender config
+                , LayoutBeside
+                    [ LayoutReqSize 350 300 $
+                      Layout $ chartDiffusionLatency config
+                    , LayoutReqSize 350 300 $
+                      Layout $ chartLinkUtilisation
+                    ]
+                ]
+            , fmap (contramap snd) $
+              LayoutAbove
+                [ LayoutReqSize 900 600 $
+                  Layout $ relayP2PSimVizRender config
+                , LayoutBeside
+                    [ LayoutReqSize 350 300 $
+                      Layout $ chartDiffusionLatency config
+                    , LayoutReqSize 350 300 $
+                      Layout $ chartLinkUtilisation
+                    ]
+                ]
             ]
         ]
   where
-    model = relaySimVizModel trace
+    model1 = model p2pTopographyCharacteristicsCommon {
+                     p2pWorldShape =
+                       p2pWorldShape {
+                         worldIsCylinder = False
+                       }
+                   }
+    model2 = model p2pTopographyCharacteristicsCommon
+
+    model p2pTopographyCharacteristics =
+        relaySimVizModel trace
       where
         trace =
           traceRelayP2P
@@ -123,19 +149,19 @@ example2 =
                   (0.5 * fromIntegral p2pNumNodes)
                   10.0
              })
-
-    p2pTopography =
-      genArbitraryP2PTopography p2pTopographyCharacteristics rng0
+        p2pTopography =
+          genArbitraryP2PTopography p2pTopographyCharacteristics rng0
 
     rng0 = mkStdGen 4 --TODO: make a param
 
-    p2pNumNodes         = 200
-    p2pTopographyCharacteristics =
+    p2pNumNodes   = 100
+    p2pWorldShape = WorldShape {
+                      worldDimensions = (0.600, 0.300),
+                      worldIsCylinder = True
+                    }
+    p2pTopographyCharacteristicsCommon =
       P2PTopographyCharacteristics {
-        p2pWorldShape       = WorldShape {
-                                worldDimensions = (0.600, 0.300),
-                                worldIsCylinder = True
-                              },
+        p2pWorldShape,
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
         p2pNodeLinksRandom  = 5
