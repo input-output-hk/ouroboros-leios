@@ -21,6 +21,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Class.MonadTime.SI (Time(Time), DiffTime, diffTime, addTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
+import qualified Graphics.Rendering.Pango.Cairo  as Pango
+import qualified Graphics.Rendering.Pango.Layout as Pango
+import qualified Graphics.Rendering.Pango.Font   as Pango
 import qualified Graphics.UI.Gtk as Gtk
 import           Graphics.UI.Gtk (AttrOp((:=)))
 
@@ -671,22 +674,26 @@ layoutLabelTime =
       Cairo.showText $
         Time.formatTime Time.defaultTimeLocale "Time (sec): %-2Es" t
 
-layoutLabel :: String -> Layout (VizRender model)
-layoutLabel label =
+layoutLabel :: Int -> String -> Layout (VizRender model)
+layoutLabel size label =
     LayoutFixed $ Layout VizRender {
-      renderReqSize = (400, 30),
+      renderReqSize = (400, size + 12),
       renderChanged = \_t _fn _ -> False,
-      renderModel   = \_t _fn _m (w,h) -> do
-        Cairo.selectFontFace ("Sans" :: String)
-                             Cairo.FontSlantNormal
-                             Cairo.FontWeightBold
-        Cairo.setFontSize (h-5)
-        Cairo.TextExtents {
-          Cairo.textExtentsWidth  = tw,
-          Cairo.textExtentsHeight = th
-        } <- Cairo.textExtents label
-        Cairo.moveTo (max 5 ((w - tw) / 2)) th
-        Cairo.setSourceRGB 0 0 0
-        Cairo.showText label
+      renderModel   = \_t _fn _m (w,_h) -> do
+        layout <- liftIO $ do
+          ctx    <- Pango.cairoCreateContext Nothing
+          layout <- Pango.layoutEmpty ctx
+          font   <- Pango.fontDescriptionNew
+          Pango.fontDescriptionSetFamily font ("Sans" :: String)
+          Pango.fontDescriptionSetSize font (fromIntegral size)
+          Pango.layoutSetFontDescription layout (Just font)
+          Pango.layoutSetWidth layout (Just w)
+          Pango.layoutSetWrap  layout Pango.WrapWholeWords
+          Pango.layoutSetEllipsize layout Pango.EllipsizeEnd
+          Pango.layoutSetAlignment layout Pango.AlignCenter
+          Pango.layoutSetText layout label
+          return layout
+        Cairo.moveTo 0 0
+        Pango.showLayout layout
     }
 

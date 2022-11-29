@@ -28,7 +28,7 @@ example1 =
       slowmoVizualisation 0.1 $
       Viz model $
         LayoutAbove
-          [ LayoutReqSize 100 25 $ layoutLabel title
+          [ LayoutReqSize 100 25 $ layoutLabel 18 title
           , LayoutBeside
               [ LayoutAbove
                   [ layoutLabelTime
