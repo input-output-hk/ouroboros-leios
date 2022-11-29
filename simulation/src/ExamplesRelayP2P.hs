@@ -74,7 +74,8 @@ example1 =
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
         p2pWorldShape       = WorldShape {
-                                worldDimensions = (0.600, 0.300)
+                                worldDimensions = (0.600, 0.300),
+                                worldIsCylinder = True
                               },
         p2pNumNodes,
         p2pNodeLinksClose   = 5,
@@ -132,7 +133,8 @@ example2 =
     p2pTopographyCharacteristics =
       P2PTopographyCharacteristics {
         p2pWorldShape       = WorldShape {
-                                worldDimensions = (0.600, 0.300)
+                                worldDimensions = (0.600, 0.300),
+                                worldIsCylinder = True
                               },
         p2pNumNodes,
         p2pNodeLinksClose   = 5,

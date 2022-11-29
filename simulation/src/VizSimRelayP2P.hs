@@ -23,7 +23,8 @@ import VizUtils
 import VizChart
 import VizSim
 import VizSimTCP (lineMessageInFlight)
-import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), recentRate)
+import VizSimRelay (RelaySimVizModel, RelaySimVizState(..), recentRate,
+                    LinkPoints(..))
 import P2P
 
 
@@ -61,6 +62,7 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                              RelaySimVizState {
                                vizWorldShape = WorldShape { worldDimensions },
                                vizNodePos,
+                               vizNodeLinks,
                                vizMsgsInTransit,
                                vizMsgsAtNodeQueue,
                                vizMsgsAtNodeBuffer,
@@ -147,44 +149,80 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  withPoint Cairo.moveTo (toScreenPoint (vizNodePos Map.! fromNode))
-                  withPoint Cairo.lineTo (toScreenPoint (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setLineWidth 1
                   Cairo.setDash [10,5] 0
-                  Cairo.stroke
+                  case vizNodeLinks Map.! (fromNode, toNode) of
+                    LinkPointsNoWrap fromPos toPos -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                    LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                      withPoint Cairo.moveTo (toScreenPoint fromPos')
+                      withPoint Cairo.lineTo (toScreenPoint toPos')
+                      Cairo.stroke
 
             -- We draw with a full line
             MsgsInFlightBallistic ->
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  withPoint Cairo.moveTo (toScreenPoint (vizNodePos Map.! fromNode))
-                  withPoint Cairo.lineTo (toScreenPoint (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setDash [] 0
                   Cairo.setLineWidth 2
-                  Cairo.stroke
+                  case vizNodeLinks Map.! (fromNode, toNode) of
+                    LinkPointsNoWrap fromPos toPos -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                    LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+                      withPoint Cairo.moveTo (toScreenPoint fromPos)
+                      withPoint Cairo.lineTo (toScreenPoint toPos)
+                      Cairo.stroke
+                      withPoint Cairo.moveTo (toScreenPoint fromPos')
+                      withPoint Cairo.lineTo (toScreenPoint toPos')
+                      Cairo.stroke
 
         | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         ]
       Cairo.restore
       -- draw the messages in flight on top
       sequence_
-        [ do Cairo.rectangle (x-8) (y-8) 16 16
-             Cairo.setSourceRGB r g b
-             Cairo.fillPreserve
-             Cairo.setSourceRGB 0 0 0
-             Cairo.stroke
+        [ case vizNodeLinks Map.! (fromNode, toNode) of
+            LinkPointsNoWrap fromPos toPos -> do
+              let (msgTrailingEdge, _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos toPos msgforecast
+                  Point x y = toScreenPoint msgTrailingEdge
+              Cairo.rectangle (x-8) (y-8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
+            LinkPointsWrap fromPos toPos fromPos' toPos' -> do
+              let (msgTrailingEdge, _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos toPos msgforecast
+                  Point x y = toScreenPoint msgTrailingEdge
+              Cairo.rectangle (x-8) (y-8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
+              let (msgTrailingEdge', _msgLeadingEdge) =
+                    lineMessageInFlight now fromPos' toPos' msgforecast
+                  Point x' y' = toScreenPoint msgTrailingEdge'
+              Cairo.rectangle (x'-8) (y'-8) 16 16
+              Cairo.setSourceRGB r g b
+              Cairo.fillPreserve
+              Cairo.setSourceRGB 0 0 0
+              Cairo.stroke
         | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         , (msg, msgforecast, _msgforecasts) <- msgs
         , now >= msgSendTrailingEdge msgforecast
         , now <= msgRecvTrailingEdge msgforecast
         , (r,g,b) <- maybeToList (ptclMessageColor msg)
-        , let fromPos = toScreenPoint (vizNodePos Map.! fromNode)
-              toPos   = toScreenPoint (vizNodePos Map.! toNode)
-              (_msgTrailingEdge@(Point x y), _msgLeadingEdge) =
-                lineMessageInFlight now fromPos toPos msgforecast
         ]
       Cairo.restore
 

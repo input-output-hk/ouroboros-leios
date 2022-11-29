@@ -208,7 +208,8 @@ traceRelayLink1 tcpprops generationPattern =
       traceWith tracer $
         RelaySimEventSetup
           WorldShape {
-            worldDimensions = (500, 500)
+            worldDimensions = (500, 500),
+            worldIsCylinder = False
           }
           (Map.fromList
             [(NodeId 0, (Point 50  100)),
@@ -247,7 +248,8 @@ traceRelayLink4 tcpprops generationPattern =
       traceWith tracer $
         RelaySimEventSetup
           WorldShape {
-            worldDimensions = (1000, 500)
+            worldDimensions = (1000, 500),
+            worldIsCylinder = False
           }
           (Map.fromList
             [(NodeId 0, (Point  50 250)),
@@ -299,7 +301,8 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
       traceWith tracer $
         RelaySimEventSetup
           WorldShape {
-            worldDimensions = (1000, 500)
+            worldDimensions = (1000, 500),
+            worldIsCylinder = False
           }
           (Map.fromList
             [(NodeId 0, (Point  50 70)),
