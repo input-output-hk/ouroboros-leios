@@ -13,6 +13,7 @@ import           Control.Monad.Class.MonadTime (Time, diffTime)
 import qualified Graphics.Rendering.Cairo as Cairo
 
 import ModelTCP
+import SimTypes (NodeId, LabelLink(..), LabelNode(..), Point(..))
 import SimTCPLinks
 import Viz
 import VizSim
@@ -32,7 +33,7 @@ type TcpSimVizModel =
 -- | The vizualisation state within the data model for the tcp simulation
 data TcpSimVizState =
      TcpSimVizState {
-       vizNodePos       :: Map NodeId (Double, Double),
+       vizNodePos       :: Map NodeId Point,
        vizNodeLinks     :: Set (NodeId, NodeId),
        vizMsgsInTransit :: Map (NodeId, NodeId)
                                [(TestMessage, TcpMsgForecast, [TcpMsgForecast])],
@@ -69,8 +70,8 @@ tcpSimVizModel =
           vizNodeLinks = Set.fromList links
         }
       where
-        toPoint :: (Int, Int) -> (Double, Double)
-        toPoint (x,y) = (fromIntegral x, fromIntegral y)
+        toPoint :: (Int, Int) -> Point
+        toPoint (x,y) = Point (fromIntegral x) (fromIntegral y)
 
     accumEventVizState (TcpSimEventTcp
                          (LabelLink nfrom nto
@@ -151,7 +152,7 @@ tcpSimVizRenderModel config@TcpSimVizConfig {
              Cairo.fillPreserve
              Cairo.setSourceRGB 0 0 0
              Cairo.stroke
-        | (_node, (x,y)) <- Map.toList vizNodePos
+        | (_node, Point x y) <- Map.toList vizNodePos
         ]
       Cairo.restore
 
@@ -166,9 +167,9 @@ tcpSimVizRenderModel config@TcpSimVizConfig {
              Cairo.stroke
         | (node, msgs) <- Map.toList vizMsgsAtNode
         , (n, msg) <- zip [1..] msgs
-        , let (x,y)   = vizNodePos Map.! node
-              y'      = y + 16 + 20 * n
-              (r,g,b) = messageColor msg
+        , let Point x y = vizNodePos Map.! node
+              y'        = y + 16 + 20 * n
+              (r,g,b)   = messageColor msg
         ]
       Cairo.restore
 
@@ -214,24 +215,24 @@ tcpSimVizRenderModel config@TcpSimVizConfig {
 
 renderMessagesInFlight :: TcpSimVizConfig msg
                        -> Time
-                       -> (Double, Double)
-                       -> (Double, Double)
+                       -> Point
+                       -> Point
                        -> [(msg, TcpMsgForecast, [TcpMsgForecast])]
                        -> Cairo.Render ()
 renderMessagesInFlight TcpSimVizConfig{messageColor} now fromPos toPos msgs = do
     sequence_
       [ do -- The overall message
-           uncurry Cairo.moveTo msgTrailingEdge
-           uncurry Cairo.lineTo msgLeadingEdge
+           withPoint Cairo.moveTo msgTrailingEdge
+           withPoint Cairo.lineTo msgLeadingEdge
            Cairo.setSourceRGBA r g b 0.4
            Cairo.setLineWidth 10
            Cairo.stroke
            -- The TCP message fragments
            sequence_
-             [ do uncurry Cairo.moveTo (msgfragTrailingEdge `addV` offset)
-                  uncurry Cairo.lineTo (msgfragLeadingEdge  `addV` offset)
-                  uncurry Cairo.lineTo (msgfragLeadingEdge  `addV` negateV offset)
-                  uncurry Cairo.lineTo (msgfragTrailingEdge `addV` negateV offset)
+             [ do withPoint Cairo.moveTo (msgfragTrailingEdge `addP` offset)
+                  withPoint Cairo.lineTo (msgfragLeadingEdge  `addP` offset)
+                  withPoint Cairo.lineTo (msgfragLeadingEdge  `addP` negateV offset)
+                  withPoint Cairo.lineTo (msgfragTrailingEdge `addP` negateV offset)
                   Cairo.closePath
              | msgfragforecast <- msgforecasts
              , now >= msgSendLeadingEdge  msgfragforecast
@@ -268,8 +269,8 @@ renderMessagesInFlight TcpSimVizConfig{messageColor} now fromPos toPos msgs = do
     Cairo.stroke
     Cairo.restore
   where
-    renderAckInFlight :: (Double, Double)
-                      -> (Double, Double)
+    renderAckInFlight :: Point
+                      -> Point
                       -> Double
                       -> TcpMsgForecast
                       -> Cairo.Render ()
@@ -277,10 +278,10 @@ renderMessagesInFlight TcpSimVizConfig{messageColor} now fromPos toPos msgs = do
                       TcpMsgForecast {
                         msgRecvLeadingEdge, msgAcknowledgement
                       } = do
-        uncurry Cairo.moveTo (ackPoint `addV` offset)
-        uncurry Cairo.lineTo (ackPoint `addV` negateV offset)
+        withPoint Cairo.moveTo (ackPoint `addP` offset)
+        withPoint Cairo.lineTo (ackPoint `addP` negateV offset)
       where
-        ackPoint     = addV to ackVector
+        ackPoint     = addP to ackVector
         ackVector    = scaleV (-ackFraction) toFromVector
         toFromVector = vector from to
         offset = scaleV (len/2) (unitV (normalV toFromVector))
@@ -291,10 +292,10 @@ renderMessagesInFlight TcpSimVizConfig{messageColor} now fromPos toPos msgs = do
 
 
 lineMessageInFlight :: Time
-                    -> (Double, Double)
-                    -> (Double, Double)
+                    -> Point
+                    -> Point
                     -> TcpMsgForecast
-                    -> ((Double, Double), (Double, Double))
+                    -> (Point, Point)
 lineMessageInFlight now from to
                     TcpMsgForecast {
                       msgSendLeadingEdge, msgSendTrailingEdge,
@@ -302,8 +303,8 @@ lineMessageInFlight now from to
                     } =
     (trailingEdgePoint, leadingEdgePoint)
   where
-    leadingEdgePoint   = leadingEdgeVector  `addV` from
-    trailingEdgePoint  = trailingEdgeVector `addV` from
+    leadingEdgePoint   = addP from leadingEdgeVector
+    trailingEdgePoint  = addP from trailingEdgeVector
 
     leadingEdgeVector  = scaleV leadingEdgeFraction  fromToVector
     trailingEdgeVector = scaleV trailingEdgeFraction fromToVector

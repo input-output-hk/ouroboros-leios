@@ -27,17 +27,18 @@ import System.Random (StdGen, uniformR, uniform)
 import Chan
 import RelayProtocol
 import ChanTCP
-import SimTCPLinks (NodeId(..), LabelNode(..), LabelLink(..),
-                    simTracer, labelDirToLabelLink, selectTimedEvents)
+import SimTypes
+import SimTCPLinks (simTracer, labelDirToLabelLink, selectTimedEvents)
 
 
 type RelaySimTrace = [(Time, RelaySimEvent)]
 
 data RelaySimEvent =
        -- | Declare the nodes and links
-       RelaySimEventSetup !(Double, Double)              -- overall "world" size
-                          !(Map NodeId (Double, Double)) -- nodes and locations
-                          !(Set (NodeId, NodeId))        -- links between nodes
+       RelaySimEventSetup
+         !WorldShape
+         !(Map NodeId Point)            -- nodes and locations
+         !(Set (NodeId, NodeId))        -- links between nodes
 
        -- | An event at a node
      | RelaySimEventNode (LabelNode (RelayNodeEvent TestBlock))
@@ -205,10 +206,12 @@ traceRelayLink1 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          (500, 500)
+          WorldShape {
+            worldDimensions = (500, 500)
+          }
           (Map.fromList
-            [(NodeId 0, (50,  100)),
-             (NodeId 1, (450, 100))])
+            [(NodeId 0, (Point 50  100)),
+             (NodeId 1, (Point 450 100))])
           (Set.fromList
             [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)])
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
@@ -242,12 +245,14 @@ traceRelayLink4 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          (1000, 500)
+          WorldShape {
+            worldDimensions = (1000, 500)
+          }
           (Map.fromList
-            [(NodeId 0, ( 50, 250)),
-             (NodeId 1, (450, 70)),
-             (NodeId 2, (550, 430)),
-             (NodeId 3, (950, 250))])
+            [(NodeId 0, (Point  50 250)),
+             (NodeId 1, (Point 450 70)),
+             (NodeId 2, (Point 550 430)),
+             (NodeId 3, (Point 950 250))])
           (symmetric $ Set.fromList
             [(NodeId 0, NodeId 1),
              (NodeId 1, NodeId 3),
@@ -292,12 +297,14 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          (1000, 500)
+          WorldShape {
+            worldDimensions = (1000, 500)
+          }
           (Map.fromList
-            [(NodeId 0, ( 50, 70)),
-             (NodeId 1, (450, 400)),
-             (NodeId 2, (500, 70)),
-             (NodeId 3, (950, 70))])
+            [(NodeId 0, (Point  50 70)),
+             (NodeId 1, (Point 450 400)),
+             (NodeId 2, (Point 500 70)),
+             (NodeId 3, (Point 950 70))])
           (symmetric $ Set.fromList
             [(NodeId 0, NodeId 1),
              (NodeId 1, NodeId 3),

@@ -16,6 +16,7 @@ import qualified Graphics.Rendering.Chart.Easy as Chart
 import qualified Data.Colour.SRGB as Colour
 
 import ModelTCP (TcpMsgForecast(..), segmentSize)
+import SimTypes (Point(..), WorldShape(..))
 import SimRelay (TestBlock, TestBlockRelayMessage)
 import Viz
 import VizUtils
@@ -58,7 +59,7 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
                           now
                           (SimVizModel _events
                              RelaySimVizState {
-                               vizWorldSize,
+                               vizWorldShape = WorldShape { worldDimensions },
                                vizNodePos,
                                vizMsgsInTransit,
                                vizMsgsAtNodeQueue,
@@ -110,14 +111,14 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
              Cairo.newPath
 
         | (node, pos) <- Map.toList vizNodePos
-        , let (x,y)   = simPointToPixel vizWorldSize screenSize pos
-              qmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
-              bmsgs   = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
+        , let Point x y = toScreenPoint pos
+              qmsgs     = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
+              bmsgs     = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
 --              nqmsgs  = length qmsgs
 --              nbmsgs  = length bmsgs
-              (r,g,b) = case qmsgs ++ bmsgs of
-                          msgs@(_:_) -> nodeMessageColor (last msgs)
-                          _          -> (0.7,0.7,0.7)
+              (r,g,b)   = case qmsgs ++ bmsgs of
+                            msgs@(_:_) -> nodeMessageColor (last msgs)
+                            _          -> (0.7,0.7,0.7)
 --              rqmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentQueue)
 --              rbmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentBuffer)
 --              tqmsgs  = fromMaybe 0 (Map.lookup node vizMsgsAtNodeTotalQueue)
@@ -146,10 +147,8 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo (simPointToPixel vizWorldSize screenSize
-                                         (vizNodePos Map.! fromNode))
-                  uncurry Cairo.lineTo (simPointToPixel vizWorldSize screenSize
-                                         (vizNodePos Map.! toNode))
+                  withPoint Cairo.moveTo (toScreenPoint (vizNodePos Map.! fromNode))
+                  withPoint Cairo.lineTo (toScreenPoint (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setLineWidth 1
                   Cairo.setDash [10,5] 0
@@ -160,10 +159,8 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
               case catMaybes [ ptclMessageColor msg | (msg,_,_) <-  msgs ] of
                 [] -> return ()
                 ((r,g,b):_) -> do
-                  uncurry Cairo.moveTo (simPointToPixel vizWorldSize screenSize
-                                         (vizNodePos Map.! fromNode))
-                  uncurry Cairo.lineTo (simPointToPixel vizWorldSize screenSize
-                                         (vizNodePos Map.! toNode))
+                  withPoint Cairo.moveTo (toScreenPoint (vizNodePos Map.! fromNode))
+                  withPoint Cairo.lineTo (toScreenPoint (vizNodePos Map.! toNode))
                   Cairo.setSourceRGB r g b
                   Cairo.setDash [] 0
                   Cairo.setLineWidth 2
@@ -184,14 +181,15 @@ relayP2PSimVizRenderModel RelayP2PSimVizConfig {
         , now >= msgSendTrailingEdge msgforecast
         , now <= msgRecvTrailingEdge msgforecast
         , (r,g,b) <- maybeToList (ptclMessageColor msg)
-        , let fromPos = simPointToPixel vizWorldSize screenSize
-                                        (vizNodePos Map.! fromNode)
-              toPos   = simPointToPixel vizWorldSize screenSize
-                                        (vizNodePos Map.! toNode)
-              (_msgTrailingEdge@(x,y), _msgLeadingEdge) =
+        , let fromPos = toScreenPoint (vizNodePos Map.! fromNode)
+              toPos   = toScreenPoint (vizNodePos Map.! toNode)
+              (_msgTrailingEdge@(Point x y), _msgLeadingEdge) =
                 lineMessageInFlight now fromPos toPos msgforecast
         ]
       Cairo.restore
+
+    toScreenPoint = simPointToPixel worldDimensions screenSize
+
 
 data MsgsInFlightClassification =
        MsgsInFlightNone

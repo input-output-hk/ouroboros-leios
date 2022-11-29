@@ -21,6 +21,7 @@ library
   exposed-modules:     Chan,
                        ModelTCP,
                        ChanTCP,
+                       SimTypes,
 
                        Viz,
                        VizSim,

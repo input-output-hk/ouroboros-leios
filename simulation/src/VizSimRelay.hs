@@ -17,7 +17,7 @@ import           Control.Exception (assert)
 import qualified Graphics.Rendering.Cairo as Cairo
 
 import ModelTCP
-import SimTCPLinks (NodeId(..), LabelNode(..), LabelLink(..))
+import SimTypes
 import SimRelay
 import Viz
 import VizSim
@@ -39,8 +39,8 @@ type RelaySimVizModel =
 -- | The vizualisation state within the data model for the tcp simulation
 data RelaySimVizState =
      RelaySimVizState {
-       vizWorldSize     :: !(Double, Double),
-       vizNodePos       :: !(Map NodeId (Double, Double)),
+       vizWorldShape    :: !WorldShape,
+       vizNodePos       :: !(Map NodeId Point),
        vizNodeLinks     :: !(Set (NodeId, NodeId)),
        vizMsgsInTransit :: !(Map (NodeId, NodeId)
                                [(TestBlockRelayMessage,
@@ -68,7 +68,7 @@ relaySimVizModel =
   where
     initVizState =
       RelaySimVizState {
-        vizWorldSize     = (0,0),
+        vizWorldShape    = WorldShape (0,0),
         vizNodePos       = Map.empty,
         vizNodeLinks     = Set.empty,
         vizMsgsInTransit = Map.empty,
@@ -86,11 +86,11 @@ relaySimVizModel =
                        -> RelaySimEvent
                        -> RelaySimVizState
                        -> RelaySimVizState
-    accumEventVizState _now (RelaySimEventSetup size nodes links) vs =
+    accumEventVizState _now (RelaySimEventSetup shape nodes links) vs =
         vs {
-          vizWorldSize = size,
-          vizNodePos   = nodes,
-          vizNodeLinks = links
+          vizWorldShape = shape,
+          vizNodePos    = nodes,
+          vizNodeLinks  = links
         }
 
     accumEventVizState _now (RelaySimEventTcp
@@ -233,7 +233,7 @@ relaySimVizRenderModel RelaySimVizConfig {
                        now
                        (SimVizModel _events
                           RelaySimVizState {
-                            vizWorldSize,
+                            vizWorldShape = WorldShape { worldDimensions },
                             vizNodePos,
                             vizNodeLinks,
                             vizMsgsInTransit,
@@ -255,7 +255,7 @@ relaySimVizRenderModel RelaySimVizConfig {
              Cairo.setSourceRGB 0 0 0
              Cairo.stroke
         | (_node, pos) <- Map.toList vizNodePos
-        , let (x,y) = simPointToPixel vizWorldSize screenSize pos
+        , let (Point x y) = simPointToPixel worldDimensions screenSize pos
         ]
       Cairo.restore
 
@@ -276,8 +276,8 @@ relaySimVizRenderModel RelaySimVizConfig {
                  Cairo.newPath
         | (node, msgs) <- Map.toList vizMsgsAtNodeQueue
         , (n, msg) <- zip [1..] msgs
-        , let (x,y)   = simPointToPixel vizWorldSize screenSize
-                                        (vizNodePos Map.! node)
+        , let (Point x y) = simPointToPixel worldDimensions screenSize
+                                            (vizNodePos Map.! node)
               y'      = y + 16 + 20 * n
               (r,g,b) = nodeMessageColor msg
         ]
@@ -296,8 +296,8 @@ relaySimVizRenderModel RelaySimVizConfig {
                  Cairo.newPath
         | (node, msgs) <- Map.toList vizMsgsAtNodeBuffer
         , (n, msg) <- zip [1..] msgs
-        , let (x,y)   = simPointToPixel vizWorldSize screenSize
-                                        (vizNodePos Map.! node)
+        , let (Point x y) = simPointToPixel worldDimensions screenSize
+                                            (vizNodePos Map.! node)
               y'      = y + 16 + 20 * n
               (r,g,b) = nodeMessageColor msg
         ]
@@ -336,8 +336,8 @@ relaySimVizRenderModel RelaySimVizConfig {
           | (fromNode, toNode) <- Set.toList vizNodeLinks
           , let (fromPos, toPos) =
                   translateLineNormal displace
-                    (simPointToPixel vizWorldSize screenSize (vizNodePos Map.! fromNode),
-                     simPointToPixel vizWorldSize screenSize (vizNodePos Map.! toNode))
+                    (simPointToPixel worldDimensions screenSize (vizNodePos Map.! fromNode),
+                     simPointToPixel worldDimensions screenSize (vizNodePos Map.! toNode))
                 -- For links in both directions, we need to displace them
                 -- so they don't overlap each other, but for unidirectional
                 -- links we can draw it centrally.
@@ -357,8 +357,8 @@ relaySimVizRenderModel RelaySimVizConfig {
         Cairo.setLineWidth 0.6
         -- draw lines from labels to messages
         sequence_
-          [ do uncurry Cairo.moveTo (labelsOrigin `addV` (0,n*10))
-               uncurry Cairo.lineTo msgTrailingEdge
+          [ do withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n*10))
+               withPoint Cairo.lineTo msgTrailingEdge
           | ((_msgLabel, msgforecast), n) <- zip msgLabels [0..]
           , let (msgTrailingEdge, _msgLeadingEdge) =
                   lineMessageInFlight now fromPos toPos msgforecast
@@ -367,13 +367,13 @@ relaySimVizRenderModel RelaySimVizConfig {
         -- draw the labels themselves
         Cairo.setSourceRGB 0 0 0
         sequence_
-          [ do uncurry Cairo.moveTo (labelsOrigin `addV` (0,n*10))
+          [ do withPoint Cairo.moveTo (labelsOrigin `addP` Vector 0 (n*10))
                Cairo.showText msgLabel
                Cairo.newPath
           | ((msgLabel, _), n) <- zip msgLabels [0..] ]
         Cairo.restore
       where
-        labelsOrigin = midpointV fromPos toPos `addV` labelsOffset
+        labelsOrigin = midpointP fromPos toPos `addP` labelsOffset
         labelsOffset = scaleV (-50) $ unitV $ normalV $ vector fromPos toPos
         msgLabels =
           [ (msgLabel, msgforecast)

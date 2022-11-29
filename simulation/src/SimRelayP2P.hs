@@ -19,9 +19,9 @@ import Control.Monad.IOSim as IOSim
 import System.Random (StdGen, split)
 
 import ChanTCP
-import SimTCPLinks (LabelNode(..), NodeId(..),
-                    simTracer, labelDirToLabelLink, selectTimedEvents)
-import P2P
+import SimTypes
+import SimTCPLinks (simTracer, labelDirToLabelLink, selectTimedEvents)
+import P2P (P2PTopography(..))
 import SimRelay
 
 
@@ -30,18 +30,24 @@ traceRelayP2P :: StdGen
               -> (DiffTime -> TcpConnProps)
               -> (StdGen -> RelayNodeConfig)
               -> RelaySimTrace
-traceRelayP2P rng0 P2PTopography {p2pNodes, p2pLinks} tcpprops relayConfig =
+traceRelayP2P rng0 P2PTopography {
+                     p2pNodes,
+                     p2pLinks,
+                     p2pWorldShape
+                   }
+              tcpprops relayConfig =
     selectTimedEvents $
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          (1.0, 1.0) -- world size
+          p2pWorldShape
           p2pNodes
           (Map.keysSet p2pLinks)
       tcplinks <-
         sequence
-          [ do (inChan, outChan) <- newConnectionTCP (linkTracer na nb)
-                                                     (tcpprops latency)
+          [ do (inChan, outChan) <- newConnectionTCP
+                                      (linkTracer na nb)
+                                      (tcpprops (realToFrac latency))
                return ((na, nb), (inChan, outChan))
           | ((na, nb), latency) <- Map.toList p2pLinks ]
       let tcplinksInChan =
