@@ -60,6 +60,7 @@ library
                        io-sim,
 
                        cairo,
+                       pango,
                        gtk3,
                        colour,
                        Chart,

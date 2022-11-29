@@ -67,7 +67,7 @@ example5 :: Vizualisation
 example5 = 
     Viz nullVizModel $
         LayoutAbove
-          [ layoutLabel "Example title"
+          [ layoutLabel 18 "Example title"
           , LayoutBeside
               [ LayoutAbove
                   [ layoutLabelTime
