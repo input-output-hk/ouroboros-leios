@@ -7,10 +7,10 @@ module P2P where
 import Data.List
 import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
-import Data.Function (on)
 import Data.Graph as Graph
 import Data.Array.ST as Array
 import Data.Array.Unboxed as Array
+import qualified Data.KdMap.Static as KdMap
 
 import Control.Monad
 import Control.Monad.ST
@@ -103,21 +103,25 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
         [ ((nid,nid'), latency)
         | (nid, rng) <- zip nodes (unfoldr (Just . Random.split) rngLinks)
         , let Just p  = Map.lookup nid  nodePositions
-        , nid' <- pickNodeLinksClose  nid
+        , nid' <- pickNodeLinksClose  p
                ++ pickNodeLinksRandom nid rng
         , let Just p'  = Map.lookup nid' nodePositions
               !latency = linkLatency p p'
         ]
 
-    pickNodeLinksClose :: NodeId -> [NodeId]
-    pickNodeLinksClose nid =
-        take p2pNodeLinksClose
-      $ map fst
-      $ sortBy (compare `on` snd)
-        [ (nid', linkLatencyCached nid nid')
-        | nid' <- nodes
-        , nid' /= nid
-        ]
+    pickNodeLinksClose :: Point -> [NodeId]
+    pickNodeLinksClose =
+        map snd
+      . KdMap.kNearest nodesKdMap p2pNodeLinksClose
+
+    -- For efficiency in finding the K nearest neighbours, we use a K-D map
+    -- of all the nodes, and then do queries in that.
+    nodesKdMap :: KdMap.KdMap Latency Point NodeId
+    nodesKdMap =
+      KdMap.buildWithDist
+        (\(Point x y) -> [x,y])
+        linkLatencySquared
+        [ (p, n) | (n, p) <- Map.toList nodePositions ]
 
     pickNodeLinksRandom :: NodeId -> StdGen -> [NodeId]
     pickNodeLinksRandom nid rng =
@@ -125,23 +129,6 @@ genArbitraryP2PTopography P2PTopographyCharacteristics{
         [ NodeId nid'
         | nid' <- Random.randomRs (0, p2pNumNodes-1) rng
         , nid /= NodeId nid' ]
-
-    linkLatenciesCached :: Map (NodeId, NodeId) Latency
-    linkLatenciesCached =
-      Map.fromList
-        [ ((n1, n2), latency)
-        | n1 <- nodes
-        , n2 <- nodes
-        , n1 <= n2
-        , let Just p1  = Map.lookup n1 nodePositions
-              Just p2  = Map.lookup n2 nodePositions
-              !latency = linkLatencySquared p1 p2
-        ]
-
-    linkLatencyCached :: NodeId -> NodeId -> Latency
-    linkLatencyCached n1 n2
-      | n1 <= n2  = let Just d = Map.lookup (n1, n2) linkLatenciesCached in d
-      | otherwise = linkLatencyCached n2 n1
 
     linkLatency :: Point -> Point -> Latency
     linkLatency p1 p2 =

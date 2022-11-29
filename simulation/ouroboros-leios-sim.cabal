@@ -50,6 +50,7 @@ library
                        containers,
                        array,
                        pqueue,
+                       kdt,
                        fingertree,
                        random,
                        time,
