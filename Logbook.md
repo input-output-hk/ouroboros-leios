@@ -11,6 +11,24 @@
 
 Code is in the [leios](leios/) directory
 
+### Quick discussion with Sandro
+
+We were supposed to shoot some made-up scenes where we would be working and drawing things, so we figured we could as well take this opportunity to ask questions to Sandro about the small experiment we did in the morning.
+
+Here is some draft we drew:
+
+![](images/zurich-leios-draft.png)
+
+Couple explanations:
+
+* Upper part is about _equivocation_, eg. an adversary producing different IBs at the same slot.
+  * a node will observe the equivocation (on the far right) by being offered 2 _equivocated_ headers from different peers
+  * This node will be able to produce a _proof of equivocation_ that's useful when voting for IBs (and EBs?)
+* Lower part is about _freshest first_ download policy: Two nodes producing valid IBs at different slots.
+  * given the choice of headers (and bodies) consumer node will choose to download the freshest body first, eg. B in this case
+  * headers are downloaded in any order as we can't know whether or not they are "freshest" before reading them
+  * It seems that's only relevant if there are more blocks offered than available bandwidth :thinking:
+
 ## 2024-05-24
 
 ### Meeting w/ Research
