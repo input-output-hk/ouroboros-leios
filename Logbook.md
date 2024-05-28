@@ -1,3 +1,16 @@
+## 2024-05-28
+
+### Discussion w/ Nicolas
+
+* We tried to get a better intuition at Leios, following [Sandro's slides](https://docs.google.com/presentation/d/1W_KHdvdLNDEStE99D7Af2SRiTqZNnVLQiEPqRHJySqI/edit#slide=id.g2df51b2cf33_0_950) focusing on the IB -> EB construction.
+* We wrote some code modelling a single node, along with an input queue for IBs and an output queue for EBs
+* It's not obvious how the various parameters and constraints interact and what exactly we want to model
+  * We start with a "happy path" behaviour where we input at most $C * λ / (λ + 1)$ IBs every round, and every such IB as the correct round number
+  * We would like to model adversarial behaviour, eg. burst, equivocations, etc.
+* What is it that we want to check? That an EB contains all the "right" IBs?
+
+Code is in the [leios](leios/) directory
+
 ## 2024-05-24
 
 ### Meeting w/ Research

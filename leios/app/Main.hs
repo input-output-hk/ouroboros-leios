@@ -10,14 +10,17 @@ module Main where
 import Bytes (Bytes (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM,
+  TBQueue,
   TQueue,
   atomically,
   flushTQueue,
+  isFullTBQueue,
   newTQueueIO,
   readTQueue,
+  writeTBQueue,
   writeTQueue,
  )
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
 import Control.Monad.Class.MonadAsync (race)
 import Control.Monad.Class.MonadSay (MonadSay, say)
 import Control.Monad.Class.MonadTimer (MonadDelay, threadDelay)
@@ -56,10 +59,11 @@ data EndorserBlock = MkEndorserBlock
 main :: IO ()
 main = do
   let λ = 12
+      capacity = 10
   inputChannel <- newTQueueIO
   outputChannel <- newTQueueIO
   void $
-    generateInput λ 42 10 inputChannel
+    generateInput capacity λ 42 10 inputChannel
       `race` runNode λ 43 10 inputChannel outputChannel
       `race` observeOutput outputChannel
 
@@ -70,55 +74,63 @@ observeOutput output = do
   observeOutput output
 
 runNode :: (MonadSTM m, MonadDelay m) => Integer -> Int -> Integer -> TQueue m InputBlock -> TQueue m EndorserBlock -> m ()
-runNode λ seed slot input output = do
-  let endorserId = genHash `generateWith` seed
-  (blocks, queueSize, droppedBlocks) <- atomically $ do
-    allBlocks <- flushTQueue input
-    let sortBlocks b (ontime, younger) =
-          case (blockTimestamp b + λ) `compare` slot of
-            EQ -> (b : ontime, younger)
-            GT -> (ontime, b : younger)
-            LT -> (ontime, younger)
-        (onTime, younger) =
-          foldr sortBlocks ([], []) allBlocks
-        dropped = length allBlocks - length onTime - length younger
-    forM_ younger (writeTQueue input)
-    pure (onTime, length younger, dropped)
+runNode λ seed round input output =
+  go seed round
+ where
+  go seed round = do
+    let endorserId = genHash `generateWith` seed
+    (blocks, queueSize, droppedBlocks) <- atomically $ do
+      -- TODO: read at most capacity blocks
+      allBlocks <- flushTQueue input
+      let sortBlocks b (ontime, younger) =
+            case (blockTimestamp b + λ) `compare` round of
+              EQ -> (b : ontime, younger)
+              GT -> (ontime, b : younger)
+              LT -> (ontime, younger)
+          (onTime, younger) =
+            foldr sortBlocks ([], []) allBlocks
+          dropped = length allBlocks - length onTime - length younger
+      forM_ younger (writeTQueue input)
+      pure (onTime, length younger, dropped)
 
-  let endorserBlock =
-        MkEndorserBlock
-          { endorserId
-          , endorsementTimestamp = fromIntegral slot
-          , inputBlocks = blockId <$> blocks
-          , queueSize
-          , droppedBlocks
-          }
+    let endorserBlock =
+          MkEndorserBlock
+            { endorserId
+            , endorsementTimestamp = fromIntegral round
+            , inputBlocks = blockId <$> blocks
+            , queueSize
+            , droppedBlocks
+            }
 
-  atomically $ writeTQueue output endorserBlock
-  let seed' = newSeed seed
-  threadDelay 100000
-  runNode λ seed' (succ slot) input output
+    atomically $ writeTQueue output endorserBlock
+    let seed' = newSeed seed
+    threadDelay 100000
+    go seed' (succ round)
 
-generateInput :: (MonadSTM m, MonadDelay m) => Integer -> Int -> Integer -> TQueue m InputBlock -> m ()
-generateInput λ seed slot channel = do
-  let blocks = genBlocks λ slot `generateWith` seed
-  atomically $ forM_ blocks $ writeTQueue channel
-  threadDelay 100000
-  let seed' = newSeed seed
-  generateInput λ seed' (succ slot) channel
+generateInput :: (MonadSTM m, MonadDelay m) => Integer -> Integer -> Int -> Integer -> TQueue m InputBlock -> m ()
+generateInput capacity λ seed round channel =
+  go seed round
+ where
+  go seed round = do
+    let blocks = genBlocks capacity λ round `generateWith` seed
+    atomically $ forM_ blocks $ writeTQueue channel
+    threadDelay 100000
+    let seed' = newSeed seed
+    go seed' (succ round)
 
 newSeed :: Int -> Int
 newSeed = (* 2147483647)
 
-genBlocks :: Integer -> Integer -> Gen [InputBlock]
-genBlocks λ atSlot =
-  listOf $ genInputBlock λ atSlot
+genBlocks :: Integer -> Integer -> Integer -> Gen [InputBlock]
+genBlocks capacity λ atRound = do
+  let maxThroughput = fromInteger $ capacity * λ `div` (λ + 1)
+  numBlocks <- choose (maxThroughput `div` 2, maxThroughput)
+  vectorOf numBlocks $ genInputBlock atRound
 
-genInputBlock :: Integer -> Integer -> Gen InputBlock
-genInputBlock λ atSlot = do
+genInputBlock :: Integer -> Gen InputBlock
+genInputBlock atRound = do
   blockId <- genHash
-  blockTimestamp <- choose (max 0 (atSlot - 2 * λ), atSlot - 1)
-  pure MkInputBlock{blockId, blockTimestamp, blockData = "00"}
+  pure MkInputBlock{blockId, blockTimestamp = atRound, blockData = "00"}
 
 genHash :: Gen Hash
 genHash =
