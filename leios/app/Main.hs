@@ -47,59 +47,77 @@ data EndorserBlock = MkEndorserBlock
   { endorserId :: Hash
   , endorsementTimestamp :: Integer
   , inputBlocks :: [Hash]
+  , queueSize :: Int
+  , droppedBlocks :: Int
   }
   deriving (Show, Generic)
   deriving anyclass (A.ToJSON, A.FromJSON)
 
 main :: IO ()
 main = do
+  let λ = 12
   inputChannel <- newTQueueIO
   outputChannel <- newTQueueIO
   void $
-    generateInput 42 10 inputChannel
-      `race` runNode 43 10 inputChannel outputChannel
+    generateInput λ 42 10 inputChannel
+      `race` runNode λ 43 10 inputChannel outputChannel
       `race` observeOutput outputChannel
 
 observeOutput :: (MonadSTM m, MonadSay m) => TQueue m EndorserBlock -> m ()
 observeOutput output = do
   block <- atomically $ readTQueue output
-  say $ show $ LT.unpack $ LT.decodeUtf8 $ A.encode block
+  say $ LT.unpack $ LT.decodeUtf8 $ A.encode block
   observeOutput output
 
-runNode :: (MonadSTM m, MonadDelay m) => Int -> Int -> TQueue m InputBlock -> TQueue m EndorserBlock -> m ()
-runNode seed slot input output = do
+runNode :: (MonadSTM m, MonadDelay m) => Integer -> Int -> Integer -> TQueue m InputBlock -> TQueue m EndorserBlock -> m ()
+runNode λ seed slot input output = do
   let endorserId = genHash `generateWith` seed
-  blocks <- atomically $ flushTQueue input
+  (blocks, queueSize, droppedBlocks) <- atomically $ do
+    allBlocks <- flushTQueue input
+    let sortBlocks b (ontime, younger) =
+          case (blockTimestamp b + λ) `compare` slot of
+            EQ -> (b : ontime, younger)
+            GT -> (ontime, b : younger)
+            LT -> (ontime, younger)
+        (onTime, younger) =
+          foldr sortBlocks ([], []) allBlocks
+        dropped = length allBlocks - length onTime - length younger
+    forM_ younger (writeTQueue input)
+    pure (onTime, length younger, dropped)
+
   let endorserBlock =
         MkEndorserBlock
           { endorserId
           , endorsementTimestamp = fromIntegral slot
           , inputBlocks = blockId <$> blocks
+          , queueSize
+          , droppedBlocks
           }
+
   atomically $ writeTQueue output endorserBlock
   let seed' = newSeed seed
-  threadDelay 1000000
-  runNode seed' (succ slot) input output
+  threadDelay 100000
+  runNode λ seed' (succ slot) input output
 
-generateInput :: (MonadSTM m, MonadDelay m) => Int -> Int -> TQueue m InputBlock -> m ()
-generateInput seed slot channel = do
-  let blocks = genBlocks slot `generateWith` seed
+generateInput :: (MonadSTM m, MonadDelay m) => Integer -> Int -> Integer -> TQueue m InputBlock -> m ()
+generateInput λ seed slot channel = do
+  let blocks = genBlocks λ slot `generateWith` seed
   atomically $ forM_ blocks $ writeTQueue channel
-  threadDelay 1000000
+  threadDelay 100000
   let seed' = newSeed seed
-  generateInput seed' (succ slot) channel
+  generateInput λ seed' (succ slot) channel
 
 newSeed :: Int -> Int
 newSeed = (* 2147483647)
 
-genBlocks :: Int -> Gen [InputBlock]
-genBlocks atSlot =
-  listOf $ genInputBlock atSlot
+genBlocks :: Integer -> Integer -> Gen [InputBlock]
+genBlocks λ atSlot =
+  listOf $ genInputBlock λ atSlot
 
-genInputBlock :: Int -> Gen InputBlock
-genInputBlock atSlot = do
+genInputBlock :: Integer -> Integer -> Gen InputBlock
+genInputBlock λ atSlot = do
   blockId <- genHash
-  blockTimestamp <- choose (0, fromIntegral $ atSlot - 1)
+  blockTimestamp <- choose (max 0 (atSlot - 2 * λ), atSlot - 1)
   pure MkInputBlock{blockId, blockTimestamp, blockData = "00"}
 
 genHash :: Gen Hash
