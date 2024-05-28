@@ -17,7 +17,7 @@ We were supposed to shoot some made-up scenes where we would be working and draw
 
 Here is some draft we drew:
 
-![](images/zurich-leios-draft.png)
+<img align="left" src="https://github.com/input-output-hk/ouroboros-leios/blob/9c8ff6c62fbd7ae3bed12d75abb8e4ed783d59dc/images/zurich-leios-draft.png#L1" width="50%" />
 
 Couple explanations:
 
