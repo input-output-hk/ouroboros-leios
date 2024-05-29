@@ -53,15 +53,15 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
-executable leios
-    -- Import common warning flags.
+library
+      -- Import common warning flags.
     import:           warnings
 
     -- .hs or .lhs file containing the Main module.
-    main-is:          Main.hs
+    exposed-modules:  Leios.Node
 
     -- Modules included in this executable, other than Main.
-    other-modules:    Bytes
+    other-modules:    Data.Bytes
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -74,6 +74,30 @@ executable leios
                       base16-bytestring,
                       io-classes,
                       io-sim,
+                      text
+
+    -- Directories containing source files.
+    hs-source-dirs:   src
+
+    -- Base language which the package is written in.
+    default-language: Haskell2010
+
+executable leios
+    -- Import common warning flags.
+    import:           warnings
+
+    -- .hs or .lhs file containing the Main module.
+    main-is:          Main.hs
+
+    -- Other library packages from which modules are imported.
+    build-depends:    QuickCheck,
+                      aeson,
+                      base ^>=4.18.1.0,
+                      bytestring,
+                      base16-bytestring,
+                      io-classes,
+                      io-sim,
+                      leios,
                       text
 
     -- Directories containing source files.
