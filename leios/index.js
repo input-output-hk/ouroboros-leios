@@ -43,10 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
   ws.onmessage = function(message) {
     if (message.data) {
       const eb = JSON.parse(message.data);
+      if (chart.data.datasets[0].data.length > 49) {
+        chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
+        chart.data.datasets[1].data.splice(0, chart.data.datasets[1].data.length - 49);
+      }
       chart.data.datasets[0].data.push({ x: eb.endorsementTimestamp, y: eb.queueSize });
       chart.data.datasets[1].data.push({ x: eb.endorsementTimestamp, y: eb.inputBlocks.length });
-      chart.options.scales.x.min = eb.endorsementTimestamp - 50;
-      chart.options.scales.x.max = eb.endorsementTimestamp;
+      const minx = chart.data.datasets[0].data[0].x;
+      chart.options.scales.x.min = minx;
+      chart.options.scales.x.max = minx + 50;
       chart.update();
     }
   };
