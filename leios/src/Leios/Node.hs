@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -123,7 +124,7 @@ runNode λ seed round input output =
 
     atomically $ writeTQueue output endorserBlock
     let seed' = newSeed seed
-    threadDelay 100000
+    threadDelay 1_000_000
     go seed' (succ round)
 
 generateInput :: (MonadSTM m, MonadDelay m) => Integer -> Integer -> Int -> Integer -> TQueue m InputBlock -> m ()
@@ -133,7 +134,7 @@ generateInput capacity λ seed round channel =
   go seed round = do
     let blocks = genBlocks capacity λ round `generateWith` seed
     atomically $ forM_ blocks $ writeTQueue channel
-    threadDelay 100000
+    threadDelay 1_000_000
     let seed' = newSeed seed
     go seed' (succ round)
 

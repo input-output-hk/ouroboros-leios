@@ -3,11 +3,11 @@
 
 module Leios.Server where
 
+import Control.Concurrent.Class.MonadSTM (atomically)
 import Control.Concurrent.Class.MonadSTM.TQueue
 import Control.Monad (forever)
-import Control.Monad.Class.MonadTimer (threadDelay)
-import Data.Aeson (Value)
-import Data.Text (Text)
+import Data.Aeson (Value, encode)
+import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
@@ -20,7 +20,7 @@ runServer queue = do
   let port = 8080
   let settings = Warp.setPort port Warp.defaultSettings
   sapp <- scottyApp
-  Warp.runSettings settings $ WS.websocketsOr WS.defaultConnectionOptions wsapp sapp
+  Warp.runSettings settings $ WS.websocketsOr WS.defaultConnectionOptions (wsapp queue) sapp
 
 scottyApp :: IO Wai.Application
 scottyApp =
@@ -30,13 +30,10 @@ scottyApp =
     Sc.get "/" $
       Sc.file "index.html"
 
-wsapp :: WS.ServerApp
-wsapp pending = do
+wsapp :: TQueue IO Value -> WS.ServerApp
+wsapp queue pending = do
   conn <- WS.acceptRequest pending
   WS.withPingThread conn 30 (pure ()) $ do
-    (msg :: Text) <- WS.receiveData conn
-    WS.sendTextData conn $ ("initial> " :: Text) <> msg
-
     forever $ do
-      WS.sendTextData conn $ ("loop data" :: Text)
-      threadDelay $ 1 * 1000000
+      msg <- atomically $ readTQueue queue
+      WS.sendTextData conn $ decodeUtf8 $ encode msg
