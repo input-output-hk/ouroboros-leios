@@ -6,7 +6,7 @@
   * It uses `Tracer` interface to have the simulation code send JSON-formatted traces that are retrieved by the server and exposed through a WS interface.
   * The UI connects to the WS, retrieves the data and plots in on a live graph
 
-> ![NOTE]
+> [!NOTE]
 > Interface for building `Tracer` in [contra-tracer](https://hackage.haskell.org/package/contra-tracer-0.2.0.0/docs/Control-Tracer.html) changed to use a Arrow-based datatype.
 > The `newtype Tracer` now wraps a `TracerA`rrow data type that looks conceptually like:
 >
@@ -17,6 +17,8 @@
 > ```
 >
 > with some `Kleisli` wrappers omitted for readability reasons.
+
+![](images/draft-leios-ui.gif)
 
 Some Ideas for a better model:
 
