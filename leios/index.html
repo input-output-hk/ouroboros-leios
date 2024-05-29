@@ -5,23 +5,10 @@
     <title>Leios</title>
     <link rel="stylesheet" href="acquire.css" >
     <link rel="stylesheet" href="font-awesome.css" >
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="index.js"></script>
   </head>
   <body>
-    <div id="acquire"></div>
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const node = document.getElementById('acquire');
-        const wsPath = window.location.pathname.split('/').slice(0, -1).join('/');
-        const ws = new WebSocket("ws://" + window.location.hostname + ":" + window.location.port + wsPath);
-        ws.onmessage = function(message)
-        {
-          if(message.data) {
-            const msg = JSON.parse(message.data);
-            const e = document.createElement('p');
-            e.appendChild(document.createTextNode(JSON.stringify(msg)));
-            node.appendChild(e);
-          }
-        };
-      });
-    </script>
-</body></html>
+    <canvas id="throughput"></canvas>
+  </body>
+</html>

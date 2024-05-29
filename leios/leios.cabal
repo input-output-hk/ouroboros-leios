@@ -95,6 +95,7 @@ executable leios
     -- Import common warning flags.
     import:           warnings
 
+    ghc-options:  -threaded -rtsopts
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
 
