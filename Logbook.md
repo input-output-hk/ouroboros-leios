@@ -1,3 +1,33 @@
+## 2024-05-29
+
+### Visualising node behaviour
+
+* Added a simple web server rendering the throughput of IBs and EBs to basic Leios simulation
+  * It uses `Tracer` interface to have the simulation code send JSON-formatted traces that are retrieved by the server and exposed through a WS interface.
+  * The UI connects to the WS, retrieves the data and plots in on a live graph
+
+> ![NOTE]
+> Interface for building `Tracer` in [contra-tracer](https://hackage.haskell.org/package/contra-tracer-0.2.0.0/docs/Control-Tracer.html) changed to use a Arrow-based datatype.
+> The `newtype Tracer` now wraps a `TracerA`rrow data type that looks conceptually like:
+>
+> ```
+> data TracerA m a where
+>  Emitting :: (a -> m x) -> (x -> m b) -> TracerA m a b
+>  Squelching :: (a -> m b) -> TracerA m a b
+> ```
+>
+> with some `Kleisli` wrappers omitted for readability reasons.
+
+Some Ideas for a better model:
+
+* Define the max bandwidth (in bytes / round) for the node
+* Within a round, a node can receive + send this max number bytes
+  * In input, deliver to the node all the proposed blocks (freshest first) until the max bandwidth is reached (or the number of offered blocks is exhausted?)
+  * Same for output
+* IB burst is dealt with by freshest first: An adversary can only accumulate "old" blocks which won't be fetched and trumped by newer ones
+  * This is guaranteed by sortition voting which is verified in the block header
+* We should model the various messages exchanged at each step of the pipeline and see what happens with various values of λ and max bandwidth
+
 ## 2024-05-28
 
 ### Discussion w/ Nicolas
