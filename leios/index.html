@@ -3,14 +3,21 @@
   <head>
     <meta charset="UTF-8">
     <title>Leios</title>
-    <link rel="stylesheet" href="acquire.css" >
-    <link rel="stylesheet" href="font-awesome.css" >
+    <link rel="stylesheet" href="leios.css" >
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="index.js"></script>
   </head>
   <body>
     <div  style="width: 80%; margin: auto;">
       <canvas id="throughput"></canvas>
+    </div>
+    <div>
+      <form id="parameters">
+        <label for="lambda">Diffusion length (λ): </label>
+        <input type="number" id="lambda" value="12" />
+        <label for="capacity">Max. capacity: </label>
+        <input type="number" id="capacity" value="10" />
+      </form>
     </div>
   </body>
 </html>

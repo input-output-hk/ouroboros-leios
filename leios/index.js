@@ -60,4 +60,38 @@ document.addEventListener('DOMContentLoaded', () => {
     ws.close();
   };
 
+  ws.onclose = function() {
+    console.log('disconnected');
+  };
+
+  // handle parameters change
+  const lambda = document.getElementById('lambda');
+  lambda.addEventListener('change', function() {
+    postJSON("http://" + window.location.hostname + ":" +
+      window.location.port + "/api/lambda", parseInt(lambda.value));
+  });
+
+  const capacity = document.getElementById('capacity');
+  capacity.addEventListener('change', function() {
+    postJSON("http://" + window.location.hostname + ":" +
+      window.location.port + "/api/capacity", parseInt(capacity.value));
+  });
+
 });
+
+async function postJSON(url, data) {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    console.log("Success:", result);
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}

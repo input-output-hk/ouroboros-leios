@@ -13,25 +13,24 @@ module Leios.Node where
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM,
   TQueue,
+  TVar,
   atomically,
   flushTQueue,
   newTQueueIO,
   readTQueue,
+  readTVar,
   writeTQueue,
  )
 import Control.Monad (forM_, forever)
 import Control.Monad.Class.MonadAsync (MonadAsync, race)
-import Control.Monad.Class.MonadSay (MonadSay, say)
+import Control.Monad.Class.MonadSay (MonadSay)
 import Control.Monad.Class.MonadTimer (MonadDelay, threadDelay)
-import Control.Monad.IOSim (Trace)
 import Control.Tracer (Tracer, traceWith)
-import Data.Aeson (Value, toJSON)
+import Data.Aeson (toJSON)
 import qualified Data.Aeson as A
 import qualified Data.ByteString as BS
 import Data.Bytes (Bytes (..))
 import Data.Functor (void)
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
 import GHC.Generics (Generic)
 import Test.QuickCheck (arbitrary, choose, vectorOf)
 import Test.QuickCheck.Gen (Gen (..))
@@ -77,13 +76,13 @@ data Params = Params
   -- ^ Starting round for simulation
   }
 
-runSimulation :: (MonadAsync m, MonadDelay m, MonadSay m) => Tracer m LeiosEvent -> Params -> m ()
-runSimulation tracer Params{λ, capacity} = do
+runSimulation :: (MonadAsync m, MonadDelay m, MonadSay m) => Tracer m LeiosEvent -> TVar m Params -> m ()
+runSimulation tracer params = do
   inputChannel <- newTQueueIO
   outputChannel <- newTQueueIO
   void $
-    generateInput capacity λ 42 10 inputChannel
-      `race` runNode λ 43 10 inputChannel outputChannel
+    generateInput params 42 10 inputChannel
+      `race` runNode params 43 10 inputChannel outputChannel
       `race` observeOutput tracer outputChannel
 
 observeOutput :: (MonadSTM m, MonadSay m) => Tracer m LeiosEvent -> TQueue m EndorserBlock -> m ()
@@ -93,13 +92,14 @@ observeOutput tracer output = forever go
     block <- atomically $ readTQueue output
     traceWith tracer (OutputEB block)
 
-runNode :: (MonadSTM m, MonadDelay m) => Integer -> Int -> Integer -> TQueue m InputBlock -> TQueue m EndorserBlock -> m ()
-runNode λ seed round input output =
+runNode :: (MonadSTM m, MonadDelay m) => TVar m Params -> Int -> Integer -> TQueue m InputBlock -> TQueue m EndorserBlock -> m ()
+runNode params seed round input output =
   go seed round
  where
   go seed round = do
     let endorserId = genHash `generateWith` seed
     (blocks, queueSize, droppedBlocks) <- atomically $ do
+      λ <- λ <$> readTVar params
       -- TODO: read at most capacity blocks
       allBlocks <- flushTQueue input
       let sortBlocks b (ontime, younger) =
@@ -127,13 +127,15 @@ runNode λ seed round input output =
     threadDelay 1_000_000
     go seed' (succ round)
 
-generateInput :: (MonadSTM m, MonadDelay m) => Integer -> Integer -> Int -> Integer -> TQueue m InputBlock -> m ()
-generateInput capacity λ seed round channel =
+generateInput :: (MonadSTM m, MonadDelay m) => TVar m Params -> Int -> Integer -> TQueue m InputBlock -> m ()
+generateInput params seed round channel =
   go seed round
  where
   go seed round = do
-    let blocks = genBlocks capacity λ round `generateWith` seed
-    atomically $ forM_ blocks $ writeTQueue channel
+    atomically $ do
+      Params{λ, capacity} <- readTVar params
+      let blocks = genBlocks capacity λ round `generateWith` seed
+      forM_ blocks $ writeTQueue channel
     threadDelay 1_000_000
     let seed' = newSeed seed
     go seed' (succ round)

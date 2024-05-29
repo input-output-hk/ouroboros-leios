@@ -1,15 +1,18 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Leios.Server where
 
-import Control.Concurrent.Class.MonadSTM (MonadSTM, atomically, newBroadcastTChanIO, writeTChan)
+import Control.Concurrent.Class.MonadSTM (MonadSTM (modifyTVar), TVar, atomically, newBroadcastTChanIO, writeTChan)
 import Control.Concurrent.Class.MonadSTM.TChan (TChan, dupTChan, readTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue
 import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (race_)
+import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (Value, encode)
 import Data.Text.Lazy.Encoding (decodeUtf8)
+import Leios.Node (Params (..))
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
@@ -17,11 +20,11 @@ import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import qualified Network.WebSockets as WS
 import qualified Web.Scotty as Sc
 
-runServer :: TQueue IO Value -> IO ()
-runServer queue = do
+runServer :: TVar IO Params -> TQueue IO Value -> IO ()
+runServer params queue = do
   let port = 8080
   let settings = Warp.setPort port Warp.defaultSettings
-  sapp <- scottyApp
+  sapp <- scottyApp params
   clientChannel <- newBroadcastTChanIO
   feedClient queue clientChannel
     `race_` Warp.runSettings
@@ -33,8 +36,8 @@ feedClient input output = forever $ do
   atomically $ do
     readTQueue input >>= writeTChan output
 
-scottyApp :: IO Wai.Application
-scottyApp =
+scottyApp :: TVar IO Params -> IO Wai.Application
+scottyApp params =
   Sc.scottyApp $ do
     Sc.middleware logStdoutDev
 
@@ -46,6 +49,21 @@ scottyApp =
 
     Sc.get "/index.js" $
       Sc.file "index.js"
+
+    Sc.get "/leios.css" $
+      Sc.file "leios.css"
+
+    Sc.post "/api/capacity" $ do
+      capacity <- Sc.jsonData
+      liftIO $
+        atomically $
+          modifyTVar params (\p -> p{capacity})
+
+    Sc.post "/api/lambda" $ do
+      λ <- Sc.jsonData
+      liftIO $
+        atomically $
+          modifyTVar params (\p -> p{λ})
 
 wsapp :: TChan IO Value -> WS.ServerApp
 wsapp queue pending = do
