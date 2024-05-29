@@ -59,6 +59,8 @@ library
 
     -- .hs or .lhs file containing the Main module.
     exposed-modules:  Leios.Node
+                      Leios.Trace
+                      Leios.Server
 
     -- Modules included in this executable, other than Main.
     other-modules:    Data.Bytes
@@ -70,11 +72,18 @@ library
     build-depends:    QuickCheck,
                       aeson,
                       base ^>=4.18.1.0,
-                      bytestring,
                       base16-bytestring,
+                      bytestring,
+                      contra-tracer,
                       io-classes,
                       io-sim,
-                      text
+                      scotty,
+                      text,
+                      wai,
+                      wai-extra,
+                      wai-websockets,
+                      warp,
+                      websockets
 
     -- Directories containing source files.
     hs-source-dirs:   src

@@ -1,12 +1,16 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Main where
 
+import Control.Concurrent.Class.MonadSTM (newTQueueIO)
+import Control.Monad.Class.MonadAsync (race_)
 import Leios.Node (Params (..), runSimulation)
+import Leios.Server (runServer)
+import Leios.Trace (mkTracer)
 
 main :: IO ()
-main = runSimulation params
+main = do
+  events <- newTQueueIO
+  runSimulation (mkTracer events) params
+    `race_` runServer events
  where
   params =
     Params
