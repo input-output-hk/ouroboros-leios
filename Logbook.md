@@ -1,3 +1,38 @@
+## 2024-05-31
+
+### Designing test environment
+
+We sketched some ideas on how to approach the problem of exploring the behaviour of Leios w.r.t. networking as discussed yesterday, and came up with the following high-level design:
+
+![](images/leios-network-simulation.jpg)
+
+## 2024-05-30
+
+### Leios meeting
+
+* simulate full network is more interesting
+  * freshest first approach is important!
+  * modelling changes in delays
+* tx throughput -> lots of problems
+  * easier to talk about throughput of IBs
+  * measure actual bandwidth
+  * CPU vs. Network bottleneck
+* certificates  for EBs -> a committee, also vote on the correctness of data
+  * provides stage 2 validation at a limited cost
+  * IB producer proofs the block is correct
+* TODO:
+  * network simulation of the protocol -> showing latency is not an issue -> need to model it!
+  * ΔQ model of the pipeline
+  * gather numbers about network latency/throughput across the globe
+  * numbers of CPU consumption
+* if data bandwidth is not limiting factor -> tx conflict might not be such a problem
+  * network latency is not a limiting factor
+* what's the impact of Leios at the edges of the network?
+  * mithril?
+
+* relation b/w latency and throughput
+  * tp closer bw => latency to grow => takes more time to absorb spikes
+
 ## 2024-05-29
 
 ### Visualising node behaviour
