@@ -1,0 +1,58 @@
+cabal-version:      3.0
+name:               leios-sim
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            NONE
+author:             Renate Eilers
+maintainer:         renate.eilers@iohk.io
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    exposed-modules:
+        Network.FFD
+        Node.Types
+        -- Protocol.Leios
+        -- Crypto
+        -- Simulation
+        -- Node
+        -- Types
+    hs-source-dirs: src
+    build-depends:
+        base ^>=4.18.2.1
+        , containers
+        , random
+        , time
+    default-language: Haskell2010
+
+
+executable leios-sim
+    import:           warnings
+    main-is:          Main.hs
+    -- other-modules:
+    -- other-extensions:
+    build-depends:
+        base ^>=4.18.2.1
+        , leios-sim
+    hs-source-dirs:   app
+    default-language: Haskell2010
+
+test-suite leios-sim-test
+    import:           warnings
+    main-is:          Main.hs
+    -- other-modules:
+    -- other-extensions:
+    build-depends:
+        base ^>=4.18.2.1
+        , leios-sim
+        , hspec
+        , QuickCheck
+    hs-source-dirs:   test
+    default-language: Haskell2010
+    type:             exitcode-stdio-1.0
