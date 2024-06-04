@@ -22,7 +22,7 @@ library
         -- Crypto
         -- Simulation
         -- Node
-        -- Types
+        Types
     hs-source-dirs: src
     build-depends:
         base
@@ -50,6 +50,7 @@ test-suite leios-sim-test
     -- other-extensions:
     build-depends:
         base
+        , containers
         , leios-sim
         , hspec
         , QuickCheck
