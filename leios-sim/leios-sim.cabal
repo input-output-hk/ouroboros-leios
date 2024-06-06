@@ -1,59 +1,86 @@
 cabal-version:      3.0
 name:               leios-sim
 version:            0.1.0.0
--- synopsis:
--- description:
-license:            NONE
-author:             Renate Eilers
+synopsis:           A simulator for Ouroboros Leios protocol
+license:            Apache-2.0
+license-file:       LICENSE
+author:             IOG
 maintainer:         renate.eilers@iohk.io
--- copyright:
+bug-reports:        https://github.com/input-output-hk/ouroboros-leios/issues
 build-type:         Simple
-extra-doc-files:    CHANGELOG.md
--- extra-source-files:
+extra-source-files:
+  index.html
+  index.js
+  leios.css
+
+data-files:
+  index.html
+  index.js
+  leios.css
 
 common warnings
-    ghc-options: -Wall
+  ghc-options:      -Wall -Werror
+  default-language: Haskell2010
 
 library
-    exposed-modules:
-        Network.FFD
-        Node.Types
-        -- Protocol.Leios
-        -- Crypto
-        -- Simulation
-        -- Node
-        Types
-    hs-source-dirs: src
-    build-depends:
-        base
-        , containers
-        , random
-        , time
-    default-language: Haskell2010
+  exposed-modules:
+    Leios.Network.FFD
+    Leios.Node
+    Leios.Node.Types
+    Leios.Server
+    Leios.Trace
+    Leios.Types
 
+  other-modules:    Data.Bytes
+  hs-source-dirs:   src
+  build-depends:
+    , aeson
+    , base
+    , base16-bytestring
+    , bytestring
+    , containers
+    , contra-tracer
+    , io-classes
+    , QuickCheck
+    , random
+    , scotty
+    , text
+    , time
+    , wai
+    , wai-extra
+    , wai-websockets
+    , warp
+    , websockets
 
-executable leios-sim
-    import:           warnings
-    main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
-    build-depends:
-        base
-        , leios-sim
-    hs-source-dirs:   app
-    default-language: Haskell2010
+  default-language: Haskell2010
+
+executable leios
+  import:         warnings
+  ghc-options:    -threaded -rtsopts
+  main-is:        Main.hs
+  build-depends:
+    , aeson
+    , base
+    , base16-bytestring
+    , bytestring
+    , io-classes
+    , io-sim
+    , leios-sim
+    , QuickCheck
+    , text
+
+  hs-source-dirs: app
 
 test-suite leios-sim-test
-    import:           warnings
-    main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
-    build-depends:
-        base
-        , containers
-        , leios-sim
-        , hspec
-        , QuickCheck
-    hs-source-dirs:   test
-    default-language: Haskell2010
-    type:             exitcode-stdio-1.0
+  import:         warnings
+  ghc-options:    -threaded -rtsopts
+  main-is:        Main.hs
+  build-depends:
+    , base
+    , containers
+    , hspec
+    , leios-sim
+    , QuickCheck
+
+  hs-source-dirs: test
+  type:           exitcode-stdio-1.0

@@ -1,4 +1,4 @@
-module Types  where
+module Leios.Types  where
 
   type Coin = Int
 

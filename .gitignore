@@ -5,3 +5,5 @@ report/leios-design.pdf
 report/leios-design.toc
 *~
 dist-newstyle/
+\#*
+.\#*

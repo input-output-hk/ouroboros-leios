@@ -1,6 +1,6 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Node.Types where
+module Leios.Node.Types where
 
 initializeNode :: LeiosParameters -> IO Node
 initializeNode params = undefined
