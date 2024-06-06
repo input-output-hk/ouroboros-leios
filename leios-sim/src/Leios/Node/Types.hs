@@ -1,5 +1,6 @@
-{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Leios.Node.Types where
 
 initializeNode :: LeiosParameters -> IO Node
