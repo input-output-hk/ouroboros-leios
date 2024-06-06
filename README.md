@@ -14,7 +14,8 @@ More documentation about Leios can be found in various sources:
 
 * The [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/379) providing rationale and high-level design of the protocol
 * The original [Research paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) is of course the _north star_ of this project
-* One of the researchers has shot a [video](https://www.youtube.com/watch?v=YEcYVygdhzU) explaining Leios
+* One of the paper's co-author, Giorgos Panagiotakos, has shot a [video](https://www.youtube.com/watch?v=YEcYVygdhzU) explaining Leios
+* [These slides ](https://docs.google.com/presentation/d/1W_KHdvdLNDEStE99D7Af2SRiTqZNnVLQiEPqRHJySqI/edit?usp=sharing) from Sandro Coretti-Drayton, another researcher that worked on Leios might also help getting a good intuition about Leios
 
 # Content
 
