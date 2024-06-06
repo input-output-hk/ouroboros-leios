@@ -1,6 +1,6 @@
 This repository is home of the _Leios R&D project_ whose purpose is to define a specification of the Ouroboros Leios protocol.
 
-> [!DANGER]
+> [!CAUTION]
 > This project is in its very early stage and is mostly
 > experimental and exploratory. All contributions and feedbacks are
 > welcome. No warranties of any kind about the current or future
