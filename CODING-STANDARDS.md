@@ -35,12 +35,12 @@ Here are [seven rules](https://cbea.ms/git-commit/) for great git commit message
 * Wrap the body at 72 characters (hard limit)
 * Use the body to explain what and why vs. how
 
-> [!NOTE] Why?
+> [!TIP]
 > Git commit messages are our only source of why something was changed the way it was changed. So we better make the readable, concise and detailed (when required).
 
 ### Squash & Rebase PRs
 
 When merging accepted Pull Requests, use `Squash & Merge` and ensure the branch has been rebased on top of `main`.
 
-> [!NOTE] Why?
+> [!TIP]
 > Individual commits history of PRs are mostly useless, and PRs should be small and self-contained.
