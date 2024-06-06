@@ -1,3 +1,11 @@
+## 2024-06-06
+
+### Structuring repository for Open-source
+
+* Added basic instructions for [Code of conduct](CODE-OF-CONDUCT.md), [Contribution](CONTRIBUTING.md) guidelines, and some [coding standards](CODING-STANDARDS.md).
+* Restructured code to merge `leios` and `leios-sim` package in a single one as it's pointless to maintain to different simulators
+* In passing, I reformatted all code following new coding standards (eg. using fourmolu), including cabal files
+
 ## 2024-05-31
 
 ### Designing test environment
