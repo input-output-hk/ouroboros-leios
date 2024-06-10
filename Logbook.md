@@ -1,3 +1,29 @@
+## 2024-06-10
+
+### Meeting w/ Spyros
+
+Spyros will work this week on network simulation for Leios
+
+* Uses discrete event simulator [Peernet](https://github.com/PeerNet/PeerNet) to play and replay specific scenarios
+* Setting bandwidth as a limiting factor (upload/download), need to change some parameters
+  * need to work at protocol messages
+  * TCP is not explicitly modelled in the simulator
+* Goal:
+  * check whether theoretical analysis matches practical experiments?
+  * what's limit for block generation frequency?
+* if bandwidth is not saturated, everything's fine
+* if bandwidth is saturated:
+  * need to queue local actions according to bandwidth availability
+  * main input parameter is IB generation rate
+  * output = delivery ratio of IBs
+  * if IB rate > threshold -> most blocks won't make it because of _freshest first_ policy
+
+Next steps:
+
+* [ ] SV: work on simulation at the IB level
+* [ ] SV: Share code when available
+* [ ] All: Reconvene next monday to discuss how to publish results
+
 ## 2024-06-06
 
 ### Structuring repository for Open-source
