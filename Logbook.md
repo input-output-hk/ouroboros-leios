@@ -1,3 +1,26 @@
+## @024-06-13
+
+### Weekly meeting
+
+* Eth has blobs with a 2-weeks TTL: https://vitalik.eth.limo/general/2024/03/28/blobs.html
+  * https://www.eip4844.com/
+* Leios could be used to store other data than tx -> put unstructured data, possibly transient
+* Intermediate state where we accomodate transient unstructured data
+  * easier to build and deploy -> no need for concurrency/tx validation/CPU
+* Concurrency issues?
+  * conflicting txs, duplicates detection
+* optional Leios node?
+  * how much miners could ignore Leios blocsk? Security issues
+  * use case = votes?
+* Leios would support much more data than Eth >>> MBs
+* Make Leios certificate verifiable on-chain through Plutus?
+  * Requires BLS keys and signatures?
+
+Next steps:
+
+* [ ] Identify potential use cases for "transient data" Leios
+* [ ] Keep working on protocol model
+
 ## 2024-06-10
 
 ### Meeting w/ Spyros
