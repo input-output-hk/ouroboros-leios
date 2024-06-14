@@ -63,6 +63,11 @@ const config: Config = {
                     label: 'Documentation',
                 },
                 {
+                    position: 'left',
+                    label: 'Simulation',
+                    to: 'docs/simulation',
+                },
+                {
                     href: 'https://github.com/input-output-hk/ouroboros-leios',
                     label: 'GitHub',
                     position: 'right',
