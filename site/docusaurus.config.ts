@@ -53,16 +53,15 @@ const config: Config = {
             title: 'Leios',
             logo: {
                 alt: 'Leios Logo',
-                src: 'img/logo.svg',
+                src: 'img/wave-logo.svg',
             },
             items: [
                 {
                     type: 'docSidebar',
                     sidebarId: 'tutorialSidebar',
                     position: 'left',
-                    label: 'Tutorial',
+                    label: 'Documentation',
                 },
-                { to: '/blog', label: 'Blog', position: 'left' },
                 {
                     href: 'https://github.com/input-output-hk/ouroboros-leios',
                     label: 'GitHub',
