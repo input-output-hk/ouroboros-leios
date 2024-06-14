@@ -15,17 +15,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: site/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: site/yarn.lock
 
       - name: 📦 Install dependencies
         working-directory: site
-        run: npm ci
+        run: yarn install
 
       - name: 🏗️ Build Docusaurus site
         working-directory: site
         run: |
-          npm run build
+          yarn build
 
       - name: 🚀 Publish Docusaurus build
         uses: actions/upload-artifact@v4
