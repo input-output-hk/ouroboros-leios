@@ -2,46 +2,31 @@
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+# What is Leios?
 
-Let's discover **Docusaurus in less than 5 minutes**.
+:::warning
 
-## Getting Started
+This web site and the Leios R&D project are in their very early stage. More details will be added in the forthcoming weeks and months.
 
-Get started by **creating a new site**.
+:::
 
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+_Ouroboros Leios_ is a novel protocol extending [Ouroboros Praos](https://docs.cardano.org/about-cardano/learn/ouroboros-overview/) that aims at dramatically increase the _throughput_ of Cardano network. The core protocol and its theoretical properties are defined in [this research paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/).
 
-### What you'll need
+## In a nutshell
 
-- [Node.js](https://nodejs.org/en/download/) version 18.0 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
+_Leios_ is based on the key idea of _input endorsers_. Whereas in a classical blockchain, the blocks' body directly contains transactions, in Leios the blocks' body can also contain references to _Endorser blocks_ which themselves contain references to so-called _Input blocks_ containing the actual transactions. Those references are _certified_ through a voting mechanism that guarantees a majority of validators agree on the content of _Endorser blocks_.
 
-## Generate a new site
+![Input Endorsers](input-endorsers.png)
 
-Generate a new Docusaurus site using the **classic template**.
 
-The classic template will automatically be added to your project after you run the command:
+By decoupling the logic of validating blocks' payload and extending the blockchain, and limiting the work needed to verify the chain, much higher throughput can be achieved and new use cases can be unlocked.
 
-```bash
-npm init docusaurus@latest my-website classic
-```
+## Tell me more
 
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
+More documentation about Leios can be found in the following sources:
 
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+* The [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/379) by Duncan Coutts, providing rationale and a high-level design of the protocol
+* The original [Research paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) is of course the main reference _north star_
+* [This video](https://www.youtube.com/watch?v=Czmg9WmSCcI) from Pr. Aggelos Kiayias, IOG's Chief Scientist, explains Leios in the context of _Scaling Cardano_
+* One of the paper's co-author, Giorgos Panagiotakos, has shot a [video](https://www.youtube.com/watch?v=YEcYVygdhzU) explaining Leios
+* [These slides ](https://docs.google.com/presentation/d/1W_KHdvdLNDEStE99D7Af2SRiTqZNnVLQiEPqRHJySqI/edit?usp=sharing) from Sandro Coretti-Drayton, another researcher that worked on Leios might also help getting a good intuition about Leios
