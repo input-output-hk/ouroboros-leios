@@ -1,4 +1,33 @@
-## @024-06-13
+## 2024-06-17
+
+### Network Simulation for Leios
+
+Discussing with researchers on some early simulations that are being worked on for Leios.
+
+* Constraint: Setup threshold on _egress_ bandwidth, then simulate diffusion of a block to downstream peers
+  * upstream sends notificatoin (Eg. header)
+  * downstream asks for block body if it does not have it
+  * then it "validates" (simulated time) and advertises to neighbours
+  * process is repeated until all peers have received the block
+* in the modeling of b/w limit, it does not multiplex connection bw
+  with neighbours, e.g it send each block to one node at a time,
+  consuming a fraction of the available b/w for each single
+  transmission until maximum is reached
+* simulate 1000 nodes and then plot the number of nodes who have not received the block at time $t$
+  * send 500 blocks with different rates (from 1/s to 1/ms)
+  * δ = 8 (4 inbound, 4 outbound)
+  * b/w limit = 1Mb/s
+  * block size ~ 1kB
+* when sending 10 blocks/s we observe more variation, a bit more contention as the  _freshest first_ policy starts to kick in
+* at 1block/ms there's a much wider variation in time it takes to reach nodes
+  * the first blocks take the longest as the queues are filling up with fresher blocks
+  * latest blocks go faster, almost as fast as when rate is much slower, but this is also an artifact of the simulation (eg. time horizon means there's no block coming after which decreases contention)
+* some enhancements:
+  * we want to model w/ larger blocks
+  * need to notify neighbours when a block is received to stop waiting
+  * validate results and clean-up model
+
+## 2024-06-13
 
 ### Weekly meeting
 
