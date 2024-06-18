@@ -87,11 +87,6 @@ const config: Config = {
                     label: 'GitHub',
                     position: 'right',
                 },
-                {
-                    href: 'https://github.com/input-output-hk/ouroboros-leios',
-                    label: 'GitHub',
-                    position: 'right',
-                },
             ],
         },
         footer: {
