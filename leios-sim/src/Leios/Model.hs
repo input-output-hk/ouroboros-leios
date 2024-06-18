@@ -17,6 +17,7 @@ import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
 import Control.Monad.Class.MonadSTM (MonadSTM, atomically)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
+import Control.Monad.Extra (whenM)
 import Control.Tracer (Tracer, traceWith)
 import qualified Data.Aeson as Aeson
 import GHC.Generics (Generic)
@@ -37,6 +38,14 @@ newtype Slot = Slot Word
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
   deriving newtype (Enum)
 
+data IB
+  = IB
+  { nodeId :: NodeId
+  , slot :: Slot
+  }
+  deriving (Show, Eq, Generic)
+  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
+
 tickSlot :: Slot -> Slot
 tickSlot = succ
 
@@ -51,7 +60,7 @@ run ::
   ) =>
   Tracer m LeiosEvent ->
   m ()
-run tracer = runConcurrently $ asum [Concurrently (node i tracer schedule) | i <- [0 .. 2]]
+run tracer = raceAll [node i tracer schedule | i <- [0 .. 2]]
  where
   -- TODO: we need to find a more general and realistic way to model the schedule.
   --
@@ -62,6 +71,13 @@ run tracer = runConcurrently $ asum [Concurrently (node i tracer schedule) | i <
   schedule _ (NodeId nid) (Slot slot) = pure $ slot `mod` (nid + 1) == 0
 
 type Schedule m = RoleType -> NodeId -> Slot -> m Bool
+
+raceAll ::
+  forall t m a.
+  (Foldable t, Functor t, MonadAsync m, MonadTimer m) =>
+  t (m a) ->
+  m a
+raceAll = runConcurrently . asum . fmap Concurrently
 
 node ::
   ( Monad m
@@ -74,19 +90,27 @@ node ::
   Tracer m LeiosEvent ->
   Schedule m ->
   m ()
-node i tracer schedule = do
+node nodeId tracer schedule = do
   clock <- runClock
   forever $ do
     slot <- nextSlot clock
-    traceWith tracer (NextSlot i slot)
+    whenM (hasIBRole slot) $ produceIB slot
+    -- traceWith tracer (NextSlot nodeId slot)
     pure ()
+ where
+  hasIBRole = schedule IBRole nodeId
+
+  produceIB slot =
+    traceWith tracer (ProducedIB (IB nodeId slot))
 
 --------------------------------------------------------------------------------
 -- Events
 --------------------------------------------------------------------------------
 
 -- FIXME: remove the prefix once this goes in a separate module.
-data LeiosEvent = NextSlot {nsNodeId :: NodeId, nsSlot :: Slot} -- FIXME: temporary, just for testing purposes.
+data LeiosEvent
+  = NextSlot {nsNodeId :: NodeId, nsSlot :: Slot} -- FIXME: temporary, just for testing purposes.
+  | ProducedIB {producedIB :: IB}
   deriving (Show, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
