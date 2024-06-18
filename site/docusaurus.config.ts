@@ -45,7 +45,13 @@ const config: Config = {
                     sidebarPath: './sidebars.ts',
                 },
                 blog: {
+                    path: 'news/',
+                    routeBasePath: 'news',
+                    blogTitle: "News",
+                    blogSidebarTitle: "Latest News",
+                    sortPosts: 'descending',
                     showReadingTime: true,
+                    authorsMapPath: "../authors.yaml",
                 },
                 theme: {
                     customCss: './src/css/custom.css',
@@ -74,6 +80,12 @@ const config: Config = {
                     position: 'left',
                     label: 'Simulation',
                     to: 'docs/simulation',
+                },
+                { to: '/news', label: 'Latest News', position: 'right' },
+                {
+                    href: 'https://github.com/input-output-hk/ouroboros-leios',
+                    label: 'GitHub',
+                    position: 'right',
                 },
                 {
                     href: 'https://github.com/input-output-hk/ouroboros-leios',
