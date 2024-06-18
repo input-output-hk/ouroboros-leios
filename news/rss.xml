@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel>
+        <title>Leios Blog</title>
+        <link>https://leios.cardano-scaling.org/news</link>
+        <description>Leios Blog</description>
+        <lastBuildDate>Tue, 18 Jun 2024 00:00:00 GMT</lastBuildDate>
+        <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
+        <generator>https://github.com/jpmonette/feed</generator>
+        <language>en</language>
+        <item>
+            <title><![CDATA[Community Round-Table on Leios]]></title>
+            <link>https://leios.cardano-scaling.org/news/2024/06/18/community-space</link>
+            <guid>https://leios.cardano-scaling.org/news/2024/06/18/community-space</guid>
+            <pubDate>Tue, 18 Jun 2024 00:00:00 GMT</pubDate>
+            <description><![CDATA[On the 14th of June, 2024, along with Pi Lanningham, I was honoured to be invited to the very first Round-Table organised by the Cardano Community group. The discussion was facilitated by Denicio Bernier and Rick McCracken, and was meant to provide a broad overview of Leios, the protocol and the R&D project we have just started working on.]]></description>
+            <content:encoded><![CDATA[<p>On the 14th of June, 2024, along with <a href="https://x.com/Quantumplation" target="_blank" rel="noopener noreferrer">Pi Lanningham</a>, I was honoured to be invited to the very first <em>Round-Table</em> organised by the <a href="https://x.com/Cardano" target="_blank" rel="noopener noreferrer">Cardano Community</a> group. The discussion was facilitated by <a href="https://x.com/DenicioBernier" target="_blank" rel="noopener noreferrer">Denicio Bernier</a> and <a href="https://x.com/RichardMcCrackn" target="_blank" rel="noopener noreferrer">Rick McCracken</a>, and was meant to provide a broad overview of <em>Leios</em>, the protocol and the R&amp;D project we have just started working on.</p>
+<p>We first went through Pi's presentation, recalling how <em>Ouroboros Praos</em> works in broad terms and the problem Leios provides a solution for, namely the low throughput of the network. This low throughput is a necessity imposed by diffusion delays across a world spanning network, and constraints of the stake-based sortition algorithm that's used to select block-forging leader. By deconnecting the data diffusion and validation process from the blockchain extension process, trading throughput for latency, Leios aims at dramatically increase the number of transactions that can be processed by Cardano.</p>
+<p>We then took questions from the audience, detailing some aspects of the protocol, while answering expectations from the community like the expected throughput and availability of benchmarks, the anticipated timeline for Leios, its possible usage for transient data diffusion, and its relationship with other expected Ouroboros extensions like <a href="https://peras.cardano-scaling.org/" target="_blank" rel="noopener noreferrer">Peras</a>.</p>
+<ul>
+<li>Original <a href="https://cardano.org/news/2024-06-14-media-understanding-leios-with-pi-lanningham-arnaud-bailly/" target="_blank" rel="noopener noreferrer">blog post</a> on Cardano.org</li>
+<li><a href="https://x.com/Cardano/status/1802717851544915972" target="_blank" rel="noopener noreferrer">X/Twitter</a> thread</li>
+<li>Discussion recording on <a href="https://www.youtube.com/watch?v=vpXS9lgL6BA&amp;t=3s" target="_blank" rel="noopener noreferrer">YouTube</a>.</li>
+</ul>]]></content:encoded>
+            <category>education</category>
+        </item>
+    </channel>
+</rss>
