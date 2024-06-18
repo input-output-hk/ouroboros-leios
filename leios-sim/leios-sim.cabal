@@ -53,6 +53,8 @@ library
     , warp
     , websockets
     , pretty-simple
+    , text
+    , extra
 
   default-language: Haskell2010
 
@@ -69,7 +71,6 @@ executable leios
     , io-sim
     , leios-sim
     , QuickCheck
-    , text
 
   hs-source-dirs: app
 
