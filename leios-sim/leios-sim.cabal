@@ -55,6 +55,7 @@ library
     , pretty-simple
     , text
     , extra
+    , pqueue
 
   default-language: Haskell2010
 
