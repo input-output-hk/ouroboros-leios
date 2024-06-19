@@ -13,34 +13,37 @@
 -- Next steps:
 -- ===========
 --
--- * Implement FFD policy.
--- * Add the notion of capacity.
--- * Add EB production only with IBs so that λ parameter becomes relevant.
--- * ⭐ Connect with the simulation front end and run.
--- * Add other plots: eg latency distribution.
--- * ...
--- * Implement other roles/phase.
+-- \* ✅ Implement FFD policy.
+-- \* Add the notion of ~~capacity~~ bandwidth.
+-- \* Check that after adding capacity when blocks are queued we still deliver the freshest first.
+-- \* Add EB production only with IBs so that λ parameter becomes relevant.
+-- \* ⭐ Connect with the simulation front end and run.
+-- \* Add other plots: eg latency distribution.
+-- \* ...
+-- \* Implement other roles/phase.
 module Leios.Model where
 
 import Prelude hiding (init)
 
-import Data.Foldable (for_)
 import Control.Applicative (asum)
+import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue (TQueue, newTQueueIO, readTQueue)
-import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, writeTVar, modifyTVar')
+import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, writeTVar)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
-import Control.Monad.Class.MonadSTM (MonadSTM, atomically)
+import Control.Monad.Class.MonadSTM (MonadSTM, STM, atomically, retry)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
 import Control.Monad.Extra (whenM)
 import Control.Tracer (Tracer, traceWith)
 import qualified Data.Aeson as Aeson
+import Data.Foldable (for_)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.PQueue.Max (MaxQueue)
+import qualified Data.PQueue.Max as PQueue
 import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import Text.Pretty.Simple (pPrint)
-import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 
 data RoleType = IBRole | EBRole | Vote1Role | Vote2Role
   deriving (Show, Eq, Generic)
@@ -52,7 +55,7 @@ newtype NodeId = NodeId Word
   deriving newtype (Enum, Num)
 
 newtype Slot = Slot Word
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
   deriving newtype (Enum)
 
@@ -143,7 +146,7 @@ node nodeId tracer schedule world = do
 data LeiosEvent
   = NextSlot {nsNodeId :: NodeId, nsSlot :: Slot} -- FIXME: temporary, just for testing purposes.
   | ProducedIB {producedIB :: IB}
-  | ReceivedIB {receivedIB :: IB, receivedBy :: NodeId }
+  | ReceivedIB {receivedIB :: IB, receivedBy :: NodeId}
   deriving (Show, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
@@ -202,51 +205,90 @@ data Clock m
 -- (very simple) Outside World Model
 --------------------------------------------------------------------------------
 
-data OutsideWorld m =
-  OutsideWorld { nodesTChans :: TVar m (Map NodeId (TChan m Msg)) }
-  -- FIXME: for IBs we need to implement FFD policy.
-  -- TODO: we need to think about the other types of messages. How are the different types of messages prioritized?
+data OutsideWorld m
+  = OutsideWorld {pqsTVar :: TVar m (Map NodeId (PQueueTVar m))}
 
-data Msg = MsgIB { msgIB :: IB }
+data Msg = MsgIB {msgIB :: IB}
 
-init :: forall m .
-  (Monad m, MonadSTM m, Applicative m) => m (OutsideWorld m)
+init ::
+  forall m.
+  (Monad m, MonadSTM m, Applicative m) =>
+  m (OutsideWorld m)
 init = do
-   tchans <- newTVarIO Map.empty
-   pure $ OutsideWorld { nodesTChans = tchans }
+  pqsTVar <- newTVarIO Map.empty
+  pure $ OutsideWorld{pqsTVar = pqsTVar}
 
 -- | .
 --
 -- PRECONDITION: the node should not have been registered.
-register :: forall m .
-  (Monad m, MonadSTM m) => NodeId -> OutsideWorld m -> m ()
+register ::
+  forall m.
+  (Monad m, MonadSTM m) =>
+  NodeId ->
+  OutsideWorld m ->
+  m ()
 register nodeId world = do
-  nodeTChan <- newTChanIO
+  pqTVar <- newPQueue
   -- TODO: we could use broadcast channels.
   atomically $ do
     -- FIXME: assert the 'nodeId' is not registered.
-    tchanMap <- readTVar (nodesTChans world)
-    modifyTVar' (nodesTChans world) (Map.insert nodeId nodeTChan)
+    modifyTVar' (pqsTVar world) (Map.insert nodeId pqTVar)
 
 -- | ...
 --
 -- In this first iteration we assume the message is broadcast to each node.
 --
 -- NOTE: a node will receive it's own message. We could prevent this by including the senders's id in the function type.
-sendTo :: forall m .
-  (MonadSTM m) =>
-  Msg -> OutsideWorld m -> m ()
+sendTo ::
+  forall m.
+  MonadSTM m =>
+  Msg ->
+  OutsideWorld m ->
+  m ()
 sendTo msg world = atomically $ do
-  tchansMap <- readTVar (nodesTChans world)
-  for_ (Map.elems tchansMap) (`writeTChan` msg)
+  pqsMap <- readTVar (pqsTVar world)
+  for_ (Map.elems pqsMap) (insertPQueue msg)
 
 -- | ...
 --
 -- PRECONDITION: The node ID must exist.
-receiveFrom :: forall m . (MonadSTM m) =>  NodeId -> OutsideWorld m -> m Msg
+receiveFrom :: forall m. MonadSTM m => NodeId -> OutsideWorld m -> m Msg
 receiveFrom nodeId world = do
-  mTChan <- fmap (Map.lookup nodeId) $ atomically $ readTVar (nodesTChans world)
-  case mTChan of
+  m_pqTVar <- fmap (Map.lookup nodeId) $ atomically $ readTVar (pqsTVar world)
+  case m_pqTVar of
     Nothing -> error $ "Node " <> show nodeId <> " does not exist."
-    Just tchan -> do
-      atomically $ readTChan tchan
+    Just pqTVar -> do
+      pop pqTVar
+
+--------------------------------------------------------------------------------
+-- A priority queue inside a transactional var
+--------------------------------------------------------------------------------
+
+data PQueueTVar m = PQueueTVar {getTQueueTVar :: TVar m (MaxQueue PMsg)}
+
+-- | Wrapper around 'Msg' to implement the priority needed for the priority queue.
+newtype PMsg = PMsg Msg
+
+instance Eq PMsg where
+  PMsg (MsgIB ib_x) == PMsg (MsgIB ib_y) = slot ib_x == slot ib_y
+
+instance Ord PMsg where
+  PMsg (MsgIB ib_x) <= PMsg (MsgIB ib_y) = slot ib_x <= slot ib_y
+
+-- TODO: the 'queue' part can be dropped if these functions are put in a separate module.
+newPQueue :: (Functor m, MonadSTM m) => m (PQueueTVar m)
+newPQueue = PQueueTVar <$> newTVarIO mempty
+
+insertPQueue :: MonadSTM m => Msg -> PQueueTVar m -> STM m ()
+insertPQueue msg pqTVar = do
+  modifyTVar' (getTQueueTVar pqTVar) (PQueue.insert (PMsg msg))
+
+-- | Take the message at the front of the queue (eg the freshest IB), and delete it from the queue. If the queue is empty, blocks until a message arrives.
+pop :: MonadSTM m => PQueueTVar m -> m Msg
+pop pqTVar = atomically $ do
+  queue <- readTVar (getTQueueTVar pqTVar)
+  case PQueue.getMax queue of
+    Nothing -> retry
+    Just (PMsg msg) -> do
+      writeTVar (getTQueueTVar pqTVar) (PQueue.deleteMax queue)
+      pure msg
