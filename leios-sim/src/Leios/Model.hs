@@ -8,11 +8,26 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- FIXME: add explicit exports
+--
+--
+-- Next steps:
+-- ===========
+--
+-- * Implement FFD policy.
+-- * Add the notion of capacity.
+-- * Add EB production only with IBs so that λ parameter becomes relevant.
+-- * ⭐ Connect with the simulation front end and run.
+-- * Add other plots: eg latency distribution.
+-- * ...
+-- * Implement other roles/phase.
 module Leios.Model where
 
+import Prelude hiding (init)
+
+import Data.Foldable (for_)
 import Control.Applicative (asum)
 import Control.Concurrent.Class.MonadSTM.TQueue (TQueue, newTQueueIO, readTQueue)
-import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, writeTVar)
+import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, writeTVar, modifyTVar')
 import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
 import Control.Monad.Class.MonadSTM (MonadSTM, atomically)
@@ -23,13 +38,16 @@ import qualified Data.Aeson as Aeson
 import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import Text.Pretty.Simple (pPrint)
+import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 data RoleType = IBRole | EBRole | Vote1Role | Vote2Role
   deriving (Show, Eq, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
 newtype NodeId = NodeId Word
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Generic, Ord)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
   deriving newtype (Enum, Num)
 
@@ -60,7 +78,9 @@ run ::
   ) =>
   Tracer m LeiosEvent ->
   m ()
-run tracer = raceAll [node i tracer schedule | i <- [0 .. 2]]
+run tracer = do
+  world <- init
+  raceAll [register i world >> node i tracer schedule world | i <- [0 .. 2]]
  where
   -- TODO: we need to find a more general and realistic way to model the schedule.
   --
@@ -89,19 +109,31 @@ node ::
   NodeId ->
   Tracer m LeiosEvent ->
   Schedule m ->
+  OutsideWorld m ->
   m ()
-node nodeId tracer schedule = do
-  clock <- runClock
-  forever $ do
-    slot <- nextSlot clock
-    whenM (hasIBRole slot) $ produceIB slot
-    -- traceWith tracer (NextSlot nodeId slot)
-    pure ()
+node nodeId tracer schedule world = do
+  producer `race_` consumer
  where
+  producer = do
+    clock <- runClock
+    forever $ do
+      slot <- nextSlot clock
+      whenM (hasIBRole slot) $ produceIB slot
+      -- traceWith tracer (NextSlot nodeId slot)
+      pure ()
+
+  consumer = forever $ do
+    msg <- nodeId `receiveFrom` world
+    case msg of
+      MsgIB ib -> do
+        traceWith tracer (ReceivedIB ib nodeId)
+
   hasIBRole = schedule IBRole nodeId
 
-  produceIB slot =
-    traceWith tracer (ProducedIB (IB nodeId slot))
+  produceIB slot = do
+    let newIB = IB nodeId slot
+    traceWith tracer (ProducedIB newIB)
+    MsgIB newIB `sendTo` world
 
 --------------------------------------------------------------------------------
 -- Events
@@ -111,6 +143,7 @@ node nodeId tracer schedule = do
 data LeiosEvent
   = NextSlot {nsNodeId :: NodeId, nsSlot :: Slot} -- FIXME: temporary, just for testing purposes.
   | ProducedIB {producedIB :: IB}
+  | ReceivedIB {receivedIB :: IB, receivedBy :: NodeId }
   deriving (Show, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
@@ -164,3 +197,56 @@ data Clock m
   , slotTVar :: TVar m Slot
   , lastReadTVar :: TVar m (Maybe Slot)
   }
+
+--------------------------------------------------------------------------------
+-- (very simple) Outside World Model
+--------------------------------------------------------------------------------
+
+data OutsideWorld m =
+  OutsideWorld { nodesTChans :: TVar m (Map NodeId (TChan m Msg)) }
+  -- FIXME: for IBs we need to implement FFD policy.
+  -- TODO: we need to think about the other types of messages. How are the different types of messages prioritized?
+
+data Msg = MsgIB { msgIB :: IB }
+
+init :: forall m .
+  (Monad m, MonadSTM m, Applicative m) => m (OutsideWorld m)
+init = do
+   tchans <- newTVarIO Map.empty
+   pure $ OutsideWorld { nodesTChans = tchans }
+
+-- | .
+--
+-- PRECONDITION: the node should not have been registered.
+register :: forall m .
+  (Monad m, MonadSTM m) => NodeId -> OutsideWorld m -> m ()
+register nodeId world = do
+  nodeTChan <- newTChanIO
+  -- TODO: we could use broadcast channels.
+  atomically $ do
+    -- FIXME: assert the 'nodeId' is not registered.
+    tchanMap <- readTVar (nodesTChans world)
+    modifyTVar' (nodesTChans world) (Map.insert nodeId nodeTChan)
+
+-- | ...
+--
+-- In this first iteration we assume the message is broadcast to each node.
+--
+-- NOTE: a node will receive it's own message. We could prevent this by including the senders's id in the function type.
+sendTo :: forall m .
+  (MonadSTM m) =>
+  Msg -> OutsideWorld m -> m ()
+sendTo msg world = atomically $ do
+  tchansMap <- readTVar (nodesTChans world)
+  for_ (Map.elems tchansMap) (`writeTChan` msg)
+
+-- | ...
+--
+-- PRECONDITION: The node ID must exist.
+receiveFrom :: forall m . (MonadSTM m) =>  NodeId -> OutsideWorld m -> m Msg
+receiveFrom nodeId world = do
+  mTChan <- fmap (Map.lookup nodeId) $ atomically $ readTVar (nodesTChans world)
+  case mTChan of
+    Nothing -> error $ "Node " <> show nodeId <> " does not exist."
+    Just tchan -> do
+      atomically $ readTChan tchan
