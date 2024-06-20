@@ -1,3 +1,28 @@
+## 2024-06-20
+
+### Team Meeting
+
+From discussion with researchers about voting with Leios, it seems that:
+
+* "Blob leios"  could be useful for Bulletin Board, adding some extra security
+* Catalyst could be a good customer:
+  * large number of votes (300k), would SPO be willing to serve that data?
+  * having commmitment on chain is good as one can "complain" on-chain
+  * Leios offer censorship freeness on top of availability
+* Other possible use cases:
+  * Governance actions could be more relevant: Small number of votes and actions, transient data?
+  * auctions would be another good use case for "Blob Leios"
+* Incentives for SPOs to serve the data?
+  * in filecoin, serving data has a cost
+  * compare w/ filecoin?
+* We might need to allocate bandwidth to different protocols as Ouroboros, Mithril, Peras, Leios... will compete for the same network resources
+  * in Leios, it's assumed there's minimal b/w reserved for votes/certificates and the rest is used for IBs
+
+### Presentation by Sandro
+
+Sandro gave us an introductory talk about Leios, motivating the decisions behind the details of the protocol.
+The recording is available on GDrive: https://drive.google.com/file/d/1r04nrjMtHijJNTLW3FuE5vEu_y3a0ssi/view
+
 ## 2024-06-17
 
 ### Network Simulation for Leios
