@@ -94,36 +94,31 @@ data Parameters = Parameters
 
 newtype NumberOfSlots = NumberOfSlots Word
   deriving stock (Generic)
-  deriving newtype (Show, Eq, Ord, Num)
-  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
+  deriving newtype (Show, Eq, Ord, Num, Aeson.ToJSON, Aeson.FromJSON)
 
 newtype NumberOfSlices = NumberOfSlices Word
   deriving stock (Generic)
-  deriving newtype (Show, Eq, Ord, Num)
-  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
+  deriving newtype (Show, Eq, Ord, Num, Aeson.ToJSON, Aeson.FromJSON)
 
 newtype BlocksPerSecond = BlocksPerSecond Word
   deriving stock (Generic)
-  deriving newtype (Show, Eq, Ord)
-  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
+  deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
 --------------------------------------------------------------------------------
 -- Model types
 --------------------------------------------------------------------------------
 
 data RoleType = IBRole | EBRole | Vote1Role | Vote2Role
-  deriving (Show, Eq, Generic)
+  deriving stock (Show, Eq, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
 newtype NodeId = NodeId Word
-  deriving (Show, Eq, Generic, Ord)
-  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
-  deriving newtype (Enum, Num)
+  deriving stock (Generic)
+  deriving newtype (Show, Eq, Enum, Num, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
 newtype Slot = Slot Word
-  deriving (Show, Eq, Ord, Generic)
-  deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
-  deriving newtype (Enum)
+  deriving stock (Generic)
+  deriving newtype (Show, Eq, Ord, Enum, Aeson.ToJSON, Aeson.FromJSON)
 
 tickSlot :: Slot -> Slot
 tickSlot = succ
@@ -262,7 +257,8 @@ node nodeId tracer schedule world = do
     traceWith tracer (ProducedEB newEB)
     MsgEB newEB `sendTo` world
 
--- | @slice _L s x@ returns the slice @y - x@, where @y@ is the slice that contains slot @s@.
+-- | A slice is an interval of slots. @slice _L s x@ returns the slice
+-- that is @x@ slices before the slice that contains slot @s@.
 --
 -- We assume the time to be divided in slots, and the slots to be
 -- grouped into slices of length @_L@. The following diagram
