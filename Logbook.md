@@ -1,3 +1,27 @@
+## 2024-06-25
+
+### Blob Leios
+
+As an intermediate deployment step a transient-data sharing version of Leios is being discussed, called "Blob Leios".
+In Blob Leios, IBs contain unstructured data (that is not parsed by the blockchain's virtual machine) instead of transactions.
+The IBs are expected to be retained by the SPOs for a limited amount of time, e.g., 2 weeks.
+The virtual machine only parses a commitment to the data that is persistently stored by SPOs and allows for 
+the applications discussed in the  2024-06-20 logbook entry.
+
+This approach defers dealing with a number of throughput scaling issues, such as :
+* increased storage size
+* concurrency issues that have to do with the concurrent generation of IBs (duplicate transactions, conflicting transactions)
+* increased CPU requirements due to the validation of transactions included in IBs
+  
+thus making a first deployment of Leios a lot easier.
+Note, that Blob Leios includes several new design elements such as:
+* the freshest first network approach
+* block voting
+* the IB/EB/voting pipeline.
+
+Finally, while the idea is similar to Ethereum's blobs, Leios allows scaling "data throughput" to an lot larger level than Ethereuem.
+
+
 ## 2024-06-20
 
 ### Team Meeting
