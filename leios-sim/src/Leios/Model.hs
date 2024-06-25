@@ -18,7 +18,9 @@
 -- \* ✅ Add the notion of ~~capacity~~ bandwidth.
 -- \* ✅ Check that after adding capacity when blocks are queued we still deliver the freshest first.
 -- \* ✅ Add EB production only with IBs so that λ parameter becomes relevant.
+-- \* ✅ Allow to pass paremeters to the simulation.
 -- \* ⭐ Connect with the simulation front end and run.
+-- \* Define a better/more-realistic schedule.
 -- \* Add other plots: eg latency distribution.
 -- \* ...
 -- \* Implement other roles/phase.
