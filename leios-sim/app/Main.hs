@@ -2,21 +2,26 @@ module Main where
 
 import Control.Concurrent.Class.MonadSTM (newTQueueIO, newTVarIO)
 import Control.Monad.Class.MonadAsync (race_)
-import Leios.Node (Params (..), runSimulation)
 import Leios.Server (runServer)
 import Leios.Trace (mkTracer)
 
+-- FIXME: import explicitly
+import Leios.Model
+import qualified Leios.Model as Model
+
 main :: IO ()
 main = do
-  params <- newTVarIO baseParams
+  params <- newTVarIO defaultParams
   events <- newTQueueIO
-  runSimulation (mkTracer events) params
-    `race_` runServer params events
+  Model.run (mkTracer events) params
+   `race_` runServer params events
  where
-  baseParams =
-    Params
-      { λ = 12
-      , capacity = 10
-      , seed = 42
-      , initialRound = 10
-      }
+   defaultParams =
+        Parameters
+          { _L = NumberOfSlots 4
+          , λ = NumberOfSlices 3
+          , nodeBandwidth = BitsPerSecond 1000
+          , ibSize = NumberOfBits 300
+          , f_I = error "this needs to be properly defined still"
+          , f_E = error "this needs to be properly defined still"
+          }

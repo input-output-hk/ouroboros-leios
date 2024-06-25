@@ -19,7 +19,7 @@ data-files:
   leios.css
 
 common warnings
-  ghc-options:      -Wall -Werror
+  ghc-options:      -Wall
   default-language: Haskell2010
 
 library
