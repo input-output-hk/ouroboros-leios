@@ -43,16 +43,25 @@ document.addEventListener('DOMContentLoaded', () => {
   ws.onmessage = function(message) {
     if (message.data) {
       const eb = JSON.parse(message.data);
-      if (chart.data.datasets[0].data.length > 49) {
-        chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
-        chart.data.datasets[1].data.splice(0, chart.data.datasets[1].data.length - 49);
+
+      if (eb.tag == 'ReceivedEB') {
+
+        if (chart.data.datasets[0].data.length > 49) {
+          chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
+          chart.data.datasets[1].data.splice(0, chart.data.datasets[1].data.length - 49);
+        }
+
+        // TODO: determine the queue size
+        chart.data.datasets[0].data.push({ x: eb.receivedEB.eb_slot, y: 0 });
+        console.log (eb.receivedEB);
+        console.log (eb.receivedEB.eb_slot);
+
+        chart.data.datasets[1].data.push({ x: eb.receivedEB.eb_slot, y: eb.receivedEB.eb_linked_IBs.length });
+        const minx = chart.data.datasets[0].data[0].x;
+        chart.options.scales.x.min = minx;
+        chart.options.scales.x.max = minx + 50;
+        chart.update();
       }
-      chart.data.datasets[0].data.push({ x: eb.endorsementTimestamp, y: eb.queueSize });
-      chart.data.datasets[1].data.push({ x: eb.endorsementTimestamp, y: eb.inputBlocks.length });
-      const minx = chart.data.datasets[0].data[0].x;
-      chart.options.scales.x.min = minx;
-      chart.options.scales.x.max = minx + 50;
-      chart.update();
     }
   };
 
@@ -71,10 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.port + "/api/lambda", parseInt(lambda.value));
   });
 
-  const capacity = document.getElementById('capacity');
+  const bps = document.getElementById('bps');
   capacity.addEventListener('change', function() {
     postJSON("http://" + window.location.hostname + ":" +
-      window.location.port + "/api/capacity", parseInt(capacity.value));
+      window.location.port + "/api/node-bandwidth", parseInt(capacity.value));
   });
 
 });

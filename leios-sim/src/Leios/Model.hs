@@ -29,7 +29,6 @@
 -- =====
 --
 -- \* Make the IB size configurable.
--- \* Define a better/more-realistic schedule.
 -- \* Minor: I need to use '_' for certain variable names so that they match the paper. Should I simply use snake case overall?
 -- \* Address all the FIXMEs.
 --
@@ -181,18 +180,9 @@ run ::
   , MonadDelay m
   ) =>
   Tracer m LeiosEvent ->
+  TVar m Parameters ->
   m ()
-run tracer = do
-  let defaultParams =
-        Parameters
-          { _L = g_L
-          , λ = g_λ
-          , nodeBandwidth = gNodeBandwidth
-          , ibSize = gIBSize
-          , f_I = g_f_I
-          , f_E = g_f_E
-          }
-  paramsTVar <- newTVarIO defaultParams
+run tracer paramsTVar = do
   world <- init paramsTVar
   let totalNodes = 1
   raceAll
@@ -325,15 +315,31 @@ data LeiosEvent
 -- IO simulation
 --------------------------------------------------------------------------------
 
-runIO :: IO ()
-runIO = do
+-- | Run the simulation without a webserver. The events are output to
+-- the standard output.
+runStandalone :: IO ()
+runStandalone = do
+  let defaultParams =
+        Parameters
+          { _L = g_L
+          , λ = g_λ
+          , nodeBandwidth = gNodeBandwidth
+          , ibSize = gIBSize
+          , f_I = g_f_I
+          , f_E = g_f_E
+          }
+  paramsTVar <- newTVarIO defaultParams
   events <- newTQueueIO
-  run (mkTracer events) `race_` outputToStdout events
+  run (mkTracer events) paramsTVar `race_` outputToStdout events
  where
   -- FIXME: temporary
   outputToStdout :: TQueue IO Aeson.Value -> IO ()
   outputToStdout events = forever $ do
     atomically (readTQueue events) >>= pPrint
+
+-- runSimulation :: (MonadAsync m, MonadDelay m, MonadSay m)
+--   => Tracer m LeiosEvent -> TVar m Parameters -> m ()
+-- runSimulation tracer params = run tracer params
 
 --------------------------------------------------------------------------------
 -- Blockchain Clock
