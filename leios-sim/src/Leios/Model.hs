@@ -67,9 +67,9 @@ gNodeBandwidth = BitsPerSecond 100
 
 gIBSize = NumberOfBits 300
 
-g_f_I = BlocksPerSecond 1
+g_f_I = 0.5
 
-g_f_E = BlocksPerSecond 4
+g_f_E = 1
 
 --------------------------------------------------------------------------------
 -- Model parameters
@@ -84,9 +84,8 @@ data Parameters = Parameters
   , nodeBandwidth :: BitsPerSecond
   , ibSize :: NumberOfBits
   -- ^ Size of the diffusion block.
-  , f_I :: BlocksPerSecond
-  -- ^ Frequency of IBs per-node. FIXME: I think this will be determined by the leader schedule (VRF lottery).
-  , f_E :: BlocksPerSecond
+  , f_I :: Rational
+  , f_E :: Rational
   -- ^ Frequency of EBs per-node. FIXME: I think this will be determined by the leader schedule (VRF lottery).
   }
   deriving (Show, Generic)
