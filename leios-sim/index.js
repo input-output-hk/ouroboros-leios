@@ -7,15 +7,22 @@ document.addEventListener('DOMContentLoaded', () => {
       text: "Leios Blocks throughput"
     },
     data: {
-      datasets: [{
-        type: 'bar',
-        label: "Queue size",
-        data: []
-      }, {
-        type: 'line',
-        label: "EB throughput",
-        data: []
-      }]
+      // N.B.: Make sure colors are picked from an inclusive color palette.
+      // See for instance: https://medium.com/@allieofisher/inclusive-color-palettes-for-the-web-bbfe8cf2410e
+      datasets: [
+	{ type: 'line',
+          label: "EB throughput",
+          data: [],
+	  backgroundColor: '#235FA4',
+	  borderColor: '#235FA4',
+        },
+	{ type: 'bar',
+          label: "Queue size",
+          data: [],
+	  backgroundColor: '#E8F086',
+	  borderColor: '#E8F086',
+	}
+      ]
     },
     options: {
       scales: {
@@ -40,29 +47,43 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('connected');
   };
 
+  // We will add elements to the queue when we get a log message about
+  // a new IB being created. When we receive a log message about a
+  // created EB, we will remove the linked IBs inside the EB from the
+  // queue.
+  var queuedIBs = [];
+
   ws.onmessage = function(message) {
     if (message.data) {
-      const eb = JSON.parse(message.data);
 
-      if (eb.tag == 'ReceivedEB') {
+      const logData = JSON.parse(message.data);
+
+      if (logData.tag == 'ReceivedEB') {
 
         if (chart.data.datasets[0].data.length > 49) {
           chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
           chart.data.datasets[1].data.splice(0, chart.data.datasets[1].data.length - 49);
         }
 
-        // TODO: determine the queue size
-        chart.data.datasets[0].data.push({ x: eb.receivedEB.eb_slot, y: 0 });
-        console.log (eb.receivedEB);
-        console.log (eb.receivedEB.eb_slot);
+	if (logData.receivedEB.eb_linked_IBs.length != 0) {
+	  queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
+	}
 
-        chart.data.datasets[1].data.push({ x: eb.receivedEB.eb_slot, y: eb.receivedEB.eb_linked_IBs.length });
+        chart.data.datasets[0].data.push({ x: logData.receivedEB.eb_slot,
+					   y: logData.receivedEB.eb_linked_IBs.length });
+        chart.data.datasets[1].data.push({ x: logData.receivedEB.eb_slot, y: queuedIBs.length });
+
         const minx = chart.data.datasets[0].data[0].x;
         chart.options.scales.x.min = minx;
         chart.options.scales.x.max = minx + 50;
         chart.update();
       }
+
+      if (logData.tag == 'ProducedIB') {
+	queuedIBs.push(logData.producedIB);
+      }
     }
+
   };
 
   window.onbeforeunload = _ => {

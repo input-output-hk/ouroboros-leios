@@ -55,6 +55,7 @@ import qualified Data.PQueue.Max as PQueue
 import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import Text.Pretty.Simple (pPrint)
+import Data.List (partition)
 
 --------------------------------------------------------------------------------
 -- FIXME: constants that should be configurable
@@ -469,13 +470,19 @@ storeIB nodeId ib OutsideWorld{storedIBsTVar} =
   atomically $
     modifyTVar' storedIBsTVar (Map.alter (Just . maybe [ib] (ib :)) nodeId)
 
--- | Retrieve the downloaded IBs by the given node, which correspond to the given slice.
+-- | Retrieve the downloaded IBs by the given node, which correspond
+-- to the given slice. Once retrieved the IBs are deleted.
+--
 storedIBsBy :: MonadSTM m => NodeId -> OutsideWorld m -> Slice -> m [IB]
-storedIBsBy nodeId OutsideWorld{storedIBsTVar} slice = do
-  mStoredIBs <- atomically (readTVar storedIBsTVar)
-  pure $
-    maybe [] (filter ((`isWithin` slice) . ib_slot)) $
-      Map.lookup nodeId mStoredIBs
+storedIBsBy nodeId OutsideWorld{storedIBsTVar} slice = atomically $ do
+  storedIBs <- readTVar storedIBsTVar
+  case Map.lookup nodeId storedIBs of
+    Nothing -> pure []
+    Just nodeIdStoredIBs -> do
+      let (ibsWithinSlice, ibsOutsideSlice) =
+            partition ((`isWithin` slice) . ib_slot) nodeIdStoredIBs
+      writeTVar storedIBsTVar (Map.insert nodeId ibsOutsideSlice storedIBs)
+      pure ibsWithinSlice
 
 --------------------------------------------------------------------------------
 -- A priority queue inside a transactional var
