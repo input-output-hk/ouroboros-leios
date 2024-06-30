@@ -121,7 +121,7 @@ newtype IBFrequency = IBFrequency {getIBFrequency ::  Double}
   deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
 -- Frequency of EB slots per Praos slots.
-newtype EBFrequency = EBFrequency Double
+newtype EBFrequency = EBFrequency {getEBFrequency :: Double}
   deriving stock (Generic)
   deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
@@ -210,7 +210,7 @@ run tracer paramsTVar = do
     [ do
         register (NodeId i) world
         let nodeGen = nodesGens !! fromIntegral i
-        node (NodeId i) stakePercent nodeGen tracer (schedule totalNodes) world
+        node (NodeId i) stakePercent nodeGen tracer world
     | i <- [0 .. totalNodes - 1]
     ]
   where
@@ -220,28 +220,19 @@ run tracer paramsTVar = do
       where
         (gen0, gen1) = split gen
 
-  -- TODO: we need to find a more general and realistic way to model the schedule.
-  --
-  -- In particular we should add the ledger state needed to determine leadership (eg stake distribution).
-  --
-  -- Also we would like more than one node to be elected to issue blocks or votes (specially the latter!).
-    schedule :: Word -> RoleType -> NodeId -> Slot -> m Bool
-    schedule _ IBRole (NodeId nid) (Slot slot) = pure $ slot `mod` (nid + 1) == 0
-    schedule totalNodes EBRole _ (Slot slot) = pure $ slot `mod` totalNodes == 0
-
 -- | Determine if the node with the given stake leads.
 --
 -- We determine this simply by generating a random number @n@ in the
 -- interval [0, 1], and returning @True@ iff:
 --
--- > n <= asc_I * α
+-- > n <= asc * α
 --
--- where @α@ is the given node stake, @f_I@ is the 'IBFrequency' and
+-- where @α@ is the given node stake, @f@ is the frequency of slots and
 --
--- > asc_I = f_I / ceiling f_I
+-- > asc = f / ceiling f
 --
-leads :: RandomGen g => NodeStakePercent -> IBFrequency -> State g Bool
-leads (NodeStakePercent α) (IBFrequency f_I) = do
+leads :: RandomGen g => NodeStakePercent -> Double -> State g Bool
+leads (NodeStakePercent α) f_I = do
   generator <- get
   let (n, nextGenerator) = randomR (0, 1) generator
   put nextGenerator
@@ -252,15 +243,9 @@ leads (NodeStakePercent α) (IBFrequency f_I) = do
 
 -- | Given a number of IB slots, determine if the node with the given
 -- stake percent leads on those slots.
-leadsMultiple :: RandomGen g => g -> Int -> NodeStakePercent -> IBFrequency -> ([Bool], g)
-leadsMultiple generator n stakePercent ibFrequency =
-  replicateM n (leads stakePercent ibFrequency) `runState` generator
-
--- FIXME: for EBs we might want to define this as
---
--- > slot `mod` totalNumberOfNodes == 0
-
-type Schedule m = RoleType -> NodeId -> Slot -> m Bool
+leadsMultiple :: RandomGen g => g -> Int -> NodeStakePercent -> Double -> ([Bool], g)
+leadsMultiple generator n stakePercent f =
+  replicateM n (leads stakePercent f) `runState` generator
 
 raceAll ::
   forall t m a.
@@ -281,24 +266,27 @@ node ::
   NodeStakePercent ->
   g ->
   Tracer m LeiosEvent ->
-  Schedule m ->
   OutsideWorld m ->
   m ()
-node nodeId nodeStakePercent initialGenerator tracer schedule world = do
+node nodeId nodeStakePercent initialGenerator tracer world = do
   producer `race_` consumer
  where
   producer = do
     clock <- runClock
     let loop generator = do
           slot <- nextSlot clock
-          Parameters {f_I} <- getParams world
-          let q_I = ceiling $ getIBFrequency f_I -- For practical reasons we want this to be a minimal value.
-              (nodeLeads, nextGenerator) = leadsMultiple generator q_I nodeStakePercent f_I
-              slotsLed = length $ filter id nodeLeads
-          replicateM slotsLed $ produceIB slot
-          whenM (hasEBRole slot) $ produceEB slot
           -- traceWith tracer (NextSlot nodeId slot)
-          loop nextGenerator
+          Parameters {f_I, f_E} <- getParams world
+          -- Generate IB blocks
+          let (numberOfIBsInThisSlot, generator1) =
+                slotsLed generator (getIBFrequency f_I)
+          replicateM numberOfIBsInThisSlot $ produceIB slot
+          -- Generate EB blocks
+          let (numberOfEBsInThisSlot, generator2) =
+                slotsLed generator1 (getEBFrequency f_E)
+          replicateM numberOfEBsInThisSlot $ produceEB slot
+          -- Continue
+          loop generator2
     loop initialGenerator
 
   consumer = forever $ do
@@ -310,12 +298,16 @@ node nodeId nodeStakePercent initialGenerator tracer schedule world = do
       MsgEB eb -> do
         traceWith tracer (ReceivedEB eb nodeId)
 
+  slotsLed generator f =
+    let q = ceiling $ f -- For practical reasons we want this to be a minimal value.
+        (nodeLeads, nextGenerator) =
+          leadsMultiple generator q nodeStakePercent f
+    in (length $ filter id nodeLeads, nextGenerator)
+
   produceIB slot = do
     let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = gIBSize}
     traceWith tracer (ProducedIB newIB)
     MsgIB newIB `sendTo` world
-
-  hasEBRole = schedule EBRole nodeId
 
   produceEB slot = do
     Parameters{_L, λ} <- getParams world
