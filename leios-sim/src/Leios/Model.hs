@@ -20,7 +20,8 @@
 -- \* ✅ Add EB production only with IBs so that λ parameter becomes relevant.
 -- \* ✅ Allow to pass paremeters to the simulation.
 -- \* ✅ Connect with the simulation front end and run.
--- \* Define a better/more-realistic schedule.
+-- \* ✅ Define a better/more-realistic schedule.
+-- \*  Tweak the model parameters.
 -- \* Add other plots: eg latency distribution.
 -- \* ...
 -- \* Implement other roles/phase.
@@ -185,7 +186,6 @@ data EB
 -- Model
 --------------------------------------------------------------------------------
 
--- TODO: when we connect the model with the server this function should be renamed to something like 'runStandalone'.
 run ::
   forall m.
   ( Monad m
@@ -392,10 +392,6 @@ runStandalone = do
   outputToStdout :: TQueue IO Aeson.Value -> IO ()
   outputToStdout events = forever $ do
     atomically (readTQueue events) >>= pPrint
-
--- runSimulation :: (MonadAsync m, MonadDelay m, MonadSay m)
---   => Tracer m LeiosEvent -> TVar m Parameters -> m ()
--- runSimulation tracer params = run tracer params
 
 --------------------------------------------------------------------------------
 -- Blockchain Clock
