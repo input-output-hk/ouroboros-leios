@@ -19,7 +19,7 @@
 -- \* ✅ Check that after adding capacity when blocks are queued we still deliver the freshest first.
 -- \* ✅ Add EB production only with IBs so that λ parameter becomes relevant.
 -- \* ✅ Allow to pass paremeters to the simulation.
--- \* ⭐ Connect with the simulation front end and run.
+-- \* ✅ Connect with the simulation front end and run.
 -- \* Define a better/more-realistic schedule.
 -- \* Add other plots: eg latency distribution.
 -- \* ...
@@ -40,7 +40,7 @@ import Control.Applicative (asum)
 import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue (TQueue, newTQueueIO, readTQueue)
 import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, readTVarIO, writeTVar)
-import Control.Monad (forever)
+import Control.Monad (forever, replicateM)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
 import Control.Monad.Class.MonadSTM (MonadSTM, STM, atomically, retry)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
@@ -56,6 +56,9 @@ import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import Text.Pretty.Simple (pPrint)
 import Data.List (partition)
+import System.Random (randomR, RandomGen, mkStdGen, split)
+import Control.Monad.State (State, get, put, runState)
+import Data.Word (Word64)
 
 --------------------------------------------------------------------------------
 -- FIXME: constants that should be configurable
@@ -69,15 +72,17 @@ gNodeBandwidth = BitsPerSecond 100
 
 gIBSize = NumberOfBits 300
 
-g_f_I = 0.5
+g_f_I = IBFrequency 0.5
 
-g_f_E = 1
+g_f_E = EBFrequency 1
 
 --------------------------------------------------------------------------------
 -- Model parameters
 --------------------------------------------------------------------------------
 
 -- FIXME: we should add a parameter to determine the number of slots per second (or slot duration).
+--
+-- TODO: we might want to split this between constants and parameters that can be tweaked at runtime.
 data Parameters = Parameters
   { _L :: NumberOfSlots
   -- ^  Slice length.
@@ -86,9 +91,9 @@ data Parameters = Parameters
   , nodeBandwidth :: BitsPerSecond
   , ibSize :: NumberOfBits
   -- ^ Size of the diffusion block.
-  , f_I :: Rational
-  , f_E :: Rational
-  -- ^ Frequency of EBs per-node. FIXME: I think this will be determined by the leader schedule (VRF lottery).
+  , f_I :: IBFrequency
+  , f_E :: EBFrequency
+  , initialSeed :: Int
   }
   deriving (Show, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
@@ -102,6 +107,21 @@ newtype NumberOfSlices = NumberOfSlices Word
   deriving newtype (Show, Eq, Ord, Num, Aeson.ToJSON, Aeson.FromJSON)
 
 newtype BlocksPerSecond = BlocksPerSecond Word
+  deriving stock (Generic)
+  deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
+
+-- We might consider using a smart constructor to make sure it's always in the range [0, 1], but it might be overkill.
+newtype NodeStakePercent = NodeStakePercent Double
+  deriving stock (Generic)
+  deriving newtype (Show)
+
+-- Frequency of IB slots per Praos slots.
+newtype IBFrequency = IBFrequency {getIBFrequency ::  Double}
+  deriving stock (Generic)
+  deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
+
+-- Frequency of EB slots per Praos slots.
+newtype EBFrequency = EBFrequency Double
   deriving stock (Generic)
   deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
@@ -180,21 +200,61 @@ run ::
   m ()
 run tracer paramsTVar = do
   world <- init paramsTVar
-  let totalNodes = 1
+  params <- readTVarIO paramsTVar
+  let totalNodes = 2
+      gen = mkStdGen (initialSeed params)
+      nodesGens = splitIn totalNodes gen
+      -- TODO: for now we don't allow this to be configurable
+      stakePercent = NodeStakePercent (1/ fromIntegral totalNodes)
   raceAll
-    [ register (NodeId i) world
-      >> node (NodeId i) tracer (schedule totalNodes) world
-    | i <- [0 .. totalNodes]
+    [ do
+        register (NodeId i) world
+        let nodeGen = nodesGens !! fromIntegral i
+        node (NodeId i) stakePercent nodeGen tracer (schedule totalNodes) world
+    | i <- [0 .. totalNodes - 1]
     ]
- where
+  where
+    splitIn 0 _ = []
+    splitIn 1 gen = [gen]
+    splitIn n gen = gen0 : splitIn (n-1) gen1
+      where
+        (gen0, gen1) = split gen
+
   -- TODO: we need to find a more general and realistic way to model the schedule.
   --
   -- In particular we should add the ledger state needed to determine leadership (eg stake distribution).
   --
   -- Also we would like more than one node to be elected to issue blocks or votes (specially the latter!).
-  schedule :: Word -> RoleType -> NodeId -> Slot -> m Bool
-  schedule _ IBRole (NodeId nid) (Slot slot) = pure $ slot `mod` (nid + 1) == 0
-  schedule totalNodes EBRole _ (Slot slot) = pure $ slot `mod` totalNodes == 0
+    schedule :: Word -> RoleType -> NodeId -> Slot -> m Bool
+    schedule _ IBRole (NodeId nid) (Slot slot) = pure $ slot `mod` (nid + 1) == 0
+    schedule totalNodes EBRole _ (Slot slot) = pure $ slot `mod` totalNodes == 0
+
+-- | Determine if the node with the given stake leads.
+--
+-- We determine this simply by generating a random number @n@ in the
+-- interval [0, 1], and returning @True@ iff:
+--
+-- > n <= asc_I * α
+--
+-- where @α@ is the given node stake, @f_I@ is the 'IBFrequency' and
+--
+-- > asc_I = f_I / ceiling f_I
+--
+leads :: RandomGen g => NodeStakePercent -> IBFrequency -> State g Bool
+leads (NodeStakePercent α) (IBFrequency f_I) = do
+  generator <- get
+  let (n, nextGenerator) = randomR (0, 1) generator
+  put nextGenerator
+  pure $! n <= asc_I * α
+  where
+    asc_I = f_I / ceiling' f_I
+    ceiling' = fromIntegral . ceiling
+
+-- | Given a number of IB slots, determine if the node with the given
+-- stake percent leads on those slots.
+leadsMultiple :: RandomGen g => g -> Int -> NodeStakePercent -> IBFrequency -> ([Bool], g)
+leadsMultiple generator n stakePercent ibFrequency =
+  replicateM n (leads stakePercent ibFrequency) `runState` generator
 
 -- FIXME: for EBs we might want to define this as
 --
@@ -215,23 +275,31 @@ node ::
   , MonadSTM m
   , MonadAsync m
   , MonadDelay m
+  , RandomGen g
   ) =>
   NodeId ->
+  NodeStakePercent ->
+  g ->
   Tracer m LeiosEvent ->
   Schedule m ->
   OutsideWorld m ->
   m ()
-node nodeId tracer schedule world = do
+node nodeId nodeStakePercent initialGenerator tracer schedule world = do
   producer `race_` consumer
  where
   producer = do
     clock <- runClock
-    forever $ do
-      slot <- nextSlot clock
-      whenM (hasIBRole slot) $ produceIB slot -- TODO: do we want to produce IBs at a higher rate than 1 per-slot?
-      whenM (hasEBRole slot) $ produceEB slot
-      -- traceWith tracer (NextSlot nodeId slot)
-      pure ()
+    let loop generator = do
+          slot <- nextSlot clock
+          Parameters {f_I} <- getParams world
+          let q_I = ceiling $ getIBFrequency f_I -- For practical reasons we want this to be a minimal value.
+              (nodeLeads, nextGenerator) = leadsMultiple generator q_I nodeStakePercent f_I
+              slotsLed = length $ filter id nodeLeads
+          replicateM slotsLed $ produceIB slot
+          whenM (hasEBRole slot) $ produceEB slot
+          -- traceWith tracer (NextSlot nodeId slot)
+          loop nextGenerator
+    loop initialGenerator
 
   consumer = forever $ do
     msg <- nodeId `receiveFrom` world
@@ -241,8 +309,6 @@ node nodeId tracer schedule world = do
         storeIB nodeId ib world
       MsgEB eb -> do
         traceWith tracer (ReceivedEB eb nodeId)
-
-  hasIBRole = schedule IBRole nodeId
 
   produceIB slot = do
     let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = gIBSize}
@@ -324,6 +390,7 @@ runStandalone = do
           , ibSize = gIBSize
           , f_I = g_f_I
           , f_E = g_f_E
+          , initialSeed = 22595838 -- https://xkcd.com/221/. We might want to generate this from the system time, or pass it as parameter.
           }
   paramsTVar <- newTVarIO defaultParams
   events <- newTQueueIO

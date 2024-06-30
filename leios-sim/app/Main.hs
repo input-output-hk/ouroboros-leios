@@ -22,6 +22,7 @@ main = do
           , λ = NumberOfSlices 3
           , nodeBandwidth = BitsPerSecond 1000
           , ibSize = NumberOfBits 300
-          , f_I = error "this needs to be properly defined still"
-          , f_E = error "this needs to be properly defined still"
+          , f_I = IBFrequency 3
+          , f_E = EBFrequency 1
+          , initialSeed = 22595838
           }
