@@ -21,8 +21,9 @@
 -- \* ✅ Allow to pass paremeters to the simulation.
 -- \* ✅ Connect with the simulation front end and run.
 -- \* ✅ Define a better/more-realistic schedule.
--- \*  Tweak the model parameters.
--- \* Add other plots: eg latency distribution.
+-- \* ✅ Add a plot showing: IB created, linked IB, dropped IB x slot.
+-- \* Tweak the model parameters.
+--
 -- \* ...
 -- \* Implement other roles/phase.
 --
@@ -275,7 +276,7 @@ node nodeId nodeStakePercent initialGenerator tracer world = do
     clock <- runClock
     let loop generator = do
           slot <- nextSlot clock
-          -- traceWith tracer (NextSlot nodeId slot)
+          traceWith tracer (NextSlot nodeId slot)
           Parameters {f_I, f_E} <- getParams world
           -- Generate IB blocks
           let (numberOfIBsInThisSlot, generator1) =
