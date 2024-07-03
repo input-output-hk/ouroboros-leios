@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return Math.floor(slot / parameters.L);
   }
 
-  const node = document.getElementById('throughput');
+  const node = document.getElementById('main_chart');
 
   // throughput chart
   const chart = new Chart(node, {
@@ -141,20 +141,25 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // handle parameters change
-  const lambda = document.getElementById('lambda');
-  lambda.addEventListener('change', function() {
-    parameters.λ = lambda.value;
+  const input_λ = document.getElementById('input_λ');
+  input_λ.addEventListener('change', function() {
+    parameters.λ = input_λ.value;
     postJSON("http://" + window.location.hostname + ":" +
-      window.location.port + "/api/lambda", parseInt(lambda.value));
-  });
-
-  const bps = document.getElementById('bps');
-  capacity.addEventListener('change', function() {
-    postJSON("http://" + window.location.hostname + ":" +
-      window.location.port + "/api/node-bandwidth", parseInt(capacity.value));
+      window.location.port + "/api/lambda", parseInt(input_λ.value));
   });
 
 });
+
+async function startSimulation() {
+  const L = document.getElementById('input_L');
+  const λ = document.getElementById('input_λ');
+  console.log(L.value);
+  console.log(λ.value);
+}
+
+async function stopSimulation() {
+
+}
 
 async function postJSON(url, data) {
   try {
