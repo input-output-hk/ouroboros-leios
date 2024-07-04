@@ -1,3 +1,26 @@
+## 2024-07-04
+
+### Weekly meeting
+
+* There's a simplified pipeline being worked on from Matthias -> shortens pipeline assuming we don't want to go above 0.4 Capacity
+  * GP to share draft once available
+* what about Blob leios?
+  * Not much progress, we want to have a working simulation/PoC to be able to discuss over some concrete numbers with potential users
+* there's a research stream started on incentives for storage
+  * need to check with realistic cost models
+  * Also need to take into account both rate and volume (typically for network usage in DCs, both are capped but one pays a linear fee for the later)
+* SNARKs research
+  * block producer generates a proof that other nodes can be verified
+  * current: All voters verify the IBs => nr of voters is large so almost everyone is verifying
+  * future: create proofs from IB producers that the IB is correct wrt ledger rule (mostly stage 2, smart contracts)
+  * related to midnights
+  * just have the heavy stuff (smart contracts)
+* Ricky's comments:
+  * how to guarantee different tx end up in different IBs?
+  * sharding seems easier to solve than increasing throughputs?
+* Tx diffusion not very well suited for Leios ?
+  * need more work on mempool and network protocol for TXs
+
 ## 2024-06-25
 
 ### Blob Leios
@@ -5,14 +28,14 @@
 As an intermediate deployment step a transient-data sharing version of Leios is being discussed, called "Blob Leios".
 In Blob Leios, IBs contain unstructured data (that is not parsed by the blockchain's virtual machine) instead of transactions.
 The IBs are expected to be retained by the SPOs for a limited amount of time, e.g., 2 weeks.
-The virtual machine only parses a commitment to the data that is persistently stored by SPOs and allows for 
+The virtual machine only parses a commitment to the data that is persistently stored by SPOs and allows for
 the applications discussed in the  2024-06-20 logbook entry.
 
 This approach defers dealing with a number of throughput scaling issues, such as :
 * increased storage size
 * concurrency issues that have to do with the concurrent generation of IBs (duplicate transactions, conflicting transactions)
 * increased CPU requirements due to the validation of transactions included in IBs
-  
+
 thus making a first deployment of Leios a lot easier.
 Note, that Blob Leios includes several new design elements such as:
 * the freshest first network approach
