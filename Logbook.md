@@ -1,5 +1,25 @@
 ## 2024-07-04
 
+### Network pricing
+
+Did some quick research on network pricing for a few major Cloud or VPS providers: https://docs.google.com/document/d/1JJJk4XPqmP61eNWYNfqL8FSbKAF9cWazKWFZP6tMGa0/edit
+
+Comparison table in USD/mo for different outgoing data transfer volumes expressed as bytes/seconds and similar VMs (32GB RAM, 4+ Cores, 500GB+ SSD disk). The base cost of the VM is added to the network cost to yield total costs:
+
+| Provider     | VM     | 50kB/s | 125kB/s | 250kB/s |
+|--------------|--------|--------|---------|---------|
+| DigitalOcean | $188   | $188   | $188    | $188    |
+| Google Cloud | $200   | $213.6 | $234    | $268    |
+| AWS          | $150 ? | $161.1 | $177.9  | $205.8  |
+| Azure        | $175   | $186   | $202    | $230    |
+| OVH          | $70    | $70    | $70     | $70     |
+| Hetzner      | $32    | $32    | $32     | $32     |
+
+Notes:
+
+* the AWS cost is quite hard to estimate up-front, obviously on purpose. The $150 base price is a rough average of various instances options in the target range
+* Google, AWS and Azure prices are based on 100% uptime and at least 1-year reservation for discounts
+
 ### Weekly meeting
 
 * There's a simplified pipeline being worked on from Matthias -> shortens pipeline assuming we don't want to go above 0.4 Capacity
