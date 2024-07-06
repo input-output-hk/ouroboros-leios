@@ -47,20 +47,20 @@ import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runCon
 import Control.Monad.Class.MonadSTM (MonadSTM, STM, atomically, retry)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
 import Control.Monad.Extra (whenM)
+import Control.Monad.State (State, get, put, runState)
 import Control.Tracer (Tracer, traceWith)
 import qualified Data.Aeson as Aeson
 import Data.Foldable (for_)
+import Data.List (partition)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.PQueue.Max (MaxQueue)
 import qualified Data.PQueue.Max as PQueue
+import Data.Word (Word64)
 import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
+import System.Random (RandomGen, mkStdGen, randomR, split)
 import Text.Pretty.Simple (pPrint)
-import Data.List (partition)
-import System.Random (randomR, RandomGen, mkStdGen, split)
-import Control.Monad.State (State, get, put, runState)
-import Data.Word (Word64)
 
 --------------------------------------------------------------------------------
 -- FIXME: constants that should be configurable
@@ -118,7 +118,7 @@ newtype NodeStakePercent = NodeStakePercent Double
   deriving newtype (Show)
 
 -- Frequency of IB slots per Praos slots.
-newtype IBFrequency = IBFrequency {getIBFrequency ::  Double}
+newtype IBFrequency = IBFrequency {getIBFrequency :: Double}
   deriving stock (Generic)
   deriving newtype (Show, Eq, Ord, Aeson.ToJSON, Aeson.FromJSON)
 
@@ -207,20 +207,20 @@ run tracer paramsTVar continueTVar = do
       gen = mkStdGen (initialSeed params)
       nodesGens = splitIn totalNodes gen
       -- TODO: for now we don't allow this to be configurable
-      stakePercent = NodeStakePercent (1/ fromIntegral totalNodes)
+      stakePercent = NodeStakePercent (1 / fromIntegral totalNodes)
   raceAll
     [ do
-        register (NodeId i) world
-        let nodeGen = nodesGens !! fromIntegral i
-        node (NodeId i) stakePercent nodeGen tracer world continueTVar
+      register (NodeId i) world
+      let nodeGen = nodesGens !! fromIntegral i
+      node (NodeId i) stakePercent nodeGen tracer world continueTVar
     | i <- [0 .. totalNodes - 1]
     ]
-  where
-    splitIn 0 _ = []
-    splitIn 1 gen = [gen]
-    splitIn n gen = gen0 : splitIn (n-1) gen1
-      where
-        (gen0, gen1) = split gen
+ where
+  splitIn 0 _ = []
+  splitIn 1 gen = [gen]
+  splitIn n gen = gen0 : splitIn (n - 1) gen1
+   where
+    (gen0, gen1) = split gen
 
 -- | Determine if the node with the given stake leads.
 --
@@ -232,16 +232,15 @@ run tracer paramsTVar continueTVar = do
 -- where @α@ is the given node stake, @f@ is the frequency of slots and
 --
 -- > asc = f / ceiling f
---
 leads :: RandomGen g => NodeStakePercent -> Double -> State g Bool
 leads (NodeStakePercent α) f_I = do
   generator <- get
   let (n, nextGenerator) = randomR (0, 1) generator
   put nextGenerator
   pure $! n <= asc_I * α
-  where
-    asc_I = f_I / ceiling' f_I
-    ceiling' = fromIntegral . ceiling
+ where
+  asc_I = f_I / ceiling' f_I
+  ceiling' = fromIntegral . ceiling
 
 -- | Given a number of IB slots, determine if the node with the given
 -- stake percent leads on those slots.
@@ -282,7 +281,7 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
     let loop generator = do
           slot <- nextSlot clock
           traceWith tracer (NextSlot nodeId slot)
-          Parameters {f_I, f_E} <- getParams world
+          Parameters{f_I, f_E} <- getParams world
           -- Generate IB blocks
           let (numberOfIBsInThisSlot, generator1) =
                 slotsLed generator (getIBFrequency f_I)
@@ -308,7 +307,7 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
     let q = ceiling $ f -- For practical reasons we want this to be a minimal value.
         (nodeLeads, nextGenerator) =
           leadsMultiple generator q nodeStakePercent f
-    in (length $ filter id nodeLeads, nextGenerator)
+     in (length $ filter id nodeLeads, nextGenerator)
 
   produceIB slot = do
     let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = gIBSize}
@@ -407,7 +406,8 @@ runStandalone = do
 -- TODO: we might want to add some mechanism to cancel the async tick
 -- thread when the thread that has a reference to the returned clock
 -- is canceled.
-runClock :: (Monad m, MonadSTM m, MonadAsync m, MonadDelay m) =>
+runClock ::
+  (Monad m, MonadSTM m, MonadAsync m, MonadDelay m) =>
   TVar m ShouldContinue ->
   m (Clock m)
 runClock continueTVar = do
@@ -539,7 +539,6 @@ storeIB nodeId ib OutsideWorld{storedIBsTVar} =
 
 -- | Retrieve the downloaded IBs by the given node, which correspond
 -- to the given slice. Once retrieved the IBs are deleted.
---
 storedIBsBy :: MonadSTM m => NodeId -> OutsideWorld m -> Slice -> m [IB]
 storedIBsBy nodeId OutsideWorld{storedIBsTVar} slice = atomically $ do
   storedIBs <- readTVar storedIBsTVar
