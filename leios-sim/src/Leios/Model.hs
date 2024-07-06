@@ -198,8 +198,9 @@ run ::
   ) =>
   Tracer m LeiosEvent ->
   TVar m Parameters ->
+  TVar m ShouldContinue ->
   m ()
-run tracer paramsTVar = do
+run tracer paramsTVar continueTVar = do
   world <- init paramsTVar
   params <- readTVarIO paramsTVar
   let totalNodes = 2
@@ -211,7 +212,7 @@ run tracer paramsTVar = do
     [ do
         register (NodeId i) world
         let nodeGen = nodesGens !! fromIntegral i
-        node (NodeId i) stakePercent nodeGen tracer world
+        node (NodeId i) stakePercent nodeGen tracer world continueTVar
     | i <- [0 .. totalNodes - 1]
     ]
   where
@@ -255,6 +256,9 @@ raceAll ::
   m a
 raceAll = runConcurrently . asum . fmap Concurrently
 
+data ShouldContinue = Continue | Stop
+  deriving (Show, Eq, Generic)
+
 node ::
   ( Monad m
   , Applicative m
@@ -268,12 +272,13 @@ node ::
   g ->
   Tracer m LeiosEvent ->
   OutsideWorld m ->
+  TVar m ShouldContinue ->
   m ()
-node nodeId nodeStakePercent initialGenerator tracer world = do
+node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
   producer `race_` consumer
  where
   producer = do
-    clock <- runClock
+    clock <- runClock continueTVar
     let loop generator = do
           slot <- nextSlot clock
           traceWith tracer (NextSlot nodeId slot)
@@ -387,7 +392,8 @@ runStandalone = do
           }
   paramsTVar <- newTVarIO defaultParams
   events <- newTQueueIO
-  run (mkTracer events) paramsTVar `race_` outputToStdout events
+  continueTVar <- newTVarIO Continue
+  run (mkTracer events) paramsTVar continueTVar `race_` outputToStdout events
  where
   -- FIXME: temporary
   outputToStdout :: TQueue IO Aeson.Value -> IO ()
@@ -401,8 +407,10 @@ runStandalone = do
 -- TODO: we might want to add some mechanism to cancel the async tick
 -- thread when the thread that has a reference to the returned clock
 -- is canceled.
-runClock :: (Monad m, MonadSTM m, MonadAsync m, MonadDelay m) => m (Clock m)
-runClock = do
+runClock :: (Monad m, MonadSTM m, MonadAsync m, MonadDelay m) =>
+  TVar m ShouldContinue ->
+  m (Clock m)
+runClock continueTVar = do
   -- FIXME: maybe the slot needs to be determined from the chain start time.
   slotTVar <- newTVarIO (Slot 0)
   lastReadTVar <- newTVarIO Nothing
@@ -416,6 +424,9 @@ runClock = do
  where
   tick slotTVar = forever $ do
     threadDelay 1_000_000
+    atomically $ do
+      shouldContinue <- readTVar continueTVar
+      check $ shouldContinue == Continue
     atomically $ modifyTVar' slotTVar tickSlot
 
 -- | Return the next slot, blocking until its time arrives.

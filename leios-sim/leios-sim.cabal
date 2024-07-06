@@ -45,6 +45,7 @@ library
     , QuickCheck
     , random
     , scotty
+    , http-types
     , text
     , time
     , wai

@@ -1,9 +1,9 @@
+var sessionId; // This value will be defined by the first message sent by the server via the websocket.
+
 document.addEventListener('DOMContentLoaded', () => {
 
-  // FIXME: these have to be synchronized with the simulation.
-  var parameters = { L: 4,
-		     λ: 3
-		   }
+  // FIXME: we need to ensure these are synchronized with the simulation.
+  var parameters = {};
 
   function sliceOf(slot) {
     return Math.floor(slot / parameters.L);
@@ -80,6 +80,20 @@ document.addEventListener('DOMContentLoaded', () => {
         chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
       }
 
+      if (logData.tag == 'SessionId') {
+	sessionId = logData.sessionId;
+	console.log(`Got session id ${sessionId}`);
+
+	// Set the parameters in the UI using the server default parameters.
+	getJSON(`/api/parameters?sessionId=${sessionId}`)
+	  .then ((data) => {
+	    document.getElementById('input_L').value = data._L;
+	    document.getElementById('input_λ').value = data.λ;
+	    document.getElementById('input_f_I').value = data.f_I;
+	    document.getElementById('input_f_E').value = data.f_E;
+	  });
+      }
+
       if (logData.tag == 'ReceivedEB') {
 
 	if (logData.receivedEB.eb_linked_IBs.length != 0) {
@@ -144,8 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const input_λ = document.getElementById('input_λ');
   input_λ.addEventListener('change', function() {
     parameters.λ = input_λ.value;
-    postJSON("http://" + window.location.hostname + ":" +
-      window.location.port + "/api/lambda", parseInt(input_λ.value));
+    postJSON(`/api/lambda?sessionId=${sessionId}`,
+	     parseInt(input_λ.value));
   });
 
 });
@@ -153,16 +167,64 @@ document.addEventListener('DOMContentLoaded', () => {
 async function startSimulation() {
   const L = document.getElementById('input_L');
   const λ = document.getElementById('input_λ');
-  console.log(L.value);
-  console.log(λ.value);
+  const f_I = document.getElementById('input_f_I');
+  const f_E = document.getElementById('input_f_E');
+
+  // TODO: perform parameters validation
+  parameters = { _L: Number(L.value),
+		 λ: Number(λ.value),
+		 nodeBandwidth: 1000, // TODO: add a field for this
+		 ibSize: 300,         // TODO: add a field for this
+		 f_I: Number(f_I.value),
+		 f_E: Number(f_E.value),
+		 initialSeed: 9126589237 // TODO: add a field for this
+	       }
+
+  postJSON(`/api/start-simulation?sessionId=${sessionId}`, parameters);
 }
 
 async function stopSimulation() {
-
+  post(`/api/stop-simulation?sessionId=${sessionId}`);
 }
 
-async function postJSON(url, data) {
+/*
+ * GET/POST methods
+ */
+
+async function getJSON(endpoint) {
+  const response = await fetch("http://" + window.location.hostname
+			       + ":"
+			       + window.location.port + endpoint);
+
+  if (!response.ok) {
+    throw new Error(`Response status: ${response.status}`);
+  }
+
+  const json = await response.json();
+  return json;
+}
+
+async function post(endpoint) {
   try {
+    const url =
+	  "http://" + window.location.hostname + ":"
+	  + window.location.port
+	  + endpoint;
+    const response = await fetch(url, {
+      method: "POST"
+    });
+
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+
+async function postJSON(endpoint, data) {
+  try {
+    const url =
+	  "http://" + window.location.hostname + ":"
+	  + window.location.port
+	  + endpoint;
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -171,8 +233,6 @@ async function postJSON(url, data) {
       body: JSON.stringify(data),
     });
 
-    const result = await response.json();
-    console.log("Success:", result);
   } catch (error) {
     console.error("Error:", error);
   }
