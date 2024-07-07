@@ -1,5 +1,5 @@
 # inspired by https://github.com/phadej/docker-haskell-example/blob/master/Dockerfile
-FROM haskell:9.6.3 as build
+FROM haskell:9.6.3 AS build
 
 RUN apt-get update -y && \
     apt-get upgrade -y && \
@@ -21,7 +21,7 @@ COPY . /app
 RUN cabal build all
 
 # Make final binary a bit smaller
-RUN strip dist-newstyle/build/x86_64-linux/ghc-9.6.3/leios-0.1.0.0/x/leios/noopt/build/leios/leios
+RUN strip dist-newstyle/build/x86_64-linux/ghc-9.6.3/leios-sim-0.1.0.0/x/leios/build/leios/leios
 
 FROM ubuntu:22.04
 
@@ -29,6 +29,6 @@ WORKDIR /app
 EXPOSE 8091
 
 COPY --from=build /app/leios-sim/* /app/
-COPY --from=build /app/dist-newstyle/build/x86_64-linux/ghc-9.6.3/leios-0.1.0.0/x/leios/noopt/build/leios/leios /app
+COPY --from=build /app/dist-newstyle/build/x86_64-linux/ghc-9.6.3/leios-sim-0.1.0.0/x/leios/build/leios/leios /app
 
 ENTRYPOINT ["/app/leios"]
