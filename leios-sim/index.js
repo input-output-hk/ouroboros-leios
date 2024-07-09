@@ -91,6 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	    document.getElementById('input_λ').value = data.λ;
 	    document.getElementById('input_f_I').value = data.f_I;
 	    document.getElementById('input_f_E').value = data.f_E;
+	    document.getElementById('inputNodeBandwidth').value = data.nodeBandwidth;
+	    document.getElementById('inputIbSize').value = data.ibSize;
 	  });
       }
 
@@ -161,6 +163,26 @@ document.addEventListener('DOMContentLoaded', () => {
 		     (newValue) => { parameters.L = newValue },
 		     `/api/set-L`);
 
+  onParametersChange('input_λ',
+		     (newValue) => { parameters.λ = newValue },
+		     `/api/set-lambda`);
+
+  onParametersChange('input_f_I',
+		     (newValue) => { parameters.f_I = newValue },
+		     `/api/set-fi`);
+
+  onParametersChange('input_f_E',
+		     (newValue) => { parameters.f_E = newValue },
+		     `/api/set-fe`);
+
+  onParametersChange('inputNodeBandwidth',
+		     (newValue) => { parameters.inputNodeBandwidth = newValue },
+		     `/api/set-node-bandwidth`);
+
+  onParametersChange('inputIbSize',
+		     (newValue) => { parameters.inputIbsize = newValue },
+		     `/api/set-ib-size`);
+
   const input_λ = document.getElementById('input_λ');
   input_λ.addEventListener('change', function() {
     parameters.λ = input_λ.value;
@@ -193,12 +215,14 @@ async function startSimulation() {
   const λ = document.getElementById('input_λ');
   const f_I = document.getElementById('input_f_I');
   const f_E = document.getElementById('input_f_E');
+  const nodeBandwidth = document.getElementById('inputNodeBandwidth');
+  const ibSize = document.getElementById('inputIbSize');
 
   // TODO: perform parameters validation
   parameters = { _L: Number(L.value),
 		 λ: Number(λ.value),
-		 nodeBandwidth: 1000, // TODO: add a field for this
-		 ibSize: 300,         // TODO: add a field for this
+		 nodeBandwidth: Number(nodeBandwidth.value),
+		 ibSize: Number(ibSize.value),
 		 f_I: Number(f_I.value),
 		 f_E: Number(f_E.value),
 		 initialSeed: 9126589237 // TODO: add a field for this
