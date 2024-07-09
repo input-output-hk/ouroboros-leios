@@ -166,33 +166,30 @@ scottyApp serverState =
         Just continueTVar ->
           liftIO $ atomically $ writeTVar continueTVar Stop
 
-    Sc.post "/api/node-bandwidth" $ do
-      -- bps <- Sc.jsonData
-      -- TODO: modify parameters
-      (id :: SessionId) <- Sc.queryParam "sessionId"
-      liftIO $ print id
-      pure ()
-    -- liftIO $
-    --   atomically $
-    --     modifyTVar params (\p -> p{nodeBandwidth = BitsPerSecond bps})
+    ----------------------------------------------------------------------------
+    -- Parameters change endpoints
+    ----------------------------------------------------------------------------
+    Sc.post "/api/set-L" $ changeParam (\v params -> params { _L = v })
 
-    Sc.post "/api/set-L" $ do
-      _L <- Sc.jsonData
+    Sc.post "/api/set-lambda" $ changeParam (\v params -> params { λ = v })
+
+    Sc.post "/api/set-node-bandwidth" $ changeParam (\v params -> params { nodeBandwidth = v })
+
+    Sc.post "/api/set-ib-size" $ changeParam (\v params -> params { ibSize = v })
+
+    Sc.post "/api/set-fi" $ changeParam (\v params -> params { f_I = v })
+
+    Sc.post "/api/set-fe" $ changeParam (\v params -> params { f_E = v })
+
+  where
+    changeParam setValue = do
+      newValue <- Sc.jsonData
       sid <- Sc.queryParam "sessionId"
       mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
       case mParamsTVar of
         Nothing -> Sc.status badRequest400
         Just paramsTVar ->
-          liftIO $ atomically $ modifyTVar paramsTVar (\p -> p{_L})
-
-    Sc.post "/api/set-lambda" $ do
-      λ <- Sc.jsonData
-      sid <- Sc.queryParam "sessionId"
-      mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
-      case mParamsTVar of
-        Nothing -> Sc.status badRequest400
-        Just paramsTVar ->
-          liftIO $ atomically $ modifyTVar paramsTVar (\p -> p{λ})
+          liftIO $ atomically $ modifyTVar paramsTVar (setValue newValue)
 
 wsapp :: ServerState IO -> WS.ServerApp
 wsapp serverState pending = do
