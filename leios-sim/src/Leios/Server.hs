@@ -176,10 +176,18 @@ scottyApp serverState =
     --   atomically $
     --     modifyTVar params (\p -> p{nodeBandwidth = BitsPerSecond bps})
 
-    Sc.post "/api/lambda" $ do
+    Sc.post "/api/set-L" $ do
+      _L <- Sc.jsonData
+      sid <- Sc.queryParam "sessionId"
+      mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
+      case mParamsTVar of
+        Nothing -> Sc.status badRequest400
+        Just paramsTVar ->
+          liftIO $ atomically $ modifyTVar paramsTVar (\p -> p{_L})
+
+    Sc.post "/api/set-lambda" $ do
       λ <- Sc.jsonData
       sid <- Sc.queryParam "sessionId"
-      -- TODO: modify parameters
       mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
       case mParamsTVar of
         Nothing -> Sc.status badRequest400

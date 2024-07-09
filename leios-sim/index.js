@@ -154,15 +154,39 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('disconnected');
   };
 
-  // handle parameters change
+  /*
+   * Parameters change handling
+   */
+  onParametersChange('input_L',
+		     (newValue) => { parameters.L = newValue },
+		     `/api/set-L`);
+
   const input_λ = document.getElementById('input_λ');
   input_λ.addEventListener('change', function() {
     parameters.λ = input_λ.value;
-    postJSON(`/api/lambda?sessionId=${sessionId}`,
+    postJSON(`/api/set-lambda?sessionId=${sessionId}`,
 	     parseInt(input_λ.value));
   });
 
 });
+
+/*
+ * Add an event listener on the given parameter id.
+ *
+ * When the value changes `applyNewvalue` is called with this new
+ * value, and the new value is sent to the given endpoint.
+ *
+ * We assume the value `parameterId` refers to is an integer.
+ *
+ * The query parameter `sessionId=${sessionId}` will be added to the given endpoint.
+ */
+function onParametersChange(parameterId, applyNewValue, endpoint) {
+  const input = document.getElementById(parameterId);
+  input.addEventListener('change', function() {
+    applyNewValue (input.value);
+    postJSON(`${endpoint}?sessionId=${sessionId}`, parseInt(input.value));
+  });
+}
 
 async function startSimulation() {
   const L = document.getElementById('input_L');
