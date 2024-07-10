@@ -61,22 +61,7 @@ import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import System.Random (RandomGen, mkStdGen, randomR, split)
 import Text.Pretty.Simple (pPrint)
-
---------------------------------------------------------------------------------
--- FIXME: constants that should be configurable
---------------------------------------------------------------------------------
-
-g_L = NumberOfSlots 4
-
-g_λ = NumberOfSlices 3
-
-gNodeBandwidth = BitsPerSecond 100
-
-gIBSize = NumberOfBits 300
-
-g_f_I = IBFrequency 0.5
-
-g_f_E = EBFrequency 1
+import Data.Maybe (fromMaybe)
 
 --------------------------------------------------------------------------------
 -- Model parameters
