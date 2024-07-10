@@ -224,10 +224,10 @@ wsapp serverState pending = do
 
   defaultParams =
     Parameters
-      { _L = NumberOfSlots 4
-      , λ = NumberOfSlices 3
-      , nodeBandwidth = BitsPerSecond 1000
-      , ibSize = NumberOfBits 300
+      { _L = NumberOfSlots 3
+      , λ = NumberOfSlices 2
+      , nodeBandwidth = BitsPerSecond 100
+      , ibSize = NumberOfBits 20
       , f_I = IBFrequency 5
       , f_E = EBFrequency 1
       , initialSeed = 22595838

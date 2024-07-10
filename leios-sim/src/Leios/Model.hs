@@ -295,7 +295,8 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
      in (length $ filter id nodeLeads, nextGenerator)
 
   produceIB slot = do
-    let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = gIBSize}
+    Parameters{ibSize} <- getParams world
+    let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = ibSize}
     traceWith tracer (ProducedIB newIB)
     MsgIB newIB `sendTo` world
 
@@ -362,16 +363,18 @@ data LeiosEvent
 
 -- | Run the simulation without a webserver. The events are output to
 -- the standard output.
+--
+-- Currently, this function does not allow setting the simulation parameters.
 runStandalone :: IO ()
 runStandalone = do
   let defaultParams =
         Parameters
-          { _L = g_L
-          , λ = g_λ
-          , nodeBandwidth = gNodeBandwidth
-          , ibSize = gIBSize
-          , f_I = g_f_I
-          , f_E = g_f_E
+          { _L = NumberOfSlots 4
+          , λ = NumberOfSlices 3
+          , nodeBandwidth = BitsPerSecond 100
+          , ibSize = NumberOfBits 300
+          , f_I = IBFrequency 0.5
+          , f_E = EBFrequency 1
           , initialSeed = 22595838 -- https://xkcd.com/221/. We might want to generate this from the system time, or pass it as parameter.
           }
   paramsTVar <- newTVarIO defaultParams
@@ -397,7 +400,7 @@ runClock ::
   m (Clock m)
 runClock continueTVar = do
   -- FIXME: maybe the slot needs to be determined from the chain start time.
-  slotTVar <- newTVarIO (Slot 0)
+  slotTVar <- newTVarIO Nothing
   lastReadTVar <- newTVarIO Nothing
   a <- async $ tick slotTVar
   pure $
@@ -412,21 +415,31 @@ runClock continueTVar = do
     atomically $ do
       shouldContinue <- readTVar continueTVar
       check $ shouldContinue == Continue
-    atomically $ modifyTVar' slotTVar tickSlot
+      modifyTVar' slotTVar mTickSlot
+    where
+      mTickSlot Nothing = Just (Slot 0)
+      mTickSlot (Just s) = Just (tickSlot s)
 
 -- | Return the next slot, blocking until its time arrives.
 nextSlot :: MonadSTM m => Clock m -> m Slot
 nextSlot clock = atomically $ do
   currentSlot <- readTVar (slotTVar clock)
-  mLastReadSlot <- readTVar (lastReadTVar clock)
-  check (Just currentSlot /= mLastReadSlot)
-  writeTVar (lastReadTVar clock) (Just currentSlot)
-  pure $ currentSlot
+  check (currentSlot /= Nothing)
+  lastReadSlot <- readTVar (lastReadTVar clock)
+  check (currentSlot /= lastReadSlot)
+  writeTVar (lastReadTVar clock) currentSlot
+  pure $ fromMaybe (error "Impossible! We just checked currentSlot /= Nothing")
+                   currentSlot
 
 data Clock m
   = Clock
   { clockAsync :: Async m ()
-  , slotTVar :: TVar m Slot
+    -- | When the clock has not ticked yet this is 'Nothing'
+    --
+    -- The clock might not have been ticked for the first time because
+    -- it started in a paused state (ie the TVar that signals whether
+    -- the clock should tick is set to 'Stop'). See 'runClock'.
+  , slotTVar :: TVar m (Maybe Slot)
   , lastReadTVar :: TVar m (Maybe Slot)
   }
 
@@ -449,6 +462,7 @@ newtype BitsPerSecond = BitsPerSecond Word
 data Msg
   = MsgIB {msgIB :: IB}
   | MsgEB {msgEB :: EB}
+  deriving (Show)
 
 instance HasSizeInBits Msg where
   size (MsgIB ib) = size ib
@@ -543,16 +557,17 @@ data PQueueTVar m = PQueueTVar {getTQueueTVar :: TVar m (MaxQueue PMsg)}
 
 -- | Wrapper around 'Msg' to implement the priority needed for the priority queue.
 newtype PMsg = PMsg Msg
+  deriving (Show)
 
 instance Eq PMsg where
   PMsg (MsgIB x) == PMsg (MsgIB y) = ib_slot x == ib_slot y
-  PMsg (MsgEB _) == PMsg (MsgEB _) = True -- FIXME: For now EB messages have the same priority
+  PMsg (MsgEB x) == PMsg (MsgEB y) = eb_slot x == eb_slot y
   PMsg (MsgIB _) == PMsg (MsgEB _) = False
   PMsg (MsgEB _) == PMsg (MsgIB _) = False
 
 instance Ord PMsg where
   PMsg (MsgIB x) <= PMsg (MsgIB y) = ib_slot x <= ib_slot y
-  PMsg (MsgEB _) <= PMsg (MsgEB _) = True -- FIXME: For now EB messages have the same priority.
+  PMsg (MsgEB x) <= PMsg (MsgEB y) = eb_slot x <= eb_slot y
   PMsg (MsgIB _) <= PMsg (MsgEB _) = True -- FIXME: For now EB messages take precedence over IB messages.
   PMsg (MsgEB _) <= PMsg (MsgIB _) = False -- FIXME: For now EB messages take precedence over IB messages.
 
