@@ -1,12 +1,12 @@
 var sessionId; // This value will be defined by the first message sent by the server via the websocket.
 
+var parameters = {};
+
 document.addEventListener('DOMContentLoaded', () => {
 
-  // FIXME: we need to ensure these are synchronized with the simulation.
-  var parameters = {};
 
   function sliceOf(slot) {
-    return Math.floor(slot / parameters.L);
+    return Math.floor(slot / parameters._L);
   }
 
   const node = document.getElementById('main_chart');
@@ -20,19 +20,19 @@ document.addEventListener('DOMContentLoaded', () => {
       // N.B.: Make sure colors are picked from an inclusive color palette.
       // See for instance: https://medium.com/@allieofisher/inclusive-color-palettes-for-the-web-bbfe8cf2410e
       datasets: [
-	{ type: 'line',
+	{ type: 'scatter',
           label: "Created IBs",
           data: [],
 	  backgroundColor: '#6FDE6E',
 	  borderColor: '#6FDE6E',
 	},
-	{ type: 'line',
+	{ type: 'scatter',
           label: "Linked IBs",
           data: [],
 	  backgroundColor: '#235FA4',
 	  borderColor: '#235FA4',
         },
-	{ type: 'line',
+	{ type: 'scatter',
           label: "Dropped IBs",
           data: [],
 	  backgroundColor: '#FF4242',
@@ -125,6 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chart.data.datasets[2].data.push({ x: logData.receivedEB.eb_slot,
 					   y: droppedIBs.length });
 
+
+	// TODO: factor this out, reduce duplication.
+	const minx = chart.data.datasets[0].data[0].x;
+        chart.options.scales.x.min = minx;
+        chart.options.scales.x.max = minx + 50;
         chart.update();
       }
 
@@ -160,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
    * Parameters change handling
    */
   onParametersChange('input_L',
-		     (newValue) => { parameters.L = newValue },
+		     (newValue) => { parameters._L = newValue },
 		     `/api/set-L`);
 
   onParametersChange('input_λ',
