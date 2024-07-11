@@ -21,7 +21,7 @@ import Data.Text.Lazy.Encoding (decodeUtf8)
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
-import Network.Wai.Middleware.RequestLogger (logStdoutDev)
+import Network.Wai.Middleware.RequestLogger (logStdout)
 import qualified Network.WebSockets as WS
 import qualified Web.Scotty as Sc
 
@@ -124,7 +124,7 @@ feedClient input output = forever $ do
 scottyApp :: ServerState IO -> IO Wai.Application
 scottyApp serverState =
   Sc.scottyApp $ do
-    Sc.middleware logStdoutDev
+    Sc.middleware logStdout
 
     Sc.get "/" $
       Sc.redirect "/index.html"

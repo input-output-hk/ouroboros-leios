@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const wsPath = window.location.pathname.split('/').slice(0, -1).join('/');
   const protocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${protocol}//${window.location.hostname}:${window.location.port}${wsPath}`);
-  const http = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/`;
 
   ws.onopen = function() {
     console.log('connected');
@@ -252,12 +251,17 @@ async function stopSimulation() {
   post(`/api/stop-simulation?sessionId=${sessionId}`);
 }
 
+function http() {
+  return `${window.location.protocol}//${window.location.hostname}:${window.location.port}`;
+}
+
 /*
- * GET/POST methods
+ * GET / POST methods
  */
 
 async function getJSON(endpoint) {
-  const response = await fetch(http + endpoint);
+  const url = http() + endpoint;
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Response status: ${response.status}`);
@@ -269,7 +273,7 @@ async function getJSON(endpoint) {
 
 async function post(endpoint) {
   try {
-    const url = http + endpoint;
+    const url = http() + endpoint;
     const response = await fetch(url, {
       method: "POST"
     });
@@ -281,7 +285,7 @@ async function post(endpoint) {
 
 async function postJSON(endpoint, data) {
   try {
-    const url = http + endpoint;
+    const url = http() + endpoint;
     const response = await fetch(url, {
       method: "POST",
       headers: {
