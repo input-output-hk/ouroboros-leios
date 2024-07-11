@@ -153,3 +153,34 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # deploy built server to Gcloud run action when pushing to main
+  deploy-server:
+    # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push-image
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: 'actions/checkout@v4'
+
+    - name: 👮 Log in to Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+
+    - name: 🚀 Deploy to Cloud Run
+      id: 'deploy'
+      uses: 'google-github-actions/deploy-cloudrun@v2'
+      with:
+        service: 'leios-server'
+        image: 'us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:${{ github.sha }}'
+        region: 'us-east1'
+
+    - name: 🔬 'Use output'
+      run: 'curl -v -L "${{ steps.deploy.outputs.url }}"'
