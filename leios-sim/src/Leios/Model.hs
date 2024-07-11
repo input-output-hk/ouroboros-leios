@@ -54,6 +54,7 @@ import Data.Foldable (for_)
 import Data.List (partition)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.PQueue.Max (MaxQueue)
 import qualified Data.PQueue.Max as PQueue
 import Data.Word (Word64)
@@ -61,7 +62,6 @@ import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
 import System.Random (RandomGen, mkStdGen, randomR, split)
 import Text.Pretty.Simple (pPrint)
-import Data.Maybe (fromMaybe)
 
 --------------------------------------------------------------------------------
 -- Model parameters
@@ -135,8 +135,7 @@ tickSlot = succ
 -- Input Blocks
 --------------------------------------------------------------------------------
 
-data IB
-  = IB
+data IB = IB
   { ib_slot :: Slot
   , ib_producer :: NodeId
   , ib_size :: NumberOfBits
@@ -159,8 +158,7 @@ ib_ref = IB_Ref -- TODO: eventually this will compute the IB hash.
 -- Endorsement Blocks
 --------------------------------------------------------------------------------
 
-data EB
-  = EB
+data EB = EB
   { eb_slot :: Slot
   , eb_producer :: NodeId
   , eb_linked_IBs :: [IB_Ref]
@@ -416,9 +414,9 @@ runClock continueTVar = do
       shouldContinue <- readTVar continueTVar
       check $ shouldContinue == Continue
       modifyTVar' slotTVar mTickSlot
-    where
-      mTickSlot Nothing = Just (Slot 0)
-      mTickSlot (Just s) = Just (tickSlot s)
+   where
+    mTickSlot Nothing = Just (Slot 0)
+    mTickSlot (Just s) = Just (tickSlot s)
 
 -- | Return the next slot, blocking until its time arrives.
 nextSlot :: MonadSTM m => Clock m -> m Slot
@@ -428,18 +426,19 @@ nextSlot clock = atomically $ do
   lastReadSlot <- readTVar (lastReadTVar clock)
   check (currentSlot /= lastReadSlot)
   writeTVar (lastReadTVar clock) currentSlot
-  pure $ fromMaybe (error "Impossible! We just checked currentSlot /= Nothing")
-                   currentSlot
+  pure $
+    fromMaybe
+      (error "Impossible! We just checked currentSlot /= Nothing")
+      currentSlot
 
-data Clock m
-  = Clock
+data Clock m = Clock
   { clockAsync :: Async m ()
-    -- | When the clock has not ticked yet this is 'Nothing'
-    --
-    -- The clock might not have been ticked for the first time because
-    -- it started in a paused state (ie the TVar that signals whether
-    -- the clock should tick is set to 'Stop'). See 'runClock'.
   , slotTVar :: TVar m (Maybe Slot)
+  -- ^ When the clock has not ticked yet this is 'Nothing'
+  --
+  -- The clock might not have been ticked for the first time because
+  -- it started in a paused state (ie the TVar that signals whether
+  -- the clock should tick is set to 'Stop'). See 'runClock'.
   , lastReadTVar :: TVar m (Maybe Slot)
   }
 
@@ -447,8 +446,7 @@ data Clock m
 -- (very simple) Outside World Model
 --------------------------------------------------------------------------------
 
-data OutsideWorld m
-  = OutsideWorld
+data OutsideWorld m = OutsideWorld
   { pqsTVar :: TVar m (Map NodeId (PQueueTVar m))
   , paramsTVar :: TVar m Parameters
   , storedIBsTVar :: TVar m (Map NodeId [IB])

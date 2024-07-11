@@ -30,6 +30,7 @@ import Leios.Model (BitsPerSecond (..), EBFrequency (..), IBFrequency (..), Numb
 import qualified Leios.Model as Model
 import Leios.Trace (mkTracer)
 import Network.HTTP.Types.Status (badRequest400)
+import System.Environment (lookupEnv)
 
 --------------------------------------------------------------------------------
 -- Server state
@@ -103,7 +104,7 @@ mkServerState = do
 
 runServer :: IO ()
 runServer = do
-  let port = 8080
+  port <- maybe 8080 read <$> lookupEnv "PORT"
   let settings = Warp.setPort port Warp.defaultSettings
   serverState <- mkServerState
   sapp <- scottyApp serverState
@@ -169,27 +170,26 @@ scottyApp serverState =
     ----------------------------------------------------------------------------
     -- Parameters change endpoints
     ----------------------------------------------------------------------------
-    Sc.post "/api/set-L" $ changeParam (\v params -> params { _L = v })
+    Sc.post "/api/set-L" $ changeParam (\v params -> params{_L = v})
 
-    Sc.post "/api/set-lambda" $ changeParam (\v params -> params { λ = v })
+    Sc.post "/api/set-lambda" $ changeParam (\v params -> params{λ = v})
 
-    Sc.post "/api/set-node-bandwidth" $ changeParam (\v params -> params { nodeBandwidth = v })
+    Sc.post "/api/set-node-bandwidth" $ changeParam (\v params -> params{nodeBandwidth = v})
 
-    Sc.post "/api/set-ib-size" $ changeParam (\v params -> params { ibSize = v })
+    Sc.post "/api/set-ib-size" $ changeParam (\v params -> params{ibSize = v})
 
-    Sc.post "/api/set-fi" $ changeParam (\v params -> params { f_I = v })
+    Sc.post "/api/set-fi" $ changeParam (\v params -> params{f_I = v})
 
-    Sc.post "/api/set-fe" $ changeParam (\v params -> params { f_E = v })
-
-  where
-    changeParam setValue = do
-      newValue <- Sc.jsonData
-      sid <- Sc.queryParam "sessionId"
-      mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
-      case mParamsTVar of
-        Nothing -> Sc.status badRequest400
-        Just paramsTVar ->
-          liftIO $ atomically $ modifyTVar paramsTVar (setValue newValue)
+    Sc.post "/api/set-fe" $ changeParam (\v params -> params{f_E = v})
+ where
+  changeParam setValue = do
+    newValue <- Sc.jsonData
+    sid <- Sc.queryParam "sessionId"
+    mParamsTVar <- liftIO $ lookupParamsTVar sid serverState
+    case mParamsTVar of
+      Nothing -> Sc.status badRequest400
+      Just paramsTVar ->
+        liftIO $ atomically $ modifyTVar paramsTVar (setValue newValue)
 
 wsapp :: ServerState IO -> WS.ServerApp
 wsapp serverState pending = do
