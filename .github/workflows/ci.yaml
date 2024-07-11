@@ -78,13 +78,13 @@ jobs:
       - name: 🛠️ Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # - name: 👮 Log in to Google Cloud
-      #   id: auth
-      #   uses: 'google-github-actions/auth@v2'
-      #   with:
-      #     token_format: access_token
-      #     credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
-      #     access_token_lifetime: 3600s # need to be long enough for docker build to finish
+      - name: 👮 Log in to Google Cloud
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          token_format: access_token
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+          access_token_lifetime: 3600s # need to be long enough for docker build to finish
 
       - name: 👮 Log in to the Container registry
         uses: docker/login-action@v3
@@ -126,21 +126,21 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:cache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:cache,mode=max
 
-      # - name: 👮 Login to Artifact Registry
-      #   uses: docker/login-action@v1
-      #   with:
-      #     registry: us-east1-docker.pkg.dev
-      #     username: oauth2accesstoken
-      #     password: ${{ steps.auth.outputs.access_token }}
+      - name: 👮 Login to Artifact Registry
+        uses: docker/login-action@v1
+        with:
+          registry: us-east1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
 
-      # - name: 📦 Push to GCR
-      #   run: |-
-      #     docker pull $image_tag
-      #     docker tag $image_tag "us-east1-docker.pkg.dev/iog-hydra/peras-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
-      #     docker push "us-east1-docker.pkg.dev/iog-hydra/peras-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
-      #   env:
-      #     image_id: ${{ steps.push.outputs.imageid }}
-      #     image_tag: ${{ steps.meta.outputs.tags }}
+      - name: 📦 Push to GCR
+        run: |-
+          docker pull $image_tag
+          docker tag $image_tag "us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
+          docker push "us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
+        env:
+          image_id: ${{ steps.push.outputs.imageid }}
+          image_tag: ${{ steps.meta.outputs.tags }}
 
       # This step generates an artifact attestation for the image,
       # which is an unforgeable statement about where and how it was
