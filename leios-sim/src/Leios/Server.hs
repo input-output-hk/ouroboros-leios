@@ -6,7 +6,17 @@
 module Leios.Server where
 
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Class.MonadSTM (MonadSTM (modifyTVar), TVar, atomically, newBroadcastTChanIO, newTVarIO, readTVarIO, stateTVar, writeTChan, writeTVar)
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (modifyTVar),
+  TVar,
+  atomically,
+  newBroadcastTChanIO,
+  newTVarIO,
+  readTVarIO,
+  stateTVar,
+  writeTChan,
+  writeTVar,
+ )
 import Control.Concurrent.Class.MonadSTM.TChan (TChan, dupTChan, readTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue
 import Control.Exception (SomeException, handle, throw)
@@ -25,8 +35,16 @@ import Network.Wai.Middleware.RequestLogger (logStdout)
 import qualified Network.WebSockets as WS
 import qualified Web.Scotty as Sc
 
--- FIXME: import explicitly
-import Leios.Model (BitsPerSecond (..), EBFrequency (..), IBFrequency (..), NumberOfBits (..), NumberOfSlices (..), NumberOfSlots (..), Parameters (..), ShouldContinue (..))
+import Leios.Model (
+  BitsPerSecond (..),
+  EBFrequency (..),
+  IBFrequency (..),
+  NumberOfBits (..),
+  NumberOfSlices (..),
+  NumberOfSlots (..),
+  Parameters (..),
+  ShouldContinue (..),
+ )
 import qualified Leios.Model as Model
 import Leios.Trace (mkTracer)
 import Network.HTTP.Types.Status (badRequest400)
@@ -63,11 +81,11 @@ newSession state paramsTVar continueTVar = do
 lookupParams :: MonadSTM m => SessionId -> ServerState m -> m (Maybe Parameters)
 lookupParams sid serverState = do
   mParamsTVar <- lookupParamsTVar sid serverState
-  maybe (pure Nothing) (fmap Just . readTVarIO) $ mParamsTVar
+  maybe (pure Nothing) (fmap Just . readTVarIO) mParamsTVar
 
 lookupParamsTVar :: MonadSTM m => SessionId -> ServerState m -> m (Maybe (TVar m Parameters))
 lookupParamsTVar sid serverState =
-  fmap (fmap paramsTVar) $ lookupClientState sid serverState
+  fmap paramsTVar <$> lookupClientState sid serverState
 
 lookupClientState :: MonadSTM m => SessionId -> ServerState m -> m (Maybe (ClientState m))
 lookupClientState sid ServerState{sessionsTVar} = do
@@ -80,7 +98,7 @@ lookupContinueTVar ::
   ServerState m ->
   m (Maybe (TVar m ShouldContinue))
 lookupContinueTVar sid serverState = do
-  fmap (fmap continueTVar) $ lookupClientState sid serverState
+  fmap continueTVar <$> lookupClientState sid serverState
 
 data ServerState m = ServerState
   { sessionsTVar :: TVar m (Map SessionId (ClientState m))
@@ -156,7 +174,7 @@ scottyApp serverState =
         Just clientState -> do
           liftIO $ atomically $ writeTVar (paramsTVar clientState) params
           liftIO $ atomically $ writeTVar (continueTVar clientState) Continue
-      liftIO $ putStrLn $ show params
+      liftIO $ print params
       pure ()
 
     Sc.post "/api/stop-simulation" $ do
@@ -230,5 +248,5 @@ wsapp serverState pending = do
       , ibSize = NumberOfBits 20
       , f_I = IBFrequency 5
       , f_E = EBFrequency 1
-      , initialSeed = 22595838
+      , initialSeed = 22_595_838
       }
