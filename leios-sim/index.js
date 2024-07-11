@@ -20,23 +20,26 @@ document.addEventListener('DOMContentLoaded', () => {
       // N.B.: Make sure colors are picked from an inclusive color palette.
       // See for instance: https://medium.com/@allieofisher/inclusive-color-palettes-for-the-web-bbfe8cf2410e
       datasets: [
-	{ type: 'scatter',
+        {
+          type: 'scatter',
           label: "Created IBs",
           data: [],
-	  backgroundColor: '#6FDE6E',
-	  borderColor: '#6FDE6E',
-	},
-	{ type: 'scatter',
+          backgroundColor: '#6FDE6E',
+          borderColor: '#6FDE6E',
+        },
+        {
+          type: 'scatter',
           label: "Linked IBs",
           data: [],
-	  backgroundColor: '#235FA4',
-	  borderColor: '#235FA4',
+          backgroundColor: '#235FA4',
+          borderColor: '#235FA4',
         },
-	{ type: 'scatter',
+        {
+          type: 'scatter',
           label: "Dropped IBs",
           data: [],
-	  backgroundColor: '#FF4242',
-	  borderColor: '#FF4242',
+          backgroundColor: '#FF4242',
+          borderColor: '#FF4242',
         }
       ]
     },
@@ -55,9 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Retrieve simulation data from server.
+  // retrieve simulation data from server
   const wsPath = window.location.pathname.split('/').slice(0, -1).join('/');
-  const ws = new WebSocket("ws://" + window.location.hostname + ":" + window.location.port + wsPath);
+  const protocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${window.location.hostname}:${window.location.port}${wsPath}`);
 
   ws.onopen = function() {
     console.log('connected');
@@ -81,73 +85,79 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (logData.tag == 'SessionId') {
-	sessionId = logData.sessionId;
-	console.log(`Got session id ${sessionId}`);
+        sessionId = logData.sessionId;
+        console.log(`Got session id ${sessionId}`);
 
-	// Set the parameters in the UI using the server default parameters.
-	getJSON(`/api/parameters?sessionId=${sessionId}`)
-	  .then ((data) => {
-	    document.getElementById('input_L').value = data._L;
-	    document.getElementById('input_λ').value = data.λ;
-	    document.getElementById('input_f_I').value = data.f_I;
-	    document.getElementById('input_f_E').value = data.f_E;
-	    document.getElementById('inputNodeBandwidth').value = data.nodeBandwidth;
-	    document.getElementById('inputIbSize').value = data.ibSize;
-	  });
+        // Set the parameters in the UI using the server default parameters.
+        getJSON(`/api/parameters?sessionId=${sessionId}`)
+          .then((data) => {
+            document.getElementById('input_L').value = data._L;
+            document.getElementById('input_λ').value = data.λ;
+            document.getElementById('input_f_I').value = data.f_I;
+            document.getElementById('input_f_E').value = data.f_E;
+            document.getElementById('inputNodeBandwidth').value = data.nodeBandwidth;
+            document.getElementById('inputIbSize').value = data.ibSize;
+          });
       }
 
       if (logData.tag == 'ReceivedEB') {
 
-	if (logData.receivedEB.eb_linked_IBs.length != 0) {
-	  queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
-	}
+        if (logData.receivedEB.eb_linked_IBs.length != 0) {
+          queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
+        }
 
-	// We know that future EBs will link IBs whose slots are
-	// greater or equal than the slice linked by the current
-	// EB. Therefore we can regard all those IBs with smaller
-	// slots as *lost*.
-	droppedIBs = queuedIBs.filter(ib =>
-	  sliceOf (ib.ib_slot) < sliceOf(logData.receivedEB.eb_slot) - (parameters.λ + 1)
-	);
+        // We know that future EBs will link IBs whose slots are
+        // greater or equal than the slice linked by the current
+        // EB. Therefore we can regard all those IBs with smaller
+        // slots as *lost*.
+        droppedIBs = queuedIBs.filter(ib =>
+          sliceOf(ib.ib_slot) < sliceOf(logData.receivedEB.eb_slot) - (parameters.λ + 1)
+        );
 
-	queuedIBs = _.differenceWith(queuedIBs, droppedIBs, _.isEqual);
+        queuedIBs = _.differenceWith(queuedIBs, droppedIBs, _.isEqual);
 
-	var i = chart.data.datasets[1].data.findIndex(p => p.x == logData.receivedEB.eb_slot);
-	if (0 <= i) {
-	  chart.data.datasets[1].data[i] = {x: logData.receivedEB.eb_slot,
-					    y: chart.data.datasets[1].data[i].y + logData.receivedEB.eb_linked_IBs.length};
-	} else {
-	  chart.data.datasets[1].data.push({ x: logData.receivedEB.eb_slot,
-					     y: logData.receivedEB.eb_linked_IBs.length });
-	}
+        var i = chart.data.datasets[1].data.findIndex(p => p.x == logData.receivedEB.eb_slot);
+        if (0 <= i) {
+          chart.data.datasets[1].data[i] = {
+            x: logData.receivedEB.eb_slot,
+            y: chart.data.datasets[1].data[i].y + logData.receivedEB.eb_linked_IBs.length
+          };
+        } else {
+          chart.data.datasets[1].data.push({
+            x: logData.receivedEB.eb_slot,
+            y: logData.receivedEB.eb_linked_IBs.length
+          });
+        }
 
 
-        chart.data.datasets[2].data.push({ x: logData.receivedEB.eb_slot,
-					   y: droppedIBs.length });
+        chart.data.datasets[2].data.push({
+          x: logData.receivedEB.eb_slot,
+          y: droppedIBs.length
+        });
 
 
-	// TODO: factor this out, reduce duplication.
-	const minx = chart.data.datasets[0].data[0].x;
+        // TODO: factor this out, reduce duplication.
+        const minx = chart.data.datasets[0].data[0].x;
         chart.options.scales.x.min = minx;
         chart.options.scales.x.max = minx + 50;
         chart.update();
       }
 
       if (logData.tag == 'ProducedIB') {
-	queuedIBs.push(logData.producedIB);
+        queuedIBs.push(logData.producedIB);
 
-	var i = chart.data.datasets[0].data.findIndex(p => p.x == logData.producedIB.ib_slot);
-	if (0 <= i) {
-	  chart.data.datasets[0].data[i] = {x: logData.producedIB.ib_slot, y: chart.data.datasets[0].data[i].y + 1 };
-	} else {
-	  chart.data.datasets[0].data.push( {x: logData.producedIB.ib_slot, y: 1});
-	}
+        var i = chart.data.datasets[0].data.findIndex(p => p.x == logData.producedIB.ib_slot);
+        if (0 <= i) {
+          chart.data.datasets[0].data[i] = { x: logData.producedIB.ib_slot, y: chart.data.datasets[0].data[i].y + 1 };
+        } else {
+          chart.data.datasets[0].data.push({ x: logData.producedIB.ib_slot, y: 1 });
+        }
 
-	// Adjust the data range
-	const minx = chart.data.datasets[0].data[0].x;
+        // Adjust the data range
+        const minx = chart.data.datasets[0].data[0].x;
         chart.options.scales.x.min = minx;
         chart.options.scales.x.max = minx + 50;
-	chart.update();
+        chart.update();
       }
     }
 
@@ -165,34 +175,34 @@ document.addEventListener('DOMContentLoaded', () => {
    * Parameters change handling
    */
   onParametersChange('input_L',
-		     (newValue) => { parameters._L = newValue },
-		     `/api/set-L`);
+    (newValue) => { parameters._L = newValue },
+    `/api/set-L`);
 
   onParametersChange('input_λ',
-		     (newValue) => { parameters.λ = newValue },
-		     `/api/set-lambda`);
+    (newValue) => { parameters.λ = newValue },
+    `/api/set-lambda`);
 
   onParametersChange('input_f_I',
-		     (newValue) => { parameters.f_I = newValue },
-		     `/api/set-fi`);
+    (newValue) => { parameters.f_I = newValue },
+    `/api/set-fi`);
 
   onParametersChange('input_f_E',
-		     (newValue) => { parameters.f_E = newValue },
-		     `/api/set-fe`);
+    (newValue) => { parameters.f_E = newValue },
+    `/api/set-fe`);
 
   onParametersChange('inputNodeBandwidth',
-		     (newValue) => { parameters.inputNodeBandwidth = newValue },
-		     `/api/set-node-bandwidth`);
+    (newValue) => { parameters.inputNodeBandwidth = newValue },
+    `/api/set-node-bandwidth`);
 
   onParametersChange('inputIbSize',
-		     (newValue) => { parameters.inputIbsize = newValue },
-		     `/api/set-ib-size`);
+    (newValue) => { parameters.inputIbsize = newValue },
+    `/api/set-ib-size`);
 
   const input_λ = document.getElementById('input_λ');
   input_λ.addEventListener('change', function() {
     parameters.λ = input_λ.value;
     postJSON(`/api/set-lambda?sessionId=${sessionId}`,
-	     parseInt(input_λ.value));
+      parseInt(input_λ.value));
   });
 
 });
@@ -210,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function onParametersChange(parameterId, applyNewValue, endpoint) {
   const input = document.getElementById(parameterId);
   input.addEventListener('change', function() {
-    applyNewValue (input.value);
+    applyNewValue(input.value);
     postJSON(`${endpoint}?sessionId=${sessionId}`, parseInt(input.value));
   });
 }
@@ -224,14 +234,15 @@ async function startSimulation() {
   const ibSize = document.getElementById('inputIbSize');
 
   // TODO: perform parameters validation
-  parameters = { _L: Number(L.value),
-		 λ: Number(λ.value),
-		 nodeBandwidth: Number(nodeBandwidth.value),
-		 ibSize: Number(ibSize.value),
-		 f_I: Number(f_I.value),
-		 f_E: Number(f_E.value),
-		 initialSeed: 9126589237 // TODO: add a field for this
-	       }
+  parameters = {
+    _L: Number(L.value),
+    λ: Number(λ.value),
+    nodeBandwidth: Number(nodeBandwidth.value),
+    ibSize: Number(ibSize.value),
+    f_I: Number(f_I.value),
+    f_E: Number(f_E.value),
+    initialSeed: 9126589237 // TODO: add a field for this
+  }
 
   postJSON(`/api/start-simulation?sessionId=${sessionId}`, parameters);
 }
@@ -246,8 +257,8 @@ async function stopSimulation() {
 
 async function getJSON(endpoint) {
   const response = await fetch("http://" + window.location.hostname
-			       + ":"
-			       + window.location.port + endpoint);
+    + ":"
+    + window.location.port + endpoint);
 
   if (!response.ok) {
     throw new Error(`Response status: ${response.status}`);
@@ -260,9 +271,9 @@ async function getJSON(endpoint) {
 async function post(endpoint) {
   try {
     const url =
-	  "http://" + window.location.hostname + ":"
-	  + window.location.port
-	  + endpoint;
+      "http://" + window.location.hostname + ":"
+      + window.location.port
+      + endpoint;
     const response = await fetch(url, {
       method: "POST"
     });
@@ -275,9 +286,9 @@ async function post(endpoint) {
 async function postJSON(endpoint, data) {
   try {
     const url =
-	  "http://" + window.location.hostname + ":"
-	  + window.location.port
-	  + endpoint;
+      "http://" + window.location.hostname + ":"
+      + window.location.port
+      + endpoint;
     const response = await fetch(url, {
       method: "POST",
       headers: {
