@@ -156,6 +156,9 @@ scottyApp serverState =
     Sc.get "/leios.css" $
       Sc.file "leios.css"
 
+    Sc.get "/favicon.ico" $
+      Sc.file "favicon.ico"
+
     Sc.get "/api/parameters" $ do
       sid <- Sc.queryParam "sessionId"
       mParams <- liftIO $ lookupParams sid serverState
