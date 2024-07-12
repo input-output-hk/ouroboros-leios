@@ -198,6 +198,13 @@ document.addEventListener('DOMContentLoaded', () => {
     (newValue) => { parameters.ibSize = newValue },
     `/api/set-ib-size`);
 
+  // activate all tooltips
+  // see https://getbootstrap.com/docs/5.0/components/tooltips/
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+
   const input_lambda = document.getElementById('input_lambda');
   input_lambda.addEventListener('change', function() {
     parameters.λ = input_lambda.value;
