@@ -1,3 +1,54 @@
+## 2024-07-11
+
+### Deploying simulation in the "cloud"
+
+Started working on simnulation deployment on AWS.
+  * Found this repository for setting up ECS which sounds the most promising option: https://github.com/ajimbong/terraform-ecs-cicd-project.
+  * This article contains the GHA workflow part: https://ajimbong.medium.com/deploy-a-docker-container-to-amazon-ecs-using-github-actions-fd50261b8e03
+  * Following tutorial here: https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build
+  * installing AWS command-line from https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+
+Created service account `leios-build` with power user rights, and generated access keys. TODO: reduce rights to the strict minimum
+
+Managed to deploy ECS cluster with defined service, but there's no EC2 instance container attached so it cannot run :( => use Fargate?
+
+Managed to configure the ECS cluster, service, and task to run the image, but it now fails to download the manifest from ghcr.io which seems a permissions issue. I need to add the necessary configuration to the task/service?
+
+need to configure a secret containing a PAT for pulling the manifest: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_repositoryCredentials
+
+I gave up trying to run on AWS, every solution I found is an insanely intricate maze of stupidly complicated solution which I don't care about as I only need to deploy a _single_ image without any data dependency attached.
+
+I managed to get Gcloud run deployment working, mostly copy pasting what I did peras and fiddling with it.
+
+* I reused same service account than Peras which is  a mistake -> should create a new service account with limited rights
+* Needeed to add service account as an _owner_ of the domain in the google console (a manual task) in order to allow subdomain mapping
+* Changed the server code to support defining its port from `PORT` environment variable which is provided by the deployment configuration
+
+Allowing anyone to access the server proved annoying too: The folowing configuration works
+```
+
+resource "google_cloud_run_service_iam_member" "noauth" {
+  location = google_cloud_run_v2_service.leios_server.location
+  service  = google_cloud_run_v2_service.leios_server.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+```
+
+but note that it does not have a `_v2_` tag! This was the mistake I made, I used a v2 iam_member with `name` proeprty which proved to be incorrect.
+Invalid argument `2024-07-11'
+
+### Weekly update
+
+* initial design was geared toward optimal usage of bandwidth
+  * => bandwidth is large, and it can accomodate spikes, so perhaps focus on something simpler?
+  * developed a short pipeline which is much simpler
+  * assumes 40% of bandwidth and needs to tolerate spikes (2.5x average throughput), provides same security, consume bandhwidth ~ throughput
+  * seems ideal for pricing model based on volume
+
+* could there be a use case for blob leios in the partner chain space?
+
 ## 2024-07-04
 
 ### Network pricing
