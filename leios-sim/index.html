@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
     <script src="index.js"></script>
+    <link rel="stylesheet" href="leios.css" >
   </head>
 
   <body>
@@ -25,33 +26,33 @@
     <div class="row g-3" style="width: 95%; margin: auto;">
 
       <div class="col-md-3">
-	<label for="input_L" class="form-label">$$L_{\ }$$</label>
+	<label for="input_L" class="form-label">\(L_{\ }\)<span class="help" title="Duration of a slice, in slots.">?</span></label>
 	<input type="number" min="1" max="15" class="form-control" id="input_L">
       </div>
 
       <div class="col-md-3">
-	<label for="inputLambda" class="form-label">$$\lambda_{\ }$$</label>
-	<input type="number" min="1" max="15" class="form-control" id="input_λ">
+	<label for="input_lambda" class="form-label">\(\lambda_{\ }\)<span class="help" title="Number of slices to deliver IBs.">?</span></label>
+	<input type="number" min="1" max="15" class="form-control" id="input_lambda">
       </div>
 
       <div class="col-md-3">
-	<label for="input_f_I" class="form-label">$$f_I$$</label>
+	<label for="input_f_I" class="form-label">\(f_I\)<span class="help" title="IB average creation rate, per slot.">?</span></label>
 	<input type="number" min="1" max="25" class="form-control" id="input_f_I">
       </div>
 
       <div class="col-md-3">
-	<label for="input_f_E" class="form-label">$$f_E$$</label>
+	<label for="input_f_E" class="form-label">\(f_E\)<span class="help" title="EB average creation rate, per slot.">?</span></label>
 	<input type="number" min="1" max="15" class="form-control" id="input_f_E">
       </div>
 
       <div class="col-md-3">
-	<label for="inputNodeBandwidth " class="form-label">Node bandwidth (bps)</label>
-	<input type="number" min="100" max="1000" class="form-control" id="inputNodeBandwidth">
+	<label for="input_node_bandwidth" class="form-label">Node bandwidth (bps)</label>
+	<input type="number" min="100" max="1000" class="form-control" id="input_node_bandwidth">
       </div>
 
       <div class="col-md-3">
-	<label for="inputIbSize " class="form-label">Input block size (bits) </label>
-	<input type="number" min="100" max="1000" class="form-control" id="inputIbSize">
+	<label for="input_ib_size" class="form-label">Input block size (bits) </label>
+	<input type="number" min="100" max="1000" class="form-control" id="input_ib_size">
       </div>
 
       <div class="col-md-3">
@@ -67,14 +68,14 @@
       <div class="col-2">
 	<button type="submit" onclick="startSimulation()" class="btn btn-success">Start</button>
       </div>
+      <div class="col-2">
+	<button type="button" onclick="stopSimulation()" class="btn btn-danger">Stop</button>
+      </div>
 
       <div class="col-8">
 
       </div>
 
-      <div class="col-2">
-	<button type="button" onclick="stopSimulation()" class="btn btn-danger">Stop</button>
-      </div>
     </div>
 
   </body>

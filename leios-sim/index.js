@@ -92,11 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
         getJSON(`/api/parameters?sessionId=${sessionId}`)
           .then((data) => {
             document.getElementById('input_L').value = data._L;
-            document.getElementById('input_λ').value = data.λ;
+            document.getElementById('input_lambda').value = data.λ;
             document.getElementById('input_f_I').value = data.f_I;
             document.getElementById('input_f_E').value = data.f_E;
-            document.getElementById('inputNodeBandwidth').value = data.nodeBandwidth;
-            document.getElementById('inputIbSize').value = data.ibSize;
+            document.getElementById('input_node_bandwidth').value = data.nodeBandwidth;
+            document.getElementById('input_ib_size').value = data.ibSize;
           });
       }
 
@@ -178,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (newValue) => { parameters._L = newValue },
     `/api/set-L`);
 
-  onParametersChange('input_λ',
+  onParametersChange('input_lambda',
     (newValue) => { parameters.λ = newValue },
     `/api/set-lambda`);
 
@@ -190,19 +190,19 @@ document.addEventListener('DOMContentLoaded', () => {
     (newValue) => { parameters.f_E = newValue },
     `/api/set-fe`);
 
-  onParametersChange('inputNodeBandwidth',
+  onParametersChange('input_node_bandwidth',
     (newValue) => { parameters.inputNodeBandwidth = newValue },
     `/api/set-node-bandwidth`);
 
-  onParametersChange('inputIbSize',
-    (newValue) => { parameters.inputIbsize = newValue },
+  onParametersChange('input_ib_size',
+    (newValue) => { parameters.ibSize = newValue },
     `/api/set-ib-size`);
 
-  const input_λ = document.getElementById('input_λ');
-  input_λ.addEventListener('change', function() {
-    parameters.λ = input_λ.value;
+  const input_lambda = document.getElementById('input_lambda');
+  input_lambda.addEventListener('change', function() {
+    parameters.λ = input_lambda.value;
     postJSON(`/api/set-lambda?sessionId=${sessionId}`,
-      parseInt(input_λ.value));
+      parseInt(input_lambda.value));
   });
 
 });
@@ -227,11 +227,11 @@ function onParametersChange(parameterId, applyNewValue, endpoint) {
 
 async function startSimulation() {
   const L = document.getElementById('input_L');
-  const λ = document.getElementById('input_λ');
+  const λ = document.getElementById('input_lambda');
   const f_I = document.getElementById('input_f_I');
   const f_E = document.getElementById('input_f_E');
-  const nodeBandwidth = document.getElementById('inputNodeBandwidth');
-  const ibSize = document.getElementById('inputIbSize');
+  const nodeBandwidth = document.getElementById('input_node_bandwidth');
+  const ibSize = document.getElementById('input_ib_size');
 
   // TODO: perform parameters validation
   parameters = {
