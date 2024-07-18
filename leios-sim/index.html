@@ -55,7 +55,7 @@
 
       <div class="col-md-2">
 	      <label for="input_ib_size" class="form-label">Input block size <span class="help" data-bs-toggle="tooltip" title="IBs size, in some arbitrary unit (eg. Kb, Mb...).">?</span> </label>
-	      <input type="number" min="100" max="1000" class="form-control" id="input_ib_size">
+	      <input type="number" min="10" max="1000" step="10" class="form-control" id="input_ib_size">
       </div>
     </div>
 
@@ -63,18 +63,18 @@
     <div class="row g-3" style="width: 95%; margin: auto;">
 
       <div class="col-2 form-group">
-	      <label for="throughput" class="form-label">Throughput <span class="help" data-bs-toggle="tooltip" title="Endorsed data throughput, in some arbitrary unit (eg. Kbps, Mbps...).">?</span></label>
-	      <input type="number" readonly class="form-control" id="throughput">
+	      <label for="throughput" class="form-label">Throughput <span class="help" data-bs-toggle="tooltip" title="Endorsed data throughput, in some arbitrary unit per slot (eg. Kbps, Mbps...).">?</span></label>
+	      <input type="number" readonly  step="0.01" class="form-control" id="throughput">
       </div>
 
       <div class="col-2 form-group">
-	      <label for="latency" class="form-label">Latency <span class="help" data-bs-toggle="tooltip" title="Endorsement average latency, in seconds.">?</span></label>
-	      <input type="number" readonly class="form-control" id="latency">
+	      <label for="latency" class="form-label">Latency <span class="help" data-bs-toggle="tooltip" title="Endorsement average latency, in slots.">?</span></label>
+	      <input type="number" readonly step="0.01"  class="form-control" id="latency">
       </div>
 
       <div class="col-2 form-group">
-	      <label for="dropped_rate" class="form-label">Dropped input rate <span class="help" data-bs-toggle="tooltip" title="Dropped data rate, in some arbitrary unit (eg. Kbps, Mbps...).">?</span></label>
-	      <input type="number" readonly class="form-control" id="dropped_rate">
+	      <label for="dropped_rate" class="form-label">Dropped input rate <span class="help" data-bs-toggle="tooltip" title="Dropped data rate, in some arbitrary unit per slot (eg. Kbps, Mbps...).">?</span></label>
+	      <input type="number" readonly step="0.01" class="form-control" id="dropped_rate">
       </div>
 
       <div class="col-1">

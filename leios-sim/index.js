@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // accumulate the size of all endorsed IBs.
   var total_endorsed_data = 0;
+  var total_dropped_data = 0;
+  var total_endorsed_IBs = 0;
+  var total_endorsed_latency = 0;
 
   var currentSlot = 0;
 
@@ -87,7 +90,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function adjustRates() {
     const throughput = document.getElementById('throughput');
-    throughput.value = total_endorsed_data / (currentSlot + 1);
+    throughput.value = (total_endorsed_data / (currentSlot + 1)).toFixed(2);
+
+    const dropped_rate = document.getElementById('dropped_rate');
+    dropped_rate.value = (total_dropped_data / (currentSlot + 1)).toFixed(2);
+
+    const latency = document.getElementById('latency');
+    latency.value = (total_endorsed_latency / (total_endorsed_IBs + 1)).toFixed(2);
   }
 
   ws.onmessage = function(message) {
@@ -128,13 +137,15 @@ document.addEventListener('DOMContentLoaded', () => {
           if (logData.receivedEB.eb_linked_IBs.length != 0) {
             queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
             total_endorsed_data += logData.receivedEB.eb_linked_IBs.map(ib => ib.ib_size).reduce((a, b) => a + b, 0);
+            total_endorsed_IBs += logData.receivedEB.eb_linked_IBs.length;
+            total_endorsed_latency += logData.receivedEB.eb_linked_IBs.map(ib => logData.receivedEB.eb_slot - ib.ib_slot).reduce((a, b) => a + b, 0);
           }
 
           // We know that future EBs will link IBs whose slots are
           // greater or equal than the slice linked by the current
           // EB. Therefore we can regard all those IBs with smaller
           // slots as *lost*.
-          droppedIBs = queuedIBs.filter(ib =>
+          const droppedIBs = queuedIBs.filter(ib =>
             sliceOf(ib.ib_slot) < sliceOf(logData.receivedEB.eb_slot) - (parameters.λ + 1)
           );
 
@@ -153,10 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }
 
-          chart.data.datasets[2].data.push({
-            x: logData.receivedEB.eb_slot,
-            y: droppedIBs.length
-          });
+          if (droppedIBs.length > 0) {
+            total_dropped_data += droppedIBs.map(ib => ib.ib_size).reduce((a, b) => a + b, 0);
+            chart.data.datasets[2].data.push({
+              x: logData.receivedEB.eb_slot,
+              y: droppedIBs.length
+            });
+          }
 
           adjust(chart);
           chart.update();
