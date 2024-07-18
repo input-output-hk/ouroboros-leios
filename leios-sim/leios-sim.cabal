@@ -76,6 +76,7 @@ test-suite leios-sim-test
   import:         warnings
   ghc-options:    -threaded -rtsopts
   main-is:        Main.hs
+  other-modules:  Leios.ModelSpec
   build-depends:
     , base
     , containers
@@ -85,3 +86,4 @@ test-suite leios-sim-test
 
   hs-source-dirs: test
   type:           exitcode-stdio-1.0
+  build-tool-depends: hspec-discover:hspec-discover

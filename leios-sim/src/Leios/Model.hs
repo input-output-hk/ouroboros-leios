@@ -126,7 +126,7 @@ newtype NodeId = NodeId Word
 
 newtype Slot = Slot Word
   deriving stock (Generic)
-  deriving newtype (Show, Eq, Ord, Enum, Aeson.ToJSON, Aeson.FromJSON)
+  deriving newtype (Show, Eq, Ord, Enum, Num, Aeson.ToJSON, Aeson.FromJSON)
 
 tickSlot :: Slot -> Slot
 tickSlot = succ
@@ -300,7 +300,7 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
 
   produceEB slot = do
     Parameters{_L, λ} <- getParams world
-    l_I <- fmap (fmap ib_ref) $ storedIBsBy nodeId world (slice _L slot (λ + 1))
+    l_I <- fmap ib_ref <$> storedIBsBy nodeId world (slice _L slot (λ + 1))
     let newEB = EB{eb_slot = slot, eb_producer = nodeId, eb_linked_IBs = l_I}
     traceWith tracer (ProducedEB newEB)
     MsgEB newEB `sendTo` world
@@ -335,7 +335,7 @@ data Slice = Slice
   { lb_inclusive :: Slot
   , ub_exclusive :: Slot
   }
-  deriving (Show, Generic)
+  deriving (Show, Eq, Generic)
 
 isWithin :: Slot -> Slice -> Bool
 isWithin slot Slice{lb_inclusive, ub_exclusive} =
