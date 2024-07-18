@@ -73,6 +73,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // queue.
   var queuedIBs = [];
 
+  // accumulate the size of all endorsed IBs.
+  var total_endorsed_data = 0;
+
+  var currentSlot = 0;
+
+  // Trim the chart data to the last 50 entries.
+  function adjust(chart) {
+    const minx = chart.data.datasets[0].data[0].x;
+    chart.options.scales.x.min = minx;
+    chart.options.scales.x.max = minx + 50;
+  }
+
+  function adjustRates() {
+    const throughput = document.getElementById('throughput');
+    throughput.value = total_endorsed_data / (currentSlot + 1);
+  }
+
   ws.onmessage = function(message) {
     if (message.data) {
       const logData = JSON.parse(message.data);
@@ -85,6 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       switch (logData.tag) {
+        case 'NextSlot': {
+          currentSlot = logData.slot;
+          adjustRates();
+          break;
+        }
         case 'SessionId': {
           sessionId = logData.sessionId;
           console.log(`Got session id ${sessionId}`);
@@ -105,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           if (logData.receivedEB.eb_linked_IBs.length != 0) {
             queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
+            total_endorsed_data += logData.receivedEB.eb_linked_IBs.map(ib => ib.ib_size).reduce((a, b) => a + b, 0);
           }
 
           // We know that future EBs will link IBs whose slots are
@@ -130,18 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }
 
-
           chart.data.datasets[2].data.push({
             x: logData.receivedEB.eb_slot,
             y: droppedIBs.length
           });
 
-
-          // TODO: factor this out, reduce duplication.
-          const minx = chart.data.datasets[0].data[0].x;
-          chart.options.scales.x.min = minx;
-          chart.options.scales.x.max = minx + 50;
+          adjust(chart);
           chart.update();
+
           break;
         }
         case 'ProducedIB': {
@@ -149,72 +168,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
           var i = chart.data.datasets[0].data.findIndex(p => p.x == logData.producedIB.ib_slot);
           if (0 <= i) {
-            chart.data.datasets[0].data[i] = { x: logData.producedIB.ib_slot, y: chart.data.datasets[0].data[i].y + 1 };
+            chart.data.datasets[0].data[i] = {
+              x: logData.producedIB.ib_slot,
+              y: chart.data.datasets[0].data[i].y + 1
+            };
           } else {
-            chart.data.datasets[0].data.push({ x: logData.producedIB.ib_slot, y: 1 });
+            chart.data.datasets[0].data.push({
+              x: logData.producedIB.ib_slot,
+              y: 1
+            });
           }
 
-          // Adjust the data range
-          const minx = chart.data.datasets[0].data[0].x;
-          chart.options.scales.x.min = minx;
-          chart.options.scales.x.max = minx + 50;
+          adjust(chart);
           chart.update();
+
           break;
         }
       }
 
     };
+  };
 
-    window.onbeforeunload = _ => {
-      ws.close();
-    };
+  window.onbeforeunload = _ => {
+    ws.close();
+  };
 
-    ws.onclose = function() {
-      console.log('disconnected');
-    };
+  ws.onclose = function() {
+    console.log('disconnected');
+  };
 
-    /*
-     * Parameters change handling
-     */
-    onParametersChange('input_L',
-      (newValue) => { parameters._L = newValue },
-      `/api/set-L`);
+  /*
+   * Parameters change handling
+   */
+  onParametersChange('input_L',
+    (newValue) => { parameters._L = newValue },
+    `/api/set-L`);
 
-    onParametersChange('input_lambda',
-      (newValue) => { parameters.λ = newValue },
-      `/api/set-lambda`);
+  onParametersChange('input_lambda',
+    (newValue) => { parameters.λ = newValue },
+    `/api/set-lambda`);
 
-    onParametersChange('input_f_I',
-      (newValue) => { parameters.f_I = newValue },
-      `/api/set-fi`);
+  onParametersChange('input_f_I',
+    (newValue) => { parameters.f_I = newValue },
+    `/api/set-fi`);
 
-    onParametersChange('input_f_E',
-      (newValue) => { parameters.f_E = newValue },
-      `/api/set-fe`);
+  onParametersChange('input_f_E',
+    (newValue) => { parameters.f_E = newValue },
+    `/api/set-fe`);
 
-    onParametersChange('input_node_bandwidth',
-      (newValue) => { parameters.inputNodeBandwidth = newValue },
-      `/api/set-node-bandwidth`);
+  onParametersChange('input_node_bandwidth',
+    (newValue) => { parameters.inputNodeBandwidth = newValue },
+    `/api/set-node-bandwidth`);
 
-    onParametersChange('input_ib_size',
-      (newValue) => { parameters.ibSize = newValue },
-      `/api/set-ib-size`);
+  onParametersChange('input_ib_size',
+    (newValue) => { parameters.ibSize = newValue },
+    `/api/set-ib-size`);
 
-    // activate all tooltips
-    // see https://getbootstrap.com/docs/5.0/components/tooltips/
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    const input_lambda = document.getElementById('input_lambda');
-    input_lambda.addEventListener('change', function() {
-      parameters.λ = input_lambda.value;
-      postJSON(`/api/set-lambda?sessionId=${sessionId}`,
-        parseInt(input_lambda.value));
-    });
-
+  // activate all tooltips
+  // see https://getbootstrap.com/docs/5.0/components/tooltips/
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
   });
+
+  const input_lambda = document.getElementById('input_lambda');
+  input_lambda.addEventListener('change', function() {
+    parameters.λ = input_lambda.value;
+    postJSON(`/api/set-lambda?sessionId=${sessionId}`,
+      parseInt(input_lambda.value));
+  });
+
+});
 
 /*
  * Add an event listener on the given parameter id.

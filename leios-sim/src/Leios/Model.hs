@@ -263,7 +263,7 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
     clock <- runClock continueTVar
     let loop generator = do
           slot <- nextSlot clock
-          traceWith tracer (NextSlot nodeId slot)
+          traceWith tracer NextSlot{nodeId, slot}
           Parameters{f_I, f_E} <- getParams world
           -- Generate IB blocks
           let (numberOfIBsInThisSlot, generator1) =
@@ -346,7 +346,7 @@ isWithin slot Slice{lb_inclusive, ub_exclusive} =
 
 -- FIXME: remove the prefix once this goes in a separate module.
 data LeiosEvent
-  = NextSlot {nsNodeId :: NodeId, nsSlot :: Slot} -- FIXME: temporary, just for testing purposes.
+  = NextSlot {nodeId :: NodeId, slot :: Slot} -- FIXME: temporary, just for testing purposes.
   | ProducedIB {producedIB :: IB}
   | ReceivedIB {receivedIB :: IB, receivedBy :: NodeId}
   | ProducedEB {producedEB :: EB}

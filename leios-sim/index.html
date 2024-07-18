@@ -62,18 +62,28 @@
       <!-- Buttons -->
     <div class="row g-3" style="width: 95%; margin: auto;">
 
+      <div class="col-2 form-group">
+	      <label for="throughput" class="form-label">Throughput <span class="help" data-bs-toggle="tooltip" title="Endorsed data throughput, in some arbitrary unit (eg. Kbps, Mbps...).">?</span></label>
+	      <input type="number" readonly class="form-control" id="throughput">
+      </div>
+
+      <div class="col-2 form-group">
+	      <label for="latency" class="form-label">Latency <span class="help" data-bs-toggle="tooltip" title="Endorsement average latency, in seconds.">?</span></label>
+	      <input type="number" readonly class="form-control" id="latency">
+      </div>
+
+      <div class="col-2 form-group">
+	      <label for="dropped_rate" class="form-label">Dropped input rate <span class="help" data-bs-toggle="tooltip" title="Dropped data rate, in some arbitrary unit (eg. Kbps, Mbps...).">?</span></label>
+	      <input type="number" readonly class="form-control" id="dropped_rate">
+      </div>
 
       <div class="col-1">
 	      <button type="submit" onclick="startSimulation()" class="btn btn-success">Start</button>
       </div>
+
       <div class="col-1">
 	      <button type="button" onclick="stopSimulation()" class="btn btn-danger">Stop</button>
       </div>
-
-      <div class="col-10">
-
-      </div>
-
     </div>
 
     <div id="help" class="row" style="width: 95%; margin: 1em auto; border: thin solid black; border-radius: 0.5em">
