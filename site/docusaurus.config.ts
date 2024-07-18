@@ -79,7 +79,7 @@ const config: Config = {
                 {
                     position: 'left',
                     label: 'Simulation',
-                    to: 'docs/simulation',
+                    to: 'https://leios-simulation.cardano-scaling.org/',
                 },
                 { to: '/news', label: 'Latest News', position: 'right' },
                 {
