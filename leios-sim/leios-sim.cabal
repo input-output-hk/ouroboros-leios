@@ -45,6 +45,7 @@ library
     , time
     , wai
     , wai-extra
+    , wai-middleware-static
     , wai-websockets
     , warp
     , websockets

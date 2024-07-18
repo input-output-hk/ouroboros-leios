@@ -28,13 +28,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as Text
 import Data.Text.Lazy.Encoding (decodeUtf8)
-import qualified Network.Wai as Wai
-import qualified Network.Wai.Handler.Warp as Warp
-import qualified Network.Wai.Handler.WebSockets as WS
-import Network.Wai.Middleware.RequestLogger (logStdout)
-import qualified Network.WebSockets as WS
-import qualified Web.Scotty as Sc
-
 import Leios.Model (
   BitsPerSecond (..),
   EBFrequency (..),
@@ -48,7 +41,14 @@ import Leios.Model (
 import qualified Leios.Model as Model
 import Leios.Trace (mkTracer)
 import Network.HTTP.Types.Status (badRequest400)
+import qualified Network.Wai as Wai
+import qualified Network.Wai.Handler.Warp as Warp
+import qualified Network.Wai.Handler.WebSockets as WS
+import Network.Wai.Middleware.RequestLogger (logStdout)
+import Network.Wai.Middleware.Static (static)
+import qualified Network.WebSockets as WS
 import System.Environment (lookupEnv)
+import qualified Web.Scotty as Sc
 
 --------------------------------------------------------------------------------
 -- Server state
@@ -147,18 +147,6 @@ scottyApp serverState =
     Sc.get "/" $
       Sc.redirect "/index.html"
 
-    Sc.get "/index.html" $
-      Sc.file "index.html"
-
-    Sc.get "/index.js" $
-      Sc.file "index.js"
-
-    Sc.get "/leios.css" $
-      Sc.file "leios.css"
-
-    Sc.get "/favicon.ico" $
-      Sc.file "favicon.ico"
-
     Sc.get "/api/parameters" $ do
       sid <- Sc.queryParam "sessionId"
       mParams <- liftIO $ lookupParams sid serverState
@@ -202,6 +190,8 @@ scottyApp serverState =
     Sc.post "/api/set-fi" $ changeParam (\v params -> params{f_I = v})
 
     Sc.post "/api/set-fe" $ changeParam (\v params -> params{f_E = v})
+
+    Sc.middleware static
  where
   changeParam setValue = do
     newValue <- Sc.jsonData
