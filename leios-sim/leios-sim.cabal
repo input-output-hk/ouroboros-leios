@@ -24,15 +24,10 @@ common warnings
 
 library
   exposed-modules:
-    Leios.Network.FFD
-    Leios.Node
-    Leios.Node.Types
     Leios.Server
     Leios.Trace
-    Leios.Types
     Leios.Model
 
-  other-modules:    Data.Bytes
   hs-source-dirs:   src
   build-depends:
     , aeson
