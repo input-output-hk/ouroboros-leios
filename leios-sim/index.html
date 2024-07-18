@@ -49,25 +49,28 @@
       </div>
 
       <div class="col-md-2">
-	      <label for="input_node_bandwidth" class="form-label">Node bandwidth (bps)</label>
+	      <label for="input_node_bandwidth" class="form-label">Node bandwidth <span class="help" data-bs-toggle="tooltip" title="Available bandwidth for Leios, in some arbitrary unit (eg. Kbps, Mbps...).">?</span></label>
 	      <input type="number" min="100" max="1000" class="form-control" id="input_node_bandwidth">
       </div>
 
       <div class="col-md-2">
-	      <label for="input_ib_size" class="form-label">Input block size (bits) </label>
+	      <label for="input_ib_size" class="form-label">Input block size <span class="help" data-bs-toggle="tooltip" title="IBs size, in some arbitrary unit (eg. Kb, Mb...).">?</span> </label>
 	      <input type="number" min="100" max="1000" class="form-control" id="input_ib_size">
       </div>
+    </div>
 
       <!-- Buttons -->
+    <div class="row g-3" style="width: 95%; margin: auto;">
 
-      <div class="col-2">
+
+      <div class="col-1">
 	      <button type="submit" onclick="startSimulation()" class="btn btn-success">Start</button>
       </div>
-      <div class="col-2">
+      <div class="col-1">
 	      <button type="button" onclick="stopSimulation()" class="btn btn-danger">Stop</button>
       </div>
 
-      <div class="col-8">
+      <div class="col-10">
 
       </div>
 
