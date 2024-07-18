@@ -84,135 +84,137 @@ document.addEventListener('DOMContentLoaded', () => {
         chart.data.datasets[0].data.splice(0, chart.data.datasets[0].data.length - 49);
       }
 
-      if (logData.tag == 'SessionId') {
-        sessionId = logData.sessionId;
-        console.log(`Got session id ${sessionId}`);
+      switch (logData.tag) {
+        case 'SessionId': {
+          sessionId = logData.sessionId;
+          console.log(`Got session id ${sessionId}`);
 
-        // Set the parameters in the UI using the server default parameters.
-        getJSON(`/api/parameters?sessionId=${sessionId}`)
-          .then((data) => {
-            document.getElementById('input_L').value = data._L;
-            document.getElementById('input_lambda').value = data.λ;
-            document.getElementById('input_f_I').value = data.f_I;
-            document.getElementById('input_f_E').value = data.f_E;
-            document.getElementById('input_node_bandwidth').value = data.nodeBandwidth;
-            document.getElementById('input_ib_size').value = data.ibSize;
-          });
-      }
-
-      if (logData.tag == 'ReceivedEB') {
-
-        if (logData.receivedEB.eb_linked_IBs.length != 0) {
-          queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
+          // Set the parameters in the UI using the server default parameters.
+          getJSON(`/api/parameters?sessionId=${sessionId}`)
+            .then((data) => {
+              document.getElementById('input_L').value = data._L;
+              document.getElementById('input_lambda').value = data.λ;
+              document.getElementById('input_f_I').value = data.f_I;
+              document.getElementById('input_f_E').value = data.f_E;
+              document.getElementById('input_node_bandwidth').value = data.nodeBandwidth;
+              document.getElementById('input_ib_size').value = data.ibSize;
+            });
+          break;
         }
+        case 'ReceivedEB': {
 
-        // We know that future EBs will link IBs whose slots are
-        // greater or equal than the slice linked by the current
-        // EB. Therefore we can regard all those IBs with smaller
-        // slots as *lost*.
-        droppedIBs = queuedIBs.filter(ib =>
-          sliceOf(ib.ib_slot) < sliceOf(logData.receivedEB.eb_slot) - (parameters.λ + 1)
-        );
+          if (logData.receivedEB.eb_linked_IBs.length != 0) {
+            queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
+          }
 
-        queuedIBs = _.differenceWith(queuedIBs, droppedIBs, _.isEqual);
+          // We know that future EBs will link IBs whose slots are
+          // greater or equal than the slice linked by the current
+          // EB. Therefore we can regard all those IBs with smaller
+          // slots as *lost*.
+          droppedIBs = queuedIBs.filter(ib =>
+            sliceOf(ib.ib_slot) < sliceOf(logData.receivedEB.eb_slot) - (parameters.λ + 1)
+          );
 
-        var i = chart.data.datasets[1].data.findIndex(p => p.x == logData.receivedEB.eb_slot);
-        if (0 <= i) {
-          chart.data.datasets[1].data[i] = {
+          queuedIBs = _.differenceWith(queuedIBs, droppedIBs, _.isEqual);
+
+          var i = chart.data.datasets[1].data.findIndex(p => p.x == logData.receivedEB.eb_slot);
+          if (0 <= i) {
+            chart.data.datasets[1].data[i] = {
+              x: logData.receivedEB.eb_slot,
+              y: chart.data.datasets[1].data[i].y + logData.receivedEB.eb_linked_IBs.length
+            };
+          } else {
+            chart.data.datasets[1].data.push({
+              x: logData.receivedEB.eb_slot,
+              y: logData.receivedEB.eb_linked_IBs.length
+            });
+          }
+
+
+          chart.data.datasets[2].data.push({
             x: logData.receivedEB.eb_slot,
-            y: chart.data.datasets[1].data[i].y + logData.receivedEB.eb_linked_IBs.length
-          };
-        } else {
-          chart.data.datasets[1].data.push({
-            x: logData.receivedEB.eb_slot,
-            y: logData.receivedEB.eb_linked_IBs.length
+            y: droppedIBs.length
           });
+
+
+          // TODO: factor this out, reduce duplication.
+          const minx = chart.data.datasets[0].data[0].x;
+          chart.options.scales.x.min = minx;
+          chart.options.scales.x.max = minx + 50;
+          chart.update();
+          break;
         }
+        case 'ProducedIB': {
+          queuedIBs.push(logData.producedIB);
 
+          var i = chart.data.datasets[0].data.findIndex(p => p.x == logData.producedIB.ib_slot);
+          if (0 <= i) {
+            chart.data.datasets[0].data[i] = { x: logData.producedIB.ib_slot, y: chart.data.datasets[0].data[i].y + 1 };
+          } else {
+            chart.data.datasets[0].data.push({ x: logData.producedIB.ib_slot, y: 1 });
+          }
 
-        chart.data.datasets[2].data.push({
-          x: logData.receivedEB.eb_slot,
-          y: droppedIBs.length
-        });
-
-
-        // TODO: factor this out, reduce duplication.
-        const minx = chart.data.datasets[0].data[0].x;
-        chart.options.scales.x.min = minx;
-        chart.options.scales.x.max = minx + 50;
-        chart.update();
+          // Adjust the data range
+          const minx = chart.data.datasets[0].data[0].x;
+          chart.options.scales.x.min = minx;
+          chart.options.scales.x.max = minx + 50;
+          chart.update();
+          break;
+        }
       }
 
-      if (logData.tag == 'ProducedIB') {
-        queuedIBs.push(logData.producedIB);
+    };
 
-        var i = chart.data.datasets[0].data.findIndex(p => p.x == logData.producedIB.ib_slot);
-        if (0 <= i) {
-          chart.data.datasets[0].data[i] = { x: logData.producedIB.ib_slot, y: chart.data.datasets[0].data[i].y + 1 };
-        } else {
-          chart.data.datasets[0].data.push({ x: logData.producedIB.ib_slot, y: 1 });
-        }
+    window.onbeforeunload = _ => {
+      ws.close();
+    };
 
-        // Adjust the data range
-        const minx = chart.data.datasets[0].data[0].x;
-        chart.options.scales.x.min = minx;
-        chart.options.scales.x.max = minx + 50;
-        chart.update();
-      }
-    }
+    ws.onclose = function() {
+      console.log('disconnected');
+    };
 
-  };
+    /*
+     * Parameters change handling
+     */
+    onParametersChange('input_L',
+      (newValue) => { parameters._L = newValue },
+      `/api/set-L`);
 
-  window.onbeforeunload = _ => {
-    ws.close();
-  };
+    onParametersChange('input_lambda',
+      (newValue) => { parameters.λ = newValue },
+      `/api/set-lambda`);
 
-  ws.onclose = function() {
-    console.log('disconnected');
-  };
+    onParametersChange('input_f_I',
+      (newValue) => { parameters.f_I = newValue },
+      `/api/set-fi`);
 
-  /*
-   * Parameters change handling
-   */
-  onParametersChange('input_L',
-    (newValue) => { parameters._L = newValue },
-    `/api/set-L`);
+    onParametersChange('input_f_E',
+      (newValue) => { parameters.f_E = newValue },
+      `/api/set-fe`);
 
-  onParametersChange('input_lambda',
-    (newValue) => { parameters.λ = newValue },
-    `/api/set-lambda`);
+    onParametersChange('input_node_bandwidth',
+      (newValue) => { parameters.inputNodeBandwidth = newValue },
+      `/api/set-node-bandwidth`);
 
-  onParametersChange('input_f_I',
-    (newValue) => { parameters.f_I = newValue },
-    `/api/set-fi`);
+    onParametersChange('input_ib_size',
+      (newValue) => { parameters.ibSize = newValue },
+      `/api/set-ib-size`);
 
-  onParametersChange('input_f_E',
-    (newValue) => { parameters.f_E = newValue },
-    `/api/set-fe`);
+    // activate all tooltips
+    // see https://getbootstrap.com/docs/5.0/components/tooltips/
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 
-  onParametersChange('input_node_bandwidth',
-    (newValue) => { parameters.inputNodeBandwidth = newValue },
-    `/api/set-node-bandwidth`);
+    const input_lambda = document.getElementById('input_lambda');
+    input_lambda.addEventListener('change', function() {
+      parameters.λ = input_lambda.value;
+      postJSON(`/api/set-lambda?sessionId=${sessionId}`,
+        parseInt(input_lambda.value));
+    });
 
-  onParametersChange('input_ib_size',
-    (newValue) => { parameters.ibSize = newValue },
-    `/api/set-ib-size`);
-
-  // activate all tooltips
-  // see https://getbootstrap.com/docs/5.0/components/tooltips/
-  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  const tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
   });
-
-  const input_lambda = document.getElementById('input_lambda');
-  input_lambda.addEventListener('change', function() {
-    parameters.λ = input_lambda.value;
-    postJSON(`/api/set-lambda?sessionId=${sessionId}`,
-      parseInt(input_lambda.value));
-  });
-
-});
 
 /*
  * Add an event listener on the given parameter id.
