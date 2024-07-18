@@ -11,3 +11,11 @@ span.help {
     margin: 0 1em;
     border-radius: 10px;
 }
+
+ul {
+    list-style-position: inside;
+}
+
+li {
+    margin: 0 0.5em;
+}
