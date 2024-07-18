@@ -42,7 +42,7 @@ import Control.Applicative (asum)
 import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue (TQueue, newTQueueIO, readTQueue)
 import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, readTVarIO, writeTVar)
-import Control.Monad (forever, replicateM)
+import Control.Monad (forever, replicateM, replicateM_)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
 import Control.Monad.Class.MonadSTM (MonadSTM, STM, atomically, retry)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
@@ -54,7 +54,7 @@ import Data.Foldable (for_)
 import Data.List (partition)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.PQueue.Max (MaxQueue)
 import qualified Data.PQueue.Max as PQueue
 import Data.Word (Word64)
@@ -268,11 +268,11 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
           -- Generate IB blocks
           let (numberOfIBsInThisSlot, generator1) =
                 slotsLed generator (getIBFrequency f_I)
-          replicateM numberOfIBsInThisSlot $ produceIB slot
+          replicateM_ numberOfIBsInThisSlot $ produceIB slot
           -- Generate EB blocks
           let (numberOfEBsInThisSlot, generator2) =
                 slotsLed generator1 (getEBFrequency f_E)
-          replicateM numberOfEBsInThisSlot $ produceEB slot
+          replicateM_ numberOfEBsInThisSlot $ produceEB slot
           -- Continue
           loop generator2
     loop initialGenerator
@@ -287,7 +287,7 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
         traceWith tracer (ReceivedEB eb nodeId)
 
   slotsLed generator f =
-    let q = ceiling $ f -- For practical reasons we want this to be a minimal value.
+    let q = ceiling f -- For practical reasons we want this to be a minimal value.
         (nodeLeads, nextGenerator) =
           leadsMultiple generator q nodeStakePercent f
      in (length $ filter id nodeLeads, nextGenerator)
@@ -310,15 +310,14 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
 --
 -- We assume the time to be divided in slots, and the slots to be
 -- grouped into slices of length @_L@. The following diagram
--- illustrates the fact that @slice 5 18 2@ should return @1@, because
--- slice @1@ is @2@ slices before slice @3@, which contains slot @18@.
+-- illustrates the fact that @slice 5 18 2@ should return slide @1@,
+-- i.e. interval @[5, 10)@, because slice @1@ is @2@ slices before
+-- slice @3@, which contains slot @18@.
 --
 -- >
 -- >    0     1     2     3
 -- > |-----|-----|-----|-----|-----|
 -- >                      ↳ s = 18 (slot s is in slice 3)
---
--- In the figure above, @slice _L s x@ will return the interval of slots corresponding to slice 3 [15, 20).
 slice :: NumberOfSlots -> Slot -> NumberOfSlices -> Slice
 slice (NumberOfSlots _L) (Slot s) (NumberOfSlices x) =
   Slice
@@ -373,7 +372,7 @@ runStandalone = do
           , ibSize = NumberOfBits 300
           , f_I = IBFrequency 0.5
           , f_E = EBFrequency 1
-          , initialSeed = 22595838 -- https://xkcd.com/221/. We might want to generate this from the system time, or pass it as parameter.
+          , initialSeed = 22_595_838 -- https://xkcd.com/221/. We might want to generate this from the system time, or pass it as parameter.
           }
   paramsTVar <- newTVarIO defaultParams
   events <- newTQueueIO
@@ -422,7 +421,7 @@ runClock continueTVar = do
 nextSlot :: MonadSTM m => Clock m -> m Slot
 nextSlot clock = atomically $ do
   currentSlot <- readTVar (slotTVar clock)
-  check (currentSlot /= Nothing)
+  check $ isJust currentSlot
   lastReadSlot <- readTVar (lastReadTVar clock)
   check (currentSlot /= lastReadSlot)
   writeTVar (lastReadTVar clock) currentSlot
@@ -499,7 +498,8 @@ register nodeId world = do
 --
 -- In this first iteration we assume the message is broadcast to each node.
 --
--- NOTE: a node will receive it's own message. We could prevent this by including the senders's id in the function type.
+-- NOTE: a node will receive it's own message. We could prevent this
+-- by including the senders's id in the function type.
 sendTo ::
   forall m.
   MonadSTM m =>
@@ -515,14 +515,13 @@ sendTo msg world = atomically $ do
 -- PRECONDITION: The node ID must exist.
 receiveFrom :: forall m. (MonadSTM m, MonadDelay m) => NodeId -> OutsideWorld m -> m Msg
 receiveFrom nodeId world = do
-  m_pqTVar <- fmap (Map.lookup nodeId) $ atomically $ readTVar (pqsTVar world)
+  m_pqTVar <- Map.lookup nodeId <$> readTVarIO (pqsTVar world)
   case m_pqTVar of
     Nothing -> error $ "Node " <> show nodeId <> " does not exist."
     Just pqTVar -> do
       msg <- pop pqTVar
-      owNodeBandwidth <- nodeBandwidth <$> (atomically $ readTVar (paramsTVar world))
-      let msToInt (Microseconds ms) = fromIntegral ms
-      threadDelay $ msToInt $ transmissionTime (size msg) owNodeBandwidth
+      owNodeBandwidth <- nodeBandwidth <$> readTVarIO (paramsTVar world)
+      threadDelay $ fromIntegral $ transmissionTime (size msg) owNodeBandwidth
       pure msg
 
 --------------------------------------------------------------------------------
@@ -551,7 +550,7 @@ storedIBsBy nodeId OutsideWorld{storedIBsTVar} slice = atomically $ do
 -- A priority queue inside a transactional var
 --------------------------------------------------------------------------------
 
-data PQueueTVar m = PQueueTVar {getTQueueTVar :: TVar m (MaxQueue PMsg)}
+newtype PQueueTVar m = PQueueTVar {getTQueueTVar :: TVar m (MaxQueue PMsg)}
 
 -- | Wrapper around 'Msg' to implement the priority needed for the priority queue.
 newtype PMsg = PMsg Msg
@@ -577,7 +576,9 @@ insertPQueue :: MonadSTM m => Msg -> PQueueTVar m -> STM m ()
 insertPQueue msg pqTVar = do
   modifyTVar' (getTQueueTVar pqTVar) (PQueue.insert (PMsg msg))
 
--- | Take the message at the front of the queue (eg the freshest IB), and delete it from the queue. If the queue is empty, blocks until a message arrives.
+-- | Take the message at the front of the queue (eg the freshest IB),
+-- and delete it from the queue. If the queue is empty, blocks until a
+-- message arrives.
 pop :: MonadSTM m => PQueueTVar m -> m Msg
 pop pqTVar = atomically $ do
   queue <- readTVar (getTQueueTVar pqTVar)
@@ -599,7 +600,7 @@ newtype NumberOfBits = NumberOfBits Word
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
 
 newtype Microseconds = Microseconds Word
-  deriving (Generic, Show, Eq, Ord)
+  deriving newtype (Show, Enum, Num, Real, Integral, Eq, Ord)
 
 -- | .
 --
@@ -608,4 +609,4 @@ transmissionTime :: NumberOfBits -> BitsPerSecond -> Microseconds
 transmissionTime (NumberOfBits nr_bits) (BitsPerSecond rate) = Microseconds $ ceiling $ seconds * 1_000_000
  where
   seconds :: Double
-  seconds = (fromIntegral nr_bits) / (fromIntegral rate)
+  seconds = fromIntegral nr_bits / fromIntegral rate
