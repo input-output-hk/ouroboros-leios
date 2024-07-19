@@ -1,3 +1,21 @@
+## 2024-07-19
+
+### Comments on `leios-sim`
+
+Here are a few comments about the `leios-sim` package by @bwbush:
+
+1. I think we should bite the bullet and add a MonadRandom instance to io-classes. Explicitly passing RNGs around makes the code harder to read and refactor.
+2. Even without that, when the code becomes more complicated, we should consider using a monad transformer stack that includes a `MonadRandom` instance.
+3. Along the same lines, we might want to minimize or hide the use of `TVars` and offload that to some State types so functions can live in `MonadState`. Once again, this will let the implementation functions read more abstractly and make later refactoring easier as the implementation evolves.
+4. The unit conversion that we have to do (e.g., seconds to milliseconds) have always bothered me because it would be easy to make a mistake. Having put the unit in `bitsPerSecond` helps somewhat.
+    1. Use one of the time types (or even `Data.Fixed`) instead of a custom `Microseconds` would help somewhat.
+    2. The typechecked dimension packages like [units](https://hackage.haskell.org/package/units) feels like overkill, but maybe they are worth it. My understanding is that these dimensional analysis packages have no runtime overhead: they'd prevent unit errors at compile time.
+5. The use of newtype wrappers was good. We could automatically derive Num instances for those, but that would decrease safety at the expense of increasing readability. (Hence, my comment on units.) I'm not sure.
+6. I think the design does a reasonable job of separating the transport aspects from the logic aspects. We'll probably need a more sophisticated network representations, maybe event separating the network interface from the network itself.
+    1. BTW, I think a big challenge for leios prototyping will be accurately representing network contention between the different leios roles, the base protocol, and the memory pool in high-throughput situations. Even without an adversary, I'm concerned that some parts of the implementation might starve others.
+7. So far as I can tell, the simulation reasonably approximates a simplified Leios.
+8. The complexity and verbosity are okay at this point because it's laying necessary groundwork (subject to refactoring) for the next level of fidelity: it highlights areas of complexity and opportunities for modularization. I think the Leios simulation will need many cycles of refactoring in order to control complexity and leverage modularity.
+
 ## 2024-07-11
 
 ### Deploying simulation in the "cloud"
