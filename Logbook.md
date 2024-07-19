@@ -2,9 +2,9 @@
 
 ### Comments on `leios-sim`
 
-Here are a few comments about the `leios-sim` package by @bwbush:
+Here are a few comments by @bwbush about the `leios-sim` package:
 
-1. I think we should bite the bullet and add a MonadRandom instance to io-classes. Explicitly passing RNGs around makes the code harder to read and refactor.
+1. I think we should bite the bullet and add a `MonadRandom` instance to io-classes. Explicitly passing RNGs around makes the code harder to read and refactor.
 2. Even without that, when the code becomes more complicated, we should consider using a monad transformer stack that includes a `MonadRandom` instance.
 3. Along the same lines, we might want to minimize or hide the use of `TVars` and offload that to some State types so functions can live in `MonadState`. Once again, this will let the implementation functions read more abstractly and make later refactoring easier as the implementation evolves.
 4. The unit conversion that we have to do (e.g., seconds to milliseconds) have always bothered me because it would be easy to make a mistake. Having put the unit in `bitsPerSecond` helps somewhat.
