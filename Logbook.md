@@ -16,6 +16,14 @@ Here are a few comments by @bwbush about the `leios-sim` package:
 7. So far as I can tell, the simulation reasonably approximates a simplified Leios.
 8. The complexity and verbosity are okay at this point because it's laying necessary groundwork (subject to refactoring) for the next level of fidelity: it highlights areas of complexity and opportunities for modularization. I think the Leios simulation will need many cycles of refactoring in order to control complexity and leverage modularity.
 
+### Document simulation
+
+Added some documentation to the Leios simulator:
+
+* Added _tooltips_ to document the various parameters available
+* Added readonly fields computing various aggregates from the simulation's data: Throughput, latency to inclusion in EB, dropped IB rate
+* Added a [comment](https://github.com/input-output-hk/ouroboros-leios/issues/7#issuecomment-2236521300) on the simulator issue as I got perplexed with the throughput computation's result: I might be doing something wrong and not computing what I think I am computing as the results are inconsistent. I think this comes from the fact we are simulation 2 nodes so the throughput aggregates the 2 nodes' and should be assigned individually to each one, perhaps more as a distribution?
+
 ## 2024-07-11
 
 ### Deploying simulation in the "cloud"

@@ -287,10 +287,14 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
         traceWith tracer (ReceivedEB eb nodeId)
 
   slotsLed generator f =
-    let q = ceiling f -- For practical reasons we want this to be a minimal value.
-        (nodeLeads, nextGenerator) =
-          leadsMultiple generator q nodeStakePercent f
-     in (length $ filter id nodeLeads, nextGenerator)
+    let
+      -- For practical reasons we want this to be a minimal value.
+      -- NOTE: What practical reasons?
+      q = ceiling f
+      (nodeLeads, nextGenerator) =
+        leadsMultiple generator q nodeStakePercent f
+     in
+      (length $ filter id nodeLeads, nextGenerator)
 
   produceIB slot = do
     Parameters{ibSize} <- getParams world
