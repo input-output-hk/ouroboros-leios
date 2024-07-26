@@ -32,9 +32,6 @@ jobs:
     - name: 🏗️ Build `exe:leios`
       run: |
         nix build --show-trace --accept-flake-config .#leios
-    - name: 🏗️ Build `test:leios-sim-test`
-      run: |
-        nix build --show-trace --accept-flake-config .#leios-sim-test
     - name: 🏗️ Build `exe:ouroboros-net-vis`
       run: |
         nix build --show-trace --accept-flake-config .#ouroboros-net-vis
