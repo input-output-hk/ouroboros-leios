@@ -1,3 +1,40 @@
+## 2024-07-26
+
+### Running `ouroborous-net-viz` in the browser
+
+It is relatively straightforward to run GTK applications like `ouroborous-net-viz` in a web browser. Here is one recipe.
+
+Start a broadway daemon:
+
+```console
+$ nix develop
+
+$ broadwayd --port 8282 :5
+Listening on /run/user/120065/broadway6.socket
+```
+
+In another terminal window, run the visualizer using the broadway backend, ignoring the messages:
+
+```console
+$ GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 nix run .#ouroboros-net-vis -- p2p-1
+/nix/store/aw2fw9ag10wr9pf0qk4nk5sxi0q0bn56-glibc-2.37-8/lib/libc.so.6: version `GLIBC_2.38' not found (required by /nix/store/rgafsh9w6yrklqbmz6gb0cvdy10ja9mv-libxfce4util-4.18.2/lib/libxfce4util.so.7)
+Failed to load module: /nix/store/s9ah4nlrxxbmzzzwqp3rf43cyr0cwnv7-xfconf-4.18.3/lib/gio/modules/libxfconfgsettingsbackend.so
+/nix/store/aw2fw9ag10wr9pf0qk4nk5sxi0q0bn56-glibc-2.37-8/lib/libc.so.6: version `GLIBC_2.38' not found (required by /nix/store/nf5mmvq3cayv4z3jcnhapiqjzh3brcd2-gvfs-1.54.1/lib/gio/modules/libgvfsdbus.so)
+Failed to load module: /nix/store/nf5mmvq3cayv4z3jcnhapiqjzh3brcd2-gvfs-1.54.1/lib/gio/modules/libgvfsdbus.so
+```
+
+Visit `localhost:8282` in the browser.
+
+Here is a video: [![image](https://github.com/user-attachments/assets/88af2794-148a-49d8-8164-ba8790b6b3de)](https://vimeo.com/990683045/74a915afd2?share=copy)
+
+We'd have to add session management and UI components to make this generally useful. Alternatively, it could be packaged as a Docker image.
+
+### Dependency upgrades, Nix, and CI
+
+- We upgraded [ouroboros-net-sim](./simulation/) to use the latest `io-sim`, `io-classes`, and `si-timers` with very few changes to the source code and with the addition of a new `TimeCompat` module.
+- A nix shell and derivations was also added for the targets in the project.
+- Builds and tests were added to the CI
+
 ## 2024-07-19
 
 ### Comments on `leios-sim`
