@@ -6,6 +6,7 @@ RUN apt-get update -y && \
     apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf
 
 COPY ./cabal.project /app/cabal.project
+RUN sed -i -e '/^  simulation$/d' /app/cabal.project
 
 RUN mkdir /app/leios-sim
 
@@ -18,7 +19,7 @@ RUN cabal build --dependencies-only all
 
 COPY . /app
 
-RUN cabal build all
+RUN cabal build exe:leios
 
 # Make final binary a bit smaller
 RUN strip dist-newstyle/build/x86_64-linux/ghc-9.6.3/leios-sim-0.1.0.0/x/leios/build/leios/leios
