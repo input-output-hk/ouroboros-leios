@@ -31,13 +31,13 @@ jobs:
           experimental-features = nix-command flakes
     - name: 🏗️ Build `exe:leios`
       run: |
-        nix build --show-trace .#leios
+        nix build --show-trace --accept-flake-config .#leios
     - name: 🏗️ Build `test:leios-sim-test`
       run: |
-        nix build --show-trace .#leios-sim-test
+        nix build --show-trace --accept-flake-config .#leios-sim-test
     - name: 🏗️ Build `exe:ouroboros-net-vis`
       run: |
-        nix build --show-trace .#ouroboros-net-vis
+        nix build --show-trace --accept-flake-config .#ouroboros-net-vis
         
   tests:
     if: true
@@ -58,7 +58,7 @@ jobs:
           experimental-features = nix-command flakes
     - name: 🔬 Test with `leios-sim-test`
       run: |
-        nix run .#leios-sim-test
+        nix run --accept-flake-config .#leios-sim-test
 
   build-docusaurus:
     runs-on: ubuntu-22.04
