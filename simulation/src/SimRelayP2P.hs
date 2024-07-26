@@ -10,7 +10,7 @@ import           Data.List
 import           Data.Foldable
 import qualified Data.Map.Strict as Map
 
-import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadAsync
 import Control.Tracer as Tracer
 

@@ -12,7 +12,7 @@ import           Data.Functor
 import           Data.List
 import           Data.Ord
 
-import           Control.Monad.Class.MonadTime (Time, DiffTime)
+import           Control.Monad.Class.MonadTime.SI (Time, DiffTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 

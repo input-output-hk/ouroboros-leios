@@ -13,7 +13,7 @@ import Data.Array.Unboxed as Array
 
 import Control.Monad
 import Control.Monad.ST
-import Control.Monad.Class.MonadTime (DiffTime)
+import Control.Monad.Class.MonadTime.SI (DiffTime)
 import qualified System.Random as Random
 import           System.Random (StdGen)
 

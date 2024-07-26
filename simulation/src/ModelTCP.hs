@@ -25,7 +25,7 @@ import           Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.PQueue.Prio.Min as PQ
 import           Data.PQueue.Prio.Min (MinPQueue)
 
-import Control.Monad.Class.MonadTime (Time(Time), DiffTime, addTime)
+import Control.Monad.Class.MonadTime.SI (Time(Time), DiffTime, addTime)
 import Control.Exception (assert)
 
 
