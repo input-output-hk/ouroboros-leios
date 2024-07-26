@@ -8,7 +8,7 @@ import           Data.Map (Map)
 import qualified Data.Set as Set
 import           Data.Set (Set)
 
-import           Control.Monad.Class.MonadTime (Time, diffTime)
+import           Control.Monad.Class.MonadTime.SI (Time, diffTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 

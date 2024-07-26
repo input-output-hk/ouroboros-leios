@@ -11,7 +11,7 @@ import           Data.Set (Set)
 import qualified Data.PQueue.Min as PQ
 import           Data.PQueue.Min (MinQueue)
 
-import           Control.Monad.Class.MonadTime (Time, addTime)
+import           Control.Monad.Class.MonadTime.SI (Time, addTime)
 import           Control.Exception (assert)
 
 import qualified Graphics.Rendering.Cairo as Cairo

@@ -7,3 +7,4 @@ report/leios-design.toc
 dist-newstyle/
 \#*
 .\#*
+.pre-commit-config.yaml

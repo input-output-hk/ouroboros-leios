@@ -9,7 +9,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Ix
 import           Data.Array.Unboxed
 
-import           Control.Monad.Class.MonadTime (Time, DiffTime, diffTime)
+import           Control.Monad.Class.MonadTime.SI (Time, DiffTime, diffTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
