@@ -1,3 +1,6 @@
+namespace Leios.Primitives
+
+
 structure ByteString where
   bytes : ByteArray
 deriving Inhabited
@@ -51,3 +54,6 @@ instance : ToString ByteString where
 
 instance : Repr ByteString where
   reprPrec x _ := "#" ++ ByteString.toHexString x
+
+
+end Leios.Primitives
