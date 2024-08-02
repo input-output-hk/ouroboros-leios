@@ -28,7 +28,6 @@ instance : CryptoHashable Proof where
   hash _ := CryptoHash.mk 0
 
 
-
 structure Variables where
   Keys : HashMap Party (HashSet PublicKey)
   T : HashMap (PublicKey × DomainValue) (RangeValue × HashSet Proof)

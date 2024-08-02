@@ -1,8 +1,10 @@
 import Lean.Data
 import Leios.Crypto
+import Leios.Primitives
 
 open Lean (HashSet)
 open Leios.Crypto (CryptoHash CryptoHashable)
+open Leios.Primitives (Encode)
 
 
 namespace Leios.BLS
@@ -31,8 +33,8 @@ instance : CryptoHashable Proof where
 
 
 structure Signature (message : Type) where
-  bytes : UInt64  -- FIXME: Replace with a fixed-length bytestring.
-deriving Repr
+  bytes : Nat
+deriving Repr, BEq, Hashable
 
 instance : BEq (Signature message) where
   beq x y := BEq.beq x.bytes y.bytes
@@ -41,7 +43,7 @@ instance : Hashable (Signature message) where
   hash := Hashable.hash ∘ Signature.bytes
 
 instance : CryptoHashable (Signature message) where
-  hash := CryptoHash.mk ∘ Signature.bytes
+  hash := CryptoHash.mk ∘ Hashable.hash ∘ Signature.bytes
 
 
 def KeyGen : Param → SecretKey × VerificationKey × Proof :=
@@ -52,11 +54,11 @@ def Check : VerificationKey → Proof → Bool :=
   sorry
 
 
-def Sign : SecretKey → message → Signature message :=
+def Sign [Encode message] : SecretKey → message → Signature message :=
   sorry
 
 
-def Ver : VerificationKey → message → Signature message → Bool :=
+def Ver [Encode message] : VerificationKey → message → Signature message → Bool :=
   sorry
 
 

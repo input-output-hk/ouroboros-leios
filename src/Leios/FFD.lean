@@ -36,15 +36,15 @@ instance : Adversary header body NullAdversary where
   adversarialBodies _ _ _ := pure default
 
 
-def hasHdr [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
+def hasHdr [MonadReaderOf (Variables header body) m] : Party → MsgID → m Bool :=
   sorry
 
 
-def hashPoE [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
+def hashPoE [MonadReaderOf (Variables header body) m] : Party → MsgID → m Bool :=
   sorry
 
 
-def hasBdy [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
+def hasBdy [MonadReaderOf (Variables header body) m] : Party → MsgID → m Bool :=
   sorry
 
 

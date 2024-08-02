@@ -7,7 +7,7 @@ namespace Leios.Crypto
 
 
 structure CryptoHash (a : Type) where
-  bytes : UInt64  -- FIXME: Replace with a fixed-length bytestring.
+  bytes : UInt64
 deriving Repr, BEq, Hashable
 
 namespace CryptoHash

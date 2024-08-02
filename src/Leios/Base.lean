@@ -53,11 +53,6 @@ instance : CryptoHashable Party where
 
 def Parties := HashSet Party
 
-/-
-instance : Repr Parties where
-  reprPrec := Repr.reprPrec ∘ HashSet.toList
--/
-
 instance : BEq Parties where
   beq x y := BEq.beq x.toList y.toList
 
@@ -65,11 +60,14 @@ instance : Hashable Parties where
   hash := Hashable.hash ∘ HashSet.toList
 
 
-def Stake := Nat
-deriving Repr, BEq, Hashable
+def Stake := Float
+deriving Repr, BEq
+
+instance : Hashable Stake where
+  hash (s : Float) := Float.toUInt64 $ Nat.toFloat (UInt64.size - 1) * s
 
 instance : CryptoHashable Stake where
-  hash := CryptoHash.mk ∘ UInt64.ofNat
+  hash (s : Float) := CryptoHash.mk ∘ Float.toUInt64 $ Nat.toFloat (UInt64.size - 1) * s
 
 
 end Leios.Base

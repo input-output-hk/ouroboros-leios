@@ -5,19 +5,17 @@ import Leios.Crypto
 open Leios.Base (Party Slot Stake)
 open Leios.BLS (KeyGen Signature VerificationKey)
 open Leios.Crypto (CryptoHash CryptoHashable)
+open Leios.Primitives (Encode Encoding)
 
 
 namespace Leios.Vote
 
 
 structure Parameters where
+  H : Encoding → Nat
+  T : Float → Stake → Nat
   mv : Nat
   kv : Nat
-deriving Repr
-
-
-def pSuccess (f : Float) (s : Nat) : Float :=
-  1 - (1 - f) ^ s.toFloat
 
 
 structure ElectionID where
@@ -68,11 +66,11 @@ def VoteCount : x → Stake → Nat :=
 export Leios.BLS (KeyGen)
 
 
-def GenVote : ElectionId → message → SecretKey → Stake → Vote message :=
+def GenVote [Encode message] : ElectionId → message → SecretKey → Stake → Vote message :=
   sorry
 
 
-def VerifyVote : ElectionID → message → VerificationKey → Stake → Vote message → Bool :=
+def VerifyVote [Encode message] : ElectionID → message → VerificationKey → Stake → Vote message → Bool :=
   sorry
 
 
