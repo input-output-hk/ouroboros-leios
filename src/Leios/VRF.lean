@@ -1,9 +1,10 @@
 import Lean.Data
 import Leios.Base
+import Leios.Crypto
 
 open Lean (HashMap HashSet)
-open Leios.Base
-
+open Leios.Base (Party)
+open Leios.Crypto (CryptoHash CryptoHashable)
 
 namespace Leios.VRF
 
@@ -22,6 +23,10 @@ deriving Repr, BEq, Hashable
 
 structure Proof where
 deriving Repr, BEq, Hashable
+
+instance : CryptoHashable Proof where
+  hash _ := CryptoHash.mk 0
+
 
 
 structure Variables where

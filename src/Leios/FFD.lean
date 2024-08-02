@@ -2,8 +2,8 @@ import Lean.Data
 import Leios.Messages
 
 open Lean (HashMap HashSet)
-open Leios.Base
-open Leios.Messages
+open Leios.Base (Parties Slot)
+open Leios.Messages (MsgID)
 
 
 namespace Leios.FFD
@@ -16,63 +16,63 @@ structure Parameters where
 deriving Repr, BEq
 
 
-structure Variables (Header : Type) (Body : Type) where
-  hdrs [BEq Header] [Hashable Header] : HashSet (Header × Slot × Parties)
-  bdys [BEq Header] [Hashable Header] [BEq Body] [Hashable Body] : HashSet (Header × Body × Slot × Parties)
-  prefHdr : HashMap mid Header
+structure Variables (header : Type) (body : Type) where
+  hdrs [BEq header] [Hashable header] : HashSet (header × Slot × Parties)
+  bdys [BEq header] [Hashable header] [BEq body] [Hashable body] : HashSet (header × body × Slot × Parties)
+  prefHdr : HashMap MsgID header
 deriving Inhabited
 
 
-class Adversary (Header : Type) (Body : Type) (s : Type) where
-  adversarialHeaders [Monad m] [MonadStateOf s m] [BEq Header] [Hashable Header] : Parameters → Slot → Party → m (HashSet Header)
-  adversarialBodies [Monad m] [MonadStateOf s m] [BEq Body] [Hashable Body] : Parameters → Slot → Party → m (HashSet Body)
+class Adversary (header : Type) (body : Type) (s : Type) where
+  adversarialheaders [Monad m] [MonadStateOf s m] [BEq header] [Hashable header] : Parameters → Slot → Party → m (HashSet header)
+  adversarialBodies [Monad m] [MonadStateOf s m] [BEq body] [Hashable body] : Parameters → Slot → Party → m (HashSet body)
 
 
 def NullAdversary := Unit
 deriving Repr, Inhabited
 
-instance : Adversary Header Body NullAdversary where
-  adversarialHeaders _ _ _ := pure default
+instance : Adversary header body NullAdversary where
+  adversarialheaders _ _ _ := pure default
   adversarialBodies _ _ _ := pure default
 
 
-def hasHdr [MonadReaderOf (Variables Header Body) m] : Party → mid → m Bool :=
+def hasHdr [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
   sorry
 
 
-def hashPoE [MonadReaderOf (Variables Header Body) m] : Party → mid → m Bool :=
+def hashPoE [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
   sorry
 
 
-def hasBdy [MonadReaderOf (Variables Header Body) m] : Party → mid → m Bool :=
+def hasBdy [MonadReaderOf (Variables header body) m] : Party → mid → m Bool :=
   sorry
 
 
-def HdrsAdd [MonadStateOf (Variables Header Body) m] : Header → Slot → Party → m Unit :=
+def HdrsAdd [MonadStateOf (Variables header body) m] : header → Slot → Party → m Unit :=
   sorry
 
 
-def BdysAdd [MonadStateOf (Variables Header Body) m] : Header → Body → Slot → Party → m Unit :=
+def BdysAdd [MonadStateOf (Variables header body) m] : header → body → Slot → Party → m Unit :=
   sorry
 
 
-def newerBdys [MonadReaderOf (Variables Header Body) m] : Header → m Nat :=
+def newerBdys [MonadReaderOf (Variables header body) m] : header → m Nat :=
   sorry
 
 
-def DiffFB [MonadStateOf (Variables Header Body) m] : Parameters → Slot → Header → IB → m Unit :=
+def DiffFB [MonadStateOf (Variables header body) m] : Parameters → Slot → header → IB → m Unit :=
   sorry
 
 
-def DiffHdr [MonadStateOf (Variables Header Body) m] : Parameters → Slot → Header → m Unit :=
+def DiffHdr [MonadStateOf (Variables header body) m] : Parameters → Slot → header → m Unit :=
   sorry
 
 
-def FetchHdrs [BEq Header] [Hashable Header] [Adversary Header Body a] [MonadReaderOf (Variables Header Body × a) m]: Party → m (HashSet Header) :=
+def FetchHdrs [BEq header] [Hashable header] [Adversary header body a] [MonadReaderOf (Variables header body × a) m]: Party → m (HashSet header) :=
   sorry
 
 
-def FetchBdys [BEq Body] [Hashable Body] [Adversary Header Body a] [MonadReaderOf (Variables Header Body × a) m] : Party → m (HashSet Body) :=
+def FetchBdys [BEq body] [Hashable body] [Adversary header body a] [MonadReaderOf (Variables header body × a) m] : Party → m (HashSet body) :=
   sorry
 
 

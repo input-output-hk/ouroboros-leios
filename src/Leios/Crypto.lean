@@ -59,11 +59,4 @@ instance : CryptoHashable ByteString where
   hash := CryptoHash.mk ∘ ByteArray.hash ∘ ByteString.bytes
 
 
-structure LotteryProof where
-deriving Repr, BEq, Hashable
-
-instance : CryptoHashable LotteryProof where
-  hash _ := CryptoHash.mk 0
-
-
 end Leios.Crypto

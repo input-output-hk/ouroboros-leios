@@ -2,25 +2,28 @@ import Leios.Base
 import Leios.BLS
 import Leios.Crypto
 import Leios.Primitives
+import Leios.Vote
+import Leios.VRF
 
-open Leios.Crypto (CryptoHash CryptoHashable LotteryProof)
-open Leios.Base
+open Leios.Crypto (CryptoHash CryptoHashable)
+open Leios.Base (Party Slot Tx)
 open Leios.BLS (Signature)
-open Leios.Primitives
+open Leios.Vote (ElectionID Vote)
+open Leios.VRF (Proof)
 
 
 namespace Leios.Messages
 
 
-structure mid where
+structure MsgID where
   slot : Slot
   party : Party
 deriving Repr, BEq, Hashable
 
 
-structure Message (Header : Type) (Body : Type) where
-  msgID : Header → mid
-  matche : Header → Body → Bool
+structure Message (header : Type) (body : Type) where
+  msgID : header → MsgID
+  matche : header → body → Bool
 
 
 namespace IB
@@ -35,9 +38,9 @@ namespace IB
   structure Header where
     slot : Slot
     party : Party
-    proof : LotteryProof
+    proof : Proof
     bodyHash : CryptoHash Body
-    signature : Signature
+    signature : Signature (Slot × Party × Proof × CryptoHash Body)
   deriving Repr, BEq, Hashable
 
   instance : CryptoHashable Header where
@@ -69,7 +72,7 @@ instance : CryptoHashable IB where
 
 
 inductive EB where
-| mk : Slot → Party → LotteryProof → List (CryptoHash IB) → List (CryptoHash EB) → EB
+| mk : Slot → Party → Proof → List (CryptoHash IB) → List (CryptoHash EB) → EB
 deriving Repr, BEq, Hashable
 
 instance : CryptoHashable EB where
@@ -92,7 +95,7 @@ namespace EB
     match eb with
     | mk _ p _ _ _ => p
 
-  def proof (eb : EB) : LotteryProof :=
+  def proof (eb : EB) : Proof :=
     match eb with
     | mk _ _ p _ _ => p
 
@@ -112,23 +115,23 @@ def EBMessage : Message EB Unit where
   matche _ _ := true
 
 
-structure Vote where
-  slot : Slot
-  voter : Party
+structure VoteEB where
+  eid : ElectionID
   ebHash : CryptoHash EB
+  vote : Vote (CryptoHash EB)
 deriving Repr, BEq, Hashable
 
-instance : CryptoHashable Vote where
+instance : CryptoHashable VoteEB where
   hash
-  | Vote.mk slot voter ebHash =>
+  | VoteEB.mk eid ebHash vote =>
     CryptoHash.castHash
       $ CryptoHashable.hash
-      $ Prod.mk slot
-      $ Prod.mk voter ebHash
+      $ Prod.mk eid
+      $ Prod.mk ebHash vote
 
-def VoteMessage : Message Vote Unit where
+def VoteMessage : Message VoteEB Unit where
   msgID
-  | Vote.mk slot party _ => ⟨ slot , party ⟩
+  | VoteEB.mk eid _ _ => ⟨ eid.slot , eid.party ⟩
   matche _ _ := true
 
 

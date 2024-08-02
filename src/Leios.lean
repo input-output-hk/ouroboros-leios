@@ -1,4 +1,5 @@
 import Leios.Base
+import Leios.BLS
 import Leios.Crypto
 import Leios.FFD
 import Leios.Messages

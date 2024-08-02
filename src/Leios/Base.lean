@@ -65,4 +65,11 @@ instance : Hashable Parties where
   hash := Hashable.hash ∘ HashSet.toList
 
 
+def Stake := Nat
+deriving Repr, BEq, Hashable
+
+instance : CryptoHashable Stake where
+  hash := CryptoHash.mk ∘ UInt64.ofNat
+
+
 end Leios.Base
