@@ -59,14 +59,6 @@ instance : CryptoHashable ByteString where
   hash := CryptoHash.mk ∘ ByteArray.hash ∘ ByteString.bytes
 
 
-structure Signature where
-  bytes : UInt64  -- FIXME: Replace with a fixed-length bytestring.
-deriving Repr, BEq, Hashable
-
-instance : CryptoHashable Signature where
-  hash := CryptoHash.mk ∘ Signature.bytes
-
-
 structure LotteryProof where
 deriving Repr, BEq, Hashable
 

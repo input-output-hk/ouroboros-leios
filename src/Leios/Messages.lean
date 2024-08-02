@@ -1,62 +1,66 @@
 import Leios.Base
+import Leios.BLS
 import Leios.Crypto
 import Leios.Primitives
 
-open Leios.Crypto (CryptoHash CryptoHashable LotteryProof Signature)
+open Leios.Crypto (CryptoHash CryptoHashable LotteryProof)
 open Leios.Base
+open Leios.BLS (Signature)
 open Leios.Primitives
 
 
 namespace Leios.Messages
 
 
-structure Body where
-  txs : List Tx
-deriving Repr, BEq, Hashable
-
-
-instance : CryptoHashable Body where
-  hash := CryptoHash.castHash ∘ CryptoHashable.hash ∘ Body.txs
-
-
-structure MsgID where
+structure mid where
   slot : Slot
   party : Party
 deriving Repr, BEq, Hashable
 
 
-structure Header where
-  slot : Slot
-  party : Party
-  proof : LotteryProof
-  bodyHash : CryptoHash Body
-  signature : Signature
-deriving Repr, BEq, Hashable
+structure Message (Header : Type) (Body : Type) where
+  msgID : Header → mid
+  matche : Header → Body → Bool
 
-instance : CryptoHashable Header where
-  hash
-  | Header.mk slot party proof bodyHash signature =>
-      CryptoHash.castHash
-        $ CryptoHashable.hash
-        $ Prod.mk slot
-        $ Prod.mk party
-        $ Prod.mk proof
-        $ Prod.mk bodyHash signature
 
-namespace Header
+namespace IB
 
-  def msgID (h : Header) : MsgID :=
-    ⟨ Header.slot h , Header.party h ⟩
+  structure Body where
+    txs : List Tx
+  deriving Repr, BEq, Hashable
 
-  def matche (h : Header) (b : Body) : Prop :=
-    Header.bodyHash h = CryptoHashable.hash b
+  instance : CryptoHashable Body where
+    hash := CryptoHash.castHash ∘ CryptoHashable.hash ∘ Body.txs
 
-end Header
+  structure Header where
+    slot : Slot
+    party : Party
+    proof : LotteryProof
+    bodyHash : CryptoHash Body
+    signature : Signature
+  deriving Repr, BEq, Hashable
 
+  instance : CryptoHashable Header where
+    hash
+    | Header.mk slot party proof bodyHash signature =>
+        CryptoHash.castHash
+          $ CryptoHashable.hash
+          $ Prod.mk slot
+          $ Prod.mk party
+          $ Prod.mk proof
+          $ Prod.mk bodyHash signature
+
+  def IBMessage : Message Header Body where
+    msgID
+    | Header.mk slot party _ _ _ => ⟨ slot , party ⟩
+    matche header body :=
+      Header.bodyHash header == CryptoHashable.hash body
+
+end IB
 
 structure IB where
-  header : Header
-  body : Body
+  header : IB.Header
+  body : IB.Body
 deriving Repr, BEq, Hashable
 
 instance : CryptoHashable IB where
@@ -102,15 +106,30 @@ namespace EB
 
 end EB
 
+def EBMessage : Message EB Unit where
+  msgID
+  | EB.mk slot party _ _ _ => ⟨ slot , party ⟩
+  matche _ _ := true
+
 
 structure Vote where
+  slot : Slot
   voter : Party
   ebHash : CryptoHash EB
 deriving Repr, BEq, Hashable
 
 instance : CryptoHashable Vote where
   hash
-  | Vote.mk voter ebHash => CryptoHash.castHash $ CryptoHashable.hash $ Prod.mk voter ebHash
+  | Vote.mk slot voter ebHash =>
+    CryptoHash.castHash
+      $ CryptoHashable.hash
+      $ Prod.mk slot
+      $ Prod.mk voter ebHash
+
+def VoteMessage : Message Vote Unit where
+  msgID
+  | Vote.mk slot party _ => ⟨ slot , party ⟩
+  matche _ _ := true
 
 
 end Leios.Messages
