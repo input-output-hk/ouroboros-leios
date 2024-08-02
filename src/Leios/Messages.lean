@@ -1,9 +1,9 @@
+import Leios.Base
 import Leios.Crypto
-import Leios.Praos
 import Leios.Primitives
 
 open Leios.Crypto (CryptoHash CryptoHashable LotteryProof Signature)
-open Leios.Praos
+open Leios.Base
 open Leios.Primitives
 
 
@@ -12,10 +12,17 @@ namespace Leios.Messages
 
 structure Body where
   txs : List Tx
-deriving Repr
+deriving Repr, BEq, Hashable
+
 
 instance : CryptoHashable Body where
   hash := CryptoHash.castHash ∘ CryptoHashable.hash ∘ Body.txs
+
+
+structure MsgID where
+  slot : Slot
+  party : Party
+deriving Repr, BEq, Hashable
 
 
 structure Header where
@@ -24,7 +31,7 @@ structure Header where
   proof : LotteryProof
   bodyHash : CryptoHash Body
   signature : Signature
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable Header where
   hash
@@ -38,7 +45,7 @@ instance : CryptoHashable Header where
 
 namespace Header
 
-  def msgID (h : Header) : Slot × Party :=
+  def msgID (h : Header) : MsgID :=
     ⟨ Header.slot h , Header.party h ⟩
 
   def matche (h : Header) (b : Body) : Prop :=
@@ -50,7 +57,7 @@ end Header
 structure IB where
   header : Header
   body : Body
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable IB where
   hash
@@ -59,7 +66,7 @@ instance : CryptoHashable IB where
 
 inductive EB where
 | mk : Slot → Party → LotteryProof → List (CryptoHash IB) → List (CryptoHash EB) → EB
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable EB where
   hash
@@ -99,7 +106,7 @@ end EB
 structure Vote where
   voter : Party
   ebHash : CryptoHash EB
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable Vote where
   hash

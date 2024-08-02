@@ -3,7 +3,7 @@ namespace Leios.Primitives
 
 structure ByteString where
   bytes : ByteArray
-deriving Inhabited
+deriving Hashable, Inhabited
 
 private def toHexDigit : UInt8 → Char
   |  0 => '0'
@@ -49,11 +49,14 @@ namespace ByteString
 
 end ByteString
 
-instance : ToString ByteString where
-  toString x := String.fromUTF8Unchecked x.bytes
-
 instance : Repr ByteString where
   reprPrec x _ := "#" ++ ByteString.toHexString x
+
+instance : BEq ByteString where
+  beq x y := BEq.beq x.toList y.toList
+
+instance : ToString ByteString where
+  toString x := String.fromUTF8Unchecked x.bytes
 
 
 end Leios.Primitives

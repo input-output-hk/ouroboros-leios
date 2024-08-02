@@ -8,7 +8,7 @@ namespace Leios.Crypto
 
 structure CryptoHash (a : Type) where
   bytes : UInt64  -- FIXME: Replace with a fixed-length bytestring.
-deriving Repr
+deriving Repr, BEq, Hashable
 
 namespace CryptoHash
 
@@ -61,14 +61,14 @@ instance : CryptoHashable ByteString where
 
 structure Signature where
   bytes : UInt64  -- FIXME: Replace with a fixed-length bytestring.
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable Signature where
   hash := CryptoHash.mk ∘ Signature.bytes
 
 
 structure LotteryProof where
-deriving Repr
+deriving Repr, BEq, Hashable
 
 instance : CryptoHashable LotteryProof where
   hash _ := CryptoHash.mk 0
