@@ -73,6 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // queue.
   var queuedIBs = [];
 
+  // We keep track of recently endorsed IBs to avoid double counting
+  var recently_endorsed_IB_UUIDs = [];
+
   // accumulate the size of all endorsed IBs.
   var total_endorsed_data = 0;
   var total_dropped_data = 0;
@@ -133,12 +136,15 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         }
         case 'ReceivedEB': {
+          var new_endorsed_IBs = logData.receivedEB.eb_linked_IBs.filter(ib => !recently_endorsed_IB_UUIDs.includes(ib.ib_UUID));
 
-          if (logData.receivedEB.eb_linked_IBs.length != 0) {
-            queuedIBs = _.differenceWith(queuedIBs, logData.receivedEB.eb_linked_IBs, _.isEqual);
-            total_endorsed_data += logData.receivedEB.eb_linked_IBs.map(ib => ib.ib_size).reduce((a, b) => a + b, 0);
-            total_endorsed_IBs += logData.receivedEB.eb_linked_IBs.length;
-            total_endorsed_latency += logData.receivedEB.eb_linked_IBs.map(ib => logData.receivedEB.eb_slot - ib.ib_slot).reduce((a, b) => a + b, 0);
+          if (new_endorsed_IBs.length != 0) {
+            queuedIBs = _.differenceWith(queuedIBs, new_endorsed_IBs, _.isEqual);
+            total_endorsed_data += new_endorsed_IBs.map(ib => ib.ib_size).reduce((a, b) => a + b, 0);
+            total_endorsed_IBs += new_endorsed_IBs.length;
+            total_endorsed_latency += new_endorsed_IBs.map(ib => logData.receivedEB.eb_slot - ib.ib_slot).reduce((a, b) => a + b, 0);
+            // TODO find a reasonable lenght to truncate to
+            recently_endorsed_IB_UUIDs = recently_endorsed_IB_UUIDs.concat(new_endorsed_IBs.map(ib => ib.ib_UUID)).slice(-500);
           }
 
           // We know that future EBs will link IBs whose slots are

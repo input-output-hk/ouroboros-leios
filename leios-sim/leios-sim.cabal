@@ -43,6 +43,7 @@ library
     , http-types
     , text
     , time
+    , uuid
     , wai
     , wai-extra
     , wai-middleware-static
