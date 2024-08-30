@@ -73,15 +73,36 @@ let
     buildInputs = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta ];
   };
 
+  leiosSpec = customAgda.agdaPackages.mkDerivation {
+    inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
+    pname = "leios-spec";
+    name = "leios-spec";  # FIXME: Why is this entry needed?
+    src = ../formal-spec;
+    meta = { };
+    preConfigure = ''
+      cat << EOI > Everything.agda
+      module Everything where
+        import CategoricalCrypto
+        import Leios.Network
+        import Leios.SimpleSpec
+      EOI
+      ls
+    '';
+    libraryFile = "formal-spec/leios-spec.agda-lib";
+    everythingFile = "Everything.agda";
+    buildInputs = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta formalLedger ];
+  };
+
   agdaWithPkgs = p: customAgda.agda.withPackages { pkgs = p; ghc = pkgs.ghc; };
 
 in
-rec {
-  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta formalLedger;
+{
+  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta formalLedger ;
   agdaWithDeps = agdaWithPkgs [
     agdaStdlib
     agdaStdlibClasses
     agdaStdlibMeta
     formalLedger
   ];
+  leiosSpec = leiosSpec;
 }

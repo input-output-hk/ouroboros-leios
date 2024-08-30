@@ -1,3 +1,5 @@
+{-# OPTIONS --allow-unsolved-metas #-}
+
 module Leios.SimpleSpec where
 
 open import Ledger.Prelude
