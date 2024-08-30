@@ -7,8 +7,5 @@ let
 in
 
 [
-  (
-    # Docs for project.flake: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#mkhaskellprojectoutflake
-    project.flake
-  )
+  (project.flake)
 ]

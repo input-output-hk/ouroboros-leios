@@ -3,6 +3,6 @@ depend:
   standard-library
   standard-library-classes
   standard-library-meta
+  formal-ledger
 include:
   .
-  ../../formal-ledger-specifications/src/
