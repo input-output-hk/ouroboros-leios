@@ -1,3 +1,30 @@
+## 2024-08-30
+
+### Nix and CI support for Leios specification
+
+The Nix flake now builds the Leios specification and the libraries upon which it depends. The type checking of the spec is now added to the CI.
+
+```console
+$ nix develop
+
+Welcome to Ouroboros Leios!
+
+Locations of Agda libraries:
+  /nix/store/1yxiwwy44xxxgzdmvyjizq53w9cfinkn-standard-library-2.0/standard-library.agda-lib
+  /nix/store/ppsczpm7l2gx1zd3cx2brv49069krzzh-agda-stdlib-classes-2.0/standard-library-classes.agda-lib
+  /nix/store/gkci6kgv4v9qw2rh5gc0s26g53b253jy-agda-stdlib-meta-2.0/standard-library-meta.agda-lib
+  /nix/store/2gk6rvsplxww4i8dnflxbd319lfxdcvv-formal-ledger-1d77a35a/formal-ledger.agda-lib
+
+Run 'emacs' to edit .agda files.
+
+
+Type 'info' to see what's inside this shell.
+
+$ cd formal-spec
+
+$ emacs Leios/SimpleSpec.agda
+```
+
 ## 2024-07-26
 
 ### Running `ouroborous-net-viz` in the browser
