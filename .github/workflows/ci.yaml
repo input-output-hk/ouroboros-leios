@@ -24,8 +24,8 @@ jobs:
       id: nix-cache
       with:
         path: /tmp/nixcache
-        key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
-        restore-keys: ${{ runner.os }}-nix-
+        key: ${{ runner.os }}-nix-typecheck-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-typecheck-
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
@@ -57,8 +57,8 @@ jobs:
       id: nix-cache
       with:
         path: /tmp/nixcache
-        key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
-        restore-keys: ${{ runner.os }}-nix-
+        key: ${{ runner.os }}-nix-compile-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-compile-
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
@@ -94,8 +94,8 @@ jobs:
       id: nix-cache
       with:
         path: /tmp/nixcache
-        key: ${{ runner.os }}-nix-${{ hashFiles('flake.lock') }}
-        restore-keys: ${{ runner.os }}-nix-
+        key: ${{ runner.os }}-nix-tests-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-tests-
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
