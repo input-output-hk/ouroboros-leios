@@ -13,12 +13,19 @@ on:
     - main
 jobs:
 
-  compile:
-    name: Build libraries
+  typecheck:
+    name: Typecheck specification
     runs-on: ubuntu-22.04
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-typecheck-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-typecheck-
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
@@ -29,12 +36,51 @@ jobs:
           trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
           substituters = ${{ env.SUBSTITUTERS }}
           experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
+    - name: 🏗️ Build specification
+      run: |
+        nix build --show-trace --accept-flake-config .#leiosSpec
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
+        
+  compile:
+    name: Build libraries
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-compile-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-compile-
+    - name: 🛠️ Install Nix
+      uses: cachix/install-nix-action@v21
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+        install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+        extra_nix_config: |
+          allowed-uris = ${{ env.ALLOWED_URIS }}
+          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+          substituters = ${{ env.SUBSTITUTERS }}
+          experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
     - name: 🏗️ Build `exe:leios`
       run: |
         nix build --show-trace --accept-flake-config .#leios
     - name: 🏗️ Build `exe:ouroboros-net-vis`
       run: |
         nix build --show-trace --accept-flake-config .#ouroboros-net-vis
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
         
   tests:
     if: true
@@ -43,6 +89,13 @@ jobs:
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-tests-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-tests-
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
@@ -53,9 +106,15 @@ jobs:
           trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
           substituters = ${{ env.SUBSTITUTERS }}
           experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
     - name: 🔬 Test with `leios-sim-test`
       run: |
         nix run --accept-flake-config .#leios-sim-test
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
 
   build-docusaurus:
     runs-on: ubuntu-22.04

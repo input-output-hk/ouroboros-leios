@@ -3,12 +3,13 @@
 let
 
   project = repoRoot.nix.project;
+  agda = import ./agda.nix {inherit pkgs lib inputs;};
 
 in
 
 [
-  (
-    # Docs for project.flake: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#mkhaskellprojectoutflake
-    project.flake
-  )
+  (project.flake)
+  {
+    packages.leiosSpec = agda.leiosSpec;
+  }
 ]

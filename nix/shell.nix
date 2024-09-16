@@ -8,29 +8,40 @@
 # project.
 cabalProject:
 
+let
+
+  agda = import ./agda.nix {inherit pkgs lib inputs;};
+  emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: [ epkgs.agda2-mode pkgs.mononoki ]);
+
+in 
+
 {
   name = "nix-shell";
 
-  # prompt = null;
+  packages = [
+    agda.agdaWithDeps
+    emacsWithPackages
+  ];
 
-  # welcomeMessage = null;
+  # Agda environment variables.
+  env.AGDA_STDLIB = "${agda.agdaStdlib}/standard-library.agda-lib";
+  env.AGDA_STDLIB_CLASSES = "${agda.agdaStdlibClasses}/standard-library-classes.agda-lib";
+  env.AGDA_STDLIB_META = "${agda.agdaStdlibMeta}/standard-library-meta.agda-lib";
+  env.FORMAL_LEDGER_LIB = "${agda.formalLedger}/formal-ledger.agda-lib";
 
-  # packages = [];
+# prompt = "[ouroboros-leios]$ ";
 
-  # scripts = {
-  #   foo = {
-  #      description = "";
-  #      group = "general";
-  #      enabled = true;
-  #      exec = ''
-  #        echo "Hello, World!"
-  #      '';
-  #    };
-  # };
+  welcomeMessage = ''
+  Welcome to Ouroboros Leios!
 
-  # env = {
-  #   KEY = "VALUE";
-  # };
+  Locations of Agda libraries:
+    ${agda.agdaStdlib}/standard-library.agda-lib
+    ${agda.agdaStdlibClasses}/standard-library-classes.agda-lib
+    ${agda.agdaStdlibMeta}/standard-library-meta.agda-lib
+    ${agda.formalLedger}/formal-ledger.agda-lib
+
+  Run 'emacs' to edit .agda files.
+  '';
 
   # shellHook = "";
 
@@ -51,6 +62,17 @@ cabalProject:
     # optipng = null;
     # purs-tidy = null;
   };
+
+  # scripts = {
+  #   foo = {
+  #      description = "";
+  #      group = "general";
+  #      enabled = true;
+  #      exec = ''
+  #        echo "Hello, World!"
+  #      '';
+  #    };
+  # };
 
   # preCommit = {
   #   cabal-fmt.enable = false;
@@ -74,5 +96,6 @@ cabalProject:
   #   purs-tidy.enable = false;
   #   purs-tidy.extraOptions = "";
   # };
+
 }
  
