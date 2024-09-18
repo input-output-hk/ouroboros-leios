@@ -251,6 +251,8 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
       postulate instance isVote1Certified? : ∀ {s eb} → isVote1Certified s eb ⁇
 
       private variable s : LeiosState
+                       ffds' : FFD'.State
+                       π : VrfPf
 
       data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
         Init : ∀ {V bs bs' SD}
@@ -258,7 +260,7 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
              → bs B.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , B.STAKE SD)
              → nothing ⇀⟦ INIT V ⟧ (record { V = V ; SD = SD ; FFDState = {!!} ; Ledger = [] ; MemPool = [] ; IBs = [] ; EBs = [] ; Vs = [] ; slot = {!!} } , EMPTY)
 
-        Slot : ∀ {msgs ffds'} → let ffds = s .LeiosState.FFDState in
+        Slot : ∀ {msgs} → let ffds = s .LeiosState.FFDState in
                FFD.Fetch FFD'.⇀⟦ ffds ⟧ (ffds' , FFD.FetchRes msgs)
              → let l = {!!} -- construct ledger l
                in just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = l } , EMPTY)
@@ -267,8 +269,8 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
 
         -- TODO: Base chain
 
-        IB-Role : ∀ {π slot ffds'}
-                → canProduceIB slot π
+        IB-Role : let open LeiosState s in
+                  canProduceIB slot π
                 → let txs = s .LeiosState.MemPool
                       b = GenFFD.ibBody (record { txs = txs })
                       h = GenFFD.ibHeader (mkIBHeader slot id π txs)
@@ -276,7 +278,7 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
                 in FFD.Send h (just b) FFD'.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
                 → just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-        EB-Role : ∀ {π ffds'} → let open LeiosState s in
+        EB-Role : let open LeiosState s in
                   canProduceEB slot π
                 → let LI = map getIBRef $ setToList (filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs))
                       LE = map getEBRef $ setToList (filterˢ (isVote1Certified s) $ filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs))
@@ -285,8 +287,8 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
                 in FFD.Send (GenFFD.ebHeader h) nothing FFD'.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
                 → just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-        V1-Role : ∀ {slot ffds'}
-                → canProduceV1 slot
+        V1-Role : let open LeiosState s in
+                  canProduceV1 slot
                 → let EBs = s .LeiosState.EBs
                       EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
                       votes = map (vote ∘ bHash) (setToList EBs')
@@ -294,8 +296,8 @@ module Leios (a : LeiosAbstract) (let open LeiosAbstract a) (id : PoolID) (pKey 
                 in FFD.Send (GenFFD.vHeader votes) nothing FFD'.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes) -- one or many?
                 → just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-        V2-Role : ∀ {slot ffds'}
-                → canProduceV2 slot
+        V2-Role : let open LeiosState s in
+                  canProduceV2 slot
                 → let EBs = s .LeiosState.EBs
                       EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
                       votes = map (vote ∘ bHash) (setToList EBs')
