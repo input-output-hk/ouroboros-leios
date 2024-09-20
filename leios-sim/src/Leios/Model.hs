@@ -38,11 +38,12 @@ module Leios.Model where
 
 import Prelude hiding (init)
 
+import Data.UUID (UUID)
 import Control.Applicative (asum)
 import Control.Concurrent.Class.MonadSTM.TChan (TChan, newTChanIO, readTChan, writeTChan)
 import Control.Concurrent.Class.MonadSTM.TQueue (TQueue, newTQueueIO, readTQueue)
 import Control.Concurrent.Class.MonadSTM.TVar (TVar, check, modifyTVar', newTVarIO, readTVar, readTVarIO, writeTVar)
-import Control.Monad (forever, replicateM, replicateM_)
+import Control.Monad (foldM, forever, replicateM, replicateM_)
 import Control.Monad.Class.MonadAsync (Async, Concurrently (Concurrently, runConcurrently), MonadAsync, async, race_)
 import Control.Monad.Class.MonadSTM (MonadSTM, STM, atomically, retry)
 import Control.Monad.Class.MonadTimer (MonadDelay, MonadTimer, threadDelay)
@@ -60,7 +61,7 @@ import qualified Data.PQueue.Max as PQueue
 import Data.Word (Word64)
 import GHC.Generics (Generic)
 import Leios.Trace (mkTracer)
-import System.Random (RandomGen, mkStdGen, randomR, split)
+import System.Random (RandomGen, mkStdGen, random, randomR, split)
 import Text.Pretty.Simple (pPrint)
 
 --------------------------------------------------------------------------------
@@ -71,16 +72,16 @@ import Text.Pretty.Simple (pPrint)
 --
 -- TODO: we might want to split this between constants and parameters that can be tweaked at runtime.
 data Parameters = Parameters
-  { _L :: NumberOfSlots
+  { _L            :: NumberOfSlots
   -- ^  Slice length.
-  , λ :: NumberOfSlices
+  , λ             :: NumberOfSlices
   -- ^ Number of slices (of size '_L') the diffusion period takes.
   , nodeBandwidth :: BitsPerSecond
-  , ibSize :: NumberOfBits
+  , ibSize        :: NumberOfBits
   -- ^ Size of the diffusion block.
-  , f_I :: IBFrequency
-  , f_E :: EBFrequency
-  , initialSeed :: Int
+  , f_I           :: IBFrequency
+  , f_E           :: EBFrequency
+  , initialSeed   :: Int
   }
   deriving (Show, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
@@ -139,6 +140,7 @@ data IB = IB
   { ib_slot :: Slot
   , ib_producer :: NodeId
   , ib_size :: NumberOfBits
+  , ib_UUID :: UUID
   }
   deriving (Show, Eq, Generic)
   deriving anyclass (Aeson.ToJSON, Aeson.FromJSON)
@@ -268,13 +270,16 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
           -- Generate IB blocks
           let (numberOfIBsInThisSlot, generator1) =
                 slotsLed generator (getIBFrequency f_I)
-          replicateM_ numberOfIBsInThisSlot $ produceIB slot
+          generator2 <- foldM
+            produceIB
+            generator1
+            $ replicate numberOfIBsInThisSlot slot
           -- Generate EB blocks
-          let (numberOfEBsInThisSlot, generator2) =
-                slotsLed generator1 (getEBFrequency f_E)
+          let (numberOfEBsInThisSlot, generator3) =
+                slotsLed generator2 (getEBFrequency f_E)
           replicateM_ numberOfEBsInThisSlot $ produceEB slot
           -- Continue
-          loop generator2
+          loop generator3
     loop initialGenerator
 
   consumer = forever $ do
@@ -293,14 +298,22 @@ node nodeId nodeStakePercent initialGenerator tracer world continueTVar = do
       q = ceiling f
       (nodeLeads, nextGenerator) =
         leadsMultiple generator q nodeStakePercent f
-     in
+      in
       (length $ filter id nodeLeads, nextGenerator)
 
-  produceIB slot = do
+  produceIB generator slot = do
     Parameters{ibSize} <- getParams world
-    let newIB = IB{ib_slot = slot, ib_producer = nodeId, ib_size = ibSize}
+    let
+      (uuid,nextGenerator) = random generator
+      newIB = IB {
+        ib_slot = slot
+        , ib_producer = nodeId
+        , ib_size = ibSize
+        , ib_UUID = uuid
+        }
     traceWith tracer (ProducedIB newIB)
     MsgIB newIB `sendTo` world
+    pure nextGenerator
 
   produceEB slot = do
     Parameters{_L, λ} <- getParams world
