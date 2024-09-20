@@ -8,3 +8,4 @@ dist-newstyle/
 \#*
 .\#*
 .pre-commit-config.yaml
+_build

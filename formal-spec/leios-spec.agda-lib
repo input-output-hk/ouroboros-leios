@@ -1,0 +1,8 @@
+name: leios-spec
+depend:
+  standard-library
+  standard-library-classes
+  standard-library-meta
+  formal-ledger
+include:
+  .
