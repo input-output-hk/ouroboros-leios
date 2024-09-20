@@ -1,3 +1,69 @@
+## 2024-09-20
+
+### Team meeting
+
+- Introductions and roles
+    - Excellent balance of Agda, Haskell, and Rust skills
+- Reviewed administrative informoration
+    - PI7 Jira tickets, mirrored at [#16](https://github.com/input-output-hk/ouroboros-leios/issues/16), [#17](https://github.com/input-output-hk/ouroboros-leios/issues/17), [#18](https://github.com/input-output-hk/ouroboros-leios/issues/18)
+    - Nominal objectives, tasks, and deliverables for next 12 months
+- Work agreement
+    - Write down “everything” in a “research journal”
+        - what we do
+        - why we do it
+        - what are the expected results vs. actual results.
+    - Regular (at least weekly) technical review of all work done by everyone
+    - Show & tell sessions
+    - Communicate with the stakeholders (including community) on a regular basis
+    - Experimenting, pivoting, and dead-ends provide valuable learnings and should be documented in logbook
+    - Processes and workflows can emerge from our needs, and do not have to match typical production enviroments
+        - However, QA and checking each others' work is important
+    - Ensure all results are “easily” reproducible by the community
+    - Arnaud will pair with engineering staff each week in October
+    - Technical report each quarter -- the next will be in December
+    - CIP at conclusion of innovation workstream
+- Project resources listed at [discussion #15](https://github.com/input-output-hk/ouroboros-leios/discussions/15)
+- Open discussion
+    - Leios flavors
+        - Blob, short, simplified, and full
+        - All flavors have the same security guarantees
+        - Blob Leios does not deal with Cardano transactions
+        - Full Leios adds robust throughput even in the face of performance issues in base protocol
+    - Details of interaction with ledger
+        - Fairness for fees
+        - Wastage (i.e., duplicate or conflicting transactions)
+        - Time-dependent smart contracts
+    - Demo of initial DeltaQ rust implementation by Roland
+    - Brian will coordinate with David about contracts and with Hans about tweeting
+- Communication and collaboration
+    - Use slack channel for admistrative and scheduling
+    - Use github [discussions](https://github.com/input-output-hk/ouroboros-leios/discussions) or [pull requests](https://github.com/input-output-hk/ouroboros-leios/pulls)
+        - When relevant, summarize discussion results or PR comments in [this logbook](./Logbook.md)
+    - Put experimental code and work in progress on the main branch of [this repository](./)
+        - Avoid long-lived branches
+        - If warranted, code can later be separated into a new repository via `git subtree`
+        - Mostly keep main branch passing the CI, but short-lived exceptions are okay
+        - Describe new work and findings in [this logbook](./Logbook.md)
+    - Approximately three working meetings per week
+        - Each meeting (or slack) will settle the topic for the next meeting
+- Next steps
+    - Meetings next week approximately at 1400 UTC
+        - Duncan will present on existing ouroboros network
+        - Two meetings to discuss, brainstorm, and plan network simulations
+    - Future meetings
+        - Duncan will present on ouroboros consensus protocol
+        - Duncan will present on praos lessons learned
+        - Arnaud, Yves, or Brian will present on peras lessons learned
+        - Andre will present on formalization lessons learned
+        - Additional protocol and formalization meetings
+        - At some point we'll meet with PNSol about DeltaQ collaboration
+    - Possible in-person meeting mid December or January?
+    - Work focus
+        - Roland and Yves will collaborate on DeltaQ
+        - Everyone should familiarize themselves with the [simulation/](simulation/) and [leios-sim/](leios-sim/) code
+            - Live version of `leios-sim` at https://leios-simulation.cardano-scaling.org/index.html
+            - Run `simulation` locally via [instructions below](#running-ouroborous-net-viz-in-the-browser)
+
 ## 2024-07-26
 
 ### Running `ouroborous-net-viz` in the browser
