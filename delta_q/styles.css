@@ -1,0 +1,25 @@
+.anchor { position: relative; }
+.blackBox { background-color: black; border-radius: 50%; margin: 4px; padding: 16px; cursor: pointer; }
+.cdf { border: 4px solid orange; margin: 4px; padding: 4px; }
+.popup {
+  position: absolute; top: 0; left: 0;
+  background-color: white; border: 1px solid black;
+  padding: 4px;
+  display: flex; flex-direction: column;
+  white-space: nowrap;
+  z-index: 1;
+}
+.popup form { margin: 0px; }
+.name { border: 4px solid orange; border-radius: 50%; margin: 4px; padding: 8px; cursor: pointer; }
+.frame { margin: 4px; border: 1px solid grey; }
+.seqSymbol { width: 10px; height: 10px; border: 2px solid black; margin: 4px; cursor: pointer; }
+.branchKind { padding: 8px; cursor: pointer; }
+.expression { background-color: rgb(206, 236, 254); padding: 4px; display: inline-block; margin: 4px; cursor: pointer; }
+
+.column { display: flex; flex-direction: column; }
+.row { display: flex; flex-direction: row; }
+.center { align-items: center; justify-content: center; }
+.left { align-items: left; }
+
+input[type="number"] { width: 5em; }
+input[type="text"] { width: 7em; }
