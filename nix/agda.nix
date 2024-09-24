@@ -10,7 +10,7 @@ let
                      else "";
   };
 
-  customAgda = pkgs;
+  customAgda = inputs.agda-nixpkgs.legacyPackages;
 
   agdaStdlib = customAgda.agdaPackages.standard-library;
 

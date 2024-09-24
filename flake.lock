@@ -33,6 +33,18 @@
         "type": "github"
       }
     },
+    "agda-nixpkgs": {
+      "locked": {
+        "lastModified": 1720181791,
+        "narHash": "sha256-i4vJL12/AdyuQuviMMd1Hk2tsGt02hDNhA0Zj1m16N8=",
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/4284c2b73c8bce4b46a6adf23e16d9e2ec8da4bb.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://github.com/NixOS/nixpkgs/archive/4284c2b73c8bce4b46a6adf23e16d9e2ec8da4bb.tar.gz"
+      }
+    },
     "blst": {
       "flake": false,
       "locked": {
@@ -968,6 +980,7 @@
     },
     "root": {
       "inputs": {
+        "agda-nixpkgs": "agda-nixpkgs",
         "iogx": "iogx"
       }
     },
