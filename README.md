@@ -23,6 +23,24 @@ More documentation about Leios can be found in the [web site](https://leios.card
 * [leios-sim](leios-sim) contains experimental code to simulate the Leios protocol
 * [site](site) contains the sources of the aforementioned web site
 
+## Specification
+
+Build the Agda specification for Leios using either
+
+```console
+$ nix build --no-link --accept-flake-config .#leiosSpec
+```
+
+or
+
+```console
+$ nix develop
+
+$ cd formal-spec
+
+$ agda Leios/SimpleSpec.agda
+```
+
 ## Archive
 
 The [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/379)

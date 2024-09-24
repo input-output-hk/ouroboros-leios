@@ -1,6 +1,5 @@
-# Docs for this file: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#flakenix
 {
-  description = "Change the description field in your flake.nix";
+  description = "Ouroboros Leios";
 
 
   inputs = {
@@ -8,27 +7,12 @@
       url = "github:input-output-hk/iogx";
     };
 
-    # nixpkgs.follows = "haskell-nix/nixpkgs";
-
-    # hackage = {
-    #   url = "github:input-output-hk/hackage.nix";
-    #   flake = false;
-    # };
-
-    # CHaP = {
-    #   url = "github:input-output-hk/cardano-haskell-packages?ref=repo";
-    #   flake = false;
-    # };
-
-    # haskell-nix = {
-    #   url = "github:input-output-hk/haskell.nix";
-    #   inputs.hackage.follows = "hackage";
-    # };
+    # Agda version 2.6.4.3
+    agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=4284c2b73c8bce4b46a6adf23e16d9e2ec8da4bb";
 
   };
 
 
-  # Docs for mkFlake: https://github.com/input-output-hk/iogx/blob/main/doc/api.md#mkflake
   outputs = inputs: inputs.iogx.lib.mkFlake {
 
     inherit inputs;
