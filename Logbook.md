@@ -1,5 +1,36 @@
 # Leios logbook
 
+## 2024-09-25
+
+### Team session on network simulation
+
+- Plans to evaluate [leios-sim](leios-sim/)
+    - How faithful is it to the Agda spec?
+    - Will major refactoring be needed?
+    - Is it engineered well enough to warrant extending?
+- Discussed the need for property-testing generators that have good coverage.
+    - Both "spatial" and "temporal" constraints exist
+    - Ideas
+        - Lazy search
+        - SMT solver
+        - . . .
+    - Ledger has had some success
+    - Packages
+        - [Plutus approach](https://github.com/IntersectMBO/plutus/tree/master/plutus-core/testlib/PlutusCore/Generators/NEAT): Agda + Haskell
+        - [Constrained generators](https://github.com/IntersectMBO/cardano-ledger/tree/master/libs%2Fconstrained-generators): Haskell
+- Rust simulation work is progressing
+    - Use of CE-Netsim seems straightforward
+    - Full-time work may start next week, depending upon final signatures to the contract
+- Clarifications
+    - The `L` parameter is some multiple of the slot length, probably dozens of slots
+    - The paper has some ambiguity regarding whether handling equivocations is strictly part of simplified or full Leios
+    - IBs might be diffused to neighbors if they nominally valid but the node might nevertheless choose not to vote on them
+- A few concerns about Leios that may need early investigation
+    - Will some pipeline segments become clogged and starve other segments, resulting in much lower throughput than theoretically possible?
+    - What are realistic bounds on throughput?
+        - This would provide concrete information about what to expect and might ground the Leios discussions that are occurring in the community.
+    - How much will ledger-level operations impact Leios, perhaps throttling its throughput?
+
 ## 2024-09-20
 
 ### Team meeting
