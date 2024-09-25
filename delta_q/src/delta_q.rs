@@ -402,8 +402,6 @@ mod tests {
             "single".to_owned() =>
                 DeltaQ::cdf(CDF::step(
                     &[(0.024, 1.0 / 3.0), (0.143, 2.0 / 3.0), (0.531, 1.0)],
-                    0.01,
-                    300,
                 )
                 .unwrap()),
             "model2".to_owned() =>

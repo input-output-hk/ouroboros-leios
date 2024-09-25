@@ -1,4 +1,11 @@
-use std::cmp::Ordering;
+use iter_tools::Itertools;
+use std::{
+    cmp::Ordering,
+    fmt::{self, Write},
+    iter::Peekable,
+    marker::PhantomData,
+    str::FromStr,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum CDFError {
@@ -7,10 +14,11 @@ pub enum CDFError {
     BinSizeMismatch,
     LengthMismatch,
     InvalidFraction,
+    InvalidFormat(&'static str, usize),
 }
 
-impl std::fmt::Display for CDFError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for CDFError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CDFError::InvalidDataRange => {
                 write!(f, "Data vector must contain values between 0 and 1")
@@ -22,6 +30,7 @@ impl std::fmt::Display for CDFError {
             CDFError::BinSizeMismatch => write!(f, "CDFs must have the same bin size"),
             CDFError::LengthMismatch => write!(f, "CDFs must have the same length"),
             CDFError::InvalidFraction => write!(f, "Fraction must be between 0 and 1"),
+            CDFError::InvalidFormat(s, pos) => write!(f, "Invalid format: {s} at {pos}"),
         }
     }
 }
@@ -32,44 +41,84 @@ impl std::error::Error for CDFError {}
 /// distribution that can be manipulated in various ways.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CDF {
-    data: Vec<u16>,
-    bin_size: f32,
+    /// invariants: first component strictly monotonically increasing and non-negative,
+    /// second component strictly monotonically increasing and in the range (0, 1]
+    data: Vec<(f32, f32)>,
 }
 
-impl std::fmt::Debug for CDF {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CDF")
-            .field("data", &self.to_string())
-            .field("bin_size", &self.bin_size)
-            .field("len", &self.data.len())
-            .finish()
+impl fmt::Debug for CDF {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CDF").field("data", &self.data).finish()
     }
 }
 
-impl std::fmt::Display for CDF {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut last_value = 0;
+impl fmt::Display for CDF {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut scratch = String::new();
+
         write!(f, "CDF[")?;
-        for (i, &value) in self.data.iter().enumerate() {
-            let value_f32 = (value as f32 / 65535.0).min(1.0);
-            if value != last_value {
-                if last_value != 0 {
-                    write!(f, ", ")?;
-                }
-                let x = i as f32 * self.bin_size;
-                write!(f, "({:.4}, {:.4})", x, value_f32)?;
-                last_value = value;
+        for (i, (x, y)) in self.data.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
             }
+            write!(&mut scratch, "{:.5}, ", x)?;
+            write!(f, "({}, ", trim(&scratch))?;
+            scratch.clear();
+            write!(&mut scratch, "{:.5}, ", y)?;
+            write!(f, "{})", trim(&scratch))?;
+            scratch.clear();
         }
         write!(f, "]")?;
         Ok(())
     }
 }
 
+fn trim(s: &str) -> &str {
+    s.trim_end_matches('0').trim_end_matches('.')
+}
+
+impl FromStr for CDF {
+    type Err = CDFError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        fn err(s: &'static str, x: &str, y: &str) -> CDFError {
+            CDFError::InvalidFormat(s, x.as_ptr() as usize - y.as_ptr() as usize)
+        }
+
+        let mut data = Vec::new();
+        for (x, y) in s
+            .trim()
+            .trim_start_matches("CDF[")
+            .trim_end_matches("]")
+            .split(',')
+            .tuples()
+        {
+            let x = x.trim();
+            if x.chars().next() != Some('(') {
+                return Err(err("expecting '('", x, s));
+            }
+            let x: f32 = x[1..]
+                .trim()
+                .parse()
+                .map_err(|_| err("expecting number", &x[1..], s))?;
+            let y = y.trim();
+            if y.chars().next_back() != Some(')') {
+                let pos = y.char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
+                return Err(err("expecting ')'", &y[pos..], s));
+            }
+            let y: f32 = y[..y.len() - 1]
+                .trim()
+                .parse()
+                .map_err(|_| err("expecting number", y, s))?;
+            data.push((x, y));
+        }
+        Ok(Self { data })
+    }
+}
+
 pub struct CDFIterator<'a> {
-    cdf: &'a CDF,
-    index: usize,
-    last_value: u16,
+    cdf: std::slice::Iter<'a, (f32, f32)>,
+    prev: (f32, f32),
     first: bool,
     last: bool,
 }
@@ -82,23 +131,13 @@ impl<'a> Iterator for CDFIterator<'a> {
             self.first = false;
             return Some((0.0, 0.0));
         }
-        while self.index < self.cdf.data.len() {
-            let value = self.cdf.data[self.index];
-            let value_f32 = (value as f32 / 65535.0).min(1.0);
-            if value != self.last_value {
-                let x = self.index as f32 * self.cdf.bin_size;
-                self.last_value = value;
-                self.index += 1;
-                return Some((x, value_f32));
-            }
-            self.index += 1;
-        }
-        if !self.last {
-            self.last = true;
-            Some((
-                self.cdf.width(),
-                (self.last_value as f32 / 65535.0).min(1.0),
-            ))
+        if let Some(pair) = self.cdf.next() {
+            self.prev = *pair;
+            Some(*pair)
+        } else if self.last {
+            self.last = false;
+            let (x, y) = self.prev;
+            Some((x * 1.2, y))
         } else {
             None
         }
@@ -116,32 +155,43 @@ impl CDF {
         if !data.windows(2).all(|w| w[0] <= w[1]) {
             return Err(CDFError::NonMonotonicData);
         }
-        let converted_data: Vec<u16> = data.iter().map(|&x| (x * 65535.0) as u16).collect();
+        let mut prev = 0.0;
         Ok(Self {
-            data: converted_data,
-            bin_size,
+            data: data
+                .iter()
+                .enumerate()
+                .map(|(i, &x)| (i as f32 * bin_size, x))
+                .filter(|&(_, y)| {
+                    let ret = y > prev;
+                    prev = y;
+                    ret
+                })
+                .collect(),
         })
     }
 
     pub fn iter(&self) -> CDFIterator {
+        self.iter0(true)
+    }
+
+    fn iter0(&self, duplicate_last: bool) -> CDFIterator {
         CDFIterator {
-            cdf: self,
-            index: 0,
-            last_value: 0,
+            cdf: self.data.iter(),
+            prev: (0.0, 0.0),
             first: true,
-            last: false,
+            last: duplicate_last,
         }
     }
 
     /// Get the width of the CDF.
     pub fn width(&self) -> f32 {
-        self.data.len() as f32 * self.bin_size
+        self.data.iter().next_back().map_or(0.0, |(x, _)| *x)
     }
 
     /// Create a step function CDF from a vector of (x, y) pairs.
     /// The x values must be greater than 0 and must be strictly monotonically increasing.
     /// The y values must be from (0, 1] and must be strictly monotonically increasing.
-    pub fn step(points: &[(f32, f32)], bin_size: f32, bins: usize) -> Result<Self, CDFError> {
+    pub fn step(points: &[(f32, f32)]) -> Result<Self, CDFError> {
         if !points.iter().all(|&(x, y)| x >= 0.0 && y > 0.0 && y <= 1.0) {
             return Err(CDFError::InvalidDataRange);
         }
@@ -151,131 +201,102 @@ impl CDF {
         {
             return Err(CDFError::NonMonotonicData);
         }
-        let mut data = vec![0u16; bins];
-        for &(x, y) in points {
-            let index = (x / bin_size).floor() as usize;
-            data[index] = to_int(y);
+        Ok(Self {
+            data: points.to_vec(),
+        })
+    }
+
+    fn zip_data<'a>(
+        &'a self,
+        other: &'a CDF,
+    ) -> PairIterators<
+        'a,
+        impl Iterator<Item = (f32, f32)> + 'a,
+        impl Iterator<Item = (f32, f32)> + 'a,
+    > {
+        PairIterators {
+            left: self.data.iter().copied().peekable(),
+            l_prev: 0.0,
+            right: other.data.iter().copied().peekable(),
+            r_prev: 0.0,
+            _ph: PhantomData,
         }
-        for i in 1..data.len() {
-            if data[i] == 0 {
-                data[i] = data[i - 1];
-            }
-        }
-        Ok(Self { data, bin_size })
     }
 
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for
     /// the first CDF.
-    pub fn choice(&self, fraction: f32, other: &CDF) -> Result<CDF, CDFError> {
-        if self.bin_size != other.bin_size {
-            return Err(CDFError::BinSizeMismatch);
-        }
-        if self.data.len() != other.data.len() {
-            return Err(CDFError::LengthMismatch);
-        }
-        if fraction < 0.0 || fraction > 1.0 {
+    pub fn choice(&self, my_fraction: f32, other: &CDF) -> Result<CDF, CDFError> {
+        if my_fraction < 0.0 || my_fraction > 1.0 {
             return Err(CDFError::InvalidFraction);
         }
-        let my_fraction = to_int(fraction);
-        let fraction = 65535 - my_fraction;
-        let combined_data: Vec<u16> = self
-            .data
-            .iter()
-            .zip(&other.data)
-            .map(|(&x, &y)| {
-                mul(x, my_fraction)
-                    .checked_add(mul(y, fraction))
-                    .expect("addition overflow")
-            })
-            .collect();
-        Ok(CDF {
-            data: combined_data,
-            bin_size: self.bin_size,
-        })
+        let fraction = 1.0 - my_fraction;
+        let mut data = Vec::new();
+        let mut prev_y = 0.0;
+        for (x, (ly, ry)) in self.zip_data(other) {
+            let y = (ly * my_fraction + ry * fraction).min(1.0);
+            if y > prev_y {
+                prev_y = y;
+                data.push((x, y));
+            }
+        }
+        Ok(CDF { data })
     }
 
     /// Combine two CDFs by universal quantification, meaning that both outcomes must occur.
     pub fn for_all(&self, other: &CDF) -> Result<CDF, CDFError> {
-        if self.bin_size != other.bin_size {
-            return Err(CDFError::BinSizeMismatch);
+        let mut data = Vec::new();
+        for (x, (ly, ry)) in self.zip_data(other) {
+            let y = ly * ry;
+            data.push((x, y));
         }
-        if self.data.len() != other.data.len() {
-            return Err(CDFError::LengthMismatch);
-        }
-        let multiplied_data: Vec<u16> = self
-            .data
-            .iter()
-            .zip(&other.data)
-            .map(|(&x, &y)| mul(x, y))
-            .collect();
-        Ok(CDF {
-            data: multiplied_data,
-            bin_size: self.bin_size,
-        })
+        Ok(CDF { data })
     }
 
     /// Combine two CDFs by existential quantification, meaning that at least one of the outcomes
     pub fn for_some(&self, other: &CDF) -> Result<CDF, CDFError> {
-        if self.bin_size != other.bin_size {
-            return Err(CDFError::BinSizeMismatch);
+        let mut data = Vec::new();
+        for (x, (ly, ry)) in self.zip_data(other) {
+            let y = (ly + ry - ly * ry).clamp(0.0, 1.0);
+            data.push((x, y));
         }
-        if self.data.len() != other.data.len() {
-            return Err(CDFError::LengthMismatch);
-        }
-        let multiplied_data: Vec<u16> = self
-            .data
-            .iter()
-            .zip(&other.data)
-            .map(|(&x, &y)| {
-                u16::try_from(
-                    (x as u32 + y as u32)
-                        .checked_sub(mul(x, y) as u32)
-                        .expect("subtraction underflow during for_some"),
-                )
-                .expect("overflow during for_some")
-            })
-            .collect();
-        Ok(CDF {
-            data: multiplied_data,
-            bin_size: self.bin_size,
-        })
+        Ok(CDF { data })
     }
 
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
     /// two CDFs. This describes the distribution of the sum of two independent random variables.
     pub fn convolve(&self, other: &CDF) -> Result<CDF, CDFError> {
-        if self.bin_size != other.bin_size {
-            return Err(CDFError::BinSizeMismatch);
-        }
-        if self.data.len() != other.data.len() {
-            return Err(CDFError::LengthMismatch);
-        }
-        let len = self.data.len();
-        let mut convolved_data: Vec<u16> = vec![0; len];
-        for i in 0..len {
-            for j in 0..len - i {
-                let other = if j == 0 {
-                    other.data[j]
-                } else {
-                    other.data[j] - other.data[j - 1]
-                };
-                convolved_data[i + j] += mul(self.data[i], other);
+        // start with the all-zero CDF
+        let mut data = Vec::new();
+        let mut prev_y = 0.0;
+        for &(lx, ly) in self.data.iter() {
+            let step = ly - prev_y;
+            // take the other CDF, scale it by the step size, shift it by the current x value, and add it into the data
+            let mut d = Vec::new();
+            let iter = PairIterators {
+                left: data.iter().copied().peekable(),
+                l_prev: 0.0,
+                right: other
+                    .data
+                    .iter()
+                    .map(|(x, y)| (x + lx, y * step))
+                    .peekable(),
+                r_prev: 0.0,
+                _ph: PhantomData,
+            };
+            for (x, (ly, ry)) in iter {
+                d.push((x, (ly + ry).min(1.0)));
             }
+            data = d;
+            prev_y = ly;
         }
-        Ok(CDF {
-            data: convolved_data,
-            bin_size: self.bin_size,
-        })
+        Ok(CDF { data })
     }
 }
 
 impl PartialOrd for CDF {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.bin_size != other.bin_size {
-            return None;
-        }
         let mut ret = None;
-        for (l, r) in self.data.iter().zip(&other.data) {
+        for (_x, (l, r)) in self.zip_data(other) {
             if l < r {
                 if ret == Some(Ordering::Greater) {
                     return None;
@@ -292,12 +313,54 @@ impl PartialOrd for CDF {
     }
 }
 
-fn mul(x: u16, y: u16) -> u16 {
-    ((x as u32 * y as u32 + 65535) >> 16) as u16
+struct PairIterators<'a, L, R>
+where
+    L: Iterator<Item = (f32, f32)> + 'a,
+    R: Iterator<Item = (f32, f32)> + 'a,
+{
+    left: Peekable<L>,
+    l_prev: f32,
+    right: Peekable<R>,
+    r_prev: f32,
+    _ph: PhantomData<&'a ()>,
 }
 
-fn to_int(x: f32) -> u16 {
-    (x * 65536.0 + 0.5).min(65535.0) as u16
+impl<'a, L, R> Iterator for PairIterators<'a, L, R>
+where
+    L: Iterator<Item = (f32, f32)> + 'a,
+    R: Iterator<Item = (f32, f32)> + 'a,
+{
+    /// yields (x, (left_y, right_y))
+    type Item = (f32, (f32, f32));
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.left.peek(), self.right.peek()) {
+            (Some(&(lx, ly)), Some(&(rx, ry))) => match lx.total_cmp(&rx) {
+                Ordering::Less => {
+                    self.l_prev = self.left.next().unwrap().1;
+                    Some((lx, (ly, self.r_prev)))
+                }
+                Ordering::Greater => {
+                    self.r_prev = self.right.next().unwrap().1;
+                    Some((rx, (self.l_prev, ry)))
+                }
+                Ordering::Equal => {
+                    self.l_prev = self.left.next().unwrap().1;
+                    self.r_prev = self.right.next().unwrap().1;
+                    Some((lx, (ly, ry)))
+                }
+            },
+            (Some(&(lx, ly)), None) => {
+                self.l_prev = self.left.next().unwrap().1;
+                Some((lx, (ly, self.r_prev)))
+            }
+            (None, Some(&(rx, ry))) => {
+                self.r_prev = self.right.next().unwrap().1;
+                Some((rx, (self.l_prev, ry)))
+            }
+            (None, None) => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -306,9 +369,7 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let cdf = CDF::new(&[0.0, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap();
-        assert_eq!(cdf.data, vec![0, 16383, 32767, 49151, 65535]);
-        assert_eq!(cdf.bin_size, 0.25);
+        CDF::new(&[0.0, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap();
 
         let cdf = CDF::new(&[0.0, 0.25, 0.5, 0.75, 1.1], 0.25);
         assert_eq!(cdf, Err(CDFError::InvalidDataRange));
@@ -354,7 +415,7 @@ mod tests {
         let left = CDF::new(&[0.0, 0.5, 0.75, 1.0], 0.25).unwrap();
         let right = CDF::new(&[0.0, 0.25, 0.5, 1.0], 0.25).unwrap();
         let result = left.for_all(&right).unwrap();
-        assert_eq!(result, CDF::new(&[0.0, 0.12501, 0.375, 1.0], 0.25).unwrap());
+        assert_eq!(result, CDF::new(&[0.0, 0.125, 0.375, 1.0], 0.25).unwrap());
     }
 
     #[test]
@@ -362,7 +423,7 @@ mod tests {
         let left = CDF::new(&[0.0, 0.5, 0.75, 1.0], 0.25).unwrap();
         let right = CDF::new(&[0.0, 0.25, 0.5, 1.0], 0.25).unwrap();
         let result = left.for_some(&right).unwrap();
-        assert_eq!(result, CDF::new(&[0.0, 0.62499, 0.875, 1.0], 0.25).unwrap());
+        assert_eq!(result, CDF::new(&[0.0, 0.625, 0.875, 1.0], 0.25).unwrap());
     }
 
     #[test]
