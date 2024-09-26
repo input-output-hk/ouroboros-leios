@@ -68,10 +68,10 @@ impl fmt::Display for CDF {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(&mut scratch, "{:.5}, ", x)?;
+            write!(&mut scratch, "{:.5}", x)?;
             write!(f, "({}, ", trim(&scratch))?;
             scratch.clear();
-            write!(&mut scratch, "{:.5}, ", y)?;
+            write!(&mut scratch, "{:.5}", y)?;
             write!(f, "{})", trim(&scratch))?;
             scratch.clear();
         }
@@ -93,6 +93,8 @@ impl FromStr for CDF {
         }
 
         let mut data = Vec::new();
+        let mut x_prev = -1.0;
+        let mut y_prev = 0.0;
         for (x, y) in s
             .trim()
             .trim_start_matches("CDF[")
@@ -108,6 +110,13 @@ impl FromStr for CDF {
                 .trim()
                 .parse()
                 .map_err(|_| err("expecting number", &x[1..], s))?;
+            if x < 0.0 {
+                return Err(CDFError::InvalidDataRange);
+            }
+            if x <= x_prev {
+                return Err(CDFError::NonMonotonicData);
+            }
+            x_prev = x;
             let y = y.trim();
             if y.chars().next_back() != Some(')') {
                 let pos = y.char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
@@ -117,6 +126,13 @@ impl FromStr for CDF {
                 .trim()
                 .parse()
                 .map_err(|_| err("expecting number", y, s))?;
+            if y <= 0.0 || y > 1.0 {
+                return Err(CDFError::InvalidDataRange);
+            }
+            if y <= y_prev {
+                return Err(CDFError::NonMonotonicData);
+            }
+            y_prev = y;
             data.push((x, y));
         }
         Ok(Self {
@@ -183,16 +199,34 @@ impl CDF {
         })
     }
 
-    pub fn iter(&self) -> CDFIterator {
-        self.iter0(true)
+    /// Set the maximum size of the CDF using a mutable reference.
+    pub fn set_max_size(&mut self, max_size: usize) {
+        self.max_size = max_size;
     }
 
-    fn iter0(&self, duplicate_last: bool) -> CDFIterator {
+    /// Set the compaction mode of the CDF using a mutable reference.
+    pub fn set_mode(&mut self, mode: CompactionMode) {
+        self.mode = mode;
+    }
+
+    /// Set the maximum size of the CDF using builder pattern.
+    pub fn with_max_size(mut self, max_size: usize) -> Self {
+        self.max_size = max_size;
+        self
+    }
+
+    /// Set the compaction mode of the CDF using builder pattern.
+    pub fn with_mode(mut self, mode: CompactionMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    pub fn iter(&self) -> CDFIterator {
         CDFIterator {
             cdf: self.data.iter(),
             prev: (0.0, 0.0),
             first: true,
-            last: duplicate_last,
+            last: true,
         }
     }
 
@@ -698,5 +732,41 @@ mod tests {
             data1,
             vec![(0.1, 0.2), (0.2, 0.4), (0.5, 0.6), (0.7, 0.8), (0.8, 1.0)]
         );
+    }
+
+    #[test]
+    fn test_display() {
+        let cdf = CDF::new(&[0.1, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap();
+        assert_eq!(
+            format!("{}", cdf),
+            "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1)]"
+        );
+    }
+
+    #[test]
+    fn test_from_str() {
+        let cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1)]";
+        let cdf: CDF = cdf_str.parse().unwrap();
+        assert_eq!(cdf, CDF::new(&[0.1, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap());
+
+        let invalid_cdf_str = "CDF[(0, 0), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1.1)]";
+        let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
+        assert_eq!(cdf, Err(CDFError::InvalidDataRange));
+
+        let invalid_format_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), 1, 1)]";
+        let cdf: Result<CDF, CDFError> = invalid_format_str.parse();
+        assert!(
+            matches!(cdf, Err(CDFError::InvalidFormat(_, _))),
+            "{:?}",
+            cdf
+        );
+
+        let invalid_cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.25), (0.75, 0.75), (1, 1)";
+        let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
+        assert_eq!(cdf, Err(CDFError::NonMonotonicData));
+
+        let invalid_cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.25, 0.5), (0.75, 0.75), (1, 1)";
+        let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
+        assert_eq!(cdf, Err(CDFError::NonMonotonicData));
     }
 }
