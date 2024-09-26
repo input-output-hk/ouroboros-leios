@@ -1,5 +1,67 @@
 # Leios logbook
 
+## 2024-09-26
+
+### Team session on requirements for metrics
+
+- Reviewed status of certificates
+	- Options
+		- ALBA
+		- BLS
+		- other
+	- Dimitar, Raphael, Tolik, and Pyrrhos are investigating viability of ALBA
+		- Potential use of ZK to reduce size
+		- Non-ALBA options are still on the table
+- Reviewed plan for Sundae Labs work
+	- First step is a simplified Praos ledger
+		- Transactions remove UTxOs and add new UTxOs
+		- Transactions are opaque objects with an identifier (hash) and padding/representation of size in bytes
+		- Delays caused by cryptography etc. are modeled
+		- Ledger is set of active inputs
+	- Subsequent steps
+		- IBs
+		- EBs
+		- Votes 1
+		- Endorsement
+		- Votes 2
+		- L1 diffusion
+		- . . .
+- Brainstorming of metrics, experiments, variants, etc.
+	- Generate loads randomly and/or based on historical data.
+		- DB sync provides distributions of transaction sizes, etc.
+		- Mempool data requires more effort to extract
+	- Experiment with measuring throughput at 20%, 40%, 60%, 80% of theoretical network bandwidth.
+	- Measure memory and disk growth.
+	- Can services be run as separate components, on separate VMs, with varied levels of trust, with/without large amount of stake?
+	- Packing of transactions:
+		- Measure % duplicate, % conflicting, % non-conflicting txs in final ledger update
+		- Scoopers and other Dex batching may naturally produce conflicting txs
+	- Design an attack scenario that maximizes conflicts and/or duplicates.
+	- Memory pool modeling may be necessary:
+		- Investigate what logic will be used to include txs in IBs.
+		- If a node is elected twice in short succession, can it include dependencies of the second IB upon the first?
+	- Consider design variant where input blocks (minus VRF signature) are proposed and then adopted (adding signature).
+	- What is the latency distribution of nodes receive txs/IBs after they are referenced by the ranking block?
+		- How long does it take txs to reach the slowest nodes?
+	- What is the optimal IB size?
+	- Could third parties propose an IB that is then signed by a VRF-elected Leios node?
+	- Can IBs depend upon IBs?
+		- Will Leios adversely affect tx batching and chaining?
+	- Compare freshest first vs oldest first.
+	- Are there synergies or conflicts with Validation Zones (Babbel Fees)?
+		- Are the validation zones the same as IBs?
+		- Are the tx-reconciliation algorithms for validation zones and IBs compatible?
+	- Might adding more Leios stages improve throughput?
+	- Is this level of node/ledger change impractical for the ecosystem?
+		- Should Leios be more like a high-throughput side chain (L1.5)?
+	- Assess the API impact of Leios for node following, indexing, etc.
+- Next week settle on initial common formats for simulation I/O.
+	- Protocol parameters
+	- Crypto: CPU delays and signature/certificate sizes
+	- Network nodes and topology
+	- Output traces
+- Use Haskell's Aeson-style YAML serialization and configure Serde to mimic that in Rust.
+
 ## 2024-09-25
 
 ### Team session on network simulation
@@ -23,6 +85,9 @@
     - Full-time work may start next week, depending upon final signatures to the contract
 - Clarifications
     - The `L` parameter is some multiple of the slot length, probably dozens of slots
+    - Is header diffusion a push or pull process?
+	    - The Leios paper differs from Cardano practice.
+	    - The two approaches may be isomorphic.
     - The paper has some ambiguity regarding whether handling equivocations is strictly part of simplified or full Leios
     - IBs might be diffused to neighbors if they nominally valid but the node might nevertheless choose not to vote on them
 - A few concerns about Leios that may need early investigation
