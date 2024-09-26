@@ -8,7 +8,7 @@ The underlying ΔQ expressions shall be used for export/import of the model, com
 
 ## Implementation plan
 
-The first step is to provide a library for manipulating CDFs, offering all operations required by the theory; the internal representation will be discrete numerical [DONE], with later optimizations for constant parts at the beginning and end of the vector.
+The first step is to provide a library for manipulating CDFs, offering all operations required by the theory; the internal representation will be discrete numerical [DONE], with later optimizations for constant parts at the beginning and end of the vector. [DONE]
 
 The second step yields an internal DSL for creating ΔQ expressions and printing them. [DONE]
 
@@ -32,7 +32,7 @@ The results of the load analysis will indicate where and under which conditions 
 The build comprises two steps:
 
 - `trunk build` (i.e. you’ll need to `cargo install --locked trunk` first)
-- `cargo run --bin editor`
+- `cargo run --bin editor -F main`
 
 The first one builds the web app in the `dist/` folder, which the second one then integrates into the single-binary application that will serve HTTP resources on port 8080 when run.
 
