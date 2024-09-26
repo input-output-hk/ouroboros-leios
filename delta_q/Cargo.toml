@@ -40,6 +40,7 @@ tracing-subscriber = { version = "0.3.18", features = [
 ], optional = true }
 wasm-bindgen = { version = "0.2.93", optional = true }
 wasm-bindgen-futures = { version = "0.4.43", optional = true }
+winnow = "0.6.20"
 yew = { version = "0.21.0", features = ["csr"], optional = true }
 
 [dependencies.web-sys]

@@ -8,6 +8,7 @@ macro_rules! cloned {
 
 mod cdf;
 mod delta_q;
+mod parser;
 #[cfg(feature = "web")]
 mod render;
 
