@@ -368,20 +368,6 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
     }
     let mk_d = |dist: f32, idx: usize| D((dist / granularity) as i16, idx, dist);
 
-    {
-        let mut heap = [mk_d(0.1, 1), mk_d(0.1, 0), mk_d(0.2, 1), mk_d(0.2, 2)]
-            .into_iter()
-            .collect::<BinaryHeap<_>>();
-        let mut v = Vec::new();
-        while let Some(elem) = heap.pop() {
-            v.push(elem);
-        }
-        assert_eq!(
-            v,
-            vec![mk_d(0.1, 1), mk_d(0.1, 0), mk_d(0.2, 2), mk_d(0.2, 1)],
-        );
-    }
-
     // use a binary heap to pull the closest pairs, identifying them by their x coordinate and sorting them by the distance to their right neighbor.
     let mut heap = data
         .iter()
