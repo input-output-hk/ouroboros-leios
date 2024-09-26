@@ -1,6 +1,7 @@
 use iter_tools::Itertools;
 use std::{
     cmp::Ordering,
+    collections::BinaryHeap,
     fmt::{self, Write},
     iter::Peekable,
     marker::PhantomData,
@@ -37,6 +38,8 @@ impl fmt::Display for CDFError {
 
 impl std::error::Error for CDFError {}
 
+pub const DEFAULT_MAX_SIZE: usize = 1000;
+
 /// A Cumulative Distribution Function (CDF) is a representation of a probability
 /// distribution that can be manipulated in various ways.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -44,6 +47,10 @@ pub struct CDF {
     /// invariants: first component strictly monotonically increasing and non-negative,
     /// second component strictly monotonically increasing and in the range (0, 1]
     data: Vec<(f32, f32)>,
+    #[serde(skip)]
+    max_size: usize,
+    #[serde(skip)]
+    mode: CompactionMode,
 }
 
 impl fmt::Debug for CDF {
@@ -112,7 +119,11 @@ impl FromStr for CDF {
                 .map_err(|_| err("expecting number", y, s))?;
             data.push((x, y));
         }
-        Ok(Self { data })
+        Ok(Self {
+            data,
+            max_size: DEFAULT_MAX_SIZE,
+            mode: CompactionMode::default(),
+        })
     }
 }
 
@@ -167,6 +178,8 @@ impl CDF {
                     ret
                 })
                 .collect(),
+            max_size: DEFAULT_MAX_SIZE,
+            mode: CompactionMode::default(),
         })
     }
 
@@ -203,6 +216,8 @@ impl CDF {
         }
         Ok(Self {
             data: points.to_vec(),
+            max_size: DEFAULT_MAX_SIZE,
+            mode: CompactionMode::default(),
         })
     }
 
@@ -214,13 +229,7 @@ impl CDF {
         impl Iterator<Item = (f32, f32)> + 'a,
         impl Iterator<Item = (f32, f32)> + 'a,
     > {
-        PairIterators {
-            left: self.data.iter().copied().peekable(),
-            l_prev: 0.0,
-            right: other.data.iter().copied().peekable(),
-            r_prev: 0.0,
-            _ph: PhantomData,
-        }
+        PairIterators::new(self.data.iter().copied(), other.data.iter().copied())
     }
 
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for
@@ -239,7 +248,8 @@ impl CDF {
                 data.push((x, y));
             }
         }
-        Ok(CDF { data })
+        compact(&mut data, self.mode, self.max_size);
+        Ok(CDF { data, ..*self })
     }
 
     /// Combine two CDFs by universal quantification, meaning that both outcomes must occur.
@@ -249,7 +259,8 @@ impl CDF {
             let y = ly * ry;
             data.push((x, y));
         }
-        Ok(CDF { data })
+        compact(&mut data, self.mode, self.max_size);
+        Ok(CDF { data, ..*self })
     }
 
     /// Combine two CDFs by existential quantification, meaning that at least one of the outcomes
@@ -259,7 +270,8 @@ impl CDF {
             let y = (ly + ry - ly * ry).clamp(0.0, 1.0);
             data.push((x, y));
         }
-        Ok(CDF { data })
+        compact(&mut data, self.mode, self.max_size);
+        Ok(CDF { data, ..*self })
     }
 
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
@@ -272,25 +284,138 @@ impl CDF {
             let step = ly - prev_y;
             // take the other CDF, scale it by the step size, shift it by the current x value, and add it into the data
             let mut d = Vec::new();
-            let iter = PairIterators {
-                left: data.iter().copied().peekable(),
-                l_prev: 0.0,
-                right: other
-                    .data
-                    .iter()
-                    .map(|(x, y)| (x + lx, y * step))
-                    .peekable(),
-                r_prev: 0.0,
-                _ph: PhantomData,
-            };
+            let iter = PairIterators::new(
+                data.iter().copied(),
+                other.data.iter().map(|(x, y)| (x + lx, y * step)),
+            );
             for (x, (ly, ry)) in iter {
                 d.push((x, (ly + ry).min(1.0)));
             }
             data = d;
             prev_y = ly;
         }
-        Ok(CDF { data })
+        compact(&mut data, self.mode, self.max_size);
+        Ok(CDF { data, ..*self })
     }
+}
+
+#[derive(Debug, PartialEq, Default, Clone, Copy)]
+pub enum CompactionMode {
+    #[default]
+    UnderApproximate,
+    OverApproximate,
+}
+
+/// Repeated computation with a CDF can lead to an unbounded number of data points, hence we limit its size.
+/// This function ensures a maximal data length of `max_size` points by collapsing point pairs that are closest to each other on the x axis.
+/// Under CompactionMode::UnderApproximate, the new point gets the greater x coordinate while under CompactionMode::OverApproximate, the new point gets the smaller x coordinate.
+/// The resulting point always has the higher y value of the pair.
+fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
+    if data.len() <= max_size {
+        return;
+    }
+    // determine overall scale of the graph to determine the granularity of distances
+    // (without this rounding the pruning will be dominated by floating point errors)
+    let scale = data[data.len() - 1].0;
+    let granularity = scale / 300.0;
+
+    #[derive(Debug, PartialEq)]
+    struct D(i16, usize, f32);
+    impl Eq for D {}
+    impl PartialOrd for D {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    impl Ord for D {
+        fn cmp(&self, other: &Self) -> Ordering {
+            other.0.cmp(&self.0).then_with(|| self.1.cmp(&other.1))
+        }
+    }
+    let mk_d = |dist: f32, idx: usize| D((dist / granularity) as i16, idx, dist);
+
+    {
+        let mut heap = [mk_d(0.1, 1), mk_d(0.1, 0), mk_d(0.2, 1), mk_d(0.2, 2)]
+            .into_iter()
+            .collect::<BinaryHeap<_>>();
+        let mut v = Vec::new();
+        while let Some(elem) = heap.pop() {
+            v.push(elem);
+        }
+        assert_eq!(
+            v,
+            vec![mk_d(0.1, 1), mk_d(0.1, 0), mk_d(0.2, 2), mk_d(0.2, 1)],
+        );
+    }
+
+    // use a binary heap to pull the closest pairs, identifying them by their x coordinate and sorting them by the distance to their right neighbor.
+    let mut heap = data
+        .iter()
+        .tuple_windows::<(&(f32, f32), &(f32, f32))>()
+        .enumerate()
+        .map(|(idx, (a, b))| {
+            let dist = b.0 - a.0;
+            mk_d(dist, idx)
+        })
+        .collect::<BinaryHeap<_>>();
+
+    let mut to_remove = data.len() - max_size;
+    let mut last_bin = -1;
+    while let Some(D(bin, idx, dist)) = heap.pop() {
+        if bin == last_bin {
+            last_bin = -1;
+            continue;
+        } else {
+            last_bin = bin;
+        }
+        if data[idx].1 == 0.0 {
+            continue;
+        }
+
+        match mode {
+            CompactionMode::UnderApproximate => {
+                // just remove this point, meaning that the left neighbour needs to be updated
+                if let Some(neighbour) = data[..idx].iter().rposition(|x| x.1 > 0.0) {
+                    heap.push(mk_d(data[idx].0 - data[neighbour].0 + dist, idx));
+                    data[idx] = data[neighbour];
+                    data[neighbour].1 = 0.0;
+                } else {
+                    data[idx].1 = 0.0;
+                }
+            }
+            CompactionMode::OverApproximate => {
+                // we update the y on this point and remove the right neighbour
+                let mut neighbours = data[idx + 1..]
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, (_x, y))| (*y > 0.0).then_some(idx + 1 + i));
+                let n1 = neighbours.next();
+                let n2 = neighbours.next();
+                match (n1, n2) {
+                    (Some(n1), Some(n2)) => {
+                        // drop n1 and update our distance
+                        heap.push(mk_d(data[n2].0 - data[idx].0, idx));
+                        data[idx].1 = data[n1].1;
+                        data[n1].1 = 0.0;
+                    }
+                    (Some(n1), None) => {
+                        // n1 is the rightmost, so don't submit us again because now we’re rightmost
+                        data[idx].1 = data[n1].1;
+                        data[n1].1 = 0.0;
+                    }
+                    _ => {
+                        debug_assert!(false, "shouldn’t get here because of the above");
+                    }
+                }
+            }
+        };
+
+        to_remove -= 1;
+        if to_remove == 0 {
+            break;
+        }
+    }
+    data.retain(|x| x.1 > 0.0);
 }
 
 impl PartialOrd for CDF {
@@ -313,6 +438,8 @@ impl PartialOrd for CDF {
     }
 }
 
+/// Iterator over a pair of iterators, yielding the x value and the pair of y values for each
+/// point where one of the iterators has a point.
 struct PairIterators<'a, L, R>
 where
     L: Iterator<Item = (f32, f32)> + 'a,
@@ -323,6 +450,22 @@ where
     right: Peekable<R>,
     r_prev: f32,
     _ph: PhantomData<&'a ()>,
+}
+
+impl<'a, L, R> PairIterators<'a, L, R>
+where
+    L: Iterator<Item = (f32, f32)> + 'a,
+    R: Iterator<Item = (f32, f32)> + 'a,
+{
+    fn new(left: L, right: R) -> Self {
+        Self {
+            left: left.peekable(),
+            l_prev: 0.0,
+            right: right.peekable(),
+            r_prev: 0.0,
+            _ph: PhantomData,
+        }
+    }
 }
 
 impl<'a, L, R> Iterator for PairIterators<'a, L, R>
@@ -453,5 +596,107 @@ mod tests {
         assert!(bottom < right);
         assert!(right >= bottom);
         assert!(bottom <= right);
+    }
+
+    #[test]
+    fn test_compact_even() {
+        let data = vec![
+            (0.0, 0.1),
+            (0.1, 0.2),
+            (0.2, 0.3),
+            (0.3, 0.4),
+            (0.4, 0.5),
+            (0.5, 0.6),
+            (0.6, 0.7),
+            (0.7, 0.8),
+            (0.8, 0.9),
+            (0.9, 1.0),
+        ];
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::UnderApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.1, 0.2), (0.3, 0.4), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
+        );
+        let mut data2 = data.clone();
+        compact(&mut data2, CompactionMode::OverApproximate, 5);
+        assert_eq!(
+            data2,
+            vec![(0.0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]
+        );
+    }
+
+    #[test]
+    fn test_compact_begin() {
+        let data = vec![
+            (0.0, 0.1),
+            (0.1, 0.2),
+            (0.2, 0.3),
+            (0.3, 0.4),
+            (0.5, 0.5),
+            (0.7, 0.6),
+            (0.9, 0.7),
+        ];
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::UnderApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.1, 0.2), (0.3, 0.4), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
+        );
+        let mut data2 = data.clone();
+        compact(&mut data2, CompactionMode::OverApproximate, 5);
+        assert_eq!(
+            data2,
+            vec![(0.0, 0.2), (0.2, 0.4), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
+        );
+    }
+
+    #[test]
+    fn test_compact_middle() {
+        let data = vec![
+            (0.0, 0.1),
+            (0.2, 0.3),
+            (0.4, 0.5),
+            (0.5, 0.6),
+            (0.7, 0.8),
+            (0.9, 1.0),
+        ];
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::UnderApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.0, 0.1), (0.2, 0.3), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
+        );
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::OverApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.6), (0.7, 0.8), (0.9, 1.0)]
+        );
+    }
+
+    #[test]
+    fn test_compact_edges() {
+        let data = vec![
+            (0.1, 0.2),
+            (0.2, 0.3),
+            (0.3, 0.4),
+            (0.5, 0.6),
+            (0.7, 0.8),
+            (0.8, 0.9),
+            (0.9, 1.0),
+        ];
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::UnderApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.1, 0.2), (0.3, 0.4), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
+        );
+        let mut data1 = data.clone();
+        compact(&mut data1, CompactionMode::OverApproximate, 5);
+        assert_eq!(
+            data1,
+            vec![(0.1, 0.2), (0.2, 0.4), (0.5, 0.6), (0.7, 0.8), (0.8, 1.0)]
+        );
     }
 }
