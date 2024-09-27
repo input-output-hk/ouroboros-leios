@@ -340,6 +340,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let seq = DeltaQ::seq(dq1, dq2);
         assert_eq!(seq.to_string(), "A ->- B");
+        assert_eq!(seq, "A ->- B".parse().unwrap());
     }
 
     #[test]
@@ -348,6 +349,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let choice = DeltaQ::choice(dq1, 0.3, dq2, 0.7);
         assert_eq!(choice.to_string(), "A 0.3<>0.7 B");
+        assert_eq!(choice, "A 0.3<>0.7 B".parse().unwrap());
     }
 
     #[test]
@@ -356,6 +358,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let for_all = DeltaQ::for_all(dq1, dq2);
         assert_eq!(for_all.to_string(), "all(A | B)");
+        assert_eq!(for_all, "all(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -364,6 +367,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let for_some = DeltaQ::for_some(dq1, dq2);
         assert_eq!(for_some.to_string(), "some(A | B)");
+        assert_eq!(for_some, "some(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -373,6 +377,8 @@ mod tests {
         let dq3 = DeltaQ::name("C");
         let nested_seq = DeltaQ::seq(DeltaQ::seq(dq1, dq2), dq3);
         assert_eq!(nested_seq.to_string(), "(A ->- B) ->- C");
+        assert_eq!(nested_seq, "(A ->- B) ->- C".parse().unwrap());
+        assert_eq!(nested_seq, "A ->- B ->- C".parse().unwrap());
     }
 
     #[test]
@@ -382,6 +388,8 @@ mod tests {
         let dq3 = DeltaQ::name("C");
         let nested_choice = DeltaQ::choice(DeltaQ::choice(dq1, 0.3, dq2, 0.7), 0.5, dq3, 0.5);
         assert_eq!(nested_choice.to_string(), "(A 0.3<>0.7 B) 0.5<>0.5 C");
+        assert_eq!(nested_choice, "(A 0.3<>0.7 B) 0.5<>0.5 C".parse().unwrap());
+        assert_eq!(nested_choice, "A 0.3<>0.7 B 0.5<>0.5 C".parse().unwrap());
     }
 
     #[test]
@@ -392,6 +400,7 @@ mod tests {
         let dq4 = DeltaQ::name("D");
         let nested_for_all = DeltaQ::for_all(DeltaQ::for_all(dq1, dq2), DeltaQ::seq(dq3, dq4));
         assert_eq!(nested_for_all.to_string(), "all(all(A | B) | C ->- D)");
+        assert_eq!(nested_for_all, "all(all(A | B) | C ->- D)".parse().unwrap());
     }
 
     #[test]
@@ -405,6 +414,10 @@ mod tests {
             DeltaQ::choice(dq3, 1.0, dq4, 2.0),
         );
         assert_eq!(nested_for_some.to_string(), "some(some(A | B) | C 1<>2 D)");
+        assert_eq!(
+            nested_for_some,
+            "some(some(A | B) | C 1<>2 D)".parse().unwrap()
+        );
     }
 
     #[test]

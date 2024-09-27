@@ -1,15 +1,14 @@
 use crate::DeltaQ;
 use winnow::{
-    combinator::{alt, delimited, repeat, separated_pair},
+    combinator::{alt, cut_err, delimited, separated, separated_pair},
+    error::{StrContext, StrContextValue},
     stream::Stream,
     token::take_while,
     PResult, Parser,
 };
 
 pub fn parse(input: &str) -> Result<DeltaQ, String> {
-    delta_q
-        .parse(input)
-        .map_err(|e| format!("ΔQ parse error: {} (at position {})", e.inner(), e.offset()))
+    delta_q.parse(input).map_err(|e| e.to_string())
 }
 
 fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
@@ -49,12 +48,16 @@ fn atom(input: &mut &str) -> PResult<DeltaQ> {
         ws,
         alt((
             blackbox,
-            name,
             cdf,
             for_all,
             for_some,
-            delimited('(', delta_q, ')'),
-        )),
+            name,
+            delimited('(', delta_q, closing_paren),
+        ))
+        .context(StrContext::Label("atom"))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "'BB', name, CDF, 'all(', 'some(', or a parentheses",
+        ))),
         ws,
     )
     .parse_next(input)
@@ -79,9 +82,21 @@ fn name(input: &mut &str) -> PResult<DeltaQ> {
 fn cdf(input: &mut &str) -> PResult<DeltaQ> {
     (
         "CDF[",
-        repeat::<_, _, (), _, _>(0.., (ws, '(', ws, num, ws, ',', ws, num, ws, ')')),
+        cut_err(separated::<_, _, (), _, _, _, _>(
+            0..,
+            (ws, '(', ws, num, ws, ',', ws, num, ws, ')'),
+            (ws, ','),
+        ))
+        .context(StrContext::Label("CDF literal"))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "CDF[(_, _), ...]",
+        ))),
         ws,
-        "]",
+        cut_err(
+            "]".context(StrContext::Expected(StrContextValue::Description(
+                "closing bracket",
+            ))),
+        ),
     )
         .take()
         .try_map(|s| s.parse().map(DeltaQ::CDF))
@@ -89,21 +104,38 @@ fn cdf(input: &mut &str) -> PResult<DeltaQ> {
 }
 
 fn for_all(input: &mut &str) -> PResult<DeltaQ> {
-    delimited("all(", separated_pair(delta_q, "|", delta_q), ")")
-        .map(|(left, right)| DeltaQ::ForAll(Box::new(left), Box::new(right)))
-        .parse_next(input)
+    delimited(
+        "all(",
+        cut_err(separated_pair(delta_q, "|", delta_q)),
+        closing_paren,
+    )
+    .map(|(left, right)| DeltaQ::ForAll(Box::new(left), Box::new(right)))
+    .parse_next(input)
 }
 
 fn for_some(input: &mut &str) -> PResult<DeltaQ> {
-    delimited("some(", separated_pair(delta_q, "|", delta_q), ")")
-        .map(|(left, right)| DeltaQ::ForSome(Box::new(left), Box::new(right)))
-        .parse_next(input)
+    delimited(
+        "some(",
+        cut_err(separated_pair(delta_q, "|", delta_q)),
+        closing_paren,
+    )
+    .map(|(left, right)| DeltaQ::ForSome(Box::new(left), Box::new(right)))
+    .parse_next(input)
 }
 
 fn num(input: &mut &str) -> PResult<f32> {
     take_while(1.., |c: char| c.is_digit(10) || c == '.')
         .parse_next(input)
         .map(|num_str| num_str.parse::<f32>().unwrap())
+}
+
+fn closing_paren(input: &mut &str) -> PResult<()> {
+    cut_err(')')
+        .void()
+        .context(StrContext::Expected(StrContextValue::Description(
+            "closing parenthesis",
+        )))
+        .parse_next(input)
 }
 
 #[derive(Debug, Clone, Copy)]
