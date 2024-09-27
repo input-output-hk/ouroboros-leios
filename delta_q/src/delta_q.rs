@@ -1,4 +1,4 @@
-use crate::{CDFError, CDF};
+use crate::{cdf::DEFAULT_MAX_SIZE, CDFError, CompactionMode, CDF};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
@@ -30,11 +30,24 @@ impl From<CDFError> for DeltaQError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<String, DeltaQ>")]
 pub struct EvaluationContext {
     ctx: BTreeMap<String, (DeltaQ, Option<CDF>)>,
     deps: BTreeMap<String, BTreeSet<String>>,
+    max_size: usize,
+    mode: CompactionMode,
+}
+
+impl Default for EvaluationContext {
+    fn default() -> Self {
+        Self {
+            ctx: Default::default(),
+            deps: Default::default(),
+            max_size: DEFAULT_MAX_SIZE,
+            mode: Default::default(),
+        }
+    }
 }
 
 impl EvaluationContext {
@@ -91,6 +104,8 @@ impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
         Self {
             ctx: value.into_iter().map(|(k, v)| (k, (v, None))).collect(),
             deps,
+            max_size: DEFAULT_MAX_SIZE,
+            mode: CompactionMode::default(),
         }
     }
 }
@@ -278,7 +293,7 @@ impl DeltaQ {
                     Err(DeltaQError::NameError(n.to_owned()))
                 }
             }
-            DeltaQ::CDF(cdf) => Ok(cdf.clone()),
+            DeltaQ::CDF(cdf) => Ok(cdf.clone().with_max_size(ctx.max_size).with_mode(ctx.mode)),
             DeltaQ::Seq(first, second) => {
                 let first_cdf = first.eval(ctx)?;
                 let second_cdf = second.eval(ctx)?;
@@ -486,6 +501,10 @@ mod tests {
         assert!(res.contains("expected CDF[("), "{}", res);
 
         let res = "+a".parse::<DeltaQ>().unwrap_err();
-        assert!(res.contains("expected 'BB', name, CDF, 'all(', 'some(', or a parentheses"), "{}", res);
+        assert!(
+            res.contains("expected 'BB', name, CDF, 'all(', 'some(', or a parentheses"),
+            "{}",
+            res
+        );
     }
 }
