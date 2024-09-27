@@ -29,7 +29,7 @@ pub struct Props {
 
 #[function_component(DeltaQComponent)]
 pub fn delta_q_component(props: &Props) -> Html {
-    web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{props:?}")));
+    // web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{props:?}")));
     let on_change = props.on_change.clone();
     match &props.delta_q {
         DeltaQ::BlackBox => {

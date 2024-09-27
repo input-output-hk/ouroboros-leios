@@ -134,7 +134,7 @@ fn app_main() -> HtmlResult {
                 <li class={classes!("row")}>
                     <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.clone(), None)))}>{ "delete "}</button>
                     <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.clone())}>
-                        { k }{ ": " }<EditExpression name={k.clone()} value={v.clone()} on_change={on_change.clone()} />
+                        { k }{ ": " }<EditExpression name={k.clone()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
                     </div>
                 </li>
             }
@@ -146,7 +146,7 @@ fn app_main() -> HtmlResult {
     }
 
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
-    web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
+    // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
     let cdf = match cdf {
         Ok(cdf) => cdf_to_svg(&cdf),
@@ -205,10 +205,11 @@ fn add_expression(props: &AddExpressionProps) -> HtmlResult {
     })
 }
 
-#[derive(Properties, PartialEq, Clone)]
+#[derive(Properties, PartialEq, Clone, Debug)]
 struct EditExpressionProps {
     name: String,
     value: DeltaQ,
+    selected: bool,
     on_change: Callback<(String, Option<DeltaQ>)>,
 }
 
@@ -240,6 +241,16 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
             }
         }
     }));
+
+    use_memo(
+        (props.value.clone(), props.selected),
+        cloned!(editing, value, buffer; move |x| {
+               editing.set(false);
+               value.set(x.0.clone());
+               buffer.set(x.0.to_string());
+            }
+        ),
+    );
 
     Ok(html! {
         if *editing {
