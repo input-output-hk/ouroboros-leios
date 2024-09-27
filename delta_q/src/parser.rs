@@ -1,6 +1,6 @@
 use crate::DeltaQ;
 use winnow::{
-    combinator::{alt, cut_err, delimited, separated, separated_pair},
+    combinator::{alt, cut_err, delimited, fail, separated, separated_pair},
     error::{StrContext, StrContextValue},
     stream::Stream,
     token::take_while,
@@ -8,7 +8,7 @@ use winnow::{
 };
 
 pub fn parse(input: &str) -> Result<DeltaQ, String> {
-    delta_q.parse(input).map_err(|e| e.to_string())
+    delta_q.parse(input).map_err(|e| format!("{e}"))
 }
 
 fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
@@ -53,11 +53,11 @@ fn atom(input: &mut &str) -> PResult<DeltaQ> {
             for_some,
             name,
             delimited('(', delta_q, closing_paren),
-        ))
-        .context(StrContext::Label("atom"))
-        .context(StrContext::Expected(StrContextValue::Description(
-            "'BB', name, CDF, 'all(', 'some(', or a parentheses",
-        ))),
+            fail.context(StrContext::Label("atom"))
+                .context(StrContext::Expected(StrContextValue::Description(
+                    "'BB', name, CDF, 'all(', 'some(', or a parentheses",
+                ))),
+        )),
         ws,
     )
     .parse_next(input)
@@ -82,15 +82,24 @@ fn name(input: &mut &str) -> PResult<DeltaQ> {
 fn cdf(input: &mut &str) -> PResult<DeltaQ> {
     (
         "CDF[",
-        cut_err(separated::<_, _, (), _, _, _, _>(
-            0..,
-            (ws, '(', ws, num, ws, ',', ws, num, ws, ')'),
-            (ws, ','),
-        ))
-        .context(StrContext::Label("CDF literal"))
-        .context(StrContext::Expected(StrContextValue::Description(
-            "CDF[(_, _), ...]",
-        ))),
+        cut_err(
+            separated::<_, _, (), _, _, _, _>(
+                0..,
+                cut_err(
+                    (ws, '(', ws, num, ws, ',', ws, num, ws, ')')
+                        .context(StrContext::Label("CDF literal"))
+                        .context(StrContext::Expected(StrContextValue::Description(
+                            "CDF[(<num>, <num>), ...]",
+                        ))),
+                ),
+                (ws, ','),
+            )
+            .take()
+            .try_map(|s: &str| {
+                //
+                s.parse().map(DeltaQ::CDF)
+            }),
+        ),
         ws,
         cut_err(
             "]".context(StrContext::Expected(StrContextValue::Description(
@@ -98,8 +107,7 @@ fn cdf(input: &mut &str) -> PResult<DeltaQ> {
             ))),
         ),
     )
-        .take()
-        .try_map(|s| s.parse().map(DeltaQ::CDF))
+        .map(|x| x.1)
         .parse_next(input)
 }
 

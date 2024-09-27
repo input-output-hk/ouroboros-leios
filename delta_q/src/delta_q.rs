@@ -476,4 +476,16 @@ mod tests {
         let result = DeltaQ::name("recursive").eval(&mut ctx.into()).unwrap_err();
         assert_eq!(result, DeltaQError::NameError("recursive".to_owned()));
     }
+
+    #[test]
+    fn parse_cdf() {
+        let res = "CDF[(2, 0.2), (2, 0.9)]".parse::<DeltaQ>().unwrap_err();
+        assert!(res.contains("must contain monotonic"), "{}", res);
+
+        let res = "CDF[(2a, 0.2), (2, 0.9)]".parse::<DeltaQ>().unwrap_err();
+        assert!(res.contains("expected CDF[("), "{}", res);
+
+        let res = "+a".parse::<DeltaQ>().unwrap_err();
+        assert!(res.contains("expected 'BB', name, CDF, 'all(', 'some(', or a parentheses"), "{}", res);
+    }
 }
