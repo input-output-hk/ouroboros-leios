@@ -1,6 +1,6 @@
 use crate::DeltaQ;
 use winnow::{
-    combinator::{alt, cut_err, delimited, fail, separated, separated_pair},
+    combinator::{alt, cut_err, delimited, fail, opt, preceded, separated, separated_pair},
     error::{StrContext, StrContextValue},
     stream::Stream,
     token::take_while,
@@ -74,9 +74,12 @@ fn blackbox(input: &mut &str) -> PResult<DeltaQ> {
 }
 
 fn name(input: &mut &str) -> PResult<DeltaQ> {
-    take_while(1.., |c: char| c.is_alphanumeric())
+    (
+        take_while(1.., |c: char| c.is_alphanumeric()),
+        opt(preceded('^', int)),
+    )
         .parse_next(input)
-        .map(|name| DeltaQ::Name(name.to_string()))
+        .map(|(name, rec)| DeltaQ::Name(name.to_string(), rec))
 }
 
 fn cdf(input: &mut &str) -> PResult<DeltaQ> {
@@ -133,8 +136,14 @@ fn for_some(input: &mut &str) -> PResult<DeltaQ> {
 
 fn num(input: &mut &str) -> PResult<f32> {
     take_while(1.., |c: char| c.is_digit(10) || c == '.')
+        .try_map(|num_str: &str| num_str.parse::<f32>())
         .parse_next(input)
-        .map(|num_str| num_str.parse::<f32>().unwrap())
+}
+
+fn int(input: &mut &str) -> PResult<usize> {
+    take_while(1.., |c: char| c.is_digit(10))
+        .try_map(|num_str: &str| num_str.parse::<usize>())
+        .parse_next(input)
 }
 
 fn closing_paren(input: &mut &str) -> PResult<()> {

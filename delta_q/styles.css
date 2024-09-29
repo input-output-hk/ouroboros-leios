@@ -28,6 +28,7 @@
 .dq_edit form { display: flex; }
 .dq_edit input[type="text"] { width: 100%; }
 .dq_show { margin-left: 16px; }
+.result { max-height: 5em; overflow-y: scroll; }
 
 .column { display: flex; flex-direction: column; }
 .row { display: flex; flex-direction: row; }

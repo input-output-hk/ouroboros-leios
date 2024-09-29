@@ -13,7 +13,7 @@ The first step is to provide a library for manipulating CDFs, offering all opera
 The second step yields an internal DSL for creating ΔQ expressions and printing them. [DONE]
 
 The third step provides evaluation of ΔQ expressions as defined in the paper. [DONE]
-This will later be expanded to include some exponentiation-like operator that simplifies expressing a randomly chosen repetition count for some sub-expression (as frequently occurs in gossip protocols).
+This will later be expanded to include some exponentiation-like operator that simplifies expressing a randomly chosen repetition count for some sub-expression (as frequently occurs in gossip protocols). [DONE]
 
 The fourth step adds a web UI to expose the internal DSL to no-code users. [DONE]
 The interaction with a ΔQ expression shall closely resemble the refinement approach for system modelling as defined in the paper. [DONE]
@@ -45,4 +45,3 @@ Requests to the `delta_q/*` endpoints will be proxied.
 - functional but ugly
 - duplicates state management in web app and backend, not yet decided what to put where (currently ΔQ expression evaluation is done in the backend, could easily move to a web worker)
 - should have export (probably as JSON) and matching import
-- should add “exponentiation” operator to wrap an expression in another one with a hole for a specified number of times

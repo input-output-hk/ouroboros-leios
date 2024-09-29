@@ -35,8 +35,8 @@ pub fn delta_q_component(props: &Props) -> Html {
         DeltaQ::BlackBox => {
             html! { <BlackBox {on_change} /> }
         }
-        DeltaQ::Name(name) => {
-            html! { <NameComponent name={name.clone()} {on_change} /> }
+        DeltaQ::Name(name, rec) => {
+            html! { <NameComponent name={name.clone()} rec={*rec} {on_change} /> }
         }
         DeltaQ::CDF(cdf) => {
             html! { <div class={classes!("cdf")}>{ format!("{}", cdf) }</div> }
@@ -96,6 +96,7 @@ pub fn black_box(props: &BlackBoxProps) -> Html {
 #[derive(Properties, Clone, PartialEq)]
 pub struct NameProps {
     pub name: String,
+    pub rec: Option<usize>,
     pub on_change: Callback<(String, Option<DeltaQ>)>,
 }
 
@@ -104,6 +105,7 @@ pub fn name_component(props: &NameProps) -> Html {
     let on_change = props.on_change.clone();
     let popup = use_state(|| false);
     let name = props.name.clone();
+    let rec = props.rec;
     let ctx = use_context::<DeltaQContext>().unwrap();
 
     let new_name = use_state(|| props.name.clone());
@@ -114,13 +116,14 @@ pub fn name_component(props: &NameProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::Name((*new_name).clone()))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::Name((*new_name).clone(), rec))));
         }
     ));
 
     html! {
         <div class={classes!("name", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
             { &props.name }
+            if let Some(rec) = rec { <sup>{ rec }</sup> }
             if *popup {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup;
@@ -440,7 +443,7 @@ pub fn cdf_to_svg(cdf: &CDF) -> Html {
     let svg = VNode::from_html_unchecked(canvas.svg().unwrap().into());
     html! {
         <>
-            <p>{ "result: " }{cdf.to_string()} </p>
+            <p class={classes!("result")}>{ "result: " }{cdf.to_string()} </p>
             { svg }
         </>
     }

@@ -9,6 +9,7 @@ use std::{
 pub enum DeltaQError {
     CDFError(CDFError),
     NameError(String),
+    RecursionError(String),
     BlackBox,
 }
 
@@ -19,6 +20,7 @@ impl Display for DeltaQError {
         match self {
             DeltaQError::CDFError(e) => write!(f, "CDF error: {}", e),
             DeltaQError::NameError(name) => write!(f, "Name error: {}", name),
+            DeltaQError::RecursionError(name) => write!(f, "Recursion error: {}", name),
             DeltaQError::BlackBox => write!(f, "Black box encountered"),
         }
     }
@@ -35,6 +37,7 @@ impl From<CDFError> for DeltaQError {
 pub struct EvaluationContext {
     ctx: BTreeMap<String, (DeltaQ, Option<CDF>)>,
     deps: BTreeMap<String, BTreeSet<String>>,
+    rec: BTreeMap<String, Option<usize>>,
     max_size: usize,
     mode: CompactionMode,
 }
@@ -44,6 +47,7 @@ impl Default for EvaluationContext {
         Self {
             ctx: Default::default(),
             deps: Default::default(),
+            rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: Default::default(),
         }
@@ -104,6 +108,7 @@ impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
         Self {
             ctx: value.into_iter().map(|(k, v)| (k, (v, None))).collect(),
             deps,
+            rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         }
@@ -130,8 +135,8 @@ impl Into<BTreeMap<String, DeltaQ>> for EvaluationContext {
 pub enum DeltaQ {
     /// Un unelaborated and unknown DeltaQ.
     BlackBox,
-    /// A named DeltaQ that can be referenced elsewhere.
-    Name(String),
+    /// A named DeltaQ taken from the context, with an optional recursion allowance.
+    Name(String, Option<usize>),
     /// A CDF that is used as a DeltaQ.
     CDF(CDF),
     /// The convolution of two DeltaQs, describing the sequential execution of two outcomes.
@@ -163,7 +168,7 @@ impl FromStr for DeltaQ {
 impl DeltaQ {
     /// Create a new DeltaQ from a name, referencing a variable.
     pub fn name(name: &str) -> DeltaQ {
-        DeltaQ::Name(name.to_string())
+        DeltaQ::Name(name.to_string(), None)
     }
 
     /// Create a new DeltaQ from a CDF.
@@ -199,7 +204,7 @@ impl DeltaQ {
     pub fn deps(&self) -> BTreeSet<String> {
         match self {
             DeltaQ::BlackBox => BTreeSet::new(),
-            DeltaQ::Name(name) => {
+            DeltaQ::Name(name, _rec) => {
                 let mut deps = BTreeSet::new();
                 deps.insert(name.clone());
                 deps
@@ -233,8 +238,12 @@ impl DeltaQ {
             DeltaQ::BlackBox => {
                 write!(f, "BB")
             }
-            DeltaQ::Name(name) => {
-                write!(f, "{}", name)
+            DeltaQ::Name(name, rec) => {
+                if let Some(rec) = rec {
+                    write!(f, "{}^{}", name, rec)
+                } else {
+                    write!(f, "{}", name)
+                }
             }
             DeltaQ::CDF(cdf) => {
                 write!(f, "{}", cdf)
@@ -275,22 +284,57 @@ impl DeltaQ {
     pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<CDF, DeltaQError> {
         match self {
             DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
-            DeltaQ::Name(n) => {
-                if let Some((_, Some(cdf))) = ctx.ctx.get(n) {
-                    Ok(cdf.clone())
-                } else if let Some((dq, _)) = ctx.ctx.remove(n) {
-                    match dq.eval(ctx) {
-                        Ok(cdf) => {
-                            ctx.ctx.insert(n.to_owned(), (dq, Some(cdf.clone())));
+            DeltaQ::Name(n, r) => {
+                // recursion is only allowed if not yet recursing on this name or there is an existing allowance
+                // which means that a new allowance leads to error if there is an existing one (this would permit
+                // infinite recursion)
+                //
+                // None means not recursing on this name
+                // Some(None) means recursing on this name without allowance
+                // Some(Some(n)) means recursing on this name with n as the remaining allowance
+                let recursion = if let Some(r) = r {
+                    if ctx.rec.contains_key(n) {
+                        return Err(DeltaQError::RecursionError(n.to_owned()));
+                    }
+                    Some(ctx.rec.entry(n.to_owned()).or_insert(Some(*r)).as_mut())
+                } else {
+                    ctx.rec.get_mut(n).map(|r| r.as_mut())
+                };
+                if let Some(Some(allowance)) = recursion {
+                    match ctx.ctx.get(n) {
+                        Some((dq, _)) => {
+                            let mut increment = true;
+                            let ret = if *allowance == 0 {
+                                increment = false;
+                                Ok(CDF::step(&[(0.0, 1.0)]).unwrap())
+                            } else {
+                                *allowance -= 1;
+                                dq.clone().eval(ctx)
+                            };
+                            if r.is_some() {
+                                ctx.rec.remove(n);
+                            } else if increment {
+                                *ctx.rec.get_mut(n).unwrap().as_mut().unwrap() += 1;
+                            }
+                            ret
+                        }
+                        None => Err(DeltaQError::NameError(n.to_owned())),
+                    }
+                } else if recursion.is_some() {
+                    Err(DeltaQError::RecursionError(n.to_owned()))
+                } else {
+                    match ctx.ctx.get(n) {
+                        Some((_, Some(cdf))) => Ok(cdf.clone()),
+                        Some((dq, None)) => {
+                            ctx.rec.insert(n.to_owned(), None);
+                            let cdf = dq.clone().eval(ctx);
+                            ctx.rec.remove(n);
+                            let cdf = cdf?;
+                            ctx.ctx.get_mut(n).unwrap().1 = Some(cdf.clone());
                             Ok(cdf)
                         }
-                        Err(e) => {
-                            ctx.ctx.insert(n.to_owned(), (dq, None));
-                            Err(e)
-                        }
+                        None => Err(DeltaQError::NameError(n.to_owned())),
                     }
-                } else {
-                    Err(DeltaQError::NameError(n.to_owned()))
                 }
             }
             DeltaQ::CDF(cdf) => Ok(cdf.clone().with_max_size(ctx.max_size).with_mode(ctx.mode)),
@@ -489,7 +533,7 @@ mod tests {
             "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
         };
         let result = DeltaQ::name("recursive").eval(&mut ctx.into()).unwrap_err();
-        assert_eq!(result, DeltaQError::NameError("recursive".to_owned()));
+        assert_eq!(result, DeltaQError::RecursionError("recursive".to_owned()));
     }
 
     #[test]
@@ -505,6 +549,51 @@ mod tests {
             res.contains("expected 'BB', name, CDF, 'all(', 'some(', or a parentheses"),
             "{}",
             res
+        );
+    }
+
+    #[test]
+    fn test_recursion() {
+        let mut ctx = EvaluationContext::default();
+
+        ctx.put("f".to_owned(), "CDF[(1,1)] ->- f ->- f".parse().unwrap());
+        let res = DeltaQ::Name("f".to_owned(), Some(3))
+            .eval(&mut ctx)
+            .unwrap();
+        assert_eq!(res, "CDF[(7,1)]".parse::<CDF>().unwrap());
+
+        ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
+        for i in 0..10 {
+            let res = DeltaQ::Name("f".to_owned(), Some(i))
+                .eval(&mut ctx)
+                .unwrap();
+            assert_eq!(res, CDF::step(&[(i as f32, 1.0)]).unwrap());
+        }
+
+        ctx.put(
+            "cdf".to_owned(),
+            "CDF[(0.1, 0.33), (0.2, 0.66), (0.4, 1)]".parse().unwrap(),
+        );
+        ctx.put(
+            "out".to_owned(),
+            "cdf ->- (cdf 0.5<>3 all(cdf | cdf ->- out))"
+                .parse()
+                .unwrap(),
+        );
+        let res = DeltaQ::Name("out".to_owned(), Some(1))
+            .eval(&mut ctx)
+            .unwrap();
+        assert_eq!(
+            res,
+            CDF::step(&[
+                (0.2, 0.046360295),
+                (0.3, 0.20068718),
+                (0.4, 0.30865377),
+                (0.5, 0.53209203),
+                (0.6, 0.81900346),
+                (0.8, 1.0)
+            ])
+            .unwrap()
         );
     }
 }
