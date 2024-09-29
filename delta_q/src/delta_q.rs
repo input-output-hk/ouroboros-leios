@@ -1,15 +1,17 @@
 use crate::{cdf::DEFAULT_MAX_SIZE, CDFError, CompactionMode, CDF};
+use smallstr::SmallString;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     str::FromStr,
+    sync::Arc,
 };
 
 #[derive(Debug, PartialEq)]
 pub enum DeltaQError {
     CDFError(CDFError),
-    NameError(String),
-    RecursionError(String),
+    NameError(Name),
+    RecursionError(Name),
     BlackBox,
 }
 
@@ -32,12 +34,14 @@ impl From<CDFError> for DeltaQError {
     }
 }
 
+type Name = SmallString<[u8; 16]>;
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<String, DeltaQ>")]
+#[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<Name, DeltaQ>")]
 pub struct EvaluationContext {
-    ctx: BTreeMap<String, (DeltaQ, Option<CDF>)>,
-    deps: BTreeMap<String, BTreeSet<String>>,
-    rec: BTreeMap<String, Option<usize>>,
+    ctx: BTreeMap<Name, (DeltaQ, Option<CDF>)>,
+    deps: BTreeMap<Name, BTreeSet<Name>>,
+    rec: BTreeMap<Name, Option<usize>>,
     max_size: usize,
     mode: CompactionMode,
 }
@@ -57,12 +61,13 @@ impl Default for EvaluationContext {
 impl EvaluationContext {
     pub fn put(&mut self, name: String, delta_q: DeltaQ) {
         // first remove all computed values that depend on this name
-        let mut to_remove = vec![name.clone()];
+        let name = Name::from(name);
+        let mut to_remove: Vec<Name> = vec![name.clone()];
         while let Some(name) = to_remove.pop() {
-            if self.ctx.get_mut(&name).and_then(|x| x.1.take()).is_some() {
+            if self.ctx.get_mut(&*name).and_then(|x| x.1.take()).is_some() {
                 tracing::info!("Removing computed value for {}", name);
                 for (k, v) in self.deps.iter() {
-                    if v.contains(&name) {
+                    if v.contains(&*name) {
                         to_remove.push(k.clone());
                     }
                 }
@@ -74,7 +79,8 @@ impl EvaluationContext {
 
     pub fn remove(&mut self, name: &str) -> Option<DeltaQ> {
         // first remove all computed values that depend on this name
-        let mut to_remove = vec![name.to_owned()];
+        let name = Name::from(name);
+        let mut to_remove = vec![name.clone()];
         while let Some(name) = to_remove.pop() {
             if self.ctx.get_mut(&name).and_then(|x| x.1.take()).is_some() {
                 tracing::info!("Removing computed value for {}", name);
@@ -85,8 +91,8 @@ impl EvaluationContext {
                 }
             }
         }
-        self.deps.remove(name);
-        self.ctx.remove(name).map(|(dq, _)| dq)
+        self.deps.remove(&name);
+        self.ctx.remove(&name).map(|(dq, _)| dq)
     }
 
     pub fn get(&self, name: &str) -> Option<&DeltaQ> {
@@ -97,16 +103,22 @@ impl EvaluationContext {
         DeltaQ::name(name).eval(self)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &DeltaQ)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Name, &DeltaQ)> {
         self.ctx.iter().map(|(k, (v, _))| (k, v))
     }
 }
 
 impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
     fn from(value: BTreeMap<String, DeltaQ>) -> Self {
-        let deps = value.iter().map(|(k, v)| (k.clone(), v.deps())).collect();
+        let deps = value
+            .iter()
+            .map(|(k, v)| (Name::from(&**k), v.deps()))
+            .collect();
         Self {
-            ctx: value.into_iter().map(|(k, v)| (k, (v, None))).collect(),
+            ctx: value
+                .into_iter()
+                .map(|(k, v)| (Name::from(k), (v, None)))
+                .collect(),
             deps,
             rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
@@ -115,8 +127,8 @@ impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
     }
 }
 
-impl Into<BTreeMap<String, DeltaQ>> for EvaluationContext {
-    fn into(self) -> BTreeMap<String, DeltaQ> {
+impl Into<BTreeMap<Name, DeltaQ>> for EvaluationContext {
+    fn into(self) -> BTreeMap<Name, DeltaQ> {
         self.ctx.into_iter().map(|(k, (v, _))| (k, v)).collect()
     }
 }
@@ -136,19 +148,54 @@ pub enum DeltaQ {
     /// Un unelaborated and unknown DeltaQ.
     BlackBox,
     /// A named DeltaQ taken from the context, with an optional recursion allowance.
-    Name(String, Option<usize>),
+    Name(Name, Option<usize>),
     /// A CDF that is used as a DeltaQ.
     CDF(CDF),
     /// The convolution of two DeltaQs, describing the sequential execution of two outcomes.
-    Seq(Box<DeltaQ>, Box<DeltaQ>),
+    Seq(
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+    ),
     /// A choice between two DeltaQs (i.e. their outcomes), with a given weight of each.
-    Choice(Box<DeltaQ>, f32, Box<DeltaQ>, f32),
+    Choice(
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        f32,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        f32,
+    ),
     /// A DeltaQ that is the result of a universal quantification over two DeltaQs,
     /// meaning that both outcomes must occur.
-    ForAll(Box<DeltaQ>, Box<DeltaQ>),
+    ForAll(
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+    ),
     /// A DeltaQ that is the result of an existential quantification over two DeltaQs,
     /// meaning that at least one of the outcomes must occur.
-    ForSome(Box<DeltaQ>, Box<DeltaQ>),
+    ForSome(
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+    ),
+}
+
+mod delta_q_serde {
+    use super::DeltaQ;
+    use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
+
+    pub(super) fn serialize<S>(this: &Arc<DeltaQ>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**this).serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Arc<DeltaQ>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let delta_q = DeltaQ::deserialize(deserializer)?;
+        Ok(Arc::new(delta_q))
+    }
 }
 
 impl Display for DeltaQ {
@@ -168,7 +215,11 @@ impl FromStr for DeltaQ {
 impl DeltaQ {
     /// Create a new DeltaQ from a name, referencing a variable.
     pub fn name(name: &str) -> DeltaQ {
-        DeltaQ::Name(name.to_string(), None)
+        DeltaQ::Name(name.into(), None)
+    }
+
+    pub fn name_rec(name: &str, rec: Option<usize>) -> DeltaQ {
+        DeltaQ::Name(name.into(), rec)
     }
 
     /// Create a new DeltaQ from a CDF.
@@ -178,30 +229,30 @@ impl DeltaQ {
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
     pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::Seq(Box::new(first), Box::new(second))
+        DeltaQ::Seq(Arc::new(first), Arc::new(second))
     }
 
     /// Create a new DeltaQ from a choice between two DeltaQs.
     pub fn choice(first: DeltaQ, first_weight: f32, second: DeltaQ, second_weight: f32) -> DeltaQ {
         DeltaQ::Choice(
-            Box::new(first),
+            Arc::new(first),
             first_weight,
-            Box::new(second),
+            Arc::new(second),
             second_weight,
         )
     }
 
     /// Create a new DeltaQ from a universal quantification over two DeltaQs.
     pub fn for_all(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::ForAll(Box::new(first), Box::new(second))
+        DeltaQ::ForAll(Arc::new(first), Arc::new(second))
     }
 
     /// Create a new DeltaQ from an existential quantification over two DeltaQs.
     pub fn for_some(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::ForSome(Box::new(first), Box::new(second))
+        DeltaQ::ForSome(Arc::new(first), Arc::new(second))
     }
 
-    pub fn deps(&self) -> BTreeSet<String> {
+    pub fn deps(&self) -> BTreeSet<Name> {
         match self {
             DeltaQ::BlackBox => BTreeSet::new(),
             DeltaQ::Name(name, _rec) => {
@@ -533,7 +584,7 @@ mod tests {
             "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
         };
         let result = DeltaQ::name("recursive").eval(&mut ctx.into()).unwrap_err();
-        assert_eq!(result, DeltaQError::RecursionError("recursive".to_owned()));
+        assert_eq!(result, DeltaQError::RecursionError("recursive".into()));
     }
 
     #[test]
@@ -557,16 +608,12 @@ mod tests {
         let mut ctx = EvaluationContext::default();
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f ->- f".parse().unwrap());
-        let res = DeltaQ::Name("f".to_owned(), Some(3))
-            .eval(&mut ctx)
-            .unwrap();
+        let res = DeltaQ::Name("f".into(), Some(3)).eval(&mut ctx).unwrap();
         assert_eq!(res, "CDF[(7,1)]".parse::<CDF>().unwrap());
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {
-            let res = DeltaQ::Name("f".to_owned(), Some(i))
-                .eval(&mut ctx)
-                .unwrap();
+            let res = DeltaQ::Name("f".into(), Some(i)).eval(&mut ctx).unwrap();
             assert_eq!(res, CDF::step(&[(i as f32, 1.0)]).unwrap());
         }
 
@@ -580,9 +627,7 @@ mod tests {
                 .parse()
                 .unwrap(),
         );
-        let res = DeltaQ::Name("out".to_owned(), Some(1))
-            .eval(&mut ctx)
-            .unwrap();
+        let res = DeltaQ::Name("out".into(), Some(1)).eval(&mut ctx).unwrap();
         assert_eq!(
             res,
             CDF::step(&[

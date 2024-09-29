@@ -41,7 +41,6 @@ Requests to the `delta_q/*` endpoints will be proxied.
 
 ## Known Shortcomings
 
-- not optimised at all, especially regarding memory usage (need to make cloning cheap for CDF, DeltaQ, etc.) and web assembly size
 - functional but ugly
 - duplicates state management in web app and backend, not yet decided what to put where (currently ΔQ expression evaluation is done in the backend, could easily move to a web worker)
 - should have export (probably as JSON) and matching import

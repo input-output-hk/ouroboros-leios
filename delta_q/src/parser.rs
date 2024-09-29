@@ -1,4 +1,5 @@
 use crate::DeltaQ;
+use std::sync::Arc;
 use winnow::{
     combinator::{alt, cut_err, delimited, fail, opt, preceded, separated, separated_pair},
     error::{StrContext, StrContextValue},
@@ -34,8 +35,8 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
 
             let rhs = rec(input, rbp)?;
             lhs = match op {
-                Op::Seq => DeltaQ::Seq(Box::new(lhs), Box::new(rhs)),
-                Op::Choice(l, r) => DeltaQ::Choice(Box::new(lhs), l, Box::new(rhs), r),
+                Op::Seq => DeltaQ::Seq(Arc::new(lhs), Arc::new(rhs)),
+                Op::Choice(l, r) => DeltaQ::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
             };
         }
         Ok(lhs)
@@ -79,7 +80,7 @@ fn name(input: &mut &str) -> PResult<DeltaQ> {
         opt(preceded('^', int)),
     )
         .parse_next(input)
-        .map(|(name, rec)| DeltaQ::Name(name.to_string(), rec))
+        .map(|(name, rec)| DeltaQ::name_rec(&name, rec))
 }
 
 fn cdf(input: &mut &str) -> PResult<DeltaQ> {
@@ -120,7 +121,7 @@ fn for_all(input: &mut &str) -> PResult<DeltaQ> {
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )
-    .map(|(left, right)| DeltaQ::ForAll(Box::new(left), Box::new(right)))
+    .map(|(left, right)| DeltaQ::ForAll(Arc::new(left), Arc::new(right)))
     .parse_next(input)
 }
 
@@ -130,7 +131,7 @@ fn for_some(input: &mut &str) -> PResult<DeltaQ> {
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )
-    .map(|(left, right)| DeltaQ::ForSome(Box::new(left), Box::new(right)))
+    .map(|(left, right)| DeltaQ::ForSome(Arc::new(left), Arc::new(right)))
     .parse_next(input)
 }
 

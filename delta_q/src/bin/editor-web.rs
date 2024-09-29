@@ -124,7 +124,7 @@ fn app_main() -> HtmlResult {
         .map(|(k, v)| {
             let name = k.clone();
             let select = select.clone();
-            let sel = if selected.as_ref() == Some(k) {
+            let sel = if selected.as_deref() == Some(k.as_str()) {
                 sel_found = true;
                 Some("selected")
             } else {
@@ -132,9 +132,9 @@ fn app_main() -> HtmlResult {
             };
             html! {
                 <li class={classes!("row")}>
-                    <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.clone(), None)))}>{ "delete "}</button>
-                    <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.clone())}>
-                        { k }{ ": " }<EditExpression name={k.clone()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
+                    <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.to_string(), None)))}>{ "delete "}</button>
+                    <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.to_string())}>
+                        { k }{ ": " }<EditExpression name={k.to_string()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
                     </div>
                 </li>
             }

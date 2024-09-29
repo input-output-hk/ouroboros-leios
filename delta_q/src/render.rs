@@ -36,7 +36,7 @@ pub fn delta_q_component(props: &Props) -> Html {
             html! { <BlackBox {on_change} /> }
         }
         DeltaQ::Name(name, rec) => {
-            html! { <NameComponent name={name.clone()} rec={*rec} {on_change} /> }
+            html! { <NameComponent name={(&**name).to_owned()} rec={*rec} {on_change} /> }
         }
         DeltaQ::CDF(cdf) => {
             html! { <div class={classes!("cdf")}>{ format!("{}", cdf) }</div> }
@@ -116,7 +116,7 @@ pub fn name_component(props: &NameProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::Name((*new_name).clone(), rec))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name_rec(&new_name, rec))));
         }
     ));
 
@@ -354,7 +354,7 @@ fn branch(props: &BranchProps) -> Html {
     let top = props.top.clone();
     let bottom = props.bottom.clone();
     let kind = props.kind;
-    let constructor: Arc<dyn Fn(Box<DeltaQ>, Box<DeltaQ>) -> DeltaQ> = match kind {
+    let constructor: Arc<dyn Fn(Arc<DeltaQ>, Arc<DeltaQ>) -> DeltaQ> = match kind {
         BranchKind::Choice(l, r) => Arc::new(move |dql, dqr| DeltaQ::Choice(dql, l, dqr, r)),
         BranchKind::ForAll => Arc::new(DeltaQ::ForAll),
         BranchKind::ForSome => Arc::new(DeltaQ::ForSome),
@@ -367,7 +367,7 @@ fn branch(props: &BranchProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(constructor(Box::new(delta_q), Box::new(bottom.clone())))));
+                on_change.emit((name, Some(constructor(Arc::new(delta_q), Arc::new(bottom.clone())))));
             }
         }
     ));
@@ -378,7 +378,7 @@ fn branch(props: &BranchProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(constructor(Box::new(top.clone()), Box::new(delta_q)))));
+                on_change.emit((name, Some(constructor(Arc::new(top.clone()), Arc::new(delta_q)))));
             }
         }
     ));

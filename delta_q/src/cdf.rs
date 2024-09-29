@@ -6,6 +6,7 @@ use std::{
     iter::Peekable,
     marker::PhantomData,
     str::FromStr,
+    sync::Arc,
 };
 
 #[derive(Debug, PartialEq)]
@@ -43,14 +44,34 @@ pub const DEFAULT_MAX_SIZE: usize = 1000;
 /// A Cumulative Distribution Function (CDF) is a representation of a probability
 /// distribution that can be manipulated in various ways.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "CDFSerial", into = "CDFSerial")]
 pub struct CDF {
     /// invariants: first component strictly monotonically increasing and non-negative,
     /// second component strictly monotonically increasing and in the range (0, 1]
-    data: Vec<(f32, f32)>,
-    #[serde(skip)]
+    data: Arc<[(f32, f32)]>,
     max_size: usize,
-    #[serde(skip)]
     mode: CompactionMode,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CDFSerial {
+    data: Vec<(f32, f32)>,
+}
+
+impl From<CDF> for CDFSerial {
+    fn from(cdf: CDF) -> Self {
+        Self {
+            data: cdf.data[..].to_owned(),
+        }
+    }
+}
+
+impl TryFrom<CDFSerial> for CDF {
+    type Error = CDFError;
+
+    fn try_from(serial: CDFSerial) -> Result<Self, Self::Error> {
+        CDF::step(&serial.data)
+    }
 }
 
 impl fmt::Debug for CDF {
@@ -136,7 +157,7 @@ impl FromStr for CDF {
             data.push((x, y));
         }
         Ok(Self {
-            data,
+            data: data.into(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
@@ -249,7 +270,7 @@ impl CDF {
             return Err(CDFError::NonMonotonicData);
         }
         Ok(Self {
-            data: points.to_vec(),
+            data: points.into(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
@@ -283,7 +304,10 @@ impl CDF {
             }
         }
         compact(&mut data, self.mode, self.max_size);
-        Ok(CDF { data, ..*self })
+        Ok(CDF {
+            data: data.into(),
+            ..*self
+        })
     }
 
     /// Combine two CDFs by universal quantification, meaning that both outcomes must occur.
@@ -294,7 +318,10 @@ impl CDF {
             data.push((x, y));
         }
         compact(&mut data, self.mode, self.max_size);
-        Ok(CDF { data, ..*self })
+        Ok(CDF {
+            data: data.into(),
+            ..*self
+        })
     }
 
     /// Combine two CDFs by existential quantification, meaning that at least one of the outcomes
@@ -305,7 +332,10 @@ impl CDF {
             data.push((x, y));
         }
         compact(&mut data, self.mode, self.max_size);
-        Ok(CDF { data, ..*self })
+        Ok(CDF {
+            data: data.into(),
+            ..*self
+        })
     }
 
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
@@ -329,7 +359,10 @@ impl CDF {
             prev_y = ly;
         }
         compact(&mut data, self.mode, self.max_size);
-        Ok(CDF { data, ..*self })
+        Ok(CDF {
+            data: data.into(),
+            ..*self
+        })
     }
 }
 
@@ -345,6 +378,25 @@ pub enum CompactionMode {
 /// Under CompactionMode::UnderApproximate, the new point gets the greater x coordinate while under CompactionMode::OverApproximate, the new point gets the smaller x coordinate.
 /// The resulting point always has the higher y value of the pair.
 fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
+    {
+        let mut pos = 0;
+        let mut prev_x = -1.0;
+        let mut prev_y = 0.0;
+        for i in 0..data.len() {
+            let (x, y) = data[i];
+            if x > prev_x && y > prev_y {
+                data[pos] = (x, y);
+                prev_x = x;
+                prev_y = y;
+                pos += 1;
+            } else if y > prev_y {
+                data[pos - 1].1 = y;
+                prev_y = y;
+            }
+        }
+        data.truncate(pos);
+    }
+
     if data.len() <= max_size {
         return;
     }
