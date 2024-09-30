@@ -34,10 +34,26 @@ The build comprises two steps:
 - `trunk build` (i.e. you’ll need to `cargo install --locked trunk` first)
 - `cargo run --bin editor`
 
-The first one builds the web app in the `dist/` folder, which the second one then integrates into the single-binary application that will serve HTTP resources on port 8080 when run.
+The first one uses [trunk](https://trunkrs.dev) to build the web app in the `dist/` folder, which the second one then integrates into the single-binary application that will serve HTTP resources on port 8080 when run.
 
 When developing the web UI part you can leave `cargo run --bin editor` running while using `trunk serve` to serve the UI with change detection.
 Requests to the `delta_q/*` endpoints will be proxied.
+
+### Troubleshooting
+
+Depending on local Rust configuration, building the web app might be less straightforward.
+
+Trunk needs the Wasm bindings generators but they are not installed by default at least on MacOS M1:
+
+```
+cargo install --locked wasm-bindgen-cli
+```
+
+It also needs a Wasm toolchain:
+
+```
+rustup target add wasm32-unknown-unknown
+```
 
 ## Known Shortcomings
 
