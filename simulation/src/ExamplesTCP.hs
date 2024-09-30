@@ -4,7 +4,7 @@ module ExamplesTCP where
 import Data.Word
 import Data.Functor.Contravariant
 
-import Control.Monad.Class.MonadTime (Time, DiffTime)
+import Control.Monad.Class.MonadTime.SI (Time, DiffTime)
 
 import System.Random (mkStdGen, random)
 

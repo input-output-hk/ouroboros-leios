@@ -3,3 +3,9 @@ report/leios-design.log
 report/leios-design.out
 report/leios-design.pdf
 report/leios-design.toc
+*~
+dist-newstyle/
+\#*
+.\#*
+.pre-commit-config.yaml
+_build

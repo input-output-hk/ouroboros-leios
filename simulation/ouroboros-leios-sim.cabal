@@ -23,6 +23,8 @@ library
                        ChanTCP,
                        SimTypes,
 
+                       TimeCompat,
+
                        Viz,
                        VizSim,
                        VizChart,
@@ -44,7 +46,6 @@ library
                        VizSimRelayP2P,
                        ExamplesRelayP2P
 
-
   -- other-extensions:
   build-depends:       base,
                        containers,
@@ -58,6 +59,7 @@ library
                        contra-tracer,
                        io-classes,
                        io-sim,
+                       si-timers,
 
                        cairo,
                        pango,

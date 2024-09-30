@@ -1,0 +1,293 @@
+name: CI
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  ALLOWED_URIS: "https://github.com https://api.github.com"
+  TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+  SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io"
+
+on:
+  pull_request:
+  push:
+    branches:
+    - main
+jobs:
+
+  typecheck:
+    name: Typecheck specification
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-typecheck-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-typecheck-
+    - name: 🛠️ Install Nix
+      uses: cachix/install-nix-action@v21
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+        install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+        extra_nix_config: |
+          allowed-uris = ${{ env.ALLOWED_URIS }}
+          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+          substituters = ${{ env.SUBSTITUTERS }}
+          experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
+    - name: 🏗️ Build specification
+      run: |
+        nix build --show-trace --accept-flake-config .#leiosSpec
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
+        
+  compile:
+    name: Build libraries
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-compile-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-compile-
+    - name: 🛠️ Install Nix
+      uses: cachix/install-nix-action@v21
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+        install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+        extra_nix_config: |
+          allowed-uris = ${{ env.ALLOWED_URIS }}
+          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+          substituters = ${{ env.SUBSTITUTERS }}
+          experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
+    - name: 🏗️ Build `exe:leios`
+      run: |
+        nix build --show-trace --accept-flake-config .#leios
+    - name: 🏗️ Build `exe:ouroboros-net-vis`
+      run: |
+        nix build --show-trace --accept-flake-config .#ouroboros-net-vis
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
+        
+  tests:
+    if: true
+    name: Run tests
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+    - name: 💾 Cache Nix store
+      uses: actions/cache@v3.0.8
+      id: nix-cache
+      with:
+        path: /tmp/nixcache
+        key: ${{ runner.os }}-nix-tests-${{ hashFiles('flake.lock') }}
+        restore-keys: ${{ runner.os }}-nix-tests-
+    - name: 🛠️ Install Nix
+      uses: cachix/install-nix-action@v21
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+        install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+        extra_nix_config: |
+          allowed-uris = ${{ env.ALLOWED_URIS }}
+          trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+          substituters = ${{ env.SUBSTITUTERS }}
+          experimental-features = nix-command flakes
+    - name: 💾➤ Import Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit == 'true'"
+      run: "nix-store --import < /tmp/nixcache"
+    - name: 🔬 Test with `leios-sim-test`
+      run: |
+        nix run --accept-flake-config .#leios-sim-test
+    - name: ➤💾 Export Nix store cache
+      if: "steps.nix-cache.outputs.cache-hit != 'true'"
+      run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
+
+  build-docusaurus:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+          cache-dependency-path: site/yarn.lock
+
+      - name: 📦 Install dependencies
+        working-directory: site
+        run: yarn install
+
+      - name: 🏗️ Build Docusaurus site
+        working-directory: site
+        run: |
+          yarn build
+
+      - name: 🚀 Publish Docusaurus build
+        uses: actions/upload-artifact@v4
+        with:
+          name: docusaurus-build
+          if-no-files-found: error
+          path: |
+            site/build/*
+
+  publish-docs:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    needs:
+      - build-docusaurus
+    steps:
+      - name: 📥 Download Docusaurus build
+        uses: actions/download-artifact@v4
+        with:
+          name: docusaurus-build
+          path: ./github-pages
+
+      - name: 🚀 Publish GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          publish_dir: ./github-pages
+          cname: leios.cardano-scaling.org
+
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      # Uses the `docker/login-action` action to log in to the
+      # Container registry registry using the account and password
+      # that will publish the packages. Once published, the packages
+      # are scoped to the account defined here.
+      - name: 🛠️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 👮 Log in to Google Cloud
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          token_format: access_token
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+          access_token_lifetime: 3600s # need to be long enough for docker build to finish
+
+      - name: 👮 Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # This step uses
+      # [docker/metadata-action](https://github.com/docker/metadata-action#about)
+      # to extract tags and labels that will be applied to the
+      # specified image. The `id` "meta" allows the output of this
+      # step to be referenced in a subsequent step. The `images` value
+      # provides the base name for the tags and labels.
+      - name: 🛻 Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # This step uses the `docker/build-push-action` action to build
+      # the image, based on your repository's `Dockerfile`. If the
+      # build succeeds, it pushes the image to GitHub Packages.  It
+      # uses the `context` parameter to define the build's context as
+      # the set of files located in the specified path. For more
+      # information, see
+      # "[Usage](https://github.com/docker/build-push-action#usage)"
+      # in the README of the `docker/build-push-action` repository.
+      # It uses the `tags` and `labels` parameters to tag and label
+      # the image with the output from the "meta" step.
+      - name: 🏗️ Build and push image to GHCR
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}:cache,mode=max
+
+      - name: 👮 Login to Artifact Registry
+        uses: docker/login-action@v1
+        with:
+          registry: us-east1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: 📦 Push to GCR
+        run: |-
+          docker pull $image_tag
+          docker tag $image_tag "us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
+          docker push "us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:$GITHUB_SHA"
+        env:
+          image_id: ${{ steps.push.outputs.imageid }}
+          image_tag: ${{ steps.meta.outputs.tags }}
+
+      # This step generates an artifact attestation for the image,
+      # which is an unforgeable statement about where and how it was
+      # built. It increases supply chain security for people who
+      # consume the image. For more information, see
+      # "[AUTOTITLE](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds)."
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+  # deploy built server to Gcloud run action when pushing to main
+  deploy-server:
+    # if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push-image
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: 'actions/checkout@v4'
+
+    - name: 👮 Log in to Google Cloud
+      id: auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+
+    - name: 🚀 Deploy to Cloud Run
+      id: 'deploy'
+      uses: 'google-github-actions/deploy-cloudrun@v2'
+      with:
+        service: 'leios-server'
+        image: 'us-east1-docker.pkg.dev/iog-hydra/leios-docker/${{ env.IMAGE_NAME}}:${{ github.sha }}'
+        region: 'us-east1'
+
+    - name: 🔬 'Use output'
+      run: 'curl -v -L "${{ steps.deploy.outputs.url }}"'

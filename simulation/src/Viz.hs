@@ -18,7 +18,7 @@ import           Data.Functor.Contravariant
 
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Class.MonadTime (Time(Time), DiffTime, diffTime, addTime)
+import           Control.Monad.Class.MonadTime.SI (Time(Time), DiffTime, diffTime, addTime)
 
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Pango.Cairo  as Pango

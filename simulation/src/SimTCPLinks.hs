@@ -9,11 +9,13 @@ import Data.Bifoldable
 import Data.Dynamic
 
 import Control.Monad
-import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadTimer
 import Control.Monad.Class.MonadAsync
 import Control.Concurrent.Class.MonadSTM
 import Control.Tracer as Tracer
+
+import TimeCompat (threadDelaySI)
 
 import Control.Monad.IOSim as IOSim
 
@@ -114,7 +116,7 @@ generatorNode tracer (UniformTrafficPattern nmsgs msgsz mdelay) chan = do
     sequence_
       [ do writeChan chan msg
            traceWith tracer (MsgDepart msg)
-           maybe (return ()) threadDelay mdelay
+           maybe (return ()) threadDelaySI mdelay
       | msg <- map (flip TestMessage msgsz) [0..nmsgs-1] ]
 
 sinkNode :: Monad m

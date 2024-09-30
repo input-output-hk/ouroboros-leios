@@ -12,13 +12,14 @@ import qualified Data.Map.Strict as Map
 import           Data.Map.Strict (Map)
 import           Data.Foldable
 
-import Control.Applicative
 import Control.Monad
-import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadTimer
 import Control.Monad.Class.MonadAsync
 import Control.Concurrent.Class.MonadSTM
 import Control.Tracer as Tracer
+
+import TimeCompat (threadDelayNDT, threadDelaySI)
 
 import Control.Monad.IOSim as IOSim
 
@@ -128,7 +129,7 @@ relayNode tracer
           --TODO: make different generators produce different non-overlapping ids
         where
           go !blkid = do
-            threadDelay gendelay
+            threadDelaySI gendelay
             now <- getCurrentTime
             let blk = TestBlock { 
                         testBlockId     = blkid,
@@ -145,7 +146,7 @@ relayNode tracer
           go !rng = do
             let (u, rng') = uniformR (0,1) rng
                 gendelay  = realToFrac (- log u * lambda :: Double) :: DiffTime
-            threadDelay gendelay
+            threadDelaySI gendelay
             now <- getCurrentTime
             let (blkidn, rng'') = uniform rng'
                 blkid = TestBlockId blkidn
@@ -171,7 +172,7 @@ relayNode tracer
             Nothing -> retry
             Just (blk, _) -> return (testBlockExpiry blk)
         now <- getCurrentTime
-        threadDelay (realToFrac (expiry `diffUTCTime` now))
+        threadDelayNDT (expiry `diffUTCTime` now)
         blks <- atomically $ do
           blkq <- readTVar buffer
           let (blks, !blkq') = dequeueExpired expiry [] blkq
@@ -191,8 +192,8 @@ relayNode tracer
     processing submitq =
       forever $ do
         (blk, completion) <- atomically $ readTQueue submitq
-        threadDelay (blockProcessingDelay blk)
-        _ <- atomically (completion <|> error "relayNode: completions should not block")
+        threadDelaySI (blockProcessingDelay blk)
+        _ <- atomically completion -- "relayNode: completions should not block"
         traceWith tracer (RelayNodeEventEnterBuffer blk)
 
 symmetric :: Ord a => Set (a, a) -> Set (a, a)

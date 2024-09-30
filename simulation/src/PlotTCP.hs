@@ -8,7 +8,7 @@
 
 module PlotTCP where
 
-import Control.Monad.Class.MonadTime
+import Control.Monad.Class.MonadTime.SI
 
 --import Graphics.Gnuplot.Simple as Gnuplot
 --import qualified Graphics.Gnuplot.Value.Tuple as Gnuplot.Tuple
