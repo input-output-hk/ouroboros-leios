@@ -89,13 +89,11 @@ fn cdf(input: &mut &str) -> PResult<DeltaQ> {
         cut_err(
             separated::<_, _, (), _, _, _, _>(
                 0..,
-                cut_err(
-                    (ws, '(', ws, num, ws, ',', ws, num, ws, ')')
-                        .context(StrContext::Label("CDF literal"))
-                        .context(StrContext::Expected(StrContextValue::Description(
-                            "CDF[(<num>, <num>), ...]",
-                        ))),
-                ),
+                (ws, '(', ws, num, ws, ',', ws, num, ws, ')')
+                    .context(StrContext::Label("CDF literal"))
+                    .context(StrContext::Expected(StrContextValue::Description(
+                        "CDF[(<num>, <num>), ...]",
+                    ))),
                 (ws, ','),
             )
             .take()
@@ -165,8 +163,8 @@ enum Op {
 impl Op {
     fn bp(&self) -> (u8, u8) {
         match self {
-            Op::Seq => (1, 2),
-            Op::Choice { .. } => (3, 4),
+            Op::Choice { .. } => (2, 1),
+            Op::Seq => (3, 4),
         }
     }
 }

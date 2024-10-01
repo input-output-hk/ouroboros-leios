@@ -401,7 +401,8 @@ fn branch(props: &BranchProps) -> Html {
 
 pub fn cdf_to_svg(cdf: &CDF) -> Html {
     let mut canvas = Canvas::new(310.0, 110.0);
-    let x_scale = 300.0 / cdf.width();
+    let width = cdf.width();
+    let x_scale = 300.0 / (width * 1.2).max(1.1);
     canvas.polyline(Polyline {
         color: Some(Color::black()),
         stroke_width: 1.0,
@@ -415,7 +416,11 @@ pub fn cdf_to_svg(cdf: &CDF) -> Html {
                         y: (1.0 - y) * 100.0 + 1.0,
                     },
                     Point {
-                        x: x2 * x_scale + 10.0,
+                        x: if x2 > width {
+                            310.0
+                        } else {
+                            x2 * x_scale + 10.0
+                        },
                         y: (1.0 - y) * 100.0 + 1.0,
                     },
                 ]

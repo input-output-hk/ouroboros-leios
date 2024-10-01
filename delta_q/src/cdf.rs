@@ -185,7 +185,7 @@ impl<'a> Iterator for CDFIterator<'a> {
         } else if self.last {
             self.last = false;
             let (x, y) = self.prev;
-            Some((x * 1.2, y))
+            Some(((x * 1.2).max(0.1), y))
         } else {
             None
         }

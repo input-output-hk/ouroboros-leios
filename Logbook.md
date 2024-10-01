@@ -1,5 +1,40 @@
 # Leios logbook
 
+## 2024-10-01
+
+Report on ΔQ work in Rust so far (Roland):
+
+- implemented MVP in the sense of being able to create ΔQ expressions as per the “Mind your outcomes” paper and evaluate them
+- added a recursion operator that is purely syntactical: recursive unfolding of a named expression with a given depth limit
+- project uses yew/trunk to render the HTML/CSS frontend, which uses WASM (tools were chosen for convenience, not minimalism)
+- ΔQ evaluation currently done in server process, but could also be moved into the web part (should use web worker to stay responsive)
+
+Implementation notes:
+
+- CDF is represented as a list of f32 tuples, with a size limit of 1000 (tunable) after which the step function will be simplified (i.e. approximated)
+- this simplification can be done in over- or under-approximation mode; running both and showing the difference will illustrate the error range
+- tuples are pruned in increasing order of their distance to the right neighbour, with two complications:
+  1. distances are binned to some precision to avoid dominating the selection by floating-point precision limits
+  2. the algorithm pulls pruning candidates from a heap but skips every second one of the same distance; this yields more even pruning along the x axis
+- the EvaluationContext holds all named expressions and allows resolving names, but also tracks the current recursion allowance for each name
+  (recursion with allowance isn’t allowed while already recursing on that name; allowing this results in infinite loop)
+
+Comments raised while presenting this to the team today:
+
+- syntax should stay closer to the original paper (I deviated in order to allow normal people to type in expressions with their keyboard)
+  - this could be done by having aliases and supporting the entry of special glyphs with a palette on the web page
+- showing recursion as exponentiation is surprising, Andre expected exponentiation to be just some form of repeated multiplication (but unclear which operation that would be)
+- recursion as template unfolding was understood as some fix point representation by Duncan, but currently that is not how it is implemented
+- treating the propagation of messages across a network graph isn’t faithfully modelled, but it could be if recursion was actually some kind of fix point operation
+  - it would be great to have an operator that expresses “only broadcast the first copy of the message I receive”, which would allow pruning the infinite evaluation tree
+  - this is unclear to me because ΔQ speaks in CDFs which aren’t concrete in this way, so pruning wouldn’t apply to CDFs but to some execution of the modelled process
+- Pi asked how this work relates to the Rust-based network graph simulator, which has at least two answers:
+  - compute CDFs that are used by the simulator using ΔQ
+  - use simulation results (CDFs) as inputs for further ΔQ modelling, e.g. on a higher level
+- on the website we’ll need something that can quickly answer high-level questions, running a simulation would probably not be feasible but ΔQ should be
+- it occurred to me that if we can get a load profile from a ΔQ model, we can then use queueing theory to compute the effect on latencies to get a better approximation of overall system behaviour
+  - these two steps can be run alternatingly to see if there is a fix point for the result — and if the computation diverges, that tells us that the network graph would die from overload
+
 ## 2024-09-30
 
 Catching-up on Leios ΔQ work:
