@@ -1,5 +1,50 @@
 # Leios logbook
 
+## 2024-09-30
+
+Catching-up on Leios ΔQ work:
+
+* pulled updated main and trying to run it. It uses [trunk](https://trunkrs.dev) which is a tool for packaging WASM app that takes care of all the dependencies and nitty-gritty details of Rust -> Wasm toolchain.
+  `trunk` build does not automatically instead needed toolchain actually, so one needs to add the toolchain and (on Mac M1) install manually wasm bindings generators.
+* actually takes quite a while to compile!!
+* added some documentation to the README to remove a couple hurdles from installation process. I guess nix does "the right thing"?
+* It seems like [wasmpack](https://github.com/rustwasm/book/issues/160) should do it, so perhaps we could use wasm-pack rather than `trunk`? Or does this even make sense?
+
+Trying to get a high-level view of the Leios project:
+
+* WT (Duncan, Andrea, Wen) -> working on network simulation?
+  * there's an old code base in `simulation` directory which contains a simulator for "simple" packets routing?
+  * What kind of question can it answers in relationship with Leios?
+* Sundae (Simon)
+  * network simulation?
+  * ledger? how does this relate to other group working on ledger?
+  * why care about ledger? could we not model IBs more abstractly?
+* Roland / Yves?
+  * ΔQ modelling tool
+  * ΔQ modelling of Leios proper (start with short pipeline Leios?)
+  * exploring use of ΔQ for modeling load and congestion?
+* Brian
+  * filling up AB's role
+* Andre Knispel
+  * protocol specification in Agda
+  * leios ledger spec?
+* Giorgos
+  * research liaison -> ledger design?
+
+Possible list of short-term goals:
+
+* Update protocol simulation (using Agda as an executable spec?)
+* ΔQ modelling of timeliness (and load/congestion ?)
+* Large scale network simulation (using ce-netsim ?)
+* Leios requirements for Ledger (adjust Praos design? simulate impact of Leios on ledger?)
+* Existing network simulation from 2 years ago?
+
+During a discussion about Leios and FM, Briand suggested we write a white paper on Agda-based conformance testing:
+
+* testing strategies for consensus, ledger, or plutus are different
+* Is Agda2hs is fit for purpose? Seems like there's some dissent within the Agda experts about this
+* At the very least, writing things down will "force" dialogue and help reach consensus/alignment on a particular way of working
+
 ## 2024-09-26
 
 ### Team session on requirements for metrics
