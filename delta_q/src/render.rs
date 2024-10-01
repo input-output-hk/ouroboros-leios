@@ -29,14 +29,14 @@ pub struct Props {
 
 #[function_component(DeltaQComponent)]
 pub fn delta_q_component(props: &Props) -> Html {
-    web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{props:?}")));
+    // web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{props:?}")));
     let on_change = props.on_change.clone();
     match &props.delta_q {
         DeltaQ::BlackBox => {
             html! { <BlackBox {on_change} /> }
         }
-        DeltaQ::Name(name) => {
-            html! { <NameComponent name={name.clone()} {on_change} /> }
+        DeltaQ::Name(name, rec) => {
+            html! { <NameComponent name={(&**name).to_owned()} rec={*rec} {on_change} /> }
         }
         DeltaQ::CDF(cdf) => {
             html! { <div class={classes!("cdf")}>{ format!("{}", cdf) }</div> }
@@ -96,6 +96,7 @@ pub fn black_box(props: &BlackBoxProps) -> Html {
 #[derive(Properties, Clone, PartialEq)]
 pub struct NameProps {
     pub name: String,
+    pub rec: Option<usize>,
     pub on_change: Callback<(String, Option<DeltaQ>)>,
 }
 
@@ -104,6 +105,7 @@ pub fn name_component(props: &NameProps) -> Html {
     let on_change = props.on_change.clone();
     let popup = use_state(|| false);
     let name = props.name.clone();
+    let rec = props.rec;
     let ctx = use_context::<DeltaQContext>().unwrap();
 
     let new_name = use_state(|| props.name.clone());
@@ -114,13 +116,14 @@ pub fn name_component(props: &NameProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::Name((*new_name).clone()))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name_rec(&new_name, rec))));
         }
     ));
 
     html! {
         <div class={classes!("name", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
             { &props.name }
+            if let Some(rec) = rec { <sup>{ rec }</sup> }
             if *popup {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup;
@@ -351,7 +354,7 @@ fn branch(props: &BranchProps) -> Html {
     let top = props.top.clone();
     let bottom = props.bottom.clone();
     let kind = props.kind;
-    let constructor: Arc<dyn Fn(Box<DeltaQ>, Box<DeltaQ>) -> DeltaQ> = match kind {
+    let constructor: Arc<dyn Fn(Arc<DeltaQ>, Arc<DeltaQ>) -> DeltaQ> = match kind {
         BranchKind::Choice(l, r) => Arc::new(move |dql, dqr| DeltaQ::Choice(dql, l, dqr, r)),
         BranchKind::ForAll => Arc::new(DeltaQ::ForAll),
         BranchKind::ForSome => Arc::new(DeltaQ::ForSome),
@@ -364,7 +367,7 @@ fn branch(props: &BranchProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(constructor(Box::new(delta_q), Box::new(bottom.clone())))));
+                on_change.emit((name, Some(constructor(Arc::new(delta_q), Arc::new(bottom.clone())))));
             }
         }
     ));
@@ -375,7 +378,7 @@ fn branch(props: &BranchProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(constructor(Box::new(top.clone()), Box::new(delta_q)))));
+                on_change.emit((name, Some(constructor(Arc::new(top.clone()), Arc::new(delta_q)))));
             }
         }
     ));
@@ -440,7 +443,7 @@ pub fn cdf_to_svg(cdf: &CDF) -> Html {
     let svg = VNode::from_html_unchecked(canvas.svg().unwrap().into());
     html! {
         <>
-            <p>{ "result: " }{cdf.to_string()} </p>
+            <p class={classes!("result")}>{ "result: " }{cdf.to_string()} </p>
             { svg }
         </>
     }

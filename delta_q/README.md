@@ -8,12 +8,12 @@ The underlying ΔQ expressions shall be used for export/import of the model, com
 
 ## Implementation plan
 
-The first step is to provide a library for manipulating CDFs, offering all operations required by the theory; the internal representation will be discrete numerical [DONE], with later optimizations for constant parts at the beginning and end of the vector.
+The first step is to provide a library for manipulating CDFs, offering all operations required by the theory; the internal representation will be discrete numerical [DONE], with later optimizations for constant parts at the beginning and end of the vector. [DONE]
 
 The second step yields an internal DSL for creating ΔQ expressions and printing them. [DONE]
 
 The third step provides evaluation of ΔQ expressions as defined in the paper. [DONE]
-This will later be expanded to include some exponentiation-like operator that simplifies expressing a randomly chosen repetition count for some sub-expression (as frequently occurs in gossip protocols).
+This will later be expanded to include some exponentiation-like operator that simplifies expressing a randomly chosen repetition count for some sub-expression (as frequently occurs in gossip protocols). [DONE]
 
 The fourth step adds a web UI to expose the internal DSL to no-code users. [DONE]
 The interaction with a ΔQ expression shall closely resemble the refinement approach for system modelling as defined in the paper. [DONE]
@@ -32,7 +32,7 @@ The results of the load analysis will indicate where and under which conditions 
 The build comprises two steps:
 
 - `trunk build` (i.e. you’ll need to `cargo install --locked trunk` first)
-- `cargo run --bin editor`
+- `cargo run --bin editor -F main`
 
 The first one uses [trunk](https://trunkrs.dev) to build the web app in the `dist/` folder, which the second one then integrates into the single-binary application that will serve HTTP resources on port 8080 when run.
 
@@ -57,11 +57,6 @@ rustup target add wasm32-unknown-unknown
 
 ## Known Shortcomings
 
-- not optimised at all, especially regarding memory usage (need to make cloning cheap for CDF, DeltaQ, etc.) and web assembly size
 - functional but ugly
 - duplicates state management in web app and backend, not yet decided what to put where (currently ΔQ expression evaluation is done in the backend, could easily move to a web worker)
-- no editing of CDFs yet
 - should have export (probably as JSON) and matching import
-- should allow editing the formulas as text, which requires making the syntax more accessible via normal keyboards
-- fixed samples and width for CDF, should be changed to support any step function and compute its width dynamically (with upper bound on details to avoid memory explosion)
-- should add “exponentiation” operator to wrap an expression in another one with a hole for a specified number of times

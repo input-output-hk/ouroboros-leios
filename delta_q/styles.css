@@ -14,7 +14,21 @@
 .frame { margin: 4px; border: 1px solid grey; }
 .seqSymbol { width: 10px; height: 10px; border: 2px solid black; margin: 4px; cursor: pointer; }
 .branchKind { padding: 8px; cursor: pointer; }
-.expression { background-color: rgb(206, 236, 254); padding: 4px; display: inline-block; margin: 4px; cursor: pointer; }
+.expression {
+  background-color: rgb(206, 236, 254);
+  padding: 4px;
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+  margin: 4px;
+  cursor: pointer;
+}
+.selected { font-weight: bold; }
+.dq_edit { vertical-align: text-top; flex-grow: 1; margin-left: 16px; }
+.dq_edit form { display: flex; }
+.dq_edit input[type="text"] { width: 100%; }
+.dq_show { margin-left: 16px; }
+.result { max-height: 5em; overflow-y: scroll; }
 
 .column { display: flex; flex-direction: column; }
 .row { display: flex; flex-direction: row; }

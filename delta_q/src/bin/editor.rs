@@ -107,7 +107,7 @@ async fn main() -> io::Result<()> {
     ctx.put("black".to_owned(), DeltaQ::BlackBox);
     ctx.put(
         "cdf".to_owned(),
-        DeltaQ::cdf(CDF::step(&[(0.1, 0.33), (0.2, 0.66), (0.4, 1.0)], 0.01, 300).unwrap()),
+        DeltaQ::cdf(CDF::step(&[(0.1, 0.33), (0.2, 0.66), (0.4, 1.0)]).unwrap()),
     );
     ctx.put(
         "out".to_owned(),

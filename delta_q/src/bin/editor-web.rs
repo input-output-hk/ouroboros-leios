@@ -87,7 +87,7 @@ fn app_main() -> HtmlResult {
         };
 
     let selected = use_state(|| Some("out".to_owned()));
-    let onclick = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
+    let select = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
 
     // epoch counter to trigger recomputation when the context changes
     let epoch = use_state(|| 0);
@@ -123,18 +123,21 @@ fn app_main() -> HtmlResult {
         .iter()
         .map(|(k, v)| {
             let name = k.clone();
-            let onclick = onclick.clone();
-            let mut h = html! {
-                <li>
-                    <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.clone(), None)))}>{ "delete "}</button>
-                    <span class={classes!("expression")} style="margin-left: 8px;" onclick={onclick.reform(move |_| name.clone())}>{ format!("{k}: {v}") }</span>
-                </li>
-            };
-            if selected.as_ref() == Some(k) {
+            let select = select.clone();
+            let sel = if selected.as_deref() == Some(k.as_str()) {
                 sel_found = true;
-                h = html! { <strong>{ h }</strong> };
+                Some("selected")
+            } else {
+                None
+            };
+            html! {
+                <li class={classes!("row")}>
+                    <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.to_string(), None)))}>{ "delete "}</button>
+                    <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.to_string())}>
+                        { k }{ ": " }<EditExpression name={k.to_string()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
+                    </div>
+                </li>
             }
-            h
         })
         .collect::<Html>();
     if selected.is_some() && !sel_found {
@@ -143,7 +146,7 @@ fn app_main() -> HtmlResult {
     }
 
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
-    web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
+    // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
     let cdf = match cdf {
         Ok(cdf) => cdf_to_svg(&cdf),
@@ -199,6 +202,68 @@ fn add_expression(props: &AddExpressionProps) -> HtmlResult {
             <button type="submit">{ "add" }</button>
             <input type="text" {value} oninput={on_input} />
         </form>
+    })
+}
+
+#[derive(Properties, PartialEq, Clone, Debug)]
+struct EditExpressionProps {
+    name: String,
+    value: DeltaQ,
+    selected: bool,
+    on_change: Callback<(String, Option<DeltaQ>)>,
+}
+
+#[function_component(EditExpression)]
+fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
+    let name = props.name.clone();
+    let on_change = props.on_change.clone();
+
+    let editing = use_state(|| false);
+    let buffer = use_state(|| props.value.to_string());
+    let result = use_state(|| "OK".to_owned());
+
+    let value = use_state(|| props.value.clone());
+    let on_submit = cloned!(name, value, on_change, editing; Callback::from(move |e: SubmitEvent| {
+        e.prevent_default();
+        editing.set(false);
+        on_change.emit((name.clone(), Some((*value).clone())));
+    }));
+    let on_input = cloned!(buffer, value, result; Callback::from(move |e: InputEvent| {
+        let v = e.target_unchecked_into::<HtmlInputElement>().value();
+        buffer.set(v.clone());
+        match v.parse::<DeltaQ>() {
+            Ok(dq) => {
+                value.set(dq);
+                result.set("OK".to_owned());
+            }
+            Err(e) => {
+                result.set(e);
+            }
+        }
+    }));
+
+    use_memo(
+        (props.value.clone(), props.selected),
+        cloned!(editing, value, buffer; move |x| {
+               editing.set(false);
+               value.set(x.0.clone());
+               buffer.set(x.0.to_string());
+            }
+        ),
+    );
+
+    Ok(html! {
+        if *editing {
+            <div class={classes!("dq_edit")}>
+                <form onsubmit={on_submit}>
+                    <input type="submit" value="update" />
+                    <input type="text" value={(*buffer).clone()} oninput={on_input} />
+                </form>
+                <pre>{ &*result }</pre>
+            </div>
+        } else {
+            <span class={classes!("dq_show")} onclick={cloned!(editing; move |_| editing.set(true))}>{ value.to_string() }</span>
+        }
     })
 }
 
