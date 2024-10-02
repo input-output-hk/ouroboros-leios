@@ -3,9 +3,8 @@
 
 module VizSim where
 
-import Data.Foldable as Foldable
-
 import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
+import Data.Foldable (Foldable (foldl'))
 
 import Viz
 

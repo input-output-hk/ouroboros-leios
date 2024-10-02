@@ -1,21 +1,22 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module SimRelayP2P where
 
-import Data.Foldable
-import Data.List
+import Control.Monad.Class.MonadAsync (
+  Concurrently (Concurrently, runConcurrently),
+ )
+import Control.Monad.Class.MonadTime.SI (DiffTime)
+import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
+import Control.Tracer as Tracer (
+  Contravariant (contramap),
+  Tracer,
+  traceWith,
+ )
+import Data.Foldable (sequenceA_)
+import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
-
-import Control.Monad.Class.MonadAsync
-import Control.Monad.Class.MonadTime.SI
-import Control.Tracer as Tracer
-
-import Control.Monad.IOSim as IOSim
-
 import System.Random (StdGen, split)
 
 import ChanTCP

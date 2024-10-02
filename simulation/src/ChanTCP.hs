@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -12,18 +10,40 @@ module ChanTCP (
   TcpConnProps (..),
 ) where
 
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (
+    TMVar,
+    TVar,
+    atomically,
+    modifyTVar',
+    newEmptyTMVarIO,
+    newTVarIO,
+    putTMVar,
+    readTMVar,
+    readTVar,
+    retry,
+    takeTMVar,
+    writeTVar
+  ),
+ )
+import Control.Exception (assert)
+import Control.Monad (when)
+import Control.Monad.Class.MonadAsync (MonadAsync (async))
+import Control.Monad.Class.MonadTime.SI (
+  DiffTime,
+  MonadMonotonicTime (..),
+  MonadTime,
+  Time,
+  diffTime,
+ )
+import Control.Monad.Class.MonadTimer (MonadDelay)
+import Control.Tracer as Tracer (
+  Contravariant (contramap),
+  Tracer,
+  traceWith,
+ )
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
-
-import Control.Concurrent.Class.MonadSTM
-import Control.Exception (assert)
-import Control.Monad
-import Control.Monad.Class.MonadAsync
-import Control.Monad.Class.MonadTime.SI
-import Control.Monad.Class.MonadTimer
-import Control.Tracer as Tracer
-
-import TimeCompat (threadDelaySI)
 
 import Chan
 import ModelTCP (
@@ -36,6 +56,7 @@ import ModelTCP (
   initTcpState,
   saneTcpState,
  )
+import TimeCompat (threadDelaySI)
 
 -- | In the scope of a two party connection, there are just two peers. These
 -- can be maped to a wider scope peer identity via contra-trace.

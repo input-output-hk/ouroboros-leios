@@ -16,16 +16,15 @@ module ModelTCP (
   traceTcpSend,
 ) where
 
-import Data.Foldable as Foldable
+import Control.Exception (assert)
+import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime)
+import Data.Foldable as Foldable (Foldable (sum))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
-import Data.Ratio
-import Data.Semigroup
-
-import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime)
+import Data.Ratio ((%))
+import Data.Semigroup (Semigroup (sconcat))
 
 -- | The fixed characteristics of this TCP link: the latency, bandwidth and
 -- receiver window size. Each of these imposes a limit to effective

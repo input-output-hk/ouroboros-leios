@@ -2,9 +2,8 @@
 
 module ExamplesRelayP2P where
 
-import Data.Functor.Contravariant
-import Data.Word
-
+import Data.Functor.Contravariant (Contravariant (contramap))
+import Data.Word (Word8)
 import System.Random (mkStdGen, uniform)
 
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)

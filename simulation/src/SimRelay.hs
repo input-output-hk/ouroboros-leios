@@ -6,23 +6,46 @@
 
 module SimRelay where
 
-import Data.Foldable
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (
+    STM,
+    TQueue,
+    atomically,
+    newTQueueIO,
+    newTVarIO,
+    readTQueue,
+    readTVar,
+    retry,
+    writeTQueue,
+    writeTVar
+  ),
+ )
+import Control.Monad (forever)
+import Control.Monad.Class.MonadAsync (
+  Concurrently (Concurrently, runConcurrently),
+  MonadAsync (concurrently_),
+ )
+import Control.Monad.Class.MonadTime.SI (
+  DiffTime,
+  MonadTime (..),
+  NominalDiffTime,
+  Time,
+  UTCTime,
+  addUTCTime,
+  diffUTCTime,
+ )
+import Control.Monad.Class.MonadTimer (MonadDelay)
+import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
+import Control.Tracer as Tracer (
+  Contravariant (contramap),
+  Tracer,
+  traceWith,
+ )
+import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-
-import Control.Concurrent.Class.MonadSTM
-import Control.Monad
-import Control.Monad.Class.MonadAsync
-import Control.Monad.Class.MonadTime.SI
-import Control.Monad.Class.MonadTimer
-import Control.Tracer as Tracer
-
-import TimeCompat (threadDelayNDT, threadDelaySI)
-
-import Control.Monad.IOSim as IOSim
-
 import System.Random (StdGen, uniform, uniformR)
 
 import Chan
@@ -30,6 +53,7 @@ import ChanTCP
 import RelayProtocol
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
+import TimeCompat (threadDelayNDT, threadDelaySI)
 
 type RelaySimTrace = [(Time, RelaySimEvent)]
 

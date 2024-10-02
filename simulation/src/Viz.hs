@@ -2,24 +2,21 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTSyntax #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Viz where
 
-import Data.Functor.Contravariant
-import Data.IORef
-import Data.List
-import Data.Ratio
+import Control.Monad (when)
+import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime, diffTime)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Data.Functor.Contravariant (Contravariant (contramap))
+import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.List (foldl1', mapAccumL, zip4)
+import Data.Ratio ((%))
 import qualified Data.Time as Time
 import Data.Tree as Tree (Tree (..))
-
-import Control.Monad
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime, diffTime)
-import Control.Monad.IO.Class
-
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Pango.Cairo as Pango
 import qualified Graphics.Rendering.Pango.Font as Pango

@@ -1,20 +1,14 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 
 module VizChart where
 
-import Data.Functor
-import Data.List
-import Data.Ord
-
 import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
-
+import Data.Functor (void)
+import Data.List (minimumBy)
+import Data.Ord (comparing)
 import qualified Graphics.Rendering.Cairo as Cairo
-
 import qualified Graphics.Rendering.Chart.Backend.Cairo as Chart
 import qualified Graphics.Rendering.Chart.Easy as Chart
 

@@ -2,9 +2,8 @@
 
 module Main where
 
-import Control.Applicative
-import Data.Maybe
-
+import Control.Applicative (Alternative ((<|>)), optional)
+import Data.Maybe (fromMaybe)
 import qualified Options.Applicative as Opts
 
 import Viz

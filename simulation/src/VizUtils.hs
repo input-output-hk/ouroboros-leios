@@ -17,10 +17,10 @@ withPoint f (Point x y) = f x y
 
 renderPathRoundedRect :: Point -> Point -> Double -> Cairo.Render ()
 renderPathRoundedRect a@(Point x1 _) b@(Point x2 _) w = do
-  if (x2 > x1)
+  if x2 > x1
     then withPoint Cairo.arc a' r (π / 2 + α) (-π / 2 + α)
     else withPoint Cairo.arc a' r (-π / 2 + α) (π / 2 + α)
-  if (x2 > x1)
+  if x2 > x1
     then withPoint Cairo.arc b' r (-π / 2 + α) (π / 2 + α)
     else withPoint Cairo.arc b' r (π / 2 + α) (-π / 2 + α)
   Cairo.closePath

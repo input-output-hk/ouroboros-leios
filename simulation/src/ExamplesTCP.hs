@@ -2,14 +2,11 @@
 
 module ExamplesTCP where
 
-import Data.Functor.Contravariant
-import Data.Word
-
 import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
-
-import System.Random (mkStdGen, random)
-
+import Data.Functor.Contravariant (Contravariant (contramap))
+import Data.Word (Word8)
 import qualified Graphics.Rendering.Chart.Easy as Chart
+import System.Random (mkStdGen, random)
 
 import ModelTCP
 import PlotTCP

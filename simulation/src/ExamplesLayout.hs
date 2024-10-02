@@ -2,10 +2,10 @@
 
 module ExamplesLayout where
 
-import Viz
-
 import qualified Graphics.Rendering.Cairo as Cairo
-import Numeric
+import Numeric (showFFloat)
+
+import Viz
 
 ------------------------------------------------------------------------------
 -- Example layouts for vizualisation

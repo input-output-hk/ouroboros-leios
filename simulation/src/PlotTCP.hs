@@ -1,17 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- TODO: share the orphans
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module PlotTCP where
 
-import Control.Monad.Class.MonadTime.SI
-
--- import Graphics.Gnuplot.Simple as Gnuplot
--- import qualified Graphics.Gnuplot.Value.Tuple as Gnuplot.Tuple
--- import qualified Graphics.Gnuplot.Terminal.PNG as Gnuplot.PNG
+import Control.Monad.Class.MonadTime.SI (DiffTime, Time (..))
 
 import ModelTCP
 import SimTCPLinks

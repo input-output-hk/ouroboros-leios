@@ -1,6 +1,6 @@
 module ExamplesRelay where
 
-import Data.Word
+import Data.Word (Word8)
 import System.Random (mkStdGen, uniform)
 
 import RelayProtocol

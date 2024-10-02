@@ -1,28 +1,40 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module SimTCPLinks where
 
-import Data.Bifoldable
-import Data.Dynamic
-
-import Control.Concurrent.Class.MonadSTM
-import Control.Monad
-import Control.Monad.Class.MonadAsync
-import Control.Monad.Class.MonadTime.SI
-import Control.Monad.Class.MonadTimer
-import Control.Tracer as Tracer
-
-import TimeCompat (threadDelaySI)
-
-import Control.Monad.IOSim as IOSim
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (atomically, newTQueueIO, readTQueue, writeTQueue),
+ )
+import Control.Monad (replicateM_)
+import Control.Monad.Class.MonadAsync (
+  Concurrently (Concurrently, runConcurrently),
+  MonadAsync (concurrently_),
+ )
+import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
+import Control.Monad.Class.MonadTimer (MonadDelay)
+import Control.Monad.IOSim as IOSim (
+  IOSim,
+  SimEvent (SimEvent, seTime, seType),
+  SimEventType (EventLog),
+  SimTrace,
+  runSimTrace,
+  traceM,
+ )
+import Control.Tracer as Tracer (
+  Contravariant (contramap),
+  Tracer (Tracer),
+  emit,
+  traceWith,
+ )
+import Data.Bifoldable (Bifoldable (bifoldr))
+import Data.Dynamic (Typeable, fromDynamic)
 
 import Chan
 import ChanTCP
 import ModelTCP
 import SimTypes
+import TimeCompat (threadDelaySI)
 
 ------------------------------------------------------------------------------
 -- Simulations

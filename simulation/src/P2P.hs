@@ -4,17 +4,23 @@
 
 module P2P where
 
-import Data.Array.ST as Array
-import Data.Array.Unboxed as Array
-import Data.Graph as Graph
+import Control.Monad (when)
+import Control.Monad.Class.MonadTime.SI (DiffTime)
+import Control.Monad.ST (ST)
+import Data.Array.ST as Array (
+  Ix (range),
+  MArray (newArray),
+  STUArray,
+  readArray,
+  runSTUArray,
+  writeArray,
+ )
+import Data.Array.Unboxed as Array (IArray (bounds), UArray, (!))
+import Data.Graph as Graph (Edge, Graph, Vertex, buildG, edges)
 import qualified Data.KdMap.Static as KdMap
-import Data.List
+import Data.List (mapAccumL, sort, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-
-import Control.Monad
-import Control.Monad.Class.MonadTime.SI (DiffTime)
-import Control.Monad.ST
 import System.Random (StdGen)
 import qualified System.Random as Random
 
