@@ -1,45 +1,43 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | The \"mempool\" for input blocks.
---
 module RelayProtocol (
-    RelayBuffer(..),
-    newRelayBuffer,
-    modifyRelayBuffer,
-    BlockQueue,
-    emptyBlockQueue,
-    nullBlockQueue,
-    snocBlockQueue,
-    unconsBlockQueue,
-    BlockRelayMessage(..),
-    relayServer,
-    BlockRelayConfig(..),
-    BlockTTL(..),
-    relayClient,
-  ) where
+  RelayBuffer (..),
+  newRelayBuffer,
+  modifyRelayBuffer,
+  BlockQueue,
+  emptyBlockQueue,
+  nullBlockQueue,
+  snocBlockQueue,
+  unconsBlockQueue,
+  BlockRelayMessage (..),
+  relayServer,
+  BlockRelayConfig (..),
+  BlockTTL (..),
+  relayClient,
+) where
 
-import           Data.Word
-import           Data.Function
-import           Data.List
-import qualified Data.Foldable as Foldable
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.FingerTree (FingerTree)
+import Data.FingerTree (FingerTree)
 import qualified Data.FingerTree as FingerTree
+import qualified Data.Foldable as Foldable
+import Data.Function
+import Data.List
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Word
 
-import Control.Monad
-import Control.Monad.Class.MonadTime
 import Control.Concurrent.Class.MonadSTM
 import Control.Exception (assert)
+import Control.Monad
+import Control.Monad.Class.MonadTime
 
 import Chan
-import ChanTCP (MessageSize(..))
-
+import ChanTCP (MessageSize (..))
 
 -- | The block relay buffer is a queue of blocks. The buffer is used to
 -- communicate currently active valid blocks.
@@ -48,13 +46,13 @@ import ChanTCP (MessageSize(..))
 --
 -- This buffer is the source and destination for the protocol that diffuses
 -- blocks between peers.
---
 newtype RelayBuffer m blk blkid = RelayBuffer (TVar m (BlockQueue blk blkid))
 
-data BlockQueue blk blkid =
-       BlockQueue !(FingerTree BlockQueueMeasure (BlockWithTicket blk blkid))
-                !(Map blkid Ticket)
-                !Ticket -- next one to use
+data BlockQueue blk blkid
+  = BlockQueue
+      !(FingerTree BlockQueueMeasure (BlockWithTicket blk blkid))
+      !(Map blkid Ticket)
+      !Ticket -- next one to use
   deriving (Show)
 
 data BlockWithTicket blk blkid = BlockWithTicket !blk !blkid !Ticket
@@ -63,22 +61,23 @@ data BlockWithTicket blk blkid = BlockWithTicket !blk !blkid !Ticket
 newtype Ticket = Ticket Word64
   deriving (Eq, Ord, Show, Bounded)
 
-data BlockQueueMeasure = BlockQueueMeasure {
-       mMinTicket :: !Ticket,
-       mMaxTicket :: !Ticket
-     }
-  deriving Show
+data BlockQueueMeasure = BlockQueueMeasure
+  { mMinTicket :: !Ticket
+  , mMaxTicket :: !Ticket
+  }
+  deriving (Show)
 
 instance FingerTree.Measured BlockQueueMeasure (BlockWithTicket blk blkid) where
   measure (BlockWithTicket _ _ pno) = BlockQueueMeasure pno pno
 
 instance Semigroup BlockQueueMeasure where
-  vl <> vr = BlockQueueMeasure
-               (mMinTicket vl `min` mMinTicket vr)
-               (mMaxTicket vl `max` mMaxTicket vr)
+  vl <> vr =
+    BlockQueueMeasure
+      (mMinTicket vl `min` mMinTicket vr)
+      (mMaxTicket vl `max` mMaxTicket vr)
 
 instance Monoid BlockQueueMeasure where
-  mempty  = BlockQueueMeasure maxBound minBound
+  mempty = BlockQueueMeasure maxBound minBound
   mappend = (<>)
 
 emptyBlockQueue :: BlockQueue blk blkid
@@ -87,54 +86,63 @@ emptyBlockQueue = BlockQueue FingerTree.empty Map.empty (Ticket 0)
 nullBlockQueue :: BlockQueue blk blkid -> Bool
 nullBlockQueue (BlockQueue ps _ _) = FingerTree.null ps
 
-snocBlockQueue :: Ord blkid => blk -> blkid
-               -> BlockQueue blk blkid -> BlockQueue blk blkid
+snocBlockQueue ::
+  Ord blkid =>
+  blk ->
+  blkid ->
+  BlockQueue blk blkid ->
+  BlockQueue blk blkid
 snocBlockQueue blk blkid (BlockQueue ps idx counter@(Ticket n)) =
-    BlockQueue
-      (ps FingerTree.|> BlockWithTicket blk blkid counter)
-      (Map.insert blkid counter idx)
-      (Ticket (n+1))
+  BlockQueue
+    (ps FingerTree.|> BlockWithTicket blk blkid counter)
+    (Map.insert blkid counter idx)
+    (Ticket (n + 1))
 
-unconsBlockQueue :: Ord blkid => BlockQueue blk blkid
-                 -> Maybe (blk, BlockQueue blk blkid)
+unconsBlockQueue ::
+  Ord blkid =>
+  BlockQueue blk blkid ->
+  Maybe (blk, BlockQueue blk blkid)
 unconsBlockQueue (BlockQueue ps idx counter) =
-    case FingerTree.viewl ps of
-      FingerTree.EmptyL -> Nothing
-      BlockWithTicket blk blkid _ FingerTree.:< ps' ->
-        let blkq' = BlockQueue ps' (Map.delete blkid idx) counter
-         in Just (blk, blkq')
+  case FingerTree.viewl ps of
+    FingerTree.EmptyL -> Nothing
+    BlockWithTicket blk blkid _ FingerTree.:< ps' ->
+      let blkq' = BlockQueue ps' (Map.delete blkid idx) counter
+       in Just (blk, blkq')
 
 lookupByBlockId :: Ord blkid => BlockQueue blk blkid -> blkid -> Maybe blk
 lookupByBlockId pq@(BlockQueue _ idx _) blkid =
-    Map.lookup blkid idx >>= lookupByTicket pq
+  Map.lookup blkid idx >>= lookupByTicket pq
 
 lookupByTicket :: BlockQueue blk blkid -> Ticket -> Maybe blk
 lookupByTicket (BlockQueue ps _ _) n =
-    case FingerTree.search (\ml mr -> mMaxTicket ml >= n
-                                   && mMinTicket mr >  n) ps of
-      FingerTree.Position _ (BlockWithTicket blk _ n') _ | n' == n -> Just blk
-      _                                                            -> Nothing
+  case FingerTree.search
+    ( \ml mr ->
+        mMaxTicket ml >= n
+          && mMinTicket mr > n
+    )
+    ps of
+    FingerTree.Position _ (BlockWithTicket blk _ n') _ | n' == n -> Just blk
+    _ -> Nothing
 
 fingerprintBlockQueue :: BlockQueue blk blkid -> Ticket
 fingerprintBlockQueue (BlockQueue _ _ counter) = counter
 
 blockQueueBlocks :: Ord blkid => BlockQueue blk blkid -> [(blk, blkid)]
 blockQueueBlocks (BlockQueue blkq _ _) =
-    [ (blk, blkid) | BlockWithTicket blk blkid _ <- Foldable.toList blkq ]
+  [(blk, blkid) | BlockWithTicket blk blkid _ <- Foldable.toList blkq]
 
 blockQueueBlockIdsSet :: Ord blkid => BlockQueue blk blkid -> Set blkid
 blockQueueBlockIdsSet (BlockQueue _ idx _) = Map.keysSet idx
 
-
 newRelayBuffer :: MonadSTM m => m (RelayBuffer m blk blkid)
 newRelayBuffer = RelayBuffer <$> newTVarIO emptyBlockQueue
 
-modifyRelayBuffer :: MonadSTM m
-                  => RelayBuffer m blk blkid
-                  -> (BlockQueue blk blkid -> BlockQueue blk blkid)
-                  -> STM m ()
+modifyRelayBuffer ::
+  MonadSTM m =>
+  RelayBuffer m blk blkid ->
+  (BlockQueue blk blkid -> BlockQueue blk blkid) ->
+  STM m ()
 modifyRelayBuffer (RelayBuffer buffer) f = modifyTVar' buffer f
-
 
 -- | The block relay protocol:
 --
@@ -148,102 +156,104 @@ modifyRelayBuffer (RelayBuffer buffer) f = modifyTVar' buffer f
 -- * The reply with block ids also includes selected block metadata: initially
 --   just the TTL of the block. This is used to avoid requesting expired blocks
 --   and also to allow policies on the order in which blocks are requested.
---
-data BlockRelayMessage blk blkid blkmd =
-       MsgReqBlockIdsBlocking
-     | MsgReqBlockIdsNonBlocking
-     | MsgRespBlockIds [(blkid, blkmd)]
-     | MsgReqBlock     blkid
-     | MsgRespBlock    blk
-     | MsgRespNoBlock  blkid
-  deriving Show
+data BlockRelayMessage blk blkid blkmd
+  = MsgReqBlockIdsBlocking
+  | MsgReqBlockIdsNonBlocking
+  | MsgRespBlockIds [(blkid, blkmd)]
+  | MsgReqBlock blkid
+  | MsgRespBlock blk
+  | MsgRespNoBlock blkid
+  deriving (Show)
 
 instance MessageSize blk => MessageSize (BlockRelayMessage blk blkid blkmd) where
-  messageSizeBytes MsgReqBlockIdsBlocking    = 10
+  messageSizeBytes MsgReqBlockIdsBlocking = 10
   messageSizeBytes MsgReqBlockIdsNonBlocking = 10
-  messageSizeBytes MsgRespBlockIds{}         = 100 -- crude approximation
-  messageSizeBytes MsgReqBlock{}             = 50
-  messageSizeBytes (MsgRespBlock blk)        = 10 + messageSizeBytes blk
-  messageSizeBytes MsgRespNoBlock{}          = 50
+  messageSizeBytes MsgRespBlockIds{} = 100 -- crude approximation
+  messageSizeBytes MsgReqBlock{} = 50
+  messageSizeBytes (MsgRespBlock blk) = 10 + messageSizeBytes blk
+  messageSizeBytes MsgRespNoBlock{} = 50
 
 newtype BlockTTL = BlockTTL UTCTime
   deriving (Eq, Ord, Show)
 
-data BlockRelayConfig m blk blkid =
-     BlockRelayConfig {
-       blockId     :: blk -> blkid,
-       blockTTL    :: blk -> BlockTTL,
-       submitBlock :: blk -> STM m () -> m ()
-     }
+data BlockRelayConfig m blk blkid
+  = BlockRelayConfig
+  { blockId :: blk -> blkid
+  , blockTTL :: blk -> BlockTTL
+  , submitBlock :: blk -> STM m () -> m ()
+  }
 
-relayServer :: forall m blk blkid.
-               (MonadSTM m, Ord blkid)
-            => BlockRelayConfig m blk blkid
-            -> RelayBuffer m blk blkid
-            -> Chan m (BlockRelayMessage blk blkid BlockTTL)
-            -> m ()
+relayServer ::
+  forall m blk blkid.
+  (MonadSTM m, Ord blkid) =>
+  BlockRelayConfig m blk blkid ->
+  RelayBuffer m blk blkid ->
+  Chan m (BlockRelayMessage blk blkid BlockTTL) ->
+  m ()
 relayServer BlockRelayConfig{blockTTL} (RelayBuffer buffer) chan =
-    go (fingerprintBlockQueue emptyBlockQueue)
-  where
-    go :: Ticket -> m ()
-    go !fingerprint = do
-      msg <- readChan chan
-      case msg of
-        MsgReqBlockIdsBlocking -> do
-          blkq <- atomically $ do
-            blkq <- readTVar buffer
-            when (fingerprintBlockQueue blkq == fingerprint) retry
-            return blkq
-          writeChan chan $
-            MsgRespBlockIds
-              [ (blkid, blockTTL blk)
-              | (blk, blkid) <- blockQueueBlocks blkq ]
-          go (fingerprintBlockQueue blkq)
+  go (fingerprintBlockQueue emptyBlockQueue)
+ where
+  go :: Ticket -> m ()
+  go !fingerprint = do
+    msg <- readChan chan
+    case msg of
+      MsgReqBlockIdsBlocking -> do
+        blkq <- atomically $ do
+          blkq <- readTVar buffer
+          when (fingerprintBlockQueue blkq == fingerprint) retry
+          return blkq
+        writeChan chan $
+          MsgRespBlockIds
+            [ (blkid, blockTTL blk)
+            | (blk, blkid) <- blockQueueBlocks blkq
+            ]
+        go (fingerprintBlockQueue blkq)
+      MsgReqBlockIdsNonBlocking -> do
+        blkq <- atomically $ readTVar buffer
+        writeChan chan $
+          MsgRespBlockIds
+            [ (blkid, blockTTL blk)
+            | (blk, blkid) <- blockQueueBlocks blkq
+            ]
+        go (fingerprintBlockQueue blkq)
+      MsgReqBlock blkid -> do
+        mblk <- atomically $ do
+          blkq <- readTVar buffer
+          return (lookupByBlockId blkq blkid)
+        case mblk of
+          Nothing -> do
+            writeChan chan (MsgRespNoBlock blkid)
+            go fingerprint
+          Just blk -> do
+            writeChan chan (MsgRespBlock blk)
+            go fingerprint
+      MsgRespBlockIds{} -> error "relayServer: unexpected message"
+      MsgRespBlock{} -> error "relayServer: unexpected message"
+      MsgRespNoBlock{} -> error "relayServer: unexpected message"
 
-        MsgReqBlockIdsNonBlocking -> do
-          blkq <- atomically $ readTVar buffer
-          writeChan chan $
-            MsgRespBlockIds
-              [ (blkid, blockTTL blk)
-              | (blk, blkid) <- blockQueueBlocks blkq ]
-          go (fingerprintBlockQueue blkq)
-
-        MsgReqBlock blkid -> do
-          mblk <- atomically $ do
-            blkq <- readTVar buffer
-            return (lookupByBlockId blkq blkid)
-          case mblk of
-            Nothing -> do
-              writeChan chan (MsgRespNoBlock blkid)
-              go fingerprint
-            Just blk -> do
-              writeChan chan (MsgRespBlock blk)
-              go fingerprint
-
-        MsgRespBlockIds{} -> error "relayServer: unexpected message"
-        MsgRespBlock{}    -> error "relayServer: unexpected message"
-        MsgRespNoBlock{}  -> error "relayServer: unexpected message"
-
-
---TODO: there is no limit on the size of in-flight set, but there probably
+-- TODO: there is no limit on the size of in-flight set, but there probably
 -- should be. It looks like we get osilating behaviour of asking for too much
 -- followed by forwarding bursts
 
-relayClient :: forall m blk blkid.
-               (MonadSTM m, MonadTime m, Ord blkid)
-            => BlockRelayConfig m blk blkid
-            -> RelayBuffer m blk blkid
-            -> TVar m (Set blkid) -- ^ in-flight set shared between all clients
-            -> Chan m (BlockRelayMessage blk blkid BlockTTL)
-            -> m ()
-relayClient BlockRelayConfig {blockId, submitBlock}
-            (RelayBuffer buffer) inflight chan = do
+relayClient ::
+  forall m blk blkid.
+  (MonadSTM m, MonadTime m, Ord blkid) =>
+  BlockRelayConfig m blk blkid ->
+  RelayBuffer m blk blkid ->
+  -- | in-flight set shared between all clients
+  TVar m (Set blkid) ->
+  Chan m (BlockRelayMessage blk blkid BlockTTL) ->
+  m ()
+relayClient
+  BlockRelayConfig{blockId, submitBlock}
+  (RelayBuffer buffer)
+  inflight
+  chan = do
     idle 0
-  where
+   where
     idle nreplies | nreplies == 0 = do
       writeChan chan MsgReqBlockIdsBlocking
-      awaitReply (nreplies+1)
-
+      awaitReply (nreplies + 1)
     idle nreplies =
       awaitReply nreplies
 
@@ -258,30 +268,36 @@ relayClient BlockRelayConfig {blockId, submitBlock}
           -- If none are new, go back to asking for more blkids.
           now <- getCurrentTime
           mnewBlkIds <- atomically $ do
-            oldBlkIds <- Set.union <$> readTVar inflight
-                                  <*> (blockQueueBlockIdsSet <$> readTVar buffer)
-            let newBlkIds = [ (blkid, ttl)
-                            | (blkid, ttl) <- availableBlkIds
-                            , blkid `Set.notMember` oldBlkIds
-                            , ttl >= BlockTTL now ]
+            oldBlkIds <-
+              Set.union
+                <$> readTVar inflight
+                <*> (blockQueueBlockIdsSet <$> readTVar buffer)
+            let newBlkIds =
+                  [ (blkid, ttl)
+                  | (blkid, ttl) <- availableBlkIds
+                  , blkid `Set.notMember` oldBlkIds
+                  , ttl >= BlockTTL now
+                  ]
                 newBlkIdsSet = Set.fromList (map fst newBlkIds)
             if null newBlkIds
               then return Nothing
-              else do modifyTVar' inflight (Set.union newBlkIdsSet)
-                      return (Just newBlkIds)
+              else do
+                modifyTVar' inflight (Set.union newBlkIdsSet)
+                return (Just newBlkIds)
           case mnewBlkIds of
-            Nothing       -> idle (nreplies - 1)
+            Nothing -> idle (nreplies - 1)
             Just newBlkIds -> do
               -- request blocks in the order from oldest to newest
               -- Note: this is a place where alternative polciies might request
               -- newest to oldest, or some hybrid (e.g. "recent" (Delta) before
               -- non-recent, but recent ones still oldest to newest).
               sequence_
-                [ do writeChan chan (MsgReqBlock blkid)
-                     writeChan chan  MsgReqBlockIdsNonBlocking
-                | (blkid, _ttl) <- sortBy (compare `on` snd) newBlkIds ]
+                [ do
+                  writeChan chan (MsgReqBlock blkid)
+                  writeChan chan MsgReqBlockIdsNonBlocking
+                | (blkid, _ttl) <- sortBy (compare `on` snd) newBlkIds
+                ]
               idle (nreplies - 1 + 2 * length newBlkIds)
-
         MsgRespBlock blk -> do
           -- Submit the block for validation, and when that completes
           -- asynchronously atomically remove from the inflight and add
@@ -289,15 +305,12 @@ relayClient BlockRelayConfig {blockId, submitBlock}
           submitBlock blk $ do
             let blkid = blockId blk
             modifyTVar' inflight (Set.delete blkid)
-            modifyTVar' buffer   (snocBlockQueue blk blkid)
+            modifyTVar' buffer (snocBlockQueue blk blkid)
           idle (nreplies - 1)
-
         MsgRespNoBlock blkno -> do
           atomically $
             modifyTVar' inflight (Set.delete blkno)
           idle (nreplies - 1)
-
-        MsgReqBlockIdsBlocking{}    -> error "relayClient: unexpected message"
+        MsgReqBlockIdsBlocking{} -> error "relayClient: unexpected message"
         MsgReqBlockIdsNonBlocking{} -> error "relayClient: unexpected message"
-        MsgReqBlock{}               -> error "relayClient: unexpected message"
-
+        MsgReqBlock{} -> error "relayClient: unexpected message"

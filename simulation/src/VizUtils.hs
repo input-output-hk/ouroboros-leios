@@ -4,7 +4,7 @@ module VizUtils where
 
 import qualified Graphics.Rendering.Cairo as Cairo
 
-import SimTypes (Point(..))
+import SimTypes (Point (..))
 
 data Vector = Vector !Double !Double
 
@@ -17,33 +17,34 @@ withPoint f (Point x y) = f x y
 
 renderPathRoundedRect :: Point -> Point -> Double -> Cairo.Render ()
 renderPathRoundedRect a@(Point x1 _) b@(Point x2 _) w = do
-    if (x2 > x1)
-      then withPoint Cairo.arc a' r ( π/2+α) (-π/2+α)
-      else withPoint Cairo.arc a' r (-π/2+α) ( π/2+α)
-    if (x2 > x1)
-      then withPoint Cairo.arc b' r (-π/2+α) ( π/2+α)
-      else withPoint Cairo.arc b' r ( π/2+α) (-π/2+α)
-    Cairo.closePath
-  where
-    π  = pi
-    α  = angleV v
-    v  = vector a b
-    uv = unitV v
-    a' = a `addP` scaleV   r  uv
-    b' = b `addP` scaleV (-r) uv
-    r  = w/2
+  if (x2 > x1)
+    then withPoint Cairo.arc a' r (π / 2 + α) (-π / 2 + α)
+    else withPoint Cairo.arc a' r (-π / 2 + α) (π / 2 + α)
+  if (x2 > x1)
+    then withPoint Cairo.arc b' r (-π / 2 + α) (π / 2 + α)
+    else withPoint Cairo.arc b' r (π / 2 + α) (-π / 2 + α)
+  Cairo.closePath
+ where
+  π = pi
+  α = angleV v
+  v = vector a b
+  uv = unitV v
+  a' = a `addP` scaleV r uv
+  b' = b `addP` scaleV (-r) uv
+  r = w / 2
 
-translateLineNormal :: Double
-                    -> (Point, Point)
-                    -> (Point, Point)
+translateLineNormal ::
+  Double ->
+  (Point, Point) ->
+  (Point, Point)
 translateLineNormal displace (a, b) =
-    (a', b')
-  where
-    a' = addP a d
-    b' = addP b d
-    d  = scaleV displace (normalV uv)
-    uv = unitV v
-    v  = vector a b
+  (a', b')
+ where
+  a' = addP a d
+  b' = addP b d
+  d = scaleV displace (normalV uv)
+  uv = unitV v
+  v = vector a b
 
 vector :: Point -> Point -> Vector
 vector (Point x0 y0) (Point x1 y1) = Vector (x1 - x0) (y1 - y0)
@@ -58,7 +59,7 @@ negateV :: Vector -> Vector
 negateV (Vector dx dy) = Vector (-dx) (-dy)
 
 lenV :: Vector -> Double
-lenV (Vector dx dy) = sqrt (dx^(2::Int) + dy^(2::Int))
+lenV (Vector dx dy) = sqrt (dx ^ (2 :: Int) + dy ^ (2 :: Int))
 
 normalV :: Vector -> Vector
 normalV (Vector dx dy) = Vector (-dy) dx
@@ -68,8 +69,8 @@ normalV' (Vector dx dy) = Vector dy (-dx)
 
 unitV :: Vector -> Vector
 unitV (Vector dx dy) = Vector (dx / l) (dy / l)
-  where
-    l = lenV (Vector dx dy)
+ where
+  l = lenV (Vector dx dy)
 
 scaleV :: Double -> Vector -> Vector
 scaleV s (Vector dx dy) = Vector (dx * s) (dy * s)
@@ -78,16 +79,20 @@ angleV :: Vector -> Double
 angleV (Vector x y) = atan (y / x)
 
 midpointP :: Point -> Point -> Point
-midpointP (Point x0 y0) (Point x1 y1) = Point ((x0+x1)/2) ((y0+y1)/2)
+midpointP (Point x0 y0) (Point x1 y1) = Point ((x0 + x1) / 2) ((y0 + y1) / 2)
 
 -- | Given the world size, world position, and screen size, return the
 -- position in screen coordinates.
---
-simPointToPixel :: (Double, Double) -- ^ Sim world dimensions
-                -> (Double, Double) -- ^ Screen size
-                -> Point            -- ^ Sim world position
-                -> Point            -- ^ Screen coordinates
+simPointToPixel ::
+  -- | Sim world dimensions
+  (Double, Double) ->
+  -- | Screen size
+  (Double, Double) ->
+  -- | Sim world position
+  Point ->
+  -- | Screen coordinates
+  Point
 simPointToPixel (!ww, !wh) (!sw, !sh) (Point wx wy) = Point sx sy
-  where
-    !sx = wx/ww * sw
-    !sy = wy/wh * sh
+ where
+  !sx = wx / ww * sw
+  !sy = wy / wh * sh

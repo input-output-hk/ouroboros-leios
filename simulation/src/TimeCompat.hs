@@ -7,7 +7,7 @@ module TimeCompat (
 ) where
 
 import Control.Monad.Class.MonadTime.SI
-import Control.Monad.Class.MonadTimer (MonadDelay(..))
+import Control.Monad.Class.MonadTimer (MonadDelay (..))
 
 -- | Suspends the current thread for a given amount of time.
 threadDelayNDT :: MonadDelay m => NominalDiffTime -> m ()
