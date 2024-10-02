@@ -76,10 +76,10 @@ toDataSeries' :: [(Time, Time, Bytes)] -> [[(DiffTime, Bytes)]]
 toDataSeries' = go [] 0 0
  where
   go [] !_ !_ [] = []
-  go ps !_ !_ [] = reverse ps : []
+  go ps !_ !_ [] = [reverse ps]
   go ps !a !x0 ((Time x1, Time x2, dy) : ts)
     | x1 == x0 = go ((x2, a + dy) : (x1, a) : ps) (a + dy) x2 ts
-    | x1 > x0 = reverse ps : go ((x2, a + dy) : (x1, a) : []) (a + dy) x2 ts
+    | x1 > x0 = reverse ps : go [(x2, a + dy), (x1, a)] (a + dy) x2 ts
     | otherwise = error "toDataSeries: non-monotonic x values"
 
 selectEventsBeforeTime ::

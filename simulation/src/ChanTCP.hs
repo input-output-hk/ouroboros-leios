@@ -45,7 +45,7 @@ import Control.Tracer as Tracer (
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 
-import Chan
+import Chan (Chan (..))
 import ModelTCP (
   Bytes,
   TcpConnProps (..),

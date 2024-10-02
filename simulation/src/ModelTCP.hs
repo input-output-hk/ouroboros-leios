@@ -247,7 +247,7 @@ forecastTcpMsgSend
           tcpstate' = accumAck tcpstate ackbytes tcpAcknowledgements'
 
     arrivedAcks :: Time -> TcpState -> TcpState
-    arrivedAcks !now !tcpstate@TcpState{tcpAcknowledgements} =
+    arrivedAcks !now tcpstate@TcpState{tcpAcknowledgements} =
       case PQ.minViewWithKey tcpAcknowledgements of
         Just ((ackts, ackbytes), tcpAcknowledgements')
           | ackts <= now ->
@@ -322,7 +322,7 @@ mergeAdjacentForecasts (forecast0 :| forecasts0) =
     | otherwise =
         forecast : go forecast' forecasts
   go forecast [] =
-    forecast : []
+    [forecast]
 
 data TcpEvent msg
   = TcpSendMsg

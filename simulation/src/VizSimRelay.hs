@@ -174,7 +174,7 @@ relaySimVizModel =
       , vizMsgsDiffusionLatency =
           Map.adjust
             ( \(blk, nid', created, arrivals) ->
-                (blk, nid', created, (now : arrivals))
+                (blk, nid', created, now : arrivals)
             )
             (testBlockId msg)
             (vizMsgsDiffusionLatency vs)

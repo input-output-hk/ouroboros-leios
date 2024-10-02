@@ -223,7 +223,7 @@ layoutTiles allocToplevel =
                   iprops
               ]
       (LayoutOver [], []) -> []
-      (LayoutOver (l : ls), (lp : lps')) ->
+      (LayoutOver (l : ls), lp : lps') ->
         concat $
           allocate (x, y) (w, h) scale clear l lp
             : [ allocate (x, y) (w, h) scale False l' lp'
@@ -248,7 +248,7 @@ takeUpTo n = go 0
  where
   go !_ [] = []
   go !a (x : xs)
-    | a + x >= n = x : [] -- inclusive
+    | a + x >= n = [x] -- inclusive
     | otherwise = x : go (a + x) xs
 
 data LayoutProperties
@@ -475,9 +475,9 @@ vizualise
       name <- Gtk.eventKeyName
       case name of
         "Escape" -> liftIO $ Gtk.widgetDestroy window
-        "F11" -> liftIO $ toggleMaximised
-        "F5" -> liftIO $ toggleFullscreen
-        "f" -> liftIO $ toggleFullscreen
+        "F11" -> liftIO toggleMaximised
+        "F5" -> liftIO toggleFullscreen
+        "f" -> liftIO toggleFullscreen
         _ -> return ()
 
     _ <- Gtk.on window Gtk.objectDestroy $ do

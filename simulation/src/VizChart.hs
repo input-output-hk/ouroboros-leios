@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module VizChart where
 
@@ -46,14 +47,14 @@ instance Chart.PlotValue Bytes where
         50
 
 instance Chart.PlotValue DiffTime where
-  toValue t = realToFrac t
-  fromValue v = realToFrac v
   autoAxis =
     autoScaledAxis $
       Chart.LinearAxisParams
-        (map (\t -> show t))
+        (map show)
         10
         50
+  toValue = realToFrac
+  fromValue = realToFrac
 
 autoScaledAxis :: RealFrac a => Chart.LinearAxisParams a -> Chart.AxisFn a
 autoScaledAxis lap ps = scaledAxis lap rs ps

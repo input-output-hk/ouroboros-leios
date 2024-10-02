@@ -28,6 +28,7 @@ import Control.Concurrent.Class.MonadSTM (
     modifyTVar',
     newTVarIO,
     readTVar,
+    readTVarIO,
     retry
   ),
  )
@@ -151,7 +152,7 @@ modifyRelayBuffer ::
   RelayBuffer m blk blkid ->
   (BlockQueue blk blkid -> BlockQueue blk blkid) ->
   STM m ()
-modifyRelayBuffer (RelayBuffer buffer) f = modifyTVar' buffer f
+modifyRelayBuffer (RelayBuffer buffer) = modifyTVar' buffer
 
 -- | The block relay protocol:
 --
@@ -218,7 +219,7 @@ relayServer BlockRelayConfig{blockTTL} (RelayBuffer buffer) chan =
             ]
         go (fingerprintBlockQueue blkq)
       MsgReqBlockIdsNonBlocking -> do
-        blkq <- atomically $ readTVar buffer
+        blkq <- readTVarIO buffer
         writeChan chan $
           MsgRespBlockIds
             [ (blkid, blockTTL blk)

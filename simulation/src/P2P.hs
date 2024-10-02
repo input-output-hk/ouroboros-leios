@@ -108,11 +108,11 @@ genArbitraryP2PTopography
       Map.fromList
         [ ((nid, nid'), latency)
         | (nid, rng) <- zip nodes (unfoldr (Just . Random.split) rngLinks)
-        , let Just p = Map.lookup nid nodePositions
+        , let p = nodePositions Map.! nid
         , nid' <-
             pickNodeLinksClose p
               ++ pickNodeLinksRandom nid rng
-        , let Just p' = Map.lookup nid' nodePositions
+        , let p' = nodePositions Map.! nid'
               !latency = linkLatency p p'
         ]
 

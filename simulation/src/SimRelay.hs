@@ -3,6 +3,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use void" #-}
 
 module SimRelay where
 
@@ -175,7 +179,7 @@ relayNode
        where
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
-              gendelay = realToFrac (-log u * lambda :: Double) :: DiffTime
+              gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
           threadDelaySI gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
@@ -245,8 +249,8 @@ traceRelayLink1 tcpprops generationPattern =
             , worldIsCylinder = False
             }
           ( Map.fromList
-              [ (NodeId 0, (Point 50 100))
-              , (NodeId 1, (Point 450 100))
+              [ (NodeId 0, Point 50 100)
+              , (NodeId 1, Point 450 100)
               ]
           )
           ( Set.fromList
@@ -291,10 +295,10 @@ traceRelayLink4 tcpprops generationPattern =
             , worldIsCylinder = False
             }
           ( Map.fromList
-              [ (NodeId 0, (Point 50 250))
-              , (NodeId 1, (Point 450 70))
-              , (NodeId 2, (Point 550 430))
-              , (NodeId 3, (Point 950 250))
+              [ (NodeId 0, Point 50 250)
+              , (NodeId 1, Point 450 70)
+              , (NodeId 2, Point 550 430)
+              , (NodeId 3, Point 950 250)
               ]
           )
           ( symmetric $
@@ -353,10 +357,10 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
             , worldIsCylinder = False
             }
           ( Map.fromList
-              [ (NodeId 0, (Point 50 70))
-              , (NodeId 1, (Point 450 400))
-              , (NodeId 2, (Point 500 70))
-              , (NodeId 3, (Point 950 70))
+              [ (NodeId 0, Point 50 70)
+              , (NodeId 1, Point 450 400)
+              , (NodeId 2, Point 500 70)
+              , (NodeId 3, Point 950 70)
               ]
           )
           ( symmetric $

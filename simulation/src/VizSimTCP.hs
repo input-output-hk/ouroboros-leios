@@ -47,7 +47,7 @@ tcpSimVizModel ::
   VizModel TcpSimVizModel
 tcpSimVizModel =
   simVizModel
-    (\_t -> accumEventVizState)
+    (\_ -> accumEventVizState)
     pruneVisState
     initVizState
  where
@@ -121,7 +121,7 @@ tcpSimVizModel =
 -- The vizualisation rendering
 --
 
-data TcpSimVizConfig msg
+newtype TcpSimVizConfig msg
   = TcpSimVizConfig
   { messageColor :: msg -> (Double, Double, Double)
   }

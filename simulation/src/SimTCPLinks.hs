@@ -1,5 +1,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use void" #-}
+{-# HLINT ignore "Use section" #-}
 
 module SimTCPLinks where
 
@@ -187,7 +192,7 @@ labelDirToLabelLink nfrom nto (DirClientToServer e) = LabelLink nfrom nto e
 labelDirToLabelLink nfrom nto (DirServerToClient e) = LabelLink nto nfrom e
 
 simTracer :: Typeable e => Tracer (IOSim s) e
-simTracer = Tracer.Tracer $ Tracer.emit $ IOSim.traceM
+simTracer = Tracer.Tracer $ Tracer.emit IOSim.traceM
 
 selectTimedEvents :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTimedEvents =

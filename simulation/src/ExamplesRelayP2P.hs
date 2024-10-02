@@ -99,8 +99,8 @@ example2 =
                 ++ "west edges are connected."
         , layoutLabelTime
         , LayoutBeside
-            [ fmap (contramap fst) $
-                LayoutAbove
+            [ contramap fst
+                <$> LayoutAbove
                   [ LayoutReqSize 900 600 $
                       Layout $
                         relayP2PSimVizRender config
@@ -109,12 +109,12 @@ example2 =
                           Layout $
                             chartDiffusionLatency config
                       , LayoutReqSize 350 300 $
-                          Layout $
+                          Layout
                             chartLinkUtilisation
                       ]
                   ]
-            , fmap (contramap snd) $
-                LayoutAbove
+            , contramap snd
+                <$> LayoutAbove
                   [ LayoutReqSize 900 600 $
                       Layout $
                         relayP2PSimVizRender config
@@ -123,7 +123,7 @@ example2 =
                           Layout $
                             chartDiffusionLatency config
                       , LayoutReqSize 350 300 $
-                          Layout $
+                          Layout
                             chartLinkUtilisation
                       ]
                   ]
