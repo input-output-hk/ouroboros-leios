@@ -1,5 +1,46 @@
 # Leios logbook
 
+## 2024-10-02
+
+### Team discussion of Haskell simulation
+
+- What general approach are we planning to take?
+    - What questions?
+    - What level of detail?
+    - What order to do things?
+- What we don't need to model (at least initially)
+    - The content of the ledger
+        - Not needed for most questions
+        - Can be done later
+        - Instead, just model input block in terms of size
+        - Cannot answer questions about tx lifecycle
+    - Shared formats not needed for now
+- Approach
+    - Start with existing network simulation, which is just a traffic simulation
+    - Go back an do praos
+        - 100s of nodes
+        - Visualization
+    - Add leios
+        - Depart from paper by accounting for asynchrony in implementation
+        - Might write an asynchronous version of the leios specification
+        - Haskell stm version could be very similar to asynchronous leios spec
+    - Stick with gtk visualizations
+        - Record videos for dissemination
+- Questions that can be answered
+    - Praos questions
+        - Validate
+    - Leios
+        - Time for IB to RB
+        - Repeat measurements for leios
+- Other
+    - Rust might be the better option for visualization
+    - Outputs from both simulations might both be visualizable with the same tool
+- For Thursday
+    - [ ] Visualizaiton approach
+    - [ ] Are common formats really not needed?
+    - [ ] What is the status of the [leios-sim/](leios-simm/) folder?
+    - [ ] What questions do we lose by having no simulation of txs?
+
 ## 2024-10-01
 
 Report on ΔQ work in Rust so far (Roland):
