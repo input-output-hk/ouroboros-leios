@@ -1,4 +1,14 @@
+# Roadmap
 
+- [ ] Extend with high-level simulation of Praos  
+      (Insofar as necessary for simulating ranking blocks in Simplified Leios.)
+- [ ] Extend with high-level simulation of Simplified Leios
+
+## Open Questions
+
+- To what extent can we reuse the simulation of Leios in `leios-sim`?
+
+## Brainstorm
 
 * Reuse `relayNode` but use Leios-specific blocks.
 * Also need Praos layer for Ranking blocks, could be high-level/abstract.
