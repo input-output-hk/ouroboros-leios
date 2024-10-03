@@ -1,5 +1,34 @@
 # Leios logbook
 
+## 2024-10-03
+
+### Team discussion
+
+- leios-sim
+    - More about the protocol than the network
+    - Input blocks are generated and endorsement blocks are generated referencing them
+    - No voting in the simulation
+    - We really don't need this now, given the network-orientic approach we are adopting
+    - Probably delete it eventually
+    - Delete this folder and record it in the log book
+- Use permalinks and commit hashes in logbook entries
+- Shared formats
+    - Do this incrementally
+    - We generally intend not to have duplicate formats
+    - The first workstream to create a format will have it reviewed by other workstreams
+    - A common output format might be more important the input format
+- Arnaud will ask for data
+    - CF for data on load and topology
+    - Blockfrost for additional data
+- Leios might need some sort of sharding or detection for mempool difussion
+    - Mempool diffusion modeling will eventually be needed
+    - Do this later
+- Monthly demo & review meetings
+    - Last week of the month
+- Switch to one team meeting per week
+- Next step on DeltaQ is to reproduce the timeliness analysis
+    - Will add import/export functionality
+  
 ## 2024-10-02
 
 ### Team discussion of Haskell simulation
