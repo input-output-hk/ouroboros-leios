@@ -11,25 +11,32 @@ use crate::{
 
 pub struct Simulation {
     pools: Vec<Pool>,
-    vrf_max_score: u64,
+    total_stake: u64,
     current_slot: u64,
 }
 
 impl Simulation {
     pub fn new(config: SimConfiguration) -> Self {
+        let total_stake = config.pools.iter().map(|p| p.stake).sum();
+        let block_generation_probability = config.block_generation_probability;
+
         let mut rng = ChaChaRng::from_rng(thread_rng()).expect("couldn't initialize RNG");
         let pools: Vec<Pool> = config
             .pools
             .into_iter()
             .map(|c| Pool {
                 id: c.id,
-                stake: c.stake,
+                target_vrf_stake: compute_target_vrf_stake(
+                    c.stake,
+                    total_stake,
+                    block_generation_probability,
+                ),
                 rng: ChaChaRng::from_rng(&mut rng).unwrap(),
             })
             .collect();
         Self {
             pools,
-            vrf_max_score: config.vrf_max_score,
+            total_stake,
             current_slot: 0,
         }
     }
@@ -47,7 +54,7 @@ impl Simulation {
             .pools
             .iter_mut()
             .filter_map(|pool| {
-                let result = pool.run_vrf(self.vrf_max_score)?;
+                let result = pool.run_vrf(self.total_stake)?;
                 Some((pool.id, result))
             })
             .collect();
@@ -73,18 +80,28 @@ impl Simulation {
 
 struct Pool {
     id: PoolId,
-    stake: u64,
+    target_vrf_stake: u64,
     rng: ChaChaRng,
 }
 
 impl Pool {
     // Simulates the output of a VRF using this pool's stake.
-    fn run_vrf(&mut self, max_score: u64) -> Option<u64> {
-        let result = self.rng.gen_range(0..max_score);
-        if result < self.stake {
+    fn run_vrf(&mut self, total_stake: u64) -> Option<u64> {
+        let result = self.rng.gen_range(0..total_stake);
+        if result < self.target_vrf_stake {
             Some(result)
         } else {
             None
         }
     }
+}
+
+fn compute_target_vrf_stake(
+    stake: u64,
+    total_stake: u64,
+    block_generation_probability: f64,
+) -> u64 {
+    let ratio = stake as f64 / total_stake as f64;
+    let p_success = 1. - (1. - block_generation_probability).powf(ratio);
+    (total_stake as f64 * p_success) as u64
 }

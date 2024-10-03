@@ -6,4 +6,4 @@ pools = [
     { stake = 1000000 },
     { stake = 10000000 },
 ]
-vrf_max_score = 200000000
+block_generation_probability = 0.05

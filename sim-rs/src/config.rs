@@ -14,7 +14,7 @@ impl Display for PoolId {
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     pools: Vec<RawPoolConfig>,
-    vrf_max_score: u64,
+    block_generation_probability: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,7 +25,7 @@ struct RawPoolConfig {
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub pools: Vec<PoolConfiguration>,
-    pub vrf_max_score: u64,
+    pub block_generation_probability: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -47,7 +47,7 @@ impl From<RawConfig> for SimConfiguration {
             .collect();
         Self {
             pools,
-            vrf_max_score: value.vrf_max_score,
+            block_generation_probability: value.block_generation_probability,
         }
     }
 }
