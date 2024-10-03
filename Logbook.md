@@ -28,6 +28,14 @@
 - Switch to one team meeting per week
 - Next step on DeltaQ is to reproduce the timeliness analysis
     - Will add import/export functionality
+
+### Rust simulation
+
+- Sim runs a slot lottery and decides which pool(s) produce block(s)
+- Sim reads input (protocol parameters and pools) from a toml file
+- Sim writes output (list of events and timestamps) to a json file 
+- Next steps:
+    - Create (extremely basic) fake transactions to measure throughput
   
 ## 2024-10-02
 
