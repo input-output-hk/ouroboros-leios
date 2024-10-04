@@ -31,6 +31,12 @@
 
 * Possible next steps: build a network model on time-to-chain for individual txs under load
 
+### Rust simulation
+
+- Sim is modeling transactions as an id and a size in bytes.
+  - The model was chosen ad-hoc to "look good", unlikely to reflect reality.
+- Next step is to model block diffusion, hopefully converging on network design with the haskell simulation of Praos
+
 ## 2024-10-03
 
 ### Team discussion
