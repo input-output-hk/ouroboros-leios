@@ -9,3 +9,32 @@ prop := hop 1<>99 hop ->- hop 5<>94 hop ->- hop ->- hop 34<>60 hop ->- hop ->- h
 
 hop := CDF[(0.012, 0.333), (0.069, 0.666), (0.268, 1)] ->- CDF[(0.012, 0.333), (0.069, 0.666), (0.268, 1)] ->- CDF[(0.012, 0.333), (0.069, 0.666), (0.268, 1)] ->- CDF[(0.024, 0.333), (0.143, 0.666), (0.531, 1)]
 prop := hop 0.6<>99.4 hop ->- hop 8.58<>90.82 hop ->- hop ->- hop 65.86<>24.96 hop ->- hop ->- hop ->- hop
+
+3 -- Leios modelling session on Oct 4, 2024
+
+diffuse:
+(hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))) ->- validateIB
+
+diffuseEB:
+(hopSmall 0.6<>99.4 ((hopSmall ->- hopSmall) 8.58<>90.82 (((hopSmall ->- hopSmall) ->- hopSmall) 65.86<>24.96 (((hopSmall ->- hopSmall) ->- hopSmall) ->- hopSmall)))) ->- validateEB
+
+hop:
+((smallBlock ->- smallBlock) ->- smallBlock) ->- largeBlock
+
+hopSmall:
+((smallBlock ->- smallBlock) ->- smallBlock) ->- mediumBlock
+
+largeBlock:
+CDF[(0.078, 0.333), (0.404, 0.666), (1.598, 1)]
+
+mediumBlock:
+CDF[(0.024, 0.333), (0.143, 0.666), (0.531, 1)]
+
+smallBlock:
+CDF[(0.012, 0.333), (0.069, 0.666), (0.268, 1)]
+
+validateEB:
+CDF[(1, 1)]
+
+validateIB:
+CDF[(3, 1)]
