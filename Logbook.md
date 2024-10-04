@@ -33,10 +33,10 @@
 
 - Sim runs a slot lottery and decides which pool(s) produce block(s)
 - Sim reads input (protocol parameters and pools) from a toml file
-- Sim writes output (list of events and timestamps) to a json file 
+- Sim writes output (list of events and timestamps) to a json file
 - Next steps:
     - Create (extremely basic) fake transactions to measure throughput
-  
+
 ## 2024-10-02
 
 ### Team discussion of Haskell simulation
@@ -77,6 +77,53 @@
     - [ ] Are common formats really not needed?
     - [ ] What is the status of the [leios-sim/](leios-simm/) folder?
     - [ ] What questions do we lose by having no simulation of txs?
+
+### Leios & Delta-Q
+
+ND starts raising a few concerns he has about leios that should be answered:
+
+* How much will settlement change?
+* What's happening at high loads?
+* How does it work at saturation?
+
+A key issue is potential attack vector that comes from de-duplicating txs: how is it handled by Leios forwarding infra? In general, how does Leios deals with adversarial behaviour?
+We acknowledge this needs to be answered, and there's work on mempool management that needs to happen, but that's not the core topic we want to work on _now_
+
+Another important question to answer is "What resources are needed?" as this has a deep impact on centralisation:
+* people come to Cardano because they can run a node cheaply
+* Leios might excludes most of the user base
+
+RK => how does hardware requirements change? how ΔQ can express these?
+
+Shelley implements isometric flow control system
+* receiver has control over the load it handles
+* blocking occurs at the point of congestion
+
+The system changes at the point of blocking -> need to allow the blocking to go away, waves of phase change goes across the system
+* ~ backpressure
+* it's a strong requirement to make it as lossless as possible
+
+Removing duplicates is a necessity for long term efficiency of the system, might have an impact on the system
+* we are not solving it right now but need to ensure this question is investigated down the road
+
+Key metrics:
+* how long to reach the block?
+* how much computational power?
+* how much data flow?
+* how much storage does Leios requires?
+
+2 models:
+* average case
+* heavy load
+
+another model:
+* cost impact of Leios, cost of networking/storage -> updating fee model
+
+* Talk to Karl about network topology
+
+Making it worthwhile to have distributed nodes? -> resolving height battles
+
+Socializing results and constraints, trygin to get actual numbers from product/usage
 
 ## 2024-10-01
 
