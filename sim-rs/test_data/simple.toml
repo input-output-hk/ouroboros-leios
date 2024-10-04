@@ -7,3 +7,7 @@ pools = [
     { stake = 10000000 },
 ]
 block_generation_probability = 0.05
+max_block_size = 90112
+max_tx_size = 16384
+transaction_frequency_ms = { mean = 1000, std_dev = 200 }
+transaction_size_bytes = { lambda = 8, scale = 16384 }

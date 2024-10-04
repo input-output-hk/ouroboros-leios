@@ -13,6 +13,7 @@ use tracing::warn;
 
 mod config;
 mod events;
+mod probability;
 mod sim;
 
 #[derive(Parser)]
