@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+
 module PraosProtocol where
 
 import Network.TypedProtocol
@@ -16,8 +17,6 @@ data BlockHeader
 data ChainTip
 
 data Point = Point BlockId SlotNo
-
-
 
 --------------------------------
 ---- ChainSync
@@ -39,33 +38,32 @@ data SingChainSyncState (st :: ChainSyncState) where
 
 instance Protocol ChainSyncState where
   data Message ChainSyncState from to where
-    MsgRequestNext       ::
+    MsgRequestNext ::
       BlockHeader ->
       ChainTip ->
       Message ChainSyncState StIdle StCanAwait
-    MsgAwaitReply        :: Message ChainSyncState StCanAwait StMustReply
-    MsgRollForward       :: Message ChainSyncState StCanAwait StIdle
-    MsgRollBackward      ::
+    MsgAwaitReply :: Message ChainSyncState StCanAwait StMustReply
+    MsgRollForward :: Message ChainSyncState StCanAwait StIdle
+    MsgRollBackward ::
       Point ->
       ChainTip ->
       Message ChainSyncState StCanAwait StIdle
-    MsgFindIntersect     ::
+    MsgFindIntersect ::
       [Point] ->
       Message ChainSyncState StIdle StIntersect
     MsgIntersectNotFound ::
       ChainTip ->
       Message ChainSyncState StIntersect StIdle
-    MsgIntersectFound    ::
+    MsgIntersectFound ::
       Point ->
       ChainTip ->
       Message ChainSyncState StIntersect StIdle
-    MsgDone              :: Message ChainSyncState StIdle StDone
+    MsgDone :: Message ChainSyncState StIdle StDone
   type StateAgency StIdle = ClientAgency
   type StateAgency StCanAwait = ServerAgency
   type StateAgency StMustReply = ServerAgency
   type StateAgency StIntersect = ServerAgency
   type StateAgency StDone = NobodyAgency
-
   type StateToken = SingChainSyncState
 
 instance StateTokenI StIdle where stateToken = SingStIdle
