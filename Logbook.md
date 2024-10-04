@@ -1,5 +1,30 @@
 # Leios logbook
 
+## 2024-10-04
+
+### ΔQ Modelling experiment
+
+* we (Roland, Yves, Arnaud) start with basic network and latency model from the "Mind your outcomes" paper
+* assume a 1MB IB, just to get a sense of how far we can push this
+* It takes about 6s for such a block to reaech > 99% of nodes
+  * using same assumptions for network topology than
+* adding 3s delay for validation
+* diffusion of EB ~ 2.9s
+
+* Q: How long does a tx/block validation takes?
+  * need to get more data about this
+  * this must obviously be lower than L as that's the duration of the `Link` phase
+  * This leads us to a discussion on tx duplication/validation/inclusion which we won't tackle
+
+* Rough preliminary conclusion is that λL should be around 6s with those parameters to ensure IBs get diffused across the network in a timely way
+  * fun fact: these are the default parameters in leios-sim
+
+* Given the way Leios works, it's not clear that modelling a "loaded system" would be interesting: Everything is "clocked" by the rounds (L) and as nodes are pulling data, the only thing that can happen is that IBs are more or less full.
+  * Load would have an impact if we model at the level of transactions, because that's the thing the protocol has no control over.
+  * Or could it be the case that we want to model what happens at saturation of the network capacity? => seems like in practice, the limits are quite high.
+
+* Possible next steps: build a network model on time-to-chain for individual txs under load
+
 ## 2024-10-03
 
 ### Team discussion
