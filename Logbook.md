@@ -2,6 +2,12 @@
 
 ## 2024-10-04
 
+### Retiring leios-sim
+
+* Delete `leios-sim` haskell project
+* Delete CI steps to deploy the simulation server
+* Remove link to the simulation from site main page
+
 ### ΔQ Modelling experiment
 
 * we (Roland, Yves, Arnaud) start with basic network and latency model from the "Mind your outcomes" paper
