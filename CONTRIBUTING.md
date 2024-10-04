@@ -91,6 +91,34 @@ Standards](CODING-STANDARDS.md), it includes guidelines on code
 formatting, general style, and some processes. To propose new
 standards or changes to the existing standards, file an issue.
 
+### Updating the package index state
+
+The `cabal.project` file contains the package index state, which freezes the package indices at a particular point in time. These can be updated whenever one of the Haskell projects in this repository requires a new or upgraded dependency. To upgrade these, run `cabal update -z`:
+
+```
+$ cabal update -z
+Downloading the latest package lists from:
+- hackage.haskell.org
+- cardano-haskell-packages
+Package list of cardano-haskell-packages is up to date.
+The index-state is set to 2024-10-04T09:54:45Z.
+Package list of hackage.haskell.org has been updated.
+The index-state is set to 2024-10-04T11:45:34Z.
+To revert to previous state run:
+    cabal v2-update 'hackage.haskell.org,2024-10-04T10:22:50Z'
+```
+
+Then copy the new index states from the command output into the `cabal.project` file:
+
+```
+index-state:
+  , hackage.haskell.org 2024-10-04T11:45:34Z
+  , cardano-haskell-packages 2024-10-04T09:54:45Z
+```
+
+NOTE: Is there a cabal command to update the `cabal.project` file?
+
+
 ### Creating a pull request
 
 Thank you for contributing your changes by opening a pull requests! To get
