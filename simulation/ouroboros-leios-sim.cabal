@@ -31,6 +31,7 @@ library
     ModelTCP
     P2P
     PlotTCP
+    PraosProtocol
     RelayProtocol
     SimRelay
     SimRelayP2P
