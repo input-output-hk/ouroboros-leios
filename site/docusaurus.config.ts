@@ -76,11 +76,6 @@ const config: Config = {
                     position: 'left',
                     label: 'Documentation',
                 },
-                {
-                    position: 'left',
-                    label: 'Simulation',
-                    to: 'https://leios-simulation.cardano-scaling.org/',
-                },
                 { to: '/news', label: 'Latest News', position: 'right' },
                 {
                     href: 'https://github.com/input-output-hk/ouroboros-leios',
