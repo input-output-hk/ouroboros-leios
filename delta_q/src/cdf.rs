@@ -246,8 +246,8 @@ impl CDF {
         CDFIterator {
             cdf: self.data.iter(),
             prev: (0.0, 0.0),
-            first: true,
-            last: true,
+            first: false,
+            last: false,
         }
     }
 

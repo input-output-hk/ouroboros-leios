@@ -1,9 +1,7 @@
-use crate::{delta_q::DeltaQ, EvaluationContext, CDF};
-use charts_rs::{Axis, Canvas, Color, Point, Polyline};
-use iter_tools::Itertools;
+use crate::{delta_q::DeltaQ, EvaluationContext};
 use std::{rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
-use yew::{prelude::*, virtual_dom::VNode};
+use yew::prelude::*;
 
 /// A piece of context that tells the DeltaQ rendering components to which named expression they belong.
 #[derive(Clone, PartialEq)]
@@ -396,61 +394,6 @@ fn branch(props: &BranchProps) -> Html {
                 </div>
             </div>
         </div>
-    }
-}
-
-pub fn cdf_to_svg(cdf: &CDF) -> Html {
-    let mut canvas = Canvas::new(310.0, 110.0);
-    let width = cdf.width();
-    let x_scale = 300.0 / (width * 1.2).max(1.1);
-    canvas.polyline(Polyline {
-        color: Some(Color::black()),
-        stroke_width: 1.0,
-        points: cdf
-            .iter()
-            .tuple_windows()
-            .flat_map(|((x, y), (x2, _))| {
-                vec![
-                    Point {
-                        x: x * x_scale + 10.0,
-                        y: (1.0 - y) * 100.0 + 1.0,
-                    },
-                    Point {
-                        x: if x2 > width {
-                            310.0
-                        } else {
-                            x2 * x_scale + 10.0
-                        },
-                        y: (1.0 - y) * 100.0 + 1.0,
-                    },
-                ]
-            })
-            .collect(),
-    });
-    canvas.axis(Axis {
-        stroke_color: Some(Color::black()),
-        left: 10.0,
-        top: 101.0,
-        width: 300.0,
-        split_number: 300,
-        tick_interval: x_scale as usize,
-        ..Default::default()
-    });
-    canvas.axis(Axis {
-        stroke_color: Some(Color::black()),
-        position: charts_rs::Position::Left,
-        top: 1.0,
-        left: 10.0,
-        height: 100.0,
-        split_number: 1,
-        ..Default::default()
-    });
-    let svg = VNode::from_html_unchecked(canvas.svg().unwrap().into());
-    html! {
-        <>
-            <p class={classes!("result")}>{ "result: " }{cdf.to_string()} </p>
-            { svg }
-        </>
     }
 }
 

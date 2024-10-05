@@ -5,8 +5,11 @@ macro_rules! cloned {
     }};
 }
 
-use delta_q::{cdf_to_svg, CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext};
-use web_sys::HtmlInputElement;
+use delta_q::{CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext};
+use gloo_utils::window;
+use js_sys::Reflect;
+use wasm_bindgen::JsValue;
+use web_sys::{HtmlInputElement, MessageEvent, MessageEventInit};
 use yew::{prelude::*, suspense::use_future_with};
 use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
 use yew_hooks::use_local_storage;
@@ -15,6 +18,9 @@ use yew_hooks::use_local_storage;
 fn app_main() -> HtmlResult {
     let ctx_handle = use_local_storage::<EvaluationContext>("delta_q".to_owned());
     let ctx = use_reducer(cloned!(ctx_handle; move || (*ctx_handle).clone().unwrap_or_default()));
+    if Some(&*ctx) != ctx_handle.as_ref() {
+        ctx_handle.set((*ctx).clone());
+    }
 
     let selected = use_state::<Option<String>, _>(|| None);
     let select = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
@@ -23,21 +29,27 @@ fn app_main() -> HtmlResult {
     let epoch = use_state(|| 0);
 
     let agent = use_oneshot_runner::<CalcCdf>();
-    let cdf = use_future_with(
+    use_future_with(
         (selected.clone(), epoch.clone()),
         cloned!(ctx; move |deps| async move {
             if let Some(name) = deps.0.as_deref() {
-                agent.run((name.to_string(), (*ctx).clone())).await
-            } else {
-                Err("no name".to_owned())
+                let cdf = agent.run((name.to_string(), (*ctx).clone())).await?;
+                let data = js_sys::Object::new();
+                Reflect::set(&data, &"bins".into(), &cdf.iter().map(|x| JsValue::from(x.0)).collect::<js_sys::Array>()).unwrap();
+                Reflect::set(&data, &"values".into(), &cdf.iter().map(|x| JsValue::from(x.1)).collect::<js_sys::Array>()).unwrap();
+                Reflect::set(&data, &"max".into(), &(cdf.width() * 1.2).max(0.1).into()).unwrap();
+                Reflect::set(&data, &"name".into(), &name.into()).unwrap();
+                let init = MessageEventInit::new();
+                init.set_data(&data);
+                let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).map_err(|e| format!("{e:?}"))?);
             }
+            Ok::<_, String>(())
         }),
     )?;
 
-    let on_change = cloned!(ctx, epoch, ctx_handle;
+    let on_change = cloned!(ctx, epoch;
         Callback::from(move |(name, dq): (String, Option<DeltaQ>)| {
             ctx.dispatch((name.clone(), dq.clone()));
-            ctx_handle.set((*ctx).clone());
             epoch.set(*epoch + 1);
         })
     );
@@ -72,11 +84,6 @@ fn app_main() -> HtmlResult {
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
     // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
-    let cdf = match &*cdf {
-        Ok(cdf) => cdf_to_svg(cdf),
-        Err(e) => html! { <p>{ "no CDF result: " }{ e }</p> },
-    };
-
     let add_on_change = on_change.reform(cloned!(selected; move |x: (String, Option<DeltaQ>)| {
         selected.set(Some(x.0.clone()));
         x
@@ -96,7 +103,6 @@ fn app_main() -> HtmlResult {
                     <DeltaQComponent delta_q={dq.clone()} {on_change} />
                 </ContextProvider<DeltaQContext>>
             </div>
-            { cdf }
         }
     </div>
     })
@@ -198,6 +204,7 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{ "DeltaQ Editor" }</h1>
+            <div id="output" style="width: 50%; height: 30%; border: 1px solid black;" />
             <Suspense fallback={waiting}>
                 <OneshotProvider<CalcCdf> path="worker.js">
                     <AppMain />

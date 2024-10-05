@@ -7,7 +7,6 @@ edition = "2021"
 name = "editor-web"
 
 [dependencies]
-charts-rs = { version = "0.3.17" }
 gloo-utils = { version = "0.2.0" }
 iter_tools = "0.21.0"
 js-sys = { version = "0.3.70" }
@@ -17,7 +16,7 @@ smallstr = { version = "0.3.0", features = ["std", "serde"] }
 tracing = "0.1.40"
 wasm-bindgen = { version = "0.2.93" }
 wasm-bindgen-futures = { version = "0.4.43" }
-web-sys = "0.3.70"
+web-sys = { version = "0.3.70", features = ["MessageEventInit"] }
 winnow = "0.6.20"
 yew = { version = "0.21.0", features = ["csr"] }
 yew-agent = "0.3.0"

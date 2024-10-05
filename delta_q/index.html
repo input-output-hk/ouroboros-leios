@@ -4,4 +4,35 @@
     <link data-trunk rel="rust" data-bin="editor-web" data-type="main" data-weak-refs />
     <link data-trunk rel="rust" data-bin="worker" data-type="worker" data-weak-refs />
   </head>
+  <body>
+    <script type="module">
+      import * as core from 'https://root.cern/js/7.7.4/modules/core.mjs';
+      window.core = core;
+      core.settings.HandleKeys = false;
+      import * as draw from 'https://root.cern/js/7.7.4/modules/draw.mjs';
+      window.draw = draw;
+      import { cleanup } from 'https://root.cern/js/7.7.4/modules/base/ObjectPainter.mjs';
+      window.cleanup = cleanup;
+
+      window.addEventListener('rootjs', (event) => {
+        const { data } = event;
+        if (data === null || typeof data !== 'object') {
+          cleanup('output');
+        } else {
+          const { bins, values, max, name } = data;
+          const hist = core.createHistogram('TH1F', bins.length);
+          hist.fXaxis.fXbins = bins;
+          for (const idx in values) {
+            hist.setBinContent(parseInt(idx) + 1, values[idx]);
+          }
+          hist.fXaxis.fXmin = 0;
+          hist.fXaxis.fXmax = max;
+          hist.fTitle = name;
+          console.log(hist);
+          cleanup('output');
+          draw.draw('output', hist, 'nostat minimum:0 maximum:1.1');
+        }
+      });
+    </script>
+  </body>
 </html>

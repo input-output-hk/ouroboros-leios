@@ -15,4 +15,4 @@ mod render;
 pub use agent::CalcCdf;
 pub use cdf::{CDFError, CompactionMode, CDF};
 pub use delta_q::{DeltaQ, EvaluationContext};
-pub use render::{cdf_to_svg, DeltaQComponent, DeltaQContext};
+pub use render::{DeltaQComponent, DeltaQContext};
