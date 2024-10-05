@@ -5,116 +5,40 @@ macro_rules! cloned {
     }};
 }
 
-use delta_q::{cdf_to_svg, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext, CDF};
-use html::RenderResult;
-use std::rc::Rc;
-use wasm_bindgen::{JsCast, JsValue};
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{HtmlInputElement, RequestInit};
-use yew::{platform, prelude::*, suspense::use_future_with};
-
-#[hook]
-fn use_json<D: PartialEq + 'static, T: for<'a> serde::Deserialize<'a>>(
-    dep: D,
-    url: impl Fn(Rc<D>) -> Result<String, JsValue> + 'static,
-) -> RenderResult<Result<T, String>> {
-    let window = web_sys::window().unwrap();
-    let json = use_future_with(dep, move |dep| async move {
-        match url(dep) {
-            Ok(url) => {
-                JsFuture::from(
-                    JsFuture::from(window.fetch_with_str(&url))
-                        .await?
-                        .dyn_into::<web_sys::Response>()?
-                        .text()?,
-                )
-                .await
-            }
-            Err(e) => Err(e),
-        }
-    })?;
-    Ok(match &*json {
-        Ok(cdf) => match serde_json::from_str::<T>(&cdf.as_string().unwrap()) {
-            Ok(cdf) => Ok(cdf),
-            Err(e) => Err(format!("{cdf:?} Deserialisation error: {}", e)),
-        },
-        Err(e) => Err(format!("Error: {e:?}")),
-    })
-}
-
-async fn put_json<T: serde::Serialize>(url: &str, value: T) -> Result<JsValue, JsValue> {
-    let window = web_sys::window().unwrap();
-    let value = serde_json::to_string(&value).unwrap();
-    let init = RequestInit::new();
-    init.set_method("PUT");
-    {
-        let headers = web_sys::Headers::new().unwrap();
-        headers.set("Content-Type", "application/json").unwrap();
-        init.set_headers(&headers);
-    }
-    init.set_body(&value.into());
-    JsFuture::from(
-        JsFuture::from(window.fetch_with_str_and_init(url, &init))
-            .await?
-            .dyn_into::<web_sys::Response>()?
-            .text()?,
-    )
-    .await
-}
-
-async fn delete_path(url: &str) -> Result<JsValue, JsValue> {
-    let window = web_sys::window().unwrap();
-    let init = RequestInit::new();
-    init.set_method("DELETE");
-    JsFuture::from(
-        JsFuture::from(window.fetch_with_str_and_init(url, &init))
-            .await?
-            .dyn_into::<web_sys::Response>()?
-            .text()?,
-    )
-    .await
-}
+use delta_q::{cdf_to_svg, CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext};
+use web_sys::HtmlInputElement;
+use yew::{prelude::*, suspense::use_future_with};
+use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
+use yew_hooks::use_local_storage;
 
 #[function_component(AppMain)]
 fn app_main() -> HtmlResult {
-    let location = web_sys::window().unwrap().location().href().unwrap();
-    let location2 = location.clone();
+    let ctx_handle = use_local_storage::<EvaluationContext>("delta_q".to_owned());
+    let ctx = use_reducer(cloned!(ctx_handle; move || (*ctx_handle).clone().unwrap_or_default()));
 
-    let ctx =
-        match use_json::<_, EvaluationContext>((), move |_| Ok(format!("{location2}delta_q")))? {
-            Ok(ctx) => ctx,
-            Err(e) => return Ok(html! { <p>{ e }</p> }),
-        };
-
-    let selected = use_state(|| Some("out".to_owned()));
+    let selected = use_state::<Option<String>, _>(|| None);
     let select = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
 
     // epoch counter to trigger recomputation when the context changes
     let epoch = use_state(|| 0);
 
-    let cdf = use_json::<_, CDF>(
+    let agent = use_oneshot_runner::<CalcCdf>();
+    let cdf = use_future_with(
         (selected.clone(), epoch.clone()),
-        cloned!(location; move |selected| {
-            (*selected)
-                .0
-                .as_ref()
-                .ok_or(JsValue::NULL)
-                .map(|s| format!("{location}delta_q/{}", s))
+        cloned!(ctx; move |deps| async move {
+            if let Some(name) = deps.0.as_deref() {
+                agent.run((name.to_string(), (*ctx).clone())).await
+            } else {
+                Err("no name".to_owned())
+            }
         }),
     )?;
 
-    let ctx = use_reducer(move || ctx);
-    let on_change = cloned!(ctx, epoch, location;
+    let on_change = cloned!(ctx, epoch, ctx_handle;
         Callback::from(move |(name, dq): (String, Option<DeltaQ>)| {
             ctx.dispatch((name.clone(), dq.clone()));
-            platform::spawn_local(cloned!(epoch, location; async move {
-                if let Some(dq) = dq {
-                    put_json(&format!("{location}delta_q/{name}"), dq).await.unwrap();
-                } else {
-                    delete_path(&format!("{location}delta_q/{name}")).await.unwrap();
-                }
-                epoch.set(*epoch + 1);
-            }));
+            ctx_handle.set((*ctx).clone());
+            epoch.set(*epoch + 1);
         })
     );
 
@@ -148,8 +72,8 @@ fn app_main() -> HtmlResult {
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
     // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
-    let cdf = match cdf {
-        Ok(cdf) => cdf_to_svg(&cdf),
+    let cdf = match &*cdf {
+        Ok(cdf) => cdf_to_svg(cdf),
         Err(e) => html! { <p>{ "no CDF result: " }{ e }</p> },
     };
 
@@ -275,7 +199,9 @@ fn app() -> Html {
         <div>
             <h1>{ "DeltaQ Editor" }</h1>
             <Suspense fallback={waiting}>
-                <AppMain />
+                <OneshotProvider<CalcCdf> path="worker.js">
+                    <AppMain />
+                </OneshotProvider<CalcCdf>>
             </Suspense>
         </div>
     }

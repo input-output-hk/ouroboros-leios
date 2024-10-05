@@ -6,13 +6,13 @@ macro_rules! cloned {
     }};
 }
 
+mod agent;
 mod cdf;
 mod delta_q;
 mod parser;
-#[cfg(feature = "web")]
 mod render;
 
+pub use agent::CalcCdf;
 pub use cdf::{CDFError, CompactionMode, CDF};
 pub use delta_q::{DeltaQ, EvaluationContext};
-#[cfg(feature = "web")]
 pub use render::{cdf_to_svg, DeltaQComponent, DeltaQContext};
