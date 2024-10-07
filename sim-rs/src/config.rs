@@ -25,7 +25,8 @@ impl PoolId {
 #[serde(untagged)]
 enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
-    ScaledExp { lambda: f64, scale: f64 },
+    Exp { lambda: f64, scale: Option<f64> },
+    LogNormal { mu: f64, sigma: f64 },
 }
 impl From<DistributionConfig> for FloatDistribution {
     fn from(value: DistributionConfig) -> Self {
@@ -33,8 +34,11 @@ impl From<DistributionConfig> for FloatDistribution {
             DistributionConfig::Normal { mean, std_dev } => {
                 FloatDistribution::normal(mean, std_dev)
             }
-            DistributionConfig::ScaledExp { lambda, scale } => {
-                FloatDistribution::scaled_exp(lambda, scale)
+            DistributionConfig::Exp { lambda, scale } => {
+                FloatDistribution::scaled_exp(lambda, scale.unwrap_or(1.))
+            }
+            DistributionConfig::LogNormal { mu, sigma } => {
+                FloatDistribution::log_normal(mu, sigma)
             }
         }
     }
