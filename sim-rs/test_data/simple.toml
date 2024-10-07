@@ -1,0 +1,21 @@
+seed = 0x3c3373756e646165
+pools = [
+    { stake = 1000000 },
+    { stake = 1000000 },
+    { stake = 1000000 },
+    { stake = 1000000 },
+    { stake = 1000000 },
+    { stake = 10000000 },
+]
+links = [
+    { pools = [0, 1], latency_ms = 30 },
+    { pools = [0, 2], latency_ms = 50 },
+    { pools = [1, 3], latency_ms = 30 },
+    { pools = [1, 4], latency_ms = 50 },
+    { pools = [2, 5], latency_ms = 30 },
+]
+block_generation_probability = 0.05
+max_block_size = 90112
+max_tx_size = 16384
+transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
+transaction_size_bytes = { distribution = "log_normal", mu = 6.85, sigma = 1.13 }
