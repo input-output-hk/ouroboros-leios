@@ -62,6 +62,7 @@ library
     , io-classes
     , io-sim
     , kdt
+    , mtl
     , pango
     , pqueue
     , random
