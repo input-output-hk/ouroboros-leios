@@ -1,8 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -26,6 +28,7 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Control.Exception (assert)
 import Control.Monad ((<=<))
+import Control.Monad.Reader (ReaderT (runReaderT), ask)
 import Data.Functor ((<&>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (lookup, (!))
@@ -137,73 +140,82 @@ tryTakeTakeOnlyTMVar = tryTakeTMVar . unTakeOnly
 
 type MonadChainSyncProducer m = MonadSTM m
 
+type ChainSyncProducer m = STM (ReaderT (ChainSyncProducerState m) m)
+type ChainSyncProducerSTM m a = STM (ReaderT (ChainSyncProducerState m) m) a
+
 data ChainSyncProducerState m = ChainSyncProducerState
-  { readPointer :: TVar m Point -- Owned, Unique, Read/Write.
-  , events :: TakeOnly (TMVar m Event) -- Owned, Shared, Take-Only.
-  , chainTip :: ReadOnly (TVar m ChainTip) -- Borrowed, Shared, Read-Only.
-  , chainForwards :: ReadOnly (TVar m (ReadOnly (TVar m (Map Point Point)))) -- Borrowed, Shared, Read-Only.
-  , blockHeaders :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Borrowed, Shared, Read-Only.
-  , blockBodies :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Borrowed, Shared, Read-Only.
+  { readPointerVar :: TVar m Point -- Unique, Read/Write.
+  , eventsVar :: TakeOnly (TMVar m LocalEvent) -- Shared, Take-Only.
+  , chainTipVar :: ReadOnly (TVar m ChainTip) -- Shared, Read-Only.
+  , chainForwardsVarVar :: ReadOnly (TVar m (ReadOnly (TVar m (Map Point Point)))) -- Shared, Read-Only.
+  , blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
+  , blockBodiesVar :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Shared, Read-Only.
   }
 
-data Event
+data LocalEvent
   = EvtNewBlock
   | EvtChainSwitch
   deriving (Eq)
 
-instance Semigroup Event where
+instance Semigroup LocalEvent where
   EvtChainSwitch <> _ = EvtChainSwitch
   _ <> EvtChainSwitch = EvtChainSwitch
   EvtNewBlock <> EvtNewBlock = EvtNewBlock
 
 -- NOTE: To be used by @ChainSyncConsumer@
-triggerEvent :: MonadSTM m => TMVar m Event -> Event -> STM m ()
-triggerEvent evts evt = tryReadTMVar evts >>= putTMVar evts . maybe evt (<> evt)
+triggerLocalEvent :: MonadSTM m => TMVar m LocalEvent -> LocalEvent -> ChainSyncProducerSTM m ()
+triggerLocalEvent evts evt = tryReadTMVar evts >>= putTMVar evts . maybe evt (<> evt)
 
-getReadPointer :: MonadChainSyncProducer m => ChainSyncProducerState m -> STM m Point
-getReadPointer st = readTVar $ readPointer st
+getReadPointer :: MonadSTM m => ChainSyncProducerSTM m Point
+getReadPointer = do
+  ChainSyncProducerState{readPointerVar} <- ask
+  readTVar readPointerVar
 
-setReadPointer :: MonadChainSyncProducer m => ChainSyncProducerState m -> Point -> STM m ()
-setReadPointer st = writeTVar $ readPointer st
+setReadPointer :: MonadSTM m => Point -> ChainSyncProducerSTM m ()
+setReadPointer point = do
+  ChainSyncProducerState{readPointerVar} <- ask
+  writeTVar readPointerVar point
 
-getChainTip :: MonadChainSyncProducer m => ChainSyncProducerState m -> STM m ChainTip
-getChainTip st = readReadOnlyTVar $ chainTip st
+getChainTip :: MonadSTM m => ChainSyncProducerSTM m ChainTip
+getChainTip = do
+  ChainSyncProducerState{chainTipVar} <- ask
+  readReadOnlyTVar chainTipVar
 
-getBlockHeader :: MonadChainSyncProducer m => ChainSyncProducerState m -> BlockId -> STM m BlockHeader
-getBlockHeader st blockId = (Map.! blockId) <$> readReadOnlyTVar (blockHeaders st)
+unsafeGetBlockHeader :: MonadSTM m => BlockId -> ChainSyncProducerSTM m BlockHeader
+unsafeGetBlockHeader blockId = do
+  ChainSyncProducerState{blockHeadersVar} <- ask
+  blockHeaders <- readReadOnlyTVar blockHeadersVar
+  return $ blockHeaders Map.! blockId
 
-getBlockBody :: MonadChainSyncProducer m => ChainSyncProducerState m -> BlockId -> STM m BlockBody
-getBlockBody st blockId = (Map.! blockId) <$> readReadOnlyTVar (blockBodies st)
-
-getNextPoint :: MonadChainSyncProducer m => ChainSyncProducerState m -> Point -> STM m (Maybe Point)
-getNextPoint st point = do
-  nextPoint <- Map.lookup point <$> (readReadOnlyTVar <=< readReadOnlyTVar) (chainForwards st)
-  chainTip <- getChainTip st -- NOTE: Only required for assertion
+getNextPoint :: MonadSTM m => Point -> ChainSyncProducerSTM m (Maybe Point)
+getNextPoint point = do
+  ChainSyncProducerState{chainForwardsVarVar} <- ask
+  nextPoint <- Map.lookup point <$> (readReadOnlyTVar <=< readReadOnlyTVar) chainForwardsVarVar
+  chainTip <- getChainTip -- NOTE: Only required for assertion
   assert (isJust nextPoint || point == chainTip) $ return nextPoint
 
-getPrevPoint :: MonadChainSyncProducer m => ChainSyncProducerState m -> Point -> STM m (Maybe Point)
-getPrevPoint st point = blockHeaderParent <$> getBlockHeader st (pointBlockId point)
+getPreviousPoint :: MonadSTM m => Point -> ChainSyncProducerSTM m (Maybe Point)
+getPreviousPoint point = blockHeaderParent <$> unsafeGetBlockHeader (pointBlockId point)
 
 -- PRECONDITION: All chains share a genesis block.
-unsafeFindIntersection :: MonadChainSyncProducer m => ChainSyncProducerState m -> ChainTip -> ChainTip -> STM m ChainTip
-unsafeFindIntersection st tip1 tip2 =
-  findIntersection st tip1 tip2 <&> fromMaybe (error "unsafeFindIntersection: Precondition violated")
+unsafeFindIntersection :: MonadSTM m => ChainTip -> ChainTip -> ChainSyncProducerSTM m ChainTip
+unsafeFindIntersection tip1 tip2 =
+  findIntersection tip1 tip2 <&> fromMaybe (error "unsafeFindIntersection: Precondition violated")
 
-findIntersection :: MonadChainSyncProducer m => ChainSyncProducerState m -> ChainTip -> ChainTip -> STM m (Maybe ChainTip)
-findIntersection st tip1 tip2
+findIntersection :: MonadSTM m => ChainTip -> ChainTip -> ChainSyncProducerSTM m (Maybe ChainTip)
+findIntersection tip1 tip2
   | tip1 == tip2 = return (Just tip1)
-  | pointSlot tip1 <= pointSlot tip2 = do
-      getPrevPoint st tip2 >>= maybe (return Nothing) (findIntersection st tip1)
-  | otherwise = findIntersection st tip2 tip1
+  | pointSlot tip1 <= pointSlot tip2 = getPreviousPoint tip2 >>= maybe (return Nothing) (findIntersection tip1)
+  | otherwise = findIntersection tip2 tip1
 
-tryRollForward :: MonadChainSyncProducer m => ChainSyncProducerState m -> STM m (Maybe BlockHeader)
-tryRollForward st = do
-  point <- getReadPointer st
-  getNextPoint st point >>= \case
+tryRollForward :: MonadSTM m => ChainSyncProducerSTM m (Maybe BlockHeader)
+tryRollForward = do
+  point <- getReadPointer
+  getNextPoint point >>= \case
     Nothing -> return Nothing
     Just point' -> do
-      header' <- getBlockHeader st (pointBlockId point')
-      setReadPointer st point'
+      header' <- unsafeGetBlockHeader (pointBlockId point')
+      setReadPointer point'
       return $ Just header'
 
 data Blocking = Blocking | NonBlocking
@@ -211,110 +223,103 @@ data Blocking = Blocking | NonBlocking
 data Direction = Forward | Backward
   deriving (Eq)
 
--- TODO:
--- Check local events.
--- If EvtNewBlock, ignore. The point of this message is to wake you up.
--- If EvtChainSwitch, recompute read-pointer, return some information that says a chain switch happened.
-catchUp :: forall m. MonadChainSyncProducer m => ChainSyncProducerState m -> Blocking -> STM m Direction
-catchUp st@ChainSyncProducerState{events} blocking = do
-  chainSwitched <- didChainSwitch
-  if not chainSwitched
+-- Handles all local events that happened since the chain-sync producer last woke up.
+-- If there were only @EvtNewBlock@ events, ignore them. The purpose of this message is to wake blocking producers.
+-- If there were @EvtChainSwitch@ events, update the read-pointer and return the current direction.
+handleLocalEvents :: MonadSTM m => Blocking -> ChainSyncProducerSTM m Direction
+handleLocalEvents shouldBlock = do
+  chainSwitched <- didChainSwitch -- Blocks if @shouldBlock == Blocking@
+  if chainSwitched
     then do
-      return Forward
-    else do
-      tip <- getChainTip st
-      point <- getReadPointer st
-      point' <- unsafeFindIntersection st tip point
+      tip <- getChainTip
+      point <- getReadPointer
+      point' <- unsafeFindIntersection tip point
       if point == point'
         then do
           return Forward
         else do
-          setReadPointer st point'
+          setReadPointer point'
           return Backward
+    else do
+      return Forward
  where
-  didChainSwitch :: STM m Bool
-  didChainSwitch =
-    (== Just EvtChainSwitch) <$> case blocking of
-      Blocking -> Just <$> takeTakeOnlyTMVar events
-      NonBlocking -> tryTakeTakeOnlyTMVar events
+  didChainSwitch = do
+    ChainSyncProducerState{eventsVar} <- ask
+    (== Just EvtChainSwitch) <$> case shouldBlock of
+      Blocking -> Just <$> takeTakeOnlyTMVar eventsVar
+      NonBlocking -> tryTakeTakeOnlyTMVar eventsVar
 
-chainSyncProducer ::
-  forall m.
-  MonadChainSyncProducer m =>
-  ChainSyncProducerState m ->
-  TS.Server ChainSyncState NonPipelined StIdle m ()
-chainSyncProducer st = chainSyncProducer_idle
+chainSyncProducer :: forall m. MonadSTM m => TS.Server ChainSyncState NonPipelined StIdle (ChainSyncProducer m) ()
+chainSyncProducer = chainSyncProducer_idle
  where
-  chainSyncProducer_idle :: TS.Server ChainSyncState NonPipelined StIdle m ()
+  chainSyncProducer_idle :: TS.Server ChainSyncState NonPipelined StIdle (ChainSyncProducer m) ()
   chainSyncProducer_idle = TS.Await $ \case
     MsgDone -> TS.Done ()
-    MsgRequestNext -> TS.Effect $ atomically $ do
-      direction <- catchUp st NonBlocking
-      case direction of
-        Forward -> do
-          tryRollForward st >>= \case
-            Nothing -> do
-              return $ TS.Yield MsgAwaitReply chainSyncProducer_mustReply
-            Just header' -> do
-              tip <- getChainTip st
-              return $ TS.Yield (MsgRollForward_StCanAwait header' tip) chainSyncProducer_idle
-        Backward -> do
-          point <- getReadPointer st
-          tip <- getChainTip st
-          return $ TS.Yield (MsgRollBackward_StCanAwait point tip) chainSyncProducer_idle
+    MsgRequestNext -> TS.Effect $ _
+    --  $ do
+    --   handleLocalEvents NonBlocking >>= \case
+    --     Forward -> do
+    --       tryRollForward >>= \case
+    --         Nothing -> do
+    --           return $ TS.Yield MsgAwaitReply chainSyncProducer_mustReply
+    --         Just header' -> do
+    --           tip <- getChainTip
+    --           return $ TS.Yield (MsgRollForward_StCanAwait header' tip) chainSyncProducer_idle
+    --     Backward -> do
+    --       (point, tip) <- (,) <$> getReadPointer <*> getChainTip
+    --       return $ TS.Yield (MsgRollBackward_StCanAwait point tip) chainSyncProducer_idle
     MsgFindIntersect points -> TS.Effect $ atomically $ do
-      -- NOTE: Should not call `catchUp` since it does not interact with the
-      --       read-pointer and cannot handle chain-switch events.
-      tip <- getChainTip st
-      findIntersectionWithPoints st tip points >>= \case
+      -- NOTE: Should not call `handleLocalEvents` since it does not interact with
+      --       the read-pointer and cannot handle chain-switch events.
+      tip <- getChainTip
+      findIntersectionWithPoints tip points >>= \case
         Nothing -> return $ TS.Yield (MsgIntersectNotFound tip) chainSyncProducer_idle
         Just point -> return $ TS.Yield (MsgIntersectFound point tip) chainSyncProducer_idle
 
-  chainSyncProducer_mustReply :: TS.Server ChainSyncState 'NonPipelined 'StMustReply m ()
+  chainSyncProducer_mustReply :: TS.Server ChainSyncState 'NonPipelined 'StMustReply (ChainSyncProducer m) ()
   chainSyncProducer_mustReply = TS.Effect $ atomically $ do
-    direction <- catchUp st Blocking
-    case direction of
+    handleLocalEvents Blocking >>= \case
       Forward -> do
-        tryRollForward st >>= \case
+        tryRollForward >>= \case
           Nothing -> do
             return chainSyncProducer_mustReply
           Just header' -> do
-            tip <- getChainTip st
+            tip <- getChainTip
             return $ TS.Yield (MsgRollForward_StMustReply header' tip) chainSyncProducer_idle
       Backward -> do
-        point <- getReadPointer st
-        tip <- getChainTip st
+        (point, tip) <- (,) <$> getReadPointer <*> getChainTip
         return $ TS.Yield (MsgRollBackward_StMustReply point tip) chainSyncProducer_idle
 
--- NOTE: Order of `points` must be maintained.
--- Maintain separate dictionary of point status (yes, no, unknown).
--- Traverse through chain by iterating `getPrevPoint` on `chainTip`.
--- For each step, for each point:
--- If the point is equal to current chain-tip, mark its status as yes.
--- If the point slot is after the current chain-tip slot, mark its status as no.
--- Otherwise, keep its status as unknown.
--- If the point status of any prefix of `points` are all yes/no with at least one yes, then return the first yes.
+data OnChain = Yes | Unknown
+
+-- Traverse through chain by iterating `getPreviousPoint` on `chainTip`.
+-- For each step, update the intersection status @OnChain@ for each point:
+--
+-- + If a point has status @Yes@, it is known to intersect with the chain.
+-- + If a point has status @Unknown@, it is not known to intersect with the chain.
+-- + If a point is known not to intersect with the chain, it is dropped.
+--
+-- Once any @Point@ is known to intersect with the chain, any less-preferred points are dropped.
+--
+-- If the status of the most-preferred point is @Yes@, return it.
 -- Otherwise, when you reach the genesis block, return Nothing.
-findIntersectionWithPoints :: forall m. MonadChainSyncProducer m => ChainSyncProducerState m -> ChainTip -> [Point] -> STM m (Maybe Point)
-findIntersectionWithPoints st chainTip points = findIntersectionAcc chainTip $ updateIntersectionStatusFor chainTip ((,False) <$> points)
+--
+-- NOTE: The order of the points indicates preference and must be maintained.
+findIntersectionWithPoints :: forall m. MonadSTM m => ChainTip -> [Point] -> ChainSyncProducerSTM m (Maybe Point)
+findIntersectionWithPoints chainTip points = findIntersectionAcc chainTip $ updateIntersectionStatusFor chainTip ((,Unknown) <$> points)
  where
-  findIntersectionAcc :: ChainTip -> [(Point, Bool)] -> STM m (Maybe Point)
+  findIntersectionAcc :: ChainTip -> [(Point, OnChain)] -> ChainSyncProducerSTM m (Maybe Point)
   findIntersectionAcc _tip [] = return Nothing
-  findIntersectionAcc _tip ((point, True) : _) = return (Just point)
+  findIntersectionAcc _tip ((point, Yes) : _) = return (Just point)
   findIntersectionAcc tip pointsAndStatuses = do
-    getPrevPoint st tip >>= \case
+    getPreviousPoint tip >>= \case
       Nothing -> return Nothing
       Just tip' -> findIntersectionAcc tip' (updateIntersectionStatusFor tip' pointsAndStatuses)
 
-  -- The @Bool@ encodes whether the @Point@ is known to intersect with the chain:
-  -- + If @True@, it is known to intersect with the chain.
-  -- + If @False@, it is not known to intersect with the chain.
-  -- + If it is known not to intersect with the chain, the point is dropped.
-  -- If any @Point@ is known to intersect with the chain, the suffix can be dropped.
-  updateIntersectionStatusFor :: ChainTip -> [(Point, Bool)] -> [(Point, Bool)]
+  updateIntersectionStatusFor :: ChainTip -> [(Point, OnChain)] -> [(Point, OnChain)]
   updateIntersectionStatusFor _ [] = []
-  updateIntersectionStatusFor _ ((point, True) : _pointsAndStatuses) = [(point, True)]
-  updateIntersectionStatusFor tip ((point, False) : pointsAndStatuses)
-    | point == tip = [(point, True)]
+  updateIntersectionStatusFor _ ((point, Yes) : _pointsAndStatuses) = [(point, Yes)]
+  updateIntersectionStatusFor tip ((point, Unknown) : pointsAndStatuses)
+    | point == tip = [(point, Yes)]
     | pointSlot tip < pointSlot point = updateIntersectionStatusFor tip pointsAndStatuses
     | otherwise = updateIntersectionStatusFor tip pointsAndStatuses
