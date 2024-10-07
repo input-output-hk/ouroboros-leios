@@ -178,6 +178,9 @@ impl EventMonitor {
         }
 
         if let Some(path) = self.output_path {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
             fs::write(path, serde_json::to_vec(&output)?)?;
         }
         Ok(())

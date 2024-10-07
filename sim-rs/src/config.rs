@@ -22,7 +22,7 @@ impl PoolId {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "distribution", rename_all = "snake_case")]
 enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
     Exp { lambda: f64, scale: Option<f64> },
@@ -37,9 +37,7 @@ impl From<DistributionConfig> for FloatDistribution {
             DistributionConfig::Exp { lambda, scale } => {
                 FloatDistribution::scaled_exp(lambda, scale.unwrap_or(1.))
             }
-            DistributionConfig::LogNormal { mu, sigma } => {
-                FloatDistribution::log_normal(mu, sigma)
-            }
+            DistributionConfig::LogNormal { mu, sigma } => FloatDistribution::log_normal(mu, sigma),
         }
     }
 }

@@ -16,5 +16,5 @@ links = [
 block_generation_probability = 0.05
 max_block_size = 90112
 max_tx_size = 16384
-transaction_frequency_ms = { lambda = 0.85, scale = 1000 }
-transaction_size_bytes = { mu = 6.85, sigma = 1.13 }
+transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
+transaction_size_bytes = { distribution = "log_normal", mu = 6.85, sigma = 1.13 }
