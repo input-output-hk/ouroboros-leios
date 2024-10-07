@@ -44,6 +44,7 @@ impl From<DistributionConfig> for FloatDistribution {
 
 #[derive(Debug, Deserialize)]
 struct RawConfig {
+    seed: Option<u64>,
     pools: Vec<RawPoolConfig>,
     links: Vec<RawLinkConfig>,
     block_generation_probability: f64,
@@ -66,6 +67,7 @@ struct RawLinkConfig {
 
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
+    pub seed: u64,
     pub pools: Vec<PoolConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub block_generation_probability: f64,
@@ -111,6 +113,7 @@ impl From<RawConfig> for SimConfiguration {
             });
         }
         Self {
+            seed: value.seed.unwrap_or_default(),
             pools,
             links,
             block_generation_probability: value.block_generation_probability,

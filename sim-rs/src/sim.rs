@@ -7,7 +7,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use futures::{stream::FuturesUnordered, StreamExt};
 use netsim_async::{EdgePolicy, HasBytesSize, Latency};
-use rand::{thread_rng, Rng};
+use rand::Rng as _;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_distr::Distribution as _;
 use tokio::{select, time};
@@ -40,7 +40,7 @@ impl Simulation {
 
         let mut network = Network::new();
 
-        let rng = ChaChaRng::from_rng(thread_rng()).context("couldn't initialize RNG")?;
+        let rng = ChaChaRng::seed_from_u64(config.seed);
         let mut pools = BTreeMap::new();
         let mut msg_sources = BTreeMap::new();
         for pool_config in &config.pools {
