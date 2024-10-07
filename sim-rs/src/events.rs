@@ -8,16 +8,30 @@ use tracing::{info, warn};
 use crate::config::{PoolId, SimConfiguration};
 
 pub enum Event {
-    Slot { number: u64, block: Option<Block> },
-    Transaction { id: u64, bytes: u64 },
+    Slot {
+        number: u64,
+        block: Option<Block>,
+    },
+    BlockReceived {
+        slot: u64,
+        sender: PoolId,
+        recipient: PoolId,
+    },
+    Transaction {
+        id: u64,
+        bytes: u64,
+    },
 }
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct Block {
+    pub slot: u64,
     pub publisher: PoolId,
     pub conflicts: Vec<PoolId>,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub id: u64,
     pub bytes: u64,
@@ -30,6 +44,12 @@ enum OutputEvent {
         slot: u64,
         publisher: PoolId,
         transactions: Vec<u64>,
+    },
+    BlockReceived {
+        time: u128,
+        slot: u64,
+        sender: PoolId,
+        recipient: PoolId,
     },
     TransactionCreated {
         time: u128,
@@ -48,6 +68,14 @@ impl EventTracker {
 
     pub fn track_slot(&self, number: u64, block: Option<Block>) {
         self.send(Event::Slot { number, block });
+    }
+
+    pub fn track_block_received(&self, slot: u64, sender: PoolId, recipient: PoolId) {
+        self.send(Event::BlockReceived {
+            slot,
+            sender,
+            recipient,
+        });
     }
 
     pub fn track_transaction(&self, transaction: &Transaction) {
@@ -125,6 +153,7 @@ impl EventMonitor {
                         empty_slots += 1;
                     }
                 }
+                Event::BlockReceived { .. } => {}
                 Event::Transaction { id, bytes } => {
                     pending_tx_sizes.insert(id, bytes);
                 }
@@ -177,6 +206,18 @@ impl EventMonitor {
                     time,
                     id: *id,
                     bytes: *bytes,
+                });
+            }
+            Event::BlockReceived {
+                slot,
+                sender,
+                recipient,
+            } => {
+                output.push(OutputEvent::BlockReceived {
+                    time,
+                    slot: *slot,
+                    sender: *sender,
+                    recipient: *recipient,
                 });
             }
         }
