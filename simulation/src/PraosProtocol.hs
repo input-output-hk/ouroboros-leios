@@ -25,6 +25,7 @@ import Control.Concurrent.Class.MonadSTM (
   ),
  )
 import Control.Exception (assert)
+import Control.Monad ((<=<))
 import Data.Functor ((<&>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (lookup, (!))
@@ -138,11 +139,11 @@ type MonadChainSyncProducer m = MonadSTM m
 
 data ChainSyncProducerState m = ChainSyncProducerState
   { readPointer :: TVar m Point -- Owned, Unique, Read/Write.
-  , events :: TakeOnly (TMVar m Event) -- Owned, Non-Unique, Take-Only.
-  , chainTip :: ReadOnly (TVar m ChainTip) -- Borrowed, Non-Unique, Read-Only.
-  , chainForwards :: ReadOnly (TVar m (Map Point Point)) -- Borrowed, Non-Unique, Read-Only.
-  , blockHeaders :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Borrowed, Non-Unique, Read-Only.
-  , blockBodies :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Borrowed, Non-Unique, Read-Only.
+  , events :: TakeOnly (TMVar m Event) -- Owned, Shared, Take-Only.
+  , chainTip :: ReadOnly (TVar m ChainTip) -- Borrowed, Shared, Read-Only.
+  , chainForwards :: ReadOnly (TVar m (ReadOnly (TVar m (Map Point Point)))) -- Borrowed, Shared, Read-Only.
+  , blockHeaders :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Borrowed, Shared, Read-Only.
+  , blockBodies :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Borrowed, Shared, Read-Only.
   }
 
 data Event
@@ -176,7 +177,7 @@ getBlockBody st blockId = (Map.! blockId) <$> readReadOnlyTVar (blockBodies st)
 
 getNextPoint :: MonadChainSyncProducer m => ChainSyncProducerState m -> Point -> STM m (Maybe Point)
 getNextPoint st point = do
-  nextPoint <- Map.lookup point <$> readReadOnlyTVar (chainForwards st)
+  nextPoint <- Map.lookup point <$> (readReadOnlyTVar <=< readReadOnlyTVar) (chainForwards st)
   chainTip <- getChainTip st -- NOTE: Only required for assertion
   assert (isJust nextPoint || point == chainTip) $ return nextPoint
 
