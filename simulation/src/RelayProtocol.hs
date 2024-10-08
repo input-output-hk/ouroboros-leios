@@ -186,8 +186,7 @@ instance MessageSize blk => MessageSize (BlockRelayMessage blk blkid blkmd) wher
 newtype BlockTTL = BlockTTL UTCTime
   deriving (Eq, Ord, Show)
 
-data BlockRelayConfig m blk blkid
-  = BlockRelayConfig
+data BlockRelayConfig m blk blkid = BlockRelayConfig
   { blockId :: blk -> blkid
   , blockTTL :: blk -> BlockTTL
   , submitBlock :: blk -> STM m () -> m ()

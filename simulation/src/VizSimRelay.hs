@@ -36,8 +36,7 @@ type RelaySimVizModel =
     RelaySimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data RelaySimVizState
-  = RelaySimVizState
+data RelaySimVizState = RelaySimVizState
   { vizWorldShape :: !WorldShape
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
@@ -288,8 +287,7 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data RelaySimVizConfig
-  = RelaySimVizConfig
+data RelaySimVizConfig = RelaySimVizConfig
   { nodeMessageColor :: TestBlock -> (Double, Double, Double)
   , ptclMessageColor :: TestBlockRelayMessage -> (Double, Double, Double)
   , nodeMessageText :: TestBlock -> Maybe String

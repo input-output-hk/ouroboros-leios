@@ -74,8 +74,7 @@ scaledAxis lap rs@(minV, maxV) ps =
     | minV == maxV =
         if minV == 0
           then (-1, 1)
-          else
-            let d = abs (minV * 0.01) in (minV - d, maxV + d)
+          else let d = abs (minV * 0.01) in (minV - d, maxV + d)
     | otherwise = rs
   labelvs = map fromRational $ steps (fromIntegral (Chart._la_nLabels lap)) r
   tickvs =

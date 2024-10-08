@@ -34,14 +34,12 @@ data Vizualisation where
     Layout (VizRender model) ->
     Vizualisation
 
-data VizModel model
-  = VizModel
+data VizModel model = VizModel
   { initModel :: model
   , stepModel :: DiffTime -> Time -> FrameNo -> model -> model
   }
 
-data VizRender model
-  = VizRender
+data VizRender model = VizRender
   { renderReqSize :: (Int, Int)
   , renderChanged :: Time -> FrameNo -> model -> Bool
   , renderModel ::
@@ -108,8 +106,7 @@ stepModelWithTime VizModel{stepModel} fps (time, frameno, model) =
 
 data LayoutTile a = LayoutTile !Tile a
 
-data Tile
-  = Tile
+data Tile = Tile
   { tileX :: !Int
   , tileY :: !Int
   , tileW :: !Int
@@ -251,8 +248,7 @@ takeUpTo n = go 0
     | a + x >= n = [x] -- inclusive
     | otherwise = x : go (a + x) xs
 
-data LayoutProperties
-  = LayoutProps
+data LayoutProperties = LayoutProps
   { reqSize :: !(Int, Int)
   , expand :: !Bool
   }
@@ -389,8 +385,7 @@ renderTiles tiles forceRender time frame model =
       Cairo.clip
       Cairo.translate (fromIntegral tileX) (fromIntegral tileY)
       if tileScale == 1.0
-        then
-          render (fromIntegral tileW, fromIntegral tileH)
+        then render (fromIntegral tileW, fromIntegral tileH)
         else do
           Cairo.scale tileScale tileScale
           render
@@ -399,8 +394,7 @@ renderTiles tiles forceRender time frame model =
             )
       Cairo.restore
 
-data GtkVizConfig
-  = GtkVizConfig
+data GtkVizConfig = GtkVizConfig
   { gtkVizFPS :: Int
   , gtkVizResolution :: Maybe (Int, Int)
   , gtkVizCpuRendering :: Bool
@@ -543,8 +537,7 @@ vizualise
     Gtk.widgetShowAll window
     Gtk.mainGUI
 
-data AnimVizConfig
-  = AnimVizConfig
+data AnimVizConfig = AnimVizConfig
   { animVizFrameFiles :: Int -> FilePath
   , animVizDuration :: Int
   , animVizStartTime :: Int
