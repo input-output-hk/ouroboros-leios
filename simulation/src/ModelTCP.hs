@@ -102,8 +102,7 @@ saneTcpState
         == tcpAvailableCongestionWindow
           + Foldable.sum tcpAcknowledgements
 
-data TcpMsgForecast
-  = TcpMsgForecast
+data TcpMsgForecast = TcpMsgForecast
   { msgSendLeadingEdge :: !Time
   -- ^ The time the sender starts sending (leading edge);
   , msgSendTrailingEdge :: !Time

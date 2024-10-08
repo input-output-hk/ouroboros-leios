@@ -98,8 +98,7 @@ instance MessageSize TestBlock where
 
 type TestBlockRelayMessage = BlockRelayMessage TestBlock TestBlockId BlockTTL
 
-data RelayNodeConfig
-  = RelayNodeConfig
+data RelayNodeConfig = RelayNodeConfig
   { blockProcessingDelay :: TestBlock -> DiffTime
   , blockGeneration :: PacketGenerationPattern
   }

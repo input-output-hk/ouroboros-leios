@@ -28,8 +28,7 @@ type TcpSimVizModel =
     TcpSimVizState
 
 -- | The vizualisation state within the data model for the tcp simulation
-data TcpSimVizState
-  = TcpSimVizState
+data TcpSimVizState = TcpSimVizState
   { vizNodePos :: Map NodeId Point
   , vizNodeLinks :: Set (NodeId, NodeId)
   , vizMsgsInTransit ::
@@ -121,8 +120,7 @@ tcpSimVizModel =
 -- The vizualisation rendering
 --
 
-newtype TcpSimVizConfig msg
-  = TcpSimVizConfig
+newtype TcpSimVizConfig msg = TcpSimVizConfig
   { messageColor :: msg -> (Double, Double, Double)
   }
 

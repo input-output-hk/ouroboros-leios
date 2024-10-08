@@ -26,8 +26,7 @@ import qualified System.Random as Random
 
 import SimTypes (NodeId (..), Point (..), WorldShape (..))
 
-data P2PTopography
-  = P2PTopography
+data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)
   , p2pLinks :: !(Map (NodeId, NodeId) Latency)
   , p2pWorldShape :: !WorldShape
@@ -38,8 +37,7 @@ type Latency =
   -- | Double rather than DiffTime for efficiency
   Double
 
-data P2PTopographyCharacteristics
-  = P2PTopographyCharacteristics
+data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   { p2pWorldShape :: !WorldShape
   -- ^ Size of the world (in seconds): (Circumference, pole-to-pole)
   , -- \^ Number of nodes, e.g. 100, 1000, 10,000

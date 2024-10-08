@@ -55,8 +55,7 @@ cli =
           \ animation frames to a directory."
     )
 
-data CliCmd
-  = CliCmd
+data CliCmd = CliCmd
   { cliVizName :: VizName
   , cliOutputFramesDir :: Maybe FilePath
   , cliOutputSeconds :: Maybe Int

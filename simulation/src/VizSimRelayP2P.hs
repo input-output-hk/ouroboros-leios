@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use const" #-}
 
 module VizSimRelayP2P where
@@ -34,8 +35,7 @@ import VizUtils
 -- The vizualisation rendering
 --
 
-data RelayP2PSimVizConfig
-  = RelayP2PSimVizConfig
+data RelayP2PSimVizConfig = RelayP2PSimVizConfig
   { nodeMessageColor :: TestBlock -> (Double, Double, Double)
   , ptclMessageColor :: TestBlockRelayMessage -> Maybe (Double, Double, Double)
   }
