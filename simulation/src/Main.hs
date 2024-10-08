@@ -14,15 +14,14 @@ import qualified ExamplesTCP
 
 main :: IO ()
 main = do
-  CliCmd
-    { cliVizName
-    , cliOutputFramesDir
-    , cliOutputSeconds
-    , cliOutputStartTime
-    , cliCpuRendering
-    , cliVizSize
-    } <-
-    Opts.execParser cli
+  cmd <- Opts.execParser cli
+  case cmd of
+    Run opts ->
+      runViz opts
+    List -> listVisualizations
+
+runViz :: RunOptions -> IO ()
+runViz RunOptions{cliVizName, cliOutputFramesDir, cliOutputSeconds, cliOutputStartTime, cliCpuRendering, cliVizSize} = do
   let viz = namedViz cliVizName
   case cliOutputFramesDir of
     Nothing ->
@@ -44,10 +43,15 @@ main = do
           , animVizResolution = cliVizSize
           }
 
-cli :: Opts.ParserInfo CliCmd
+listVisualizations :: IO ()
+listVisualizations = do
+  putStrLn "Available visualisations:"
+  mapM_ (putStrLn . ("  " ++) . show) $ enumFrom VizTCP1
+
+cli :: Opts.ParserInfo Command
 cli =
   Opts.info
-    (Opts.helper <*> options)
+    (Opts.helper <*> command)
     ( Opts.fullDesc
         <> Opts.header "Vizualisations of Ouroboros-related network simulations"
         <> Opts.progDesc
@@ -55,7 +59,7 @@ cli =
           \ animation frames to a directory."
     )
 
-data CliCmd = CliCmd
+data RunOptions = RunOptions
   { cliVizName :: VizName
   , cliOutputFramesDir :: Maybe FilePath
   , cliOutputSeconds :: Maybe Int
@@ -64,9 +68,18 @@ data CliCmd = CliCmd
   , cliVizSize :: Maybe (Int, Int)
   }
 
-options :: Opts.Parser CliCmd
+data Command = Run RunOptions | List
+
+command :: Opts.Parser Command
+command =
+  Opts.hsubparser
+    ( Opts.command "run" (Opts.info (Run <$> options) (Opts.progDesc "Run a visualisation"))
+        <> Opts.command "list" (Opts.info (pure List) (Opts.progDesc "List available visualisations"))
+    )
+
+options :: Opts.Parser RunOptions
 options =
-  CliCmd
+  RunOptions
     <$> Opts.argument
       (Opts.eitherReader readVizName)
       (Opts.metavar "VIZNAME")
@@ -126,6 +139,21 @@ data VizName
   | VizRelay2
   | VizRelayP2P1
   | VizRelayP2P2
+  deriving (Eq, Enum)
+
+instance Show VizName where
+  show VizTCP1 = "tcp-1"
+  show VizTCP2 = "tcp-2"
+  show VizTCP3 = "tcp-3"
+  show VizRelay1 = "relay-1"
+  show VizRelay2 = "relay-2"
+  show VizRelayP2P1 = "p2p-1"
+  show VizRelayP2P2 = "p2p-2"
+
+instance Read VizName where
+  readsPrec _ s = case readVizName s of
+    Right v -> [(v, "")]
+    Left _ -> []
 
 readVizName :: String -> Either String VizName
 readVizName "tcp-1" = Right VizTCP1
