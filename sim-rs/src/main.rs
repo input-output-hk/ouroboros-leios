@@ -1,7 +1,8 @@
-use std::{path::PathBuf, process};
+use std::{path::PathBuf, process, time::Instant};
 
 use anyhow::Result;
 use clap::Parser;
+use clock::Clock;
 use config::read_config;
 use events::{EventMonitor, EventTracker};
 use sim::Simulation;
@@ -11,6 +12,7 @@ use tokio::{
 };
 use tracing::warn;
 
+mod clock;
 mod config;
 mod events;
 mod network;
@@ -46,11 +48,12 @@ async fn main() -> Result<()> {
     let monitor = EventMonitor::new(&config, events_source, args.output).run();
     pin!(monitor);
 
-    let tracker = EventTracker::new(events_sink);
-    let mut simulation = Simulation::new(config)?;
+    let clock = Clock::new(Instant::now());
+    let tracker = EventTracker::new(events_sink, clock.clone());
+    let mut simulation = Simulation::new(config, clock)?;
 
     select! {
-        _ = simulation.run(tracker) => {}
+        result = simulation.run(tracker) => { result? }
         result = &mut monitor => { result? }
         _ = ctrlc_source => {}
     };

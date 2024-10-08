@@ -1,11 +1,14 @@
-use std::{collections::BTreeMap, fs, path::PathBuf, time::Instant};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
 use anyhow::Result;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
-use crate::config::{PoolId, SimConfiguration};
+use crate::{
+    clock::{Clock, Timestamp},
+    config::{NodeId, SimConfiguration},
+};
 
 pub enum Event {
     Slot {
@@ -14,8 +17,8 @@ pub enum Event {
     },
     BlockReceived {
         slot: u64,
-        sender: PoolId,
-        recipient: PoolId,
+        sender: NodeId,
+        recipient: NodeId,
     },
     Transaction {
         id: u64,
@@ -26,8 +29,8 @@ pub enum Event {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Block {
     pub slot: u64,
-    pub publisher: PoolId,
-    pub conflicts: Vec<PoolId>,
+    pub publisher: NodeId,
+    pub conflicts: Vec<NodeId>,
     pub transactions: Vec<Transaction>,
 }
 
@@ -40,37 +43,40 @@ pub struct Transaction {
 #[derive(Clone, Serialize)]
 enum OutputEvent {
     BlockGenerated {
-        time: u128,
+        time: Timestamp,
         slot: u64,
-        publisher: PoolId,
+        publisher: NodeId,
         transactions: Vec<u64>,
     },
     BlockReceived {
-        time: u128,
+        time: Timestamp,
         slot: u64,
-        sender: PoolId,
-        recipient: PoolId,
+        sender: NodeId,
+        recipient: NodeId,
     },
     TransactionCreated {
-        time: u128,
+        time: Timestamp,
         id: u64,
         bytes: u64,
     },
 }
 
 #[derive(Clone)]
-pub struct EventTracker(mpsc::UnboundedSender<(Event, Instant)>);
+pub struct EventTracker {
+    sender: mpsc::UnboundedSender<(Event, Timestamp)>,
+    clock: Clock,
+}
 
 impl EventTracker {
-    pub fn new(inner: mpsc::UnboundedSender<(Event, Instant)>) -> Self {
-        Self(inner)
+    pub fn new(sender: mpsc::UnboundedSender<(Event, Timestamp)>, clock: Clock) -> Self {
+        Self { sender, clock }
     }
 
     pub fn track_slot(&self, number: u64, block: Option<Block>) {
         self.send(Event::Slot { number, block });
     }
 
-    pub fn track_block_received(&self, slot: u64, sender: PoolId, recipient: PoolId) {
+    pub fn track_block_received(&self, slot: u64, sender: NodeId, recipient: NodeId) {
         self.send(Event::BlockReceived {
             slot,
             sender,
@@ -86,30 +92,32 @@ impl EventTracker {
     }
 
     fn send(&self, event: Event) {
-        if self.0.send((event, Instant::now())).is_err() {
+        if self.sender.send((event, self.clock.now())).is_err() {
             warn!("tried sending event after aggregator finished");
         }
     }
 }
 
 pub struct EventMonitor {
-    pool_ids: Vec<PoolId>,
-    start: Instant,
-    events_source: mpsc::UnboundedReceiver<(Event, Instant)>,
+    pool_ids: Vec<NodeId>,
+    events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
 }
 
 impl EventMonitor {
     pub fn new(
         config: &SimConfiguration,
-        events_source: mpsc::UnboundedReceiver<(Event, Instant)>,
+        events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
     ) -> Self {
-        let pool_ids = config.pools.iter().map(|p| p.id).collect();
-        let start = Instant::now();
+        let pool_ids = config
+            .nodes
+            .iter()
+            .filter(|p| p.stake > 0)
+            .map(|p| p.id)
+            .collect();
         Self {
             pool_ids,
-            start,
             events_source,
             output_path,
         }
@@ -118,8 +126,8 @@ impl EventMonitor {
     // Monitor and report any events emitted by the simulation,
     // including any aggregated stats at the end.
     pub async fn run(mut self) -> Result<()> {
-        let mut blocks_published: BTreeMap<PoolId, u64> = BTreeMap::new();
-        let mut blocks_rejected: BTreeMap<PoolId, u64> = BTreeMap::new();
+        let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
+        let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut pending_tx_sizes: BTreeMap<u64, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
@@ -186,13 +194,7 @@ impl EventMonitor {
         Ok(())
     }
 
-    fn compute_output_events(
-        &self,
-        output: &mut Vec<OutputEvent>,
-        event: &Event,
-        timestamp: Instant,
-    ) {
-        let time = timestamp.duration_since(self.start).as_nanos();
+    fn compute_output_events(&self, output: &mut Vec<OutputEvent>, event: &Event, time: Timestamp) {
         match event {
             Event::Slot { number, block } => {
                 if let Some(block) = block {

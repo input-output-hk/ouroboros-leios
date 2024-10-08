@@ -1,18 +1,19 @@
 use std::{fmt::Display, fs, path::Path, time::Duration};
 
 use anyhow::Result;
+use netsim_async::geo::{self, Location};
 use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct PoolId(usize);
-impl Display for PoolId {
+pub struct NodeId(usize);
+impl Display for NodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
-impl PoolId {
+impl NodeId {
     pub fn to_inner(self) -> usize {
         self.0
     }
@@ -45,7 +46,7 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     seed: Option<u64>,
-    pools: Vec<RawPoolConfig>,
+    nodes: Vec<RawNodeConfig>,
     links: Vec<RawLinkConfig>,
     block_generation_probability: f64,
     max_block_size: u64,
@@ -55,20 +56,21 @@ struct RawConfig {
 }
 
 #[derive(Debug, Deserialize)]
-struct RawPoolConfig {
-    stake: u64,
+struct RawNodeConfig {
+    location: (f64, f64),
+    stake: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
 struct RawLinkConfig {
-    pools: [usize; 2],
-    latency_ms: u64,
+    nodes: (usize, usize),
+    latency_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
-    pub pools: Vec<PoolConfiguration>,
+    pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub block_generation_probability: f64,
     pub max_block_size: u64,
@@ -78,43 +80,45 @@ pub struct SimConfiguration {
 }
 
 #[derive(Debug, Clone)]
-pub struct PoolConfiguration {
-    pub id: PoolId,
+pub struct NodeConfiguration {
+    pub id: NodeId,
+    pub location: Location,
     pub stake: u64,
-    pub peers: Vec<PoolId>,
+    pub peers: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LinkConfiguration {
-    pub pools: [PoolId; 2],
+    pub nodes: (NodeId, NodeId),
     pub latency: Duration,
 }
 
 impl From<RawConfig> for SimConfiguration {
     fn from(value: RawConfig) -> Self {
-        let mut pools: Vec<PoolConfiguration> = value
-            .pools
+        let mut nodes: Vec<NodeConfiguration> = value
+            .nodes
             .into_iter()
             .enumerate()
-            .map(|(index, raw)| PoolConfiguration {
-                id: PoolId(index),
-                stake: raw.stake,
+            .map(|(index, raw)| NodeConfiguration {
+                id: NodeId(index),
+                location: to_netsim_location(raw.location),
+                stake: raw.stake.unwrap_or_default(),
                 peers: vec![],
             })
             .collect();
         let mut links = vec![];
         for link in value.links {
-            let [id1, id2] = link.pools;
-            pools[id1].peers.push(PoolId(id2));
-            pools[id2].peers.push(PoolId(id1));
+            let (id1, id2) = link.nodes;
+            nodes[id1].peers.push(NodeId(id2));
+            nodes[id2].peers.push(NodeId(id1));
             links.push(LinkConfiguration {
-                pools: [PoolId(id1), PoolId(id2)],
-                latency: Duration::from_millis(link.latency_ms),
+                nodes: (NodeId(id1), NodeId(id2)),
+                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
             });
         }
         Self {
             seed: value.seed.unwrap_or_default(),
-            pools,
+            nodes,
             links,
             block_generation_probability: value.block_generation_probability,
             max_block_size: value.max_block_size,
@@ -123,6 +127,18 @@ impl From<RawConfig> for SimConfiguration {
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
     }
+}
+
+fn to_netsim_location((lat, long): (f64, f64)) -> Location {
+    ((lat * 10000.) as i64, (long * 10000.) as u64)
+}
+
+fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Duration {
+    let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
+        .map(|l| l.to_duration())
+        .unwrap_or(Duration::ZERO);
+    let extra_latency = Duration::from_millis(extra_ms.unwrap_or(5));
+    geo_latency + extra_latency
 }
 
 pub fn read_config(filename: &Path) -> Result<SimConfiguration> {

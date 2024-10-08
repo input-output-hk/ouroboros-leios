@@ -1,7 +1,8 @@
 use std::{
     cmp::Reverse,
     collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
-    time::{Duration, Instant},
+    sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{bail, Context, Result};
@@ -10,50 +11,48 @@ use netsim_async::{EdgePolicy, HasBytesSize, Latency};
 use rand::Rng as _;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_distr::Distribution as _;
-use tokio::{select, time};
+use tokio::select;
 
 use crate::{
-    config::{PoolConfiguration, PoolId, SimConfiguration},
+    clock::{Clock, Timestamp},
+    config::{NodeConfiguration, NodeId, SimConfiguration},
     events::{Block, EventTracker, Transaction},
     network::{Network, NetworkSink, NetworkSource},
-    probability::FloatDistribution,
 };
 
 pub struct Simulation {
+    config: SimConfiguration,
+    clock: Clock,
     rng: ChaChaRng,
     network: Network<SimulationMessage>,
-    pools: BTreeMap<PoolId, Pool>,
-    msg_sources: BTreeMap<PoolId, NetworkSource<SimulationMessage>>,
-    max_block_size: u64,
-    max_tx_size: u64,
+    nodess: BTreeMap<NodeId, Node>,
+    msg_sources: BTreeMap<NodeId, NetworkSource<SimulationMessage>>,
     next_slot: u64,
     next_tx_id: u64,
-    transaction_frequency_ms: FloatDistribution,
-    transaction_size_bytes: FloatDistribution,
     event_queue: BinaryHeap<FutureEvent>,
     unpublished_txs: VecDeque<Transaction>,
 }
 
 impl Simulation {
-    pub fn new(config: SimConfiguration) -> Result<Self> {
-        let total_stake = config.pools.iter().map(|p| p.stake).sum();
+    pub fn new(config: SimConfiguration, clock: Clock) -> Result<Self> {
+        let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
         let mut network = Network::new();
 
         let rng = ChaChaRng::seed_from_u64(config.seed);
-        let mut pools = BTreeMap::new();
+        let mut nodes = BTreeMap::new();
         let mut msg_sources = BTreeMap::new();
-        for pool_config in &config.pools {
-            let id = pool_config.id;
+        for node_config in &config.nodes {
+            let id = node_config.id;
             let (msg_source, msg_sink) = network.open(id).context("could not open socket")?;
-            let pool = Pool::new(pool_config, &config, total_stake, msg_sink);
-            msg_sources.insert(pool.id, msg_source);
-            pools.insert(pool.id, pool);
+            let node = Node::new(node_config, &config, total_stake, msg_sink);
+            msg_sources.insert(node.id, msg_source);
+            nodes.insert(node.id, node);
         }
-        for link_config in config.links {
+        for link_config in config.links.iter() {
             network.set_edge_policy(
-                link_config.pools[0],
-                link_config.pools[1],
+                link_config.nodes.0,
+                link_config.nodes.1,
                 EdgePolicy {
                     latency: Latency::new(link_config.latency),
                     ..EdgePolicy::default()
@@ -62,14 +61,12 @@ impl Simulation {
         }
 
         let mut sim = Self {
+            config,
+            clock,
             rng,
             network,
-            pools,
+            nodess: nodes,
             msg_sources,
-            max_block_size: config.max_block_size,
-            max_tx_size: config.max_tx_size,
-            transaction_frequency_ms: config.transaction_frequency_ms,
-            transaction_size_bytes: config.transaction_size_bytes,
             next_slot: 0,
             next_tx_id: 0,
             event_queue: BinaryHeap::new(),
@@ -88,10 +85,16 @@ impl Simulation {
                 SimulationEvent::NewSlot => self.run_slot_lottery(&tracker)?,
                 SimulationEvent::NewTransaction => self.generate_tx(&tracker),
                 SimulationEvent::NetworkMessage { from, to, msg } => {
-                    let Some(target) = self.pools.get_mut(&to) else {
+                    let Some(target) = self.nodess.get_mut(&to) else {
                         bail!("unrecognized message target {to}");
                     };
                     match msg {
+                        SimulationMessage::RollForward(slot) => {
+                            target.receive_roll_forward(from, slot)?;
+                        }
+                        SimulationMessage::RequestBlock(slot) => {
+                            target.receive_request_block(from, slot)?;
+                        }
                         SimulationMessage::Block(block) => {
                             tracker.track_block_received(block.slot, from, to);
                             target.receive_block(from, block)?;
@@ -109,15 +112,16 @@ impl Simulation {
 
     fn queue_event(&mut self, event: SimulationEvent, after: Duration) {
         self.event_queue
-            .push(FutureEvent(Instant::now() + after, event));
+            .push(FutureEvent(self.clock.now() + after, event));
     }
 
     async fn next_event(&mut self) -> Option<SimulationEvent> {
         let queued_event = self.event_queue.peek().cloned();
 
+        let clock = self.clock.clone();
         let next_queued_event = async move {
-            let FutureEvent(instant, event) = queued_event?;
-            time::sleep_until(instant.into()).await;
+            let FutureEvent(timestamp, event) = queued_event?;
+            clock.wait_until(timestamp).await;
             Some(event)
         };
 
@@ -140,12 +144,12 @@ impl Simulation {
     }
 
     fn run_slot_lottery(&mut self, tracker: &EventTracker) -> Result<()> {
-        let vrf_winners: Vec<(PoolId, u64)> = self
-            .pools
+        let vrf_winners: Vec<(NodeId, u64)> = self
+            .nodess
             .values()
-            .filter_map(|pool| {
-                let result = pool.run_vrf(&mut self.rng)?;
-                Some((pool.id, result))
+            .filter_map(|node| {
+                let result = node.run_vrf(&mut self.rng)?;
+                Some((node.id, result))
             })
             .collect();
 
@@ -164,7 +168,7 @@ impl Simulation {
             let mut size = 0;
             let mut transactions = vec![];
             while let Some(tx) = self.unpublished_txs.front() {
-                if size + tx.bytes > self.max_block_size {
+                if size + tx.bytes > self.config.max_block_size {
                     break;
                 }
                 size += tx.bytes;
@@ -177,10 +181,10 @@ impl Simulation {
                 conflicts,
                 transactions,
             };
-            self.pools
+            self.nodess
                 .get_mut(&publisher)
                 .unwrap()
-                .publish_block(&block)?;
+                .publish_block(Arc::new(block.clone()))?;
             tracker.track_slot(self.next_slot, Some(block));
         } else {
             tracker.track_slot(self.next_slot, None);
@@ -194,15 +198,16 @@ impl Simulation {
     fn generate_tx(&mut self, tracker: &EventTracker) {
         let id = self.next_tx_id;
         let bytes = self
+            .config
             .max_tx_size
-            .min(self.transaction_size_bytes.sample(&mut self.rng) as u64);
+            .min(self.config.transaction_size_bytes.sample(&mut self.rng) as u64);
         let tx = Transaction { id, bytes };
 
         tracker.track_transaction(&tx);
         self.unpublished_txs.push_back(tx);
 
         self.next_tx_id += 1;
-        let ms_until_tx = self.transaction_frequency_ms.sample(&mut self.rng) as u64;
+        let ms_until_tx = self.config.transaction_frequency_ms.sample(&mut self.rng) as u64;
         self.queue_event(
             SimulationEvent::NewTransaction,
             Duration::from_millis(ms_until_tx),
@@ -210,18 +215,20 @@ impl Simulation {
     }
 }
 
-struct Pool {
-    id: PoolId,
+struct Node {
+    id: NodeId,
     msg_sink: NetworkSink<SimulationMessage>,
     target_vrf_stake: u64,
     total_stake: u64,
-    peers: Vec<PoolId>,
-    blocks_sent_to_peers: BTreeSet<(PoolId, u64)>,
+    peers: Vec<NodeId>,
+    peer_heads: BTreeMap<NodeId, u64>,
+    blocks_seen: BTreeSet<u64>,
+    blocks: BTreeMap<u64, Arc<Block>>,
 }
 
-impl Pool {
+impl Node {
     fn new(
-        config: &PoolConfiguration,
+        config: &NodeConfiguration,
         sim_config: &SimConfiguration,
         total_stake: u64,
         msg_sink: NetworkSink<SimulationMessage>,
@@ -239,26 +246,52 @@ impl Pool {
             target_vrf_stake,
             total_stake,
             peers,
-            blocks_sent_to_peers: BTreeSet::new(),
+            peer_heads: BTreeMap::new(),
+            blocks_seen: BTreeSet::new(),
+            blocks: BTreeMap::new(),
         }
     }
 
-    fn publish_block(&mut self, block: &Block) -> Result<()> {
+    fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
         for peer in &self.peers {
-            if self.blocks_sent_to_peers.insert((*peer, block.slot)) {
+            if !self.peer_heads.get(peer).is_some_and(|&s| s >= block.slot) {
                 self.msg_sink
-                    .send_to(*peer, SimulationMessage::Block(block.clone()))?
+                    .send_to(*peer, SimulationMessage::RollForward(block.slot))?;
+                self.peer_heads.insert(*peer, block.slot);
             }
+        }
+        self.blocks.insert(block.slot, block);
+        Ok(())
+    }
+
+    fn receive_roll_forward(&mut self, from: NodeId, slot: u64) -> Result<()> {
+        if self.blocks_seen.insert(slot) {
+            self.msg_sink
+                .send_to(from, SimulationMessage::RequestBlock(slot))?;
         }
         Ok(())
     }
 
-    fn receive_block(&mut self, from: PoolId, block: Block) -> Result<()> {
-        self.blocks_sent_to_peers.insert((from, block.slot));
-        self.publish_block(&block)
+    fn receive_request_block(&mut self, from: NodeId, slot: u64) -> Result<()> {
+        if let Some(block) = self.blocks.get(&slot) {
+            self.msg_sink
+                .send_to(from, SimulationMessage::Block(block.clone()))?;
+        }
+        Ok(())
     }
 
-    // Simulates the output of a VRF using this pool's stake.
+    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
+        if self.blocks.insert(block.slot, block.clone()).is_none() {
+            let head = self.peer_heads.entry(from).or_default();
+            if *head < block.slot {
+                *head = block.slot
+            }
+            self.publish_block(block)?;
+        }
+        Ok(())
+    }
+
+    // Simulates the output of a VRF using this node's stake (if any).
     fn run_vrf(&self, rng: &mut ChaChaRng) -> Option<u64> {
         let result = rng.gen_range(0..self.total_stake);
         if result < self.target_vrf_stake {
@@ -282,9 +315,9 @@ fn compute_target_vrf_stake(
 // wrapper struct which holds a SimulationEvent,
 // but is ordered by a timestamp (in reverse)
 #[derive(Clone)]
-struct FutureEvent(Instant, SimulationEvent);
+struct FutureEvent(Timestamp, SimulationEvent);
 impl FutureEvent {
-    fn key(&self) -> Reverse<Instant> {
+    fn key(&self) -> Reverse<Timestamp> {
         Reverse(self.0)
     }
 }
@@ -311,20 +344,24 @@ enum SimulationEvent {
     NewSlot,
     NewTransaction,
     NetworkMessage {
-        from: PoolId,
-        to: PoolId,
+        from: NodeId,
+        to: NodeId,
         msg: SimulationMessage,
     },
 }
 
 #[derive(Clone)]
 enum SimulationMessage {
-    Block(Block),
+    RollForward(u64),
+    RequestBlock(u64),
+    Block(Arc<Block>),
 }
 
 impl HasBytesSize for SimulationMessage {
     fn bytes_size(&self) -> u64 {
         match self {
+            Self::RollForward(_) => 8,
+            Self::RequestBlock(_) => 8,
             Self::Block(block) => block.transactions.iter().map(|t| t.bytes).sum(),
         }
     }

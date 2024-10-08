@@ -5,7 +5,7 @@ use netsim_async::{
     Edge, EdgePolicy, HasBytesSize, SimContext, SimId, SimSocketReadHalf, SimSocketWriteHalf,
 };
 
-use crate::config::PoolId;
+use crate::config::NodeId;
 
 pub struct Network<T: HasBytesSize> {
     context: SimContext<T>,
@@ -24,9 +24,9 @@ impl<T: HasBytesSize> Network<T> {
         self.context.shutdown()
     }
 
-    pub fn open(&mut self, pool_id: PoolId) -> Result<(NetworkSource<T>, NetworkSink<T>)> {
+    pub fn open(&mut self, node_id: NodeId) -> Result<(NetworkSource<T>, NetworkSink<T>)> {
         let socket = self.context.open()?;
-        self.id_lookup.add_id_mapping(pool_id, socket.id());
+        self.id_lookup.add_id_mapping(node_id, socket.id());
 
         let (inner_source, inner_sink) = socket.into_split();
         let source = NetworkSource(inner_source, self.id_lookup.clone());
@@ -34,7 +34,7 @@ impl<T: HasBytesSize> Network<T> {
         Ok((source, sink))
     }
 
-    pub fn set_edge_policy(&mut self, from: PoolId, to: PoolId, policy: EdgePolicy) -> Result<()> {
+    pub fn set_edge_policy(&mut self, from: NodeId, to: NodeId, policy: EdgePolicy) -> Result<()> {
         let from = self.id_lookup.find_sim_id(from);
         let to = self.id_lookup.find_sim_id(to);
         let edge = Edge::new((from, to));
@@ -44,46 +44,46 @@ impl<T: HasBytesSize> Network<T> {
 
 pub struct NetworkSource<T: HasBytesSize>(SimSocketReadHalf<T>, IdLookup);
 impl<T: HasBytesSize> NetworkSource<T> {
-    pub async fn recv(&mut self) -> Option<(PoolId, T)> {
+    pub async fn recv(&mut self) -> Option<(NodeId, T)> {
         let (sim_id, msg) = self.0.recv().await?;
-        let pool_id = self.1.find_pool_id(sim_id);
-        Some((pool_id, msg))
+        let node_id = self.1.find_node_id(sim_id);
+        Some((node_id, msg))
     }
 }
 
 pub struct NetworkSink<T: HasBytesSize>(SimSocketWriteHalf<T>, IdLookup);
 impl<T: HasBytesSize> NetworkSink<T> {
-    pub fn send_to(&self, to: PoolId, msg: T) -> Result<()> {
+    pub fn send_to(&self, to: NodeId, msg: T) -> Result<()> {
         let sim_id = self.1.find_sim_id(to);
         self.0.send_to(sim_id, msg)
     }
 }
 
-// We must map between PoolId (which this code has control over)
+// We must map between NodeId (which this code has control over)
 // and SimId (an opaque type from the netsim library).
-// PoolId is sequentially assigned, so we can look it up by index.
+// NodeId is sequentially assigned, so we can look it up by index.
 #[derive(Default, Clone)]
 struct IdLookup(Arc<RwLock<Vec<SimId>>>);
 impl IdLookup {
-    fn add_id_mapping(&self, pool_id: PoolId, sim_id: SimId) {
+    fn add_id_mapping(&self, node_id: NodeId, sim_id: SimId) {
         let mut id_list = self.0.write().expect("id list rwlock poisoned");
-        assert_eq!(pool_id.to_inner(), id_list.len());
+        assert_eq!(node_id.to_inner(), id_list.len());
         id_list.push(sim_id);
     }
 
-    fn find_sim_id(&self, pool_id: PoolId) -> SimId {
+    fn find_sim_id(&self, node_id: NodeId) -> SimId {
         let id_list = self.0.read().expect("id list rwlock poisoned!");
         *id_list
-            .get(pool_id.to_inner())
-            .expect("unrecognized pool id")
+            .get(node_id.to_inner())
+            .expect("unrecognized node id")
     }
 
-    fn find_pool_id(&self, sim_id: SimId) -> PoolId {
+    fn find_node_id(&self, sim_id: SimId) -> NodeId {
         let id_list = self.0.read().expect("id list rwlock poisoned!");
         let index = id_list
             .iter()
             .position(|&id| id == sim_id)
             .expect("unrecognized sim id");
-        PoolId::from_usize(index)
+        NodeId::from_usize(index)
     }
 }
