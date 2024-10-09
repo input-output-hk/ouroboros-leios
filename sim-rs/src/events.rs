@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use serde::Serialize;
@@ -31,7 +31,7 @@ pub struct Block {
     pub slot: u64,
     pub publisher: NodeId,
     pub conflicts: Vec<NodeId>,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<Arc<Transaction>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
