@@ -21,9 +21,7 @@ import Control.Concurrent.Class.MonadSTM (
     atomically,
     putTMVar,
     readTVar,
-    takeTMVar,
     tryReadTMVar,
-    tryTakeTMVar,
     writeTVar
   ),
  )
@@ -35,30 +33,8 @@ import qualified Data.Map.Strict as Map (lookup, (!))
 import Data.Maybe (fromMaybe, isJust)
 import Network.TypedProtocol
 import Network.TypedProtocol.Peer.Server as TS
-import Numeric.Natural (Natural)
 
---------------------------------
---- Common types
---------------------------------
-
--- TODO
-newtype Slot = Slot Natural
-  deriving (Eq, Ord)
-newtype BlockId = BlockId Natural
-  deriving (Eq, Ord)
-data BlockHeader
-data BlockBody
-type ChainTip = Point
-
-blockHeaderParent :: BlockHeader -> Maybe Point
-blockHeaderParent = undefined
-
--- TODO: Could points just be the slot?
-data Point = Point
-  { pointSlot :: Slot
-  , pointBlockId :: BlockId
-  }
-  deriving (Eq, Ord)
+import PraosProtocol.Types
 
 --------------------------------
 ---- ChainSync
@@ -299,29 +275,3 @@ chainSyncProducer st = idle
     | tip1 == tip2 = return (Just tip1)
     | pointSlot tip1 <= pointSlot tip2 = getPreviousPoint tip2 >>= maybe (return Nothing) (findIntersection tip1)
     | otherwise = findIntersection tip2 tip1
-
---------------------------------
----- Common Utility Types
---------------------------------
-
-data OnChain = Yes | Unknown
-
-data Blocking = Blocking | NonBlocking
-  deriving (Eq)
-
-data Direction = Forward | Backward
-  deriving (Eq)
-
--- | Readonly TVar.
-newtype ReadOnly a = ReadOnly {unReadOnly :: a}
-
-readReadOnlyTVar :: MonadSTM m => ReadOnly (TVar m a) -> STM m a
-readReadOnlyTVar = readTVar . unReadOnly
-
-newtype TakeOnly a = TakeOnly {unTakeOnly :: a}
-
-takeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m a
-takeTakeOnlyTMVar = takeTMVar . unTakeOnly
-
-tryTakeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m (Maybe a)
-tryTakeTakeOnlyTMVar = tryTakeTMVar . unTakeOnly
