@@ -179,10 +179,12 @@ impl EventMonitor {
         );
 
         for id in self.pool_ids {
-            let published = blocks_published.get(&id).copied().unwrap_or_default();
-            info!("Pool {id} published {published} block(s)");
-            let rejected = blocks_rejected.get(&id).copied().unwrap_or_default();
-            info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
+            if let Some(published) = blocks_published.get(&id) {
+                info!("Pool {id} published {published} block(s)");
+            }
+            if let Some(rejected) = blocks_rejected.get(&id) {
+                info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
+            }
         }
 
         if let Some(path) = self.output_path {

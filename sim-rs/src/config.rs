@@ -116,7 +116,8 @@ impl From<RawConfig> for SimConfiguration {
             nodes[id2].peers.push(NodeId(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId(id1), NodeId(id2)),
-                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms) / timescale,
+                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms)
+                    / timescale,
             });
         }
         Self {
