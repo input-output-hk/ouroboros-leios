@@ -29,6 +29,9 @@ type ChainTip = Point
 blockHeaderParent :: BlockHeader -> Maybe Point
 blockHeaderParent = undefined
 
+blockHeaderSlot :: BlockHeader -> Slot
+blockHeaderSlot = undefined
+
 -- TODO: Could points just be the slot?
 data Point = Point
   { pointSlot :: Slot
