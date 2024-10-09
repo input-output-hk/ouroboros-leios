@@ -28,12 +28,22 @@ fn app_main() -> HtmlResult {
     // epoch counter to trigger recomputation when the context changes
     let epoch = use_state(|| 0);
 
+    let agent_status = use_state(|| "".to_owned());
     let agent = use_oneshot_runner::<CalcCdf>();
     use_future_with(
         (selected.clone(), epoch.clone()),
-        cloned!(ctx; move |deps| async move {
+        cloned!(agent_status, ctx; move |deps| async move {
             if let Some(name) = deps.0.as_deref() {
-                let cdf = agent.run((name.to_string(), (*ctx).clone())).await?;
+                let cdf = match agent.run((name.to_string(), (*ctx).clone())).await {
+                    Ok(cdf) => cdf,
+                    Err(e) => {
+                        let init = MessageEventInit::new();
+                        init.set_data(&wasm_bindgen::JsValue::null());
+                        let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).unwrap());
+                                agent_status.set(format!("evaluation error: {e}"));
+                        return;
+                    }
+                };
                 let data = js_sys::Object::new();
                 Reflect::set(&data, &"bins".into(), &cdf.iter().map(|x| JsValue::from(x.0)).collect::<js_sys::Array>()).unwrap();
                 Reflect::set(&data, &"values".into(), &cdf.iter().map(|x| JsValue::from(x.1)).collect::<js_sys::Array>()).unwrap();
@@ -41,9 +51,9 @@ fn app_main() -> HtmlResult {
                 Reflect::set(&data, &"name".into(), &name.into()).unwrap();
                 let init = MessageEventInit::new();
                 init.set_data(&data);
-                let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).map_err(|e| format!("{e:?}"))?);
+                let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).unwrap());
+                agent_status.set("OK".to_owned());
             }
-            Ok::<_, String>(())
         }),
     )?;
 
@@ -104,6 +114,7 @@ fn app_main() -> HtmlResult {
                 </ContextProvider<DeltaQContext>>
             </div>
         }
+        <p>{ "agent status: " }{ &*agent_status }</p>
     </div>
     })
 }

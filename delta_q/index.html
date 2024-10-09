@@ -28,7 +28,8 @@
           hist.fXaxis.fXmin = 0;
           hist.fXaxis.fXmax = max;
           hist.fTitle = name;
-          console.log(hist);
+          hist.fXaxis.fTitle = 'time';
+          hist.fYaxis.fTitle = 'cumulative distribution';
           cleanup('output');
           draw.draw('output', hist, 'nostat minimum:0 maximum:1.1');
         }
