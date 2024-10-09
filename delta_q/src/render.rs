@@ -118,6 +118,15 @@ pub fn name_component(props: &NameProps) -> Html {
         }
     ));
 
+    use_effect_with(
+        popup.clone(),
+        cloned!(new_name, name; move |popup| {
+            if **popup {
+                new_name.set(name.clone());
+            }
+        }),
+    );
+
     html! {
         <div class={classes!("name", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
             { &props.name }
@@ -330,16 +339,33 @@ pub fn branch_kind_component(props: &BranchProps) -> Html {
 
     let top_frac = use_state(|| props.kind.choice_frac().0);
     let bottom_frac = use_state(|| props.kind.choice_frac().1);
-    let top_input = Callback::from(cloned!(top_frac;
-        move |e: InputEvent| top_frac.set(e.target_unchecked_into::<HtmlInputElement>().value_as_number() as f32)));
-    let bottom_input = Callback::from(cloned!(bottom_frac;
-        move |e: InputEvent| bottom_frac.set(e.target_unchecked_into::<HtmlInputElement>().value_as_number() as f32)));
+    let top_input = Callback::from(cloned!(top_frac; move |e: InputEvent| {
+        if let Ok(f) = e.target_unchecked_into::<HtmlInputElement>().value().parse::<f32>() {
+            top_frac.set(f);
+        }
+    }));
+    let bottom_input = Callback::from(cloned!(bottom_frac; move |e: InputEvent| {
+        if let Ok(f) = e.target_unchecked_into::<HtmlInputElement>().value().parse::<f32>() {
+            bottom_frac.set(f);
+        }
+    }));
     let frac_submit = Callback::from(
         cloned!(popup, on_change, top, bottom, top_frac, bottom_frac, ctx;
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
             on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(top.clone(), *top_frac, bottom.clone(), *bottom_frac))));
+        }),
+    );
+
+    let choices = props.kind.choice_frac();
+    use_effect_with(
+        popup.clone(),
+        cloned!(top_frac, bottom_frac; move |popup| {
+            if **popup {
+                top_frac.set(choices.0);
+                bottom_frac.set(choices.1);
+            }
         }),
     );
 
