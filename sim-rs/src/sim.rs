@@ -25,7 +25,7 @@ pub struct Simulation {
     clock: Clock,
     rng: ChaChaRng,
     network: Network<SimulationMessage>,
-    nodess: BTreeMap<NodeId, Node>,
+    nodes: BTreeMap<NodeId, Node>,
     msg_sources: BTreeMap<NodeId, NetworkSource<SimulationMessage>>,
     next_slot: u64,
     next_tx_id: u64,
@@ -65,7 +65,7 @@ impl Simulation {
             clock,
             rng,
             network,
-            nodess: nodes,
+            nodes,
             msg_sources,
             next_slot: 0,
             next_tx_id: 0,
@@ -85,7 +85,7 @@ impl Simulation {
                 SimulationEvent::NewSlot => self.run_slot_lottery(&tracker)?,
                 SimulationEvent::NewTransaction => self.generate_tx(&tracker),
                 SimulationEvent::NetworkMessage { from, to, msg } => {
-                    let Some(target) = self.nodess.get_mut(&to) else {
+                    let Some(target) = self.nodes.get_mut(&to) else {
                         bail!("unrecognized message target {to}");
                     };
                     match msg {
@@ -145,7 +145,7 @@ impl Simulation {
 
     fn run_slot_lottery(&mut self, tracker: &EventTracker) -> Result<()> {
         let vrf_winners: Vec<(NodeId, u64)> = self
-            .nodess
+            .nodes
             .values()
             .filter_map(|node| {
                 let result = node.run_vrf(&mut self.rng)?;
@@ -181,7 +181,7 @@ impl Simulation {
                 conflicts,
                 transactions,
             };
-            self.nodess
+            self.nodes
                 .get_mut(&publisher)
                 .unwrap()
                 .publish_block(Arc::new(block.clone()))?;
