@@ -193,12 +193,25 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
         ),
     );
 
+    let field = use_node_ref();
+    use_effect_with(
+        editing.clone(),
+        cloned!(field; move |editing| {
+            if **editing {
+                let Some(field) = field.cast::<HtmlInputElement>() else {
+                    return;
+                };
+                field.focus().expect("focus failed");
+            }
+        }),
+    );
+
     Ok(html! {
         if *editing {
             <div class={classes!("dq_edit")}>
                 <form onsubmit={on_submit}>
                     <input type="submit" value="update" />
-                    <input type="text" value={(*buffer).clone()} oninput={on_input} />
+                    <input type="text" value={(*buffer).clone()} oninput={on_input} ref={field} />
                 </form>
                 <pre>{ &*result }</pre>
             </div>
