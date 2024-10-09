@@ -1,4 +1,5 @@
 seed = 0x3c3373756e646165
+timescale = 16
 nodes = [
     # producers
     { location = [-80,  40], stake = 1000000 },

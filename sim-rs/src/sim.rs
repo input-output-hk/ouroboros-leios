@@ -134,6 +134,7 @@ impl Simulation {
         }
 
         select! {
+            biased; // always poll the "next queued event" future first
             Some(event) = next_queued_event => {
                 self.event_queue.pop();
                 Some(event)

@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
     let monitor = EventMonitor::new(&config, events_source, args.output).run();
     pin!(monitor);
 
-    let clock = Clock::new(Instant::now());
+    let clock = Clock::new(Instant::now(), config.timescale);
     let tracker = EventTracker::new(events_sink, clock.clone());
     let mut simulation = Simulation::new(config, clock)?;
 

@@ -46,6 +46,7 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     seed: Option<u64>,
+    timescale: Option<u32>,
     nodes: Vec<RawNodeConfig>,
     links: Vec<RawLinkConfig>,
     block_generation_probability: f64,
@@ -70,6 +71,7 @@ struct RawLinkConfig {
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
+    pub timescale: u32,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub block_generation_probability: f64,
@@ -95,6 +97,7 @@ pub struct LinkConfiguration {
 
 impl From<RawConfig> for SimConfiguration {
     fn from(value: RawConfig) -> Self {
+        let timescale = value.timescale.unwrap_or(1);
         let mut nodes: Vec<NodeConfiguration> = value
             .nodes
             .into_iter()
@@ -113,11 +116,12 @@ impl From<RawConfig> for SimConfiguration {
             nodes[id2].peers.push(NodeId(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId(id1), NodeId(id2)),
-                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
+                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms) / timescale,
             });
         }
         Self {
             seed: value.seed.unwrap_or_default(),
+            timescale,
             nodes,
             links,
             block_generation_probability: value.block_generation_probability,
