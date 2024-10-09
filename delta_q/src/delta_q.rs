@@ -133,6 +133,15 @@ impl Into<BTreeMap<Name, DeltaQ>> for EvaluationContext {
     }
 }
 
+impl Display for EvaluationContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (k, v) in self.ctx.iter() {
+            writeln!(f, "{} := {}", k, v.0)?;
+        }
+        Ok(())
+    }
+}
+
 /// A DeltaQ is a representation of a probability distribution that can be
 /// manipulated in various ways.
 ///
@@ -427,6 +436,7 @@ impl DeltaQ {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::eval_ctx;
     use maplit::btreemap;
 
     #[test]
@@ -640,5 +650,68 @@ mod tests {
             ])
             .unwrap()
         );
+    }
+
+    #[test]
+    fn parse_eval_ctx() {
+        const SOURCE: &'static str = "
+            -- start with a comment
+            diffuse := -- add a comment here
+            hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))
+
+            diffuseEB :=
+            hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) ->- hopEB) 65.86<>24.96 (((hopEB ->- hopEB) ->- hopEB) ->- hopEB)))
+
+            far :=
+            CDF[(0.268, 1)]
+
+            farL :=
+            CDF[(0.531, 1)]
+
+            farXL :=
+            CDF[(1.598, 1)]
+
+            hop :=
+            (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
+
+            hopEB :=
+            (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
+
+            mid :=
+            CDF[(0.069, 1)]
+
+            midL :=
+            CDF[(0.143, 1)]
+
+            midXL :=
+            CDF[(0.404, 1)]
+
+            near :=
+            CDF[(0.012, 1)]
+
+            nearL :=
+            CDF[(0.024, 1)]
+
+            nearXL :=
+            CDF[(0.078, 1)]
+            ";
+        let ctx = eval_ctx(SOURCE).unwrap();
+        assert_eq!(ctx.iter().count(), 13);
+        assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))");
+
+        const DEST: &'static str = "\
+            diffuse := hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))\n\
+            diffuseEB := hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) ->- hopEB) 65.86<>24.96 (((hopEB ->- hopEB) ->- hopEB) ->- hopEB)))\nfar := CDF[(0.268, 1)]\n\
+            farL := CDF[(0.531, 1)]\n\
+            farXL := CDF[(1.598, 1)]\n\
+            hop := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))\n\
+            hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))\n\
+            mid := CDF[(0.069, 1)]\n\
+            midL := CDF[(0.143, 1)]\n\
+            midXL := CDF[(0.404, 1)]\n\
+            near := CDF[(0.012, 1)]\n\
+            nearL := CDF[(0.024, 1)]\n\
+            nearXL := CDF[(0.078, 1)]\n";
+        assert_eq!(ctx.to_string(), DEST);
     }
 }

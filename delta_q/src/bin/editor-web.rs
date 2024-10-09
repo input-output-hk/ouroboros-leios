@@ -8,7 +8,7 @@ macro_rules! cloned {
 use delta_q::{CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext};
 use gloo_utils::window;
 use js_sys::Reflect;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
 use web_sys::{HtmlInputElement, MessageEvent, MessageEventInit};
 use yew::{prelude::*, suspense::use_future_with};
 use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
@@ -202,6 +202,8 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
                     return;
                 };
                 field.focus().expect("focus failed");
+                let escape = Closure::<dyn Fn()>::new(cloned!(editing; move || editing.set(false))).into_js_value();
+                field.add_event_listener_with_callback("keydown", escape.unchecked_ref()).expect("listening on keydown failed");
             }
         }),
     );

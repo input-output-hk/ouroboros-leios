@@ -1,12 +1,31 @@
-use crate::DeltaQ;
+use crate::{DeltaQ, EvaluationContext};
 use std::sync::Arc;
 use winnow::{
-    combinator::{alt, cut_err, delimited, fail, opt, preceded, separated, separated_pair},
+    combinator::{alt, cut_err, delimited, fail, opt, preceded, repeat, separated, separated_pair},
     error::{StrContext, StrContextValue},
-    stream::Stream,
+    stream::{Accumulate, Stream},
     token::take_while,
     PResult, Parser,
 };
+
+pub fn eval_ctx(input: &str) -> Result<EvaluationContext, String> {
+    repeat(
+        0..,
+        delimited(ws, separated_pair(name_bare, (ws, ":=", ws), delta_q), ws),
+    )
+    .parse(input)
+    .map_err(|e| format!("{e}"))
+}
+
+impl<'a> Accumulate<(&'a str, DeltaQ)> for EvaluationContext {
+    fn accumulate(&mut self, (name, dq): (&'a str, DeltaQ)) {
+        self.put(name.to_owned(), dq);
+    }
+
+    fn initial(_capacity: Option<usize>) -> Self {
+        EvaluationContext::default()
+    }
+}
 
 pub fn parse(input: &str) -> Result<DeltaQ, String> {
     delta_q.parse(input).map_err(|e| format!("{e}"))
@@ -65,7 +84,9 @@ fn atom(input: &mut &str) -> PResult<DeltaQ> {
 }
 
 fn ws(input: &mut &str) -> PResult<()> {
-    take_while(0.., |c: char| c.is_whitespace())
+    let white = take_while(0.., |c: char| c.is_whitespace()).void();
+    let comment = ("--", take_while(0.., |c: char| c != '\n'), opt('\n')).void();
+    separated::<_, _, (), _, _, _, _>(0.., white, comment)
         .void()
         .parse_next(input)
 }
@@ -74,13 +95,14 @@ fn blackbox(input: &mut &str) -> PResult<DeltaQ> {
     "BB".value(DeltaQ::BlackBox).parse_next(input)
 }
 
+fn name_bare<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    take_while(1.., |c: char| c.is_alphanumeric()).parse_next(input)
+}
+
 fn name(input: &mut &str) -> PResult<DeltaQ> {
-    (
-        take_while(1.., |c: char| c.is_alphanumeric()),
-        opt(preceded('^', int)),
-    )
+    (name_bare, opt(preceded('^', int)))
         .parse_next(input)
-        .map(|(name, rec)| DeltaQ::name_rec(&name, rec))
+        .map(|(name, rec)| DeltaQ::name_rec(name, rec))
 }
 
 fn cdf(input: &mut &str) -> PResult<DeltaQ> {
