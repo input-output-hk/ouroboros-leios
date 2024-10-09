@@ -453,16 +453,28 @@ fn branch(props: &BranchProps) -> Html {
     }
 }
 
-impl Reducible for EvaluationContext {
-    type Action = (String, Option<DeltaQ>);
+pub enum EvalCtxAction {
+    Put(String, DeltaQ),
+    Remove(String),
+    Set(EvaluationContext),
+}
 
-    fn reduce(self: Rc<Self>, (name, dq): Self::Action) -> Rc<Self> {
-        let mut ctx = (*self).clone();
-        if let Some(dq) = dq {
-            ctx.put(name, dq);
-        } else {
-            ctx.remove(&name);
+impl Reducible for EvaluationContext {
+    type Action = EvalCtxAction;
+
+    fn reduce(self: Rc<Self>, act: Self::Action) -> Rc<Self> {
+        match act {
+            EvalCtxAction::Put(name, delta_q) => {
+                let mut ret = (*self).clone();
+                ret.put(name, delta_q);
+                Rc::new(ret)
+            }
+            EvalCtxAction::Remove(name) => {
+                let mut ret = (*self).clone();
+                ret.remove(&name);
+                Rc::new(ret)
+            }
+            EvalCtxAction::Set(evaluation_context) => Rc::new(evaluation_context),
         }
-        Rc::new(ctx)
     }
 }

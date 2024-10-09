@@ -5,11 +5,12 @@ macro_rules! cloned {
     }};
 }
 
-use delta_q::{CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvaluationContext};
+use delta_q::{CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvalCtxAction, EvaluationContext};
 use gloo_utils::window;
 use js_sys::Reflect;
+use std::str::FromStr;
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{HtmlInputElement, MessageEvent, MessageEventInit};
+use web_sys::{HtmlInputElement, HtmlTextAreaElement, MessageEvent, MessageEventInit};
 use yew::{prelude::*, suspense::use_future_with};
 use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
 use yew_hooks::use_local_storage;
@@ -22,11 +23,56 @@ fn app_main() -> HtmlResult {
         ctx_handle.set((*ctx).clone());
     }
 
-    let selected = use_state::<Option<String>, _>(|| None);
-    let select = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
-
     // epoch counter to trigger recomputation when the context changes
     let epoch = use_state(|| 0);
+
+    let ctx_popup = use_state(|| false);
+    let ctx_text = use_state(|| String::new());
+    let ctx_text_status = use_state(|| "OK".to_owned());
+    let ctx_text_ref = use_node_ref();
+
+    let ctx_text_input = Callback::from(cloned!(ctx_text, ctx_text_status; move |e: InputEvent| {
+        let text = e.target_unchecked_into::<HtmlInputElement>().value();
+        match text.parse::<EvaluationContext>() {
+            Ok(_) => ctx_text_status.set("OK".to_owned()),
+            Err(e) => ctx_text_status.set(e),
+        }
+        ctx_text.set(text);
+    }));
+    let ctx_popup_show = Callback::from(cloned!(ctx_popup, ctx_text, ctx; move |_: MouseEvent| {
+        ctx_popup.set(true);
+        ctx_text.set(ctx.to_string());
+    }));
+    use_effect_with(
+        ctx_popup.clone(),
+        cloned!(ctx_text_ref, ctx_text, ctx_popup; move |popup| {
+            if **popup {
+                let Some(textarea) = ctx_text_ref.cast::<HtmlTextAreaElement>() else {
+                    return;
+                };
+                textarea.focus().expect("focus failed");
+                textarea.set_value(&*ctx_text);
+                let escape = Closure::<dyn Fn(KeyboardEvent)>::new(move |e: KeyboardEvent| if e.key() == "Escape" {
+                    ctx_popup.set(false)
+                }).into_js_value();
+                textarea.add_event_listener_with_callback("keydown", escape.unchecked_ref()).expect("listening on keydown failed");
+            }
+        }),
+    );
+    let ctx_popup_close =
+        Callback::from(cloned!(ctx_popup, ctx_text, epoch, ctx; move |save: bool| {
+            ctx_popup.set(false);
+            if !save {
+                return;
+            }
+            if let Ok(cx) = EvaluationContext::from_str(&*ctx_text) {
+                ctx.dispatch(EvalCtxAction::Set(cx));
+                epoch.set(*epoch + 1);
+            }
+        }));
+
+    let selected = use_state::<Option<String>, _>(|| None);
+    let select = cloned!(selected; Callback::from(move |n| selected.set(Some(n))));
 
     let agent_status = use_state(|| "".to_owned());
     let agent = use_oneshot_runner::<CalcCdf>();
@@ -59,7 +105,11 @@ fn app_main() -> HtmlResult {
 
     let on_change = cloned!(ctx, epoch;
         Callback::from(move |(name, dq): (String, Option<DeltaQ>)| {
-            ctx.dispatch((name.clone(), dq.clone()));
+            if let Some(dq) = dq {
+                ctx.dispatch(EvalCtxAction::Put(name.clone(), dq));
+            } else {
+                ctx.dispatch(EvalCtxAction::Remove(name));
+            }
             epoch.set(*epoch + 1);
         })
     );
@@ -101,7 +151,7 @@ fn app_main() -> HtmlResult {
 
     Ok(html! {
     <div>
-        <p>{ "context:" }</p>
+        <p>{ "context:" }<button onclick={ctx_popup_show}>{ "edit" }</button></p>
         <ul>
         { list_items }
         </ul>
@@ -115,6 +165,16 @@ fn app_main() -> HtmlResult {
             </div>
         }
         <p>{ "agent status: " }{ &*agent_status }</p>
+        if *ctx_popup {
+            <div class={classes!("ctx_popup")}>
+                <p>
+                    <button onclick={cloned!(ctx_popup_close; move |_| ctx_popup_close.emit(true))} disabled={&*ctx_text_status != "OK"} >{ "save" }</button>
+                    <button onclick={cloned!(ctx_popup_close; move |_| ctx_popup_close.emit(false))} >{ "cancel" }</button>
+                </p>
+                <textarea oninput={ctx_text_input} rows={(ctx_text.lines().count() + 1).to_string()} cols="80" ref={ctx_text_ref} />
+                <pre>{ &*ctx_text_status }</pre>
+            </div>
+        }
     </div>
     })
 }
@@ -157,6 +217,7 @@ struct EditExpressionProps {
 #[function_component(EditExpression)]
 fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
     let name = props.name.clone();
+    let orig = props.value.clone();
     let on_change = props.on_change.clone();
 
     let editing = use_state(|| false);
@@ -196,14 +257,17 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
     let field = use_node_ref();
     use_effect_with(
         editing.clone(),
-        cloned!(field; move |editing| {
+        cloned!(field, buffer; move |editing| {
             if **editing {
                 let Some(field) = field.cast::<HtmlInputElement>() else {
                     return;
                 };
                 field.focus().expect("focus failed");
-                let escape = Closure::<dyn Fn()>::new(cloned!(editing; move || editing.set(false))).into_js_value();
+                let escape = Closure::<dyn Fn(KeyboardEvent)>::new(cloned!(editing; move |e: KeyboardEvent| if e.key() == "Escape" {
+                    editing.set(false)
+                })).into_js_value();
                 field.add_event_listener_with_callback("keydown", escape.unchecked_ref()).expect("listening on keydown failed");
+                buffer.set(orig.to_string());
             }
         }),
     );

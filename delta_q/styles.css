@@ -29,6 +29,8 @@
 .dq_edit input[type="text"] { width: 100%; }
 .dq_show { margin-left: 16px; }
 .result { max-height: 5em; overflow-y: scroll; }
+.ctx_popup { z-index: 1; position: absolute; left: 20px; top: 20px; right: 20px; bottom: 20px; border: 1px solid black; background-color: lightgrey; }
+.ctx_popup textarea { width: 100%; white-space: nowrap; }
 
 .column { display: flex; flex-direction: column; }
 .row { display: flex; flex-direction: row; }

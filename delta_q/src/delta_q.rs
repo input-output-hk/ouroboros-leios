@@ -1,4 +1,4 @@
-use crate::{cdf::DEFAULT_MAX_SIZE, CDFError, CompactionMode, CDF};
+use crate::{cdf::DEFAULT_MAX_SIZE, parser::eval_ctx, CDFError, CompactionMode, CDF};
 use smallstr::SmallString;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -44,6 +44,14 @@ pub struct EvaluationContext {
     rec: BTreeMap<Name, Option<usize>>,
     max_size: usize,
     mode: CompactionMode,
+}
+
+impl FromStr for EvaluationContext {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        eval_ctx(s)
+    }
 }
 
 impl Default for EvaluationContext {

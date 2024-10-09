@@ -38,3 +38,27 @@ CDF[(1, 1)]
 
 validateIB:
 CDF[(3, 1)]
+
+4 -- better modelling of Leios (in format for import into editor)
+
+-- diffusion of one IB (assuming 1MB)
+diffuseIB := hopIB 0.6<>99.4 ((hopIB ->- hopIB) 8.58<>90.82 (((hopIB ->- hopIB) ->- hopIB) 65.86<>24.96 (((hopIB ->- hopIB) ->- hopIB) ->- hopIB)))
+-- diffusion of one EB (assuming 64kB)
+diffuseEB := hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) ->- hopEB) 65.86<>24.96 (((hopEB ->- hopEB) ->- hopEB) ->- hopEB)))
+
+-- single link latencies across continents
+far := CDF[(0.268, 1)]
+farL := CDF[(0.531, 1)]
+farXL := CDF[(1.598, 1)]
+-- single link latencies between data centers within a continent
+mid := CDF[(0.069, 1)]
+midL := CDF[(0.143, 1)]
+midXL := CDF[(0.404, 1)]
+-- single link latencies within a data center
+near := CDF[(0.012, 1)]
+nearL := CDF[(0.024, 1)]
+nearXL := CDF[(0.078, 1)]
+
+-- a hop (for an IB or EB) is a choice of near/mid/far with req-res-req-resLarge in each arm
+hopIB := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
+hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
