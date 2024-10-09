@@ -6,7 +6,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -108,7 +107,6 @@ data ChainSyncProducerState m = ChainSyncProducerState
   , chainTipVar :: ReadOnly (TVar m ChainTip) -- Shared, Read-Only.
   , chainForwardsVarVar :: ReadOnly (TVar m (ReadOnly (TVar m (Map Point Point)))) -- Shared, Read-Only.
   , blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
-  , blockBodiesVar :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Shared, Read-Only.
   }
 
 -- CONVENTION: Events are named for the recipient.
@@ -224,7 +222,8 @@ chainSyncProducer st = idle
   --
   -- NOTE: The order of the points indicates preference and must be maintained.
   findIntersectionWithPoints :: ChainTip -> [Point] -> STM m (Maybe Point)
-  findIntersectionWithPoints chainTip points = findIntersectionAcc chainTip $ updateIntersectionStatusFor chainTip ((,Unknown) <$> points)
+  findIntersectionWithPoints chainTip points =
+    findIntersectionAcc chainTip (updateIntersectionStatusFor chainTip ((,Unknown) <$> points))
    where
     findIntersectionAcc :: ChainTip -> [(Point, OnChain)] -> STM m (Maybe Point)
     findIntersectionAcc _tip [] = return Nothing
@@ -251,6 +250,7 @@ chainSyncProducer st = idle
   getChainTip :: STM m ChainTip
   getChainTip = readReadOnlyTVar st.chainTipVar
 
+  -- PRECONDITION: All block IDs have headers.
   unsafeGetBlockHeader :: BlockId -> STM m BlockHeader
   unsafeGetBlockHeader blockId = do
     blockHeaders <- readReadOnlyTVar st.blockHeadersVar
