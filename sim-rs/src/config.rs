@@ -146,8 +146,11 @@ fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Dur
     geo_latency + extra_latency
 }
 
-pub fn read_config(filename: &Path) -> Result<SimConfiguration> {
+pub fn read_config(filename: &Path, timescale: Option<u32>) -> Result<SimConfiguration> {
     let file = fs::read_to_string(filename)?;
-    let raw_config: RawConfig = toml::from_str(&file)?;
+    let mut raw_config: RawConfig = toml::from_str(&file)?;
+    if let Some(ts) = timescale {
+        raw_config.timescale = Some(ts);
+    }
     Ok(raw_config.into())
 }

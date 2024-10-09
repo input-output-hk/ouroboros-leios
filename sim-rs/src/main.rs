@@ -23,6 +23,8 @@ mod sim;
 struct Args {
     filename: PathBuf,
     output: Option<PathBuf>,
+    #[clap(short, long)]
+    timescale: Option<u32>,
 }
 
 #[tokio::main]
@@ -42,7 +44,7 @@ async fn main() -> Result<()> {
     })?;
 
     let args = Args::parse();
-    let config = read_config(&args.filename)?;
+    let config = read_config(&args.filename, args.timescale)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
     let monitor = EventMonitor::new(&config, events_source, args.output).run();
