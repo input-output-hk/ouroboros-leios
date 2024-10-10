@@ -17,17 +17,24 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     STM,
     TVar,
-    atomically
+    atomically,
+    readTVar,
+    retry,
+    writeTVar
   ),
  )
 import Control.Monad (guard)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (lookup)
 import Network.TypedProtocol
-import Network.TypedProtocol.Peer.Server as TS
+import qualified Network.TypedProtocol.Peer.Client as TC
+import qualified Network.TypedProtocol.Peer.Server as TS
 
+import Ouroboros.Network.AnchoredFragment (AnchoredFragment)
+import qualified Ouroboros.Network.AnchoredFragment as AF
 import qualified Ouroboros.Network.Block as OAPI
 import Ouroboros.Network.Mock.ConcreteBlock
+
 import PraosProtocol.Types (ReadOnly, readReadOnlyTVar)
 
 type BlockId = OAPI.HeaderHash Block
@@ -63,6 +70,10 @@ instance StateTokenI StIdle where stateToken = SingStIdle
 instance StateTokenI StBusy where stateToken = SingStBusy
 instance StateTokenI StStreaming where stateToken = SingStStreaming
 instance StateTokenI StDone where stateToken = SingStDone
+
+--------------------------------
+--- BlockFetch Server
+--------------------------------
 
 data BlockFetchServerState m = BlockFetchProducerState
   { blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
@@ -107,3 +118,56 @@ blockFetchServer st = idle
   streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
   streaming [] = TS.Yield MsgBatchDone idle
   streaming (blk : blks) = TS.Yield (MsgBlock blk) (streaming blks)
+
+--------------------------------
+--- BlockFetch Client
+--------------------------------
+
+newtype FetchRequest
+  = FetchRequest {fetchRequestFragments :: [AnchoredFragment BlockHeader]}
+  deriving (Show)
+
+fragmentRange :: AnchoredFragment BlockHeader -> (Point, Point)
+fragmentRange = undefined
+
+data BlockFetchClientState m = BlockFetchClientState
+  { fetchRequestsVar :: TVar m FetchRequest -- Shared, Read-Write.
+  , addFetchedBlock :: Block -> m () -- this should include validation.
+  -- or should it be the whole fragment at once?
+  }
+
+blockFetchClient ::
+  forall m.
+  MonadSTM m =>
+  BlockFetchClientState m ->
+  TC.Client BlockFetchState NonPipelined StIdle m ()
+blockFetchClient BlockFetchClientState{..} = idle
+ where
+  -- \| does not support preemption of in-flight requests.
+  fetchRequest :: STM m (AnchoredFragment BlockHeader)
+  fetchRequest = do
+    FetchRequest rs <- readTVar fetchRequestsVar
+    case rs of
+      [] -> retry
+      (r : rs') -> do
+        writeTVar fetchRequestsVar (FetchRequest rs')
+        return r
+  idle :: TC.Client BlockFetchState NonPipelined StIdle m ()
+  idle = TC.Effect $ atomically $ do
+    fr <- fetchRequest
+    let range@(start, end) = fragmentRange fr
+    return $ TC.Yield (MsgRequestRange start end) $ busy range fr
+  busy :: (Point, Point) -> AnchoredFragment BlockHeader -> TC.Client BlockFetchState NonPipelined StBusy m ()
+  busy range fr = TC.Await $ \case
+    MsgNoBlocks -> idle -- TODO: adversarial? should signal to block fetch controller?
+    MsgStartBatch -> streaming range $ AF.toOldestFirst fr
+  streaming :: (Point, Point) -> [BlockHeader] -> TC.Client BlockFetchState NonPipelined StStreaming m ()
+  streaming range headers = TC.Await $ \msg ->
+    case (msg, headers) of
+      (MsgBatchDone, []) -> idle -- TODO: signal someone?
+      (MsgBlock block, header : headers') -> TC.Effect $ do
+        -- TODO: check hash?
+        addFetchedBlock (Block header block)
+        return (streaming range headers')
+      (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO
+      (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO
