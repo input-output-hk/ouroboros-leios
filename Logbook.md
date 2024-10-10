@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-10-10
+
+### Open tasks for research
+
+* Transition from a split-bandwidth description of the network for Leios (each type of message is allocated some part of the bandwidth) to a uniform priority based download policy.
+* How to avoid conflicts, duplicates, and fees not being paid at the ledger level? Is avoiding conflicts the responsibility of the user or of the system?
+* What applications are supported by a Blob-Leios version where certificates do not end up on-chain?
+
 ## 2024-10-04
 
 ### Retiring leios-sim
