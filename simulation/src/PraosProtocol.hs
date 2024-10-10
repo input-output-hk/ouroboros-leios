@@ -33,6 +33,8 @@ import Data.Maybe (fromMaybe, isJust)
 import Network.TypedProtocol
 import Network.TypedProtocol.Peer.Server as TS
 
+import Data.Kind (Type)
+import qualified Network.TypedProtocol.Peer.Client as TC
 import PraosProtocol.Types
 
 --------------------------------
@@ -98,10 +100,30 @@ instance StateTokenI StIntersect where stateToken = SingStIntersect
 instance StateTokenI StDone where stateToken = SingStDone
 
 --------------------------------
+---- ChainSync Consumer
+--------------------------------
+
+-- NOTE: To be used by @ChainSyncConsumer@
+triggerLocalEvent :: MonadSTM m => TMVar m ChainSyncProducerEvent -> ChainSyncProducerEvent -> STM m ()
+triggerLocalEvent evts evt =
+  tryReadTMVar evts >>= putTMVar evts . maybe evt (<> evt)
+
+data ChainSyncConsumerState (m :: Type -> Type) = ChainSyncConsumerState
+  {
+  }
+
+chainSyncConsumer ::
+  forall m.
+  MonadSTM m =>
+  ChainSyncConsumerState m ->
+  TC.Client ChainSyncState NonPipelined StIdle m ()
+chainSyncConsumer = undefined
+
+--------------------------------
 ---- ChainSync Producer
 --------------------------------
 
-data ChainSyncProducerState m = ChainSyncProducerState
+data ChainSyncProducerState (m :: Type -> Type) = ChainSyncProducerState
   { readPointerVar :: TVar m Point -- Unique, Read/Write.
   , eventsVar :: TakeOnly (TMVar m ChainSyncProducerEvent) -- Shared, Take-Only.
   , chainTipVar :: ReadOnly (TVar m ChainTip) -- Shared, Read-Only.
@@ -119,11 +141,6 @@ instance Semigroup ChainSyncProducerEvent where
   EvtChainSwitch <> _ = EvtChainSwitch
   _ <> EvtChainSwitch = EvtChainSwitch
   EvtNewBlock <> EvtNewBlock = EvtNewBlock
-
--- NOTE: To be used by @ChainSyncConsumer@
-triggerLocalEvent :: MonadSTM m => TMVar m ChainSyncProducerEvent -> ChainSyncProducerEvent -> STM m ()
-triggerLocalEvent evts evt =
-  tryReadTMVar evts >>= putTMVar evts . maybe evt (<> evt)
 
 chainSyncProducer ::
   forall m.
@@ -169,8 +186,11 @@ chainSyncProducer st = idle
     --       the read-pointer and cannot handle chain-switch events.
     tip <- getChainTip
     findIntersectionWithPoints tip points >>= \case
-      Nothing -> return $ TS.Yield (MsgIntersectNotFound tip) idle
-      Just point -> return $ TS.Yield (MsgIntersectFound point tip) idle
+      Nothing -> do
+        return $ TS.Yield (MsgIntersectNotFound tip) idle
+      Just point -> do
+        setReadPointer point
+        return $ TS.Yield (MsgIntersectFound point tip) idle
 
   -- Handles all local events that happened since the chain-sync producer last woke up.
   -- If there were only @EvtNewBlock@ events, ignore them. The purpose of this message is to wake blocking producers.
