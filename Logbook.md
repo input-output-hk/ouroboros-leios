@@ -2,6 +2,38 @@
 
 ## 2024-10-10
 
+### Approximate transaction sizes and frequencies
+
+Using post-Byron `mainnet` data from `cardano-db-sync`, we tally the transaction sizes and number of transactions per block.
+
+```sql
+-- Transaction sizes.
+select size
+  from tx
+  where size > 0
+    and block_id >= 5000000
+    and valid_contract
+;
+
+-- Number of transactions per block.
+select count(*)
+  from tx
+  where block_id >= 5000000
+    and valid_contract
+  group by block_id
+;
+```
+
+As a rough approximation, we can model the size distribution by a log-normal distribution with log-mean of `6.833` and log-standard-deviation of `1.127` and the transactions per block as an exponential distribution with mean `16.97`. The plots below compare the empirical distributions to these approximations.
+
+| Transaction Size                                     | Transactions per Block                                    |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| ![Transaction size distribution](images/tx-size.svg) | ![Transaction-per-block distribution](images/tx-freq.svg) |
+
+The transaction-size distribution has a longer tail and more clumpiness than the log-normal approximation, but the transaction-per-block distribution is consistent with an exponential distribution. Note, however, that there is a correlation between size and number per block, so we'd really need to model the joint distribution. For the time being, these two approximation should be adequate.
+
+See the notebook [analysis/tx.ipynb](analysis/tx.ipynb) for details of the analysis.
+
 ### Open tasks for research
 
 * Transition from a split-bandwidth description of the network for Leios (each type of message is allocated some part of the bandwidth) to a uniform priority based download policy.
