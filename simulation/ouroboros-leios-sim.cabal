@@ -65,6 +65,7 @@ library
     , io-sim
     , kdt
     , mtl
+    , ouroboros-network-api
     , ouroboros-network-mock
     , pango
     , pqueue
