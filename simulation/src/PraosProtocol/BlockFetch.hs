@@ -69,6 +69,7 @@ resolveRange st start end = do
   headers <- readReadOnlyTVar st.blockHeadersVar
   bodies <- readReadOnlyTVar st.blockBodiesVar
   let go acc p
+        | start.pointSlot > p.pointSlot = Nothing
         | start == p = Just []
         | otherwise = do
             hdr <- Map.lookup p.pointBlockId headers
