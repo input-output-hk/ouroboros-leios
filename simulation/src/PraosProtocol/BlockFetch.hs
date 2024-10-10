@@ -26,7 +26,12 @@ import qualified Data.Map.Strict as Map (lookup)
 import Network.TypedProtocol
 import Network.TypedProtocol.Peer.Server as TS
 
-import PraosProtocol.Types
+import qualified Ouroboros.Network.Block as OAPI
+import Ouroboros.Network.Mock.ConcreteBlock
+import PraosProtocol.Types (ReadOnly, readReadOnlyTVar)
+
+type BlockId = OAPI.HeaderHash Block
+type Point = OAPI.Point Block
 
 data BlockFetchState
   = StIdle
@@ -68,15 +73,19 @@ resolveRange :: MonadSTM m => BlockFetchServerState m -> Point -> Point -> STM m
 resolveRange st start end = do
   headers <- readReadOnlyTVar st.blockHeadersVar
   bodies <- readReadOnlyTVar st.blockBodiesVar
-  let go acc p
-        | start.pointSlot > p.pointSlot = Nothing
-        | start == p = Just []
-        | otherwise = do
-            hdr <- Map.lookup p.pointBlockId headers
-            guard $ blockHeaderSlot hdr == p.pointSlot
-            p' <- blockHeaderParent hdr
-            b <- Map.lookup p.pointBlockId bodies
-            go (b : acc) p'
+  let
+    blockPrevPoint hdr = case OAPI.blockPrevHash hdr of
+      OAPI.GenesisHash -> pure OAPI.GenesisPoint
+      OAPI.BlockHash hsh -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hsh headers
+    go acc p | start == p = Just acc
+    go _acc OAPI.GenesisPoint = Nothing
+    go acc p@(OAPI.BlockPoint pSlot pHash)
+      | OAPI.pointSlot start > OAPI.pointSlot p = Nothing
+      | otherwise = do
+          hdr <- Map.lookup pHash headers
+          guard $ OAPI.blockSlot hdr == pSlot
+          bdy <- Map.lookup pHash bodies
+          go (bdy : acc) =<< blockPrevPoint hdr
 
   return $ reverse <$> go [] end
 
