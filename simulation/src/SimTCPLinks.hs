@@ -29,7 +29,6 @@ import Control.Monad.IOSim as IOSim (
 import Control.Tracer as Tracer (
   Contravariant (contramap),
   Tracer (Tracer),
-  emit,
   traceWith,
  )
 import Data.Bifoldable (Bifoldable (bifoldr))
@@ -192,7 +191,7 @@ labelDirToLabelLink nfrom nto (DirClientToServer e) = LabelLink nfrom nto e
 labelDirToLabelLink nfrom nto (DirServerToClient e) = LabelLink nto nfrom e
 
 simTracer :: Typeable e => Tracer (IOSim s) e
-simTracer = Tracer.Tracer $ Tracer.emit IOSim.traceM
+simTracer = Tracer.Tracer $ IOSim.traceM
 
 selectTimedEvents :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTimedEvents =
