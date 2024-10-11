@@ -16,7 +16,7 @@ use tokio::select;
 use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId, SimConfiguration},
-    events::{Block, EventTracker, Transaction},
+    events::{Block, EventTracker, Transaction, TransactionId},
     network::{Network, NetworkSink, NetworkSource},
 };
 
@@ -31,7 +31,7 @@ pub struct Simulation {
     next_tx_id: u64,
     event_queue: BinaryHeap<FutureEvent>,
     unpublished_txs: VecDeque<Arc<Transaction>>,
-    txs: BTreeMap<u64, Arc<Transaction>>,
+    txs: BTreeMap<TransactionId, Arc<Transaction>>,
 }
 
 impl Simulation {
@@ -209,7 +209,7 @@ impl Simulation {
     }
 
     fn generate_tx(&mut self, tracker: &EventTracker) -> Result<()> {
-        let id = self.next_tx_id;
+        let id = TransactionId::new(self.next_tx_id);
         let bytes = self
             .config
             .max_tx_size
@@ -251,7 +251,7 @@ struct Node {
     peer_heads: BTreeMap<NodeId, u64>,
     blocks_seen: BTreeSet<u64>,
     blocks: BTreeMap<u64, Arc<Block>>,
-    txs_seen: BTreeSet<u64>,
+    txs_seen: BTreeSet<TransactionId>,
 }
 
 impl Node {
@@ -281,7 +281,7 @@ impl Node {
         }
     }
 
-    fn propagate_tx(&mut self, id: u64) -> Result<()> {
+    fn propagate_tx(&mut self, id: TransactionId) -> Result<()> {
         for peer in &self.peers {
             self.msg_sink
                 .send_to(*peer, SimulationMessage::AnnounceTx(id))?;
@@ -301,7 +301,7 @@ impl Node {
         Ok(())
     }
 
-    fn receive_announce_tx(&mut self, from: NodeId, id: u64) -> Result<()> {
+    fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
         if self.txs_seen.insert(id) {
             self.msg_sink
                 .send_to(from, SimulationMessage::RequestTx(id))?;
@@ -412,8 +412,8 @@ enum SimulationEvent {
 
 #[derive(Clone)]
 enum SimulationMessage {
-    AnnounceTx(u64),
-    RequestTx(u64),
+    AnnounceTx(TransactionId),
+    RequestTx(TransactionId),
     Tx(Arc<Transaction>),
     RollForward(u64),
     RequestBlock(u64),

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use serde::Serialize;
@@ -9,6 +9,19 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeId, SimConfiguration},
 };
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct TransactionId(u64);
+impl Display for TransactionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+impl TransactionId {
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+}
 
 pub enum Event {
     Slot {
@@ -21,7 +34,7 @@ pub enum Event {
         recipient: NodeId,
     },
     Transaction {
-        id: u64,
+        id: TransactionId,
         bytes: u64,
     },
 }
@@ -36,7 +49,7 @@ pub struct Block {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
-    pub id: u64,
+    pub id: TransactionId,
     pub bytes: u64,
 }
 
@@ -46,7 +59,7 @@ enum OutputEvent {
         time: Timestamp,
         slot: u64,
         publisher: NodeId,
-        transactions: Vec<u64>,
+        transactions: Vec<TransactionId>,
     },
     BlockReceived {
         time: Timestamp,
@@ -56,7 +69,7 @@ enum OutputEvent {
     },
     TransactionCreated {
         time: Timestamp,
-        id: u64,
+        id: TransactionId,
         bytes: u64,
     },
 }
@@ -128,7 +141,7 @@ impl EventMonitor {
     pub async fn run(mut self) -> Result<()> {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
-        let mut pending_tx_sizes: BTreeMap<u64, u64> = BTreeMap::new();
+        let mut pending_tx_sizes: BTreeMap<TransactionId, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
         let mut empty_slots = 0u64;
