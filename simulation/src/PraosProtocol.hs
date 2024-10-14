@@ -32,6 +32,7 @@ import qualified Data.Map.Strict as Map (lookup, (!))
 import Data.Maybe (fromMaybe, isJust)
 import Network.TypedProtocol
 import Network.TypedProtocol.Peer.Server as TS
+import Ouroboros.Network.Mock.ConcreteBlock (BlockHeader)
 
 import Data.Kind (Type)
 import qualified Network.TypedProtocol.Peer.Client as TC
@@ -104,50 +105,50 @@ instance StateTokenI StDone where stateToken = SingStDone
 --------------------------------
 
 -- NOTE: To be used by @ChainSyncConsumer@
-triggerLocalEvent :: MonadSTM m => TMVar m ChainSyncProducerEvent -> ChainSyncProducerEvent -> STM m ()
+triggerLocalEvent :: MonadSTM m => TMVar m ChainProducerEvent -> ChainProducerEvent -> STM m ()
 triggerLocalEvent evts evt =
   tryReadTMVar evts >>= putTMVar evts . maybe evt (<> evt)
 
-data ChainSyncConsumerState (m :: Type -> Type) = ChainSyncConsumerState
+data ChainConsumerState (m :: Type -> Type) = ChainConsumerState
   {
   }
 
-chainSyncConsumer ::
+chainConsumer ::
   forall m.
   MonadSTM m =>
-  ChainSyncConsumerState m ->
+  ChainConsumerState m ->
   TC.Client ChainSyncState NonPipelined StIdle m ()
-chainSyncConsumer = undefined
+chainConsumer = undefined
 
 --------------------------------
 ---- ChainSync Producer
 --------------------------------
 
-data ChainSyncProducerState (m :: Type -> Type) = ChainSyncProducerState
+data ChainProducerState (m :: Type -> Type) = ChainProducerState
   { readPointerVar :: TVar m Point -- Unique, Read/Write.
-  , eventsVar :: TakeOnly (TMVar m ChainSyncProducerEvent) -- Shared, Take-Only.
+  , eventsVar :: TakeOnly (TMVar m ChainProducerEvent) -- Shared, Take-Only.
   , chainTipVar :: ReadOnly (TVar m ChainTip) -- Shared, Read-Only.
   , chainForwardsVarVar :: ReadOnly (TVar m (ReadOnly (TVar m (Map Point Point)))) -- Shared, Read-Only.
   , blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
   }
 
 -- CONVENTION: Events are named for the recipient.
-data ChainSyncProducerEvent
+data ChainProducerEvent
   = EvtNewBlock
   | EvtChainSwitch
   deriving (Eq)
 
-instance Semigroup ChainSyncProducerEvent where
+instance Semigroup ChainProducerEvent where
   EvtChainSwitch <> _ = EvtChainSwitch
   _ <> EvtChainSwitch = EvtChainSwitch
   EvtNewBlock <> EvtNewBlock = EvtNewBlock
 
-chainSyncProducer ::
+chainProducer ::
   forall m.
   MonadSTM m =>
-  ChainSyncProducerState m ->
+  ChainProducerState m ->
   TS.Server ChainSyncState NonPipelined StIdle m ()
-chainSyncProducer st = idle
+chainProducer st = idle
  where
   idle :: TS.Server ChainSyncState NonPipelined StIdle m ()
   idle = TS.Await $ \case
@@ -273,8 +274,8 @@ chainSyncProducer st = idle
   -- PRECONDITION: All block IDs have headers.
   unsafeGetBlockHeader :: BlockId -> STM m BlockHeader
   unsafeGetBlockHeader blockId = do
-    blockHeaders <- readReadOnlyTVar st.blockHeadersVar
-    return $ blockHeaders Map.! blockId
+    headers <- readReadOnlyTVar st.blockHeadersVar
+    return $ headers Map.! blockId
 
   getNextPoint :: Point -> STM m (Maybe Point)
   getNextPoint point = do
@@ -283,7 +284,9 @@ chainSyncProducer st = idle
     assert (isJust nextPoint || point == chainTip) $ return nextPoint
 
   getPreviousPoint :: Point -> STM m (Maybe Point)
-  getPreviousPoint point = blockHeaderParent <$> unsafeGetBlockHeader (pointBlockId point)
+  getPreviousPoint point = do
+    headers <- readReadOnlyTVar st.blockHeadersVar
+    blockPrevPoint headers <$> unsafeGetBlockHeader (pointBlockId point)
 
   -- PRECONDITION: All chains share a genesis block.
   unsafeFindIntersection :: ChainTip -> ChainTip -> STM m ChainTip
