@@ -26,16 +26,24 @@ import Control.Concurrent.Class.MonadSTM (
 import Control.Monad (guard)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (lookup)
-import Network.TypedProtocol
+import Network.TypedProtocol (
+  Agency (ClientAgency, NobodyAgency, ServerAgency),
+  IsPipelined (NonPipelined),
+  Protocol (..),
+  StateTokenI (..),
+ )
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
-
 import Ouroboros.Network.AnchoredFragment (AnchoredFragment)
 import qualified Ouroboros.Network.AnchoredFragment as AF
 import qualified Ouroboros.Network.Block as OAPI
-import Ouroboros.Network.Mock.ConcreteBlock
+import Ouroboros.Network.Mock.ConcreteBlock (
+  Block (Block),
+  BlockBody,
+  BlockHeader,
+ )
 
-import PraosProtocol.Types (ReadOnly, readReadOnlyTVar)
+import PraosProtocol.Types (ReadOnly, blockPrevPoint, readReadOnlyTVar)
 
 type BlockId = OAPI.HeaderHash Block
 type Point = OAPI.Point Block
@@ -75,37 +83,33 @@ instance StateTokenI StDone where stateToken = SingStDone
 --- BlockFetch Server
 --------------------------------
 
-data BlockFetchServerState m = BlockFetchProducerState
+data BlockProducerState m = BlockProducerState
   { blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
   , blockBodiesVar :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Shared, Read-Only.
   }
 
-resolveRange :: MonadSTM m => BlockFetchServerState m -> Point -> Point -> STM m (Maybe [BlockBody])
+resolveRange :: MonadSTM m => BlockProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
 resolveRange st start end = do
   headers <- readReadOnlyTVar st.blockHeadersVar
   bodies <- readReadOnlyTVar st.blockBodiesVar
-  let
-    blockPrevPoint hdr = case OAPI.blockPrevHash hdr of
-      OAPI.GenesisHash -> pure OAPI.GenesisPoint
-      OAPI.BlockHash hsh -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hsh headers
-    go acc p | start == p = Just acc
-    go _acc OAPI.GenesisPoint = Nothing
-    go acc p@(OAPI.BlockPoint pSlot pHash)
-      | OAPI.pointSlot start > OAPI.pointSlot p = Nothing
-      | otherwise = do
-          hdr <- Map.lookup pHash headers
-          guard $ OAPI.blockSlot hdr == pSlot
-          bdy <- Map.lookup pHash bodies
-          go (bdy : acc) =<< blockPrevPoint hdr
+  let resolveRangeAcc :: [BlockBody] -> Point -> Maybe [BlockBody]
+      resolveRangeAcc acc p | start == p = Just acc
+      resolveRangeAcc _acc OAPI.GenesisPoint = Nothing
+      resolveRangeAcc acc p@(OAPI.BlockPoint pSlot pHash)
+        | OAPI.pointSlot start > OAPI.pointSlot p = Nothing
+        | otherwise = do
+            header <- Map.lookup pHash headers
+            guard $ OAPI.blockSlot header == pSlot
+            body <- Map.lookup pHash bodies
+            resolveRangeAcc (body : acc) =<< blockPrevPoint headers header
+  return $ reverse <$> resolveRangeAcc [] end
 
-  return $ reverse <$> go [] end
-
-blockFetchServer ::
+blockProducer ::
   forall m.
   MonadSTM m =>
-  BlockFetchServerState m ->
+  BlockProducerState m ->
   TS.Server BlockFetchState NonPipelined StIdle m ()
-blockFetchServer st = idle
+blockProducer st = idle
  where
   idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
   idle = TS.Await $ \case
@@ -115,6 +119,7 @@ blockFetchServer st = idle
         Nothing -> return $ TS.Yield MsgNoBlocks idle
         Just blocks -> return $ TS.Yield MsgStartBatch (streaming blocks)
     MsgClientDone -> TS.Done ()
+
   streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
   streaming [] = TS.Yield MsgBatchDone idle
   streaming (blk : blks) = TS.Yield (MsgBlock blk) (streaming blks)
@@ -123,44 +128,47 @@ blockFetchServer st = idle
 --- BlockFetch Client
 --------------------------------
 
-newtype FetchRequest
-  = FetchRequest {fetchRequestFragments :: [AnchoredFragment BlockHeader]}
+newtype BlockRequest
+  = BlockRequest {blockRequestFragments :: [AnchoredFragment BlockHeader]}
   deriving (Show)
 
 fragmentRange :: AnchoredFragment BlockHeader -> (Point, Point)
 fragmentRange = undefined
 
-data BlockFetchClientState m = BlockFetchClientState
-  { fetchRequestsVar :: TVar m FetchRequest -- Shared, Read-Write.
+data BlockConsumerState m = BlockConsumerState
+  { fetchRequestsVar :: TVar m BlockRequest -- Shared, Read-Write.
   , addFetchedBlock :: Block -> m () -- this should include validation.
   -- or should it be the whole fragment at once?
   }
 
-blockFetchClient ::
+blockConsumer ::
   forall m.
   MonadSTM m =>
-  BlockFetchClientState m ->
+  BlockConsumerState m ->
   TC.Client BlockFetchState NonPipelined StIdle m ()
-blockFetchClient BlockFetchClientState{..} = idle
+blockConsumer BlockConsumerState{..} = idle
  where
   -- \| does not support preemption of in-flight requests.
   fetchRequest :: STM m (AnchoredFragment BlockHeader)
   fetchRequest = do
-    FetchRequest rs <- readTVar fetchRequestsVar
+    BlockRequest rs <- readTVar fetchRequestsVar
     case rs of
       [] -> retry
       (r : rs') -> do
-        writeTVar fetchRequestsVar (FetchRequest rs')
+        writeTVar fetchRequestsVar (BlockRequest rs')
         return r
+
   idle :: TC.Client BlockFetchState NonPipelined StIdle m ()
   idle = TC.Effect $ atomically $ do
     fr <- fetchRequest
     let range@(start, end) = fragmentRange fr
     return $ TC.Yield (MsgRequestRange start end) $ busy range fr
+
   busy :: (Point, Point) -> AnchoredFragment BlockHeader -> TC.Client BlockFetchState NonPipelined StBusy m ()
   busy range fr = TC.Await $ \case
     MsgNoBlocks -> idle -- TODO: adversarial? should signal to block fetch controller?
     MsgStartBatch -> streaming range $ AF.toOldestFirst fr
+
   streaming :: (Point, Point) -> [BlockHeader] -> TC.Client BlockFetchState NonPipelined StStreaming m ()
   streaming range headers = TC.Await $ \msg ->
     case (msg, headers) of

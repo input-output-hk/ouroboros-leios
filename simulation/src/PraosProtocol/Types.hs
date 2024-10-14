@@ -10,34 +10,35 @@ import Control.Concurrent.Class.MonadSTM (
     tryTakeTMVar
   ),
  )
-
-import Numeric.Natural (Natural)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import qualified Ouroboros.Network.Block as OAPI
+import Ouroboros.Network.Mock.ConcreteBlock (
+  Block (Block),
+  BlockBody,
+  BlockHeader,
+ )
 
 --------------------------------
 --- Common types
 --------------------------------
 
 -- TODO
-newtype Slot = Slot Natural
-  deriving (Eq, Ord)
-newtype BlockId = BlockId Natural
-  deriving (Eq, Ord)
-data BlockHeader
-data BlockBody
+type BlockId = OAPI.HeaderHash Block
+type Point = OAPI.Point Block
+type Slot = OAPI.SlotNo
 type ChainTip = Point
 
-blockHeaderParent :: BlockHeader -> Maybe Point
-blockHeaderParent = undefined
+pointBlockId :: Point -> BlockId
+pointBlockId = undefined
 
-blockHeaderSlot :: BlockHeader -> Slot
-blockHeaderSlot = undefined
+pointSlot :: Point -> Slot
+pointSlot = undefined
 
--- TODO: Could points just be the slot?
-data Point = Point
-  { pointSlot :: Slot
-  , pointBlockId :: BlockId
-  }
-  deriving (Eq, Ord)
+blockPrevPoint :: Map BlockId BlockHeader -> BlockHeader -> Maybe Point
+blockPrevPoint headers header = case OAPI.blockPrevHash header of
+  OAPI.GenesisHash -> pure OAPI.GenesisPoint
+  OAPI.BlockHash hash -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hash headers
 
 --------------------------------
 ---- Common Utility Types
