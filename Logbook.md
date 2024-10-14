@@ -1,5 +1,43 @@
 # Leios logbook
 
+## 2024-10-14
+
+### Discussing Conformance testing approach
+
+We are trying to understand the link between formal ledger specification and cardano-ledger, as we want to find a better way to relate Agda spec w/ actual code building a conformance testing suite:
+
+* Formal specification lives in [formal-ledger-specifications](https://github.com/IntersectMBO/formal-ledger-specifications) repository
+  * There is a branch there called `MAlonzo-code` which contains MAlonzo-based generated Haskell code from the spec
+* This branch is referred to in the [cabal.project](https://github.com/IntersectMBO/cardano-ledger/blob/master/cabal.project#L21) of cardano-ledger as a source-level dependency
+* The toplevle module in the generated code is name `Lib`
+  * Perhaps a [more descriptive name](https://github.com/IntersectMBO/formal-ledger-specifications/issues/595) would be useful?
+* This module is imported and renamed as `Agda` in cardano-ledger repo, in the `cardano-ledger-conformance` library
+
+The link between the formal spec and the ledger impl is mediated by the [constrained-generators](https://github.com/IntersectMBO/cardano-ledger/tree/master/libs/constrained-generators) library which provides a DSL for expressing constraintss from which generators, shrinkers, and predicate can be derived:
+
+* Traces tests use `minitraceEither` is a generator for traces in the Small-step semantics of the ledger
+* the `ExecSpecRule` typeclass is defined for the various categories of transactions (eg. `POOL`, `RATIFY`, etc.) and provides methods for producing constrained spec expressions
+* the `runAgdaRule` methods does the linking between an environment, a state and a transition, "executing" the corresponding Agda rule
+* the `checkConformance` function ultimately calls the latter and does the comparison
+
+We can run the conformance tests in the ledger spec :tada:
+
+#### What approach for Leios?
+
+* We don't have an executable Agda spec for Leios, only a relational one (with holes).
+* We need to make the spec executable, but we know from experience with Peras that maintaining _both_ a  relational spec and an executable spec is costly
+  * to guarantee at least soundness we need to prove the executable spec implements correctly the relational one which is non trivial
+* Also, a larger question is how do we handle adversarial behaviour in the spec?
+  * it's expected the specification uses dependent types to express the preconditions for a transition, so that only valid transitions can be expressed at the level of the specification
+  * but we want the _implementaiton_ to also rule out those transitions and therefore we want to explicitly test failed preconditions
+* then the question is: how does the (executable) specification handles failed preconditions? does it crash? can we know in some ways it failed?
+  * we need to figure how this is done in the ledger spec
+* In the case of Peras, we started out modelling an `Adversary` or dishonest node in the spec but this proved cumbersome and we needed to relax or remove that constraint to make progress
+  * however, it seems we really want the executable spec to be _total_ in the sense that any sequence of transitions, valid or invalid, has a definite result
+
+* we have summarized short term plan [here](https://github.com/input-output-hk/ouroboros-leios/issues/42)
+* we also need to define a "longer" term plan, eg. 2 months horizon
+
 ## 2024-10-10
 
 ### Approximate transaction sizes and frequencies
