@@ -1,4 +1,18 @@
-module PraosProtocol.Types where
+{-# LANGUAGE NamedFieldPuns #-}
+
+module PraosProtocol.Types (
+  HeaderHash,
+  Point,
+  SlotNo,
+  Tip,
+  blockPrevPoint,
+  ReadOnly,
+  readReadOnlyTVar,
+  TakeOnly,
+  takeTakeOnlyTMVar,
+  tryTakeTakeOnlyTMVar,
+  module ConcreteBlock,
+) where
 
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
@@ -13,8 +27,8 @@ import Control.Concurrent.Class.MonadSTM (
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Ouroboros.Network.Block as OAPI
-import Ouroboros.Network.Mock.ConcreteBlock (
-  Block (Block),
+import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
+  Block,
   BlockBody,
   BlockHeader,
  )
@@ -24,18 +38,12 @@ import Ouroboros.Network.Mock.ConcreteBlock (
 --------------------------------
 
 -- TODO
-type BlockId = OAPI.HeaderHash Block
-type Point = OAPI.Point Block
-type Slot = OAPI.SlotNo
-type ChainTip = Point
+type HeaderHash = OAPI.HeaderHash ConcreteBlock.Block
+type Point = OAPI.Point ConcreteBlock.Block
+type SlotNo = OAPI.SlotNo
+type Tip = OAPI.Tip
 
-pointBlockId :: Point -> BlockId
-pointBlockId = undefined
-
-pointSlot :: Point -> Slot
-pointSlot = undefined
-
-blockPrevPoint :: Map BlockId BlockHeader -> BlockHeader -> Maybe Point
+blockPrevPoint :: Map HeaderHash BlockHeader -> BlockHeader -> Maybe Point
 blockPrevPoint headers header = case OAPI.blockPrevHash header of
   OAPI.GenesisHash -> pure OAPI.GenesisPoint
   OAPI.BlockHash hash -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hash headers
@@ -44,24 +52,22 @@ blockPrevPoint headers header = case OAPI.blockPrevHash header of
 ---- Common Utility Types
 --------------------------------
 
-data OnChain = Yes | Unknown
-
-data Blocking = Blocking | NonBlocking
-  deriving (Eq)
-
-data Direction = Forward | Backward
-  deriving (Eq)
+-- data OnChain = Yes | Unknown
+-- data Blocking = Blocking | NonBlocking
+-- deriving (Eq)
+-- data Direction = Forward | Backward
+-- deriving (Eq)
 
 -- | Readonly TVar.
 newtype ReadOnly a = ReadOnly {unReadOnly :: a}
 
 readReadOnlyTVar :: MonadSTM m => ReadOnly (TVar m a) -> STM m a
-readReadOnlyTVar = readTVar . unReadOnly
+readReadOnlyTVar ReadOnly{unReadOnly} = readTVar unReadOnly
 
 newtype TakeOnly a = TakeOnly {unTakeOnly :: a}
 
 takeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m a
-takeTakeOnlyTMVar = takeTMVar . unTakeOnly
+takeTakeOnlyTMVar TakeOnly{unTakeOnly} = takeTMVar unTakeOnly
 
 tryTakeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m (Maybe a)
-tryTakeTakeOnlyTMVar = tryTakeTMVar . unTakeOnly
+tryTakeTakeOnlyTMVar TakeOnly{unTakeOnly} = tryTakeTMVar unTakeOnly
