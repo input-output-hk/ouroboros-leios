@@ -8,7 +8,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module PraosProtocol.BlockFetch where
@@ -122,7 +121,7 @@ blockProducer st = idle
 
   streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
   streaming [] = TS.Yield MsgBatchDone idle
-  streaming (blk : blks) = TS.Yield (MsgBlock blk) (streaming blks)
+  streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
 
 --------------------------------
 --- BlockFetch Client
@@ -136,7 +135,7 @@ fragmentRange :: AnchoredFragment BlockHeader -> (Point, Point)
 fragmentRange = undefined
 
 data BlockConsumerState m = BlockConsumerState
-  { fetchRequestsVar :: TVar m BlockRequest -- Shared, Read-Write.
+  { blockRequestVar :: TVar m BlockRequest -- Shared, Read-Write.
   , addFetchedBlock :: Block -> m () -- this should include validation.
   -- or should it be the whole fragment at once?
   }
@@ -149,18 +148,18 @@ blockConsumer ::
 blockConsumer BlockConsumerState{..} = idle
  where
   -- \| does not support preemption of in-flight requests.
-  fetchRequest :: STM m (AnchoredFragment BlockHeader)
-  fetchRequest = do
-    BlockRequest rs <- readTVar fetchRequestsVar
+  blockRequest :: STM m (AnchoredFragment BlockHeader)
+  blockRequest = do
+    BlockRequest rs <- readTVar blockRequestVar
     case rs of
       [] -> retry
       (r : rs') -> do
-        writeTVar fetchRequestsVar (BlockRequest rs')
+        writeTVar blockRequestVar (BlockRequest rs')
         return r
 
   idle :: TC.Client BlockFetchState NonPipelined StIdle m ()
   idle = TC.Effect $ atomically $ do
-    fr <- fetchRequest
+    fr <- blockRequest
     let range@(start, end) = fragmentRange fr
     return $ TC.Yield (MsgRequestRange start end) $ busy range fr
 
