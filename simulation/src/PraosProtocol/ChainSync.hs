@@ -19,6 +19,7 @@ import Network.TypedProtocol (
   Protocol (..),
   StateTokenI (..),
  )
+import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import PraosProtocol.Types
 
@@ -46,29 +47,29 @@ instance Protocol ChainSyncState where
     MsgAwaitReply :: Message ChainSyncState StCanAwait StMustReply
     MsgRollForward_StCanAwait ::
       BlockHeader ->
-      Tip Block ->
+      Tip BlockHeader ->
       Message ChainSyncState StCanAwait StIdle
     MsgRollBackward_StCanAwait ::
-      Point Block ->
-      Tip Block ->
+      Point BlockHeader ->
+      Tip BlockHeader ->
       Message ChainSyncState StCanAwait StIdle
     MsgRollForward_StMustReply ::
       BlockHeader ->
-      Tip Block ->
+      Tip BlockHeader ->
       Message ChainSyncState StMustReply StIdle
     MsgRollBackward_StMustReply ::
-      Point Block ->
-      Tip Block ->
+      Point BlockHeader ->
+      Tip BlockHeader ->
       Message ChainSyncState StMustReply StIdle
     MsgFindIntersect ::
-      [Point Block] ->
+      [Point BlockHeader] ->
       Message ChainSyncState StIdle StIntersect
     MsgIntersectFound ::
-      Point Block ->
-      Tip Block ->
+      Point BlockHeader ->
+      Tip BlockHeader ->
       Message ChainSyncState StIntersect StIdle
     MsgIntersectNotFound ::
-      Tip Block ->
+      Tip BlockHeader ->
       Message ChainSyncState StIntersect StIdle
     MsgDone :: Message ChainSyncState StIdle StDone
   type StateAgency StIdle = ClientAgency
@@ -88,19 +89,47 @@ instance StateTokenI StDone where stateToken = SingStDone
 ---- ChainSync Consumer
 --------------------------------
 
+-- type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
+
+-- chainConsumer ::
+--   forall m.
+--   MonadSTM m =>
+--   TVar m (Chain BlockHeader) ->
+--   ChainConsumer 'StIdle m ()
+-- chainConsumer chainVar = initialise
+--  where
+--   initialise :: ChainConsumer 'StIdle m ()
+--   initialise = TC.Effect $ atomically $ do
+--     chain <- readTVar chainVar
+--     points <- selectPoints recentOffsets chain
+--     return $ TC.Yield (MsgFindIntersect points) intersect
+--    where
+--     recentOffsets :: [Int]
+--     recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
+
+--   intersect :: ChainConsumer 'StIntersect m ()
+--   intersect = TC.Await $ \case
+--     MsgIntersectFound point _tip -> _
+--     MsgIntersectNotFound tip -> _
+
+--   requestNext :: ChainConsumer 'StIdle m ()
+--   requestNext = _
+
 --------------------------------
 ---- ChainSync Producer
 --------------------------------
+
+type ChainProducer st m a = TS.Server ChainSyncState 'NonPipelined st m a
 
 chainProducer ::
   forall m.
   MonadSTM m =>
   FollowerId ->
   TVar m (ChainProducerState Block) ->
-  TS.Server ChainSyncState NonPipelined StIdle m ()
+  ChainProducer StIdle m ()
 chainProducer followerId stVar = idle
  where
-  idle :: TS.Server ChainSyncState NonPipelined StIdle m ()
+  idle :: ChainProducer 'StIdle m ()
   idle = TS.Await $ \case
     MsgDone -> TS.Done ()
     MsgRequestNext -> TS.Effect $ atomically $ do
@@ -111,16 +140,17 @@ chainProducer followerId stVar = idle
             return $ TS.Yield MsgAwaitReply mustReply
           Just (chainUpdate, st') -> do
             writeTVar stVar st'
-            let tip = headTip (chainState st')
+            let htip = castTip (headTip (chainState st'))
             case chainUpdate of
               AddBlock block -> do
                 let header = blockHeader block
-                return $ TS.Yield (MsgRollForward_StCanAwait header tip) idle
-              RollBack point -> do
-                return $ TS.Yield (MsgRollBackward_StCanAwait point tip) idle
+                return $ TS.Yield (MsgRollForward_StCanAwait header htip) idle
+              RollBack bpoint -> do
+                let hpoint = castPoint bpoint
+                return $ TS.Yield (MsgRollBackward_StCanAwait hpoint htip) idle
     MsgFindIntersect points -> intersect points
 
-  mustReply :: TS.Server ChainSyncState 'NonPipelined 'StMustReply m ()
+  mustReply :: ChainProducer 'StMustReply m ()
   mustReply = TS.Effect $ atomically $ do
     st <- readTVar stVar
     assert (followerExists followerId st) $
@@ -128,22 +158,24 @@ chainProducer followerId stVar = idle
         Nothing -> retry
         Just (chainUpdate, st') -> do
           writeTVar stVar st'
-          let tip = headTip (chainState st')
+          let htip = castTip (headTip (chainState st'))
           case chainUpdate of
             AddBlock block -> do
               let header = blockHeader block
-              return $ TS.Yield (MsgRollForward_StMustReply header tip) idle
-            RollBack point -> do
-              return $ TS.Yield (MsgRollBackward_StMustReply point tip) idle
+              return $ TS.Yield (MsgRollForward_StMustReply header htip) idle
+            RollBack bpoint -> do
+              let hpoint = castPoint bpoint
+              return $ TS.Yield (MsgRollBackward_StMustReply hpoint htip) idle
 
-  intersect :: [Point Block] -> TS.Server ChainSyncState 'NonPipelined 'StIntersect m ()
-  intersect points = TS.Effect $ atomically $ do
+  intersect :: [Point BlockHeader] -> ChainProducer 'StIntersect m ()
+  intersect hpoints = TS.Effect $ atomically $ do
     st <- readTVar stVar
-    let tip = headTip (chainState st)
+    let htip = castTip (headTip (chainState st))
     assert (followerExists followerId st) $
-      case findFirstPoint points st of
+      case findFirstPoint (castPoint <$> hpoints) st of
         Nothing -> do
-          return $ TS.Yield (MsgIntersectNotFound tip) idle
-        Just point -> do
-          writeTVar stVar $ setFollowerPoint followerId point st
-          return $ TS.Yield (MsgIntersectFound point tip) idle
+          return $ TS.Yield (MsgIntersectNotFound htip) idle
+        Just bpoint -> do
+          let hpoint = castPoint bpoint
+          writeTVar stVar $ setFollowerPoint followerId bpoint st
+          return $ TS.Yield (MsgIntersectFound hpoint htip) idle
