@@ -30,26 +30,21 @@ import Control.Concurrent.Class.MonadSTM (
 import Control.Exception (assert)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Ouroboros.Network.Block as Block (
-  HeaderHash,
-  Point,
-  SlotNo,
-  Tip,
- )
-import qualified Ouroboros.Network.Block as OAPI
+import Ouroboros.Network.Block as Block
 import Ouroboros.Network.Mock.Chain as Chain hiding (
-  addBlock,
-  applyChainUpdate,
-  applyChainUpdates,
   findFirstPoint,
-  rollback,
  )
 import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
   Block (..),
   BlockBody,
   BlockHeader,
  )
-import Ouroboros.Network.Mock.ProducerState as ProducerState
+import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
+  addBlock,
+  applyChainUpdate,
+  applyChainUpdates,
+  rollback,
+ )
 
 --------------------------------
 --- Common types
@@ -59,9 +54,9 @@ type BlockHeaders = Map (HeaderHash Block) BlockHeader
 type BlockBodies = Map (HeaderHash Block) BlockBody
 
 blockPrevPoint :: BlockHeaders -> BlockHeader -> Maybe (Point Block)
-blockPrevPoint headers header = case OAPI.blockPrevHash header of
-  OAPI.GenesisHash -> pure OAPI.GenesisPoint
-  OAPI.BlockHash hash -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hash headers
+blockPrevPoint headers header = case blockPrevHash header of
+  GenesisHash -> pure GenesisPoint
+  BlockHash hash -> castPoint . blockPoint <$> Map.lookup hash headers
 
 setFollowerPoint :: FollowerId -> Point Block -> ChainProducerState Block -> ChainProducerState Block
 setFollowerPoint followerId point st@ChainProducerState{..} =
