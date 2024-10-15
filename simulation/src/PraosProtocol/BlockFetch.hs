@@ -23,7 +23,6 @@ import Control.Concurrent.Class.MonadSTM (
   ),
  )
 import Control.Monad (guard)
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map (lookup)
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
@@ -42,7 +41,7 @@ import Ouroboros.Network.Mock.ConcreteBlock (
   BlockHeader,
  )
 
-import PraosProtocol.Types (ReadOnly, blockPrevPoint, readReadOnlyTVar)
+import PraosProtocol.Types (BlockBodies, BlockHeaders, ReadOnly, blockPrevPoint, readReadOnlyTVar)
 
 type BlockId = OAPI.HeaderHash Block
 type Point = OAPI.Point Block
@@ -83,8 +82,8 @@ instance StateTokenI StDone where stateToken = SingStDone
 --------------------------------
 
 data BlockProducerState m = BlockProducerState
-  { blockHeadersVar :: ReadOnly (TVar m (Map BlockId BlockHeader)) -- Shared, Read-Only.
-  , blockBodiesVar :: ReadOnly (TVar m (Map BlockId BlockBody)) -- Shared, Read-Only.
+  { blockHeadersVar :: ReadOnly (TVar m BlockHeaders) -- Shared, Read-Only.
+  , blockBodiesVar :: ReadOnly (TVar m BlockBodies) -- Shared, Read-Only.
   }
 
 resolveRange :: MonadSTM m => BlockProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
