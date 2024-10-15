@@ -1,7 +1,8 @@
 module Leios.Network where
 
-open import Prelude hiding (_∘_; _⊗_)
-open import Ledger.Prelude using (ℙ_; _∈_; _∪_; ❴_❵; _∉_)
+open import abstract-set-theory.Prelude hiding (_∘_; _⊗_)
+open import abstract-set-theory.FiniteSetTheory using (ℙ_; _∈_; _∪_; ❴_❵; _∉_)
+
 open import CategoricalCrypto
 
 record Abstract : Set₁ where

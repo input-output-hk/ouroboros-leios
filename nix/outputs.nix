@@ -10,6 +10,6 @@ in
 [
   (project.flake)
   {
-    packages.leiosSpec = agda.leiosSpec;
+    packages = agda;
   }
 ]

@@ -1,6 +1,6 @@
 module CategoricalCrypto where
 
-open import Prelude hiding (id; _∘_; _⊗_; lookup; Dec)
+open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec)
 
 --------------------------------------------------------------------------------
 -- Channels, which form the objects

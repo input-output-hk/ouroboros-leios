@@ -1,9 +1,15 @@
-{-# OPTIONS --allow-unsolved-metas #-}
+{-# OPTIONS --allow-unsolved-metas --erasure #-}
 
 module Leios.SimpleSpec where
 
-open import Ledger.Prelude
+open import abstract-set-theory.FiniteSetTheory
+open import abstract-set-theory.Prelude
 open import Data.List using (upTo)
+
+open import Class.HasAdd
+open import Class.HasOrder
+open import Class.Hashable
+open import Prelude.InferenceRules
 
 fromTo : ℕ → ℕ → List ℕ
 fromTo m n = map (_+ m) (upTo (n ∸ m))
