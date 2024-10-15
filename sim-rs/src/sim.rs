@@ -283,7 +283,8 @@ impl Simulation {
 
         // any node could be the first to see a transaction
         let publisher_id = self.choose_random_node();
-        self.get_node_mut(&publisher_id).receive_tx(publisher_id, tx)
+        self.get_node_mut(&publisher_id)
+            .receive_tx(publisher_id, tx)
     }
 
     fn get_node_mut(&mut self, id: &NodeId) -> &mut Node {
@@ -305,11 +306,21 @@ struct Node {
     total_stake: u64,
     max_ib_size: u64,
     peers: Vec<NodeId>,
+    praos: NodePraosState,
+    leios: NodeLeiosState,
+}
+
+#[derive(Default)]
+struct NodePraosState {
     peer_heads: BTreeMap<NodeId, u64>,
     blocks_seen: BTreeSet<u64>,
     blocks: BTreeMap<u64, Arc<Block>>,
     txs_seen: BTreeSet<TransactionId>,
-    leios_mempool: BTreeMap<TransactionId, Arc<Transaction>>,
+}
+
+#[derive(Default)]
+struct NodeLeiosState {
+    mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     unsent_ibs: BTreeMap<u64, VecDeque<InputBlock>>,
     ibs: BTreeMap<InputBlockId, Arc<InputBlock>>,
     ffd_queue: PriorityQueue<InputBlockHeader, Timestamp>,
@@ -336,34 +347,33 @@ impl Node {
             total_stake,
             max_ib_size: sim_config.max_ib_size,
             peers,
-            peer_heads: BTreeMap::new(),
-            blocks_seen: BTreeSet::new(),
-            blocks: BTreeMap::new(),
-            txs_seen: BTreeSet::new(),
-            leios_mempool: BTreeMap::new(),
-            unsent_ibs: BTreeMap::new(),
-            ibs: BTreeMap::new(),
-            ffd_queue: PriorityQueue::new(),
+            praos: NodePraosState::default(),
+            leios: NodeLeiosState::default(),
         }
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
         for transaction in &block.transactions {
-            self.leios_mempool.remove(&transaction.id);
+            self.leios.mempool.remove(&transaction.id);
         }
         for peer in &self.peers {
-            if !self.peer_heads.get(peer).is_some_and(|&s| s >= block.slot) {
+            if !self
+                .praos
+                .peer_heads
+                .get(peer)
+                .is_some_and(|&s| s >= block.slot)
+            {
                 self.msg_sink
                     .send_to(*peer, SimulationMessage::RollForward(block.slot))?;
-                self.peer_heads.insert(*peer, block.slot);
+                self.praos.peer_heads.insert(*peer, block.slot);
             }
         }
-        self.blocks.insert(block.slot, block);
+        self.praos.blocks.insert(block.slot, block);
         Ok(())
     }
 
     fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
-        if self.txs_seen.insert(id) {
+        if self.praos.txs_seen.insert(id) {
             self.msg_sink
                 .send_to(from, SimulationMessage::RequestTx(id))?;
         }
@@ -376,7 +386,7 @@ impl Node {
 
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
-        self.leios_mempool.insert(tx.id, tx);
+        self.leios.mempool.insert(tx.id, tx);
         for peer in &self.peers {
             if *peer == from {
                 continue;
@@ -388,7 +398,7 @@ impl Node {
     }
 
     fn receive_roll_forward(&mut self, from: NodeId, slot: u64) -> Result<()> {
-        if self.blocks_seen.insert(slot) {
+        if self.praos.blocks_seen.insert(slot) {
             self.msg_sink
                 .send_to(from, SimulationMessage::RequestBlock(slot))?;
         }
@@ -396,7 +406,7 @@ impl Node {
     }
 
     fn receive_request_block(&mut self, from: NodeId, slot: u64) -> Result<()> {
-        if let Some(block) = self.blocks.get(&slot) {
+        if let Some(block) = self.praos.blocks.get(&slot) {
             self.msg_sink
                 .send_to(from, SimulationMessage::Block(block.clone()))?;
         }
@@ -404,11 +414,16 @@ impl Node {
     }
 
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
-        if self.blocks.insert(block.slot, block.clone()).is_none() {
+        if self
+            .praos
+            .blocks
+            .insert(block.slot, block.clone())
+            .is_none()
+        {
             for transaction in &block.transactions {
-                self.leios_mempool.remove(&transaction.id);
+                self.leios.mempool.remove(&transaction.id);
             }
-            let head = self.peer_heads.entry(from).or_default();
+            let head = self.praos.peer_heads.entry(from).or_default();
             if *head < block.slot {
                 *head = block.slot
             }
@@ -424,7 +439,7 @@ impl Node {
     }
 
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        if let Some(ib) = self.ibs.get(&id) {
+        if let Some(ib) = self.leios.ibs.get(&id) {
             self.msg_sink
                 .send_to(from, SimulationMessage::IBHeader(ib.header.clone()))?;
         }
@@ -433,11 +448,11 @@ impl Node {
 
     fn receive_ib_header(&mut self, from: NodeId, header: InputBlockHeader) -> Result<()> {
         let id = header.id();
-        if self.ibs.contains_key(&id) {
+        if self.leios.ibs.contains_key(&id) {
             return Ok(());
         }
         let timestamp = header.timestamp;
-        if self.ffd_queue.push(header, timestamp).is_none() {
+        if self.leios.ffd_queue.push(header, timestamp).is_none() {
             // We hadn't seen this header before, so propagate it to our neighbors
             for peer in &self.peers {
                 if *peer == from {
@@ -464,13 +479,13 @@ impl Node {
                 transactions: vec![],
             });
         }
-        self.unsent_ibs.insert(slot, unsent_ibs);
+        self.leios.unsent_ibs.insert(slot, unsent_ibs);
         self.try_fill_ibs()
     }
 
     fn try_fill_ibs(&mut self) -> Result<()> {
         loop {
-            let Some(mut first_ib_entry) = self.unsent_ibs.first_entry() else {
+            let Some(mut first_ib_entry) = self.leios.unsent_ibs.first_entry() else {
                 // we aren't sending any IBs
                 return Ok(());
             };
@@ -478,10 +493,10 @@ impl Node {
             let unsent_ibs = first_ib_entry.get_mut();
             let Some(unsent_ib) = unsent_ibs.front_mut() else {
                 // we aren't sending any more IBs this round
-                self.unsent_ibs.remove(&slot);
+                self.leios.unsent_ibs.remove(&slot);
                 return Ok(());
             };
-            let Some((_, tx)) = self.leios_mempool.first_key_value() else {
+            let Some((_, tx)) = self.leios.mempool.first_key_value() else {
                 // our mempool is empty
                 return Ok(());
             };
@@ -491,8 +506,8 @@ impl Node {
 
             if remaining_capacity >= tx_bytes {
                 // This IB has room for another TX, add it in
-                let (id, tx) = self.leios_mempool.pop_first().unwrap();
-                self.leios_mempool.remove(&id);
+                let (id, tx) = self.leios.mempool.pop_first().unwrap();
+                self.leios.mempool.remove(&id);
                 unsent_ib.transactions.push(tx);
             }
 
@@ -505,7 +520,7 @@ impl Node {
     }
 
     fn finish_generating_ibs(&mut self, slot: u64) -> Result<()> {
-        let Some(unsent_ibs) = self.unsent_ibs.remove(&slot) else {
+        let Some(unsent_ibs) = self.leios.unsent_ibs.remove(&slot) else {
             return Ok(());
         };
         for ib in unsent_ibs {
@@ -524,7 +539,7 @@ impl Node {
         self.tracker.track_ib_generated(ib.clone());
 
         let id = ib.header.id();
-        self.ibs.insert(id, ib);
+        self.leios.ibs.insert(id, ib);
         for peer in &self.peers {
             self.msg_sink
                 .send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
