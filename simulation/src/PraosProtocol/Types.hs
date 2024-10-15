@@ -1,17 +1,20 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module PraosProtocol.Types (
-  HeaderHash,
-  Point,
-  SlotNo,
-  Tip,
+  BlockBodies,
+  BlockHeaders,
   blockPrevPoint,
+  setFollowerPoint,
+  module Block,
+  module Chain,
+  module ConcreteBlock,
+  module ProducerState,
   ReadOnly,
   readReadOnlyTVar,
   TakeOnly,
   takeTakeOnlyTMVar,
   tryTakeTakeOnlyTMVar,
-  module ConcreteBlock,
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
@@ -24,29 +27,49 @@ import Control.Concurrent.Class.MonadSTM (
     tryTakeTMVar
   ),
  )
+import Control.Exception (assert)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Ouroboros.Network.Block as Block (
+  HeaderHash,
+  Point,
+  SlotNo,
+  Tip,
+ )
 import qualified Ouroboros.Network.Block as OAPI
+import Ouroboros.Network.Mock.Chain as Chain hiding (
+  addBlock,
+  applyChainUpdate,
+  applyChainUpdates,
+  findFirstPoint,
+  rollback,
+ )
 import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
-  Block,
+  Block (..),
   BlockBody,
   BlockHeader,
  )
+import Ouroboros.Network.Mock.ProducerState as ProducerState
 
 --------------------------------
 --- Common types
 --------------------------------
 
--- TODO
-type HeaderHash = OAPI.HeaderHash ConcreteBlock.Block
-type Point = OAPI.Point ConcreteBlock.Block
-type SlotNo = OAPI.SlotNo
-type Tip = OAPI.Tip
+type BlockHeaders = Map (HeaderHash Block) BlockHeader
+type BlockBodies = Map (HeaderHash Block) BlockBody
 
-blockPrevPoint :: Map HeaderHash BlockHeader -> BlockHeader -> Maybe Point
+blockPrevPoint :: BlockHeaders -> BlockHeader -> Maybe (Point Block)
 blockPrevPoint headers header = case OAPI.blockPrevHash header of
   OAPI.GenesisHash -> pure OAPI.GenesisPoint
   OAPI.BlockHash hash -> OAPI.castPoint . OAPI.blockPoint <$> Map.lookup hash headers
+
+setFollowerPoint :: FollowerId -> Point Block -> ChainProducerState Block -> ChainProducerState Block
+setFollowerPoint followerId point st@ChainProducerState{..} =
+  assert (pointOnChain point chainState) $
+    st{chainFollowers = Map.adjust setFollowerPoint' followerId chainFollowers}
+ where
+  setFollowerPoint' :: FollowerState Block -> FollowerState Block
+  setFollowerPoint' followerState = followerState{followerPoint = point}
 
 --------------------------------
 ---- Common Utility Types
