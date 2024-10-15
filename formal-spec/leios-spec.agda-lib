@@ -3,6 +3,7 @@ depend:
   standard-library
   standard-library-classes
   standard-library-meta
-  formal-ledger
+  abstract-set-theory
+  iog-prelude
 include:
   .

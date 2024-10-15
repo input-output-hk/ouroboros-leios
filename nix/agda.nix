@@ -1,5 +1,6 @@
 { pkgs, lib, inputs, ... }:
 
+with pkgs;
 let
 
   locales = {
@@ -18,27 +19,27 @@ let
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-classes";
     version = "2.0";
-    src = pkgs.fetchFromGitHub {
+    src = fetchFromGitHub {
       repo = "agda-stdlib-classes";
       owner = "omelkonian";
-      rev = "v2.0";
-      sha256 = "sha256-PcieRRnctjCzFCi+gUYAgyIAicMOAZPl8Sw35fZdt0E=";
+      rev = "2b42a6043296b4601134b8ab9371b37bda5d4424";
+      sha256 = "sha256-kTqS9p+jjv34d4JIWV9eWAI8cw9frX/K9DHuwv56AHo=";
     };
     meta = { };
     libraryFile = "agda-stdlib-classes.agda-lib";
-    everythingFile = "Classes.agda";
+    everythingFile = "standard-library-classes.agda";
     buildInputs = [ agdaStdlib ];
   };
 
   agdaStdlibMeta = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-meta";
-    version = "2.0";
-    src = pkgs.fetchFromGitHub {
+    version = "2.1.1";
+    src = fetchFromGitHub {
       repo = "stdlib-meta";
-      owner = "input-output-hk";
-      rev = "4fc4b1ed6e47d180516917d04be87cbacbf7d314";
-      sha256 = "T+9vwccbDO1IGBcGLjgV/fOt+IN14KEV9ct/J6nQCsM=";
+      owner = "omelkonian";
+      rev = "v2.1.1";
+      sha256 = "qOoThYMG0dzjKvwmzzVZmGcerfb++MApbaGRzLEq3/4=";
     };
     meta = { };
     libraryFile = "agda-stdlib-meta.agda-lib";
@@ -46,32 +47,39 @@ let
     buildInputs = [ agdaStdlib agdaStdlibClasses ];
   };
 
-  formalLedger = customAgda.agdaPackages.mkDerivation {
+  agdaSets = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
-    pname = "formal-ledger";
-    version = "1d77a35a";
+    pname = "agda-sets";
+    version = "2.1.1";
     src = pkgs.fetchFromGitHub {
-      repo = "formal-ledger-specifications";
-      owner = "IntersectMBO";
-      rev = "1d77a35ab1820c123790e5138d85325d33787e86";
-      sha256 = "0d15aysxdmn31aj982gr63d40q606dqvq0k4y4rwa9kpmjgadjaq";
+      repo = "agda-sets";
+      owner = "input-output-hk";
+      rev = "f517d0d0c1ff1fd6dbac8b34309dea0e1aea6fc6";
+      sha256 = "sha256-OsdDNNJp9NWDgDM0pDOGv98Z+vAS1U8mORWF7/B1D7k=";
     };
     meta = { };
-    preConfigure = ''
-      cat << EOI > formal-ledger.agda-lib
-      name: formal-ledger
-      depend:
-        standard-library
-        standard-library-classes
-        standard-library-meta
-      include: src
-      EOI
-      mv src/Everything.agda .
-    '';
-    libraryFile = "formal-ledger.agda-lib";
-    everythingFile = "Everything.agda";
+    libraryFile = "abstract-set-theory.agda-lib";
+    everythingFile = "src/abstract-set-theory.agda";
     buildInputs = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta ];
   };
+
+  agdaIOGPrelude = customAgda.agdaPackages.mkDerivation {
+    inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
+    pname = "agda-prelude";
+    version = "2.0";
+    src = pkgs.fetchFromGitHub {
+      repo = "iog-agda-prelude";
+      owner = "input-output-hk";
+      rev = "457d52576c2824647e96079557e5f04d459b8d4d";
+      sha256 = "sha256-gp+AJLVtltNnPM0wP4ou2QnxVfUzd380OZVdGUKzoH8=";
+    };
+    meta = { };
+    libraryFile = "iog-prelude.agda-lib";
+    everythingFile = "src/Everything.agda";
+    buildInputs = [ agdaStdlib agdaStdlibClasses ];
+  };
+
+  deps = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta agdaSets agdaIOGPrelude ];
 
   leiosSpec = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
@@ -79,30 +87,16 @@ let
     name = "leios-spec";  # FIXME: Why is this entry needed?
     src = ../formal-spec;
     meta = { };
-    preConfigure = ''
-      cat << EOI > Everything.agda
-      module Everything where
-        import CategoricalCrypto
-        import Leios.Network
-        import Leios.SimpleSpec
-      EOI
-      ls
-    '';
     libraryFile = "formal-spec/leios-spec.agda-lib";
     everythingFile = "Everything.agda";
-    buildInputs = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta formalLedger ];
+    buildInputs = deps;
   };
 
   agdaWithPkgs = p: customAgda.agda.withPackages { pkgs = p; ghc = pkgs.ghc; };
 
 in
 {
-  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta formalLedger ;
-  agdaWithDeps = agdaWithPkgs [
-    agdaStdlib
-    agdaStdlibClasses
-    agdaStdlibMeta
-    formalLedger
-  ];
+  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta ;
+  agdaWithDeps = agdaWithPkgs deps;
   leiosSpec = leiosSpec;
 }
