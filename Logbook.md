@@ -1,5 +1,99 @@
 # Leios logbook
 
+## 2024-10-15
+
+### AB - Conformance testing exploration
+
+Investigating how https://github.com/stevana/coverage-guided-pbt/ could be used to explore traces in Leios, in the context of state-machine based tests
+
+* Ensure the implementation generates logs on top of results => combined "language" that can be used in coverage assertions
+* Define some combinators that checks some logs have been covered,  possibly using a predicate?
+* Generate traces, guided by coverage metrics
+
+Got side-tracked into dependency hell and different versions of GHC:
+
+* The coverage-guided-pbt repo has a lower bound dependency on `base >= 4.20` which means it requires ghc 9.10
+* Then tried to configure Emacs to use eglot LSP client instead of lsp-mode. Found out a way to configure the workspace to use `stylish-haskell` formatter using `.dir-locals.el` config, but it seems not to be called...
+* Trying to install stylish-haskell globally with `cabal install stylish-haskell` -> does not work with ghc 9.10.1 (!) and HLS for 9.10.1 does not support it as a plugin
+* Tried to enter nix shell on remote machine, but it fails with a cryptic error
+* I switched to base 4.19 and GHC 9.8.2 then stylish-haskell plugin is available, and the code is formatted. Also, reverted to use `lsp-mode` as `eglot` does not provide any code actions
+
+Main question is what to test (first)? And how to test? Network diffusion seems like a good candidate, with the SUT representing a single node and the test focusing on the timeliness and correctness of the diffusion process:
+
+* The node can fetch new headers and blocks
+* The node can diffuse new headers and blocks
+* It must node propagate equivocated blocks more than once
+  * But it must propagate them at least once to ensure a _proof-of-equivocation_ is available to all honest nodes in the network
+
+How does coverage comes into play here?
+
+* The node emits logs, which we know the language of
+  * node receives a header
+  * node receives a body
+  * node diffuse a header
+  * node diffuse a body
+  * node sees an equivocated block
+  * node blacklist a peer
+* There's a correlation between messages we want to observe, ie:
+  * see equivocated block ---> node blacklist a peer ?
+
+### Team meeting
+
+Meeting goal: define or refine objectives for remaining 2 months
+
+* There's an admin side to this as part of internal PI planning cycle but it's less important than aligning on clear goals
+* We know there will be "dev rel" role dedicated to Leios to connect w/ the community
+
+We need to answer some questions asked from the demos yesterday:
+* "Why are simulations not using Agda code?"
+  * Q: what's the availability of andre knispel?
+  * he will be dedicated to Leios and we also have Yves
+* "Why a rust ΔQ tool when there exists other tools?"
+
+Discussing some possible short-term objectives:
+* On conformance testing
+  * define interface b/w testers and implementations
+  * start with Adversarial scenarios, answering the question on where to define the behaviour: in the spec or in the tester?
+  * simulatios/prototypes will need to have some ways to interact w/ tester => interfaces can be refined later
+* Define a taxonomy of "adversarialness"
+  * strong adversary that's _misbehaving_
+  * adversarial "natural" conditions, eg. outages/split brains
+  * transaction level adversary
+  * we need to qualify those different scenarios
+* throughput bounds/measurements
+  * "will the leios node be so expensive community won't like it?"
+  * we want to provide a model, map the possible tradeoffs and the relationship b/w different resources and functionalities provided by Leios
+  * It's important to learn from the mistakes from hydra, esp. w.r.t communication: avoid discrepancy b/w narrative and reality leading to FUD
+  * the previous CIP from 2022 had some numbers, ie. ~1000 tps based on network traffic pattern simulation
+  * based on assumptions about the design: each link b/w peer is 1Mb/s (50 Mb/s for ~20 nodes)
+  * current solana throughput is ~65k tps
+* we do not need lot of simulation to answer those questions
+  * network bandwidth not a limiting factor, above assumptions are an order of magnitude from saturating the network
+  * CPU will be a limiting factor: if 1 IB takes 100 ms to validate, then this means one can validate 10 IB/s
+* we also need to compute costof resources
+  * for various scenarios -> 1k / 10k / 100k tps
+  * when saturating a network from high end data center
+  * keep a stream of approximate calculations alive, and iterate
+
+* some speculation: Leios fees might be cheaper than Praos, because there's more competition for resources on Praos?
+  * in general, it could be the case we price tx differently
+* Mempool design -> sharding?
+  * depends on resources pressure on CPU
+  * existing nodes already have 4 cores
+
+Objectives:  We should give ourselves until end of next week to write down and refine 3-4 concrete objectives for the next 2 months
+
+**Conformance**
+* Write an Agda executable spec
+* Establish a conformance pipeline from Agda spec to prototypes
+* Test relevant adversarial scenarios (equivocated blocks and votes, possibly DoS attempts, split-brains, network outages and delays...)
+
+**Data collection & load modelling**
+* Provide answers to resources questions -> Revive results from earlier CIP
+* We need data on validation time -> relationship b/w block size/exec budget -> waht's the time budget
+* Build an integrated spreadsheet to explore the "resources space"
+* Communicate resources model to the community
+
 ## 2024-10-14
 
 ### Discussing Conformance testing approach
