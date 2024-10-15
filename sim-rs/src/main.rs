@@ -15,6 +15,7 @@ use tracing::warn;
 mod clock;
 mod config;
 mod events;
+mod model;
 mod network;
 mod probability;
 mod sim;
@@ -52,10 +53,10 @@ async fn main() -> Result<()> {
 
     let clock = Clock::new(Instant::now(), config.timescale);
     let tracker = EventTracker::new(events_sink, clock.clone());
-    let mut simulation = Simulation::new(config, clock)?;
+    let mut simulation = Simulation::new(config, tracker, clock)?;
 
     select! {
-        result = simulation.run(tracker) => { result? }
+        result = simulation.run() => { result? }
         result = &mut monitor => { result? }
         _ = ctrlc_source => {}
     };

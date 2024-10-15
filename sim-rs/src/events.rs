@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, fs, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use serde::Serialize;
@@ -8,22 +8,14 @@ use tracing::{info, warn};
 use crate::{
     clock::{Clock, Timestamp},
     config::{NodeId, SimConfiguration},
+    model::{Block, InputBlock, Transaction, TransactionId},
 };
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct TransactionId(u64);
-impl Display for TransactionId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-impl TransactionId {
-    pub fn new(value: u64) -> Self {
-        Self(value)
-    }
-}
-
 pub enum Event {
+    Transaction {
+        id: TransactionId,
+        bytes: u64,
+    },
     Slot {
         number: u64,
         block: Option<Block>,
@@ -33,24 +25,9 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
-    Transaction {
-        id: TransactionId,
-        bytes: u64,
+    InputBlockGenerated {
+        block: Arc<InputBlock>,
     },
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Block {
-    pub slot: u64,
-    pub publisher: NodeId,
-    pub conflicts: Vec<NodeId>,
-    pub transactions: Vec<Arc<Transaction>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Transaction {
-    pub id: TransactionId,
-    pub bytes: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -58,7 +35,7 @@ enum OutputEvent {
     BlockGenerated {
         time: Timestamp,
         slot: u64,
-        publisher: NodeId,
+        producer: NodeId,
         transactions: Vec<TransactionId>,
     },
     BlockReceived {
@@ -71,6 +48,12 @@ enum OutputEvent {
         time: Timestamp,
         id: TransactionId,
         bytes: u64,
+    },
+    InputBlockGenerated {
+        time: Timestamp,
+        slot: u64,
+        producer: NodeId,
+        transactions: Vec<TransactionId>,
     },
 }
 
@@ -102,6 +85,10 @@ impl EventTracker {
             id: transaction.id,
             bytes: transaction.bytes,
         });
+    }
+
+    pub fn track_ib_generated(&self, block: Arc<InputBlock>) {
+        self.send(Event::InputBlockGenerated { block });
     }
 
     fn send(&self, event: Event) {
@@ -152,19 +139,19 @@ impl EventMonitor {
         while let Some((event, timestamp)) = self.events_source.recv().await {
             self.compute_output_events(&mut output, &event, timestamp);
             match event {
+                Event::Transaction { id, bytes } => {
+                    pending_tx_sizes.insert(id, bytes);
+                }
                 Event::Slot { number, block } => {
                     if let Some(block) = block {
-                        info!(
-                            "Pool {} published a block in slot {number}.",
-                            block.publisher
-                        );
+                        info!("Pool {} produced a block in slot {number}.", block.producer);
                         filled_slots += 1;
                         for published_tx in block.transactions {
                             published_txs += 1;
                             published_bytes += published_tx.bytes;
                             pending_tx_sizes.remove(&published_tx.id);
                         }
-                        *blocks_published.entry(block.publisher).or_default() += 1;
+                        *blocks_published.entry(block.producer).or_default() += 1;
 
                         for conflict in block.conflicts {
                             *blocks_rejected.entry(conflict).or_default() += 1;
@@ -175,8 +162,13 @@ impl EventMonitor {
                     }
                 }
                 Event::BlockReceived { .. } => {}
-                Event::Transaction { id, bytes } => {
-                    pending_tx_sizes.insert(id, bytes);
+                Event::InputBlockGenerated { block } => {
+                    info!(
+                        "Pool {} generated an IB with {} transaction(s) in slot {}",
+                        block.header.producer,
+                        block.transactions.len(),
+                        block.header.slot,
+                    )
                 }
             }
         }
@@ -216,7 +208,7 @@ impl EventMonitor {
                     output.push(OutputEvent::BlockGenerated {
                         time,
                         slot: *number,
-                        publisher: block.publisher,
+                        producer: block.producer,
                         transactions: block.transactions.iter().map(|t| t.id).collect(),
                     });
                 }
@@ -238,6 +230,14 @@ impl EventMonitor {
                     slot: *slot,
                     sender: *sender,
                     recipient: *recipient,
+                });
+            }
+            Event::InputBlockGenerated { block } => {
+                output.push(OutputEvent::InputBlockGenerated {
+                    time,
+                    slot: block.header.slot,
+                    producer: block.header.producer,
+                    transactions: block.transactions.iter().map(|t| t.id).collect(),
                 });
             }
         }
