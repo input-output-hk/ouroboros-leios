@@ -1,4 +1,24 @@
 # Leios logbook
+## 2024-10-15
+
+### ΔQ Next steps
+
+Discussing ΔQSD progress (and plans for next months)
+
+* Roland currently focused on figuring out rules for expressing load, where the outcome is a CDF of some resources value over a (possibly infinite?) period of time
+* Main question is: is the language suitable to model load?
+  * Yves remarks we could just model thiings using probability directly without the intermediate language and that's been his thought reading the paper
+* interim conclusion: language is useful, same expression can be evaluated in the timeliness or load context?
+  * is the result relevant?
+* what we are interested in is the distribution of bandwidth consumption for one node we should shift our focus from a global property (delay across the network) to a local one (resources consumption for a single node), ie. reason about a node, parameterised by say its connectivity?
+  * Then given some assumptions about the node's location, we could also model the cost of running Leios
+* Tricky part is modelling the "recursion" or "exponentiation" of some outcome expression given possible number of repetitions
+  * global clustering coefficient
+
+* Next steps (1w):
+  * Roland try to fit CDF of throughput in ΔQ
+  * Yves try to go down the probability route with a notebook
+  * We compare notes next week
 
 ## 2024-10-15
 
