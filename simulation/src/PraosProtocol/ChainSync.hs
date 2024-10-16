@@ -13,7 +13,7 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromMaybe)
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -97,37 +97,50 @@ chainConsumer ::
   MonadSTM m =>
   TVar m (Chain BlockHeader) ->
   ChainConsumer 'StIdle m ()
-chainConsumer hchainVar = initialise
+chainConsumer hchainVar = idle True
  where
   -- NOTE: The specification says to do an initial intersection with
   --       exponentially spaced points, and perform binary search to
   --       narrow down the actual intersection point from there on.
   --       However, the real implementation only does the first step.
-  initialise :: ChainConsumer 'StIdle m ()
-  initialise = TC.Effect $ atomically $ do
-    hchain <- readTVar hchainVar
-    let hpoints = selectPoints recentOffsets hchain
-    return $ TC.Yield (MsgFindIntersect hpoints) intersect
-   where
-    recentOffsets :: [Int]
-    recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
+  idle :: Bool -> ChainConsumer 'StIdle m ()
+  idle initialise
+    | initialise = TC.Effect $ atomically $ do
+        hchain <- readTVar hchainVar
+        let recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
+        let hpoints = selectPoints recentOffsets hchain
+        return $ TC.Yield (MsgFindIntersect hpoints) intersect
+    | otherwise = TC.Yield MsgRequestNext canAwait
 
   intersect :: ChainConsumer 'StIntersect m ()
   intersect = TC.Await $ \case
-    MsgIntersectFound hpoint _tip ->
-      TC.Effect $ atomically $ do
-        hchain <- readTVar hchainVar
-        assert (pointOnChain hpoint hchain) $ do
-          let hchain' = fromJust $ rollback hpoint hchain
-          writeTVar hchainVar hchain'
-          return requestNext
-    MsgIntersectNotFound _htip ->
-      TC.Effect $ atomically $ do
-        writeTVar hchainVar genesis
-        return requestNext
+    MsgIntersectFound hpoint _tip -> rollBackward hpoint
+    MsgIntersectNotFound _htip -> rollBackward GenesisPoint
 
-  requestNext :: ChainConsumer 'StIdle m ()
-  requestNext = undefined
+  canAwait :: ChainConsumer 'StCanAwait m ()
+  canAwait = TC.Await $ \case
+    MsgAwaitReply -> mustReply
+    MsgRollForward_StCanAwait header _htip -> rollForward header
+    MsgRollBackward_StCanAwait hpoint _htip -> rollBackward hpoint
+
+  mustReply :: ChainConsumer 'StMustReply m ()
+  mustReply = TC.Await $ \case
+    MsgRollForward_StMustReply header _htip -> rollForward header
+    MsgRollBackward_StMustReply hpoint _htip -> rollBackward hpoint
+
+  rollForward :: BlockHeader -> ChainConsumer 'StIdle m ()
+  rollForward header =
+    TC.Effect $ atomically $ do
+      modifyTVar' hchainVar $ addBlock header
+      return $ idle False
+
+  rollBackward :: Point BlockHeader -> ChainConsumer 'StIdle m ()
+  rollBackward hpoint =
+    TC.Effect $ atomically $ do
+      modifyTVar' hchainVar $
+        fromMaybe (error "chainConsumer: MsgRollBackward with point not on chain")
+          . rollback hpoint
+      return $ idle False
 
 --------------------------------
 ---- ChainSync Producer
