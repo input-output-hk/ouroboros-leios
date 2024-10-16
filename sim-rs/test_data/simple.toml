@@ -51,4 +51,5 @@ max_block_size = 90112
 
 # IB parameters
 ib_generation_probability = 0.5 # corresponds to 𝑓I in the model
-max_ib_size = 0x100000000
+max_ib_size = 327680
+max_ib_requests_per_peer = 1

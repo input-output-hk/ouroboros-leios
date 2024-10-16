@@ -54,6 +54,7 @@ struct RawConfig {
     max_block_size: u64,
     max_tx_size: u64,
     max_ib_size: u64,
+    max_ib_requests_per_peer: usize,
     transaction_frequency_ms: DistributionConfig,
     transaction_size_bytes: DistributionConfig,
 }
@@ -81,6 +82,7 @@ pub struct SimConfiguration {
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub max_ib_size: u64,
+    pub max_ib_requests_per_peer: usize,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }
@@ -134,6 +136,7 @@ impl From<RawConfig> for SimConfiguration {
             max_block_size: value.max_block_size,
             max_tx_size: value.max_tx_size,
             max_ib_size: value.max_ib_size,
+            max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }

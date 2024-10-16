@@ -37,7 +37,7 @@ pub struct Transaction {
     pub bytes: u64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
 pub struct InputBlockId {
     slot: u64,
     producer: NodeId,

@@ -28,17 +28,22 @@ pub enum Event {
     InputBlockGenerated {
         block: Arc<InputBlock>,
     },
+    InputBlockReceived {
+        block: Arc<InputBlock>,
+        sender: NodeId,
+        recipient: NodeId,
+    },
 }
 
 #[derive(Clone, Serialize)]
 enum OutputEvent {
-    BlockGenerated {
+    PraosBlockGenerated {
         time: Timestamp,
         slot: u64,
         producer: NodeId,
         transactions: Vec<TransactionId>,
     },
-    BlockReceived {
+    PraosBlockReceived {
         time: Timestamp,
         slot: u64,
         sender: NodeId,
@@ -53,7 +58,16 @@ enum OutputEvent {
         time: Timestamp,
         slot: u64,
         producer: NodeId,
+        index: u64,
         transactions: Vec<TransactionId>,
+    },
+    InputBlockReceived {
+        time: Timestamp,
+        slot: u64,
+        producer: NodeId,
+        index: u64,
+        sender: NodeId,
+        recipient: NodeId,
     },
 }
 
@@ -89,6 +103,14 @@ impl EventTracker {
 
     pub fn track_ib_generated(&self, block: Arc<InputBlock>) {
         self.send(Event::InputBlockGenerated { block });
+    }
+
+    pub fn track_ib_received(&self, block: Arc<InputBlock>, sender: NodeId, recipient: NodeId) {
+        self.send(Event::InputBlockReceived {
+            block,
+            sender,
+            recipient,
+        });
     }
 
     fn send(&self, event: Event) {
@@ -170,6 +192,7 @@ impl EventMonitor {
                         block.header.slot,
                     )
                 }
+                Event::InputBlockReceived { .. } => {}
             }
         }
 
@@ -205,7 +228,7 @@ impl EventMonitor {
         match event {
             Event::Slot { number, block } => {
                 if let Some(block) = block {
-                    output.push(OutputEvent::BlockGenerated {
+                    output.push(OutputEvent::PraosBlockGenerated {
                         time,
                         slot: *number,
                         producer: block.producer,
@@ -225,7 +248,7 @@ impl EventMonitor {
                 sender,
                 recipient,
             } => {
-                output.push(OutputEvent::BlockReceived {
+                output.push(OutputEvent::PraosBlockReceived {
                     time,
                     slot: *slot,
                     sender: *sender,
@@ -237,7 +260,22 @@ impl EventMonitor {
                     time,
                     slot: block.header.slot,
                     producer: block.header.producer,
+                    index: block.header.index,
                     transactions: block.transactions.iter().map(|t| t.id).collect(),
+                });
+            }
+            Event::InputBlockReceived {
+                block,
+                sender,
+                recipient,
+            } => {
+                output.push(OutputEvent::InputBlockReceived {
+                    time,
+                    slot: block.header.slot,
+                    producer: block.header.producer,
+                    index: block.header.index,
+                    sender: *sender,
+                    recipient: *recipient,
                 });
             }
         }

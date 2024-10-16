@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
@@ -124,7 +124,7 @@ impl Simulation {
                             target.receive_block(from, block)?;
                         }
 
-                        // IB propagation
+                        // IB header propagation
                         SimulationMessage::AnnounceIBHeader(id) => {
                             target.receive_announce_ib_header(from, id)?;
                         }
@@ -133,6 +133,18 @@ impl Simulation {
                         }
                         SimulationMessage::IBHeader(header) => {
                             target.receive_ib_header(from, header)?;
+                        }
+
+                        // IB transmission
+                        SimulationMessage::AnnounceIB(id) => {
+                            target.receive_announce_ib(from, id)?;
+                        }
+                        SimulationMessage::RequestIB(id) => {
+                            target.receive_request_ib(from, id)?;
+                        }
+                        SimulationMessage::IB(ib) => {
+                            self.tracker.track_ib_received(ib.clone(), from, to);
+                            target.receive_ib(from, ib)?;
                         }
                     }
                 }
@@ -305,6 +317,7 @@ struct Node {
     stake: u64,
     total_stake: u64,
     max_ib_size: u64,
+    max_ib_requests_per_peer: usize,
     peers: Vec<NodeId>,
     praos: NodePraosState,
     leios: NodeLeiosState,
@@ -319,11 +332,23 @@ struct NodePraosState {
 }
 
 #[derive(Default)]
+struct PeerInputBlockRequests {
+    pending: PriorityQueue<InputBlockId, Timestamp>,
+    active: HashSet<InputBlockId>,
+}
+
+struct PendingInputBlock {
+    header: InputBlockHeader,
+    has_been_requested: bool,
+}
+
+#[derive(Default)]
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     unsent_ibs: BTreeMap<u64, VecDeque<InputBlock>>,
     ibs: BTreeMap<InputBlockId, Arc<InputBlock>>,
-    ffd_queue: PriorityQueue<InputBlockHeader, Timestamp>,
+    pending_ibs: BTreeMap<InputBlockId, PendingInputBlock>,
+    ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
 }
 
 impl Node {
@@ -346,6 +371,7 @@ impl Node {
             stake,
             total_stake,
             max_ib_size: sim_config.max_ib_size,
+            max_ib_requests_per_peer: sim_config.max_ib_requests_per_peer,
             peers,
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
@@ -439,9 +465,16 @@ impl Node {
     }
 
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        if let Some(ib) = self.leios.ibs.get(&id) {
+        if let Some(pending_ib) = self.leios.pending_ibs.get(&id) {
+            // We don't have this IB, just the header. Send that.
+            self.msg_sink
+                .send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone()))?;
+        } else if let Some(ib) = self.leios.ibs.get(&id) {
+            // We have the full IB. Send the header, and also advertise that we have the full IB.
             self.msg_sink
                 .send_to(from, SimulationMessage::IBHeader(ib.header.clone()))?;
+            self.msg_sink
+                .send_to(from, SimulationMessage::AnnounceIB(id))?;
         }
         Ok(())
     }
@@ -451,17 +484,92 @@ impl Node {
         if self.leios.ibs.contains_key(&id) {
             return Ok(());
         }
-        let timestamp = header.timestamp;
-        if self.leios.ffd_queue.push(header, timestamp).is_none() {
-            // We hadn't seen this header before, so propagate it to our neighbors
-            for peer in &self.peers {
-                if *peer == from {
-                    continue;
-                }
-                self.msg_sink
-                    .send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
-            }
+        if self.leios.pending_ibs.contains_key(&id) {
+            return Ok(());
         }
+        self.leios.pending_ibs.insert(
+            id,
+            PendingInputBlock {
+                header,
+                has_been_requested: false,
+            },
+        );
+        // We haven't seen this header before, so propagate it to our neighbors
+        for peer in &self.peers {
+            if *peer == from {
+                continue;
+            }
+            self.msg_sink
+                .send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
+        }
+        Ok(())
+    }
+
+    fn receive_announce_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
+        let Some(pending_ib) = self.leios.pending_ibs.get_mut(&id) else {
+            return Ok(());
+        };
+        // Ignore IBs which have already been requested
+        if pending_ib.has_been_requested {
+            return Ok(());
+        }
+        // Do we have capacity to request this block?
+        let reqs = self.leios.ib_requests.entry(from).or_default();
+        if reqs.active.len() < self.max_ib_requests_per_peer {
+            // If so, make the request
+            pending_ib.has_been_requested = true;
+            reqs.active.insert(id);
+            self.msg_sink
+                .send_to(from, SimulationMessage::RequestIB(id))?;
+        } else {
+            // If not, just track that this peer has this IB when we're ready
+            reqs.pending.push(id, pending_ib.header.timestamp);
+        }
+        Ok(())
+    }
+
+    fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
+        if let Some(ib) = self.leios.ibs.get(&id) {
+            self.msg_sink
+                .send_to(from, SimulationMessage::IB(ib.clone()))?;
+        }
+        Ok(())
+    }
+
+    fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
+        let id = ib.header.id();
+        self.leios.ibs.insert(id, ib);
+        for peer in &self.peers {
+            if *peer == from {
+                continue;
+            }
+            self.msg_sink
+                .send_to(*peer, SimulationMessage::AnnounceIB(id))?;
+        }
+
+        // Mark that this IB is no longer pending
+        self.leios.pending_ibs.remove(&id);
+        let reqs = self.leios.ib_requests.entry(from).or_default();
+        reqs.active.remove(&id);
+
+        // We now have capacity to request one more IB from this peer
+        while let Some((id, _)) = reqs.pending.pop() {
+            let Some(pending_ib) = self.leios.pending_ibs.get_mut(&id) else {
+                // We fetched this IB from some other node already
+                continue;
+            };
+            if pending_ib.has_been_requested {
+                // There's already a request for this IB in flight
+                continue;
+            }
+
+            // Make the request
+            pending_ib.has_been_requested = true;
+            reqs.active.insert(id);
+            self.msg_sink
+                .send_to(from, SimulationMessage::RequestIB(id))?;
+        }
+
         Ok(())
     }
 
@@ -617,6 +725,10 @@ enum SimulationMessage {
     AnnounceIBHeader(InputBlockId),
     RequestIBHeader(InputBlockId),
     IBHeader(InputBlockHeader),
+    // IB transmission
+    AnnounceIB(InputBlockId),
+    RequestIB(InputBlockId),
+    IB(Arc<InputBlock>),
 }
 
 impl HasBytesSize for SimulationMessage {
@@ -630,9 +742,13 @@ impl HasBytesSize for SimulationMessage {
             Self::RequestBlock(_) => 8,
             Self::Block(block) => block.transactions.iter().map(|t| t.bytes).sum(),
 
-            Self::RequestIBHeader(_) => 8,
             Self::AnnounceIBHeader(_) => 8,
+            Self::RequestIBHeader(_) => 8,
             Self::IBHeader(_) => 32,
+
+            Self::AnnounceIB(_) => 8,
+            Self::RequestIB(_) => 8,
+            Self::IB(ib) => ib.bytes(),
         }
     }
 }
