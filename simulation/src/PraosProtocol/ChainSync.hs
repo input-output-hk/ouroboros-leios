@@ -13,6 +13,7 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
+import Data.Maybe (fromJust)
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -89,31 +90,44 @@ instance StateTokenI StDone where stateToken = SingStDone
 ---- ChainSync Consumer
 --------------------------------
 
--- type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
+type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
--- chainConsumer ::
---   forall m.
---   MonadSTM m =>
---   TVar m (Chain BlockHeader) ->
---   ChainConsumer 'StIdle m ()
--- chainConsumer chainVar = initialise
---  where
---   initialise :: ChainConsumer 'StIdle m ()
---   initialise = TC.Effect $ atomically $ do
---     chain <- readTVar chainVar
---     points <- selectPoints recentOffsets chain
---     return $ TC.Yield (MsgFindIntersect points) intersect
---    where
---     recentOffsets :: [Int]
---     recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
+chainConsumer ::
+  forall m.
+  MonadSTM m =>
+  TVar m (Chain BlockHeader) ->
+  ChainConsumer 'StIdle m ()
+chainConsumer hchainVar = initialise
+ where
+  -- NOTE: The specification says to do an initial intersection with
+  --       exponentially spaced points, and perform binary search to
+  --       narrow down the actual intersection point from there on.
+  --       However, the real implementation only does the first step.
+  initialise :: ChainConsumer 'StIdle m ()
+  initialise = TC.Effect $ atomically $ do
+    hchain <- readTVar hchainVar
+    let hpoints = selectPoints recentOffsets hchain
+    return $ TC.Yield (MsgFindIntersect hpoints) intersect
+   where
+    recentOffsets :: [Int]
+    recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
 
---   intersect :: ChainConsumer 'StIntersect m ()
---   intersect = TC.Await $ \case
---     MsgIntersectFound point _tip -> _
---     MsgIntersectNotFound tip -> _
+  intersect :: ChainConsumer 'StIntersect m ()
+  intersect = TC.Await $ \case
+    MsgIntersectFound hpoint _tip ->
+      TC.Effect $ atomically $ do
+        hchain <- readTVar hchainVar
+        assert (pointOnChain hpoint hchain) $ do
+          let hchain' = fromJust $ rollback hpoint hchain
+          writeTVar hchainVar hchain'
+          return requestNext
+    MsgIntersectNotFound _htip ->
+      TC.Effect $ atomically $ do
+        writeTVar hchainVar genesis
+        return requestNext
 
---   requestNext :: ChainConsumer 'StIdle m ()
---   requestNext = _
+  requestNext :: ChainConsumer 'StIdle m ()
+  requestNext = undefined
 
 --------------------------------
 ---- ChainSync Producer
