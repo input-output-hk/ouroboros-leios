@@ -19,6 +19,7 @@ Discussing ΔQSD progress (and plans for next months)
   * Roland try to fit CDF of throughput in ΔQ
   * Yves try to go down the probability route with a notebook
   * We compare notes next week
+  * see [#41](https://github.com/input-output-hk/ouroboros-leios/issues/41)
 
 ## 2024-10-15
 
