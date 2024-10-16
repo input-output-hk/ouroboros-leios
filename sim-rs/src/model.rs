@@ -1,8 +1,4 @@
-use std::{
-    fmt::Display,
-    hash::{DefaultHasher, Hash, Hasher},
-    sync::Arc,
-};
+use std::{fmt::Display, sync::Arc};
 
 use crate::{clock::Timestamp, config::NodeId};
 use serde::Serialize;
@@ -41,7 +37,12 @@ pub struct Transaction {
     pub bytes: u64,
 }
 
-id_wrapper!(InputBlockId, u64);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct InputBlockId {
+    slot: u64,
+    producer: NodeId,
+    index: u64,
+}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct InputBlockHeader {
@@ -54,9 +55,11 @@ pub struct InputBlockHeader {
 }
 impl InputBlockHeader {
     pub fn id(&self) -> InputBlockId {
-        let mut hasher = DefaultHasher::new();
-        (self.slot, self.producer, self.index).hash(&mut hasher);
-        InputBlockId(hasher.finish())
+        InputBlockId {
+            slot: self.slot,
+            producer: self.producer,
+            index: self.index,
+        }
     }
 }
 
