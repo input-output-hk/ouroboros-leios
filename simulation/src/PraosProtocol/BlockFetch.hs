@@ -1,14 +1,19 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.BlockFetch where
 
@@ -17,13 +22,20 @@ import Control.Concurrent.Class.MonadSTM (
     STM,
     TVar,
     atomically,
+    modifyTVar,
     readTVar,
     retry,
     writeTVar
   ),
  )
-import Control.Monad (guard)
-import qualified Data.Map.Strict as Map (lookup)
+import Control.Monad (forM, forever, guard, (<=<))
+import Data.Bifunctor (second)
+import qualified Data.List as List
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import Data.Maybe (catMaybes)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -41,7 +53,7 @@ import Ouroboros.Network.Mock.ConcreteBlock (
   BlockHeader,
  )
 
-import PraosProtocol.Types (BlockBodies, BlockHeaders, ReadOnly, blockPrevPoint, readReadOnlyTVar)
+import PraosProtocol.Types (Block (blockHeader), BlockBodies, BlockHeaders, Chain, ChainProducerState (..), ReadOnly, blockPrevPoint, headPoint, headerPoint, intersectChains, readReadOnlyTVar, selectChain, toAnchoredFragment)
 
 type BlockId = OAPI.HeaderHash Block
 type Point = OAPI.Point Block
@@ -129,9 +141,13 @@ blockProducer st = idle
 newtype BlockRequest
   = BlockRequest {blockRequestFragments :: [AnchoredFragment BlockHeader]}
   deriving (Show)
+  deriving newtype (Semigroup) -- TODO: we could merge the fragments.
 
 fragmentRange :: AnchoredFragment BlockHeader -> (Point, Point)
-fragmentRange = undefined
+fragmentRange fr = (OAPI.castPoint $ AF.headPoint fr, OAPI.castPoint $ AF.lastPoint fr)
+
+blockRequestPoints :: BlockRequest -> [Point]
+blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AF.toOldestFirst) $ frs
 
 data BlockConsumerState m = BlockConsumerState
   { blockRequestVar :: TVar m BlockRequest -- Shared, Read-Write.
@@ -172,8 +188,93 @@ blockConsumer BlockConsumerState{..} = idle
     case (msg, headers) of
       (MsgBatchDone, []) -> idle -- TODO: signal someone?
       (MsgBlock block, header : headers') -> TC.Effect $ do
-        -- TODO: check hash?
         addFetchedBlock (Block header block)
         return (streaming range headers')
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO
+
+--------------------------------------------
+---- BlockFetch controller
+--------------------------------------------
+
+longestChainSelection ::
+  forall block header m.
+  ( OAPI.HasHeader block
+  , OAPI.HasHeader header
+  , OAPI.HeaderHash block ~ OAPI.HeaderHash header
+  , MonadSTM m
+  ) =>
+  [(PeerId, ReadOnly (TVar m (Maybe (Chain header))))] ->
+  ReadOnly (TVar m (ChainProducerState block)) ->
+  (block -> header) ->
+  STM m (Maybe (PeerId, AnchoredFragment header))
+longestChainSelection candidateChainVars cpsVar getHeader = do
+  candidateChains <- mapM (\(pId, v) -> fmap (pId,) <$> readReadOnlyTVar v) candidateChainVars
+  cps <- readReadOnlyTVar cpsVar
+  let
+    chain = fmap getHeader cps.chainState
+    -- using foldl' since @selectChain@ is left biased
+    aux (mpId, c1) (pId, c2) =
+      let c = selectChain c1 c2
+       in if headPoint c == headPoint c1
+            then (mpId, c1)
+            else (Just pId, c2)
+    (selectedPeer, chain') = List.foldl' aux (Nothing, chain) (catMaybes candidateChains)
+  return $ do
+    peerId <- selectedPeer
+    let af = toAnchoredFragment chain'
+    (peerId,) <$> case intersectChains chain chain' of
+      Nothing -> pure af
+      Just point -> snd <$> AF.splitAfterPoint af point
+
+type PeerId = Int
+
+-- | Note:
+--    * a block is added to RequestVar and InFlightVar at the same time.
+--    * the block is removed from blockRequestVar when the consumer starts fetching
+--      the corresponding fragment.
+--    * the block is removed from blocksInFlightVar when it reaches the
+--      "ChainDB" i.e. blockBodiesVar, or the consumer encountered a
+--      problem when fetching it. TODO!
+data PeerStatus m = PeerStatus
+  { blockRequestVar :: TVar m BlockRequest
+  , blocksInFlightVar :: TVar m (Set Point)
+  , peerChainVar :: ReadOnly (TVar m (Maybe (Chain BlockHeader)))
+  }
+
+data BlockControllerState m = BlockControllerState
+  { blockBodiesVar :: ReadOnly (TVar m BlockBodies) -- Shared, Read-Only.
+  , peers :: Map PeerId (PeerStatus m)
+  , cpsVar :: ReadOnly (TVar m (ChainProducerState Block))
+  }
+
+blockFetchController :: forall m. MonadSTM m => BlockControllerState m -> m ()
+blockFetchController BlockControllerState{..} = forever (atomically makeRequests)
+ where
+  makeRequests :: STM m ()
+  makeRequests = do
+    let peerChainVars = (map (second (.peerChainVar)) $ Map.toList peers)
+    (peerId, fr) <- maybe retry pure =<< longestChainSelection peerChainVars cpsVar blockHeader
+
+    req <- filterInFlight <=< filterFetched $ fr
+    addRequest peerId req
+
+  filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
+  filterFetched fr = do
+    bodies <- readReadOnlyTVar blockBodiesVar
+    pure $ filterBR ((`Map.notMember` bodies) . OAPI.blockHash) (BlockRequest [fr])
+  filterBR :: (BlockHeader -> Bool) -> BlockRequest -> BlockRequest
+  filterBR p = BlockRequest . concatMap (AF.filter p) . (.blockRequestFragments)
+  filterInFlight :: BlockRequest -> STM m BlockRequest
+  filterInFlight br = do
+    in_flights <- forM (Map.elems peers) $ \peer -> do
+      readTVar peer.blocksInFlightVar
+    pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
+  addRequest :: PeerId -> BlockRequest -> STM m ()
+  addRequest _pId (BlockRequest []) = retry
+  addRequest pId br = do
+    case Map.lookup pId peers of
+      Nothing -> error "addRequest: no such peer"
+      Just PeerStatus{..} -> do
+        modifyTVar blocksInFlightVar (`Set.union` Set.fromList (blockRequestPoints br))
+        modifyTVar blockRequestVar (<> br)

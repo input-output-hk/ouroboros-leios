@@ -4,6 +4,7 @@
 module PraosProtocol.Types (
   BlockBodies,
   BlockHeaders,
+  headerPoint,
   blockPrevPoint,
   setFollowerPoint,
   module Block,
@@ -52,6 +53,9 @@ import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
 
 type BlockHeaders = Map (HeaderHash Block) BlockHeader
 type BlockBodies = Map (HeaderHash Block) BlockBody
+
+headerPoint :: BlockHeader -> Point Block
+headerPoint = castPoint . blockPoint
 
 blockPrevPoint :: BlockHeaders -> BlockHeader -> Maybe (Point Block)
 blockPrevPoint headers header = case blockPrevHash header of
