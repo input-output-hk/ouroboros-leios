@@ -538,7 +538,11 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id();
+        for transaction in &ib.transactions {
+            self.leios.mempool.remove(&transaction.id);
+        }
         self.leios.ibs.insert(id, ib);
+
         for peer in &self.peers {
             if *peer == from {
                 continue;
