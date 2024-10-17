@@ -16,6 +16,9 @@ module PraosProtocol.Types (
   TakeOnly (..),
   takeTakeOnlyTMVar,
   tryTakeTakeOnlyTMVar,
+  SlotConfig (..),
+  slotTime,
+  module TimeCompat,
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
@@ -47,6 +50,8 @@ import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
   rollback,
  )
 
+import TimeCompat
+
 --------------------------------
 --- Common types
 --------------------------------
@@ -68,6 +73,11 @@ setFollowerPoint followerId point st@ChainProducerState{..} =
  where
   setFollowerPoint' :: FollowerState Block -> FollowerState Block
   setFollowerPoint' followerState = followerState{followerPoint = point}
+
+data SlotConfig = SlotConfig {start :: UTCTime, duration :: NominalDiffTime}
+
+slotTime :: SlotConfig -> SlotNo -> UTCTime
+slotTime SlotConfig{start, duration} sl = (fromIntegral (unSlotNo sl) * duration) `addUTCTime` start
 
 --------------------------------
 ---- Common Utility Types

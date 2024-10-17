@@ -32,6 +32,7 @@ library
     P2P
     PlotTCP
     PraosProtocol
+    PraosProtocol.BlockGeneration
     PraosProtocol.BlockFetch
     PraosProtocol.ChainSync
     PraosProtocol.Types
@@ -54,6 +55,7 @@ library
     , array
     , base
     , cairo
+    , cardano-slotting
     , Chart
     , Chart-cairo
     , colour
