@@ -2,8 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module PraosProtocol.Types (
-  BlockBodies,
-  BlockHeaders,
+  Blocks,
   headerPoint,
   blockPrevPoint,
   setFollowerPoint,
@@ -51,16 +50,15 @@ import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
 --- Common types
 --------------------------------
 
-type BlockHeaders = Map (HeaderHash Block) BlockHeader
-type BlockBodies = Map (HeaderHash Block) BlockBody
+type Blocks = Map (HeaderHash Block) Block
 
 headerPoint :: BlockHeader -> Point Block
 headerPoint = castPoint . blockPoint
 
-blockPrevPoint :: BlockHeaders -> BlockHeader -> Maybe (Point Block)
-blockPrevPoint headers header = case blockPrevHash header of
+blockPrevPoint :: (HasFullHeader b, HeaderHash b ~ HeaderHash Block) => Blocks -> b -> Maybe (Point Block)
+blockPrevPoint blks header = case blockPrevHash header of
   GenesisHash -> pure GenesisPoint
-  BlockHash hash -> castPoint . blockPoint <$> Map.lookup hash headers
+  BlockHash hash -> castPoint . blockPoint <$> Map.lookup hash blks
 
 setFollowerPoint :: FollowerId -> Point Block -> ChainProducerState Block -> ChainProducerState Block
 setFollowerPoint followerId point st@ChainProducerState{..} =
