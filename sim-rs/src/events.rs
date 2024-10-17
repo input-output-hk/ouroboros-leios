@@ -156,6 +156,7 @@ impl EventMonitor {
         let mut empty_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
+        let mut generated_ibs = 0u64;
 
         let mut output = vec![];
         while let Some((event, timestamp)) = self.events_source.recv().await {
@@ -185,6 +186,7 @@ impl EventMonitor {
                 }
                 Event::BlockReceived { .. } => {}
                 Event::InputBlockGenerated { block } => {
+                    generated_ibs += 1;
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {}",
                         block.header.producer,
@@ -199,6 +201,7 @@ impl EventMonitor {
         info!("{filled_slots} block(s) were published.");
         info!("{empty_slots} slot(s) had no blocks.");
         info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
+        info!("{generated_ibs} IB(s) were generated, on average {} per slot", generated_ibs as f64 / (filled_slots + empty_slots) as f64);
 
         info!(
             "{} transaction(s) ({} byte(s)) did not reach a block.",

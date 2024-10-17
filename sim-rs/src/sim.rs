@@ -210,7 +210,7 @@ impl Simulation {
         let mut probability = self.config.ib_generation_probability;
         let mut block_counts = BTreeMap::new();
         while probability > 0.0 {
-            let next_p = probability % 1.0;
+            let next_p = f64::min(probability, 1.0);
             for (id, _) in self.run_vrf_lottery(next_p) {
                 *block_counts.entry(id).or_default() += 1;
             }
