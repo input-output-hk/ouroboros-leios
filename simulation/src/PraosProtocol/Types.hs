@@ -11,9 +11,9 @@ module PraosProtocol.Types (
   module Chain,
   module ConcreteBlock,
   module ProducerState,
-  ReadOnly,
+  ReadOnly (..),
   readReadOnlyTVar,
-  TakeOnly,
+  TakeOnly (..),
   takeTakeOnlyTMVar,
   tryTakeTakeOnlyTMVar,
 ) where
