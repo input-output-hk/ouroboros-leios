@@ -47,13 +47,8 @@ import qualified Network.TypedProtocol.Peer.Server as TS
 import Ouroboros.Network.AnchoredFragment (AnchoredFragment)
 import qualified Ouroboros.Network.AnchoredFragment as AF
 import qualified Ouroboros.Network.Block as OAPI
-import Ouroboros.Network.Mock.ConcreteBlock (
-  Block (Block),
-  BlockBody,
-  BlockHeader,
- )
 
-import PraosProtocol.Types (Block (blockHeader), BlockBodies, BlockHeaders, Chain, ChainProducerState (..), ReadOnly, blockPrevPoint, headPoint, headerPoint, intersectChains, readReadOnlyTVar, selectChain, toAnchoredFragment)
+import PraosProtocol.Types (Block (..), BlockBody, BlockHeader, Blocks, Chain, ChainProducerState (..), ReadOnly, blockPrevPoint, headPoint, headerPoint, intersectChains, readReadOnlyTVar, selectChain, toAnchoredFragment)
 
 type BlockId = OAPI.HeaderHash Block
 type Point = OAPI.Point Block
@@ -94,24 +89,21 @@ instance StateTokenI StDone where stateToken = SingStDone
 --------------------------------
 
 data BlockProducerState m = BlockProducerState
-  { blockHeadersVar :: ReadOnly (TVar m BlockHeaders) -- Shared, Read-Only.
-  , blockBodiesVar :: ReadOnly (TVar m BlockBodies) -- Shared, Read-Only.
+  { blocksVar :: ReadOnly (TVar m Blocks) -- Shared, Read-Only.
   }
 
 resolveRange :: MonadSTM m => BlockProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
 resolveRange st start end = do
-  headers <- readReadOnlyTVar st.blockHeadersVar
-  bodies <- readReadOnlyTVar st.blockBodiesVar
+  blocks <- readReadOnlyTVar st.blocksVar
   let resolveRangeAcc :: [BlockBody] -> Point -> Maybe [BlockBody]
       resolveRangeAcc acc p | start == p = Just acc
       resolveRangeAcc _acc OAPI.GenesisPoint = Nothing
       resolveRangeAcc acc p@(OAPI.BlockPoint pSlot pHash)
         | OAPI.pointSlot start > OAPI.pointSlot p = Nothing
         | otherwise = do
-            header <- Map.lookup pHash headers
-            guard $ OAPI.blockSlot header == pSlot
-            body <- Map.lookup pHash bodies
-            resolveRangeAcc (body : acc) =<< blockPrevPoint headers header
+            Block{..} <- Map.lookup pHash blocks
+            guard $ OAPI.blockSlot blockHeader == pSlot
+            resolveRangeAcc (blockBody : acc) =<< blockPrevPoint blocks blockHeader
   return $ reverse <$> resolveRangeAcc [] end
 
 blockProducer ::
@@ -243,7 +235,7 @@ data PeerStatus m = PeerStatus
   }
 
 data BlockControllerState m = BlockControllerState
-  { blockBodiesVar :: ReadOnly (TVar m BlockBodies) -- Shared, Read-Only.
+  { blocksVar :: ReadOnly (TVar m Blocks) -- Shared, Read-Only.
   , peers :: Map PeerId (PeerStatus m)
   , cpsVar :: ReadOnly (TVar m (ChainProducerState Block))
   }
@@ -261,8 +253,9 @@ blockFetchController BlockControllerState{..} = forever (atomically makeRequests
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
-    bodies <- readReadOnlyTVar blockBodiesVar
-    pure $ filterBR ((`Map.notMember` bodies) . OAPI.blockHash) (BlockRequest [fr])
+    blocks <- readReadOnlyTVar blocksVar
+    pure $ filterBR ((`Map.notMember` blocks) . OAPI.blockHash) (BlockRequest [fr])
+
   filterBR :: (BlockHeader -> Bool) -> BlockRequest -> BlockRequest
   filterBR p = BlockRequest . concatMap (AF.filter p) . (.blockRequestFragments)
   filterInFlight :: BlockRequest -> STM m BlockRequest
