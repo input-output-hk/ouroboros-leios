@@ -13,9 +13,11 @@ pub struct Network<T: HasBytesSize> {
 }
 
 impl<T: HasBytesSize> Network<T> {
-    pub fn new() -> Self {
+    pub fn new(timescale: u32) -> Self {
+        let mut config = netsim_async::SimConfiguration::default();
+        config.idle_duration /= timescale;
         Self {
-            context: SimContext::new(),
+            context: SimContext::with_config(config),
             id_lookup: IdLookup::default(),
         }
     }

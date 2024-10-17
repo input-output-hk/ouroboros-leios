@@ -90182,5 +90182,5 @@ scale = 1000.0
 
 [transaction_size_bytes]
 distribution = "log_normal"
-mu = 6.85
-sigma = 1.13
+mu = 6.833
+sigma = 1.127

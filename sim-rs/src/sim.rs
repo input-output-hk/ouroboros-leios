@@ -40,7 +40,7 @@ impl Simulation {
     pub fn new(config: SimConfiguration, tracker: EventTracker, clock: Clock) -> Result<Self> {
         let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
-        let mut network = Network::new();
+        let mut network = Network::new(config.timescale);
 
         let rng = ChaChaRng::seed_from_u64(config.seed);
         let mut nodes = BTreeMap::new();
@@ -379,9 +379,8 @@ impl Node {
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
-        for transaction in &block.transactions {
-            self.leios.mempool.remove(&transaction.id);
-        }
+        // Do not remove TXs in these blocks from the leios mempool.
+        // Wait until we learn more about how praos and leios interact.
         for peer in &self.peers {
             if !self
                 .praos
@@ -446,9 +445,8 @@ impl Node {
             .insert(block.slot, block.clone())
             .is_none()
         {
-            for transaction in &block.transactions {
-                self.leios.mempool.remove(&transaction.id);
-            }
+            // Do not remove TXs in these blocks from the leios mempool.
+            // Wait until we learn more about how praos and leios interact.
             let head = self.praos.peer_heads.entry(from).or_default();
             if *head < block.slot {
                 *head = block.slot
@@ -673,8 +671,7 @@ impl Node {
 
 fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> u64 {
     let ratio = stake as f64 / total_stake as f64;
-    let p_success = 1. - (1. - success_rate).powf(ratio);
-    (total_stake as f64 * p_success) as u64
+    (total_stake as f64 * ratio * success_rate) as u64
 }
 
 // wrapper struct which holds a SimulationEvent,

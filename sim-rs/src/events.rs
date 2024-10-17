@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 use anyhow::Result;
 use serde::Serialize;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{info, info_span, warn};
 
 use crate::{
     clock::{Clock, Timestamp},
@@ -151,13 +151,13 @@ impl EventMonitor {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut pending_tx_sizes: BTreeMap<TransactionId, u64> = BTreeMap::new();
+        let mut tx_ib_counts: BTreeMap<TransactionId, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
         let mut empty_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
-        let mut txs_in_ib = 0u64;
         let mut total_txs = 0u64;
 
         let mut output = vec![];
@@ -190,7 +190,9 @@ impl EventMonitor {
                 Event::BlockReceived { .. } => {}
                 Event::InputBlockGenerated { block } => {
                     generated_ibs += 1;
-                    txs_in_ib += block.transactions.len() as u64;
+                    for tx in &block.transactions {
+                        *tx_ib_counts.entry(tx.id).or_default() += 1;
+                    }
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {}",
                         block.header.producer,
@@ -202,36 +204,46 @@ impl EventMonitor {
             }
         }
 
-        info!("{filled_slots} block(s) were published.");
-        info!("{empty_slots} slot(s) had no blocks.");
-        info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
-        info!(
-            "{generated_ibs} IB(s) were generated, on average {} per slot.",
-            generated_ibs as f64 / (filled_slots + empty_slots) as f64
-        );
-        info!(
-            "Each transaction was included in an average of {} IBs.",
-            txs_in_ib as f64 / total_txs as f64
-        );
-        info!(
-            "Each IB contained an average of {} transactions.",
-            txs_in_ib as f64 / generated_ibs as f64
-        );
+        info_span!("praos").in_scope(|| {
+            info!("{filled_slots} block(s) were published.");
+            info!("{empty_slots} slot(s) had no blocks.");
+            info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
+            info!(
+                "{} transaction(s) ({} byte(s)) did not reach a block.",
+                pending_tx_sizes.len(),
+                pending_tx_sizes.into_values().sum::<u64>()
+            );
 
-        info!(
-            "{} transaction(s) ({} byte(s)) did not reach a block.",
-            pending_tx_sizes.len(),
-            pending_tx_sizes.into_values().sum::<u64>()
-        );
+            for id in self.pool_ids {
+                if let Some(published) = blocks_published.get(&id) {
+                    info!("Pool {id} published {published} block(s)");
+                }
+                if let Some(rejected) = blocks_rejected.get(&id) {
+                    info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
+                }
+            }
+        });
 
-        for id in self.pool_ids {
-            if let Some(published) = blocks_published.get(&id) {
-                info!("Pool {id} published {published} block(s)");
-            }
-            if let Some(rejected) = blocks_rejected.get(&id) {
-                info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
-            }
-        }
+        info_span!("leios").in_scope(|| {
+            let txs_in_ib: u64 = tx_ib_counts.values().copied().sum();
+            info!(
+                "{generated_ibs} IB(s) were generated, on average {} per slot.",
+                generated_ibs as f64 / (filled_slots + empty_slots) as f64
+            );
+            info!(
+                "{} out of {} transaction(s) reached an IB.",
+                tx_ib_counts.len(),
+                total_txs
+            );
+            info!(
+                "Each transaction was included in an average of {} IBs.",
+                txs_in_ib as f64 / total_txs as f64
+            );
+            info!(
+                "Each IB contained an average of {} transactions.",
+                txs_in_ib as f64 / generated_ibs as f64
+            );
+        });
 
         if let Some(path) = self.output_path {
             if let Some(parent) = path.parent() {
