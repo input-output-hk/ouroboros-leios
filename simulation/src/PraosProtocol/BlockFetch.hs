@@ -106,11 +106,11 @@ instance StateTokenI StDone where stateToken = SingStDone
 --- BlockFetch Server
 --------------------------------
 
-data BlockProducerState m = BlockProducerState
+data BlockFetchProducerState m = BlockFetchProducerState
   { blocksVar :: ReadOnly (TVar m Blocks)
   }
 
-resolveRange :: MonadSTM m => BlockProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
+resolveRange :: MonadSTM m => BlockFetchProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
   let resolveRangeAcc :: [BlockBody] -> Point -> Maybe [BlockBody]
@@ -124,12 +124,12 @@ resolveRange st start end = do
             resolveRangeAcc (blockBody : acc) =<< blockPrevPoint blocks blockHeader
   return $ reverse <$> resolveRangeAcc [] end
 
-blockProducer ::
+blockFetchProducer ::
   forall m.
   MonadSTM m =>
-  BlockProducerState m ->
+  BlockFetchProducerState m ->
   TS.Server BlockFetchState NonPipelined StIdle m ()
-blockProducer st = idle
+blockFetchProducer st = idle
  where
   idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
   idle = TS.Await $ \case
@@ -159,18 +159,18 @@ fragmentRange fr = (OAPI.castPoint $ AF.lastPoint fr, OAPI.castPoint $ AF.headPo
 blockRequestPoints :: BlockRequest -> [Point]
 blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AF.toOldestFirst) $ frs
 
-data BlockConsumerState m = BlockConsumerState
+data BlockFetchConsumerState m = BlockFetchConsumerState
   { blockRequestVar :: TVar m BlockRequest
   , addFetchedBlock :: Block -> m ()
   , removeInFlight :: [Point] -> m ()
   }
 
-blockConsumer ::
+blockFetchConsumer ::
   forall m.
   MonadSTM m =>
-  BlockConsumerState m ->
+  BlockFetchConsumerState m ->
   TC.Client BlockFetchState NonPipelined StIdle m ()
-blockConsumer st = idle
+blockFetchConsumer st = idle
  where
   -- does not support preemption of in-flight requests.
   blockRequest :: STM m (AnchoredFragment BlockHeader)
@@ -208,7 +208,7 @@ blockConsumer st = idle
               st.addFetchedBlock (Block header block)
               return (streaming range headers')
           )
-          (error "blockConsumer: invalid block") -- TODO
+          (error "blockFetchConsumer: invalid block") -- TODO
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
   ifValidBlockBody hdr bdy t f = do
@@ -267,15 +267,15 @@ data PeerStatus m = PeerStatus
 
 type PeerId = Int
 
-data BlockControllerState m = BlockControllerState
+data BlockFetchControllerState m = BlockFetchControllerState
   { blocksVar :: TVar m Blocks
   , selectedChainVar :: TVar m (Maybe MissingBlocksChain)
   , peers :: Map PeerId (PeerStatus m)
   , cpsVar :: TVar m (ChainProducerState Block)
   }
 
-blockFetchController :: forall m. MonadSTM m => BlockControllerState m -> m ()
-blockFetchController st@BlockControllerState{..} = forever (atomically makeRequests)
+blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
+blockFetchController st@BlockFetchControllerState{..} = forever (atomically makeRequests)
  where
   makeRequests :: STM m ()
   makeRequests = do
@@ -380,10 +380,10 @@ whenMissing (Right m) k = k m
 updateChains ::
   forall m.
   MonadSTM m =>
-  BlockControllerState m ->
+  BlockFetchControllerState m ->
   Either (Chain Block) MissingBlocksChain ->
   STM m ()
-updateChains BlockControllerState{..} e =
+updateChains BlockFetchControllerState{..} e =
   case e of
     Left fullChain -> do
       writeTVar selectedChainVar Nothing
@@ -392,16 +392,16 @@ updateChains BlockControllerState{..} e =
       writeTVar selectedChainVar (Just missingChain)
 
 -----------------------------------------------------------
----- Methods for blockConsumer and blockProducer
+---- Methods for blockFetchConsumer and blockFetchProducer
 -----------------------------------------------------------
 
-removeInFlight :: MonadSTM m => BlockControllerState m -> PeerId -> [Point] -> STM m ()
-removeInFlight BlockControllerState{..} pId points = do
+removeInFlight :: MonadSTM m => BlockFetchControllerState m -> PeerId -> [Point] -> STM m ()
+removeInFlight BlockFetchControllerState{..} pId points = do
   let peer = fromMaybe (error "missing peer") $ Map.lookup pId peers
   modifyTVar' peer.blocksInFlightVar (\s -> List.foldl' (flip Set.delete) s points)
 
 -- | Like @addBlock@ but also removes block from PeerId's in-flight set.
-addFetchedBlock :: MonadSTM m => BlockControllerState m -> PeerId -> Block -> STM m ()
+addFetchedBlock :: MonadSTM m => BlockFetchControllerState m -> PeerId -> Block -> STM m ()
 addFetchedBlock st pId blk = do
   removeInFlight st pId [OAPI.blockPoint blk]
   addBlock st blk
@@ -409,8 +409,8 @@ addFetchedBlock st pId blk = do
 -- | Adds validated block to the state.
 --   * adds block to blocksVar
 --   * fillBlocks on selectedChain, and @updateChains@
-addBlock :: MonadSTM m => BlockControllerState m -> Block -> STM m ()
-addBlock st@BlockControllerState{..} blk = do
+addBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
+addBlock st@BlockFetchControllerState{..} blk = do
   modifyTVar' blocksVar (Map.insert (OAPI.blockHash blk) blk)
 
   selected <- readTVar selectedChainVar
