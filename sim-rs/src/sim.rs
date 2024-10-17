@@ -1,37 +1,35 @@
 use std::{
-    cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     sync::Arc,
     time::Duration,
 };
 
 use anyhow::{bail, Context, Result};
-use futures::{stream::FuturesUnordered, StreamExt};
+use event_queue::EventQueue;
 use netsim_async::{EdgePolicy, HasBytesSize, Latency};
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_distr::Distribution as _;
-use tokio::select;
 
 use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{Block, InputBlock, InputBlockHeader, InputBlockId, Transaction, TransactionId},
-    network::{Network, NetworkSink, NetworkSource},
+    network::{Network, NetworkSink},
 };
+
+mod event_queue;
 
 pub struct Simulation {
     config: SimConfiguration,
     tracker: EventTracker,
-    clock: Clock,
     rng: ChaChaRng,
     network: Network<SimulationMessage>,
+    event_queue: EventQueue,
     nodes: BTreeMap<NodeId, Node>,
-    msg_sources: BTreeMap<NodeId, NetworkSource<SimulationMessage>>,
     next_tx_id: u64,
-    event_queue: BinaryHeap<FutureEvent>,
     unpublished_txs: VecDeque<Arc<Transaction>>,
     txs: BTreeMap<TransactionId, Arc<Transaction>>,
 }
@@ -44,7 +42,7 @@ impl Simulation {
 
         let rng = ChaChaRng::seed_from_u64(config.seed);
         let mut nodes = BTreeMap::new();
-        let mut msg_sources = BTreeMap::new();
+        let mut msg_sources = vec![];
         for node_config in &config.nodes {
             let id = node_config.id;
             let (msg_source, msg_sink) = network.open(id).context("could not open socket")?;
@@ -56,7 +54,7 @@ impl Simulation {
                 tracker.clone(),
                 clock.clone(),
             );
-            msg_sources.insert(node.id, msg_source);
+            msg_sources.push((node.id, msg_source));
             nodes.insert(node.id, node);
         }
         for link_config in config.links.iter() {
@@ -70,28 +68,25 @@ impl Simulation {
             )?;
         }
 
-        let mut sim = Self {
+        let mut event_queue = EventQueue::new(clock, msg_sources);
+        event_queue.queue_event(SimulationEvent::NewSlot(0), Duration::ZERO);
+        event_queue.queue_event(SimulationEvent::NewTransaction, Duration::ZERO);
+        Ok(Self {
             config,
             tracker,
-            clock,
             rng,
             network,
+            event_queue,
             nodes,
-            msg_sources,
             next_tx_id: 0,
-            event_queue: BinaryHeap::new(),
             unpublished_txs: VecDeque::new(),
             txs: BTreeMap::new(),
-        };
-        sim.queue_event(SimulationEvent::NewSlot(0), Duration::ZERO);
-        sim.queue_event(SimulationEvent::NewTransaction, Duration::ZERO);
-
-        Ok(sim)
+        })
     }
 
     // Run the simulation indefinitely.
     pub async fn run(&mut self) -> Result<()> {
-        while let Some(event) = self.next_event().await {
+        while let Some(event) = self.event_queue.next_event().await {
             match event {
                 SimulationEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
                 SimulationEvent::NewTransaction => self.generate_tx()?,
@@ -157,45 +152,12 @@ impl Simulation {
         self.network.shutdown()
     }
 
-    fn queue_event(&mut self, event: SimulationEvent, after: Duration) {
-        self.event_queue
-            .push(FutureEvent(self.clock.now() + after, event));
-    }
-
-    async fn next_event(&mut self) -> Option<SimulationEvent> {
-        let queued_event = self.event_queue.peek().cloned();
-
-        let clock = self.clock.clone();
-        let next_queued_event = async move {
-            let FutureEvent(timestamp, event) = queued_event?;
-            clock.wait_until(timestamp).await;
-            Some(event)
-        };
-
-        let mut next_incoming_message = FuturesUnordered::new();
-        for (id, source) in self.msg_sources.iter_mut() {
-            next_incoming_message.push(async move {
-                let (from, msg) = source.recv().await?;
-                Some(SimulationEvent::NetworkMessage { from, to: *id, msg })
-            });
-        }
-
-        select! {
-            biased; // always poll the "next queued event" future first
-            Some(event) = next_queued_event => {
-                self.event_queue.pop();
-                Some(event)
-            }
-            Some(Some(event)) = next_incoming_message.next() => Some(event),
-            else => None
-        }
-    }
-
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
         self.handle_input_block_generation(slot)?;
         self.try_generate_praos_block(slot)?;
 
-        self.queue_event(SimulationEvent::NewSlot(slot + 1), Duration::from_secs(1));
+        self.event_queue
+            .queue_event(SimulationEvent::NewSlot(slot + 1), Duration::from_secs(1));
         Ok(())
     }
 
@@ -288,7 +250,7 @@ impl Simulation {
 
         self.next_tx_id += 1;
         let ms_until_tx = self.config.transaction_frequency_ms.sample(&mut self.rng) as u64;
-        self.queue_event(
+        self.event_queue.queue_event(
             SimulationEvent::NewTransaction,
             Duration::from_millis(ms_until_tx),
         );
@@ -674,34 +636,7 @@ fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> 
     (total_stake as f64 * ratio * success_rate) as u64
 }
 
-// wrapper struct which holds a SimulationEvent,
-// but is ordered by a timestamp (in reverse)
-#[derive(Clone)]
-struct FutureEvent(Timestamp, SimulationEvent);
-impl FutureEvent {
-    fn key(&self) -> Reverse<Timestamp> {
-        Reverse(self.0)
-    }
-}
-
-impl PartialEq for FutureEvent {
-    fn eq(&self, other: &Self) -> bool {
-        self.key() == other.key()
-    }
-}
-impl Eq for FutureEvent {}
-impl PartialOrd for FutureEvent {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for FutureEvent {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.key().cmp(&other.key())
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum SimulationEvent {
     NewSlot(u64),
     NewTransaction,
@@ -712,7 +647,7 @@ enum SimulationEvent {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum SimulationMessage {
     // tx "propagation"
     AnnounceTx(TransactionId),

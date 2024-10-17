@@ -121,6 +121,7 @@ impl EventTracker {
 }
 
 pub struct EventMonitor {
+    node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
@@ -132,6 +133,7 @@ impl EventMonitor {
         events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
     ) -> Self {
+        let node_ids = config.nodes.iter().map(|p| p.id).collect();
         let pool_ids = config
             .nodes
             .iter()
@@ -139,6 +141,7 @@ impl EventMonitor {
             .map(|p| p.id)
             .collect();
         Self {
+            node_ids,
             pool_ids,
             events_source,
             output_path,
@@ -152,6 +155,7 @@ impl EventMonitor {
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut pending_tx_sizes: BTreeMap<TransactionId, u64> = BTreeMap::new();
         let mut tx_ib_counts: BTreeMap<TransactionId, u64> = BTreeMap::new();
+        let mut seen_ibs: BTreeMap<NodeId, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
         let mut empty_slots = 0u64;
@@ -193,6 +197,7 @@ impl EventMonitor {
                     for tx in &block.transactions {
                         *tx_ib_counts.entry(tx.id).or_default() += 1;
                     }
+                    *seen_ibs.entry(block.header.producer).or_default() += 1;
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {}",
                         block.header.producer,
@@ -200,7 +205,9 @@ impl EventMonitor {
                         block.header.slot,
                     )
                 }
-                Event::InputBlockReceived { .. } => {}
+                Event::InputBlockReceived { recipient, .. } => {
+                    *seen_ibs.entry(recipient).or_default() += 1;
+                }
             }
         }
 
@@ -226,6 +233,12 @@ impl EventMonitor {
 
         info_span!("leios").in_scope(|| {
             let txs_in_ib: u64 = tx_ib_counts.values().copied().sum();
+            let avg_seen = self
+                .node_ids
+                .iter()
+                .map(|id| seen_ibs.get(id).copied().unwrap_or_default() as f64)
+                .sum::<f64>()
+                / self.node_ids.len() as f64;
             info!(
                 "{generated_ibs} IB(s) were generated, on average {} per slot.",
                 generated_ibs as f64 / (filled_slots + empty_slots) as f64
@@ -243,6 +256,7 @@ impl EventMonitor {
                 "Each IB contained an average of {} transactions.",
                 txs_in_ib as f64 / generated_ibs as f64
             );
+            info!("Each node received an average of {avg_seen} IBs.");
         });
 
         if let Some(path) = self.output_path {

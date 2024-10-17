@@ -21,7 +21,7 @@ macro_rules! id_wrapper {
     };
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Block {
     pub slot: u64,
     pub producer: NodeId,

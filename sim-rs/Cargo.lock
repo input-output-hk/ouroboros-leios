@@ -73,6 +73,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 
 [[package]]
+name = "async-stream"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -440,7 +462,7 @@ dependencies = [
 [[package]]
 name = "netsim-async"
 version = "0.1.0"
-source = "git+https://github.com/SupernaviX/ce-netsim.git?rev=8569a6f#8569a6f01f2e9b65898e2255c73b5d8604cff6e5"
+source = "git+https://github.com/input-output-hk/ce-netsim.git?rev=f4feba6#f4feba657021459690118b2874f9fed809a2dc4a"
 dependencies = [
  "anyhow",
  "netsim-core",
@@ -450,7 +472,7 @@ dependencies = [
 [[package]]
 name = "netsim-core"
 version = "0.1.0"
-source = "git+https://github.com/SupernaviX/ce-netsim.git?rev=8569a6f#8569a6f01f2e9b65898e2255c73b5d8604cff6e5"
+source = "git+https://github.com/input-output-hk/ce-netsim.git?rev=f4feba6#f4feba657021459690118b2874f9fed809a2dc4a"
 dependencies = [
  "anyhow",
  "logos",
@@ -719,6 +741,7 @@ name = "sim-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "clap",
  "ctrlc",
  "futures",
