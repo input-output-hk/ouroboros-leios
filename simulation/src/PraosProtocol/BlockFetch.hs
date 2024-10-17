@@ -22,7 +22,7 @@ import Control.Concurrent.Class.MonadSTM (
     STM,
     TVar,
     atomically,
-    modifyTVar,
+    modifyTVar',
     readTVar,
     retry,
     writeTVar
@@ -33,7 +33,6 @@ import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Network.TypedProtocol (
@@ -196,22 +195,22 @@ longestChainSelection ::
   , OAPI.HeaderHash block ~ OAPI.HeaderHash header
   , MonadSTM m
   ) =>
-  [(PeerId, ReadOnly (TVar m (Maybe (Chain header))))] ->
+  [(PeerId, ReadOnly (TVar m (Chain header)))] ->
   ReadOnly (TVar m (ChainProducerState block)) ->
   (block -> header) ->
   STM m (Maybe (PeerId, AnchoredFragment header))
 longestChainSelection candidateChainVars cpsVar getHeader = do
-  candidateChains <- mapM (\(pId, v) -> fmap (pId,) <$> readReadOnlyTVar v) candidateChainVars
+  candidateChains <- mapM (\(pId, v) -> (pId,) <$> readReadOnlyTVar v) candidateChainVars
   cps <- readReadOnlyTVar cpsVar
   let
     chain = fmap getHeader cps.chainState
-    -- using foldl' since @selectChain@ is left biased
     aux (mpId, c1) (pId, c2) =
       let c = selectChain c1 c2
        in if headPoint c == headPoint c1
             then (mpId, c1)
             else (Just pId, c2)
-    (selectedPeer, chain') = List.foldl' aux (Nothing, chain) (catMaybes candidateChains)
+    -- using foldl' since @selectChain@ is left biased
+    (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
   return $ do
     peerId <- selectedPeer
     let af = toAnchoredFragment chain'
@@ -231,7 +230,7 @@ type PeerId = Int
 data PeerStatus m = PeerStatus
   { blockRequestVar :: TVar m BlockRequest
   , blocksInFlightVar :: TVar m (Set Point)
-  , peerChainVar :: ReadOnly (TVar m (Maybe (Chain BlockHeader)))
+  , peerChainVar :: ReadOnly (TVar m (Chain BlockHeader))
   }
 
 data BlockControllerState m = BlockControllerState
@@ -258,16 +257,18 @@ blockFetchController BlockControllerState{..} = forever (atomically makeRequests
 
   filterBR :: (BlockHeader -> Bool) -> BlockRequest -> BlockRequest
   filterBR p = BlockRequest . concatMap (AF.filter p) . (.blockRequestFragments)
+
   filterInFlight :: BlockRequest -> STM m BlockRequest
   filterInFlight br = do
     in_flights <- forM (Map.elems peers) $ \peer -> do
       readTVar peer.blocksInFlightVar
     pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
+
   addRequest :: PeerId -> BlockRequest -> STM m ()
   addRequest _pId (BlockRequest []) = retry
   addRequest pId br = do
     case Map.lookup pId peers of
       Nothing -> error "addRequest: no such peer"
       Just PeerStatus{..} -> do
-        modifyTVar blocksInFlightVar (`Set.union` Set.fromList (blockRequestPoints br))
-        modifyTVar blockRequestVar (<> br)
+        modifyTVar' blocksInFlightVar (`Set.union` Set.fromList (blockRequestPoints br))
+        modifyTVar' blockRequestVar (<> br)
