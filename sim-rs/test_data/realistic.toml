@@ -1,5 +1,8 @@
 block_generation_probability = 0.05
+ib_generation_probability = 5.0
 max_block_size = 90112
+max_ib_requests_per_peer = 1
+max_ib_size = 327680
 max_tx_size = 16384
 
 [[nodes]]
@@ -90179,5 +90182,5 @@ scale = 1000.0
 
 [transaction_size_bytes]
 distribution = "log_normal"
-mu = 6.85
-sigma = 1.13
+mu = 6.833
+sigma = 1.127

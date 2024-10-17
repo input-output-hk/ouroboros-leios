@@ -6,7 +6,7 @@ use std::{
 use serde::Serialize;
 use tokio::time::{self, Sleep};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Timestamp(Duration);
 impl Add<Duration> for Timestamp {
     type Output = Timestamp;

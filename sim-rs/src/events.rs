@@ -3,14 +3,19 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
 use anyhow::Result;
 use serde::Serialize;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{info, info_span, warn};
 
 use crate::{
     clock::{Clock, Timestamp},
     config::{NodeId, SimConfiguration},
+    model::{Block, InputBlock, Transaction, TransactionId},
 };
 
 pub enum Event {
+    Transaction {
+        id: TransactionId,
+        bytes: u64,
+    },
     Slot {
         number: u64,
         block: Option<Block>,
@@ -20,35 +25,25 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
-    Transaction {
-        id: u64,
-        bytes: u64,
+    InputBlockGenerated {
+        block: Arc<InputBlock>,
     },
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Block {
-    pub slot: u64,
-    pub publisher: NodeId,
-    pub conflicts: Vec<NodeId>,
-    pub transactions: Vec<Arc<Transaction>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Transaction {
-    pub id: u64,
-    pub bytes: u64,
+    InputBlockReceived {
+        block: Arc<InputBlock>,
+        sender: NodeId,
+        recipient: NodeId,
+    },
 }
 
 #[derive(Clone, Serialize)]
 enum OutputEvent {
-    BlockGenerated {
+    PraosBlockGenerated {
         time: Timestamp,
         slot: u64,
-        publisher: NodeId,
-        transactions: Vec<u64>,
+        producer: NodeId,
+        transactions: Vec<TransactionId>,
     },
-    BlockReceived {
+    PraosBlockReceived {
         time: Timestamp,
         slot: u64,
         sender: NodeId,
@@ -56,8 +51,23 @@ enum OutputEvent {
     },
     TransactionCreated {
         time: Timestamp,
-        id: u64,
+        id: TransactionId,
         bytes: u64,
+    },
+    InputBlockGenerated {
+        time: Timestamp,
+        slot: u64,
+        producer: NodeId,
+        index: u64,
+        transactions: Vec<TransactionId>,
+    },
+    InputBlockReceived {
+        time: Timestamp,
+        slot: u64,
+        producer: NodeId,
+        index: u64,
+        sender: NodeId,
+        recipient: NodeId,
     },
 }
 
@@ -91,6 +101,18 @@ impl EventTracker {
         });
     }
 
+    pub fn track_ib_generated(&self, block: Arc<InputBlock>) {
+        self.send(Event::InputBlockGenerated { block });
+    }
+
+    pub fn track_ib_received(&self, block: Arc<InputBlock>, sender: NodeId, recipient: NodeId) {
+        self.send(Event::InputBlockReceived {
+            block,
+            sender,
+            recipient,
+        });
+    }
+
     fn send(&self, event: Event) {
         if self.sender.send((event, self.clock.now())).is_err() {
             warn!("tried sending event after aggregator finished");
@@ -99,6 +121,7 @@ impl EventTracker {
 }
 
 pub struct EventMonitor {
+    node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
@@ -110,6 +133,7 @@ impl EventMonitor {
         events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
     ) -> Self {
+        let node_ids = config.nodes.iter().map(|p| p.id).collect();
         let pool_ids = config
             .nodes
             .iter()
@@ -117,6 +141,7 @@ impl EventMonitor {
             .map(|p| p.id)
             .collect();
         Self {
+            node_ids,
             pool_ids,
             events_source,
             output_path,
@@ -128,30 +153,35 @@ impl EventMonitor {
     pub async fn run(mut self) -> Result<()> {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
-        let mut pending_tx_sizes: BTreeMap<u64, u64> = BTreeMap::new();
+        let mut pending_tx_sizes: BTreeMap<TransactionId, u64> = BTreeMap::new();
+        let mut tx_ib_counts: BTreeMap<TransactionId, u64> = BTreeMap::new();
+        let mut seen_ibs: BTreeMap<NodeId, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
         let mut empty_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
+        let mut generated_ibs = 0u64;
+        let mut total_txs = 0u64;
 
         let mut output = vec![];
         while let Some((event, timestamp)) = self.events_source.recv().await {
             self.compute_output_events(&mut output, &event, timestamp);
             match event {
+                Event::Transaction { id, bytes } => {
+                    total_txs += 1;
+                    pending_tx_sizes.insert(id, bytes);
+                }
                 Event::Slot { number, block } => {
                     if let Some(block) = block {
-                        info!(
-                            "Pool {} published a block in slot {number}.",
-                            block.publisher
-                        );
+                        info!("Pool {} produced a block in slot {number}.", block.producer);
                         filled_slots += 1;
                         for published_tx in block.transactions {
                             published_txs += 1;
                             published_bytes += published_tx.bytes;
                             pending_tx_sizes.remove(&published_tx.id);
                         }
-                        *blocks_published.entry(block.publisher).or_default() += 1;
+                        *blocks_published.entry(block.producer).or_default() += 1;
 
                         for conflict in block.conflicts {
                             *blocks_rejected.entry(conflict).or_default() += 1;
@@ -162,30 +192,72 @@ impl EventMonitor {
                     }
                 }
                 Event::BlockReceived { .. } => {}
-                Event::Transaction { id, bytes } => {
-                    pending_tx_sizes.insert(id, bytes);
+                Event::InputBlockGenerated { block } => {
+                    generated_ibs += 1;
+                    for tx in &block.transactions {
+                        *tx_ib_counts.entry(tx.id).or_default() += 1;
+                    }
+                    *seen_ibs.entry(block.header.producer).or_default() += 1;
+                    info!(
+                        "Pool {} generated an IB with {} transaction(s) in slot {}",
+                        block.header.producer,
+                        block.transactions.len(),
+                        block.header.slot,
+                    )
+                }
+                Event::InputBlockReceived { recipient, .. } => {
+                    *seen_ibs.entry(recipient).or_default() += 1;
                 }
             }
         }
 
-        info!("{filled_slots} block(s) were published.");
-        info!("{empty_slots} slot(s) had no blocks.");
-        info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
+        info_span!("praos").in_scope(|| {
+            info!("{filled_slots} block(s) were published.");
+            info!("{empty_slots} slot(s) had no blocks.");
+            info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
+            info!(
+                "{} transaction(s) ({} byte(s)) did not reach a block.",
+                pending_tx_sizes.len(),
+                pending_tx_sizes.into_values().sum::<u64>()
+            );
 
-        info!(
-            "{} transaction(s) ({} byte(s)) did not reach a block.",
-            pending_tx_sizes.len(),
-            pending_tx_sizes.into_values().sum::<u64>()
-        );
+            for id in self.pool_ids {
+                if let Some(published) = blocks_published.get(&id) {
+                    info!("Pool {id} published {published} block(s)");
+                }
+                if let Some(rejected) = blocks_rejected.get(&id) {
+                    info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
+                }
+            }
+        });
 
-        for id in self.pool_ids {
-            if let Some(published) = blocks_published.get(&id) {
-                info!("Pool {id} published {published} block(s)");
-            }
-            if let Some(rejected) = blocks_rejected.get(&id) {
-                info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
-            }
-        }
+        info_span!("leios").in_scope(|| {
+            let txs_in_ib: u64 = tx_ib_counts.values().copied().sum();
+            let avg_seen = self
+                .node_ids
+                .iter()
+                .map(|id| seen_ibs.get(id).copied().unwrap_or_default() as f64)
+                .sum::<f64>()
+                / self.node_ids.len() as f64;
+            info!(
+                "{generated_ibs} IB(s) were generated, on average {} per slot.",
+                generated_ibs as f64 / (filled_slots + empty_slots) as f64
+            );
+            info!(
+                "{} out of {} transaction(s) reached an IB.",
+                tx_ib_counts.len(),
+                total_txs
+            );
+            info!(
+                "Each transaction was included in an average of {} IBs.",
+                txs_in_ib as f64 / total_txs as f64
+            );
+            info!(
+                "Each IB contained an average of {} transactions.",
+                txs_in_ib as f64 / generated_ibs as f64
+            );
+            info!("Each node received an average of {avg_seen} IBs.");
+        });
 
         if let Some(path) = self.output_path {
             if let Some(parent) = path.parent() {
@@ -200,10 +272,10 @@ impl EventMonitor {
         match event {
             Event::Slot { number, block } => {
                 if let Some(block) = block {
-                    output.push(OutputEvent::BlockGenerated {
+                    output.push(OutputEvent::PraosBlockGenerated {
                         time,
                         slot: *number,
-                        publisher: block.publisher,
+                        producer: block.producer,
                         transactions: block.transactions.iter().map(|t| t.id).collect(),
                     });
                 }
@@ -220,9 +292,32 @@ impl EventMonitor {
                 sender,
                 recipient,
             } => {
-                output.push(OutputEvent::BlockReceived {
+                output.push(OutputEvent::PraosBlockReceived {
                     time,
                     slot: *slot,
+                    sender: *sender,
+                    recipient: *recipient,
+                });
+            }
+            Event::InputBlockGenerated { block } => {
+                output.push(OutputEvent::InputBlockGenerated {
+                    time,
+                    slot: block.header.slot,
+                    producer: block.header.producer,
+                    index: block.header.index,
+                    transactions: block.transactions.iter().map(|t| t.id).collect(),
+                });
+            }
+            Event::InputBlockReceived {
+                block,
+                sender,
+                recipient,
+            } => {
+                output.push(OutputEvent::InputBlockReceived {
+                    time,
+                    slot: block.header.slot,
+                    producer: block.header.producer,
+                    index: block.header.index,
                     sender: *sender,
                     recipient: *recipient,
                 });

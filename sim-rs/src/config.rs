@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct NodeId(usize);
 impl Display for NodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -50,8 +50,11 @@ struct RawConfig {
     nodes: Vec<RawNodeConfig>,
     links: Vec<RawLinkConfig>,
     block_generation_probability: f64,
+    ib_generation_probability: f64,
     max_block_size: u64,
     max_tx_size: u64,
+    max_ib_size: u64,
+    max_ib_requests_per_peer: usize,
     transaction_frequency_ms: DistributionConfig,
     transaction_size_bytes: DistributionConfig,
 }
@@ -75,8 +78,11 @@ pub struct SimConfiguration {
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub block_generation_probability: f64,
+    pub ib_generation_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
+    pub max_ib_size: u64,
+    pub max_ib_requests_per_peer: usize,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }
@@ -126,8 +132,11 @@ impl From<RawConfig> for SimConfiguration {
             nodes,
             links,
             block_generation_probability: value.block_generation_probability,
+            ib_generation_probability: value.ib_generation_probability,
             max_block_size: value.max_block_size,
             max_tx_size: value.max_tx_size,
+            max_ib_size: value.max_ib_size,
+            max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }

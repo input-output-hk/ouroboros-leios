@@ -39,8 +39,17 @@ links = [
     { nodes = [10, 11] },
     { nodes = [11, 12] },
 ]
+
+# transaction parameters
+transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
+transaction_size_bytes = { distribution = "log_normal", mu = 6.833, sigma = 1.127 }
+max_tx_size = 16384
+
+# praos block generation parameters
 block_generation_probability = 0.05
 max_block_size = 90112
-max_tx_size = 16384
-transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
-transaction_size_bytes = { distribution = "log_normal", mu = 6.85, sigma = 1.13 }
+
+# IB parameters
+ib_generation_probability = 0.5 # corresponds to 𝑓I in the model
+max_ib_size = 327680
+max_ib_requests_per_peer = 1
