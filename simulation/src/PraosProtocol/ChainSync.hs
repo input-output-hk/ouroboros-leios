@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module PraosProtocol.ChainSync where
 
@@ -14,6 +15,7 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Control.Exception (assert)
 import Data.Maybe (fromMaybe)
+import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -41,6 +43,23 @@ data SingChainSyncState (st :: ChainSyncState) where
   SingStMustReply :: SingChainSyncState StMustReply
   SingStIntersect :: SingChainSyncState StIntersect
   SingStDone :: SingChainSyncState StDone
+
+decideSingChainSyncState ::
+  SingChainSyncState st ->
+  SingChainSyncState st' ->
+  Maybe (st :~: st')
+decideSingChainSyncState SingStIdle SingStIdle = Just Refl
+decideSingChainSyncState SingStCanAwait SingStCanAwait = Just Refl
+decideSingChainSyncState SingStMustReply SingStMustReply = Just Refl
+decideSingChainSyncState SingStIntersect SingStIntersect = Just Refl
+decideSingChainSyncState SingStDone SingStDone = Just Refl
+decideSingChainSyncState _ _ = Nothing
+
+decideChainSyncState ::
+  forall (st :: ChainSyncState) (st' :: ChainSyncState).
+  (StateTokenI st, StateTokenI st') =>
+  Maybe (st :~: st')
+decideChainSyncState = decideSingChainSyncState stateToken stateToken
 
 instance Protocol ChainSyncState where
   data Message ChainSyncState from to where

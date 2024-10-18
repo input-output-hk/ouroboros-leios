@@ -39,6 +39,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -87,14 +88,39 @@ data SingBlockFetchState (st :: BlockFetchState) where
   SingStStreaming :: SingBlockFetchState StStreaming
   SingStDone :: SingBlockFetchState StDone
 
+decideSingBlockFetchState ::
+  SingBlockFetchState st ->
+  SingBlockFetchState st' ->
+  Maybe (st :~: st')
+decideSingBlockFetchState SingStIdle SingStIdle = Just Refl
+decideSingBlockFetchState SingStBusy SingStBusy = Just Refl
+decideSingBlockFetchState SingStStreaming SingStStreaming = Just Refl
+decideSingBlockFetchState SingStDone SingStDone = Just Refl
+decideSingBlockFetchState _ _ = Nothing
+
+decideBlockFetchState ::
+  forall (st :: BlockFetchState) (st' :: BlockFetchState).
+  (StateTokenI st, StateTokenI st') =>
+  Maybe (st :~: st')
+decideBlockFetchState = decideSingBlockFetchState stateToken stateToken
+
 instance Protocol BlockFetchState where
   data Message BlockFetchState from to where
-    MsgRequestRange :: Point -> Point -> Message BlockFetchState StIdle StBusy
-    MsgNoBlocks :: Message BlockFetchState StBusy StIdle
-    MsgStartBatch :: Message BlockFetchState StBusy StStreaming
-    MsgBlock :: BlockBody -> Message BlockFetchState StStreaming StStreaming
-    MsgBatchDone :: Message BlockFetchState StStreaming StIdle
-    MsgClientDone :: Message BlockFetchState StIdle StDone
+    MsgRequestRange ::
+      Point ->
+      Point ->
+      Message BlockFetchState StIdle StBusy
+    MsgNoBlocks ::
+      Message BlockFetchState StBusy StIdle
+    MsgStartBatch ::
+      Message BlockFetchState StBusy StStreaming
+    MsgBlock ::
+      BlockBody ->
+      Message BlockFetchState StStreaming StStreaming
+    MsgBatchDone ::
+      Message BlockFetchState StStreaming StIdle
+    MsgClientDone ::
+      Message BlockFetchState StIdle StDone
   type StateAgency StIdle = ClientAgency
   type StateAgency StBusy = ServerAgency
   type StateAgency StStreaming = ServerAgency
