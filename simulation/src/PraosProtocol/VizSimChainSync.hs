@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -75,7 +77,7 @@ examplesRelaySimVizConfig =
   testPtclMessageText ::
     ChainSyncMessage ->
     Maybe String
-  testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ take 15 $ show msg
+  testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ chainSyncMessageLabel msg
 
 ------------------------------------------------------------------------------
 -- The vizualisation model

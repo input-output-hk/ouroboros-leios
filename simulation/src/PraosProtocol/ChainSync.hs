@@ -103,6 +103,19 @@ instance Protocol ChainSyncState where
 
 deriving instance Show (Message ChainSyncState from to)
 
+chainSyncMessageLabel :: Message ChainSyncState st st' -> String
+chainSyncMessageLabel = \case
+  MsgRequestNext -> "MsgRequestNext"
+  MsgAwaitReply -> "MsgAwaitReply"
+  MsgRollForward_StCanAwait _ _ -> "MsgRollForward"
+  MsgRollBackward_StCanAwait _ _ -> "MsgRollBackward"
+  MsgRollForward_StMustReply _ _ -> "MsgRollForward"
+  MsgRollBackward_StMustReply _ _ -> "MsgRollBackward"
+  MsgFindIntersect _ -> "MsgFindIntersect"
+  MsgIntersectFound _ _ -> "MsgIntersectFound"
+  MsgIntersectNotFound _ -> "MsgIntersectNotFound"
+  MsgDone -> "MsgDone"
+
 instance StateTokenI StIdle where stateToken = SingStIdle
 instance StateTokenI StCanAwait where stateToken = SingStCanAwait
 instance StateTokenI StMustReply where stateToken = SingStMustReply
