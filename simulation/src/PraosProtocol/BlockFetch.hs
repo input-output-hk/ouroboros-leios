@@ -30,11 +30,13 @@ import Control.Concurrent.Class.MonadSTM (
     writeTVar
   ),
  )
+import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, replicateM, (<=<))
 import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Network.TypedProtocol (
@@ -48,9 +50,8 @@ import qualified Network.TypedProtocol.Peer.Server as TS
 import Ouroboros.Network.AnchoredFragment (AnchoredFragment, anchorPoint)
 import qualified Ouroboros.Network.AnchoredFragment as AF
 import qualified Ouroboros.Network.Block as OAPI
-
-import Data.Maybe (fromMaybe)
 import Ouroboros.Network.Mock.ConcreteBlock (BlockHeader (..), hashBody)
+import qualified Ouroboros.Network.Mock.ProducerState as CPS
 import PraosProtocol.Types (
   Block (..),
   BlockBody,
@@ -68,6 +69,7 @@ import PraosProtocol.Types (
   selectChain,
   switchFork,
   toAnchoredFragment,
+  validExtension,
  )
 
 type BlockId = OAPI.HeaderHash Block
@@ -430,21 +432,29 @@ removeInFlight BlockFetchControllerState{..} pId points = do
   let peer = fromMaybe (error "missing peer") $ Map.lookup pId peers
   modifyTVar' peer.blocksInFlightVar (\s -> List.foldl' (flip Set.delete) s points)
 
--- | Like @addBlock@ but also removes block from PeerId's in-flight set.
+-- | Adds validated block to the state.
+--   * removes block from PeerId's in-flight set
+--   * adds block to blocksVar
+--   * @fillInBlocks@ on @selectedChain@, and @updateChains@
 addFetchedBlock :: MonadSTM m => BlockFetchControllerState m -> PeerId -> Block -> STM m ()
 addFetchedBlock st pId blk = do
   removeInFlight st pId [OAPI.blockPoint blk]
-  addBlock st blk
+  modifyTVar' st.blocksVar (Map.insert (OAPI.blockHash blk) blk)
 
--- | Adds validated block to the state.
---   * adds block to blocksVar
---   * fillBlocks on selectedChain, and @updateChains@
-addBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
-addBlock st@BlockFetchControllerState{..} blk = do
-  modifyTVar' blocksVar (Map.insert (OAPI.blockHash blk) blk)
-
-  selected <- readTVar targetChainVar
+  selected <- readTVar st.targetChainVar
   case selected of
     Nothing -> return () -- I suppose we do not need this block anymore.
     Just missingChain -> do
-      updateChains st =<< fillInBlocks <$> readTVar blocksVar <*> pure missingChain
+      updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
+
+addProducedBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
+addProducedBlock BlockFetchControllerState{..} blk = do
+  cps <- readTVar cpsVar
+  assert (validExtension (cps.chainState) blk) $ do
+    writeTVar cpsVar $! CPS.addBlock blk cps
+    modifyTVar' blocksVar (Map.insert (OAPI.blockHash blk) blk)
+
+    -- We reset the target chain because ours might be longest now:
+    -- the controller will wake up and decide, and we do not want to
+    -- switch to the target chain before that.
+    writeTVar targetChainVar Nothing
