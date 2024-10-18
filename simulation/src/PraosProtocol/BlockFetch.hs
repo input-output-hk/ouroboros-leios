@@ -136,7 +136,7 @@ blockFetchProducer st = idle
   idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
   idle = TS.Await $ \case
     MsgRequestRange start end -> TS.Effect $ atomically $ do
-      mblocks <- resolveRange st start end
+      mblocks <- resolveRange st start end -- Note: we could just look at current chain.
       case mblocks of
         Nothing -> return $ TS.Yield MsgNoBlocks idle
         Just blocks -> return $ TS.Yield MsgStartBatch (streaming blocks)
@@ -269,9 +269,10 @@ data PeerStatus m = PeerStatus
 
 type PeerId = Int
 
+-- | invariant: blocksVar contains all blocks of cpsVar
 data BlockFetchControllerState m = BlockFetchControllerState
   { blocksVar :: TVar m Blocks
-  , selectedChainVar :: TVar m (Maybe MissingBlocksChain)
+  , selectedChainVar :: TVar m (Maybe MissingBlocksChain) -- target chain
   , peers :: Map PeerId (PeerStatus m)
   , cpsVar :: TVar m (ChainProducerState Block)
   }
@@ -434,4 +435,5 @@ addBlock st@BlockFetchControllerState{..} blk = do
   case selected of
     Nothing -> return () -- I suppose we do not need this block anymore.
     Just missingChain -> do
+      -- TODO: switch to target as soon as it's better than current chain.
       updateChains st =<< fillInBlocks <$> readTVar blocksVar <*> pure missingChain
