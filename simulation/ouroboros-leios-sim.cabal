@@ -33,8 +33,8 @@ library
     P2P
     PlotTCP
     PraosProtocol
-    PraosProtocol.BlockGeneration
     PraosProtocol.BlockFetch
+    PraosProtocol.BlockGeneration
     PraosProtocol.ChainSync
     PraosProtocol.SimChainSync
     PraosProtocol.Types
@@ -86,7 +86,7 @@ library
   default-language: Haskell2010
   ghc-options:      -Wall -fno-ignore-asserts
 
-executable ouroboros-net-vis
+executable viz
   main-is:          src/Main.hs
   build-depends:
     , base
