@@ -20,8 +20,8 @@ import Network.TypedProtocol
 data ProtocolMessage ps where
   ProtocolMessage :: forall ps (st :: ps). SomeMessage st -> ProtocolMessage ps
 
-instance Show (ProtocolMessage ps) where
-  show _ = "TODO"
+instance forall ps. (forall st st'. Show (Message ps st st')) => Show (ProtocolMessage ps) where
+  show (ProtocolMessage (SomeMessage msg)) = show msg
 
 instance forall ps. (forall st st'. MessageSize (Message ps st st')) => MessageSize (ProtocolMessage ps) where
   messageSizeBytes (ProtocolMessage (SomeMessage msg)) = messageSizeBytes msg
