@@ -24,12 +24,13 @@ import Control.Concurrent.Class.MonadSTM (
     TVar,
     atomically,
     modifyTVar',
+    newTVar,
     readTVar,
     retry,
     writeTVar
   ),
  )
-import Control.Monad (forM, forever, guard, (<=<))
+import Control.Monad (forM, forever, guard, replicateM, (<=<))
 import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -61,6 +62,7 @@ import PraosProtocol.Types (
   fromAnchoredFragment,
   headPoint,
   headerPoint,
+  initChainProducerState,
   intersectChains,
   readReadOnlyTVar,
   selectChain,
@@ -273,6 +275,21 @@ data BlockFetchControllerState m = BlockFetchControllerState
   , peers :: Map PeerId (PeerStatus m)
   , cpsVar :: TVar m (ChainProducerState Block)
   }
+
+-- NOTE: The ChainProducerState is initalized with no followers.
+initBlockFetchControllerState :: MonadSTM m => [PeerId] -> m (BlockFetchControllerState m)
+initBlockFetchControllerState peerIds = atomically $ do
+  blocksVar <- newTVar Map.empty
+  selectedChainVar <- newTVar Nothing
+  peers <- Map.fromList . zip peerIds <$> replicateM (length peerIds) initPeerStatus
+  cpsVar <- newTVar $ initChainProducerState Genesis
+  return BlockFetchControllerState{..}
+ where
+  initPeerStatus = do
+    blockRequestVar <- newTVar (BlockRequest [])
+    blocksInFlightVar <- newTVar Set.empty
+    peerChainVar <- ReadOnly <$> newTVar Genesis
+    return PeerStatus{..}
 
 blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
 blockFetchController st@BlockFetchControllerState{..} = forever (atomically makeRequests)
