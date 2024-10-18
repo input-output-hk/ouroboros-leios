@@ -42,6 +42,7 @@ import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
   Block (..),
   BlockBody (..),
   BlockHeader (..),
+  ConcreteHeaderHash (..),
  )
 import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
   addBlock,
