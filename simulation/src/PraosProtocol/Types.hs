@@ -1,6 +1,8 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module PraosProtocol.Types (
   Blocks,
@@ -51,11 +53,27 @@ import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
   rollback,
  )
 
+import ChanTCP (MessageSize (..))
+import SimTCPLinks (kilobytes)
 import TimeCompat
 
 --------------------------------
 --- Common types
 --------------------------------
+
+instance MessageSize BlockHeader where
+  messageSizeBytes _ = kilobytes 1
+
+instance MessageSize Block where
+  messageSizeBytes _ = kilobytes 96
+
+-- TODO: Refactor to provide sizes for basic types.
+
+instance MessageSize (Tip block) where
+  messageSizeBytes _ = {- slot no -} 8 + {- hash -} 32 + {- block no -} 8
+
+instance MessageSize (Point block) where
+  messageSizeBytes _ = {- hash -} 32 + {- slot no -} 8
 
 type Blocks = Map (HeaderHash Block) Block
 
