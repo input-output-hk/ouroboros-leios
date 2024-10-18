@@ -3,6 +3,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -18,6 +19,7 @@
 
 module PraosProtocol.BlockFetch where
 
+import ChanTCP (MessageSize (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     STM,
@@ -131,6 +133,15 @@ instance StateTokenI StIdle where stateToken = SingStIdle
 instance StateTokenI StBusy where stateToken = SingStBusy
 instance StateTokenI StStreaming where stateToken = SingStStreaming
 instance StateTokenI StDone where stateToken = SingStDone
+
+instance MessageSize (Message BlockFetchState st st') where
+  messageSizeBytes = \case
+    MsgRequestRange pt1 pt2 -> messageSizeBytes pt1 + messageSizeBytes pt2
+    MsgNoBlocks -> 1
+    MsgStartBatch -> 1
+    MsgBlock blk -> messageSizeBytes blk
+    MsgBatchDone -> 1
+    MsgClientDone -> 1
 
 --------------------------------
 --- BlockFetch Server

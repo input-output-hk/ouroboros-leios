@@ -61,11 +61,11 @@ import TimeCompat
 --- Common types
 --------------------------------
 
+instance MessageSize BlockBody where
+  messageSizeBytes _ = kilobytes 95
+
 instance MessageSize BlockHeader where
   messageSizeBytes _ = kilobytes 1
-
-instance MessageSize Block where
-  messageSizeBytes _ = kilobytes 96
 
 -- TODO: Refactor to provide sizes for basic types.
 
