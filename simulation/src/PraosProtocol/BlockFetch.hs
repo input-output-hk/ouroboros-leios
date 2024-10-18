@@ -269,10 +269,10 @@ data PeerStatus m = PeerStatus
 
 type PeerId = Int
 
--- | invariant: blocksVar contains all blocks of cpsVar
+-- | invariant: blocksVar contains all blocks of cpsVar and targetChainVar
 data BlockFetchControllerState m = BlockFetchControllerState
   { blocksVar :: TVar m Blocks
-  , selectedChainVar :: TVar m (Maybe MissingBlocksChain) -- target chain
+  , targetChainVar :: TVar m (Maybe MissingBlocksChain)
   , peers :: Map PeerId (PeerStatus m)
   , cpsVar :: TVar m (ChainProducerState Block)
   }
@@ -281,7 +281,7 @@ data BlockFetchControllerState m = BlockFetchControllerState
 initBlockFetchControllerState :: MonadSTM m => [PeerId] -> m (BlockFetchControllerState m)
 initBlockFetchControllerState peerIds = atomically $ do
   blocksVar <- newTVar Map.empty
-  selectedChainVar <- newTVar Nothing
+  targetChainVar <- newTVar Nothing
   peers <- Map.fromList . zip peerIds <$> replicateM (length peerIds) initPeerStatus
   cpsVar <- newTVar $ initChainProducerState Genesis
   return BlockFetchControllerState{..}
@@ -321,7 +321,7 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
     pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
 
   addRequest :: PeerId -> BlockRequest -> STM m ()
-  addRequest _pId (BlockRequest []) = retry
+  addRequest _pId (BlockRequest []) = return ()
   addRequest pId br = do
     case Map.lookup pId peers of
       Nothing -> error "addRequest: no such peer"
@@ -354,12 +354,19 @@ instance OAPI.HasHeader BlockOrHeader where
       (OAPI.castHeaderFields . OAPI.getHeaderFields)
       x
 
-fillInBlocks :: Blocks -> MissingBlocksChain -> Either (Chain Block) MissingBlocksChain
+data ChainsUpdate
+  = FullChain (Chain Block)
+  | ImprovedPrefix MissingBlocksChain
+  | SamePrefix MissingBlocksChain
+
+fillInBlocks :: Blocks -> MissingBlocksChain -> ChainsUpdate
 fillInBlocks blocks MissingBlocksChain{..} =
   case addToChain prefix (AF.mapAnchoredFragment blkLookup suffix) of
-    (prefix', Just suffix') -> Right $ MissingBlocksChain prefix' suffix'
+    (prefix', Just suffix')
+      | AF.headPoint prefix < AF.headPoint prefix' -> ImprovedPrefix $ MissingBlocksChain prefix' suffix'
+      | otherwise -> SamePrefix $ MissingBlocksChain prefix' suffix'
     (prefix', Nothing) ->
-      Left $
+      FullChain $
         fromMaybe (error "fillInBlocks: prefix not from genesis") $
           fromAnchoredFragment prefix'
  where
@@ -376,7 +383,7 @@ initMissingBlocksChain ::
   Blocks ->
   Chain Block ->
   AnchoredFragment BlockHeader ->
-  Either (Chain Block) MissingBlocksChain
+  ChainsUpdate
 initMissingBlocksChain blocks c fr =
   fillInBlocks blocks $
     MissingBlocksChain prefix (AF.mapAnchoredFragment (BlockOrHeader . Left) fr)
@@ -389,25 +396,30 @@ initMissingBlocksChain blocks c fr =
 
 whenMissing ::
   Monad m =>
-  Either (Chain Block) MissingBlocksChain ->
+  ChainsUpdate ->
   (MissingBlocksChain -> m ()) ->
   m ()
-whenMissing (Left _) _ = return ()
-whenMissing (Right m) k = k m
+whenMissing (FullChain _) _ = return ()
+whenMissing (ImprovedPrefix m) k = k m
+whenMissing (SamePrefix m) k = k m
 
 updateChains ::
   forall m.
   MonadSTM m =>
   BlockFetchControllerState m ->
-  Either (Chain Block) MissingBlocksChain ->
+  ChainsUpdate ->
   STM m ()
 updateChains BlockFetchControllerState{..} e =
   case e of
-    Left fullChain -> do
-      writeTVar selectedChainVar Nothing
+    FullChain fullChain -> do
+      writeTVar targetChainVar Nothing
       modifyTVar' cpsVar (switchFork fullChain)
-    Right missingChain -> do
-      writeTVar selectedChainVar (Just missingChain)
+    ImprovedPrefix missingChain -> do
+      writeTVar targetChainVar (Just missingChain)
+      let improvedChain = fromMaybe (error "prefix not from Genesis") $ fromAnchoredFragment $ missingChain.prefix
+      modifyTVar' cpsVar (switchFork improvedChain)
+    SamePrefix missingChain -> do
+      writeTVar targetChainVar (Just missingChain)
 
 -----------------------------------------------------------
 ---- Methods for blockFetchConsumer and blockFetchProducer
@@ -431,9 +443,8 @@ addBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
 addBlock st@BlockFetchControllerState{..} blk = do
   modifyTVar' blocksVar (Map.insert (OAPI.blockHash blk) blk)
 
-  selected <- readTVar selectedChainVar
+  selected <- readTVar targetChainVar
   case selected of
     Nothing -> return () -- I suppose we do not need this block anymore.
     Just missingChain -> do
-      -- TODO: switch to target as soon as it's better than current chain.
       updateChains st =<< fillInBlocks <$> readTVar blocksVar <*> pure missingChain
