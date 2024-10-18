@@ -43,17 +43,18 @@ import System.Random (StdGen, uniform, uniformR)
 
 instance MessageSize (Message ChainSyncState st st') where
   messageSizeBytes msg =
-    case msg of
-      MsgRequestNext -> 1
-      MsgAwaitReply -> 1
-      MsgRollForward_StCanAwait hdr tip -> 2 * 256
-      MsgRollBackward_StCanAwait pt tip -> 2 * 256
-      MsgRollForward_StMustReply hdr tip -> 2 * 256
-      MsgRollBackward_StMustReply pt tip -> 2 * 256
-      MsgFindIntersect pts -> fromIntegral (Prelude.length pts) * 256
-      MsgIntersectFound pt tip -> 2 * 256
-      MsgIntersectNotFound tip -> 256
-      MsgDone -> 1
+    1000
+      * case msg of
+        MsgRequestNext -> 1
+        MsgAwaitReply -> 1
+        MsgRollForward_StCanAwait hdr tip -> 2 * 256
+        MsgRollBackward_StCanAwait pt tip -> 2 * 256
+        MsgRollForward_StMustReply hdr tip -> 2 * 256
+        MsgRollBackward_StMustReply pt tip -> 2 * 256
+        MsgFindIntersect pts -> fromIntegral (Prelude.length pts) * 256
+        MsgIntersectFound pt tip -> 2 * 256
+        MsgIntersectNotFound tip -> 256
+        MsgDone -> 1
 
 type ChainSyncTrace = [(Time, ChainSyncEvent)]
 
