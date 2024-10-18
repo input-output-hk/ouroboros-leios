@@ -12,6 +12,7 @@
 
 module PraosProtocol.ChainSync where
 
+import ChanTCP (MessageSize (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
@@ -102,6 +103,19 @@ instance Protocol ChainSyncState where
   type StateToken = SingChainSyncState
 
 deriving instance Show (Message ChainSyncState from to)
+
+instance MessageSize (Message ChainSyncState st st') where
+  messageSizeBytes = \case
+    MsgRequestNext -> 1
+    MsgAwaitReply -> 1
+    MsgRollForward_StCanAwait hdr tip -> messageSizeBytes hdr + messageSizeBytes tip
+    MsgRollBackward_StCanAwait pt tip -> messageSizeBytes pt + messageSizeBytes tip
+    MsgRollForward_StMustReply hdr tip -> messageSizeBytes hdr + messageSizeBytes tip
+    MsgRollBackward_StMustReply pt tip -> messageSizeBytes pt + messageSizeBytes tip
+    MsgFindIntersect pts -> sum (messageSizeBytes <$> pts)
+    MsgIntersectFound pt tip -> messageSizeBytes pt + messageSizeBytes tip
+    MsgIntersectNotFound tip -> messageSizeBytes tip
+    MsgDone -> 1
 
 chainSyncMessageLabel :: Message ChainSyncState st st' -> String
 chainSyncMessageLabel = \case

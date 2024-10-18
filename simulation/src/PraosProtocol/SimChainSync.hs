@@ -2,27 +2,15 @@
 
 module PraosProtocol.SimChainSync where
 
-import Chan
 import ChanDriver
 import ChanTCP
 import PraosProtocol.ChainSync
 import PraosProtocol.Types hiding (Point)
 
-import Control.Concurrent.Class.MonadSTM (MonadSTM (atomically, newTVar))
+import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
-  Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadTime (..),
-  NominalDiffTime,
-  Time,
-  UTCTime,
-  addUTCTime,
-  diffUTCTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -30,7 +18,6 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import qualified Data.ByteString as BS
-import Data.Foldable (traverse_)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -39,22 +26,6 @@ import Network.TypedProtocol
 import Ouroboros.Network.Mock.ConcreteBlock (mkChainSimple)
 import SimTCPLinks
 import SimTypes
-import System.Random (StdGen, uniform, uniformR)
-
-instance MessageSize (Message ChainSyncState st st') where
-  messageSizeBytes msg =
-    1000
-      * case msg of
-        MsgRequestNext -> 1
-        MsgAwaitReply -> 1
-        MsgRollForward_StCanAwait hdr tip -> 2 * 256
-        MsgRollBackward_StCanAwait pt tip -> 2 * 256
-        MsgRollForward_StMustReply hdr tip -> 2 * 256
-        MsgRollBackward_StMustReply pt tip -> 2 * 256
-        MsgFindIntersect pts -> fromIntegral (Prelude.length pts) * 256
-        MsgIntersectFound pt tip -> 2 * 256
-        MsgIntersectNotFound tip -> 256
-        MsgDone -> 1
 
 type ChainSyncTrace = [(Time, ChainSyncEvent)]
 
@@ -80,6 +51,7 @@ data ChainSyncNodeEvent = ChainSyncNodeEvent
       Show
     )
 
+exampleTrace1 :: ChainSyncTrace
 exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
 
 traceRelayLink1 ::
@@ -110,12 +82,12 @@ traceRelayLink1 tcpprops =
       return ()
  where
   consumerNode chan = do
-    hchainVar <- atomically $ newTVar Genesis
+    hchainVar <- newTVarIO Genesis
     runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer hchainVar)
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
-    cpsVar <- atomically $ newTVar cps
+    cpsVar <- newTVarIO cps
     runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer fId cpsVar)
   [na, nb] = map NodeId [0, 1]
   -- configNode0 = RelayNodeConfig processingDelay generationPattern
