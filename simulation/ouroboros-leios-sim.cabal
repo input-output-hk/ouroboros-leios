@@ -54,6 +54,7 @@ library
   build-depends:
     , array
     , base
+    , bytestring
     , cairo
     , cardano-slotting
     , Chart
@@ -73,6 +74,7 @@ library
     , pango
     , pqueue
     , random
+    , serialise
     , si-timers
     , time
     , typed-protocols         >=0.3
