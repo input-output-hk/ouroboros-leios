@@ -40,8 +40,8 @@ import Ouroboros.Network.Mock.Chain as Chain hiding (
  )
 import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
   Block (..),
-  BlockBody,
-  BlockHeader,
+  BlockBody (..),
+  BlockHeader (..),
  )
 import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
   addBlock,
