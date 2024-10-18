@@ -38,6 +38,7 @@ library
     PraosProtocol.ChainSync
     PraosProtocol.SimChainSync
     PraosProtocol.Types
+    PraosProtocol.VizSimChainSync
     RelayProtocol
     SimRelay
     SimRelayP2P

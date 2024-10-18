@@ -2,9 +2,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -98,6 +100,8 @@ instance Protocol ChainSyncState where
   type StateAgency StIntersect = ServerAgency
   type StateAgency StDone = NobodyAgency
   type StateToken = SingChainSyncState
+
+deriving instance Show (Message ChainSyncState from to)
 
 instance StateTokenI StIdle where stateToken = SingStIdle
 instance StateTokenI StCanAwait where stateToken = SingStCanAwait

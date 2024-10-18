@@ -68,7 +68,7 @@ data ChainSyncEvent
   | -- | An event on a tcp link between two nodes
     ChainSyncEventTcp (LabelLink (TcpEvent (ProtocolMessage ChainSyncState)))
   deriving (Show)
-
+type ChainSyncMessage = ProtocolMessage ChainSyncState
 data ChainSyncNodeEvent = ChainSyncNodeEvent
   -- = RelayNodeEventGenerate blk
 
@@ -78,6 +78,8 @@ data ChainSyncNodeEvent = ChainSyncNodeEvent
       -- | RelayNodeEventRemove blk
       Show
     )
+
+exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
 
 traceRelayLink1 ::
   TcpConnProps ->
@@ -108,12 +110,12 @@ traceRelayLink1 tcpprops =
  where
   consumerNode chan = do
     hchainVar <- atomically $ newTVar Genesis
-    runPeerWithDriver (chanDriver chan) (chainConsumer hchainVar)
+    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer hchainVar)
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
     cpsVar <- atomically $ newTVar cps
-    runPeerWithDriver (chanDriver chan) (chainProducer fId cpsVar)
+    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer fId cpsVar)
   [na, nb] = map NodeId [0, 1]
   -- configNode0 = RelayNodeConfig processingDelay generationPattern
   -- configNode1 = RelayNodeConfig processingDelay NoPacketGeneration
