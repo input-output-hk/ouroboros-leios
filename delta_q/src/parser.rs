@@ -111,7 +111,7 @@ fn cdf(input: &mut &str) -> PResult<DeltaQ> {
         cut_err(
             separated::<_, _, (), _, _, _, _>(
                 0..,
-                (ws, '(', ws, num, ws, ',', ws, num, ws, ')')
+                (ws, '(', ws, cut_err((num, ws, ',', ws, num, ws, ')')))
                     .context(StrContext::Label("CDF literal"))
                     .context(StrContext::Expected(StrContextValue::Description(
                         "CDF[(<num>, <num>), ...]",
