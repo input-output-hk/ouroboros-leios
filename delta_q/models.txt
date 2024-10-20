@@ -50,10 +50,12 @@ diffuseEB := hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) 
 far := CDF[(0.268, 1)]
 farL := CDF[(0.531, 1)]
 farXL := CDF[(1.598, 1)]
+
 -- single link latencies between data centers within a continent
 mid := CDF[(0.069, 1)]
 midL := CDF[(0.143, 1)]
 midXL := CDF[(0.404, 1)]
+
 -- single link latencies within a data center
 near := CDF[(0.012, 1)]
 nearL := CDF[(0.024, 1)]
