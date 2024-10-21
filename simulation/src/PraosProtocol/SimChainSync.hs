@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module PraosProtocol.SimChainSync where
 
@@ -99,7 +98,7 @@ traceRelayLink1 tcpprops =
     cpsVar <- newTVarIO cps
     runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer fId cpsVar)
 
-  [na, nb] = map NodeId [0, 1]
+  (na, nb) = (NodeId 0, NodeId 1)
 
   tracer :: Tracer (IOSim s) ChainSyncEvent
   tracer = simTracer

@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module PraosProtocol.SimBlockFetch where
 
