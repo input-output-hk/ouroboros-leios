@@ -293,7 +293,7 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
 --      the corresponding fragment.
 --    * the block is removed from blocksInFlightVar when it reaches the
 --      "ChainDB" i.e. blockBodiesVar, or the consumer encountered a
---      problem when fetching it. TODO!
+--      problem when fetching it.
 data PeerStatus m = PeerStatus
   { blockRequestVar :: TVar m BlockRequest
   , blocksInFlightVar :: TVar m (Set (Point Block))
