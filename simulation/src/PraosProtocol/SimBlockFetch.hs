@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module PraosProtocol.SimBlockFetch where
@@ -87,7 +86,7 @@ traceRelayLink1 tcpprops =
     peerChainVar <- newTVarIO (blockHeader <$> chain)
     blockFetchControllerState <-
       newBlockFetchControllerState
-        >>= addPeer peerId (ReadOnly peerChainVar)
+        >>= addPeer peerId (asReadOnly peerChainVar)
     concurrently_
       ( blockFetchController blockFetchControllerState
       )
@@ -97,7 +96,7 @@ traceRelayLink1 tcpprops =
       )
   -- Block-Fetch Producer
   nodeB chan = do
-    blocksVar <- ReadOnly <$> newTVarIO (toBlocks chain)
+    blocksVar <- asReadOnly <$> newTVarIO (toBlocks chain)
     let blockFetchProducerState = BlockFetchProducerState blocksVar
     runPeerWithDriver (chanDriver decideBlockFetchState chan) $
       blockFetchProducer blockFetchProducerState

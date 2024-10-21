@@ -14,9 +14,11 @@ module PraosProtocol.Common (
   module Block,
   module ConcreteBlock,
   module ProducerState,
-  ReadOnly (..),
+  ReadOnly,
+  asReadOnly,
   readReadOnlyTVar,
-  TakeOnly (..),
+  TakeOnly,
+  asTakeOnly,
   takeTakeOnlyTMVar,
   tryTakeTakeOnlyTMVar,
   SlotConfig (..),
@@ -100,10 +102,16 @@ slotTime SlotConfig{start, duration} sl = (fromIntegral (unSlotNo sl) * duration
 -- | Readonly TVar.
 newtype ReadOnly a = ReadOnly {unReadOnly :: a}
 
+asReadOnly :: a -> ReadOnly a
+asReadOnly = ReadOnly
+
 readReadOnlyTVar :: MonadSTM m => ReadOnly (TVar m a) -> STM m a
 readReadOnlyTVar ReadOnly{unReadOnly} = readTVar unReadOnly
 
 newtype TakeOnly a = TakeOnly {unTakeOnly :: a}
+
+asTakeOnly :: a -> TakeOnly a
+asTakeOnly = TakeOnly
 
 takeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m a
 takeTakeOnlyTMVar TakeOnly{unTakeOnly} = takeTMVar unTakeOnly
