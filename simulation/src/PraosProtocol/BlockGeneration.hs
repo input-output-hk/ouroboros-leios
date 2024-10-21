@@ -5,14 +5,7 @@
 module PraosProtocol.BlockGeneration where
 
 import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TVar,
-    atomically,
-    newTVar,
-    readTVar,
-    writeTVar
-  ),
+  MonadSTM (..),
  )
 import Control.Monad (forever, when)
 import Control.Monad.Class.MonadTimer.SI (MonadDelay)
@@ -21,16 +14,17 @@ import System.Random (StdGen, uniformR)
 
 import Cardano.Slotting.Slot (WithOrigin (..))
 import Codec.Serialise
-import Ouroboros.Network.Mock.ConcreteBlock (BlockBody (..), fixupBlock, mkPartialBlock)
 
 import ChanTCP (Bytes)
 import Data.Word (Word64)
-import PraosProtocol.Types
+
+import PraosProtocol.Common
+import qualified PraosProtocol.Common.Chain as Chain
 
 -- | Returns a block that can extend the chain.
 --   PRECONDITION: the SlotNo is ahead of the chain tip.
 mkBlock :: Chain Block -> SlotNo -> BlockBody -> Block
-mkBlock c sl body = fixupBlock (headAnchor c) (mkPartialBlock sl body)
+mkBlock c sl body = fixupBlock (Chain.headAnchor c) (mkPartialBlock sl body)
 
 type SlotGap = Word64
 
@@ -52,7 +46,7 @@ mkNextBlock ::
   m (Maybe (m (SlotNo, BlockBody)))
 mkNextBlock NoPacketGeneration _ = return Nothing
 mkNextBlock (UniformGenerationPattern sz gap) prefix = do
-  stVar <- atomically $ newTVar (SlotNo 0)
+  stVar <- newTVarIO (SlotNo 0)
   let
     go = atomically $ do
       last_sl <- readTVar stVar
@@ -63,7 +57,7 @@ mkNextBlock (UniformGenerationPattern sz gap) prefix = do
       return (sl, body)
   return $ Just go
 mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
-  stVar <- atomically $ newTVar (SlotNo 0, rng0)
+  stVar <- newTVarIO (SlotNo 0, rng0)
   let go = atomically $ do
         (last_sl, rng) <- readTVar stVar
 
@@ -81,7 +75,7 @@ blockGenerator ::
   SlotConfig ->
   TVar m (ChainProducerState Block) ->
   (Block -> STM m ()) ->
-  (Maybe (m (SlotNo, BlockBody))) ->
+  Maybe (m (SlotNo, BlockBody)) ->
   m ()
 blockGenerator _slotConfig _cpsVar _addBlockSt Nothing = return ()
 blockGenerator slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
@@ -91,7 +85,7 @@ blockGenerator slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
     waitForSlot sl
     atomically $ do
       chain <- chainState <$> readTVar cpsVar
-      when (headSlot chain <= At sl) $
+      when (Chain.headSlot chain <= At sl) $
         addBlockSt (mkBlock chain sl body)
   waitForSlot sl = do
     let tgt = slotTime slotConfig sl

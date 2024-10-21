@@ -1,21 +1,24 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module PraosProtocol.VizSimChainSync where
 
-import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (Time, addTime)
+import ChanDriver
+import Data.Coerce
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
+import Data.Word
 import qualified Graphics.Rendering.Cairo as Cairo
-
 import ModelTCP
+import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
+import PraosProtocol.ChainSync
+import PraosProtocol.Common hiding (Point)
+import PraosProtocol.SimChainSync
 import SimTypes
 import System.Random (mkStdGen, uniform)
 import Viz
@@ -26,15 +29,6 @@ import VizSimTCP (
   renderMessagesInFlight,
  )
 import VizUtils
-
-import ChanDriver
-import Data.Coerce
-import Data.Word
-import Network.TypedProtocol
-import PraosProtocol.ChainSync
-import PraosProtocol.SimChainSync
-import PraosProtocol.Types hiding (Point)
-import Viz
 
 example1 :: Vizualisation
 example1 =
@@ -98,7 +92,7 @@ data ChainSyncVizState
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( (ChainSyncMessage)
+          [ ( ChainSyncMessage
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
@@ -345,9 +339,9 @@ recentPrune now (RecentRate pq) =
 data ChainSyncVizConfig
   = ChainSyncVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  , ptclMessageColor :: (ChainSyncMessage) -> (Double, Double, Double)
+  , ptclMessageColor :: ChainSyncMessage -> (Double, Double, Double)
   , nodeMessageText :: BlockHeader -> Maybe String
-  , ptclMessageText :: (ChainSyncMessage) -> Maybe String
+  , ptclMessageText :: ChainSyncMessage -> Maybe String
   }
 
 relaySimVizRender ::

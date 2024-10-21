@@ -4,13 +4,14 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-module PraosProtocol.Types (
+module PraosProtocol.Common (
+  AnchoredFragment,
+  Chain,
   Blocks,
   headerPoint,
   blockPrevPoint,
   setFollowerPoint,
   module Block,
-  module Chain,
   module ConcreteBlock,
   module ProducerState,
   ReadOnly (..),
@@ -20,6 +21,8 @@ module PraosProtocol.Types (
   tryTakeTakeOnlyTMVar,
   SlotConfig (..),
   slotTime,
+  MessageSize (..),
+  kilobytes,
   module TimeCompat,
 ) where
 
@@ -37,21 +40,10 @@ import Control.Exception (assert)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Ouroboros.Network.Block as Block
-import Ouroboros.Network.Mock.Chain as Chain hiding (
-  findFirstPoint,
- )
-import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock (
-  Block (..),
-  BlockBody (..),
-  BlockHeader (..),
-  ConcreteHeaderHash (..),
- )
-import Ouroboros.Network.Mock.ProducerState as ProducerState hiding (
-  addBlock,
-  applyChainUpdate,
-  applyChainUpdates,
-  rollback,
- )
+import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock
+import Ouroboros.Network.Mock.ProducerState as ProducerState
+import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
+import PraosProtocol.Common.Chain (Chain, pointOnChain)
 
 import ChanTCP (MessageSize (..))
 import SimTCPLinks (kilobytes)
@@ -101,12 +93,6 @@ slotTime SlotConfig{start, duration} sl = (fromIntegral (unSlotNo sl) * duration
 --------------------------------
 ---- Common Utility Types
 --------------------------------
-
--- data OnChain = Yes | Unknown
--- data Blocking = Blocking | NonBlocking
--- deriving (Eq)
--- data Direction = Forward | Backward
--- deriving (Eq)
 
 -- | Readonly TVar.
 newtype ReadOnly a = ReadOnly {unReadOnly :: a}
