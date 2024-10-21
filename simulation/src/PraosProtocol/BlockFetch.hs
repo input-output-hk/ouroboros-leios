@@ -19,7 +19,6 @@
 
 module PraosProtocol.BlockFetch where
 
-import ChanTCP (MessageSize (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     STM,
@@ -50,33 +49,9 @@ import Network.TypedProtocol (
  )
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
-import Ouroboros.Network.AnchoredFragment (AnchoredFragment, anchorPoint)
-import qualified Ouroboros.Network.AnchoredFragment as AF
-import qualified Ouroboros.Network.Block as OAPI
-import Ouroboros.Network.Mock.ConcreteBlock (BlockHeader (..), hashBody)
-import qualified Ouroboros.Network.Mock.ProducerState as CPS
-import PraosProtocol.Types (
-  Block (..),
-  BlockBody,
-  Blocks,
-  Chain (..),
-  ChainProducerState (..),
-  ReadOnly (..),
-  blockPrevPoint,
-  fromAnchoredFragment,
-  headPoint,
-  headerPoint,
-  initChainProducerState,
-  intersectChains,
-  readReadOnlyTVar,
-  selectChain,
-  switchFork,
-  toAnchoredFragment,
-  validExtension,
- )
-
-type BlockId = OAPI.HeaderHash Block
-type Point = OAPI.Point Block
+import PraosProtocol.Common
+import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
+import qualified PraosProtocol.Common.Chain as Chain
 
 data BlockFetchState
   = StIdle
@@ -109,8 +84,8 @@ decideBlockFetchState = decideSingBlockFetchState stateToken stateToken
 instance Protocol BlockFetchState where
   data Message BlockFetchState from to where
     MsgRequestRange ::
-      Point ->
-      Point ->
+      Point Block ->
+      Point Block ->
       Message BlockFetchState StIdle StBusy
     MsgNoBlocks ::
       Message BlockFetchState StBusy StIdle
@@ -147,21 +122,26 @@ instance MessageSize (Message BlockFetchState st st') where
 --- BlockFetch Server
 --------------------------------
 
-data BlockFetchProducerState m = BlockFetchProducerState
+newtype BlockFetchProducerState m = BlockFetchProducerState
   { blocksVar :: ReadOnly (TVar m Blocks)
   }
 
-resolveRange :: MonadSTM m => BlockFetchProducerState m -> Point -> Point -> STM m (Maybe [BlockBody])
+resolveRange ::
+  MonadSTM m =>
+  BlockFetchProducerState m ->
+  Point Block ->
+  Point Block ->
+  STM m (Maybe [BlockBody])
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
-  let resolveRangeAcc :: [BlockBody] -> Point -> Maybe [BlockBody]
-      resolveRangeAcc acc p | start == p = Just acc
-      resolveRangeAcc _acc OAPI.GenesisPoint = Nothing
-      resolveRangeAcc acc p@(OAPI.BlockPoint pSlot pHash)
-        | OAPI.pointSlot start > OAPI.pointSlot p = Nothing
+  let resolveRangeAcc :: [BlockBody] -> Point Block -> Maybe [BlockBody]
+      resolveRangeAcc acc bpoint | start == bpoint = Just acc
+      resolveRangeAcc _acc GenesisPoint = Nothing
+      resolveRangeAcc acc bpoint@(BlockPoint pslot phash)
+        | pointSlot start > pointSlot bpoint = Nothing
         | otherwise = do
-            Block{..} <- Map.lookup pHash blocks
-            guard $ OAPI.blockSlot blockHeader == pSlot
+            Block{..} <- Map.lookup phash blocks
+            guard $ blockSlot blockHeader == pslot
             resolveRangeAcc (blockBody : acc) =<< blockPrevPoint blocks blockHeader
   return $ reverse <$> resolveRangeAcc [] end
 
@@ -194,16 +174,16 @@ newtype BlockRequest
   deriving (Show)
   deriving newtype (Semigroup) -- TODO: we could merge the fragments.
 
-fragmentRange :: AnchoredFragment BlockHeader -> (Point, Point)
-fragmentRange fr = (OAPI.castPoint $ AF.lastPoint fr, OAPI.castPoint $ AF.headPoint fr)
+fragmentRange :: AnchoredFragment BlockHeader -> (Point Block, Point Block)
+fragmentRange fr = (castPoint $ AnchoredFragment.lastPoint fr, castPoint $ AnchoredFragment.headPoint fr)
 
-blockRequestPoints :: BlockRequest -> [Point]
-blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AF.toOldestFirst) $ frs
+blockRequestPoints :: BlockRequest -> [Point Block]
+blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AnchoredFragment.toOldestFirst) frs
 
 data BlockFetchConsumerState m = BlockFetchConsumerState
   { blockRequestVar :: TVar m BlockRequest
   , addFetchedBlock :: Block -> m ()
-  , removeInFlight :: [Point] -> m ()
+  , removeInFlight :: [Point Block] -> m ()
   }
 
 blockFetchConsumer ::
@@ -229,15 +209,15 @@ blockFetchConsumer st = idle
     let range@(start, end) = fragmentRange fr
     return $ TC.Yield (MsgRequestRange start end) $ busy range fr
 
-  busy :: (Point, Point) -> AnchoredFragment BlockHeader -> TC.Client BlockFetchState NonPipelined StBusy m ()
+  busy :: (Point Block, Point Block) -> AnchoredFragment BlockHeader -> TC.Client BlockFetchState NonPipelined StBusy m ()
   busy range fr = TC.Await $ \case
     MsgNoBlocks -> TC.Effect $ do
       -- TODO: controller might just ask this peer again.
       st.removeInFlight (blockRequestPoints $ BlockRequest [fr])
       return idle
-    MsgStartBatch -> streaming range $ AF.toOldestFirst fr
+    MsgStartBatch -> streaming range $ AnchoredFragment.toOldestFirst fr
 
-  streaming :: (Point, Point) -> [BlockHeader] -> TC.Client BlockFetchState NonPipelined StStreaming m ()
+  streaming :: (Point Block, Point Block) -> [BlockHeader] -> TC.Client BlockFetchState NonPipelined StStreaming m ()
   streaming range headers = TC.Await $ \msg ->
     case (msg, headers) of
       (MsgBatchDone, []) -> idle
@@ -264,9 +244,9 @@ blockFetchConsumer st = idle
 
 longestChainSelection ::
   forall block header m.
-  ( OAPI.HasHeader block
-  , OAPI.HasHeader header
-  , OAPI.HeaderHash block ~ OAPI.HeaderHash header
+  ( HasHeader block
+  , HasHeader header
+  , HeaderHash block ~ HeaderHash header
   , MonadSTM m
   ) =>
   [(PeerId, ReadOnly (TVar m (Chain header)))] ->
@@ -279,18 +259,18 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
   let
     chain = fmap getHeader cps.chainState
     aux (mpId, c1) (pId, c2) =
-      let c = selectChain c1 c2
-       in if headPoint c == headPoint c1
+      let c = Chain.selectChain c1 c2
+       in if Chain.headPoint c == Chain.headPoint c1
             then (mpId, c1)
             else (Just pId, c2)
     -- using foldl' since @selectChain@ is left biased
     (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
   return $ do
     peerId <- selectedPeer
-    point <- intersectChains chain chain'
+    point <- Chain.intersectChains chain chain'
     let suffix =
           snd . fromMaybe (error "longestChainSelection: intersect not on chain") $
-            AF.splitAfterPoint (toAnchoredFragment chain') point
+            AnchoredFragment.splitAfterPoint (Chain.toAnchoredFragment chain') point
     pure (peerId, suffix)
 
 -- | Note:
@@ -302,7 +282,7 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
 --      problem when fetching it. TODO!
 data PeerStatus m = PeerStatus
   { blockRequestVar :: TVar m BlockRequest
-  , blocksInFlightVar :: TVar m (Set Point)
+  , blocksInFlightVar :: TVar m (Set (Point Block))
   , peerChainVar :: ReadOnly (TVar m (Chain BlockHeader))
   }
 
@@ -322,13 +302,13 @@ initBlockFetchControllerState peerIds = atomically $ do
   blocksVar <- newTVar Map.empty
   targetChainVar <- newTVar Nothing
   peers <- Map.fromList . zip peerIds <$> replicateM (length peerIds) initPeerStatus
-  cpsVar <- newTVar $ initChainProducerState Genesis
+  cpsVar <- newTVar $ initChainProducerState Chain.Genesis
   return BlockFetchControllerState{..}
  where
   initPeerStatus = do
     blockRequestVar <- newTVar (BlockRequest [])
     blocksInFlightVar <- newTVar Set.empty
-    peerChainVar <- ReadOnly <$> newTVar Genesis
+    peerChainVar <- ReadOnly <$> newTVar Chain.Genesis
     return PeerStatus{..}
 
 blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
@@ -348,10 +328,10 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
     blocks <- readTVar blocksVar
-    pure $ filterBR ((`Map.notMember` blocks) . OAPI.blockHash) (BlockRequest [fr])
+    pure $ filterBR ((`Map.notMember` blocks) . blockHash) (BlockRequest [fr])
 
   filterBR :: (BlockHeader -> Bool) -> BlockRequest -> BlockRequest
-  filterBR p = BlockRequest . concatMap (AF.filter p) . (.blockRequestFragments)
+  filterBR p = BlockRequest . concatMap (AnchoredFragment.filter p) . (.blockRequestFragments)
 
   filterInFlight :: BlockRequest -> STM m BlockRequest
   filterInFlight br = do
@@ -382,15 +362,15 @@ data MissingBlocksChain = MissingBlocksChain
 
 newtype BlockOrHeader = BlockOrHeader {unBlockOrHeader :: Either BlockHeader Block}
 
-type instance OAPI.HeaderHash BlockOrHeader = OAPI.HeaderHash BlockHeader
+type instance HeaderHash BlockOrHeader = HeaderHash BlockHeader
 
-instance OAPI.StandardHash BlockOrHeader
+instance StandardHash BlockOrHeader
 
-instance OAPI.HasHeader BlockOrHeader where
+instance HasHeader BlockOrHeader where
   getHeaderFields (BlockOrHeader x) =
     either
-      (OAPI.castHeaderFields . OAPI.getHeaderFields)
-      (OAPI.castHeaderFields . OAPI.getHeaderFields)
+      (castHeaderFields . getHeaderFields)
+      (castHeaderFields . getHeaderFields)
       x
 
 data ChainsUpdate
@@ -400,22 +380,23 @@ data ChainsUpdate
 
 fillInBlocks :: Blocks -> MissingBlocksChain -> ChainsUpdate
 fillInBlocks blocks MissingBlocksChain{..} =
-  case addToChain prefix (AF.mapAnchoredFragment blkLookup suffix) of
+  case addToChain prefix (AnchoredFragment.mapAnchoredFragment blkLookup suffix) of
     (prefix', Just suffix')
-      | AF.headPoint prefix < AF.headPoint prefix' -> ImprovedPrefix $ MissingBlocksChain prefix' suffix'
+      | AnchoredFragment.headPoint prefix < AnchoredFragment.headPoint prefix' ->
+          ImprovedPrefix $ MissingBlocksChain prefix' suffix'
       | otherwise -> SamePrefix $ MissingBlocksChain prefix' suffix'
     (prefix', Nothing) ->
       FullChain $
         fromMaybe (error "fillInBlocks: prefix not from genesis") $
-          fromAnchoredFragment prefix'
+          Chain.fromAnchoredFragment prefix'
  where
   blkLookup :: BlockOrHeader -> BlockOrHeader
   blkLookup x@(BlockOrHeader e) = case e of
     Right _ -> x
-    Left hdr -> maybe x (BlockOrHeader . Right) . Map.lookup (OAPI.blockHash hdr) $ blocks
-  addToChain c (AF.Empty _) = (c, Nothing)
-  addToChain c af@(x AF.:< af') = case x of
-    BlockOrHeader (Right blk) -> addToChain (c AF.:> blk) af'
+    Left hdr -> maybe x (BlockOrHeader . Right) . Map.lookup (blockHash hdr) $ blocks
+  addToChain c (AnchoredFragment.Empty _) = (c, Nothing)
+  addToChain c af@(x AnchoredFragment.:< af') = case x of
+    BlockOrHeader (Right blk) -> addToChain (c AnchoredFragment.:> blk) af'
     BlockOrHeader (Left _) -> (c, Just af)
 
 initMissingBlocksChain ::
@@ -425,11 +406,11 @@ initMissingBlocksChain ::
   ChainsUpdate
 initMissingBlocksChain blocks c fr =
   fillInBlocks blocks $
-    MissingBlocksChain prefix (AF.mapAnchoredFragment (BlockOrHeader . Left) fr)
+    MissingBlocksChain prefix (AnchoredFragment.mapAnchoredFragment (BlockOrHeader . Left) fr)
  where
-  pt :: Point
-  pt = OAPI.castPoint $ anchorPoint fr
-  prefix = case AF.splitAfterPoint (toAnchoredFragment c) pt of
+  pt :: Point Block
+  pt = castPoint $ AnchoredFragment.anchorPoint fr
+  prefix = case AnchoredFragment.splitAfterPoint (Chain.toAnchoredFragment c) pt of
     Just (before, _) -> before
     Nothing -> error "initMissingBlocksChain: anchor of fragment not on chain"
 
@@ -455,7 +436,7 @@ updateChains BlockFetchControllerState{..} e =
       modifyTVar' cpsVar (switchFork fullChain)
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
-      let improvedChain = fromMaybe (error "prefix not from Genesis") $ fromAnchoredFragment $ missingChain.prefix
+      let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment $ missingChain.prefix
       modifyTVar' cpsVar (switchFork improvedChain)
     SamePrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
@@ -464,7 +445,7 @@ updateChains BlockFetchControllerState{..} e =
 ---- Methods for blockFetchConsumer and blockFetchProducer
 -----------------------------------------------------------
 
-removeInFlight :: MonadSTM m => BlockFetchControllerState m -> PeerId -> [Point] -> STM m ()
+removeInFlight :: MonadSTM m => BlockFetchControllerState m -> PeerId -> [Point Block] -> STM m ()
 removeInFlight BlockFetchControllerState{..} pId points = do
   let peer = fromMaybe (error "missing peer") $ Map.lookup pId peers
   modifyTVar' peer.blocksInFlightVar (\s -> List.foldl' (flip Set.delete) s points)
@@ -475,8 +456,8 @@ removeInFlight BlockFetchControllerState{..} pId points = do
 --   * @fillInBlocks@ on @selectedChain@, and @updateChains@
 addFetchedBlock :: MonadSTM m => BlockFetchControllerState m -> PeerId -> Block -> STM m ()
 addFetchedBlock st pId blk = do
-  removeInFlight st pId [OAPI.blockPoint blk]
-  modifyTVar' st.blocksVar (Map.insert (OAPI.blockHash blk) blk)
+  removeInFlight st pId [blockPoint blk]
+  modifyTVar' st.blocksVar (Map.insert (blockHash blk) blk)
 
   selected <- readTVar st.targetChainVar
   case selected of
@@ -487,9 +468,9 @@ addFetchedBlock st pId blk = do
 addProducedBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
 addProducedBlock BlockFetchControllerState{..} blk = do
   cps <- readTVar cpsVar
-  assert (validExtension (cps.chainState) blk) $ do
-    writeTVar cpsVar $! CPS.addBlock blk cps
-    modifyTVar' blocksVar (Map.insert (OAPI.blockHash blk) blk)
+  assert (Chain.validExtension cps.chainState blk) $ do
+    writeTVar cpsVar $! addBlock blk cps
+    modifyTVar' blocksVar (Map.insert (blockHash blk) blk)
 
     -- We reset the target chain because ours might be longest now:
     -- the controller will wake up and decide, and we do not want to

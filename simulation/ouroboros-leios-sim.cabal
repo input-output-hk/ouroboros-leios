@@ -36,8 +36,10 @@ library
     PraosProtocol.BlockFetch
     PraosProtocol.BlockGeneration
     PraosProtocol.ChainSync
+    PraosProtocol.Common
+    PraosProtocol.Common.AnchoredFragment
+    PraosProtocol.Common.Chain
     PraosProtocol.SimChainSync
-    PraosProtocol.Types
     PraosProtocol.VizSimChainSync
     RelayProtocol
     SimRelay

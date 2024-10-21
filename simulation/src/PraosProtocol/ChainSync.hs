@@ -12,7 +12,6 @@
 
 module PraosProtocol.ChainSync where
 
-import ChanTCP (MessageSize (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
@@ -27,7 +26,8 @@ import Network.TypedProtocol (
  )
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
-import PraosProtocol.Types
+import PraosProtocol.Common
+import qualified PraosProtocol.Common.Chain as Chain
 
 --------------------------------
 ---- ChainSync
@@ -158,7 +158,7 @@ chainConsumer hchainVar = idle True
     | initialise = TC.Effect $ atomically $ do
         hchain <- readTVar hchainVar
         let recentOffsets = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584]
-        let hpoints = selectPoints recentOffsets hchain
+        let hpoints = Chain.selectPoints recentOffsets hchain
         return $ TC.Yield (MsgFindIntersect hpoints) intersect
     | otherwise = TC.Yield MsgRequestNext canAwait
 
@@ -181,7 +181,7 @@ chainConsumer hchainVar = idle True
   rollForward :: BlockHeader -> ChainConsumer 'StIdle m ()
   rollForward header =
     TC.Effect $ atomically $ do
-      modifyTVar' hchainVar $ addBlock header
+      modifyTVar' hchainVar $ Chain.addBlock header
       return $ idle False
 
   rollBackward :: Point BlockHeader -> ChainConsumer 'StIdle m ()
@@ -189,7 +189,7 @@ chainConsumer hchainVar = idle True
     TC.Effect $ atomically $ do
       modifyTVar' hchainVar $
         fromMaybe (error "chainConsumer: MsgRollBackward with point not on chain")
-          . rollback hpoint
+          . Chain.rollback hpoint
       return $ idle False
 
 --------------------------------
@@ -217,7 +217,7 @@ chainProducer followerId stVar = idle
             return $ TS.Yield MsgAwaitReply mustReply
           Just (chainUpdate, st') -> do
             writeTVar stVar st'
-            let htip = castTip (headTip (chainState st'))
+            let htip = castTip (Chain.headTip (chainState st'))
             case chainUpdate of
               AddBlock block -> do
                 let header = blockHeader block
@@ -235,7 +235,7 @@ chainProducer followerId stVar = idle
         Nothing -> retry
         Just (chainUpdate, st') -> do
           writeTVar stVar st'
-          let htip = castTip (headTip (chainState st'))
+          let htip = castTip (Chain.headTip (chainState st'))
           case chainUpdate of
             AddBlock block -> do
               let header = blockHeader block
@@ -247,7 +247,7 @@ chainProducer followerId stVar = idle
   intersect :: [Point BlockHeader] -> ChainProducer 'StIntersect m ()
   intersect hpoints = TS.Effect $ atomically $ do
     st <- readTVar stVar
-    let htip = castTip (headTip (chainState st))
+    let htip = castTip (Chain.headTip (chainState st))
     assert (followerExists followerId st) $
       case findFirstPoint (castPoint <$> hpoints) st of
         Nothing -> do

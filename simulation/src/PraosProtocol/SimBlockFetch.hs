@@ -1,15 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module PraosProtocol.SimChainSync where
+module PraosProtocol.SimBlockFetch where
 
-import ChanDriver (ProtocolMessage, chanDriver)
-import ChanTCP (
-  LabelTcpDir,
-  TcpConnProps,
-  TcpEvent,
-  newConnectionTCP,
- )
+import ChanDriver
+import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
@@ -25,38 +20,28 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Network.TypedProtocol (runPeerWithDriver)
-import PraosProtocol.ChainSync (
-  ChainSyncState,
-  chainConsumer,
-  chainProducer,
-  decideChainSyncState,
- )
+import Network.TypedProtocol
+import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
 import qualified PraosProtocol.Common.Chain as Chain
-import SimTCPLinks (
-  labelDirToLabelLink,
-  mkTcpConnProps,
-  selectTimedEvents,
-  simTracer,
- )
+import SimTCPLinks
 import SimTypes
 
-type ChainSyncTrace = [(Time, ChainSyncEvent)]
+type BlockFetchTrace = [(Time, BlockFetchEvent)]
 
-data ChainSyncEvent
+data BlockFetchEvent
   = -- | Declare the nodes and links
-    ChainSyncEventSetup
+    BlockFetchEventSetup
       !WorldShape
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
-    ChainSyncEventNode (LabelNode ChainSyncNodeEvent)
+    BlockFetchEventNode (LabelNode BlockFetchNodeEvent)
   | -- | An event on a tcp link between two nodes
-    ChainSyncEventTcp (LabelLink (TcpEvent (ProtocolMessage ChainSyncState)))
+    BlockFetchEventTcp (LabelLink (TcpEvent (ProtocolMessage BlockFetchState)))
   deriving (Show)
-type ChainSyncMessage = ProtocolMessage ChainSyncState
-data ChainSyncNodeEvent = ChainSyncNodeEvent
+type BlockFetchMessage = ProtocolMessage BlockFetchState
+data BlockFetchNodeEvent = BlockFetchNodeEvent
   -- = RelayNodeEventGenerate blk
 
   deriving
@@ -66,18 +51,18 @@ data ChainSyncNodeEvent = ChainSyncNodeEvent
       Show
     )
 
-exampleTrace1 :: ChainSyncTrace
+exampleTrace1 :: BlockFetchTrace
 exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
 
 traceRelayLink1 ::
   TcpConnProps ->
   --- PacketGenerationPattern ->
-  ChainSyncTrace
+  BlockFetchTrace
 traceRelayLink1 tcpprops =
   selectTimedEvents $
     runSimTrace $ do
       traceWith tracer $
-        ChainSyncEventSetup
+        BlockFetchEventSetup
           WorldShape
             { worldDimensions = (500, 500)
             , worldIsCylinder = False
@@ -98,16 +83,16 @@ traceRelayLink1 tcpprops =
  where
   consumerNode chan = do
     hchainVar <- newTVarIO Chain.Genesis
-    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer hchainVar)
+    runPeerWithDriver (chanDriver decideBlockFetchState chan) (chainConsumer hchainVar)
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
     cpsVar <- newTVarIO cps
-    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer fId cpsVar)
+    runPeerWithDriver (chanDriver decideBlockFetchState chan) (chainProducer fId cpsVar)
 
   [na, nb] = map NodeId [0, 1]
 
-  tracer :: Tracer (IOSim s) ChainSyncEvent
+  tracer :: Tracer (IOSim s) BlockFetchEvent
   tracer = simTracer
 
   linkTracer ::
@@ -115,6 +100,6 @@ traceRelayLink1 tcpprops =
     NodeId ->
     Tracer
       (IOSim s)
-      (LabelTcpDir (TcpEvent (ProtocolMessage ChainSyncState)))
+      (LabelTcpDir (TcpEvent (ProtocolMessage BlockFetchState)))
   linkTracer nfrom nto =
-    contramap (ChainSyncEventTcp . labelDirToLabelLink nfrom nto) tracer
+    contramap (BlockFetchEventTcp . labelDirToLabelLink nfrom nto) tracer
