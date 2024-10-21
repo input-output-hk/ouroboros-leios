@@ -1,4 +1,7 @@
-use crate::{parser::eval_ctx, CDFError, CompactionMode, CDF, DEFAULT_MAX_SIZE};
+use crate::{
+    parser::eval_ctx, CDFError, CompactionMode, Outcome, StepFunction, CDF, DEFAULT_MAX_SIZE,
+};
+use itertools::Itertools;
 use smallstr::SmallString;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -34,16 +37,17 @@ impl From<CDFError> for DeltaQError {
     }
 }
 
-type Name = SmallString<[u8; 16]>;
+pub type Name = SmallString<[u8; 16]>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<Name, DeltaQ>")]
 pub struct EvaluationContext {
-    ctx: BTreeMap<Name, (DeltaQ, Option<CDF>)>,
-    deps: BTreeMap<Name, BTreeSet<Name>>,
-    rec: BTreeMap<Name, Option<usize>>,
-    max_size: usize,
-    mode: CompactionMode,
+    pub ctx: BTreeMap<Name, (DeltaQ, Option<Outcome>)>,
+    pub deps: BTreeMap<Name, BTreeSet<Name>>,
+    pub rec: BTreeMap<Name, Option<usize>>,
+    pub max_size: usize,
+    pub mode: CompactionMode,
+    pub load_factor: f32,
 }
 
 impl FromStr for EvaluationContext {
@@ -62,6 +66,7 @@ impl Default for EvaluationContext {
             rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: Default::default(),
+            load_factor: 1.0,
         }
     }
 }
@@ -107,7 +112,7 @@ impl EvaluationContext {
         self.ctx.get(name).map(|(dq, _)| dq)
     }
 
-    pub fn eval(&mut self, name: &str) -> Result<CDF, DeltaQError> {
+    pub fn eval(&mut self, name: &str) -> Result<Outcome, DeltaQError> {
         DeltaQ::name(name).eval(self)
     }
 
@@ -131,6 +136,7 @@ impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
             rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            load_factor: 1.0,
         }
     }
 }
@@ -147,6 +153,21 @@ impl Display for EvaluationContext {
             writeln!(f, "{} := {}", k, v.0)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LoadUpdate {
+    pub factor: f32,
+    pub summand: f32,
+}
+
+impl Default for LoadUpdate {
+    fn default() -> Self {
+        Self {
+            factor: 1.0,
+            summand: 0.0,
+        }
     }
 }
 
@@ -167,10 +188,11 @@ pub enum DeltaQ {
     /// A named DeltaQ taken from the context, with an optional recursion allowance.
     Name(Name, Option<usize>),
     /// A CDF that is used as a DeltaQ.
-    CDF(CDF),
+    CDF(Outcome),
     /// The convolution of two DeltaQs, describing the sequential execution of two outcomes.
     Seq(
         #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        LoadUpdate,
         #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
     ),
     /// A choice between two DeltaQs (i.e. their outcomes), with a given weight of each.
@@ -241,12 +263,12 @@ impl DeltaQ {
 
     /// Create a new DeltaQ from a CDF.
     pub fn cdf(cdf: CDF) -> DeltaQ {
-        DeltaQ::CDF(cdf)
+        DeltaQ::CDF(Outcome::new(cdf))
     }
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
     pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::Seq(Arc::new(first), Arc::new(second))
+        DeltaQ::Seq(Arc::new(first), LoadUpdate::default(), Arc::new(second))
     }
 
     /// Create a new DeltaQ from a choice between two DeltaQs.
@@ -277,8 +299,8 @@ impl DeltaQ {
                 deps.insert(name.clone());
                 deps
             }
-            DeltaQ::CDF(_) => BTreeSet::new(),
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::CDF { .. } => BTreeSet::new(),
+            DeltaQ::Seq(first, _load, second) => {
                 let mut deps = first.deps();
                 deps.extend(second.deps());
                 deps
@@ -313,15 +335,22 @@ impl DeltaQ {
                     write!(f, "{}", name)
                 }
             }
-            DeltaQ::CDF(cdf) => {
-                write!(f, "{}", cdf)
+            DeltaQ::CDF(outcome) => {
+                write!(f, "{}", outcome)
             }
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::Seq(first, load, second) => {
                 if parens {
                     write!(f, "(")?;
                 }
                 first.display(f, true)?;
-                write!(f, " ->- ")?;
+                write!(f, " ->-")?;
+                if load.factor != 1.0 {
+                    write!(f, "*{}", load.factor)?;
+                }
+                if load.summand != 0.0 {
+                    write!(f, "+{}", load.summand)?;
+                }
+                write!(f, " ")?;
                 second.display(f, true)?;
                 if parens {
                     write!(f, ")")?;
@@ -349,7 +378,7 @@ impl DeltaQ {
         }
     }
 
-    pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<CDF, DeltaQError> {
+    pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<Outcome, DeltaQError> {
         match self {
             DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
             DeltaQ::Name(n, r) => {
@@ -374,7 +403,10 @@ impl DeltaQ {
                             let mut increment = true;
                             let ret = if *allowance == 0 {
                                 increment = false;
-                                Ok(CDF::step(&[(0.0, 1.0)]).unwrap())
+                                Ok(Outcome {
+                                    cdf: CDF::from_steps(&[(0.0, 1.0)]).unwrap(),
+                                    load: BTreeMap::new(),
+                                })
                             } else {
                                 *allowance -= 1;
                                 dq.clone().eval(ctx)
@@ -405,12 +437,15 @@ impl DeltaQ {
                     }
                 }
             }
-            DeltaQ::CDF(cdf) => Ok(cdf.clone().with_max_size(ctx.max_size).with_mode(ctx.mode)),
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::CDF(outcome) => Ok(outcome.mult(ctx.load_factor, ctx)),
+            DeltaQ::Seq(first, load, second) => {
                 let first_cdf = first.eval(ctx)?;
+                let lf = ctx.load_factor;
+                ctx.load_factor = ctx.load_factor * load.factor + load.summand;
                 let second_cdf = second.eval(ctx)?;
+                ctx.load_factor = lf;
                 first_cdf
-                    .convolve(&second_cdf)
+                    .seq(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::Choice(first, first_fraction, second, second_fraction) => {
@@ -420,6 +455,7 @@ impl DeltaQ {
                     .choice(
                         *first_fraction / (*first_fraction + *second_fraction),
                         &second_cdf,
+                        ctx,
                     )
                     .map_err(DeltaQError::CDFError)
             }
@@ -427,14 +463,14 @@ impl DeltaQ {
                 let first_cdf = first.eval(ctx)?;
                 let second_cdf = second.eval(ctx)?;
                 first_cdf
-                    .for_all(&second_cdf)
+                    .for_all(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::ForSome(first, second) => {
                 let first_cdf = first.eval(ctx)?;
                 let second_cdf = second.eval(ctx)?;
                 first_cdf
-                    .for_some(&second_cdf)
+                    .for_some(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
         }
@@ -552,7 +588,7 @@ mod tests {
     fn test_scenario_from_paper_64k() {
         let ctx = btreemap! {
             "single".to_owned() =>
-                DeltaQ::cdf(CDF::step(
+                DeltaQ::cdf(CDF::from_steps(
                     &[(0.024, 1.0 / 3.0), (0.143, 2.0 / 3.0), (0.531, 1.0)],
                 )
                 .unwrap()),
@@ -632,7 +668,7 @@ mod tests {
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {
             let res = DeltaQ::Name("f".into(), Some(i)).eval(&mut ctx).unwrap();
-            assert_eq!(res, CDF::step(&[(i as f32, 1.0)]).unwrap());
+            assert_eq!(res, CDF::from_steps(&[(i as f32, 1.0)]).unwrap());
         }
 
         ctx.put(
@@ -648,7 +684,7 @@ mod tests {
         let res = DeltaQ::Name("out".into(), Some(1)).eval(&mut ctx).unwrap();
         assert_eq!(
             res,
-            CDF::step(&[
+            CDF::from_steps(&[
                 (0.2, 0.046360295),
                 (0.3, 0.20068718),
                 (0.4, 0.30865377),

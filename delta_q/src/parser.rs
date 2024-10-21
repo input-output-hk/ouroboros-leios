@@ -1,4 +1,4 @@
-use crate::{DeltaQ, EvaluationContext};
+use crate::{delta_q::LoadUpdate, DeltaQ, EvaluationContext, Outcome};
 use std::sync::Arc;
 use winnow::{
     combinator::{alt, cut_err, delimited, fail, opt, preceded, repeat, separated, separated_pair},
@@ -54,7 +54,7 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
 
             let rhs = rec(input, rbp)?;
             lhs = match op {
-                Op::Seq => DeltaQ::Seq(Arc::new(lhs), Arc::new(rhs)),
+                Op::Seq => DeltaQ::Seq(Arc::new(lhs), LoadUpdate::default(), Arc::new(rhs)),
                 Op::Choice(l, r) => DeltaQ::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
             };
         }
@@ -119,10 +119,7 @@ fn cdf(input: &mut &str) -> PResult<DeltaQ> {
                 (ws, ','),
             )
             .take()
-            .try_map(|s: &str| {
-                //
-                s.parse().map(DeltaQ::CDF)
-            }),
+            .try_map(|s: &str| s.parse().map(|cdf| DeltaQ::CDF(Outcome::new(cdf)))),
         ),
         ws,
         cut_err(

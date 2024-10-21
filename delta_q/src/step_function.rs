@@ -1,4 +1,4 @@
-use iter_tools::Itertools;
+use itertools::Itertools;
 use std::{
     cmp::Ordering,
     collections::BinaryHeap,
@@ -45,6 +45,10 @@ struct StepFunctionSerial {
 }
 
 impl StepFunction {
+    pub fn zero() -> Self {
+        Self::new(&[]).unwrap()
+    }
+
     /// Create a step function CDF from a vector of (x, y) pairs.
     /// The x values must be greater than 0 and must be strictly monotonically increasing.
     /// The y values must be from (0, 1] and must be strictly monotonically increasing.
@@ -108,6 +112,46 @@ impl StepFunction {
         other: &'a StepFunction,
     ) -> impl Iterator<Item = (f32, (f32, f32))> + 'a {
         PairIterators::new(self.data.iter().copied(), other.data.iter().copied())
+    }
+
+    pub fn mult(&self, factor: f32) -> Self {
+        if factor == 0.0 {
+            return Self::new(&[])
+                .unwrap()
+                .with_max_size(self.max_size)
+                .with_mode(self.mode);
+        }
+        Self {
+            data: self.data.iter().map(|&(x, y)| (x, y * factor)).collect(),
+            max_size: self.max_size,
+            mode: self.mode,
+        }
+    }
+
+    pub fn add(&self, other: &Self) -> Self {
+        let mut data = Vec::new();
+        for (x, (l, r)) in self.zip(other) {
+            data.push((x, l + r));
+        }
+        compact(&mut data, self.mode, self.max_size);
+        Self {
+            data: data.into(),
+            max_size: self.max_size,
+            mode: self.mode,
+        }
+    }
+
+    pub fn choice(&self, my_fraction: f32, other: &Self) -> Self {
+        let mut data = Vec::new();
+        for (x, (l, r)) in self.zip(other) {
+            data.push((x, l * my_fraction + r * (1.0 - my_fraction)));
+        }
+        compact(&mut data, self.mode, self.max_size);
+        Self {
+            data: data.into(),
+            max_size: self.max_size,
+            mode: self.mode,
+        }
     }
 }
 
