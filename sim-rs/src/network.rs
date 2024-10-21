@@ -83,8 +83,7 @@ impl IdLookup {
     fn find_node_id(&self, sim_id: SimId) -> NodeId {
         let id_list = self.0.read().expect("id list rwlock poisoned!");
         let index = id_list
-            .iter()
-            .position(|&id| id == sim_id)
+            .binary_search(&sim_id)
             .expect("unrecognized sim id");
         NodeId::from_usize(index)
     }

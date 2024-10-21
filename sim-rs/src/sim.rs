@@ -11,7 +11,7 @@ use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_distr::Distribution as _;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{
     clock::{Clock, Timestamp},
@@ -93,7 +93,7 @@ impl Simulation {
                 SimulationEvent::NewTransaction => self.generate_tx()?,
                 SimulationEvent::NetworkMessage { from, to, msg } => {
                     if self.config.trace_nodes.contains(&to) {
-                        info!(
+                        trace!(
                             "node {to} received msg of size {} from node {from}",
                             msg.bytes_size()
                         );
@@ -631,7 +631,7 @@ impl Node {
 
     fn send_to(&self, to: NodeId, msg: SimulationMessage) -> Result<()> {
         if self.trace {
-            info!(
+            trace!(
                 "node {} sent msg of size {} to node {to}",
                 self.id,
                 msg.bytes_size()
