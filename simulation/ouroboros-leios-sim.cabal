@@ -41,6 +41,7 @@ library
     PraosProtocol.Common.Chain
     PraosProtocol.SimBlockFetch
     PraosProtocol.SimChainSync
+    PraosProtocol.VizSimBlockFetch
     PraosProtocol.VizSimChainSync
     RelayProtocol
     SimRelay

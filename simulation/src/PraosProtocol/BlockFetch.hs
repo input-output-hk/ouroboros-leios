@@ -33,7 +33,7 @@ import Control.Concurrent.Class.MonadSTM (
   ),
  )
 import Control.Exception (assert)
-import Control.Monad (forM, forever, guard, replicateM, (<=<))
+import Control.Monad (forM, forever, guard, (<=<))
 import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -337,7 +337,7 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
   makeRequests :: STM m ()
   makeRequests = do
     let peerChainVars = (map . second) (.peerChainVar) $ Map.toList peers
-    (peerId, fr) <- maybe retry pure =<< longestChainSelection peerChainVars (ReadOnly cpsVar) blockHeader
+    (peerId, fr) <- maybe retry pure =<< longestChainSelection peerChainVars (asReadOnly cpsVar) blockHeader
     e <- initMissingBlocksChain <$> readTVar blocksVar <*> (chainState <$> readTVar cpsVar) <*> pure fr
     updateChains st e
     whenMissing e $ \_missingChain -> do
@@ -456,7 +456,7 @@ updateChains BlockFetchControllerState{..} e =
       modifyTVar' cpsVar (switchFork fullChain)
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
-      let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment $ missingChain.prefix
+      let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
       modifyTVar' cpsVar (switchFork improvedChain)
     SamePrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)

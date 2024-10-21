@@ -4,14 +4,13 @@ module Main where
 
 import Control.Applicative (Alternative ((<|>)), optional)
 import Data.Maybe (fromMaybe)
-import qualified Options.Applicative as Opts
-
-import Viz
-
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import qualified Options.Applicative as Opts
+import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
+import Viz
 
 main :: IO ()
 main = do
@@ -128,6 +127,8 @@ data VizName
   | VizRelayP2P1
   | VizRelayP2P2
   | VizPraosChainSync1
+  | VizPraosBlockFetch1
+
 readVizName :: String -> Either String VizName
 readVizName "tcp-1" = Right VizTCP1
 readVizName "tcp-2" = Right VizTCP2
@@ -137,6 +138,7 @@ readVizName "relay-2" = Right VizRelay2
 readVizName "p2p-1" = Right VizRelayP2P1
 readVizName "p2p-2" = Right VizRelayP2P2
 readVizName "pcs-1" = Right VizPraosChainSync1
+readVizName "pbf-1" = Right VizPraosBlockFetch1
 readVizName _ = Left "unknown vizualisation"
 
 namedViz :: VizName -> Vizualisation
@@ -148,3 +150,4 @@ namedViz VizRelay2 = ExamplesRelay.example2
 namedViz VizRelayP2P1 = ExamplesRelayP2P.example1
 namedViz VizRelayP2P2 = ExamplesRelayP2P.example2
 namedViz VizPraosChainSync1 = VizChainSync.example1
+namedViz VizPraosBlockFetch1 = VizBlockFetch.example1
