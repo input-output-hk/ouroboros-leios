@@ -33,7 +33,7 @@ import Control.Concurrent.Class.MonadSTM (
   ),
  )
 import Control.Exception (assert)
-import Control.Monad (forM, forever, guard, (<=<))
+import Control.Monad (forM, forever, guard, unless, void, when, (<=<))
 import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -345,10 +345,13 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
         blocks <- readTVar blocksVar
         chain <- chainState <$> readTVar cpsVar
         let chainUpdate = initMissingBlocksChain blocks chain fragment
-        updateChains st chainUpdate
+        useful <- updateChains st chainUpdate
         whenMissing chainUpdate $ \_missingChain -> do
           -- TODO: filterFetched could be reusing the missingChain suffix.
-          addRequest peerId <=< filterInFlight <=< filterFetched $ fragment
+          br <- filterInFlight <=< filterFetched $ fragment
+          if null br.blockRequestFragments
+            then unless useful retry
+            else addRequest peerId br
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
@@ -365,8 +368,7 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
     pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
 
   addRequest :: PeerId -> BlockRequest -> STM m ()
-  addRequest _pId (BlockRequest []) = return ()
-  addRequest pId br = do
+  addRequest pId br = assert (not $ null br.blockRequestFragments) $ do
     case Map.lookup pId peers of
       Nothing -> error "addRequest: no such peer"
       Just PeerStatus{..} -> do
@@ -397,6 +399,9 @@ instance HasHeader BlockOrHeader where
       (castHeaderFields . getHeaderFields)
       (castHeaderFields . getHeaderFields)
       x
+
+headPointMChain :: MissingBlocksChain -> Point Block
+headPointMChain ch = castPoint $ AnchoredFragment.headPoint ch.suffix
 
 data ChainsUpdate
   = FullChain (Chain Block)
@@ -448,23 +453,30 @@ whenMissing (FullChain _) _ = return ()
 whenMissing (ImprovedPrefix m) k = k m
 whenMissing (SamePrefix m) k = k m
 
+-- | Returns whether useful work was done.
 updateChains ::
   forall m.
   MonadSTM m =>
   BlockFetchControllerState m ->
   ChainsUpdate ->
-  STM m ()
+  STM m Bool
 updateChains BlockFetchControllerState{..} e =
   case e of
     FullChain fullChain -> do
       writeTVar targetChainVar Nothing
       modifyTVar' cpsVar (switchFork fullChain)
+      return True
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
       let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
       modifyTVar' cpsVar (switchFork improvedChain)
+      return True
     SamePrefix missingChain -> do
-      writeTVar targetChainVar (Just missingChain)
+      target <- readTVar targetChainVar
+      let useful = Just (headPointMChain missingChain) /= fmap headPointMChain target
+      when useful $ do
+        writeTVar targetChainVar (Just missingChain)
+      return useful
 
 -----------------------------------------------------------
 ---- Methods for blockFetchConsumer and blockFetchProducer
@@ -488,7 +500,7 @@ addFetchedBlock st pId blk = do
   case selected of
     Nothing -> return () -- I suppose we do not need this block anymore.
     Just missingChain -> do
-      updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
+      void $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
 
 addProducedBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
 addProducedBlock BlockFetchControllerState{..} blk = do
