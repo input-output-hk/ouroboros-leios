@@ -11,6 +11,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -58,6 +59,7 @@ data BlockFetchState
   | StBusy
   | StStreaming
   | StDone
+  deriving (Show)
 
 data SingBlockFetchState (st :: BlockFetchState) where
   SingStIdle :: SingBlockFetchState StIdle
@@ -109,6 +111,8 @@ instance StateTokenI StBusy where stateToken = SingStBusy
 instance StateTokenI StStreaming where stateToken = SingStStreaming
 instance StateTokenI StDone where stateToken = SingStDone
 
+deriving instance Show (Message BlockFetchState from to)
+
 instance MessageSize (Message BlockFetchState st st') where
   messageSizeBytes = \case
     MsgRequestRange pt1 pt2 -> messageSizeBytes pt1 + messageSizeBytes pt2
@@ -117,6 +121,15 @@ instance MessageSize (Message BlockFetchState st st') where
     MsgBlock blk -> messageSizeBytes blk
     MsgBatchDone -> 1
     MsgClientDone -> 1
+
+blockFetchMessageLabel :: Message BlockFetchState st st' -> String
+blockFetchMessageLabel = \case
+  MsgRequestRange _ _ -> "MsgRequestRange"
+  MsgNoBlocks -> "MsgNoBlocks"
+  MsgStartBatch -> "MsgStartBatch"
+  MsgBlock _ -> "MsgBlock"
+  MsgBatchDone -> "MsgBatchDone"
+  MsgClientDone -> "MsgClientDone"
 
 --------------------------------
 --- BlockFetch Server
@@ -296,20 +309,27 @@ data BlockFetchControllerState m = BlockFetchControllerState
   , cpsVar :: TVar m (ChainProducerState Block)
   }
 
--- NOTE: The ChainProducerState is initalized with no followers.
-initBlockFetchControllerState :: MonadSTM m => [PeerId] -> m (BlockFetchControllerState m)
-initBlockFetchControllerState peerIds = atomically $ do
+addPeer ::
+  MonadSTM m =>
+  PeerId ->
+  ReadOnly (TVar m (Chain BlockHeader)) ->
+  BlockFetchControllerState m ->
+  m (BlockFetchControllerState m)
+addPeer peerId peerChainVar blockFetchControllerState = atomically $ do
+  blockRequestVar <- newTVar (BlockRequest [])
+  blocksInFlightVar <- newTVar Set.empty
+  return $
+    blockFetchControllerState
+      { peers = Map.insert peerId PeerStatus{..} blockFetchControllerState.peers
+      }
+
+newBlockFetchControllerState :: MonadSTM m => m (BlockFetchControllerState m)
+newBlockFetchControllerState = atomically $ do
   blocksVar <- newTVar Map.empty
   targetChainVar <- newTVar Nothing
-  peers <- Map.fromList . zip peerIds <$> replicateM (length peerIds) initPeerStatus
+  let peers = Map.empty
   cpsVar <- newTVar $ initChainProducerState Chain.Genesis
   return BlockFetchControllerState{..}
- where
-  initPeerStatus = do
-    blockRequestVar <- newTVar (BlockRequest [])
-    blocksInFlightVar <- newTVar Set.empty
-    peerChainVar <- ReadOnly <$> newTVar Chain.Genesis
-    return PeerStatus{..}
 
 blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
 blockFetchController st@BlockFetchControllerState{..} = forever (atomically makeRequests)
@@ -476,3 +496,16 @@ addProducedBlock BlockFetchControllerState{..} blk = do
     -- the controller will wake up and decide, and we do not want to
     -- switch to the target chain before that.
     writeTVar targetChainVar Nothing
+
+blockRequestVarForPeerId :: PeerId -> BlockFetchControllerState m -> TVar m BlockRequest
+blockRequestVarForPeerId peerId blockFetchControllerState =
+  case Map.lookup peerId blockFetchControllerState.peers of
+    Nothing -> error $ "blockRequestVarForPeerId: no peer with id " <> show peerId
+    Just peerStatus -> peerStatus.blockRequestVar
+
+initBlockFetchConsumerStateForPeerId :: MonadSTM m => PeerId -> BlockFetchControllerState m -> BlockFetchConsumerState m
+initBlockFetchConsumerStateForPeerId peerId blockFetchControllerState =
+  BlockFetchConsumerState
+    (blockRequestVarForPeerId peerId blockFetchControllerState)
+    (atomically . addFetchedBlock blockFetchControllerState peerId)
+    (atomically . removeInFlight blockFetchControllerState peerId)

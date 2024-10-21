@@ -55,23 +55,17 @@ data ChainSyncEvent
   | -- | An event on a tcp link between two nodes
     ChainSyncEventTcp (LabelLink (TcpEvent (ProtocolMessage ChainSyncState)))
   deriving (Show)
-type ChainSyncMessage = ProtocolMessage ChainSyncState
-data ChainSyncNodeEvent = ChainSyncNodeEvent
-  -- = RelayNodeEventGenerate blk
 
-  deriving
-    ( -- | RelayNodeEventEnterQueue blk
-      -- | RelayNodeEventEnterBuffer blk
-      -- | RelayNodeEventRemove blk
-      Show
-    )
+type ChainSyncMessage = ProtocolMessage ChainSyncState
+
+data ChainSyncNodeEvent = ChainSyncNodeEvent
+  deriving (Show)
 
 exampleTrace1 :: ChainSyncTrace
 exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
 
 traceRelayLink1 ::
   TcpConnProps ->
-  --- PacketGenerationPattern ->
   ChainSyncTrace
 traceRelayLink1 tcpprops =
   selectTimedEvents $

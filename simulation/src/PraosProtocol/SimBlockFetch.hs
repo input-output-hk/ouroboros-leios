@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module PraosProtocol.SimBlockFetch where
 
+import Chan (Chan)
 import ChanDriver
 import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
@@ -23,7 +25,6 @@ import qualified Data.Set as Set
 import Network.TypedProtocol
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
-import qualified PraosProtocol.Common.Chain as Chain
 import SimTCPLinks
 import SimTypes
 
@@ -40,16 +41,11 @@ data BlockFetchEvent
   | -- | An event on a tcp link between two nodes
     BlockFetchEventTcp (LabelLink (TcpEvent (ProtocolMessage BlockFetchState)))
   deriving (Show)
-type BlockFetchMessage = ProtocolMessage BlockFetchState
-data BlockFetchNodeEvent = BlockFetchNodeEvent
-  -- = RelayNodeEventGenerate blk
 
-  deriving
-    ( -- | RelayNodeEventEnterQueue blk
-      -- | RelayNodeEventEnterBuffer blk
-      -- | RelayNodeEventRemove blk
-      Show
-    )
+type BlockFetchMessage = ProtocolMessage BlockFetchState
+
+data BlockFetchNodeEvent = BlockFetchNodeEvent
+  deriving (Show)
 
 exampleTrace1 :: BlockFetchTrace
 exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
@@ -77,20 +73,36 @@ traceRelayLink1 tcpprops =
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
-        (consumerNode inChan)
-        (producerNode outChan)
+        (nodeA outChan)
+        (nodeB inChan)
       return ()
  where
-  consumerNode chan = do
-    hchainVar <- newTVarIO Chain.Genesis
-    runPeerWithDriver (chanDriver decideBlockFetchState chan) (chainConsumer hchainVar)
-  producerNode chan = do
-    let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
-    let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
-    cpsVar <- newTVarIO cps
-    runPeerWithDriver (chanDriver decideBlockFetchState chan) (chainProducer fId cpsVar)
+  -- Soon-To-Be-Shared Chain
+  chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
 
-  [na, nb] = map NodeId [0, 1]
+  -- Block-Fetch Controller & Consumer
+  nodeA :: (MonadAsync m, MonadSTM m) => Chan m (ProtocolMessage BlockFetchState) -> m ()
+  nodeA chan = do
+    let peerId = 1
+    peerChainVar <- newTVarIO (blockHeader <$> chain)
+    blockFetchControllerState <-
+      newBlockFetchControllerState
+        >>= addPeer peerId (ReadOnly peerChainVar)
+    concurrently_
+      ( blockFetchController blockFetchControllerState
+      )
+      ( runPeerWithDriver (chanDriver decideBlockFetchState chan) $
+          blockFetchConsumer $
+            initBlockFetchConsumerStateForPeerId 1 blockFetchControllerState
+      )
+  -- Block-Fetch Producer
+  nodeB chan = do
+    blocksVar <- ReadOnly <$> newTVarIO (toBlocks chain)
+    let blockFetchProducerState = BlockFetchProducerState blocksVar
+    runPeerWithDriver (chanDriver decideBlockFetchState chan) $
+      blockFetchProducer blockFetchProducerState
+
+  (na, nb) = (NodeId 0, NodeId 1)
 
   tracer :: Tracer (IOSim s) BlockFetchEvent
   tracer = simTracer
