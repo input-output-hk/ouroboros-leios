@@ -280,7 +280,7 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
     (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
   return $ do
     peerId <- selectedPeer
-    point <- Chain.intersectChains chain chain'
+    let point = fromMaybe GenesisPoint $ Chain.intersectChains chain chain'
     let suffix =
           snd . fromMaybe (error "longestChainSelection: intersect not on chain") $
             AnchoredFragment.splitAfterPoint (Chain.toAnchoredFragment chain') point
