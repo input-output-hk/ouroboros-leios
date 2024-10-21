@@ -148,14 +148,15 @@ resolveRange ::
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
   let resolveRangeAcc :: [BlockBody] -> Point Block -> Maybe [BlockBody]
-      resolveRangeAcc acc bpoint | start == bpoint = Just acc
-      resolveRangeAcc _acc GenesisPoint = Nothing
-      resolveRangeAcc acc bpoint@(BlockPoint pslot phash)
-        | pointSlot start > pointSlot bpoint = Nothing
-        | otherwise = do
-            Block{..} <- Map.lookup phash blocks
-            guard $ blockSlot blockHeader == pslot
-            resolveRangeAcc (blockBody : acc) =<< blockPrevPoint blocks blockHeader
+      resolveRangeAcc _acc bpoint | pointSlot start > pointSlot bpoint = Nothing
+      resolveRangeAcc acc GenesisPoint = assert (start == GenesisPoint) (Just acc)
+      resolveRangeAcc acc bpoint@(BlockPoint pslot phash) = do
+        Block{..} <- Map.lookup phash blocks
+        guard $ blockSlot blockHeader == pslot
+        let acc' = blockBody : acc
+        if start == bpoint
+          then Just acc'
+          else resolveRangeAcc acc' =<< blockPrevPoint blocks blockHeader
   return $ reverse <$> resolveRangeAcc [] end
 
 blockFetchProducer ::
