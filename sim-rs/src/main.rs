@@ -10,7 +10,8 @@ use tokio::{
     pin, select,
     sync::{mpsc, oneshot},
 };
-use tracing::warn;
+use tracing::{level_filters::LevelFilter, warn};
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, EnvFilter};
 
 mod clock;
 mod config;
@@ -26,11 +27,20 @@ struct Args {
     output: Option<PathBuf>,
     #[clap(short, long)]
     timescale: Option<u32>,
+    #[clap(long)]
+    trace_node: Vec<usize>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().compact().without_time().init();
+    let fmt_layer = tracing_subscriber::fmt::layer().compact().without_time();
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy();
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .with(filter)
+        .init();
 
     // Handle ctrl+c (SIGINT) at an application level, so we can report on necessary stats before shutting down.
     let (ctrlc_sink, ctrlc_source) = oneshot::channel();
@@ -45,7 +55,7 @@ async fn main() -> Result<()> {
     })?;
 
     let args = Args::parse();
-    let config = read_config(&args.filename, args.timescale)?;
+    let config = read_config(&args.filename, args.timescale, &args.trace_node)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
     let monitor = EventMonitor::new(&config, events_source, args.output).run();

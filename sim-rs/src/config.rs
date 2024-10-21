@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs, path::Path, time::Duration};
+use std::{collections::HashSet, fmt::Display, fs, path::Path, time::Duration};
 
 use anyhow::Result;
 use netsim_async::geo::{self, Location};
@@ -47,6 +47,8 @@ impl From<DistributionConfig> for FloatDistribution {
 struct RawConfig {
     seed: Option<u64>,
     timescale: Option<u32>,
+    #[serde(default)]
+    trace_nodes: HashSet<NodeId>,
     nodes: Vec<RawNodeConfig>,
     links: Vec<RawLinkConfig>,
     block_generation_probability: f64,
@@ -75,6 +77,7 @@ struct RawLinkConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub timescale: u32,
+    pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub block_generation_probability: f64,
@@ -130,6 +133,7 @@ impl From<RawConfig> for SimConfiguration {
             seed: value.seed.unwrap_or_default(),
             timescale,
             nodes,
+            trace_nodes: value.trace_nodes,
             links,
             block_generation_probability: value.block_generation_probability,
             ib_generation_probability: value.ib_generation_probability,
@@ -155,11 +159,18 @@ fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Dur
     geo_latency + extra_latency
 }
 
-pub fn read_config(filename: &Path, timescale: Option<u32>) -> Result<SimConfiguration> {
+pub fn read_config(
+    filename: &Path,
+    timescale: Option<u32>,
+    trace_nodes: &[usize],
+) -> Result<SimConfiguration> {
     let file = fs::read_to_string(filename)?;
     let mut raw_config: RawConfig = toml::from_str(&file)?;
     if let Some(ts) = timescale {
         raw_config.timescale = Some(ts);
+    }
+    for id in trace_nodes {
+        raw_config.trace_nodes.insert(NodeId(*id));
     }
     Ok(raw_config.into())
 }

@@ -11,6 +11,7 @@ use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use rand_distr::Distribution as _;
+use tracing::{debug, info};
 
 use crate::{
     clock::{Clock, Timestamp},
@@ -91,6 +92,12 @@ impl Simulation {
                 SimulationEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
                 SimulationEvent::NewTransaction => self.generate_tx()?,
                 SimulationEvent::NetworkMessage { from, to, msg } => {
+                    if self.config.trace_nodes.contains(&to) {
+                        info!(
+                            "node {to} received msg of size {} from node {from}",
+                            msg.bytes_size()
+                        );
+                    }
                     let Some(target) = self.nodes.get_mut(&to) else {
                         bail!("unrecognized message target {to}");
                     };
@@ -257,6 +264,7 @@ impl Simulation {
 
         // any node could be the first to see a transaction
         let publisher_id = self.choose_random_node();
+        debug!("node {publisher_id} generated tx {id}");
         self.get_node_mut(&publisher_id)
             .receive_tx(publisher_id, tx)
     }
@@ -273,6 +281,7 @@ impl Simulation {
 
 struct Node {
     id: NodeId,
+    trace: bool,
     msg_sink: NetworkSink<SimulationMessage>,
     tracker: EventTracker,
     clock: Clock,
@@ -327,6 +336,7 @@ impl Node {
         let peers = config.peers.clone();
         Self {
             id,
+            trace: sim_config.trace_nodes.contains(&id),
             msg_sink,
             tracker,
             clock,
@@ -350,8 +360,7 @@ impl Node {
                 .get(peer)
                 .is_some_and(|&s| s >= block.slot)
             {
-                self.msg_sink
-                    .send_to(*peer, SimulationMessage::RollForward(block.slot))?;
+                self.send_to(*peer, SimulationMessage::RollForward(block.slot))?;
                 self.praos.peer_heads.insert(*peer, block.slot);
             }
         }
@@ -361,41 +370,40 @@ impl Node {
 
     fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
         if self.praos.txs_seen.insert(id) {
-            self.msg_sink
-                .send_to(from, SimulationMessage::RequestTx(id))?;
+            self.send_to(from, SimulationMessage::RequestTx(id))?;
         }
         Ok(())
     }
 
     fn receive_request_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
-        self.msg_sink.send_to(from, SimulationMessage::Tx(tx))
+        self.send_to(from, SimulationMessage::Tx(tx))
     }
 
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
+        if self.trace {
+            info!("node {} saw tx {id}", self.id);
+        }
         self.leios.mempool.insert(tx.id, tx);
         for peer in &self.peers {
             if *peer == from {
                 continue;
             }
-            self.msg_sink
-                .send_to(*peer, SimulationMessage::AnnounceTx(id))?;
+            self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
         }
         self.try_fill_ibs()
     }
 
     fn receive_roll_forward(&mut self, from: NodeId, slot: u64) -> Result<()> {
         if self.praos.blocks_seen.insert(slot) {
-            self.msg_sink
-                .send_to(from, SimulationMessage::RequestBlock(slot))?;
+            self.send_to(from, SimulationMessage::RequestBlock(slot))?;
         }
         Ok(())
     }
 
     fn receive_request_block(&mut self, from: NodeId, slot: u64) -> Result<()> {
         if let Some(block) = self.praos.blocks.get(&slot) {
-            self.msg_sink
-                .send_to(from, SimulationMessage::Block(block.clone()))?;
+            self.send_to(from, SimulationMessage::Block(block.clone()))?;
         }
         Ok(())
     }
@@ -419,22 +427,18 @@ impl Node {
     }
 
     fn receive_announce_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        self.msg_sink
-            .send_to(from, SimulationMessage::RequestIBHeader(id))?;
+        self.send_to(from, SimulationMessage::RequestIBHeader(id))?;
         Ok(())
     }
 
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(pending_ib) = self.leios.pending_ibs.get(&id) {
             // We don't have this IB, just the header. Send that.
-            self.msg_sink
-                .send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone()))?;
+            self.send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone()))?;
         } else if let Some(ib) = self.leios.ibs.get(&id) {
             // We have the full IB. Send the header, and also advertise that we have the full IB.
-            self.msg_sink
-                .send_to(from, SimulationMessage::IBHeader(ib.header.clone()))?;
-            self.msg_sink
-                .send_to(from, SimulationMessage::AnnounceIB(id))?;
+            self.send_to(from, SimulationMessage::IBHeader(ib.header.clone()))?;
+            self.send_to(from, SimulationMessage::AnnounceIB(id))?;
         }
         Ok(())
     }
@@ -459,8 +463,7 @@ impl Node {
             if *peer == from {
                 continue;
             }
-            self.msg_sink
-                .send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
+            self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
         Ok(())
     }
@@ -479,8 +482,7 @@ impl Node {
             // If so, make the request
             pending_ib.has_been_requested = true;
             reqs.active.insert(id);
-            self.msg_sink
-                .send_to(from, SimulationMessage::RequestIB(id))?;
+            self.send_to(from, SimulationMessage::RequestIB(id))?;
         } else {
             // If not, just track that this peer has this IB when we're ready
             reqs.pending.push(id, pending_ib.header.timestamp);
@@ -490,8 +492,7 @@ impl Node {
 
     fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(ib) = self.leios.ibs.get(&id) {
-            self.msg_sink
-                .send_to(from, SimulationMessage::IB(ib.clone()))?;
+            self.send_to(from, SimulationMessage::IB(ib.clone()))?;
         }
         Ok(())
     }
@@ -507,8 +508,7 @@ impl Node {
             if *peer == from {
                 continue;
             }
-            self.msg_sink
-                .send_to(*peer, SimulationMessage::AnnounceIB(id))?;
+            self.send_to(*peer, SimulationMessage::AnnounceIB(id))?;
         }
 
         // Mark that this IB is no longer pending
@@ -530,8 +530,8 @@ impl Node {
             // Make the request
             pending_ib.has_been_requested = true;
             reqs.active.insert(id);
-            self.msg_sink
-                .send_to(from, SimulationMessage::RequestIB(id))?;
+            self.send_to(from, SimulationMessage::RequestIB(id))?;
+            break;
         }
 
         Ok(())
@@ -613,8 +613,7 @@ impl Node {
         let id = ib.header.id();
         self.leios.ibs.insert(id, ib);
         for peer in &self.peers {
-            self.msg_sink
-                .send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
+            self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
         Ok(())
     }
@@ -628,6 +627,17 @@ impl Node {
         } else {
             None
         }
+    }
+
+    fn send_to(&self, to: NodeId, msg: SimulationMessage) -> Result<()> {
+        if self.trace {
+            info!(
+                "node {} sent msg of size {} to node {to}",
+                self.id,
+                msg.bytes_size()
+            );
+        }
+        self.msg_sink.send_to(to, msg)
     }
 }
 
