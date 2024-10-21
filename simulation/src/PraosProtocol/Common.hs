@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
@@ -8,6 +7,7 @@ module PraosProtocol.Common (
   AnchoredFragment,
   Chain,
   Blocks,
+  toBlocks,
   headerPoint,
   blockPrevPoint,
   setFollowerPoint,
@@ -43,7 +43,7 @@ import Ouroboros.Network.Block as Block
 import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
-import PraosProtocol.Common.Chain (Chain, pointOnChain)
+import PraosProtocol.Common.Chain (Chain, foldChain, pointOnChain)
 
 import ChanTCP (MessageSize (..))
 import SimTCPLinks (kilobytes)
@@ -68,6 +68,9 @@ instance MessageSize (Point block) where
   messageSizeBytes _ = {- hash -} 32 + {- slot no -} 8
 
 type Blocks = Map (HeaderHash Block) Block
+
+toBlocks :: Chain Block -> Blocks
+toBlocks = foldChain (\blocks block -> Map.insert (headerHash . blockHeader $ block) block blocks) Map.empty
 
 headerPoint :: BlockHeader -> Point Block
 headerPoint = castPoint . blockPoint
