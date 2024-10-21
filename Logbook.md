@@ -1,4 +1,39 @@
 # Leios logbook
+
+## 2024-10-21:
+
+### Rust simulation
+
+We identified that the sim's failure to propagate messages was caused by an issue in ce-netsim. Profiling revealed a small issue in `netsim`, and correcting that fixed transaction propagation. When the sim is run faster than realtime, transaction propagation is still too slow.
+
+To reproduce the issue, go to the `sim-rs` directory and run the following command:
+```sh
+RUST_LOG="debug,sim_rs::events=error" cargo run --release -- ./test_data/realistic.toml output/simple.json --trace-node 0 -t 1
+```
+The `-t` flag controls the simulation speed. `-t 1` means to run the sim at 1x real speed (1 slot per second). At `-t 1`, the logs will indicate that transactions propagate about as quickly as they are received. At `-t 16`, transactions are generated faster than they propagate.
+
+Input blocks are failing to propagate due to what looks like a separate issue; some IBs propagate across the network immediately, other IBs never reach some nodes. This is likely a bug in the sim.
+
+## 2024-10-17
+
+### Rust simulation
+
+The sim output is incorrect, apparently because IBs and TXs are propagating slowly. On a sim with 3000 nodes (2000 of which are stake pools) running for 1996 slots with 𝑓I = 5.0,
+ - 8733 IB(s) were generated, on average 4.373059589384076 per slot.
+ - 1187 out of 1647 transaction(s) reached an IB.
+ - Each transaction was included in an average of 44.4936247723133 IBs.
+ - Each IB contained an average of 8.391274476125043 transactions.
+ - Each node received an average of 113.649 IBs.
+
+When
+
+## 2024-10-16
+
+### Rust simulation
+
+* First pass at input block body propagation
+* Brief slack chat about mempool validation. It will be more complicated in Leios than in Praos; transactions can either come from IBs (which may or may not reach the final chain in some order) or from RBs (which are on the final chain). We don't need to worry about that for the sim yet, but it will be relevant for modeling CPU costs.
+
 ## 2024-10-15
 
 ### ΔQ Next steps
@@ -114,6 +149,11 @@ Objectives:  We should give ourselves until end of next week to write down and r
 * We need data on validation time -> relationship b/w block size/exec budget -> waht's the time budget
 * Build an integrated spreadsheet to explore the "resources space"
 * Communicate resources model to the community
+
+### Rust simulation
+
+* First pass at input block generation and header propagation
+* PR open with the above
 
 ## 2024-10-14
 
