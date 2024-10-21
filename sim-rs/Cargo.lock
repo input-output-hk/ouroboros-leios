@@ -480,7 +480,7 @@ dependencies = [
 [[package]]
 name = "netsim-async"
 version = "0.1.0"
-source = "git+https://github.com/input-output-hk/ce-netsim.git?rev=f4feba6#f4feba657021459690118b2874f9fed809a2dc4a"
+source = "git+https://github.com/SupernaviX/ce-netsim.git?rev=535ae49#535ae49360ad245dbf58123063f6cf79f411b503"
 dependencies = [
  "anyhow",
  "netsim-core",
@@ -490,7 +490,7 @@ dependencies = [
 [[package]]
 name = "netsim-core"
 version = "0.1.0"
-source = "git+https://github.com/input-output-hk/ce-netsim.git?rev=f4feba6#f4feba657021459690118b2874f9fed809a2dc4a"
+source = "git+https://github.com/SupernaviX/ce-netsim.git?rev=535ae49#535ae49360ad245dbf58123063f6cf79f411b503"
 dependencies = [
  "anyhow",
  "logos",

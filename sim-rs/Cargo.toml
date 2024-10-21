@@ -9,7 +9,7 @@ async-stream = "0.3"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
 futures = "0.3"
-netsim-async = { git = "https://github.com/input-output-hk/ce-netsim.git", rev = "f4feba6" }
+netsim-async = { git = "https://github.com/SupernaviX/ce-netsim.git", rev = "535ae49" }
 priority-queue = "2"
 rand = "0.8"
 rand_chacha = "0.3"
