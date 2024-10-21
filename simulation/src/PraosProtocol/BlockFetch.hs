@@ -337,13 +337,18 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
   makeRequests :: STM m ()
   makeRequests = do
     let peerChainVars = (map . second) (.peerChainVar) $ Map.toList peers
-    (peerId, fr) <- maybe retry pure =<< longestChainSelection peerChainVars (asReadOnly cpsVar) blockHeader
-    e <- initMissingBlocksChain <$> readTVar blocksVar <*> (chainState <$> readTVar cpsVar) <*> pure fr
-    updateChains st e
-    whenMissing e $ \_missingChain -> do
-      -- TODO: filterFetched could be reusing the missingChain suffix.
-      req <- filterInFlight <=< filterFetched $ fr
-      addRequest peerId req
+    mchainSwitch <- longestChainSelection peerChainVars (asReadOnly cpsVar) blockHeader
+    case mchainSwitch of
+      Nothing -> retry
+      Just (peerId, fragment) -> do
+        blocks <- readTVar blocksVar
+        chain <- chainState <$> readTVar cpsVar
+        let chainUpdate = initMissingBlocksChain blocks chain fragment
+        updateChains st chainUpdate
+        whenMissing chainUpdate $ \_missingChain -> do
+          -- TODO: filterFetched could be reusing the missingChain suffix.
+          req <- filterInFlight <=< filterFetched $ fragment
+          addRequest peerId req
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
