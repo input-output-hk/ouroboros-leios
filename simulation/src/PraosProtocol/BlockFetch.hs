@@ -347,8 +347,7 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
         updateChains st chainUpdate
         whenMissing chainUpdate $ \_missingChain -> do
           -- TODO: filterFetched could be reusing the missingChain suffix.
-          req <- filterInFlight <=< filterFetched $ fragment
-          addRequest peerId req
+          addRequest peerId <=< filterInFlight <=< filterFetched $ fragment
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
