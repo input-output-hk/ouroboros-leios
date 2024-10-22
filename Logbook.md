@@ -55,6 +55,22 @@ Next steps:
   * Triage defined objectives according to priorities
   * GP to detail sharding ideas
 
+### Rust simulation
+
+The bug preventing IB propagation was caused by the netsim optimization; it removed delivery order guarantees. The sim has been updated to work correctly even if messages are received out-of-order, and now works enough to study IB delivery from its output.
+
+When running with current transaction volume and 𝑓I = 5.0, IBs are extremely small and transactions are duplicated across many IBs.
+
+ - 724 IB(s) were generated, on average 2.8171206225680936 per slot.
+ - 234 out of 234 transaction(s) reached an IB.
+ - Each transaction was included in an average of 4.653846153846154 IBs.
+ - Each IB contained an average of 1.5041436464088398 transactions.
+ - Each node received an average of 720.099 IBs.
+
+We're going to try adding sharding to the simulation, to see if it lets us use network resources more efficiently.
+
+At Pi's advice, we plan to take some time over the next week to visualize the parts of the sim that are implemented so far. We don't expect to use this for next week's demo, just making sure that the infrastructure is in place.
+
 ## 2024-10-21
 
 ### Rust simulation
@@ -66,6 +82,12 @@ To reproduce the issue, go to the `sim-rs` directory and run the following comma
 RUST_LOG="debug,sim_rs::events=error" cargo run --release -- ./test_data/realistic.toml output/simple.json --trace-node 0 -t 1
 ```
 The `-t` flag controls the simulation speed. `-t 1` means to run the sim at 1x real speed (1 slot per second). At `-t 1`, the logs will indicate that transactions propagate about as quickly as they are received. At `-t 16`, transactions are generated faster than they propagate.
+
+We profiled netsim by using the rust [flamegraph](https://github.com/flamegraph-rs/flamegraph) crate with the below command:
+```sh
+cargo flamegraph -- ./test_data/realistic.toml output/simple.json --trace-node 0 -t 1
+```
+This generated a (very pretty) flamegraph showing CPU usage of the simulation. 92% of CPU time was spent inside of a call to `VecDeque::pop` inside of netsim: replacing that call with `VecDeque::swap_remove_back` dramatically improved performance.
 
 Input blocks are failing to propagate due to what looks like a separate issue; some IBs propagate across the network immediately, other IBs never reach some nodes. This is likely a bug in the sim.
 
@@ -79,8 +101,6 @@ The sim output is incorrect, apparently because IBs and TXs are propagating slow
  - Each transaction was included in an average of 44.4936247723133 IBs.
  - Each IB contained an average of 8.391274476125043 transactions.
  - Each node received an average of 113.649 IBs.
-
-When
 
 ## 2024-10-16
 
