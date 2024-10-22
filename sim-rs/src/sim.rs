@@ -504,7 +504,13 @@ impl Node {
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id();
         for transaction in &ib.transactions {
+            // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
+            for pending_ibs in self.leios.unsent_ibs.values_mut() {
+                for pending_ib in pending_ibs {
+                    pending_ib.transactions.retain(|tx| tx.id != transaction.id);
+                }
+            }
         }
         self.leios.ibs.insert(id, ib);
 
