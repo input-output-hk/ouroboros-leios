@@ -434,7 +434,10 @@ impl Node {
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(pending_ib) = self.leios.pending_ibs.get(&id) {
             // We don't have this IB, just the header. Send that.
-            self.send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone(), false))?;
+            self.send_to(
+                from,
+                SimulationMessage::IBHeader(pending_ib.header.clone(), false),
+            )?;
         } else if let Some(ib) = self.leios.ibs.get(&id) {
             // We have the full IB. Send the header, and also advertise that we have the full IB.
             self.send_to(from, SimulationMessage::IBHeader(ib.header.clone(), true))?;
@@ -442,7 +445,12 @@ impl Node {
         Ok(())
     }
 
-    fn receive_ib_header(&mut self, from: NodeId, header: InputBlockHeader, has_body: bool) -> Result<()> {
+    fn receive_ib_header(
+        &mut self,
+        from: NodeId,
+        header: InputBlockHeader,
+        has_body: bool,
+    ) -> Result<()> {
         let id = header.id();
         if self.leios.ibs.contains_key(&id) {
             return Ok(());

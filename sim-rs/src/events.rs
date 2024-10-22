@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use serde::Serialize;
-use tokio::sync::mpsc;
+use tokio::{fs::File, io::AsyncWriteExt, sync::mpsc};
 use tracing::{info, info_span, warn};
 
 use crate::{
@@ -164,9 +164,13 @@ impl EventMonitor {
         let mut generated_ibs = 0u64;
         let mut total_txs = 0u64;
 
-        let mut output = vec![];
+        let mut output = match self.output_path {
+            Some(ref path) => OutputTarget::File(File::create(path).await?),
+            None => OutputTarget::None,
+        };
         while let Some((event, timestamp)) = self.events_source.recv().await {
-            self.compute_output_events(&mut output, &event, timestamp);
+            self.compute_output_events(&mut output, &event, timestamp)
+                .await?;
             match event {
                 Event::Transaction { id, bytes } => {
                     total_txs += 1;
@@ -258,70 +262,96 @@ impl EventMonitor {
             );
             info!("Each node received an average of {avg_seen} IBs.");
         });
-
-        if let Some(path) = self.output_path {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(path, serde_json::to_vec(&output)?)?;
-        }
         Ok(())
     }
 
-    fn compute_output_events(&self, output: &mut Vec<OutputEvent>, event: &Event, time: Timestamp) {
+    async fn compute_output_events(
+        &self,
+        output: &mut OutputTarget,
+        event: &Event,
+        time: Timestamp,
+    ) -> Result<()> {
         match event {
             Event::Slot { number, block } => {
                 if let Some(block) = block {
-                    output.push(OutputEvent::PraosBlockGenerated {
-                        time,
-                        slot: *number,
-                        producer: block.producer,
-                        transactions: block.transactions.iter().map(|t| t.id).collect(),
-                    });
+                    output
+                        .write(OutputEvent::PraosBlockGenerated {
+                            time,
+                            slot: *number,
+                            producer: block.producer,
+                            transactions: block.transactions.iter().map(|t| t.id).collect(),
+                        })
+                        .await?;
                 }
             }
             Event::Transaction { id, bytes } => {
-                output.push(OutputEvent::TransactionCreated {
-                    time,
-                    id: *id,
-                    bytes: *bytes,
-                });
+                output
+                    .write(OutputEvent::TransactionCreated {
+                        time,
+                        id: *id,
+                        bytes: *bytes,
+                    })
+                    .await?;
             }
             Event::BlockReceived {
                 slot,
                 sender,
                 recipient,
             } => {
-                output.push(OutputEvent::PraosBlockReceived {
-                    time,
-                    slot: *slot,
-                    sender: *sender,
-                    recipient: *recipient,
-                });
+                output
+                    .write(OutputEvent::PraosBlockReceived {
+                        time,
+                        slot: *slot,
+                        sender: *sender,
+                        recipient: *recipient,
+                    })
+                    .await?;
             }
             Event::InputBlockGenerated { block } => {
-                output.push(OutputEvent::InputBlockGenerated {
-                    time,
-                    slot: block.header.slot,
-                    producer: block.header.producer,
-                    index: block.header.index,
-                    transactions: block.transactions.iter().map(|t| t.id).collect(),
-                });
+                output
+                    .write(OutputEvent::InputBlockGenerated {
+                        time,
+                        slot: block.header.slot,
+                        producer: block.header.producer,
+                        index: block.header.index,
+                        transactions: block.transactions.iter().map(|t| t.id).collect(),
+                    })
+                    .await?;
             }
             Event::InputBlockReceived {
                 block,
                 sender,
                 recipient,
             } => {
-                output.push(OutputEvent::InputBlockReceived {
-                    time,
-                    slot: block.header.slot,
-                    producer: block.header.producer,
-                    index: block.header.index,
-                    sender: *sender,
-                    recipient: *recipient,
-                });
+                output
+                    .write(OutputEvent::InputBlockReceived {
+                        time,
+                        slot: block.header.slot,
+                        producer: block.header.producer,
+                        index: block.header.index,
+                        sender: *sender,
+                        recipient: *recipient,
+                    })
+                    .await?;
             }
         }
+        Ok(())
+    }
+}
+
+enum OutputTarget {
+    File(File),
+    None,
+}
+
+impl OutputTarget {
+    async fn write(&mut self, event: OutputEvent) -> Result<()> {
+        let Self::File(file) = self else {
+            return Ok(());
+        };
+        let mut string = serde_json::to_string(&event)?;
+        string.push('\n');
+        file.write_all(string.as_bytes()).await?;
+        Ok(())
     }
 }

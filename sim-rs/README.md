@@ -8,7 +8,7 @@ This directory contains a (very heavily WIP) simulation of the Leios protocol. I
 cargo run --release input_path [output_path]
 
 # for example...
-cargo run --release ./test_data/simple.toml output/simple.json
+cargo run --release ./test_data/realistic.toml output/out.jsonl
 ```
 
 The `input_path` is a TOML file which describes protocol parameters, the network topology, and other necessary configuration. Input files for predefined scenarios are in the `test_data` directory.
