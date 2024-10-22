@@ -24,6 +24,7 @@ library
   exposed-modules:
     Chan
     ChanDriver
+    ChanMux
     ChanTCP
     ExamplesLayout
     ExamplesRelay
