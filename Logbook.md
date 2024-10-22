@@ -1,6 +1,61 @@
 # Leios logbook
 
-## 2024-10-21:
+## 2024-10-22
+
+### NetSim
+
+Discussion with NdP about the changes we would like to see in ce-netsim for the purpose of large-scale simulation of Leios, the main point being that we need the network simulator to also simulate time passing in order to avoid being dependent on the underlying computational power, ie. timestamps are attached by netsim's driver  to external events and passing of time is computed internally according to latency and bandwidth models
+
+Next steps:
+
+* NdP targeting version of netsim with simulated time by the end of November
+* Short term: using a faster method to pop from the queue already makes it possible to run large scale simulation
+
+### λείος Team Meeting
+
+* Next week is Monthly demo & review
+  * 1 slide with what's been promised
+  * 1 slide with what's next
+  * in between, a few slides or demos about what's been done
+  * opportunity to ask deep questions, but there won't be time answer those => we can defer to another dedicated meeting to discuss important or lengthy questions
+  * feedback received can change the project, it happened on Peras
+  * it's more like a "bait" to trigger feedback from attendees and stakeholders
+* what about mempool design?
+  * there are other options
+* Would be good to start with 2-3 slides description of Leios
+  * Giorgos -> introduce high-level description of Leios
+* Then about 30' of content
+  * FM -> Andre?
+  * ΔQ -> Roland
+  * Haskell simulation -> Andrea
+  * Rust simulation -> Simon
+  * Ledger design?
+
+* We want to define objectives for the next 2 months (eg. until end of December) by next Monday
+
+* Next week's meeting
+  * focus on sharding stuff, interesting the issue popped up also in the Rust simulation
+  *
+  * process question: need to know who is going to do the work?
+    * let's write tickets for objectives
+    * and then prioritise next meeting what we have
+
+* focusing on short-leios would speedup things, so the main question for next 2 months can be reframed as:
+
+  > How much resources would short Leios need and what would that imply in terms of cost for running a node?
+
+  * We need to have an accurate description of Short Leios in a single place, copy/pasting from the paper with PNGs is just fine
+  * Note: we've been bitten in Peras with having several, inconsistent documents floating around, and verbal descriptions
+
+#### TODO
+
+* [ ] Everyone: Define December objectives as GH issues
+* [ ] Everyone: Fill in slides/placeholders & prepare for Wednesday demo meeting
+* Next meeting:
+  * Triage defined objectives according to priorities
+  * GP to detail sharding ideas
+
+## 2024-10-21
 
 ### Rust simulation
 
