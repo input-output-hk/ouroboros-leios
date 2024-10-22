@@ -39,10 +39,13 @@ library
     PraosProtocol.Common
     PraosProtocol.Common.AnchoredFragment
     PraosProtocol.Common.Chain
+    PraosProtocol.PraosNode
     PraosProtocol.SimBlockFetch
     PraosProtocol.SimChainSync
+    PraosProtocol.SimPraos
     PraosProtocol.VizSimBlockFetch
     PraosProtocol.VizSimChainSync
+    PraosProtocol.VizSimPraos
     RelayProtocol
     SimRelay
     SimRelayP2P

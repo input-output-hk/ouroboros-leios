@@ -26,7 +26,10 @@ import Network.TypedProtocol (
  )
 
 data ProtocolMessage ps where
-  ProtocolMessage :: forall ps (st :: ps). SomeMessage st -> ProtocolMessage ps
+  ProtocolMessage ::
+    forall ps (st :: ps).
+    SomeMessage st ->
+    ProtocolMessage ps
 
 instance forall ps. (forall st st'. Show (Message ps st st')) => Show (ProtocolMessage ps) where
   show (ProtocolMessage (SomeMessage msg)) = show msg

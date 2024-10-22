@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -61,7 +62,7 @@ import TimeCompat (threadDelaySI)
 -- | In the scope of a two party connection, there are just two peers. These
 -- can be maped to a wider scope peer identity via contra-trace.
 data LabelTcpDir e = DirClientToServer e | DirServerToClient e
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor)
 
 -- | Class for messages to be sent over a simulated TCP connection.
 -- To correctly model the timing of the messages sent over the connection we

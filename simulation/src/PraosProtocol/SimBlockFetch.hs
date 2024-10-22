@@ -3,7 +3,7 @@
 module PraosProtocol.SimBlockFetch where
 
 import Chan (Chan)
-import ChanDriver
+import ChanDriver (ProtocolMessage)
 import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
@@ -16,13 +16,14 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import qualified Data.ByteString as BS
+import Data.Functor ((<&>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Network.TypedProtocol
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
+import PraosProtocol.Common.Chain (Chain (..))
 import SimTCPLinks
 import SimTypes
 
@@ -39,8 +40,6 @@ data BlockFetchEvent
   | -- | An event on a tcp link between two nodes
     BlockFetchEventTcp (LabelLink (TcpEvent (ProtocolMessage BlockFetchState)))
   deriving (Show)
-
-type BlockFetchMessage = ProtocolMessage BlockFetchState
 
 data BlockFetchNodeEvent = BlockFetchNodeEvent
   deriving (Show)
@@ -76,29 +75,23 @@ traceRelayLink1 tcpprops =
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+  bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadSTM m) => Chan m (ProtocolMessage BlockFetchState) -> m ()
   nodeA chan = do
-    let peerId = 1
-    peerChainVar <- newTVarIO (blockHeader <$> chain)
-    blockFetchControllerState <-
-      newBlockFetchControllerState
-        >>= addPeer peerId (asReadOnly peerChainVar)
+    peerChainVar <- newTVarIO (blockHeader <$> bchain)
+    st <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar) <&> fst
     concurrently_
-      ( blockFetchController blockFetchControllerState
+      ( blockFetchController st
       )
-      ( runPeerWithDriver (chanDriver decideBlockFetchState chan) $
-          blockFetchConsumer $
-            initBlockFetchConsumerStateForPeerId 1 blockFetchControllerState
+      ( runBlockFetchConsumer chan $
+          initBlockFetchConsumerStateForPeerId 1 st
       )
   -- Block-Fetch Producer
   nodeB chan = do
-    blocksVar <- asReadOnly <$> newTVarIO (toBlocks chain)
-    let blockFetchProducerState = BlockFetchProducerState blocksVar
-    runPeerWithDriver (chanDriver decideBlockFetchState chan) $
-      blockFetchProducer blockFetchProducerState
+    st <- BlockFetchProducerState . asReadOnly <$> newTVarIO (toBlocks bchain)
+    runBlockFetchProducer chan st
 
   (na, nb) = (NodeId 0, NodeId 1)
 

@@ -21,11 +21,11 @@ For creating videos use a command like
 ffmpeg -i example/frame-%d.png -vf format=yuv420p example.mp4
 ```
 
-The `ouroboros-net-vis` command line is
+The `viz` command line is
 ```
 Vizualisations of Ouroboros-related network simulations
 
-Usage: ouroboros-net-vis VIZNAME [--frames-dir DIR] [--seconds SEC] 
+Usage: viz VIZNAME [--frames-dir DIR] [--seconds SEC] 
                          [--skip-seconds SEC] [--cpu-render] 
                          [--720p | --1080p | --resolution (W,H)]
 

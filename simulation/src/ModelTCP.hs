@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -328,7 +329,7 @@ data TcpEvent msg
       msg
       TcpMsgForecast -- overall
       [TcpMsgForecast] -- tcp internal activity
-  deriving (Show)
+  deriving (Show, Functor)
 
 traceTcpSend ::
   TcpConnProps ->

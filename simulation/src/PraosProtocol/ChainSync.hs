@@ -12,10 +12,13 @@
 
 module PraosProtocol.ChainSync where
 
+import Chan (Chan)
+import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
+import Control.Monad (void)
 import Data.Maybe (fromMaybe)
 import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
@@ -23,6 +26,7 @@ import Network.TypedProtocol (
   IsPipelined (NonPipelined),
   Protocol (..),
   StateTokenI (..),
+  runPeerWithDriver,
  )
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
@@ -136,18 +140,28 @@ instance StateTokenI StMustReply where stateToken = SingStMustReply
 instance StateTokenI StIntersect where stateToken = SingStIntersect
 instance StateTokenI StDone where stateToken = SingStDone
 
+type ChainSyncMessage = ProtocolMessage ChainSyncState
+
 --------------------------------
 ---- ChainSync Consumer
 --------------------------------
+
+newtype ChainConsumerState m = ChainConsumerState
+  { chainVar :: TVar m (Chain BlockHeader)
+  }
+
+runChainConsumer :: MonadSTM m => Chan m ChainSyncMessage -> ChainConsumerState m -> m ()
+runChainConsumer chan st =
+  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer st)
 
 type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
 chainConsumer ::
   forall m.
   MonadSTM m =>
-  TVar m (Chain BlockHeader) ->
+  ChainConsumerState m ->
   ChainConsumer 'StIdle m ()
-chainConsumer hchainVar = idle True
+chainConsumer (ChainConsumerState hchainVar) = idle True
  where
   -- NOTE: The specification says to do an initial intersection with
   --       exponentially spaced points, and perform binary search to
@@ -195,6 +209,10 @@ chainConsumer hchainVar = idle True
 --------------------------------
 ---- ChainSync Producer
 --------------------------------
+
+runChainProducer :: MonadSTM m => Chan m ChainSyncMessage -> FollowerId -> TVar m (ChainProducerState Block) -> m ()
+runChainProducer chan followerId stVar =
+  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer followerId stVar)
 
 type ChainProducer st m a = TS.Server ChainSyncState 'NonPipelined st m a
 

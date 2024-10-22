@@ -2,7 +2,7 @@
 
 module PraosProtocol.SimChainSync where
 
-import ChanDriver (ProtocolMessage, chanDriver)
+import ChanDriver (ProtocolMessage)
 import ChanTCP (
   LabelTcpDir,
   TcpConnProps,
@@ -24,12 +24,11 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Network.TypedProtocol (runPeerWithDriver)
 import PraosProtocol.ChainSync (
+  ChainConsumerState (..),
   ChainSyncState,
-  chainConsumer,
-  chainProducer,
-  decideChainSyncState,
+  runChainConsumer,
+  runChainProducer,
  )
 import PraosProtocol.Common hiding (Point)
 import qualified PraosProtocol.Common.Chain as Chain
@@ -54,8 +53,6 @@ data ChainSyncEvent
   | -- | An event on a tcp link between two nodes
     ChainSyncEventTcp (LabelLink (TcpEvent (ProtocolMessage ChainSyncState)))
   deriving (Show)
-
-type ChainSyncMessage = ProtocolMessage ChainSyncState
 
 data ChainSyncNodeEvent = ChainSyncNodeEvent
   deriving (Show)
@@ -90,13 +87,13 @@ traceRelayLink1 tcpprops =
       return ()
  where
   consumerNode chan = do
-    hchainVar <- newTVarIO Chain.Genesis
-    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer hchainVar)
+    st <- ChainConsumerState <$> newTVarIO Chain.Genesis
+    runChainConsumer chan st
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
-    cpsVar <- newTVarIO cps
-    runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer fId cpsVar)
+    st <- newTVarIO cps
+    runChainProducer chan fId st
 
   (na, nb) = (NodeId 0, NodeId 1)
 

@@ -20,6 +20,8 @@
 
 module PraosProtocol.BlockFetch where
 
+import Chan (Chan)
+import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     STM,
@@ -48,6 +50,7 @@ import Network.TypedProtocol (
   Protocol (..),
   StateTokenI (..),
  )
+import Network.TypedProtocol.Driver (runPeerWithDriver)
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import PraosProtocol.Common
@@ -131,6 +134,8 @@ blockFetchMessageLabel = \case
   MsgBatchDone -> "MsgBatchDone"
   MsgClientDone -> "MsgClientDone"
 
+type BlockFetchMessage = ProtocolMessage BlockFetchState
+
 --------------------------------
 --- BlockFetch Server
 --------------------------------
@@ -138,6 +143,10 @@ blockFetchMessageLabel = \case
 newtype BlockFetchProducerState m = BlockFetchProducerState
   { blocksVar :: ReadOnly (TVar m Blocks)
   }
+
+runBlockFetchProducer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchProducerState m -> m ()
+runBlockFetchProducer chan blockFetchProducerState =
+  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchProducer blockFetchProducerState)
 
 resolveRange ::
   MonadSTM m =>
@@ -179,6 +188,36 @@ blockFetchProducer st = idle
   streaming [] = TS.Yield MsgBatchDone idle
   streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
 
+-- NOTE: Variant that uses the current chain.
+
+-- newtype BlockFetchProducerState m = BlockFetchProducerState
+--   { chainVar :: ReadOnly (TVar m (Chain Block))
+--   }
+
+-- runBlockFetchProducer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchProducerState m -> m ()
+-- runBlockFetchProducer chan blockFetchProducerState =
+--   void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchProducer blockFetchProducerState)
+
+-- blockFetchProducer ::
+--   forall m.
+--   MonadSTM m =>
+--   BlockFetchProducerState m ->
+--   TS.Server BlockFetchState NonPipelined StIdle m ()
+-- blockFetchProducer st = idle
+--  where
+--   idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
+--   idle = TS.Await $ \case
+--     MsgRequestRange start end -> TS.Effect $ atomically $ do
+--       bchain <- readReadOnlyTVar st.chainVar
+--       case Chain.selectBlockRange bchain start end of
+--         Nothing -> return $ TS.Yield MsgNoBlocks idle
+--         Just blocks -> return $ TS.Yield MsgStartBatch $ streaming $ (blockBody <$> blocks)
+--     MsgClientDone -> TS.Done ()
+
+--   streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
+--   streaming [] = TS.Yield MsgBatchDone idle
+--   streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
+
 --------------------------------
 --- BlockFetch Client
 --------------------------------
@@ -199,6 +238,10 @@ data BlockFetchConsumerState m = BlockFetchConsumerState
   , addFetchedBlock :: Block -> m ()
   , removeInFlight :: [Point Block] -> m ()
   }
+
+runBlockFetchConsumer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchConsumerState m -> m ()
+runBlockFetchConsumer chan blockFetchConsumerState =
+  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer blockFetchConsumerState)
 
 blockFetchConsumer ::
   forall m.
@@ -307,29 +350,31 @@ data BlockFetchControllerState m = BlockFetchControllerState
   { blocksVar :: TVar m Blocks
   , targetChainVar :: TVar m (Maybe MissingBlocksChain)
   , peers :: Map PeerId (PeerStatus m)
+  , nextPeerId :: Int
   , cpsVar :: TVar m (ChainProducerState Block)
   }
 
 addPeer ::
+  forall m.
   MonadSTM m =>
-  PeerId ->
   ReadOnly (TVar m (Chain BlockHeader)) ->
   BlockFetchControllerState m ->
-  m (BlockFetchControllerState m)
-addPeer peerId peerChainVar blockFetchControllerState = atomically $ do
+  m (BlockFetchControllerState m, PeerId)
+addPeer peerChainVar st = atomically $ do
+  let peerId = st.nextPeerId
   blockRequestVar <- newTVar (BlockRequest [])
   blocksInFlightVar <- newTVar Set.empty
-  return $
-    blockFetchControllerState
-      { peers = Map.insert peerId PeerStatus{..} blockFetchControllerState.peers
-      }
+  let peerStatus = PeerStatus{..} :: PeerStatus m
+  let peers = Map.insert peerId peerStatus st.peers
+  return (st{peers = peers, nextPeerId = peerId + 1}, peerId)
 
-newBlockFetchControllerState :: MonadSTM m => m (BlockFetchControllerState m)
-newBlockFetchControllerState = atomically $ do
-  blocksVar <- newTVar Map.empty
+newBlockFetchControllerState :: MonadSTM m => Chain Block -> m (BlockFetchControllerState m)
+newBlockFetchControllerState chain = atomically $ do
+  blocksVar <- newTVar (toBlocks chain)
   targetChainVar <- newTVar Nothing
   let peers = Map.empty
-  cpsVar <- newTVar $ initChainProducerState Chain.Genesis
+  let nextPeerId = 0
+  cpsVar <- newTVar $ initChainProducerState chain
   return BlockFetchControllerState{..}
 
 blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
