@@ -133,8 +133,8 @@ impl Simulation {
                         SimulationMessage::RequestIBHeader(id) => {
                             target.receive_request_ib_header(from, id)?;
                         }
-                        SimulationMessage::IBHeader(header) => {
-                            target.receive_ib_header(from, header)?;
+                        SimulationMessage::IBHeader(header, has_body) => {
+                            target.receive_ib_header(from, header, has_body)?;
                         }
 
                         // IB transmission
@@ -434,16 +434,15 @@ impl Node {
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(pending_ib) = self.leios.pending_ibs.get(&id) {
             // We don't have this IB, just the header. Send that.
-            self.send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone()))?;
+            self.send_to(from, SimulationMessage::IBHeader(pending_ib.header.clone(), false))?;
         } else if let Some(ib) = self.leios.ibs.get(&id) {
             // We have the full IB. Send the header, and also advertise that we have the full IB.
-            self.send_to(from, SimulationMessage::IBHeader(ib.header.clone()))?;
-            self.send_to(from, SimulationMessage::AnnounceIB(id))?;
+            self.send_to(from, SimulationMessage::IBHeader(ib.header.clone(), true))?;
         }
         Ok(())
     }
 
-    fn receive_ib_header(&mut self, from: NodeId, header: InputBlockHeader) -> Result<()> {
+    fn receive_ib_header(&mut self, from: NodeId, header: InputBlockHeader, has_body: bool) -> Result<()> {
         let id = header.id();
         if self.leios.ibs.contains_key(&id) {
             return Ok(());
@@ -464,6 +463,11 @@ impl Node {
                 continue;
             }
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
+        }
+        if has_body {
+            // Whoever sent us this IB header has also announced that they have the body.
+            // If we still need it, download it from them.
+            self.receive_announce_ib(from, id)?;
         }
         Ok(())
     }
@@ -670,7 +674,7 @@ enum SimulationMessage {
     // IB header propagation
     AnnounceIBHeader(InputBlockId),
     RequestIBHeader(InputBlockId),
-    IBHeader(InputBlockHeader),
+    IBHeader(InputBlockHeader, bool /* has_body */),
     // IB transmission
     AnnounceIB(InputBlockId),
     RequestIB(InputBlockId),
@@ -690,7 +694,7 @@ impl HasBytesSize for SimulationMessage {
 
             Self::AnnounceIBHeader(_) => 8,
             Self::RequestIBHeader(_) => 8,
-            Self::IBHeader(_) => 32,
+            Self::IBHeader(_, _) => 32,
 
             Self::AnnounceIB(_) => 8,
             Self::RequestIB(_) => 8,
