@@ -1,6 +1,12 @@
-use std::{collections::HashSet, fmt::Display, fs, path::Path, time::Duration};
+use std::{
+    collections::{HashSet, VecDeque},
+    fmt::Display,
+    fs,
+    path::Path,
+    time::Duration,
+};
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use netsim_async::geo::{self, Location};
 use serde::{Deserialize, Serialize};
 
@@ -159,6 +165,33 @@ fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Dur
     geo_latency + extra_latency
 }
 
+fn validate_graph(config: &SimConfiguration) -> Result<()> {
+    // The graph must be nonempty and fully connected,
+    // and every link must be between two nodes which exist
+    let mut connected_nodes = HashSet::new();
+    let mut frontier = VecDeque::new();
+    let first_node = config
+        .nodes
+        .first()
+        .ok_or_else(|| anyhow!("Graph must not be empty!"))?;
+    frontier.push_back(first_node);
+    while let Some(node) = frontier.pop_front() {
+        if connected_nodes.insert(node.id) {
+            for peer_id in &node.peers {
+                let peer = config
+                    .nodes
+                    .get(peer_id.0)
+                    .ok_or_else(|| anyhow!("Node {peer_id} not found!"))?;
+                frontier.push_back(peer);
+            }
+        }
+    }
+    if connected_nodes.len() < config.nodes.len() {
+        bail!("Graph must be fully connected!");
+    }
+    Ok(())
+}
+
 pub fn read_config(
     filename: &Path,
     timescale: Option<u32>,
@@ -172,5 +205,7 @@ pub fn read_config(
     for id in trace_nodes {
         raw_config.trace_nodes.insert(NodeId(*id));
     }
-    Ok(raw_config.into())
+    let config = raw_config.into();
+    validate_graph(&config)?;
+    Ok(config)
 }
