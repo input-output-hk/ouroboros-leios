@@ -96,7 +96,7 @@ let
 
 in
 {
-  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta ;
+  inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta agdaSets agdaIOGPrelude ;
   agdaWithDeps = agdaWithPkgs deps;
   leiosSpec = leiosSpec;
 }

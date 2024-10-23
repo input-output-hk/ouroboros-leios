@@ -27,7 +27,8 @@ in
   env.AGDA_STDLIB = "${agda.agdaStdlib}/standard-library.agda-lib";
   env.AGDA_STDLIB_CLASSES = "${agda.agdaStdlibClasses}/standard-library-classes.agda-lib";
   env.AGDA_STDLIB_META = "${agda.agdaStdlibMeta}/standard-library-meta.agda-lib";
-  env.FORMAL_LEDGER_LIB = "${agda.formalLedger}/formal-ledger.agda-lib";
+  env.AGDA_SETS = "${agda.agdaSets}/abstract-set-theory.agda-lib";
+  env.AGDA_IOG_PRELUDE = "${agda.agdaIOGPrelude}/iog-prelude.agda-lib";
 
 # prompt = "[ouroboros-leios]$ ";
 
@@ -38,7 +39,8 @@ in
     ${agda.agdaStdlib}/standard-library.agda-lib
     ${agda.agdaStdlibClasses}/standard-library-classes.agda-lib
     ${agda.agdaStdlibMeta}/standard-library-meta.agda-lib
-    ${agda.formalLedger}/formal-ledger.agda-lib
+    ${agda.agdaSets}/abstract-set-theory.agda-lib
+    ${agda.agdaIOGPrelude}/iog-prelude.agda-lib
 
   Run 'emacs' to edit .agda files.
   '';
