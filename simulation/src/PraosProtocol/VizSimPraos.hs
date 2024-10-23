@@ -70,26 +70,26 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
     Maybe String
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
-  blockHeaderColor :: BlockHeader -> (Double, Double, Double)
-  blockHeaderColor hdr =
-    (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
-   where
-    r, g, b :: Word8
-    ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
+blockHeaderColor :: BlockHeader -> (Double, Double, Double)
+blockHeaderColor hdr =
+  (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
+ where
+  r, g, b :: Word8
+  ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
 
 -- | The vizualisation data model for the relay simulation
-type PraosVizModel =
+type PraosSimVizModel =
   SimVizModel
     PraosEvent
-    PraosVizState
+    PraosSimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data PraosVizState
-  = PraosVizState
+data PraosSimVizState
+  = PraosSimVizState
   { vizWorldShape :: !WorldShape
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
@@ -135,7 +135,7 @@ data LinkPoints
 -- trace.
 praosSimVizModel ::
   PraosTrace ->
-  VizModel PraosVizModel
+  VizModel PraosSimVizModel
 praosSimVizModel =
   simVizModel
     accumEventVizState
@@ -143,7 +143,7 @@ praosSimVizModel =
     initVizState
  where
   initVizState =
-    PraosVizState
+    PraosSimVizState
       { vizWorldShape = WorldShape (0, 0) False
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
@@ -161,8 +161,8 @@ praosSimVizModel =
   accumEventVizState ::
     Time ->
     PraosEvent ->
-    PraosVizState ->
-    PraosVizState
+    PraosSimVizState ->
+    PraosSimVizState
   accumEventVizState _now (PraosEventSetup shape nodes links) vs =
     vs
       { vizWorldShape = shape
@@ -198,8 +198,8 @@ praosSimVizModel =
 
   pruneVisState ::
     Time ->
-    PraosVizState ->
-    PraosVizState
+    PraosSimVizState ->
+    PraosSimVizState
   pruneVisState now vs =
     vs
       { vizMsgsInTransit =
@@ -282,7 +282,7 @@ data PraosVizConfig
 
 praosSimVizRender ::
   PraosVizConfig ->
-  VizRender PraosVizModel
+  VizRender PraosSimVizModel
 praosSimVizRender vizConfig =
   VizRender
     { renderReqSize = (500, 500)
@@ -293,7 +293,7 @@ praosSimVizRender vizConfig =
 praosSimVizRenderModel ::
   PraosVizConfig ->
   Time ->
-  SimVizModel event PraosVizState ->
+  SimVizModel event PraosSimVizState ->
   (Double, Double) ->
   Cairo.Render ()
 praosSimVizRenderModel
@@ -306,7 +306,7 @@ praosSimVizRenderModel
   now
   ( SimVizModel
       _events
-      PraosVizState
+      PraosSimVizState
         { vizWorldShape = WorldShape{worldDimensions}
         , vizNodePos
         , vizNodeLinks

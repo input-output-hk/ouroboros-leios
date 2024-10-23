@@ -26,7 +26,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.Common.Chain (Chain (..))
-import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
+import PraosProtocol.PraosNode (PraosMessage, PraosNodeEvent, runPraosNode)
 import SimTCPLinks
 import SimTypes
 
@@ -42,9 +42,6 @@ data PraosEvent
     PraosEventNode (LabelNode PraosNodeEvent)
   | -- | An event on a tcp link between two nodes
     PraosEventTcp (LabelLink (TcpEvent PraosMessage))
-  deriving (Show)
-
-data PraosNodeEvent = PraosNodeEvent
   deriving (Show)
 
 exampleTrace1 :: PraosTrace

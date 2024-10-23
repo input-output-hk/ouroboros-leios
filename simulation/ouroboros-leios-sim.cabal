@@ -44,9 +44,12 @@ library
     PraosProtocol.SimBlockFetch
     PraosProtocol.SimChainSync
     PraosProtocol.SimPraos
+    PraosProtocol.SimPraosP2P
+    PraosProtocol.ExamplesPraosP2P
     PraosProtocol.VizSimBlockFetch
     PraosProtocol.VizSimChainSync
     PraosProtocol.VizSimPraos
+    PraosProtocol.VizSimPraosP2P
     RelayProtocol
     SimRelay
     SimRelayP2P

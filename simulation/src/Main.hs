@@ -8,6 +8,7 @@ import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
 import qualified Options.Applicative as Opts
+import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
@@ -130,6 +131,8 @@ data VizName
   | VizPraosChainSync1
   | VizPraosBlockFetch1
   | VizPraos1
+  | VizPraosP2P1
+  | VizPraosP2P2
 
 readVizName :: String -> Either String VizName
 readVizName "tcp-1" = Right VizTCP1
@@ -142,6 +145,8 @@ readVizName "p2p-2" = Right VizRelayP2P2
 readVizName "pcs-1" = Right VizPraosChainSync1
 readVizName "pbf-1" = Right VizPraosBlockFetch1
 readVizName "praos-1" = Right VizPraos1
+readVizName "praos-p2p-1" = Right VizPraosP2P1
+readVizName "praos-p2p-2" = Right VizPraosP2P2
 readVizName _ = Left "unknown vizualisation"
 
 namedViz :: VizName -> Vizualisation
@@ -155,3 +160,5 @@ namedViz VizRelayP2P2 = ExamplesRelayP2P.example2
 namedViz VizPraosChainSync1 = VizChainSync.example1
 namedViz VizPraosBlockFetch1 = VizBlockFetch.example1
 namedViz VizPraos1 = VizPraos.example1
+namedViz VizPraosP2P1 = VizPraosP2P.example1
+namedViz VizPraosP2P2 = VizPraosP2P.example2

@@ -7,6 +7,9 @@ module PraosProtocol.PraosNode where
 import ChanMux
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadAsync
+import Control.Monad.Class.MonadTimer.SI (MonadDelay)
+import Control.Tracer
+import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Foldable (sequenceA_)
@@ -14,8 +17,9 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
+import PraosProtocol.BlockGeneration
 import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
-import PraosProtocol.Common (Block, Chain, FollowerId, MessageSize (..), asReadOnly, genesisPoint, initFollower)
+import PraosProtocol.Common (Block, Chain, FollowerId, MessageSize (..), MonadTime, SlotConfig, asReadOnly, genesisPoint, initFollower)
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
 
 data Praos f = Praos
@@ -108,9 +112,48 @@ runPraosNode ::
   m ()
 runPraosNode chain followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
+  runConcurrently =<< setupPraosThreads st0 followers peers
+
+setupPraosThreads ::
+  (MonadAsync m, MonadSTM m) =>
+  PraosNodeState m ->
+  [Praos (Chan m)] ->
+  [Praos (Chan m)] ->
+  m (Concurrently m ())
+setupPraosThreads st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM addPeer (length peers) st1
   let controllerThread = Concurrently $ blockFetchController st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer st2) peerIds peers
-  runConcurrently $ sequenceA_ (controllerThread : followerThreads <> peerThreads)
+  return $ sequenceA_ (controllerThread : followerThreads <> peerThreads)
+
+data PraosNodeEvent = PraosNodeEvent
+  deriving (Show)
+
+data PraosNodeConfig = PraosNodeConfig
+  { blockGeneration :: PacketGenerationPattern
+  , slotConfig :: SlotConfig
+  , chain :: Chain Block
+  , blockMarker :: ByteString
+  -- ^ bytes to include in block bodies.
+  }
+
+praosNode ::
+  (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
+  Tracer m PraosNodeEvent ->
+  PraosNodeConfig ->
+  [Praos (Chan m)] ->
+  [Praos (Chan m)] ->
+  m ()
+praosNode _tracer cfg followers peers = do
+  st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
+  praosThreads <- setupPraosThreads st0 followers peers
+  nextBlock <- mkNextBlock cfg.blockGeneration cfg.blockMarker
+  let generationThread =
+        blockGenerator
+          cfg.slotConfig
+          st0.blockFetchControllerState.cpsVar
+          (BlockFetch.addProducedBlock st0.blockFetchControllerState)
+          nextBlock
+  runConcurrently $ sequenceA_ [Concurrently generationThread, praosThreads]
