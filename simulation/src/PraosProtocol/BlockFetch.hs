@@ -166,7 +166,7 @@ resolveRange st start end = do
         if start == bpoint
           then Just acc'
           else resolveRangeAcc acc' =<< blockPrevPoint blocks blockHeader
-  return $ reverse <$> resolveRangeAcc [] end
+  return $ resolveRangeAcc [] end
 
 blockFetchProducer ::
   forall m.
@@ -286,12 +286,12 @@ blockFetchConsumer st = idle
               st.addFetchedBlock (Block header block)
               return (streaming range headers')
           )
-          (error "blockFetchConsumer: invalid block") -- TODO
+          (error $ "blockFetchConsumer: invalid block\n" ++ show (Block header block)) -- TODO
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
   ifValidBlockBody hdr bdy t f = do
     -- TODO: threadDelay
-    if headerBodyHash hdr == hashBody bdy
+    if blockInvariant $ Block hdr bdy
       then t
       else f
 
