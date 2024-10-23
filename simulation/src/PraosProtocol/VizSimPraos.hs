@@ -38,9 +38,9 @@ example1 =
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
-          relaySimVizRender examplesRelaySimVizConfig
+          praosSimVizRender examplesRelaySimVizConfig
  where
-  model = relaySimVizModel trace
+  model = praosSimVizModel trace
    where
     trace = exampleTrace1
 
@@ -132,10 +132,10 @@ data LinkPoints
 
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
-relaySimVizModel ::
+praosSimVizModel ::
   PraosTrace ->
   VizModel PraosVizModel
-relaySimVizModel =
+praosSimVizModel =
   simVizModel
     accumEventVizState
     pruneVisState
@@ -297,23 +297,23 @@ data PraosVizConfig
   , blockFetchMessageText :: BlockFetchMessage -> Maybe String
   }
 
-relaySimVizRender ::
+praosSimVizRender ::
   PraosVizConfig ->
   VizRender PraosVizModel
-relaySimVizRender vizConfig =
+praosSimVizRender vizConfig =
   VizRender
     { renderReqSize = (500, 500)
     , renderChanged = \_t _fn _m -> True
-    , renderModel = \t _fn m sz -> relaySimVizRenderModel vizConfig t m sz
+    , renderModel = \t _fn m sz -> praosSimVizRenderModel vizConfig t m sz
     }
 
-relaySimVizRenderModel ::
+praosSimVizRenderModel ::
   PraosVizConfig ->
   Time ->
   SimVizModel event PraosVizState ->
   (Double, Double) ->
   Cairo.Render ()
-relaySimVizRenderModel
+praosSimVizRenderModel
   PraosVizConfig
     { chainSyncMessageColor
     , chainSyncMessageText
