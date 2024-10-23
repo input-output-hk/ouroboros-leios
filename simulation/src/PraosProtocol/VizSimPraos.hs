@@ -39,14 +39,14 @@ example1 =
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
-          praosSimVizRender examplesRelaySimVizConfig
+          praosSimVizRender examplesPraosSimVizConfig
  where
   model = praosSimVizModel trace
    where
     trace = exampleTrace1
 
-examplesRelaySimVizConfig :: PraosVizConfig
-examplesRelaySimVizConfig = PraosVizConfig{..}
+examplesPraosSimVizConfig :: PraosVizConfig
+examplesPraosSimVizConfig = PraosVizConfig{..}
  where
   chainSyncMessageColor ::
     ChainSyncMessage ->
