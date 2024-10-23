@@ -10,10 +10,10 @@ import Control.Concurrent.Class.MonadSTM (
 import Control.Monad (forever, when)
 import Control.Monad.Class.MonadTimer.SI (MonadDelay)
 import Data.ByteString as BS
+import Data.ByteString.Char8 as BS8
 import System.Random (StdGen, uniformR)
 
 import Cardano.Slotting.Slot (WithOrigin (..))
-import Codec.Serialise
 
 import ChanTCP (Bytes)
 import Data.Word (Word64)
@@ -34,9 +34,10 @@ data PacketGenerationPattern
   | PoissonGenerationPattern Bytes StdGen Double
 
 mkBody :: Bytes -> ByteString -> SlotNo -> BlockBody
-mkBody sz prefix (SlotNo w) = BlockBody $ pad $ BS.append prefix $ BS.toStrict (serialise w)
+mkBody _sz prefix (SlotNo w) = BlockBody $ pad $ BS.append prefix $ BS8.pack (show w)
  where
-  pad s = BS.append s (BS.replicate (fromIntegral sz - BS.length s) 0)
+  -- MessageSize for BlockBody is fixed, so we do not need padding.
+  pad s = s
 
 mkNextBlock ::
   forall m.
