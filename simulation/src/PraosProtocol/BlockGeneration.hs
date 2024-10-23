@@ -92,3 +92,8 @@ blockGenerator slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
     let tgt = slotTime slotConfig sl
     now <- getCurrentTime
     threadDelayNDT (tgt `diffUTCTime` now)
+
+slotConfigFromNow :: MonadTime m => m SlotConfig
+slotConfigFromNow = do
+  start <- getCurrentTime
+  return $ SlotConfig{start, duration = 1}
