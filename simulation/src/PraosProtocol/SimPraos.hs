@@ -8,6 +8,7 @@
 
 module PraosProtocol.SimPraos where
 
+import ChanMux
 import ChanTCP
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
@@ -23,27 +24,11 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import PraosProtocol.BlockFetch
-import PraosProtocol.ChainSync (ChainSyncMessage)
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.Common.Chain (Chain (..))
-import PraosProtocol.PraosNode (Praos (..), runPraosNode)
+import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
 import SimTCPLinks
 import SimTypes
-
--- newConnectionTCP ::
---   forall (m :: Type -> Type).
---   (MonadTime m, MonadMonotonicTime m, MonadDelay m, MonadAsync m) =>
---   Tracer m (LabelTcpDir (TcpEvent ChainSyncMessage)) ->
---   Tracer m (LabelTcpDir (TcpEvent BlockFetchMessage)) ->
---   TcpConnProps ->
---   m (Praos (Chan m), Praos (Chan m))
--- newConnectionTCP chainSyncTracer blockFetchTracer tcpConnProps = do
---   (chainSyncProducerChan, chainSyncConsumerChan) <-
---     newConnectionTCP chainSyncTracer tcpConnProps
---   (blockFetchProducerChan, blockFetchOConsumerChan) <-
---     newConnectionTCP blockFetchTracer tcpConnProps
---   return (Praos chainSyncIn blockFetchIn, Praos chainSyncOut blockFetchOut)
 
 type PraosTrace = [(Time, PraosEvent)]
 
@@ -56,9 +41,7 @@ data PraosEvent
   | -- | An event at a node
     PraosEventNode (LabelNode PraosNodeEvent)
   | -- | An event on a tcp link between two nodes
-    PraosChainSyncEventTcp (LabelLink (TcpEvent ChainSyncMessage))
-  | -- | An event on a tcp link between two nodes
-    PraosBlockFetchEventTcp (LabelLink (TcpEvent BlockFetchMessage))
+    PraosEventTcp (LabelLink (TcpEvent PraosMessage))
   deriving (Show)
 
 data PraosNodeEvent = PraosNodeEvent
@@ -89,13 +72,11 @@ traceRelayLink1 tcpprops =
           )
       let chainA = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
       let chainB = Genesis
-      (cspA, cscB) <- newConnectionTCP (chainSyncLinkTracer nodeA nodeB) tcpprops
-      (cscA, cspB) <- newConnectionTCP (chainSyncLinkTracer nodeA nodeB) tcpprops
-      (bfpA, bfcB) <- newConnectionTCP (blockFetchLinkTracer nodeA nodeB) tcpprops
-      (bfcA, bfpB) <- newConnectionTCP (blockFetchLinkTracer nodeA nodeB) tcpprops
+      (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
+      (cA, pB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       concurrently_
-        (runPraosNode chainA [Praos cspA bfpA] [Praos cscA bfcA])
-        (runPraosNode chainB [Praos cspB bfpB] [Praos cscB bfcB])
+        (runPraosNode chainA [pA] [cA])
+        (runPraosNode chainB [pB] [cB])
       return ()
  where
   (nodeA, nodeB) = (NodeId 0, NodeId 1)
@@ -103,16 +84,9 @@ traceRelayLink1 tcpprops =
   tracer :: Tracer (IOSim s) PraosEvent
   tracer = simTracer
 
-  chainSyncLinkTracer ::
+  praosTracer ::
     NodeId ->
     NodeId ->
-    Tracer (IOSim s) (LabelTcpDir (TcpEvent ChainSyncMessage))
-  chainSyncLinkTracer nfrom nto =
-    contramap (PraosChainSyncEventTcp . labelDirToLabelLink nfrom nto) tracer
-
-  blockFetchLinkTracer ::
-    NodeId ->
-    NodeId ->
-    Tracer (IOSim s) (LabelTcpDir (TcpEvent BlockFetchMessage))
-  blockFetchLinkTracer nfrom nto =
-    contramap (PraosBlockFetchEventTcp . labelDirToLabelLink nfrom nto) tracer
+    Tracer (IOSim s) (LabelTcpDir (TcpEvent PraosMessage))
+  praosTracer nfrom nto =
+    contramap (PraosEventTcp . labelDirToLabelLink nfrom nto) tracer

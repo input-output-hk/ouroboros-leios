@@ -1,24 +1,42 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module PraosProtocol.PraosNode where
 
-import Chan (Chan)
+import ChanMux
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadAsync
+import Data.Coerce (coerce)
+import Data.Either (fromLeft, fromRight)
 import Data.Foldable (sequenceA_)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
-import PraosProtocol.Common (Block, Chain, FollowerId, asReadOnly, genesisPoint, initFollower)
+import PraosProtocol.Common (Block, Chain, FollowerId, MessageSize (..), asReadOnly, genesisPoint, initFollower)
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
 
 data Praos f = Praos
   { protocolChainSync :: f ChainSyncMessage
   , protocolBlockFetch :: f BlockFetchMessage
   }
+
+newtype PraosMessage = PraosMessage (Either ChainSyncMessage BlockFetchMessage)
+  deriving (Show)
+
+instance MessageSize PraosMessage where
+  messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
+
+instance MuxBundle Praos where
+  type MuxMsg Praos = PraosMessage
+  toFromMuxMsgBundle =
+    coerce $
+      Praos
+        (ToFromMuxMsg Left $ fromLeft $ error "MuxBundle Praos: fromLeft")
+        (ToFromMuxMsg Right $ fromRight $ error "MuxBundle Praos: fromRight")
+  traverseMuxBundle f (Praos x y) = Praos <$> f x <*> f y
 
 data PraosNodeState m = PraosNodeState
   { blockFetchControllerState :: BlockFetchControllerState m

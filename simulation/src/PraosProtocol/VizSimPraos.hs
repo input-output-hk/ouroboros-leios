@@ -20,6 +20,7 @@ import P2P (linkPathLatenciesSquared)
 import PraosProtocol.BlockFetch (BlockFetchMessage, blockFetchMessageLabel)
 import PraosProtocol.ChainSync (ChainSyncMessage, Message (..), chainSyncMessageLabel)
 import PraosProtocol.Common hiding (Point)
+import PraosProtocol.PraosNode (PraosMessage (..))
 import PraosProtocol.SimPraos (PraosEvent (..), PraosTrace, exampleTrace1)
 import SimTypes
 import System.Random (mkStdGen, uniform)
@@ -95,7 +96,7 @@ data PraosVizState
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( Either ChainSyncMessage BlockFetchMessage
+          [ ( PraosMessage
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
@@ -178,7 +179,7 @@ praosSimVizModel =
       }
   accumEventVizState
     _now
-    ( PraosBlockFetchEventTcp
+    ( PraosEventTcp
         ( LabelLink
             nfrom
             nto
@@ -191,25 +192,7 @@ praosSimVizModel =
             Map.insertWith
               (flip (++))
               (nfrom, nto)
-              [(Right msg, msgforecast, msgforecasts)]
-              (vizMsgsInTransit vs)
-        }
-  accumEventVizState
-    _now
-    ( PraosChainSyncEventTcp
-        ( LabelLink
-            nfrom
-            nto
-            (TcpSendMsg msg msgforecast msgforecasts)
-          )
-      )
-    vs =
-      vs
-        { vizMsgsInTransit =
-            Map.insertWith
-              (flip (++))
-              (nfrom, nto)
-              [(Left msg, msgforecast, msgforecasts)]
+              [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
 
@@ -363,7 +346,7 @@ praosSimVizRenderModel
           Cairo.newPath
           -- draw all the messages within the clipping region of the link
           renderMessagesInFlight
-            (TcpSimVizConfig $ either chainSyncMessageColor blockFetchMessageColor)
+            (TcpSimVizConfig $ either chainSyncMessageColor blockFetchMessageColor . coerce)
             now
             fromPos
             toPos
@@ -437,5 +420,5 @@ praosSimVizRenderModel
         [ (msgLabel, msgforecast)
         | (msg, msgforecast, _) <- msgs
         , now <= msgRecvTrailingEdge msgforecast
-        , Just msgLabel <- [either chainSyncMessageText blockFetchMessageText msg]
+        , Just msgLabel <- [either chainSyncMessageText blockFetchMessageText $ coerce msg]
         ]

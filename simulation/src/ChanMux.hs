@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
@@ -12,16 +13,29 @@
 module ChanMux (
   newMuxChan,
   Chan (..),
+  ToFromMuxMsg (..),
+  dynToFromMuxMsg,
+  MuxBundle (..),
+  BearerMsg,
+  fromBearerMsg,
+  newConnectionBundleTCP,
 ) where
 
 import Data.Array
+import Data.Dynamic
+import Data.Maybe
 
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad
+import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadTimer
+import Control.Tracer
 
 import Chan
+import ChanTCP
+import TimeCompat
 
 class MuxBundle bundle where
   type MuxMsg bundle
@@ -48,7 +62,16 @@ data ToFromMuxMsg mm a
   , fromMuxMsg :: mm -> a
   }
 
+dynToFromMuxMsg :: Typeable a => ToFromMuxMsg Dynamic a
+dynToFromMuxMsg = ToFromMuxMsg toDyn (fromJust . fromDynamic)
+
 data BearerMsg a = BearerMsg !Int a
+
+fromBearerMsg :: BearerMsg a -> a
+fromBearerMsg (BearerMsg _ a) = a
+
+instance MessageSize a => MessageSize (BearerMsg a) where
+  messageSizeBytes (BearerMsg _ a) = 1 + messageSizeBytes a
 
 newMuxChan ::
   forall bundle m.
@@ -119,6 +142,17 @@ demuxer bearer queues =
     case queues ! i of
       RecvQueue convert queue ->
         atomically $ writeTQueue queue $! (convert msg)
+
+newConnectionBundleTCP ::
+  forall bundle m.
+  (MuxBundle bundle, MonadTime m, MonadMonotonicTime m, MonadDelay m, MonadAsync m, MessageSize (MuxMsg bundle), MonadMVar m, MonadFork m) =>
+  Tracer m (LabelTcpDir (TcpEvent (MuxMsg bundle))) ->
+  TcpConnProps ->
+  m (bundle (Chan m), bundle (Chan m))
+newConnectionBundleTCP tracer tcpprops = do
+  let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
+  (mA, mB) <- newConnectionTCP tracer' tcpprops
+  (,) <$> newMuxChan mA <*> newMuxChan mB
 
 data ExampleBundle f = ExampleBundle
   { exampleFoo :: f Int
