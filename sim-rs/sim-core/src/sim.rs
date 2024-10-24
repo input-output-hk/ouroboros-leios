@@ -111,6 +111,7 @@ impl Simulation {
                             target.receive_request_tx(from, tx)?;
                         }
                         SimulationMessage::Tx(tx) => {
+                            self.tracker.track_transaction_received(tx.id, from, to);
                             target.receive_tx(from, tx)?;
                         }
 
@@ -122,7 +123,7 @@ impl Simulation {
                             target.receive_request_block(from, slot)?;
                         }
                         SimulationMessage::Block(block) => {
-                            self.tracker.track_block_received(block.slot, from, to);
+                            self.tracker.track_praos_block_received(&block, from, to);
                             target.receive_block(from, block)?;
                         }
 
@@ -145,7 +146,7 @@ impl Simulation {
                             target.receive_request_ib(from, id)?;
                         }
                         SimulationMessage::IB(ib) => {
-                            self.tracker.track_ib_received(ib.clone(), from, to);
+                            self.tracker.track_ib_received(ib.header.id(), from, to);
                             target.receive_ib(from, ib)?;
                         }
                     }
@@ -160,6 +161,16 @@ impl Simulation {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
+        // The beginning of a new slot is the end of an old slot.
+        // Publish any input blocks left over from the last slot
+        if slot > 0 {
+            for node in self.nodes.values_mut() {
+                node.finish_generating_ibs(slot - 1)?;
+            }
+        }
+
+        self.tracker.track_slot(slot);
+
         self.handle_input_block_generation(slot)?;
         self.try_generate_praos_block(slot)?;
 
@@ -169,24 +180,17 @@ impl Simulation {
     }
 
     fn handle_input_block_generation(&mut self, slot: u64) -> Result<()> {
-        // Publish any input blocks from last round
-        if slot > 0 {
-            for node in self.nodes.values_mut() {
-                node.finish_generating_ibs(slot - 1)?;
-            }
-        }
-
         let mut probability = self.config.ib_generation_probability;
-        let mut block_counts = BTreeMap::new();
+        let mut ib_vrfs: BTreeMap<NodeId, Vec<u64>> = BTreeMap::new();
         while probability > 0.0 {
             let next_p = f64::min(probability, 1.0);
-            for (id, _) in self.run_vrf_lottery(next_p) {
-                *block_counts.entry(id).or_default() += 1;
+            for (id, vrf) in self.run_vrf_lottery(next_p) {
+                ib_vrfs.entry(id).or_default().push(vrf);
             }
             probability -= 1.0;
         }
-        for (id, count) in block_counts {
-            self.get_node_mut(&id).begin_generating_ibs(slot, count)?;
+        for (id, vrfs) in ib_vrfs {
+            self.get_node_mut(&id).begin_generating_ibs(slot, vrfs)?;
         }
         Ok(())
     }
@@ -200,35 +204,35 @@ impl Simulation {
             .map(|(id, _)| *id);
 
         // L1 block generation
-        if let Some(producer) = winner {
-            let conflicts = vrf_winners
-                .into_iter()
-                .filter_map(|(id, _)| if producer != id { Some(id) } else { None })
-                .collect();
+        let Some(producer) = winner else {
+            return Ok(());
+        };
 
-            // Fill a block with as many pending transactions as can fit
-            let mut size = 0;
-            let mut transactions = vec![];
-            while let Some(tx) = self.unpublished_txs.front() {
-                if size + tx.bytes > self.config.max_block_size {
-                    break;
-                }
-                size += tx.bytes;
-                transactions.push(self.unpublished_txs.pop_front().unwrap());
+        let conflicts = vrf_winners
+            .into_iter()
+            .filter_map(|(id, _)| if producer != id { Some(id) } else { None })
+            .collect();
+
+        // Fill a block with as many pending transactions as can fit
+        let mut size = 0;
+        let mut transactions = vec![];
+        while let Some(tx) = self.unpublished_txs.front() {
+            if size + tx.bytes > self.config.max_block_size {
+                break;
             }
-
-            let block = Block {
-                slot,
-                producer,
-                conflicts,
-                transactions,
-            };
-            self.get_node_mut(&producer)
-                .publish_block(Arc::new(block.clone()))?;
-            self.tracker.track_slot(slot, Some(block));
-        } else {
-            self.tracker.track_slot(slot, None);
+            size += tx.bytes;
+            transactions.push(self.unpublished_txs.pop_front().unwrap());
         }
+
+        let block = Block {
+            slot,
+            producer,
+            conflicts,
+            transactions,
+        };
+        self.tracker.track_praos_block_generated(&block);
+        self.get_node_mut(&producer)
+            .publish_block(Arc::new(block))?;
 
         Ok(())
     }
@@ -245,13 +249,17 @@ impl Simulation {
 
     fn generate_tx(&mut self) -> Result<()> {
         let id = TransactionId::new(self.next_tx_id);
+        let shard = self.rng.gen_range(0..self.config.ib_shards);
         let bytes = self
             .config
             .max_tx_size
             .min(self.config.transaction_size_bytes.sample(&mut self.rng) as u64);
-        let tx = Arc::new(Transaction { id, bytes });
+        let tx = Arc::new(Transaction { id, shard, bytes });
 
-        self.tracker.track_transaction(&tx);
+        // any node could be the first to see a transaction
+        let publisher_id = self.choose_random_node();
+
+        self.tracker.track_transaction_generated(&tx, publisher_id);
         self.unpublished_txs.push_back(tx.clone());
         self.txs.insert(id, tx.clone());
 
@@ -262,8 +270,6 @@ impl Simulation {
             Duration::from_millis(ms_until_tx),
         );
 
-        // any node could be the first to see a transaction
-        let publisher_id = self.choose_random_node();
         debug!("node {publisher_id} generated tx {id}");
         self.get_node_mut(&publisher_id)
             .receive_tx(publisher_id, tx)
@@ -289,6 +295,7 @@ struct Node {
     total_stake: u64,
     max_ib_size: u64,
     max_ib_requests_per_peer: usize,
+    ib_shards: u64,
     peers: Vec<NodeId>,
     praos: NodePraosState,
     leios: NodeLeiosState,
@@ -316,7 +323,7 @@ struct PendingInputBlock {
 #[derive(Default)]
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, Arc<Transaction>>,
-    unsent_ibs: BTreeMap<u64, VecDeque<InputBlock>>,
+    unsent_ibs: Vec<InputBlock>,
     ibs: BTreeMap<InputBlockId, Arc<InputBlock>>,
     pending_ibs: BTreeMap<InputBlockId, PendingInputBlock>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
@@ -344,6 +351,7 @@ impl Node {
             total_stake,
             max_ib_size: sim_config.max_ib_size,
             max_ib_requests_per_peer: sim_config.max_ib_requests_per_peer,
+            ib_shards: sim_config.ib_shards,
             peers,
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
@@ -384,14 +392,16 @@ impl Node {
         if self.trace {
             info!("node {} saw tx {id}", self.id);
         }
-        self.leios.mempool.insert(tx.id, tx);
         for peer in &self.peers {
             if *peer == from {
                 continue;
             }
             self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
         }
-        self.try_fill_ibs()
+        if !self.try_adding_tx_to_ib(&tx)? {
+            self.leios.mempool.insert(tx.id, tx);
+        }
+        Ok(())
     }
 
     fn receive_roll_forward(&mut self, from: NodeId, slot: u64) -> Result<()> {
@@ -514,10 +524,8 @@ impl Node {
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
-            for pending_ibs in self.leios.unsent_ibs.values_mut() {
-                for pending_ib in pending_ibs {
-                    pending_ib.transactions.retain(|tx| tx.id != transaction.id);
-                }
+            for unsent_ib in &mut self.leios.unsent_ibs {
+                unsent_ib.transactions.retain(|tx| tx.id != transaction.id);
             }
         }
         self.leios.ibs.insert(id, ib);
@@ -555,69 +563,72 @@ impl Node {
         Ok(())
     }
 
-    fn begin_generating_ibs(&mut self, slot: u64, count: u64) -> Result<()> {
-        let mut unsent_ibs = VecDeque::new();
-        for index in 0..count {
+    fn begin_generating_ibs(&mut self, slot: u64, vrfs: Vec<u64>) -> Result<()> {
+        for (index, vrf) in vrfs.into_iter().enumerate() {
             let header = InputBlockHeader {
                 slot,
                 producer: self.id,
-                index,
+                index: index as u64,
+                vrf,
                 timestamp: self.clock.now(),
             };
-            unsent_ibs.push_back(InputBlock {
+            self.leios.unsent_ibs.push(InputBlock {
                 header,
                 transactions: vec![],
             });
         }
-        self.leios.unsent_ibs.insert(slot, unsent_ibs);
-        self.try_fill_ibs()
-    }
-
-    fn try_fill_ibs(&mut self) -> Result<()> {
-        loop {
-            let Some(mut first_ib_entry) = self.leios.unsent_ibs.first_entry() else {
-                // we aren't sending any IBs
-                return Ok(());
-            };
-            let slot = *first_ib_entry.key();
-            let unsent_ibs = first_ib_entry.get_mut();
-            let Some(unsent_ib) = unsent_ibs.front_mut() else {
-                // we aren't sending any more IBs this round
-                self.leios.unsent_ibs.remove(&slot);
-                return Ok(());
-            };
-            let Some((_, tx)) = self.leios.mempool.first_key_value() else {
-                // our mempool is empty
-                return Ok(());
-            };
-
-            let remaining_capacity = self.max_ib_size - unsent_ib.bytes();
-            let tx_bytes = tx.bytes;
-
-            if remaining_capacity >= tx_bytes {
-                // This IB has room for another TX, add it in
-                let (id, tx) = self.leios.mempool.pop_first().unwrap();
-                self.leios.mempool.remove(&id);
-                unsent_ib.transactions.push(tx);
-            }
-
-            if remaining_capacity <= tx_bytes {
-                // This IB is full, :shipit:
-                let ib = unsent_ibs.pop_front().unwrap();
-                self.generate_ib(ib)?;
+        let candidate_txs: Vec<TransactionId> = self.leios.mempool.keys().copied().collect();
+        for tx_id in candidate_txs {
+            let tx = self.leios.mempool.get(&tx_id).cloned().unwrap();
+            if self.try_adding_tx_to_ib(&tx)? {
+                self.leios.mempool.remove(&tx_id);
             }
         }
+        Ok(())
+    }
+
+    fn try_adding_tx_to_ib(&mut self, tx: &Arc<Transaction>) -> Result<bool> {
+        let mut added = false;
+        let mut index_to_publish = None;
+        for (index, ib) in self.leios.unsent_ibs.iter_mut().enumerate() {
+            let shard = ib.header.vrf % self.ib_shards;
+            if shard != tx.shard {
+                continue;
+            }
+
+            let remaining_capacity = self.max_ib_size - ib.bytes();
+            let tx_bytes = tx.bytes;
+
+            if remaining_capacity < tx_bytes {
+                continue;
+            }
+
+            // This IB has room for another TX, add it in
+            ib.transactions.push(tx.clone());
+            added = true;
+            if remaining_capacity <= tx_bytes {
+                // This IB is full, :shipit:
+                index_to_publish = Some(index);
+            }
+            break;
+        }
+        if let Some(index) = index_to_publish {
+            let ib = self.leios.unsent_ibs.remove(index);
+            self.generate_ib(ib)?;
+        }
+        Ok(added)
     }
 
     fn finish_generating_ibs(&mut self, slot: u64) -> Result<()> {
-        let Some(unsent_ibs) = self.leios.unsent_ibs.remove(&slot) else {
-            return Ok(());
-        };
+        let mut unsent_ibs = vec![];
+        unsent_ibs.append(&mut self.leios.unsent_ibs);
+
         for ib in unsent_ibs {
-            if ib.transactions.is_empty() {
-                continue;
+            if ib.header.slot != slot {
+                self.leios.unsent_ibs.push(ib);
+            } else if !ib.transactions.is_empty() {
+                self.generate_ib(ib)?;
             }
-            self.generate_ib(ib)?;
         }
         Ok(())
     }
@@ -626,7 +637,7 @@ impl Node {
         ib.header.timestamp = self.clock.now();
         let ib = Arc::new(ib);
 
-        self.tracker.track_ib_generated(ib.clone());
+        self.tracker.track_ib_generated(&ib);
 
         let id = ib.header.id();
         self.leios.ibs.insert(id, ib);
