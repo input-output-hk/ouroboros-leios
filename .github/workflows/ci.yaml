@@ -50,12 +50,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         ghc-version: ['9.8']
-
-        include:
-          - os: macos-latest
-            ghc-version: '9.8'
 
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +64,8 @@ jobs:
           # Defaults, added for clarity:
           cabal-version: 'latest'
           cabal-update: true
-
+      - name: Install pango
+        run: sudo apt-get install -y libpango1.0-dev
       - name: Configure the build
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
