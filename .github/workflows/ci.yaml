@@ -64,8 +64,8 @@ jobs:
           # Defaults, added for clarity:
           cabal-version: 'latest'
           cabal-update: true
-      - name: Install pango
-        run: sudo apt-get install -y libpango1.0-dev
+      - name: Install libraries
+        run: sudo apt-get install -y libpango1.0-dev libgtk-3-dev
       - name: Configure the build
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
