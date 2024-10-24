@@ -4,10 +4,12 @@ module Main where
 
 import Control.Applicative (Alternative ((<|>)), optional)
 import Data.Maybe (fromMaybe)
+import Data.String (IsString (fromString))
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
 import qualified Options.Applicative as Opts
+import Options.Applicative.Help (line)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
@@ -17,7 +19,7 @@ import Viz
 main :: IO ()
 main = do
   CliCmd
-    { cliVizName
+    { cliViz = viz
     , cliOutputFramesDir
     , cliOutputSeconds
     , cliOutputStartTime
@@ -25,7 +27,6 @@ main = do
     , cliVizSize
     } <-
     Opts.execParser cli
-  let viz = namedViz cliVizName
   case cliOutputFramesDir of
     Nothing ->
       vizualise config viz
@@ -52,13 +53,18 @@ cli =
     (Opts.helper <*> options)
     ( Opts.fullDesc
         <> Opts.header "Vizualisations of Ouroboros-related network simulations"
-        <> Opts.progDesc
-          "Either show a visualisation in a window, or output \
-          \ animation frames to a directory."
+        <> Opts.progDescDoc (Just desc)
     )
+ where
+  desc =
+    fromString
+      "Either show a visualisation in a window, or output \
+      \ animation frames to a directory."
+      <> line
+      <> fromString ("VIZNAME is one of: " ++ unwords (map fst vizualisations))
 
 data CliCmd = CliCmd
-  { cliVizName :: VizName
+  { cliViz :: Vizualisation
   , cliOutputFramesDir :: Maybe FilePath
   , cliOutputSeconds :: Maybe Int
   , cliOutputStartTime :: Maybe Int
@@ -66,12 +72,17 @@ data CliCmd = CliCmd
   , cliVizSize :: Maybe (Int, Int)
   }
 
+vizNamesHelp :: String
+vizNamesHelp = "VIZNAME is one of: " ++ unwords (map fst vizualisations)
+
 options :: Opts.Parser CliCmd
 options =
   CliCmd
     <$> Opts.argument
-      (Opts.eitherReader readVizName)
-      (Opts.metavar "VIZNAME")
+      (Opts.eitherReader readViz)
+      ( Opts.metavar "VIZNAME"
+          <> Opts.help vizNamesHelp
+      )
     <*> optional
       ( Opts.strOption
           ( Opts.long "frames-dir"
@@ -120,45 +131,23 @@ options =
             <> Opts.help "Use a specific resolution"
         )
 
-data VizName
-  = VizTCP1
-  | VizTCP2
-  | VizTCP3
-  | VizRelay1
-  | VizRelay2
-  | VizRelayP2P1
-  | VizRelayP2P2
-  | VizPraosChainSync1
-  | VizPraosBlockFetch1
-  | VizPraos1
-  | VizPraosP2P1
-  | VizPraosP2P2
+vizualisations :: [(String, Vizualisation)]
+vizualisations =
+  [ ("tcp-1", ExamplesTCP.example1)
+  , ("tcp-2", ExamplesTCP.example2)
+  , ("tcp-3", ExamplesTCP.example3)
+  , ("relay-1", ExamplesRelay.example1)
+  , ("relay-2", ExamplesRelay.example2)
+  , ("p2p-1", ExamplesRelayP2P.example1)
+  , ("p2p-2", ExamplesRelayP2P.example2)
+  , ("pcs-1", VizChainSync.example1)
+  , ("pbf-1", VizBlockFetch.example1)
+  , ("praos-1", VizPraos.example1)
+  , ("praos-p2p-1", VizPraosP2P.example1)
+  , ("praos-p2p-2", VizPraosP2P.example2)
+  ]
 
-readVizName :: String -> Either String VizName
-readVizName "tcp-1" = Right VizTCP1
-readVizName "tcp-2" = Right VizTCP2
-readVizName "tcp-3" = Right VizTCP3
-readVizName "relay-1" = Right VizRelay1
-readVizName "relay-2" = Right VizRelay2
-readVizName "p2p-1" = Right VizRelayP2P1
-readVizName "p2p-2" = Right VizRelayP2P2
-readVizName "pcs-1" = Right VizPraosChainSync1
-readVizName "pbf-1" = Right VizPraosBlockFetch1
-readVizName "praos-1" = Right VizPraos1
-readVizName "praos-p2p-1" = Right VizPraosP2P1
-readVizName "praos-p2p-2" = Right VizPraosP2P2
-readVizName _ = Left "unknown vizualisation"
-
-namedViz :: VizName -> Vizualisation
-namedViz VizTCP1 = ExamplesTCP.example1
-namedViz VizTCP2 = ExamplesTCP.example2
-namedViz VizTCP3 = ExamplesTCP.example3
-namedViz VizRelay1 = ExamplesRelay.example1
-namedViz VizRelay2 = ExamplesRelay.example2
-namedViz VizRelayP2P1 = ExamplesRelayP2P.example1
-namedViz VizRelayP2P2 = ExamplesRelayP2P.example2
-namedViz VizPraosChainSync1 = VizChainSync.example1
-namedViz VizPraosBlockFetch1 = VizBlockFetch.example1
-namedViz VizPraos1 = VizPraos.example1
-namedViz VizPraosP2P1 = VizPraosP2P.example1
-namedViz VizPraosP2P2 = VizPraosP2P.example2
+readViz :: String -> Either String Vizualisation
+readViz s = case lookup s vizualisations of
+  Just viz -> Right viz
+  Nothing -> Left "unknown vizualisation"
