@@ -54,9 +54,8 @@ impl EventMonitor {
     pub async fn run(mut self) -> Result<()> {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
-        let mut tx_sizes: BTreeMap<TransactionId, u64> = BTreeMap::new();
+        let mut txs: BTreeMap<TransactionId, Transaction> = BTreeMap::new();
         let mut pending_txs: BTreeSet<TransactionId> = BTreeSet::new();
-        let mut tx_ib_counts: BTreeMap<TransactionId, u64> = BTreeMap::new();
         let mut seen_ibs: BTreeMap<NodeId, u64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
@@ -64,7 +63,7 @@ impl EventMonitor {
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
-        let mut total_txs = 0u64;
+        let mut total_tx_ib_count = 0u64;
 
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
@@ -82,8 +81,14 @@ impl EventMonitor {
                     max_slot = number;
                 }
                 Event::TransactionGenerated { id, bytes, .. } => {
-                    total_txs += 1;
-                    tx_sizes.insert(id, bytes);
+                    txs.insert(
+                        id,
+                        Transaction {
+                            bytes,
+                            generated: time,
+                            included_in_ib: None,
+                        },
+                    );
                     pending_txs.insert(id);
                 }
                 Event::TransactionReceived { .. } => {}
@@ -96,9 +101,9 @@ impl EventMonitor {
                     info!("Pool {} produced a block in slot {slot}.", producer);
                     filled_slots += 1;
                     for published_tx in transactions {
-                        let tx_bytes = tx_sizes.get(&published_tx).unwrap();
+                        let tx = txs.get(&published_tx).unwrap();
                         published_txs += 1;
-                        published_bytes += tx_bytes;
+                        published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
                     *blocks_published.entry(producer).or_default() += 1;
@@ -113,8 +118,12 @@ impl EventMonitor {
                     transactions,
                 } => {
                     generated_ibs += 1;
-                    for tx in &transactions {
-                        *tx_ib_counts.entry(*tx).or_default() += 1;
+                    for tx_id in &transactions {
+                        total_tx_ib_count += 1;
+                        let tx = txs.get_mut(tx_id).unwrap();
+                        if tx.included_in_ib.is_none() {
+                            tx.included_in_ib = Some(time);
+                        }
                     }
                     *seen_ibs.entry(header.producer).or_default() += 1;
                     info!(
@@ -139,7 +148,8 @@ impl EventMonitor {
                 pending_txs.len(),
                 pending_txs
                     .iter()
-                    .filter_map(|id| tx_sizes.get(id))
+                    .filter_map(|id| txs.get(id))
+                    .map(|tx| tx.bytes)
                     .sum::<u64>(),
             );
 
@@ -154,7 +164,22 @@ impl EventMonitor {
         });
 
         info_span!("leios").in_scope(|| {
-            let txs_in_ib: u64 = tx_ib_counts.values().copied().sum();
+            let txs_which_reached_ib: Vec<_> = txs
+                .values()
+                .filter(|tx| tx.included_in_ib.is_some())
+                .collect();
+            let times_to_reach_ib: Vec<f64> = txs_which_reached_ib
+                .iter()
+                .map(|tx| {
+                    let duration = tx.included_in_ib.unwrap() - tx.generated;
+                    duration.as_secs_f64()
+                })
+                .collect();
+            let avg_time_to_reach_ib = if times_to_reach_ib.is_empty() {
+                0.
+            } else {
+                times_to_reach_ib.iter().sum::<f64>() / times_to_reach_ib.len() as f64
+            };
             let avg_seen = self
                 .node_ids
                 .iter()
@@ -167,21 +192,31 @@ impl EventMonitor {
             );
             info!(
                 "{} out of {} transaction(s) reached an IB.",
-                tx_ib_counts.len(),
-                total_txs
+                txs_which_reached_ib.len(),
+                txs.len(),
             );
             info!(
                 "Each transaction was included in an average of {} IBs.",
-                txs_in_ib as f64 / total_txs as f64
+                total_tx_ib_count as f64 / txs.len() as f64,
             );
             info!(
                 "Each IB contained an average of {} transactions.",
-                txs_in_ib as f64 / generated_ibs as f64
+                total_tx_ib_count as f64 / generated_ibs as f64,
+            );
+            info!(
+                "Each transaction took an average of {}s to reach an IB.",
+                avg_time_to_reach_ib,
             );
             info!("Each node received an average of {avg_seen} IBs.");
         });
         Ok(())
     }
+}
+
+struct Transaction {
+    bytes: u64,
+    generated: Timestamp,
+    included_in_ib: Option<Timestamp>,
 }
 
 enum OutputTarget {

@@ -1,5 +1,5 @@
 use std::{
-    ops::Add,
+    ops::{Add, Sub},
     time::{Duration, Instant},
 };
 
@@ -13,6 +13,13 @@ impl Add<Duration> for Timestamp {
 
     fn add(self, rhs: Duration) -> Self::Output {
         Timestamp(self.0 + rhs)
+    }
+}
+impl Sub<Timestamp> for Timestamp {
+    type Output = Duration;
+
+    fn sub(self, rhs: Timestamp) -> Self::Output {
+        self.0 - rhs.0
     }
 }
 
