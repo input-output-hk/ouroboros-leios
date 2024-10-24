@@ -4,7 +4,7 @@
 
 ### Rough estimate of Leios resources
 
-The spreatsheet [analysis/Leios resource estimates - ROUGH ESTIMATE.ods][analysis/Leios resource estimates - ROUGH ESTIMATE.ods] contains an initial rough estimate of the network and CPU resources required by Leios at three different throughputs:
+The spreatsheet [analysis/Leios resource estimates - ROUGH ESTIMATE.ods](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) contains an initial rough estimate of the network and CPU resources required by Leios at three different throughputs:
 
 - ~1,000 tx/s
 - ~10,000 tx/s
