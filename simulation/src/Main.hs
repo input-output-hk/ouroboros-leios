@@ -6,26 +6,23 @@ import Control.Applicative (Alternative ((<|>)), optional)
 import Data.Maybe (fromMaybe)
 import qualified Options.Applicative as Opts
 
-import Viz (
-  AnimVizConfig (..),
-  GtkVizConfig (..),
-  defaultAnimVizConfig,
-  defaultGtkVizConfig,
-  vizualise,
-  writeAnimationFrames,
- )
-import VizName (VizName (..), namedViz)
+import Viz
+
+import qualified ExamplesRelay
+import qualified ExamplesRelayP2P
+import qualified ExamplesTCP
 
 main :: IO ()
 main = do
-  cmd <- Opts.execParser cli
-  case cmd of
-    Run opts ->
-      runViz opts
-    List -> listVisualizations
-
-runViz :: RunOptions -> IO ()
-runViz RunOptions{cliVizName, cliOutputFramesDir, cliOutputSeconds, cliOutputStartTime, cliCpuRendering, cliVizSize} = do
+  CliCmd
+    { cliVizName
+    , cliOutputFramesDir
+    , cliOutputSeconds
+    , cliOutputStartTime
+    , cliCpuRendering
+    , cliVizSize
+    } <-
+    Opts.execParser cli
   let viz = namedViz cliVizName
   case cliOutputFramesDir of
     Nothing ->
@@ -47,15 +44,10 @@ runViz RunOptions{cliVizName, cliOutputFramesDir, cliOutputSeconds, cliOutputSta
           , animVizResolution = cliVizSize
           }
 
-listVisualizations :: IO ()
-listVisualizations = do
-  putStrLn "Available visualisations:"
-  mapM_ (putStrLn . ("  " ++) . show) $ enumFrom VizTCP1
-
-cli :: Opts.ParserInfo Command
+cli :: Opts.ParserInfo CliCmd
 cli =
   Opts.info
-    (Opts.helper <*> command)
+    (Opts.helper <*> options)
     ( Opts.fullDesc
         <> Opts.header "Vizualisations of Ouroboros-related network simulations"
         <> Opts.progDesc
@@ -63,7 +55,7 @@ cli =
           \ animation frames to a directory."
     )
 
-data RunOptions = RunOptions
+data CliCmd = CliCmd
   { cliVizName :: VizName
   , cliOutputFramesDir :: Maybe FilePath
   , cliOutputSeconds :: Maybe Int
@@ -72,20 +64,11 @@ data RunOptions = RunOptions
   , cliVizSize :: Maybe (Int, Int)
   }
 
-data Command = Run RunOptions | List
-
-command :: Opts.Parser Command
-command =
-  Opts.hsubparser
-    ( Opts.command "run" (Opts.info (Run <$> options) (Opts.progDesc "Run a visualisation"))
-        <> Opts.command "list" (Opts.info (pure List) (Opts.progDesc "List available visualisations"))
-    )
-
-options :: Opts.Parser RunOptions
+options :: Opts.Parser CliCmd
 options =
-  RunOptions
+  CliCmd
     <$> Opts.argument
-      Opts.auto
+      (Opts.eitherReader readVizName)
       (Opts.metavar "VIZNAME")
     <*> optional
       ( Opts.strOption
@@ -134,3 +117,31 @@ options =
             <> Opts.metavar "(W,H)"
             <> Opts.help "Use a specific resolution"
         )
+
+data VizName
+  = VizTCP1
+  | VizTCP2
+  | VizTCP3
+  | VizRelay1
+  | VizRelay2
+  | VizRelayP2P1
+  | VizRelayP2P2
+
+readVizName :: String -> Either String VizName
+readVizName "tcp-1" = Right VizTCP1
+readVizName "tcp-2" = Right VizTCP2
+readVizName "tcp-3" = Right VizTCP3
+readVizName "relay-1" = Right VizRelay1
+readVizName "relay-2" = Right VizRelay2
+readVizName "p2p-1" = Right VizRelayP2P1
+readVizName "p2p-2" = Right VizRelayP2P2
+readVizName _ = Left "unknown vizualisation"
+
+namedViz :: VizName -> Vizualisation
+namedViz VizTCP1 = ExamplesTCP.example1
+namedViz VizTCP2 = ExamplesTCP.example2
+namedViz VizTCP3 = ExamplesTCP.example3
+namedViz VizRelay1 = ExamplesRelay.example1
+namedViz VizRelay2 = ExamplesRelay.example2
+namedViz VizRelayP2P1 = ExamplesRelayP2P.example1
+namedViz VizRelayP2P2 = ExamplesRelayP2P.example2
