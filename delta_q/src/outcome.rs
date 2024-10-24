@@ -87,7 +87,9 @@ impl Outcome {
     pub fn seq(&self, other: &Self, ctx: &EvaluationContext) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.convolve(&other.cdf)?,
-            load: self.map_loads(other, ctx, |l, r| Ok(l.add(&self.cdf.convolve_step(r)?)))?,
+            load: self.map_loads(other, ctx, |l, r| {
+                Ok(l.add(&self.cdf.convolve_step(r, f32::INFINITY)?))
+            })?,
         })
     }
 
@@ -160,5 +162,29 @@ mod tests {
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.choice(0.6, &outcome2, &ctx).unwrap();
         assert_eq!(res.to_string(), "CDF[(0, 0.04), (1, 0.28), (2, 0.64), (5, 1)] WITH m1[(0.1, 9), (0.5, 6), (1.9, 0)] WITH m2[(0, 20), (1.5, 80), (2, 20), (4.5, 0)] WITH m3[(4.5, 4.8), (5.5, 0)]");
+    }
+
+    #[test]
+    fn test_for_all() {
+        let ctx = EvaluationContext::default();
+        let (outcome1, outcome2) = outcomes();
+        let res = outcome1.for_all(&outcome2, &ctx).unwrap();
+        assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (5, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
+    }
+
+    #[test]
+    fn test_for_some() {
+        let ctx = EvaluationContext::default();
+        let (outcome1, outcome2) = outcomes();
+        let res = outcome1.for_some(&outcome2, &ctx).unwrap();
+        assert_eq!(res.to_string(), "CDF[(0, 0.1), (1, 0.46), (2, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
+    }
+
+    #[test]
+    fn test_seq() {
+        let ctx = EvaluationContext::default();
+        let (outcome1, outcome2) = outcomes();
+        let res = outcome1.seq(&outcome2, &ctx).unwrap();
+        assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (6, 0.46), (7, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(1, 20), (1.5, 120), (2, 50), (5.5, 30), (6.5, 0)] WITH m3[(5.5, 4.8), (6.5, 7.2), (7.5, 0)]");
     }
 }

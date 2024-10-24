@@ -191,13 +191,17 @@ impl CDF {
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
     /// two CDFs. This describes the distribution of the sum of two independent random variables.
     pub fn convolve(&self, other: &CDF) -> Result<CDF, CDFError> {
-        let steps = self.convolve_step(&other.steps)?;
+        let steps = self.convolve_step(&other.steps, 1.0)?;
         Ok(CDF { steps })
     }
 
     /// Convolve a CDF with a step function, which means smearing out the step function by the
     /// gradual completion of the CDF.
-    pub fn convolve_step(&self, other: &StepFunction) -> Result<StepFunction, StepFunctionError> {
+    pub fn convolve_step(
+        &self,
+        other: &StepFunction,
+        max: f32,
+    ) -> Result<StepFunction, StepFunctionError> {
         // start with the all-zero CDF
         let mut data = Vec::new();
         let mut prev_y = 0.0;
@@ -210,7 +214,7 @@ impl CDF {
                 other.iter().map(|(x, y)| (x + lx, y * step)),
             );
             for (x, (ly, ry)) in iter {
-                d.push((x, (ly + ry).min(1.0)));
+                d.push((x, (ly + ry).min(max)));
             }
             data = d;
             prev_y = ly;

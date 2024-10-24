@@ -299,6 +299,20 @@ pub enum CompactionMode {
 /// Under CompactionMode::UnderApproximate, the new point gets the greater x coordinate while under CompactionMode::OverApproximate, the new point gets the smaller x coordinate.
 /// The resulting point always has the higher y value of the pair.
 fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
+    {
+        let mut pos = 0;
+        let mut prev_y = 0.0;
+        for i in 0..data.len() {
+            let (x, y) = data[i];
+            if y != prev_y {
+                data[pos] = (x, y);
+                prev_y = y;
+                pos += 1;
+            }
+        }
+        data.truncate(pos);
+    }
+
     if data.len() <= max_size {
         return;
     }
