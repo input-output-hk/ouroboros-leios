@@ -12,7 +12,13 @@ use crate::{
 pub enum Event {
     Transaction {
         id: TransactionId,
+        publisher: NodeId,
         bytes: u64,
+    },
+    TransactionReceived {
+        id: TransactionId,
+        sender: NodeId,
+        recipient: NodeId,
     },
     Slot {
         number: u64,
@@ -56,10 +62,19 @@ impl EventTracker {
         });
     }
 
-    pub fn track_transaction(&self, transaction: &Transaction) {
+    pub fn track_transaction(&self, transaction: &Transaction, publisher: NodeId) {
         self.send(Event::Transaction {
             id: transaction.id,
+            publisher,
             bytes: transaction.bytes,
+        });
+    }
+
+    pub fn track_transaction_received(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
+        self.send(Event::TransactionReceived {
+            id,
+            sender,
+            recipient,
         });
     }
 

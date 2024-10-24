@@ -111,6 +111,7 @@ impl Simulation {
                             target.receive_request_tx(from, tx)?;
                         }
                         SimulationMessage::Tx(tx) => {
+                            self.tracker.track_transaction_received(tx.id, from, to);
                             target.receive_tx(from, tx)?;
                         }
 
@@ -251,7 +252,10 @@ impl Simulation {
             .min(self.config.transaction_size_bytes.sample(&mut self.rng) as u64);
         let tx = Arc::new(Transaction { id, bytes });
 
-        self.tracker.track_transaction(&tx);
+        // any node could be the first to see a transaction
+        let publisher_id = self.choose_random_node();
+
+        self.tracker.track_transaction(&tx, publisher_id);
         self.unpublished_txs.push_back(tx.clone());
         self.txs.insert(id, tx.clone());
 
@@ -262,8 +266,6 @@ impl Simulation {
             Duration::from_millis(ms_until_tx),
         );
 
-        // any node could be the first to see a transaction
-        let publisher_id = self.choose_random_node();
         debug!("node {publisher_id} generated tx {id}");
         self.get_node_mut(&publisher_id)
             .receive_tx(publisher_id, tx)

@@ -28,7 +28,14 @@ enum OutputEvent {
     TransactionCreated {
         time: Timestamp,
         id: TransactionId,
+        publisher: NodeId,
         bytes: u64,
+    },
+    TransactionReceived {
+        time: Timestamp,
+        id: TransactionId,
+        sender: NodeId,
+        recipient: NodeId,
     },
     InputBlockGenerated {
         time: Timestamp,
@@ -99,10 +106,11 @@ impl EventMonitor {
             self.compute_output_events(&mut output, &event, timestamp)
                 .await?;
             match event {
-                Event::Transaction { id, bytes } => {
+                Event::Transaction { id, bytes, .. } => {
                     total_txs += 1;
                     pending_tx_sizes.insert(id, bytes);
                 }
+                Event::TransactionReceived { .. } => {}
                 Event::Slot { number, block } => {
                     if let Some(block) = block {
                         info!("Pool {} produced a block in slot {number}.", block.producer);
@@ -211,12 +219,31 @@ impl EventMonitor {
                         .await?;
                 }
             }
-            Event::Transaction { id, bytes } => {
+            Event::Transaction {
+                id,
+                publisher,
+                bytes,
+            } => {
                 output
                     .write(OutputEvent::TransactionCreated {
                         time,
                         id: *id,
+                        publisher: *publisher,
                         bytes: *bytes,
+                    })
+                    .await?;
+            }
+            Event::TransactionReceived {
+                id,
+                sender,
+                recipient,
+            } => {
+                output
+                    .write(OutputEvent::TransactionReceived {
+                        time,
+                        id: *id,
+                        sender: *sender,
+                        recipient: *recipient,
                     })
                     .await?;
             }
