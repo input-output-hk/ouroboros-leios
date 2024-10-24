@@ -22,7 +22,6 @@ import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import PraosProtocol.SimPraos (PraosEvent (..), PraosTrace, exampleTrace1)
 import SimTypes
-import System.Random (mkStdGen)
 import Viz
 import VizSim
 import VizSimTCP (
@@ -62,17 +61,14 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   blockFetchMessageColor ::
     BlockFetchMessage ->
     (Double, Double, Double)
-  blockFetchMessageColor (ProtocolMessage (SomeMessage (MsgBlock blk))) =
-    rngColor . mkStdGen . coerce . hashBody $ blk
-  blockFetchMessageColor _ = (1, 0, 0)
+  blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
+    MsgBlock blk -> blockBodyColor blk
+    _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
     BlockFetchMessage ->
     Maybe String
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
-
-blockHeaderColor :: BlockHeader -> (Double, Double, Double)
-blockHeaderColor = rngColor . mkStdGen . coerce . blockHash
 
 ------------------------------------------------------------------------------
 -- The vizualisation model

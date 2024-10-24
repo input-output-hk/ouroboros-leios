@@ -12,11 +12,11 @@ import Network.TypedProtocol
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
-import PraosProtocol.Common (BlockHeader)
+import PraosProtocol.Common (BlockHeader, blockHeaderColor)
 import PraosProtocol.Common.Chain (Chain (Genesis))
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraosP2P
-import PraosProtocol.VizSimPraos (PraosVizConfig (..), blockHeaderColor, examplesPraosSimVizConfig, praosSimVizModel)
+import PraosProtocol.VizSimPraos (PraosVizConfig (..), examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes

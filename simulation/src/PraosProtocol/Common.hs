@@ -11,6 +11,8 @@ module PraosProtocol.Common (
   headerPoint,
   blockPrevPoint,
   setFollowerPoint,
+  blockBodyColor,
+  blockHeaderColor,
   module Block,
   module ConcreteBlock,
   module ProducerState,
@@ -48,7 +50,10 @@ import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain, foldChain, pointOnChain)
 
 import ChanTCP (MessageSize (..))
+import Data.Coerce (coerce)
+import Data.Word (Word8)
 import SimTCPLinks (kilobytes)
+import System.Random (mkStdGen, uniform)
 import TimeCompat
 
 --------------------------------
@@ -94,6 +99,18 @@ data SlotConfig = SlotConfig {start :: UTCTime, duration :: NominalDiffTime}
 
 slotTime :: SlotConfig -> SlotNo -> UTCTime
 slotTime SlotConfig{start, duration} sl = (fromIntegral (unSlotNo sl) * duration) `addUTCTime` start
+
+blockBodyColor :: BlockBody -> (Double, Double, Double)
+blockBodyColor = hashToColor . coerce . hashBody
+
+blockHeaderColor :: BlockHeader -> (Double, Double, Double)
+blockHeaderColor = hashToColor . coerce . blockHash
+
+hashToColor :: Int -> (Double, Double, Double)
+hashToColor hash = (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
+ where
+  r, g, b :: Word8
+  ((r, g, b), _) = uniform (mkStdGen hash)
 
 --------------------------------
 ---- Common Utility Types
