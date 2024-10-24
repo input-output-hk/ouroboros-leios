@@ -48,7 +48,15 @@ impl Outcome {
         ctx: &EvaluationContext,
         f: impl Fn(&StepFunction) -> StepFunction,
     ) -> BTreeMap<Name, StepFunction> {
-        self.load.iter().map(|(n, l)| (n.clone(), f(l))).collect()
+        self.load
+            .iter()
+            .map(|(n, l)| {
+                (
+                    n.clone(),
+                    f(l).with_max_size(ctx.max_size).with_mode(ctx.mode),
+                )
+            })
+            .collect()
     }
 
     fn map_loads(
@@ -114,8 +122,43 @@ impl Display for Outcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.cdf)?;
         for (metric, load) in self.load.iter() {
-            write!(f, " with {metric}{load}")?;
+            write!(f, " WITH {metric}{load}")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn outcomes() -> (Outcome, Outcome) {
+        let outcome1 = Outcome::new(CDF::from_steps(&[(1.0, 0.4), (2.0, 1.0)]).unwrap())
+            .with_load(
+                "m1".into(),
+                StepFunction::new(&[(0.1, 15.0), (0.5, 10.0), (1.9, 0.0)]).unwrap(),
+            )
+            .with_load(
+                "m2".into(),
+                StepFunction::new(&[(1.5, 100.0), (2.0, 0.0)]).unwrap(),
+            );
+        let outcome2 = Outcome::new(CDF::from_steps(&[(0.0, 0.1), (5.0, 1.0)]).unwrap())
+            .with_load(
+                "m2".into(),
+                StepFunction::new(&[(0.0, 50.0), (4.5, 0.0)]).unwrap(),
+            )
+            .with_load(
+                "m3".into(),
+                StepFunction::new(&[(4.5, 12.0), (5.5, 0.0)]).unwrap(),
+            );
+        (outcome1, outcome2)
+    }
+
+    #[test]
+    fn test_choice() {
+        let ctx = EvaluationContext::default();
+        let (outcome1, outcome2) = outcomes();
+        let res = outcome1.choice(0.6, &outcome2, &ctx).unwrap();
+        assert_eq!(res.to_string(), "CDF[(0, 0.04), (1, 0.28), (2, 0.64), (5, 1)] WITH m1[(0.1, 9), (0.5, 6), (1.9, 0)] WITH m2[(0, 20), (1.5, 80), (2, 20), (4.5, 0)] WITH m3[(4.5, 4.8), (5.5, 0)]");
     }
 }

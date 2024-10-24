@@ -91,9 +91,9 @@ fn app_main() -> HtmlResult {
                     }
                 };
                 let data = js_sys::Object::new();
-                Reflect::set(&data, &"bins".into(), &cdf.iter().map(|x| JsValue::from(x.0)).collect::<js_sys::Array>()).unwrap();
-                Reflect::set(&data, &"values".into(), &cdf.iter().map(|x| JsValue::from(x.1)).collect::<js_sys::Array>()).unwrap();
-                Reflect::set(&data, &"max".into(), &(cdf.width() * 1.2).max(0.1).into()).unwrap();
+                Reflect::set(&data, &"bins".into(), &cdf.cdf.iter().map(|x| JsValue::from(x.0)).collect::<js_sys::Array>()).unwrap();
+                Reflect::set(&data, &"values".into(), &cdf.cdf.iter().map(|x| JsValue::from(x.1)).collect::<js_sys::Array>()).unwrap();
+                Reflect::set(&data, &"max".into(), &(cdf.cdf.width() * 1.2).max(0.1).into()).unwrap();
                 Reflect::set(&data, &"name".into(), &name.into()).unwrap();
                 let init = MessageEventInit::new();
                 init.set_data(&data);
