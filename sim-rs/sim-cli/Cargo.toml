@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
+average = "0.15"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
 serde = { version = "1", features = ["derive"] }

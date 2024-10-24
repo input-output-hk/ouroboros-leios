@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
+use average::Variance;
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
@@ -175,11 +176,7 @@ impl EventMonitor {
                     duration.as_secs_f64()
                 })
                 .collect();
-            let avg_time_to_reach_ib = if times_to_reach_ib.is_empty() {
-                0.
-            } else {
-                times_to_reach_ib.iter().sum::<f64>() / times_to_reach_ib.len() as f64
-            };
+            let ib_stats = compute_stats(&times_to_reach_ib);
             let avg_seen = self
                 .node_ids
                 .iter()
@@ -204,8 +201,8 @@ impl EventMonitor {
                 total_tx_ib_count as f64 / generated_ibs as f64,
             );
             info!(
-                "Each transaction took an average of {}s to reach an IB.",
-                avg_time_to_reach_ib,
+                "Each transaction took an average of {}s (stddev {}) to reach an IB.",
+                ib_stats.mean, ib_stats.std_dev,
             );
             info!("Each node received an average of {avg_seen} IBs.");
         });
@@ -217,6 +214,19 @@ struct Transaction {
     bytes: u64,
     generated: Timestamp,
     included_in_ib: Option<Timestamp>,
+}
+
+struct Stats {
+    mean: f64,
+    std_dev: f64,
+}
+
+fn compute_stats(data: &[f64]) -> Stats {
+    let v: Variance = data.iter().collect();
+    Stats {
+        mean: v.mean(),
+        std_dev: v.population_variance().sqrt(),
+    }
 }
 
 enum OutputTarget {
