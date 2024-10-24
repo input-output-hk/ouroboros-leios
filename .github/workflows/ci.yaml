@@ -70,9 +70,9 @@ jobs:
     - name: 💾➤ Import Nix store cache
       if: "steps.nix-cache.outputs.cache-hit == 'true'"
       run: "nix-store --import < /tmp/nixcache"
-    - name: 🏗️ Build `exe:ouroboros-net-vis`
+    - name: 🏗️ Build `exe:viz`
       run: |
-        nix build --show-trace --accept-flake-config .#ouroboros-net-vis
+        nix build --show-trace --accept-flake-config .#viz
     - name: ➤💾 Export Nix store cache
       if: "steps.nix-cache.outputs.cache-hit != 'true'"
       run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
