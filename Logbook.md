@@ -2,6 +2,12 @@
 
 ## 2024-10-24
 
+### Assessment criteria
+
+Discussion #53 proposes assessment criteria for the continuation of Leios after PI8. The basic idea is to estimate bounds for the Leios curve in the following diagram. This is an attempt to view the economic and technical aspects of Leios's viability on the same chart.
+
+![Leios Assessment Criteria for PI8](https://github.com/user-attachments/assets/e94287fe-0ad6-4805-98da-21cbbd134361)
+
 ### Haskell Simulation
 
 * First batch of praos visualizations:
