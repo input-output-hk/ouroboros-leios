@@ -34,6 +34,7 @@ id_wrapper!(TransactionId, u64);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub id: TransactionId,
+    pub shard: u64,
     pub bytes: u64,
 }
 
@@ -51,6 +52,7 @@ pub struct InputBlockHeader {
     /// Need this field to distinguish IBs from the same slot+producer.
     /// The real implementation can use the VRF proof for that.
     pub index: u64,
+    pub vrf: u64,
     pub timestamp: Timestamp,
 }
 impl InputBlockHeader {
