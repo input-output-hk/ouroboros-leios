@@ -1,5 +1,26 @@
 # Leios logbook
 
+## 2024-10-24
+
+### Haskell Simulation
+
+* First batch of praos visualizations:
+  - `cabal run viz praos-1` for a 2-node simulation relaying a chain
+    across.
+  - `cabal run viz praos-p2p-1` and `praos-p2p-2` for WIP simulations
+    of ~100 nodes dynamically generating and diffusing blocks.
+
+* CLI:
+  - `cabal run viz` now lists the visualization names,
+    as does `cabal run viz -- --help`.
+
+* CI:
+  - Haskell CI switched to use `haskell-actions/setup` instead of nix.
+  - Isolated the formal spec nix setup by using a `dummy-project`
+    instead of the repo root haskell project. Not a nix expert, others
+    might find a better solution.
+
+
 ## 2024-10-22
 
 ### NetSim
