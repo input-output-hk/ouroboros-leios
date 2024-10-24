@@ -19,7 +19,7 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -67,7 +67,7 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
-      let chainA = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+      let chainA = mkChainSimple $ map (\(i :: Int) -> (BlockBody $ BS8.pack $ show i)) [1 .. 10]
       let chainB = Genesis
       (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       (cA, pB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops

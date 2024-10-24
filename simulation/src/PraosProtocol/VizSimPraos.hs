@@ -12,18 +12,17 @@ import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
-import Data.Word (Word8)
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.BlockFetch (BlockFetchMessage, blockFetchMessageLabel)
+import PraosProtocol.BlockFetch (BlockFetchMessage, Message (MsgBlock), blockFetchMessageLabel)
 import PraosProtocol.ChainSync (ChainSyncMessage, Message (..), chainSyncMessageLabel)
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import PraosProtocol.SimPraos (PraosEvent (..), PraosTrace, exampleTrace1)
 import SimTypes
-import System.Random (mkStdGen, uniform)
+import System.Random (mkStdGen)
 import Viz
 import VizSim
 import VizSimTCP (
@@ -63,6 +62,8 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   blockFetchMessageColor ::
     BlockFetchMessage ->
     (Double, Double, Double)
+  blockFetchMessageColor (ProtocolMessage (SomeMessage (MsgBlock blk))) =
+    rngColor . mkStdGen . coerce . hashBody $ blk
   blockFetchMessageColor _ = (1, 0, 0)
 
   blockFetchMessageText ::
@@ -71,11 +72,7 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
 blockHeaderColor :: BlockHeader -> (Double, Double, Double)
-blockHeaderColor hdr =
-  (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
- where
-  r, g, b :: Word8
-  ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
+blockHeaderColor = rngColor . mkStdGen . coerce . blockHash
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
