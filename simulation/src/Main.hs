@@ -4,29 +4,29 @@ module Main where
 
 import Control.Applicative (Alternative ((<|>)), optional)
 import Data.Maybe (fromMaybe)
+import Data.String (IsString (fromString))
+import qualified ExamplesRelay
+import qualified ExamplesRelayP2P
+import qualified ExamplesTCP
 import qualified Options.Applicative as Opts
-
-import Viz (
-  AnimVizConfig (..),
-  GtkVizConfig (..),
-  defaultAnimVizConfig,
-  defaultGtkVizConfig,
-  vizualise,
-  writeAnimationFrames,
- )
-import VizName (VizName (..), namedViz)
+import Options.Applicative.Help (line)
+import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
+import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
+import qualified PraosProtocol.VizSimChainSync as VizChainSync
+import qualified PraosProtocol.VizSimPraos as VizPraos
+import Viz
 
 main :: IO ()
 main = do
-  cmd <- Opts.execParser cli
-  case cmd of
-    Run opts ->
-      runViz opts
-    List -> listVisualizations
-
-runViz :: RunOptions -> IO ()
-runViz RunOptions{cliVizName, cliOutputFramesDir, cliOutputSeconds, cliOutputStartTime, cliCpuRendering, cliVizSize} = do
-  let viz = namedViz cliVizName
+  CliCmd
+    { cliViz = viz
+    , cliOutputFramesDir
+    , cliOutputSeconds
+    , cliOutputStartTime
+    , cliCpuRendering
+    , cliVizSize
+    } <-
+    Opts.execParser cli
   case cliOutputFramesDir of
     Nothing ->
       vizualise config viz
@@ -47,24 +47,24 @@ runViz RunOptions{cliVizName, cliOutputFramesDir, cliOutputSeconds, cliOutputSta
           , animVizResolution = cliVizSize
           }
 
-listVisualizations :: IO ()
-listVisualizations = do
-  putStrLn "Available visualisations:"
-  mapM_ (putStrLn . ("  " ++) . show) $ enumFrom VizTCP1
-
-cli :: Opts.ParserInfo Command
+cli :: Opts.ParserInfo CliCmd
 cli =
   Opts.info
-    (Opts.helper <*> command)
+    (Opts.helper <*> options)
     ( Opts.fullDesc
         <> Opts.header "Vizualisations of Ouroboros-related network simulations"
-        <> Opts.progDesc
-          "Either show a visualisation in a window, or output \
-          \ animation frames to a directory."
+        <> Opts.progDescDoc (Just desc)
     )
+ where
+  desc =
+    fromString
+      "Either show a visualisation in a window, or output \
+      \ animation frames to a directory."
+      <> line
+      <> fromString ("VIZNAME is one of: " ++ unwords (map fst vizualisations))
 
-data RunOptions = RunOptions
-  { cliVizName :: VizName
+data CliCmd = CliCmd
+  { cliViz :: Vizualisation
   , cliOutputFramesDir :: Maybe FilePath
   , cliOutputSeconds :: Maybe Int
   , cliOutputStartTime :: Maybe Int
@@ -72,21 +72,17 @@ data RunOptions = RunOptions
   , cliVizSize :: Maybe (Int, Int)
   }
 
-data Command = Run RunOptions | List
+vizNamesHelp :: String
+vizNamesHelp = "VIZNAME is one of: " ++ unwords (map fst vizualisations)
 
-command :: Opts.Parser Command
-command =
-  Opts.hsubparser
-    ( Opts.command "run" (Opts.info (Run <$> options) (Opts.progDesc "Run a visualisation"))
-        <> Opts.command "list" (Opts.info (pure List) (Opts.progDesc "List available visualisations"))
-    )
-
-options :: Opts.Parser RunOptions
+options :: Opts.Parser CliCmd
 options =
-  RunOptions
+  CliCmd
     <$> Opts.argument
-      Opts.auto
-      (Opts.metavar "VIZNAME")
+      (Opts.eitherReader readViz)
+      ( Opts.metavar "VIZNAME"
+          <> Opts.help vizNamesHelp
+      )
     <*> optional
       ( Opts.strOption
           ( Opts.long "frames-dir"
@@ -134,3 +130,24 @@ options =
             <> Opts.metavar "(W,H)"
             <> Opts.help "Use a specific resolution"
         )
+
+vizualisations :: [(String, Vizualisation)]
+vizualisations =
+  [ ("tcp-1", ExamplesTCP.example1)
+  , ("tcp-2", ExamplesTCP.example2)
+  , ("tcp-3", ExamplesTCP.example3)
+  , ("relay-1", ExamplesRelay.example1)
+  , ("relay-2", ExamplesRelay.example2)
+  , ("p2p-1", ExamplesRelayP2P.example1)
+  , ("p2p-2", ExamplesRelayP2P.example2)
+  , ("pcs-1", VizChainSync.example1)
+  , ("pbf-1", VizBlockFetch.example1)
+  , ("praos-1", VizPraos.example1)
+  , ("praos-p2p-1", VizPraosP2P.example1)
+  , ("praos-p2p-2", VizPraosP2P.example2)
+  ]
+
+readViz :: String -> Either String Vizualisation
+readViz s = case lookup s vizualisations of
+  Just viz -> Right viz
+  Nothing -> Left "unknown vizualisation"

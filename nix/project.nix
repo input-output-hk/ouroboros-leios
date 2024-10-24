@@ -9,7 +9,7 @@ let
       isCross = pkgs.stdenv.hostPlatform != pkgs.stdenv.buildPlatform;
     in
     {
-      src = ../.;
+      src = ./dummy-project;
 
       shell.withHoogle = false;
 
