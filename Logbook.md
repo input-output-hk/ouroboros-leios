@@ -2,6 +2,16 @@
 
 ## 2024-10-24
 
+### Rough estimate of Leios resources
+
+The spreatsheet [analysis/Leios resource estimates - ROUGH ESTIMATE.ods][analysis/Leios resource estimates - ROUGH ESTIMATE.ods] contains an initial rough estimate of the network and CPU resources required by Leios at three different throughputs:
+
+- ~1,000 tx/s
+- ~10,000 tx/s
+- ~100,000 tx/s
+
+Later work and simulations will refine this.
+
 ### Assessment criteria
 
 Discussion #53 proposes assessment criteria for the continuation of Leios after PI8. The basic idea is to estimate bounds for the Leios curve in the following diagram. This is an attempt to view the economic and technical aspects of Leios's viability on the same chart.
