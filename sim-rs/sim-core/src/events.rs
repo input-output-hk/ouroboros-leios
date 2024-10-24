@@ -1,16 +1,19 @@
-use std::sync::Arc;
-
+use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::warn;
 
 use crate::{
     clock::{Clock, Timestamp},
     config::NodeId,
-    model::{Block, InputBlock, Transaction, TransactionId},
+    model::{Block, InputBlock, InputBlockHeader, InputBlockId, Transaction, TransactionId},
 };
 
+#[derive(Debug, Clone, Serialize)]
 pub enum Event {
-    Transaction {
+    Slot {
+        number: u64,
+    },
+    TransactionGenerated {
         id: TransactionId,
         publisher: NodeId,
         bytes: u64,
@@ -20,20 +23,25 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
-    Slot {
-        number: u64,
-        block: Option<Block>,
+    PraosBlockGenerated {
+        slot: u64,
+        producer: NodeId,
+        transactions: Vec<TransactionId>,
+        conflicts: Vec<NodeId>,
     },
-    BlockReceived {
+    PraosBlockReceived {
         slot: u64,
         sender: NodeId,
         recipient: NodeId,
     },
     InputBlockGenerated {
-        block: Arc<InputBlock>,
+        #[serde(flatten)]
+        header: InputBlockHeader,
+        transactions: Vec<TransactionId>,
     },
     InputBlockReceived {
-        block: Arc<InputBlock>,
+        #[serde(flatten)]
+        id: InputBlockId,
         sender: NodeId,
         recipient: NodeId,
     },
@@ -50,20 +58,29 @@ impl EventTracker {
         Self { sender, clock }
     }
 
-    pub fn track_slot(&self, number: u64, block: Option<Block>) {
-        self.send(Event::Slot { number, block });
+    pub fn track_slot(&self, number: u64) {
+        self.send(Event::Slot { number });
     }
 
-    pub fn track_block_received(&self, slot: u64, sender: NodeId, recipient: NodeId) {
-        self.send(Event::BlockReceived {
-            slot,
+    pub fn track_praos_block_generated(&self, block: &Block) {
+        self.send(Event::PraosBlockGenerated {
+            slot: block.slot,
+            producer: block.producer,
+            transactions: block.transactions.iter().map(|tx| tx.id).collect(),
+            conflicts: block.conflicts.clone(),
+        });
+    }
+
+    pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
+        self.send(Event::PraosBlockReceived {
+            slot: block.slot,
             sender,
             recipient,
         });
     }
 
-    pub fn track_transaction(&self, transaction: &Transaction, publisher: NodeId) {
-        self.send(Event::Transaction {
+    pub fn track_transaction_generated(&self, transaction: &Transaction, publisher: NodeId) {
+        self.send(Event::TransactionGenerated {
             id: transaction.id,
             publisher,
             bytes: transaction.bytes,
@@ -78,13 +95,16 @@ impl EventTracker {
         });
     }
 
-    pub fn track_ib_generated(&self, block: Arc<InputBlock>) {
-        self.send(Event::InputBlockGenerated { block });
+    pub fn track_ib_generated(&self, block: &InputBlock) {
+        self.send(Event::InputBlockGenerated {
+            header: block.header.clone(),
+            transactions: block.transactions.iter().map(|tx| tx.id).collect(),
+        });
     }
 
-    pub fn track_ib_received(&self, block: Arc<InputBlock>, sender: NodeId, recipient: NodeId) {
+    pub fn track_ib_received(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::InputBlockReceived {
-            block,
+            id,
             sender,
             recipient,
         });

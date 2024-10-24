@@ -123,7 +123,7 @@ impl Simulation {
                             target.receive_request_block(from, slot)?;
                         }
                         SimulationMessage::Block(block) => {
-                            self.tracker.track_block_received(block.slot, from, to);
+                            self.tracker.track_praos_block_received(&block, from, to);
                             target.receive_block(from, block)?;
                         }
 
@@ -146,7 +146,7 @@ impl Simulation {
                             target.receive_request_ib(from, id)?;
                         }
                         SimulationMessage::IB(ib) => {
-                            self.tracker.track_ib_received(ib.clone(), from, to);
+                            self.tracker.track_ib_received(ib.header.id(), from, to);
                             target.receive_ib(from, ib)?;
                         }
                     }
@@ -161,6 +161,16 @@ impl Simulation {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
+        // The beginning of a new slot is the end of an old slot.
+        // Publish any input blocks left over from the last slot
+        if slot > 0 {
+            for node in self.nodes.values_mut() {
+                node.finish_generating_ibs(slot - 1)?;
+            }
+        }
+
+        self.tracker.track_slot(slot);
+
         self.handle_input_block_generation(slot)?;
         self.try_generate_praos_block(slot)?;
 
@@ -170,13 +180,6 @@ impl Simulation {
     }
 
     fn handle_input_block_generation(&mut self, slot: u64) -> Result<()> {
-        // Publish any input blocks from last round
-        if slot > 0 {
-            for node in self.nodes.values_mut() {
-                node.finish_generating_ibs(slot - 1)?;
-            }
-        }
-
         let mut probability = self.config.ib_generation_probability;
         let mut block_counts = BTreeMap::new();
         while probability > 0.0 {
@@ -201,35 +204,35 @@ impl Simulation {
             .map(|(id, _)| *id);
 
         // L1 block generation
-        if let Some(producer) = winner {
-            let conflicts = vrf_winners
-                .into_iter()
-                .filter_map(|(id, _)| if producer != id { Some(id) } else { None })
-                .collect();
+        let Some(producer) = winner else {
+            return Ok(());
+        };
 
-            // Fill a block with as many pending transactions as can fit
-            let mut size = 0;
-            let mut transactions = vec![];
-            while let Some(tx) = self.unpublished_txs.front() {
-                if size + tx.bytes > self.config.max_block_size {
-                    break;
-                }
-                size += tx.bytes;
-                transactions.push(self.unpublished_txs.pop_front().unwrap());
+        let conflicts = vrf_winners
+            .into_iter()
+            .filter_map(|(id, _)| if producer != id { Some(id) } else { None })
+            .collect();
+
+        // Fill a block with as many pending transactions as can fit
+        let mut size = 0;
+        let mut transactions = vec![];
+        while let Some(tx) = self.unpublished_txs.front() {
+            if size + tx.bytes > self.config.max_block_size {
+                break;
             }
-
-            let block = Block {
-                slot,
-                producer,
-                conflicts,
-                transactions,
-            };
-            self.get_node_mut(&producer)
-                .publish_block(Arc::new(block.clone()))?;
-            self.tracker.track_slot(slot, Some(block));
-        } else {
-            self.tracker.track_slot(slot, None);
+            size += tx.bytes;
+            transactions.push(self.unpublished_txs.pop_front().unwrap());
         }
+
+        let block = Block {
+            slot,
+            producer,
+            conflicts,
+            transactions,
+        };
+        self.tracker.track_praos_block_generated(&block);
+        self.get_node_mut(&producer)
+            .publish_block(Arc::new(block))?;
 
         Ok(())
     }
@@ -255,7 +258,7 @@ impl Simulation {
         // any node could be the first to see a transaction
         let publisher_id = self.choose_random_node();
 
-        self.tracker.track_transaction(&tx, publisher_id);
+        self.tracker.track_transaction_generated(&tx, publisher_id);
         self.unpublished_txs.push_back(tx.clone());
         self.txs.insert(id, tx.clone());
 
@@ -628,7 +631,7 @@ impl Node {
         ib.header.timestamp = self.clock.now();
         let ib = Arc::new(ib);
 
-        self.tracker.track_ib_generated(ib.clone());
+        self.tracker.track_ib_generated(&ib);
 
         let id = ib.header.id();
         self.leios.ibs.insert(id, ib);
