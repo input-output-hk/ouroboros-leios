@@ -793,13 +793,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "sim-rs"
+name = "sim-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ctrlc",
+ "serde",
+ "serde_json",
+ "sim-core",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "sim-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
- "clap",
- "ctrlc",
  "futures",
  "netsim-async",
  "priority-queue",
@@ -807,11 +821,8 @@ dependencies = [
  "rand_chacha",
  "rand_distr",
  "serde",
- "serde_json",
  "tokio",
- "toml",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

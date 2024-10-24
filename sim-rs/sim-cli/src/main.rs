@@ -2,10 +2,9 @@ use std::{path::PathBuf, process, time::Instant};
 
 use anyhow::Result;
 use clap::Parser;
-use clock::Clock;
 use config::read_config;
-use events::{EventMonitor, EventTracker};
-use sim::Simulation;
+use events::EventMonitor;
+use sim_core::{clock::Clock, events::EventTracker, sim::Simulation};
 use tokio::{
     pin, select,
     sync::{mpsc, oneshot},
@@ -13,13 +12,8 @@ use tokio::{
 use tracing::{level_filters::LevelFilter, warn};
 use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, EnvFilter};
 
-mod clock;
 mod config;
 mod events;
-mod model;
-mod network;
-mod probability;
-mod sim;
 
 #[derive(Parser)]
 struct Args {

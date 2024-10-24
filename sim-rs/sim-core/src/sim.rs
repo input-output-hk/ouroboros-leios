@@ -275,7 +275,7 @@ impl Simulation {
 
     fn choose_random_node(&mut self) -> NodeId {
         let index = self.rng.gen_range(0..self.nodes.len());
-        NodeId::from_usize(index)
+        NodeId::new(index)
     }
 }
 

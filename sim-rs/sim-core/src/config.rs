@@ -1,8 +1,6 @@
 use std::{
     collections::{HashSet, VecDeque},
     fmt::Display,
-    fs,
-    path::Path,
     time::Duration,
 };
 
@@ -23,14 +21,14 @@ impl NodeId {
     pub fn to_inner(self) -> usize {
         self.0
     }
-    pub fn from_usize(value: usize) -> Self {
+    pub fn new(value: usize) -> Self {
         Self(value)
     }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "distribution", rename_all = "snake_case")]
-enum DistributionConfig {
+pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
     Exp { lambda: f64, scale: Option<f64> },
     LogNormal { mu: f64, sigma: f64 },
@@ -50,64 +48,33 @@ impl From<DistributionConfig> for FloatDistribution {
 }
 
 #[derive(Debug, Deserialize)]
-struct RawConfig {
-    seed: Option<u64>,
-    timescale: Option<u32>,
+pub struct RawConfig {
+    pub seed: Option<u64>,
+    pub timescale: Option<u32>,
     #[serde(default)]
-    trace_nodes: HashSet<NodeId>,
-    nodes: Vec<RawNodeConfig>,
-    links: Vec<RawLinkConfig>,
-    block_generation_probability: f64,
-    ib_generation_probability: f64,
-    max_block_size: u64,
-    max_tx_size: u64,
-    max_ib_size: u64,
-    max_ib_requests_per_peer: usize,
-    transaction_frequency_ms: DistributionConfig,
-    transaction_size_bytes: DistributionConfig,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawNodeConfig {
-    location: (f64, f64),
-    stake: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawLinkConfig {
-    nodes: (usize, usize),
-    latency_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SimConfiguration {
-    pub seed: u64,
-    pub timescale: u32,
     pub trace_nodes: HashSet<NodeId>,
-    pub nodes: Vec<NodeConfiguration>,
-    pub links: Vec<LinkConfiguration>,
+    pub nodes: Vec<RawNodeConfig>,
+    pub links: Vec<RawLinkConfig>,
     pub block_generation_probability: f64,
     pub ib_generation_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub max_ib_size: u64,
     pub max_ib_requests_per_peer: usize,
-    pub transaction_frequency_ms: FloatDistribution,
-    pub transaction_size_bytes: FloatDistribution,
+    pub transaction_frequency_ms: DistributionConfig,
+    pub transaction_size_bytes: DistributionConfig,
 }
 
-#[derive(Debug, Clone)]
-pub struct NodeConfiguration {
-    pub id: NodeId,
-    pub location: Location,
-    pub stake: u64,
-    pub peers: Vec<NodeId>,
+#[derive(Debug, Deserialize)]
+pub struct RawNodeConfig {
+    pub location: (f64, f64),
+    pub stake: Option<u64>,
 }
 
-#[derive(Debug, Clone)]
-pub struct LinkConfiguration {
-    pub nodes: (NodeId, NodeId),
-    pub latency: Duration,
+#[derive(Debug, Deserialize)]
+pub struct RawLinkConfig {
+    nodes: (usize, usize),
+    latency_ms: Option<u64>,
 }
 
 impl From<RawConfig> for SimConfiguration {
@@ -118,7 +85,7 @@ impl From<RawConfig> for SimConfiguration {
             .into_iter()
             .enumerate()
             .map(|(index, raw)| NodeConfiguration {
-                id: NodeId(index),
+                id: NodeId::new(index),
                 location: to_netsim_location(raw.location),
                 stake: raw.stake.unwrap_or_default(),
                 peers: vec![],
@@ -127,10 +94,10 @@ impl From<RawConfig> for SimConfiguration {
         let mut links = vec![];
         for link in value.links {
             let (id1, id2) = link.nodes;
-            nodes[id1].peers.push(NodeId(id2));
-            nodes[id2].peers.push(NodeId(id1));
+            nodes[id1].peers.push(NodeId::new(id2));
+            nodes[id2].peers.push(NodeId::new(id1));
             links.push(LinkConfiguration {
-                nodes: (NodeId(id1), NodeId(id2)),
+                nodes: (NodeId::new(id1), NodeId::new(id2)),
                 latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms)
                     / timescale,
             });
@@ -153,6 +120,52 @@ impl From<RawConfig> for SimConfiguration {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SimConfiguration {
+    pub seed: u64,
+    pub timescale: u32,
+    pub trace_nodes: HashSet<NodeId>,
+    pub nodes: Vec<NodeConfiguration>,
+    pub links: Vec<LinkConfiguration>,
+    pub block_generation_probability: f64,
+    pub ib_generation_probability: f64,
+    pub max_block_size: u64,
+    pub max_tx_size: u64,
+    pub max_ib_size: u64,
+    pub max_ib_requests_per_peer: usize,
+    pub transaction_frequency_ms: FloatDistribution,
+    pub transaction_size_bytes: FloatDistribution,
+}
+
+impl SimConfiguration {
+    pub fn validate(&self) -> Result<()> {
+        // The graph must be nonempty and fully connected,
+        // and every link must be between two nodes which exist
+        let mut connected_nodes = HashSet::new();
+        let mut frontier = VecDeque::new();
+        let first_node = self
+            .nodes
+            .first()
+            .ok_or_else(|| anyhow!("Graph must not be empty!"))?;
+        frontier.push_back(first_node);
+        while let Some(node) = frontier.pop_front() {
+            if connected_nodes.insert(node.id) {
+                for peer_id in &node.peers {
+                    let peer = self
+                        .nodes
+                        .get(peer_id.0)
+                        .ok_or_else(|| anyhow!("Node {peer_id} not found!"))?;
+                    frontier.push_back(peer);
+                }
+            }
+        }
+        if connected_nodes.len() < self.nodes.len() {
+            bail!("Graph must be fully connected!");
+        }
+        Ok(())
+    }
+}
+
 fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
@@ -165,47 +178,16 @@ fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Dur
     geo_latency + extra_latency
 }
 
-fn validate_graph(config: &SimConfiguration) -> Result<()> {
-    // The graph must be nonempty and fully connected,
-    // and every link must be between two nodes which exist
-    let mut connected_nodes = HashSet::new();
-    let mut frontier = VecDeque::new();
-    let first_node = config
-        .nodes
-        .first()
-        .ok_or_else(|| anyhow!("Graph must not be empty!"))?;
-    frontier.push_back(first_node);
-    while let Some(node) = frontier.pop_front() {
-        if connected_nodes.insert(node.id) {
-            for peer_id in &node.peers {
-                let peer = config
-                    .nodes
-                    .get(peer_id.0)
-                    .ok_or_else(|| anyhow!("Node {peer_id} not found!"))?;
-                frontier.push_back(peer);
-            }
-        }
-    }
-    if connected_nodes.len() < config.nodes.len() {
-        bail!("Graph must be fully connected!");
-    }
-    Ok(())
+#[derive(Debug, Clone)]
+pub struct NodeConfiguration {
+    pub id: NodeId,
+    pub location: Location,
+    pub stake: u64,
+    pub peers: Vec<NodeId>,
 }
 
-pub fn read_config(
-    filename: &Path,
-    timescale: Option<u32>,
-    trace_nodes: &[usize],
-) -> Result<SimConfiguration> {
-    let file = fs::read_to_string(filename)?;
-    let mut raw_config: RawConfig = toml::from_str(&file)?;
-    if let Some(ts) = timescale {
-        raw_config.timescale = Some(ts);
-    }
-    for id in trace_nodes {
-        raw_config.trace_nodes.insert(NodeId(*id));
-    }
-    let config = raw_config.into();
-    validate_graph(&config)?;
-    Ok(config)
+#[derive(Debug, Clone)]
+pub struct LinkConfiguration {
+    pub nodes: (NodeId, NodeId),
+    pub latency: Duration,
 }
