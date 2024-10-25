@@ -10,7 +10,7 @@ use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
     events::Event,
-    model::TransactionId,
+    model::{InputBlockId, TransactionId},
 };
 use tokio::{fs::File, io::AsyncWriteExt as _, sync::mpsc};
 use tracing::{info, info_span};
@@ -57,14 +57,15 @@ impl EventMonitor {
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut txs: BTreeMap<TransactionId, Transaction> = BTreeMap::new();
         let mut pending_txs: BTreeSet<TransactionId> = BTreeSet::new();
-        let mut seen_ibs: BTreeMap<NodeId, u64> = BTreeMap::new();
+        let mut seen_ibs: BTreeMap<NodeId, f64> = BTreeMap::new();
+        let mut txs_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
+        let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
         let mut max_slot = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
-        let mut total_tx_ib_count = 0u64;
 
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
@@ -120,13 +121,14 @@ impl EventMonitor {
                 } => {
                     generated_ibs += 1;
                     for tx_id in &transactions {
-                        total_tx_ib_count += 1;
+                        *txs_in_ib.entry(header.id()).or_default() += 1.;
+                        *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
                         }
                     }
-                    *seen_ibs.entry(header.producer).or_default() += 1;
+                    *seen_ibs.entry(header.producer).or_default() += 1.;
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {}",
                         header.producer,
@@ -135,7 +137,7 @@ impl EventMonitor {
                     )
                 }
                 Event::InputBlockReceived { recipient, .. } => {
-                    *seen_ibs.entry(recipient).or_default() += 1;
+                    *seen_ibs.entry(recipient).or_default() += 1.;
                 }
             }
         }
@@ -169,20 +171,17 @@ impl EventMonitor {
                 .values()
                 .filter(|tx| tx.included_in_ib.is_some())
                 .collect();
-            let times_to_reach_ib: Vec<f64> = txs_which_reached_ib
-                .iter()
-                .map(|tx| {
-                    let duration = tx.included_in_ib.unwrap() - tx.generated;
-                    duration.as_secs_f64()
-                })
-                .collect();
-            let ib_stats = compute_stats(&times_to_reach_ib);
-            let avg_seen = self
-                .node_ids
-                .iter()
-                .map(|id| seen_ibs.get(id).copied().unwrap_or_default() as f64)
-                .sum::<f64>()
-                / self.node_ids.len() as f64;
+            let txs_per_ib = compute_stats(txs_in_ib.into_values());
+            let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
+            let times_to_reach_ibs = compute_stats(txs_which_reached_ib.iter().map(|tx| {
+                let duration = tx.included_in_ib.unwrap() - tx.generated;
+                duration.as_secs_f64()
+            }));
+            let ibs_received = compute_stats(
+                self.node_ids
+                    .iter()
+                    .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
+            );
             info!(
                 "{generated_ibs} IB(s) were generated, on average {} per slot.",
                 generated_ibs as f64 / (max_slot) as f64
@@ -193,18 +192,21 @@ impl EventMonitor {
                 txs.len(),
             );
             info!(
-                "Each transaction was included in an average of {} IBs.",
-                total_tx_ib_count as f64 / txs.len() as f64,
+                "Each transaction was included in an average of {} IBs (stddev {}).",
+                txs_per_ib.mean, txs_per_ib.std_dev,
             );
             info!(
-                "Each IB contained an average of {} transactions.",
-                total_tx_ib_count as f64 / generated_ibs as f64,
+                "Each IB contained an average of {} transactions (stddev {}).",
+                ibs_per_tx.mean, ibs_per_tx.std_dev,
             );
             info!(
                 "Each transaction took an average of {}s (stddev {}) to reach an IB.",
-                ib_stats.mean, ib_stats.std_dev,
+                times_to_reach_ibs.mean, times_to_reach_ibs.std_dev,
             );
-            info!("Each node received an average of {avg_seen} IBs.");
+            info!(
+                "Each node received an average of {} IBs (stddev {}).",
+                ibs_received.mean, ibs_received.std_dev,
+            );
         });
         Ok(())
     }
@@ -221,8 +223,8 @@ struct Stats {
     std_dev: f64,
 }
 
-fn compute_stats(data: &[f64]) -> Stats {
-    let v: Variance = data.iter().collect();
+fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
+    let v: Variance = data.into_iter().collect();
     Stats {
         mean: v.mean(),
         std_dev: v.population_variance().sqrt(),
