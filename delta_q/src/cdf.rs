@@ -141,9 +141,17 @@ impl CDF {
         self.steps.iter()
     }
 
+    pub fn graph_iter(&self) -> impl Iterator<Item = (f32, f32)> + '_ {
+        self.steps.graph_iter()
+    }
+
     /// Get the width of the CDF.
     pub fn width(&self) -> f32 {
         self.steps.max_x()
+    }
+
+    pub fn steps(&self) -> &StepFunction {
+        &self.steps
     }
 
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for

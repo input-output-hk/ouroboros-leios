@@ -18,9 +18,9 @@ pub enum StepFunctionError {
 impl fmt::Display for StepFunctionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidFormat(s, pos) => write!(f, "Invalid format: {} at position {}", s, pos),
-            Self::InvalidDataRange => write!(f, "Invalid data range"),
-            Self::NonMonotonicData => write!(f, "Non-monotonic data"),
+            Self::InvalidFormat(s, pos) => write!(f, "invalid format: {} at position {}", s, pos),
+            Self::InvalidDataRange => write!(f, "invalid data range"),
+            Self::NonMonotonicData => write!(f, "non-monotonic data"),
         }
     }
 }
@@ -98,6 +98,15 @@ impl StepFunction {
             cdf: self.data.iter(),
             prev: (0.0, 0.0),
             first: false,
+            last: false,
+        }
+    }
+
+    pub fn graph_iter(&self) -> StepFunctionIterator {
+        StepFunctionIterator {
+            cdf: self.data.iter(),
+            prev: (0.0, 0.0),
+            first: true,
             last: false,
         }
     }
@@ -302,6 +311,7 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
     {
         let mut pos = 0;
         let mut prev_y = 0.0;
+        let mut prev_x = -1.0;
         for i in 0..data.len() {
             let (x, y) = data[i];
             if y != prev_y {
@@ -309,6 +319,11 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
                 prev_y = y;
                 pos += 1;
             }
+            if x == prev_x {
+                web_sys::console::log_2(&"duplicate x".into(), &format!("{:?}", data).into());
+                panic!("duplicate x");
+            }
+            prev_x = x;
         }
         data.truncate(pos);
     }
@@ -510,7 +525,7 @@ where
 
         match (left, right) {
             (Some((lx, ly)), Some((rx, ry))) => {
-                if (lx - rx).abs() / rx <= 5.0 * f32::EPSILON {
+                if (lx - rx).abs() / rx.max(1.0e-10) <= 5.0 * f32::EPSILON {
                     self.l_prev = self.left.next().unwrap().1;
                     self.r_prev = self.right.next().unwrap().1;
                     Some((lx, (ly, ry)))

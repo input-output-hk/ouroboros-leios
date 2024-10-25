@@ -1,4 +1,7 @@
-use crate::{delta_q::DeltaQ, EvaluationContext, Outcome};
+use crate::{
+    delta_q::{DeltaQ, LoadUpdate},
+    EvaluationContext, Outcome,
+};
 use std::{rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
@@ -36,11 +39,11 @@ pub fn delta_q_component(props: &Props) -> Html {
         DeltaQ::Name(name, rec) => {
             html! { <NameComponent name={(&**name).to_owned()} rec={*rec} {on_change} /> }
         }
-        DeltaQ::CDF(outcome) => {
+        DeltaQ::Outcome(outcome) => {
             html! { <CdfComponent outcome={outcome.clone()} {on_change} /> }
         }
         DeltaQ::Seq(first, load, second) => {
-            html!(<Seq first={(**first).clone()} second={(**second).clone()} {on_change} />)
+            html!(<Seq first={(**first).clone()} load={*load} second={(**second).clone()} {on_change} />)
         }
         DeltaQ::Choice(first, first_weight, second, second_weight) => {
             html!(<Branch top={(**first).clone()} bottom={(**second).clone()} {on_change} kind={BranchKind::Choice(*first_weight, *second_weight)} />)
@@ -177,7 +180,7 @@ pub fn cdf_component(props: &CdfProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&abstract_name))));
-            on_change.emit(((*abstract_name).clone(), Some(DeltaQ::CDF(outcome.clone()))));
+            on_change.emit(((*abstract_name).clone(), Some(DeltaQ::Outcome(outcome.clone()))));
         }
     ));
 
@@ -188,13 +191,13 @@ pub fn cdf_component(props: &CdfProps) -> Html {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup; move |_| popup.set(false))}>{ "abort" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::CDF(outcome.clone()), DeltaQ::BlackBox))))) }>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "append" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::CDF(outcome.clone()), 1.0, DeltaQ::BlackBox, 1.0))))) }>{ "make choice" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::Outcome(outcome.clone()), 1.0, DeltaQ::BlackBox, 1.0))))) }>{ "make choice" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::CDF(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forAll" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forAll" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::CDF(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forSome" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forSome" }</button>
                     <button onclick={cloned!(on_change, ctx;
                         move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::BlackBox))))}>{ "black box" }</button>
                     <form onsubmit={abstract_submit}>
@@ -210,6 +213,7 @@ pub fn cdf_component(props: &CdfProps) -> Html {
 #[derive(Properties, Clone, PartialEq)]
 pub struct SeqProps {
     pub first: DeltaQ,
+    pub load: LoadUpdate,
     pub second: DeltaQ,
     pub on_change: Callback<(String, Option<DeltaQ>)>,
 }
@@ -260,6 +264,7 @@ pub fn seq(props: &SeqProps) -> Html {
         <div class={classes!("row", "center", "frame")}>
             <DeltaQComponent delta_q={first.clone()} on_change={on_first_change} />
             <div class={classes!("seqSymbol", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
+                { format!("{}", props.load) }
                 if *popup {
                     <div class={classes!("popup")}>
                     <button onclick={cloned!(popup;

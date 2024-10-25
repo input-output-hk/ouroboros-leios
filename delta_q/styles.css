@@ -12,7 +12,7 @@
 .popup form { margin: 0px; }
 .name { border: 4px solid orange; border-radius: 50%; margin: 4px; padding: 8px; cursor: pointer; }
 .frame { margin: 4px; border: 1px solid grey; }
-.seqSymbol { width: 10px; height: 10px; border: 2px solid black; margin: 4px; cursor: pointer; }
+.seqSymbol { padding: 5px; border: 2px solid black; margin: 4px; cursor: pointer; }
 .branchKind { padding: 8px; cursor: pointer; }
 .expression {
   background-color: rgb(206, 236, 254);
