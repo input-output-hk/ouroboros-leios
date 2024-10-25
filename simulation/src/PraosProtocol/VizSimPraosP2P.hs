@@ -394,7 +394,7 @@ chartBandwidth =
               Chart.def
                 { Chart._laxis_generate =
                     Chart.scaledAxis Chart.def{Chart._la_nLabels = maxX} (0, maxX)
-                , Chart._laxis_title = "Count of events within last second"
+                , Chart._laxis_title = "Count of events within last 30 seconds"
                 }
           , Chart._layout_y_axis =
               Chart.def

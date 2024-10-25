@@ -271,18 +271,15 @@ praosSimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
-          Map.filter (\(_, _, t, _) -> t >= secondsAgo15) (vizMsgsDiffusionLatency vs)
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       }
    where
-    secondsAgo1 :: Time
-    secondsAgo1 = addTime (-1) now
-
-    secondsAgo15 :: Time
-    secondsAgo15 = addTime (-15) now
+    secondsAgo30 :: Time
+    secondsAgo30 = addTime (-30) now
 
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.
