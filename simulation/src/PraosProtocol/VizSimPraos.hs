@@ -1,5 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
@@ -7,9 +8,11 @@
 module PraosProtocol.VizSimPraos where
 
 import ChanDriver
+import Control.Exception (assert)
 import Data.Coerce (coerce)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
@@ -95,13 +98,19 @@ data PraosSimVizState
             )
           ]
        )
-  , vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
+  , vizNodeTip :: !(Map NodeId FullTip)
+  , -- the Buffer and Queue names are legacy from VizSimRelay.
+    -- In Praos we consider:
+    --  * Queue = seen by blockFetchConsumer and not yet in Buffer
+    --  * Buffer = added to blocksVar
+    vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
   , vizMsgsAtNodeBuffer :: !(Map NodeId [BlockHeader])
   , vizMsgsAtNodeRecentQueue :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeRecentBuffer :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeTotalQueue :: !(Map NodeId Int)
   , vizMsgsAtNodeTotalBuffer :: !(Map NodeId Int)
-  , vizNumMsgsGenerated :: !Int
+  , -- these are `Block`s generated (globally).
+    vizNumMsgsGenerated :: !Int
   , vizMsgsDiffusionLatency :: !(Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time]))
   }
 
@@ -141,6 +150,7 @@ praosSimVizModel =
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
+      , vizNodeTip = Map.empty
       , vizMsgsAtNodeQueue = Map.empty
       , vizMsgsAtNodeBuffer = Map.empty
       , vizMsgsAtNodeRecentQueue = Map.empty
@@ -169,6 +179,63 @@ praosSimVizModel =
                   (nodes Map.! n2)
             )
             links
+      }
+  accumEventVizState _now (PraosEventNode (LabelNode nid (PraosNodeEventNewTip tip))) vs =
+    vs{vizNodeTip = Map.insert nid tip (vizNodeTip vs)}
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
+      , vizMsgsDiffusionLatency =
+          assert (not (blockHash blk `Map.member` vizMsgsDiffusionLatency vs)) $
+            Map.insert
+              (blockHash blk)
+              (blockHeader blk, nid, now, [now])
+              (vizMsgsDiffusionLatency vs)
+      }
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventReceived blk))) vs =
+    vs
+      { vizMsgsAtNodeQueue =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentQueue =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentQueue vs)
+      , vizMsgsAtNodeTotalQueue =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalQueue vs)
+      }
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventEnterState blk))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeQueue =
+          Map.adjust
+            (filter (\blk' -> blockHash blk' /= blockHash blk))
+            nid
+            (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizMsgsDiffusionLatency =
+          Map.adjust
+            ( \(hdr, nid', created, arrivals) ->
+                (hdr, nid', created, now : arrivals)
+            )
+            (blockHash blk)
+            (vizMsgsDiffusionLatency vs)
       }
   accumEventVizState
     _now

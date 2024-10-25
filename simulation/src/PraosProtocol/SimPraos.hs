@@ -26,7 +26,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.Common.Chain (Chain (..))
-import PraosProtocol.PraosNode (PraosMessage, PraosNodeEvent, runPraosNode)
+import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
 import SimTCPLinks
 import SimTypes
 
@@ -72,14 +72,18 @@ traceRelayLink1 tcpprops =
       (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       (cA, pB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       concurrently_
-        (runPraosNode chainA [pA] [cA])
-        (runPraosNode chainB [pB] [cB])
+        (runPraosNode (nodeTracer nodeA) chainA [pA] [cA])
+        (runPraosNode (nodeTracer nodeB) chainB [pB] [cB])
       return ()
  where
   (nodeA, nodeB) = (NodeId 0, NodeId 1)
 
   tracer :: Tracer (IOSim s) PraosEvent
   tracer = simTracer
+
+  nodeTracer :: NodeId -> Tracer (IOSim s) PraosNodeEvent
+  nodeTracer n =
+    contramap (PraosEventNode . LabelNode n) tracer
 
   praosTracer ::
     NodeId ->

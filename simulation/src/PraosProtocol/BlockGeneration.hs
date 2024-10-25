@@ -4,22 +4,20 @@
 
 module PraosProtocol.BlockGeneration where
 
+import Cardano.Slotting.Slot (WithOrigin (..))
+import ChanTCP (Bytes)
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
-import Control.Monad (forever, when)
+import Control.Monad (forever)
 import Control.Monad.Class.MonadTimer.SI (MonadDelay)
+import Control.Tracer
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BS8
-import System.Random (StdGen, uniformR)
-
-import Cardano.Slotting.Slot (WithOrigin (..))
-
-import ChanTCP (Bytes)
 import Data.Word (Word64)
-
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
+import System.Random (StdGen, uniformR)
 
 -- | Returns a block that can extend the chain.
 --   PRECONDITION: the SlotNo is ahead of the chain tip.
@@ -73,21 +71,30 @@ mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
 
 blockGenerator ::
   (MonadSTM m, MonadDelay m, MonadTime m) =>
+  Tracer m PraosNodeEvent ->
   SlotConfig ->
   TVar m (ChainProducerState Block) ->
   (Block -> STM m ()) ->
   Maybe (m (SlotNo, BlockBody)) ->
   m ()
-blockGenerator _slotConfig _cpsVar _addBlockSt Nothing = return ()
-blockGenerator slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
+blockGenerator _tracer _slotConfig _cpsVar _addBlockSt Nothing = return ()
+blockGenerator tracer slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
  where
   go = do
     (sl, body) <- nextBlock
     waitForSlot sl
-    atomically $ do
+    mblk <- atomically $ do
       chain <- chainState <$> readTVar cpsVar
-      when (Chain.headSlot chain <= At sl) $
-        addBlockSt (mkBlock chain sl body)
+      let block = mkBlock chain sl body
+      if (Chain.headSlot chain <= At sl)
+        then
+          addBlockSt block >> return (Just block)
+        else return Nothing
+    case mblk of
+      Nothing -> return ()
+      Just blk -> do
+        traceWith tracer (PraosNodeEventGenerate blk)
+        traceWith tracer (PraosNodeEventNewTip (FullTip (blockHeader blk)))
   waitForSlot sl = do
     let tgt = slotTime slotConfig sl
     now <- getCurrentTime

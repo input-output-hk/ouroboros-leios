@@ -12,7 +12,7 @@ import Control.Monad.Class.MonadAsync (
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer,
+  Tracer (Tracer),
   traceWith,
  )
 import qualified Data.ByteString as BS
@@ -83,10 +83,10 @@ traceRelayLink1 tcpprops =
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     st <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar) <&> fst
     concurrently_
-      ( blockFetchController st
+      ( blockFetchController nullTracer st
       )
-      ( runBlockFetchConsumer chan $
-          initBlockFetchConsumerStateForPeerId 1 st
+      ( runBlockFetchConsumer nullTracer chan $
+          initBlockFetchConsumerStateForPeerId nullTracer 1 st
       )
   -- Block-Fetch Producer
   nodeB chan = do
@@ -94,6 +94,9 @@ traceRelayLink1 tcpprops =
     runBlockFetchProducer chan st
 
   (na, nb) = (NodeId 0, NodeId 1)
+
+  nullTracer :: Monad m => Tracer m a
+  nullTracer = Tracer $ const $ return ()
 
   tracer :: Tracer (IOSim s) BlockFetchEvent
   tracer = simTracer

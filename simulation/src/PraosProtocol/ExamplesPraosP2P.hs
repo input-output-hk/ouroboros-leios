@@ -12,48 +12,48 @@ import Network.TypedProtocol
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
-import PraosProtocol.Common (BlockHeader, blockHeaderColor)
+import PraosProtocol.Common
 import PraosProtocol.Common.Chain (Chain (Genesis))
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraosP2P
 import PraosProtocol.VizSimPraos (PraosVizConfig (..), examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
-import SimTCPLinks (kilobytes, mkTcpConnProps)
+import SimTCPLinks (mkTcpConnProps)
 import SimTypes
 import Viz
 
 example1 :: Vizualisation
 example1 =
-  slowmoVizualisation 0.1 $
-    Viz model $
-      LayoutAbove
-        [ layoutLabelTime
-        , LayoutBeside
-            [ LayoutReqSize 1200 1000 $
-                Layout $
-                  praosP2PSimVizRender config
-            , LayoutBeside
-                [ LayoutAbove
-                    [ LayoutReqSize 350 300 $
-                        Layout $
-                          chartDiffusionLatency config
-                    , LayoutReqSize 350 300 $
-                        Layout $
-                          chartDiffusionImperfection
-                            p2pTopography
-                            0.1
-                            (96 / 1000)
-                            config
-                    ]
-                , LayoutAbove
-                    [ LayoutReqSize 350 300 $
-                        Layout chartBandwidth
-                    , LayoutReqSize 350 300 $
-                        Layout chartLinkUtilisation
-                    ]
-                ]
-            ]
-        ]
+  -- slowmoVizualisation 0.1 $
+  Viz model $
+    LayoutAbove
+      [ layoutLabelTime
+      , LayoutBeside
+          [ LayoutReqSize 1200 1000 $
+              Layout $
+                praosP2PSimVizRender config
+          , LayoutBeside
+              [ LayoutAbove
+                  [ LayoutReqSize 350 300 $
+                      Layout $
+                        chartDiffusionLatency config
+                  , LayoutReqSize 350 300 $
+                      Layout $
+                        chartDiffusionImperfection
+                          p2pTopography
+                          0.1
+                          (96 / 1000)
+                          config
+                  ]
+              , LayoutAbove
+                  [ LayoutReqSize 350 300 $
+                      Layout chartBandwidth
+                  , LayoutReqSize 350 300 $
+                      Layout chartLinkUtilisation
+                  ]
+              ]
+          ]
+      ]
  where
   model = praosSimVizModel trace
    where
@@ -70,7 +70,7 @@ example1 =
                     (kilobytes 96)
                     rng
                     -- average seconds between blocks:
-                    (0.2 * fromIntegral p2pNumNodes)
+                    (5 * fromIntegral p2pNumNodes)
               , slotConfig
               , blockMarker = BS8.pack $ show nid ++ ": "
               , chain = Genesis
@@ -96,47 +96,47 @@ example1 =
 
 example2 :: Vizualisation
 example2 =
-  slowmoVizualisation 0.2 $
-    Viz (pairVizModel model1 model2) $
-      LayoutAbove
-        [ layoutLabel 18 "Flat vs cylindrical world topology"
-        , LayoutReqSize 0 40 $
-            layoutLabel 10 $
-              "Left side is a flat rectangular world.\n"
-                ++ "Right is a cylindrical world, i.e. the east and "
-                ++ "west edges are connected."
-        , layoutLabelTime
-        , LayoutBeside
-            [ contramap fst
-                <$> LayoutAbove
-                  [ LayoutReqSize 900 600 $
-                      Layout $
-                        praosP2PSimVizRender config
-                  , LayoutBeside
-                      [ LayoutReqSize 350 300 $
-                          Layout $
-                            chartDiffusionLatency config
-                      , LayoutReqSize 350 300 $
-                          Layout
-                            chartLinkUtilisation
-                      ]
-                  ]
-            , contramap snd
-                <$> LayoutAbove
-                  [ LayoutReqSize 900 600 $
-                      Layout $
-                        praosP2PSimVizRender config
-                  , LayoutBeside
-                      [ LayoutReqSize 350 300 $
-                          Layout $
-                            chartDiffusionLatency config
-                      , LayoutReqSize 350 300 $
-                          Layout
-                            chartLinkUtilisation
-                      ]
-                  ]
-            ]
-        ]
+  --  slowmoVizualisation 0.2 $
+  Viz (pairVizModel model1 model2) $
+    LayoutAbove
+      [ layoutLabel 18 "Flat vs cylindrical world topology"
+      , LayoutReqSize 0 40 $
+          layoutLabel 10 $
+            "Left side is a flat rectangular world.\n"
+              ++ "Right is a cylindrical world, i.e. the east and "
+              ++ "west edges are connected."
+      , layoutLabelTime
+      , LayoutBeside
+          [ contramap fst
+              <$> LayoutAbove
+                [ LayoutReqSize 900 600 $
+                    Layout $
+                      praosP2PSimVizRender config
+                , LayoutBeside
+                    [ LayoutReqSize 350 300 $
+                        Layout $
+                          chartDiffusionLatency config
+                    , LayoutReqSize 350 300 $
+                        Layout
+                          chartLinkUtilisation
+                    ]
+                ]
+          , contramap snd
+              <$> LayoutAbove
+                [ LayoutReqSize 900 600 $
+                    Layout $
+                      praosP2PSimVizRender config
+                , LayoutBeside
+                    [ LayoutReqSize 350 300 $
+                        Layout $
+                          chartDiffusionLatency config
+                    , LayoutReqSize 350 300 $
+                        Layout
+                          chartLinkUtilisation
+                    ]
+                ]
+          ]
+      ]
  where
   model1 =
     model
@@ -164,7 +164,7 @@ example2 =
                     (kilobytes 96)
                     rng
                     -- average seconds between blocks:
-                    (0.5 * fromIntegral p2pNumNodes)
+                    (5 * fromIntegral p2pNumNodes)
               , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
@@ -205,4 +205,4 @@ config =
       _ -> Nothing
 
   testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  testNodeMessageColor = blockHeaderColor
+  testNodeMessageColor = blockHeaderColorAsBody

@@ -11,13 +11,13 @@ import Control.Monad.Class.MonadTime.SI (DiffTime, Time, diffTime)
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import qualified Data.Colour.SRGB as Colour
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 
 import ModelTCP (TcpMsgForecast (..), segmentSize)
 import P2P
-import PraosProtocol.Common (BlockHeader)
+import PraosProtocol.Common (BlockHeader, FullTip (FullTip), Time (..))
 import PraosProtocol.PraosNode
 import PraosProtocol.VizSimPraos (
   LinkPoints (..),
@@ -26,6 +26,7 @@ import PraosProtocol.VizSimPraos (
   recentRate,
  )
 import SimTypes (Point (..), WorldShape (..))
+import Text.Printf (printf)
 import Viz
 import VizChart
 import VizSim
@@ -64,21 +65,16 @@ praosP2PSimVizRenderModel
     { nodeMessageColor
     , ptclMessageColor
     }
-  now
+  now@(Time t)
   ( SimVizModel
       _events
       PraosSimVizState
         { vizWorldShape = WorldShape{worldDimensions}
         , vizNodePos
         , vizNodeLinks
+        , vizNodeTip
         , vizMsgsInTransit
-        , vizMsgsAtNodeQueue
-        , vizMsgsAtNodeBuffer
-        , --                               vizMsgsAtNodeRecentQueue,
-        --                               vizMsgsAtNodeRecentBuffer,
-        --                               vizMsgsAtNodeTotalQueue,
-        --                               vizMsgsAtNodeTotalBuffer,
-        vizNumMsgsGenerated
+        , vizNumMsgsGenerated
         }
     )
   screenSize = do
@@ -90,7 +86,10 @@ praosP2PSimVizRenderModel
       Cairo.moveTo 5 40
       Cairo.setFontSize 20
       Cairo.setSourceRGB 0 0 0
-      Cairo.showText $ "Blocks generated: " ++ show vizNumMsgsGenerated
+      Cairo.showText $
+        "Blocks generated: "
+          ++ show vizNumMsgsGenerated
+          ++ printf " (%.2f blk/s)" (fromIntegral vizNumMsgsGenerated / realToFrac t :: Double)
 
     renderNodes = do
       Cairo.save
@@ -123,12 +122,12 @@ praosP2PSimVizRenderModel
           Cairo.newPath
         | (node, pos) <- Map.toList vizNodePos
         , let Point x y = toScreenPoint pos
-              qmsgs = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
-              bmsgs = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
+              -- qmsgs = fromMaybe [] (Map.lookup node vizMsgsAtNodeQueue)
+              -- bmsgs = fromMaybe [] (Map.lookup node vizMsgsAtNodeBuffer)
               --              nqmsgs  = length qmsgs
               --              nbmsgs  = length bmsgs
-              (r, g, b) = case qmsgs ++ bmsgs of
-                msgs@(_ : _) -> nodeMessageColor (last msgs)
+              (r, g, b) = case Map.lookup node vizNodeTip of
+                Just (FullTip hdr) -> nodeMessageColor hdr
                 _ -> (0.7, 0.7, 0.7)
                 --              rqmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentQueue)
                 --              rbmsgs  = maybe 0 recentRate (Map.lookup node vizMsgsAtNodeRecentBuffer)

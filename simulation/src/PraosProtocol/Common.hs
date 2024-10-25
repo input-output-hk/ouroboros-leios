@@ -6,6 +6,8 @@
 module PraosProtocol.Common (
   AnchoredFragment,
   Chain,
+  FullTip (..),
+  fullTip,
   Blocks,
   toBlocks,
   headerPoint,
@@ -13,6 +15,7 @@ module PraosProtocol.Common (
   setFollowerPoint,
   blockBodyColor,
   blockHeaderColor,
+  blockHeaderColorAsBody,
   module Block,
   module ConcreteBlock,
   module ProducerState,
@@ -25,6 +28,7 @@ module PraosProtocol.Common (
   tryTakeTakeOnlyTMVar,
   SlotConfig (..),
   slotTime,
+  PraosNodeEvent (..),
   MessageSize (..),
   kilobytes,
   module TimeCompat,
@@ -47,7 +51,7 @@ import Ouroboros.Network.Block as Block
 import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
-import PraosProtocol.Common.Chain (Chain, foldChain, pointOnChain)
+import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
 
 import ChanTCP (MessageSize (..))
 import Data.Coerce (coerce)
@@ -73,6 +77,17 @@ instance MessageSize (Tip block) where
 
 instance MessageSize (Point block) where
   messageSizeBytes _ = {- hash -} 32 + {- slot no -} 8
+
+data FullTip
+  = -- | The tip is genesis
+    FullTipGenesis
+  | -- | The tip is not genesis
+    FullTip BlockHeader
+  deriving (Show)
+
+fullTip :: Chain Block -> FullTip
+fullTip Genesis = FullTipGenesis
+fullTip (_ :> blk) = FullTip (blockHeader blk)
 
 type Blocks = Map (HeaderHash Block) Block
 
@@ -106,11 +121,21 @@ blockBodyColor = hashToColor . coerce . hashBody
 blockHeaderColor :: BlockHeader -> (Double, Double, Double)
 blockHeaderColor = hashToColor . coerce . blockHash
 
+blockHeaderColorAsBody :: BlockHeader -> (Double, Double, Double)
+blockHeaderColorAsBody = hashToColor . coerce . headerBodyHash
+
 hashToColor :: Int -> (Double, Double, Double)
 hashToColor hash = (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
  where
   r, g, b :: Word8
   ((r, g, b), _) = uniform (mkStdGen hash)
+
+data PraosNodeEvent
+  = PraosNodeEventGenerate Block
+  | PraosNodeEventReceived Block
+  | PraosNodeEventEnterState Block
+  | PraosNodeEventNewTip FullTip
+  deriving (Show)
 
 --------------------------------
 ---- Common Utility Types
