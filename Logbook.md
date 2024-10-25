@@ -1,5 +1,12 @@
 # Leios logbook
 
+
+## 2024-10-25
+
+### Rust simulation
+
+The sim has been updated to support simple sharding between IBs, and to report on how long it takes a transaction to reach an IB.
+
 ## 2024-10-24
 
 ### Rough estimate of Leios resources
@@ -36,6 +43,9 @@ Discussion #53 proposes assessment criteria for the continuation of Leios after 
     instead of the repo root haskell project. Not a nix expert, others
     might find a better solution.
 
+### Rust simulation
+
+We experimented with a wasm build of the sim, it was difficult to get running because of ce-netsim using threads internally. The plan is to wait for changes to netsim before running the sim in browser. Next week, we are building a browser viz with "hard-coded" events (produced by the CLI version of the sim) so that we can get a head start.
 
 ## 2024-10-22
 
