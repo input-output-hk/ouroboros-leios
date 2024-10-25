@@ -62,25 +62,28 @@ impl EventMonitor {
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
 
         let mut filled_slots = 0u64;
-        let mut max_slot = 0u64;
+        let mut total_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
+        let mut empty_ibs = 0u64;
 
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
             None => OutputTarget::None,
         };
         while let Some((event, time)) = self.events_source.recv().await {
-            let output_event = OutputEvent {
-                time,
-                event: event.clone(),
-            };
-            output.write(output_event).await?;
+            if should_log_event(&event) {
+                let output_event = OutputEvent {
+                    time,
+                    event: event.clone(),
+                };
+                output.write(output_event).await?;
+            }
             match event {
                 Event::Slot { number } => {
                     info!("Slot {number} has begun.");
-                    max_slot = number;
+                    total_slots = number + 1;
                 }
                 Event::TransactionGenerated { id, bytes, .. } => {
                     txs.insert(
@@ -136,6 +139,9 @@ impl EventMonitor {
                         header.slot,
                     )
                 }
+                Event::EmptyInputBlockNotGenerated { .. } => {
+                    empty_ibs += 1;
+                }
                 Event::InputBlockReceived { recipient, .. } => {
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
@@ -144,7 +150,7 @@ impl EventMonitor {
 
         info_span!("praos").in_scope(|| {
             info!("{filled_slots} block(s) were published.");
-            info!("{} slot(s) had no blocks.", max_slot - filled_slots);
+            info!("{} slot(s) had no blocks.", total_slots - filled_slots);
             info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
             info!(
                 "{} transaction(s) ({} byte(s)) did not reach a block.",
@@ -183,8 +189,8 @@ impl EventMonitor {
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
             info!(
-                "{generated_ibs} IB(s) were generated, on average {} per slot.",
-                generated_ibs as f64 / (max_slot) as f64
+                "{generated_ibs} IB(s) were generated, and {empty_ibs} empty IB(s) skipped; on average {} non-empty IB(s) per slot.",
+                generated_ibs as f64 / total_slots as f64
             );
             info!(
                 "{} out of {} transaction(s) reached an IB.",
@@ -229,6 +235,13 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
         mean: v.mean(),
         std_dev: v.population_variance().sqrt(),
     }
+}
+
+fn should_log_event(event: &Event) -> bool {
+    if matches!(event, Event::EmptyInputBlockNotGenerated { .. }) {
+        return false;
+    }
+    true
 }
 
 enum OutputTarget {

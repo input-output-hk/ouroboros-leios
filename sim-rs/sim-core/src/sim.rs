@@ -638,6 +638,8 @@ impl Node {
                 self.leios.unsent_ibs.push(ib);
             } else if !ib.transactions.is_empty() {
                 self.generate_ib(ib)?;
+            } else {
+                self.tracker.track_empty_ib_not_generated(&ib.header);
             }
         }
         Ok(())
