@@ -89,7 +89,12 @@ impl Simulation {
     pub async fn run(&mut self) -> Result<()> {
         while let Some(event) = self.event_queue.next_event().await {
             match event {
-                SimulationEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
+                SimulationEvent::NewSlot(slot) => {
+                    let done = self.handle_new_slot(slot)?;
+                    if done {
+                        break;
+                    }
+                }
                 SimulationEvent::NewTransaction => self.generate_tx()?,
                 SimulationEvent::NetworkMessage { from, to, msg } => {
                     if self.config.trace_nodes.contains(&to) {
@@ -160,13 +165,18 @@ impl Simulation {
         self.network.shutdown()
     }
 
-    fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
+    fn handle_new_slot(&mut self, slot: u64) -> Result<bool> {
         // The beginning of a new slot is the end of an old slot.
         // Publish any input blocks left over from the last slot
         if slot > 0 {
             for node in self.nodes.values_mut() {
                 node.finish_generating_ibs(slot - 1)?;
             }
+        }
+
+        if self.config.slots.is_some_and(|s| slot == s) {
+            // done running
+            return Ok(true);
         }
 
         self.tracker.track_slot(slot);
@@ -176,7 +186,7 @@ impl Simulation {
 
         self.event_queue
             .queue_event(SimulationEvent::NewSlot(slot + 1), Duration::from_secs(1));
-        Ok(())
+        Ok(false)
     }
 
     fn handle_input_block_generation(&mut self, slot: u64) -> Result<()> {

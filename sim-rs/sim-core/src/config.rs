@@ -51,6 +51,7 @@ impl From<DistributionConfig> for FloatDistribution {
 pub struct RawConfig {
     pub seed: Option<u64>,
     pub timescale: Option<u32>,
+    pub slots: Option<u64>,
     #[serde(default)]
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<RawNodeConfig>,
@@ -106,6 +107,7 @@ impl From<RawConfig> for SimConfiguration {
         Self {
             seed: value.seed.unwrap_or_default(),
             timescale,
+            slots: value.slots,
             nodes,
             trace_nodes: value.trace_nodes,
             links,
@@ -125,6 +127,7 @@ impl From<RawConfig> for SimConfiguration {
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
+    pub slots: Option<u64>,
     pub timescale: u32,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
