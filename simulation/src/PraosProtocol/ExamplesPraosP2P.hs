@@ -64,14 +64,17 @@ example1 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \slotConfig nid rng ->
             PraosNodeConfig
-              { -- blockProcessingDelay = const 0.1 -- 100ms
-                blockGeneration =
+              { blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)
-              , slotConfig
+              , praosConfig =
+                  PraosConfig
+                    { slotConfig
+                    , blockValidationDelay = const 0.1 -- 100ms
+                    }
               , blockMarker = BS8.pack $ show nid ++ ": "
               , chain = Genesis
               }
@@ -158,14 +161,17 @@ example2 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \slotConfig nid rng ->
             PraosNodeConfig
-              { -- blockProcessingDelay = const 0.1 -- 100ms
-                blockGeneration =
+              { blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)
-              , slotConfig
+              , praosConfig =
+                  PraosConfig
+                    { slotConfig
+                    , blockValidationDelay = const 0.1 -- 100ms
+                    }
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
               }

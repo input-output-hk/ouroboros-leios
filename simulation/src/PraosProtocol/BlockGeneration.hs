@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module PraosProtocol.BlockGeneration where
@@ -10,7 +11,6 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Monad (forever)
-import Control.Monad.Class.MonadTimer.SI (MonadDelay)
 import Control.Tracer
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BS8
@@ -72,13 +72,13 @@ mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
 blockGenerator ::
   (MonadSTM m, MonadDelay m, MonadTime m) =>
   Tracer m PraosNodeEvent ->
-  SlotConfig ->
+  PraosConfig ->
   TVar m (ChainProducerState Block) ->
   (Block -> STM m ()) ->
   Maybe (m (SlotNo, BlockBody)) ->
   m ()
-blockGenerator _tracer _slotConfig _cpsVar _addBlockSt Nothing = return ()
-blockGenerator tracer slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
+blockGenerator _tracer _praosConfig _cpsVar _addBlockSt Nothing = return ()
+blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
  where
   go = do
     (sl, body) <- nextBlock
@@ -96,11 +96,6 @@ blockGenerator tracer slotConfig cpsVar addBlockSt (Just nextBlock) = forever $ 
         traceWith tracer (PraosNodeEventGenerate blk)
         traceWith tracer (PraosNodeEventNewTip (FullTip (blockHeader blk)))
   waitForSlot sl = do
-    let tgt = slotTime slotConfig sl
+    let tgt = slotTime praosConfig.slotConfig sl
     now <- getCurrentTime
     threadDelayNDT (tgt `diffUTCTime` now)
-
-slotConfigFromNow :: MonadTime m => m SlotConfig
-slotConfigFromNow = do
-  start <- getCurrentTime
-  return $ SlotConfig{start, duration = 1}

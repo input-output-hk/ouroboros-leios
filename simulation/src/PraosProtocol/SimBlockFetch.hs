@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module PraosProtocol.SimBlockFetch where
 
@@ -69,8 +70,10 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      slotConfig <- slotConfigFromNow
+      let praosConfig = PraosConfig{slotConfig, blockValidationDelay = const 0.1}
       concurrently_
-        (nodeA outChan)
+        (nodeA praosConfig outChan)
         (nodeB inChan)
       return ()
  where
@@ -78,14 +81,14 @@ traceRelayLink1 tcpprops =
   bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
 
   -- Block-Fetch Controller & Consumer
-  nodeA :: (MonadAsync m, MonadSTM m) => Chan m (ProtocolMessage BlockFetchState) -> m ()
-  nodeA chan = do
+  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig -> Chan m (ProtocolMessage BlockFetchState) -> m ()
+  nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     st <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar) <&> fst
     concurrently_
       ( blockFetchController nullTracer st
       )
-      ( runBlockFetchConsumer nullTracer chan $
+      ( runBlockFetchConsumer nullTracer praosConfig chan $
           initBlockFetchConsumerStateForPeerId nullTracer 1 st
       )
   -- Block-Fetch Producer

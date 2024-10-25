@@ -28,7 +28,9 @@ module PraosProtocol.Common (
   tryTakeTakeOnlyTMVar,
   SlotConfig (..),
   slotTime,
+  slotConfigFromNow,
   PraosNodeEvent (..),
+  PraosConfig (..),
   MessageSize (..),
   kilobytes,
   module TimeCompat,
@@ -115,6 +117,11 @@ data SlotConfig = SlotConfig {start :: UTCTime, duration :: NominalDiffTime}
 slotTime :: SlotConfig -> SlotNo -> UTCTime
 slotTime SlotConfig{start, duration} sl = (fromIntegral (unSlotNo sl) * duration) `addUTCTime` start
 
+slotConfigFromNow :: MonadTime m => m SlotConfig
+slotConfigFromNow = do
+  start <- getCurrentTime
+  return $ SlotConfig{start, duration = 1}
+
 blockBodyColor :: BlockBody -> (Double, Double, Double)
 blockBodyColor = hashToColor . coerce . hashBody
 
@@ -136,6 +143,11 @@ data PraosNodeEvent
   | PraosNodeEventEnterState Block
   | PraosNodeEventNewTip FullTip
   deriving (Show)
+
+data PraosConfig = PraosConfig
+  { slotConfig :: SlotConfig
+  , blockValidationDelay :: Block -> DiffTime
+  }
 
 --------------------------------
 ---- Common Utility Types

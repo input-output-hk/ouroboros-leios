@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -67,13 +68,15 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
+      slotConfig <- slotConfigFromNow
+      let praosConfig = PraosConfig{slotConfig, blockValidationDelay = const 0.1}
       let chainA = mkChainSimple $ [BlockBody (BS.singleton word) | word <- [0 .. 9]]
       let chainB = Genesis
       (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       (cA, pB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
       concurrently_
-        (runPraosNode (nodeTracer nodeA) chainA [pA] [cA])
-        (runPraosNode (nodeTracer nodeB) chainB [pB] [cB])
+        (runPraosNode (nodeTracer nodeA) praosConfig chainA [pA] [cA])
+        (runPraosNode (nodeTracer nodeB) praosConfig chainB [pB] [cB])
       return ()
  where
   (nodeA, nodeB) = (NodeId 0, NodeId 1)

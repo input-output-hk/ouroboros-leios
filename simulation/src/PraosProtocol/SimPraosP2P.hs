@@ -22,7 +22,6 @@ import System.Random (StdGen, split)
 import ChanMux (newConnectionBundleTCP)
 import ChanTCP
 import P2P (P2PTopography (..))
-import PraosProtocol.BlockGeneration (slotConfigFromNow)
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos

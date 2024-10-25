@@ -14,6 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -242,21 +243,23 @@ data BlockFetchConsumerState m = BlockFetchConsumerState
   }
 
 runBlockFetchConsumer ::
-  MonadSTM m =>
+  (MonadSTM m, MonadDelay m) =>
   Tracer m PraosNodeEvent ->
+  PraosConfig ->
   Chan m BlockFetchMessage ->
   BlockFetchConsumerState m ->
   m ()
-runBlockFetchConsumer tracer chan blockFetchConsumerState =
-  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer tracer blockFetchConsumerState)
+runBlockFetchConsumer tracer cfg chan blockFetchConsumerState =
+  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer tracer cfg blockFetchConsumerState)
 
 blockFetchConsumer ::
   forall m.
-  MonadSTM m =>
+  (MonadSTM m, MonadDelay m) =>
   Tracer m PraosNodeEvent ->
+  PraosConfig ->
   BlockFetchConsumerState m ->
   TC.Client BlockFetchState NonPipelined StIdle m ()
-blockFetchConsumer tracer st = idle
+blockFetchConsumer tracer cfg st = idle
  where
   -- does not support preemption of in-flight requests.
   blockRequest :: STM m (AnchoredFragment BlockHeader)
@@ -289,22 +292,15 @@ blockFetchConsumer tracer st = idle
       (MsgBlock body, header : headers') -> TC.Effect $ do
         let block = Block header body
         traceWith tracer $ PraosNodeEventReceived block
-        ifValidBlockBody
-          header
-          body
-          ( do
-              st.addFetchedBlock block
-              traceWith tracer (PraosNodeEventEnterState block)
-              return (streaming range headers')
-          )
-          (error $ "blockFetchConsumer: invalid block\n" ++ show block) -- TODO
+        threadDelaySI (cfg.blockValidationDelay block)
+        if blockInvariant block
+          then do
+            st.addFetchedBlock block
+            traceWith tracer (PraosNodeEventEnterState block)
+            return (streaming range headers')
+          else error $ "blockFetchConsumer: invalid block\n" ++ show block -- TODO
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
-  ifValidBlockBody hdr bdy t f = do
-    -- TODO: threadDelay
-    if blockInvariant $ Block hdr bdy
-      then t
-      else f
 
 --------------------------------------------
 ---- BlockFetch controller
