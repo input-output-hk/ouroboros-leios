@@ -164,7 +164,7 @@ fn step_function_body(input: &mut &str) -> PResult<StepFunction> {
 
 fn for_all(input: &mut &str) -> PResult<DeltaQ> {
     delimited(
-        "all(",
+        alt(("all(", "∀(")),
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )
@@ -174,7 +174,7 @@ fn for_all(input: &mut &str) -> PResult<DeltaQ> {
 
 fn for_some(input: &mut &str) -> PResult<DeltaQ> {
     delimited(
-        "some(",
+        alt(("some(", "∃(")),
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )

@@ -359,7 +359,7 @@ impl DeltaQ {
                 }
                 first.display(f, true)?;
                 write!(f, " ->-{load} ")?;
-                second.display(f, true)?;
+                second.display(f, !matches!(**second, DeltaQ::Seq { .. }))?;
                 if parens {
                     write!(f, ")")?;
                 }
@@ -369,19 +369,22 @@ impl DeltaQ {
                 if parens {
                     write!(f, "(")?;
                 }
-                first.display(f, true)?;
+                first.display(f, !matches!(**first, DeltaQ::Seq { .. }))?;
                 write!(f, " {}<>{} ", first_weight, second_weight)?;
-                second.display(f, true)?;
+                second.display(
+                    f,
+                    !matches!(**second, DeltaQ::Seq { .. } | DeltaQ::Choice { .. }),
+                )?;
                 if parens {
                     write!(f, ")")?;
                 }
                 Ok(())
             }
             DeltaQ::ForAll(first, second) => {
-                write!(f, "all({} | {})", first, second)
+                write!(f, "∀({} | {})", first, second)
             }
             DeltaQ::ForSome(first, second) => {
-                write!(f, "some({} | {})", first, second)
+                write!(f, "∃({} | {})", first, second)
             }
         }
     }
@@ -535,8 +538,8 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let for_all = DeltaQ::for_all(dq1, dq2);
-        assert_eq!(for_all.to_string(), "all(A | B)");
-        assert_eq!(for_all, "all(A | B)".parse().unwrap());
+        assert_eq!(for_all.to_string(), "∀(A | B)");
+        assert_eq!(for_all, "∀(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -544,8 +547,8 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let for_some = DeltaQ::for_some(dq1, dq2);
-        assert_eq!(for_some.to_string(), "some(A | B)");
-        assert_eq!(for_some, "some(A | B)".parse().unwrap());
+        assert_eq!(for_some.to_string(), "∃(A | B)");
+        assert_eq!(for_some, "∃(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -554,7 +557,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
         let nested_seq = DeltaQ::seq(dq1, DeltaQ::seq(dq2, dq3));
-        assert_eq!(nested_seq.to_string(), "A ->- (B ->- C)");
+        assert_eq!(nested_seq.to_string(), "A ->- B ->- C");
         assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
         assert_eq!(nested_seq, "A ->- B ->- C".parse().unwrap());
     }
@@ -565,7 +568,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
         let nested_choice = DeltaQ::choice(dq1, 0.3, DeltaQ::choice(dq2, 0.5, dq3, 0.5), 0.7);
-        assert_eq!(nested_choice.to_string(), "A 0.3<>0.7 (B 0.5<>0.5 C)");
+        assert_eq!(nested_choice.to_string(), "A 0.3<>0.7 B 0.5<>0.5 C");
         assert_eq!(nested_choice, "A 0.3<>0.7 (B 0.5<>0.5 C)".parse().unwrap());
         assert_eq!(nested_choice, "A 0.3<>0.7 B 0.5<>0.5 C".parse().unwrap());
     }
@@ -577,8 +580,8 @@ mod tests {
         let dq3 = DeltaQ::name("C");
         let dq4 = DeltaQ::name("D");
         let nested_for_all = DeltaQ::for_all(DeltaQ::for_all(dq1, dq2), DeltaQ::seq(dq3, dq4));
-        assert_eq!(nested_for_all.to_string(), "all(all(A | B) | C ->- D)");
-        assert_eq!(nested_for_all, "all(all(A | B) | C ->- D)".parse().unwrap());
+        assert_eq!(nested_for_all.to_string(), "∀(∀(A | B) | C ->- D)");
+        assert_eq!(nested_for_all, "∀(∀(A | B) | C ->- D)".parse().unwrap());
     }
 
     #[test]
@@ -591,11 +594,8 @@ mod tests {
             DeltaQ::for_some(dq1, dq2),
             DeltaQ::choice(dq3, 1.0, dq4, 2.0),
         );
-        assert_eq!(nested_for_some.to_string(), "some(some(A | B) | C 1<>2 D)");
-        assert_eq!(
-            nested_for_some,
-            "some(some(A | B) | C 1<>2 D)".parse().unwrap()
-        );
+        assert_eq!(nested_for_some.to_string(), "∃(∃(A | B) | C 1<>2 D)");
+        assert_eq!(nested_for_some, "∃(∃(A | B) | C 1<>2 D)".parse().unwrap());
     }
 
     #[test]
@@ -786,15 +786,16 @@ mod tests {
             ";
         let ctx = eval_ctx(SOURCE).unwrap();
         assert_eq!(ctx.iter().count(), 13);
-        assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))");
+        assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop");
 
         const DEST: &'static str = "\
-            diffuse := hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))\n\
-            diffuseEB := hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) ->- hopEB) 65.86<>24.96 (((hopEB ->- hopEB) ->- hopEB) ->- hopEB)))\nfar := CDF[(0.268, 1)]\n\
+            diffuse := hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop\n\
+            diffuseEB := hopEB 0.6<>99.4 hopEB ->- hopEB 8.58<>90.82 (hopEB ->- hopEB) ->- hopEB 65.86<>24.96 ((hopEB ->- hopEB) ->- hopEB) ->- hopEB\n\
+            far := CDF[(0.268, 1)]\n\
             farL := CDF[(0.531, 1)]\n\
             farXL := CDF[(1.598, 1)]\n\
-            hop := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))\n\
-            hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))\n\
+            hop := ((near ->- near) ->- near) ->- nearXL 1<>2 ((mid ->- mid) ->- mid) ->- midXL 1<>1 ((far ->- far) ->- far) ->- farXL\n\
+            hopEB := ((near ->- near) ->- near) ->- nearL 1<>2 ((mid ->- mid) ->- mid) ->- midL 1<>1 ((far ->- far) ->- far) ->- farL\n\
             mid := CDF[(0.069, 1)]\n\
             midL := CDF[(0.143, 1)]\n\
             midXL := CDF[(0.404, 1)]\n\
