@@ -455,8 +455,9 @@ impl DeltaQ {
                 let first_cdf = first.eval(ctx)?;
                 let lf = ctx.load_factor;
                 ctx.load_factor = ctx.load_factor * load.factor + load.summand;
-                let second_cdf = second.eval(ctx)?;
+                let second_cdf = second.eval(ctx);
                 ctx.load_factor = lf;
+                let second_cdf = second_cdf?;
                 first_cdf
                     .seq(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
@@ -851,5 +852,29 @@ mod tests {
         let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
         let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+    }
+
+    #[test]
+    fn test_load_factor() {
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            
+            e1 := a ->-×2 a ->-×3+1 b
+            e2 := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+                ->-×2 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+                ->-×3+1 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        assert_eq!(ctx.load_factor, 1.0);
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert_eq!(ctx.load_factor, 1.0);
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+        assert_eq!(e1.to_string(), "\
+            CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \
+            WITH a[(0, 1), (1, 0.8), (2, 1.2), (3, 0)] \
+            WITH ab[(0, 12), (1, 9.6), (2, 22.24), (3, 31.36), (4, 41.16), (5, 17.64), (6, 0)] \
+            WITH b[(2, 1.12), (3, 4.48), (4, 5.88), (5, 2.52), (6, 0)] \
+            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.712), (2.8, 0.112), (3.2, 0.56), (3.5, 0.336), (4.2, 0.924), (4.5, 0.252), (5.2, 0.504), (5.5, 0)]");
     }
 }
