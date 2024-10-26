@@ -824,4 +824,31 @@ mod tests {
         );
         assert_eq!(res, expected);
     }
+
+    #[test]
+    fn distributive_choice() {
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
+
+            e1 := a ->- b 1<>2 a ->- c
+            e2 := a ->- (b 1<>2 c)
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
+
+            e1 := a ->-×3 b 1<>2 a ->-×3 c
+            e2 := a ->-×3 (b 1<>2 c)
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+    }
 }

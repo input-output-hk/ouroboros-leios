@@ -118,8 +118,19 @@ impl Outcome {
             load: self.map_loads(other, ctx, |l, r| Ok(l.add(r)))?,
         })
     }
-}
 
+    pub fn similar(&self, other: &Self) -> bool {
+        self.cdf.steps().similar(&other.cdf.steps())
+            && self
+                .load
+                .iter()
+                .merge_join_by(other.load.iter(), |(nl, _), (nr, _)| nl.cmp(nr))
+                .all(|x| match x {
+                    EitherOrBoth::Both((_, l), (_, r)) => l.similar(r),
+                    _ => false,
+                })
+    }
+}
 impl Display for Outcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.cdf)?;

@@ -39,7 +39,9 @@ CDF[(1, 1)]
 validateIB:
 CDF[(3, 1)]
 
+=================================================================
 4 -- better modelling of Leios (in format for import into editor)
+=================================================================
 
 -- diffusion of one IB (assuming 1MB)
 diffuseIB := hopIB 0.6<>99.4 ((hopIB ->- hopIB) 8.58<>90.82 (((hopIB ->- hopIB) ->- hopIB) 65.86<>24.96 (((hopIB ->- hopIB) ->- hopIB) ->- hopIB)))
@@ -65,9 +67,12 @@ nearXL := CDF[(0.078, 1)]
 hopIB := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
 hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
 
+=======================================
 5 -- Leios model including network load
+=======================================
 
 -- single link latencies across continents
+-- (network rates are 1_500/64_000/1_000_000 octets spread over the respective durations, for far/farL/farXL)
 far := CDF[(0.268, 1)] WITH net[(0, 5597), (0.268, 0)]
 farL := CDF[(0.531, 1)] WITH net[(0, 120527), (0.531, 0)]
 farXL := CDF[(1.598, 1)] WITH net[(0, 625782), (1.598, 0)]

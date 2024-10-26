@@ -18,6 +18,10 @@
         const { data } = event;
         if (data === null || typeof data !== 'object') {
           cleanup('output');
+          const load_container = document.getElementById('loads');
+          while (load_container.firstChild) {
+            load_container.removeChild(load_container.firstChild);
+          }
         } else {
           const { bins, values, max, name, loads } = data;
 
@@ -46,7 +50,7 @@
           }
 
           let canvas = 0;
-          for (const { bins, values, man, name } of loads || []) {
+          for (const { bins, values, max, name } of loads || []) {
             const load_hist = core.createHistogram('TH1F', bins.length);
             load_hist.fXaxis.fXbins = bins;
             for (const idx in values) {

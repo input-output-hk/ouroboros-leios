@@ -162,6 +162,20 @@ impl StepFunction {
             mode: self.mode,
         }
     }
+
+    pub fn similar(&self, other: &Self) -> bool {
+        fn similar(a: f32, b: f32) -> bool {
+            a == 0.0 && b.abs() < 1e-6
+                || b == 0.0 && a.abs() < 1e-6
+                || (a - b).abs() / a.max(b) < 1e-6
+        }
+        self.data.len() == other.data.len()
+            && self
+                .data
+                .iter()
+                .zip(other.data.iter())
+                .all(|(a, b)| similar(a.0, b.0) && similar(a.1, b.1))
+    }
 }
 
 impl From<StepFunction> for StepFunctionSerial {
