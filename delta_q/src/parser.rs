@@ -215,7 +215,7 @@ impl Op {
     fn bp(&self) -> (u8, u8) {
         match self {
             Op::Choice { .. } => (2, 1),
-            Op::Seq { .. } => (3, 4),
+            Op::Seq { .. } => (4, 3),
         }
     }
 }

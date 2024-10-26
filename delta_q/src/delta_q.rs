@@ -553,9 +553,9 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
-        let nested_seq = DeltaQ::seq(DeltaQ::seq(dq1, dq2), dq3);
-        assert_eq!(nested_seq.to_string(), "(A ->- B) ->- C");
-        assert_eq!(nested_seq, "(A ->- B) ->- C".parse().unwrap());
+        let nested_seq = DeltaQ::seq(dq1, DeltaQ::seq(dq2, dq3));
+        assert_eq!(nested_seq.to_string(), "A ->- (B ->- C)");
+        assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
         assert_eq!(nested_seq, "A ->- B ->- C".parse().unwrap());
     }
 
