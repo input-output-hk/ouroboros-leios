@@ -73,8 +73,8 @@ hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) -
 (this isn’t yet a model of the actual Leios, just playing around with the necessary primitives)
 
 TOP := CDF[(0, 1)]
-diffuseEB := TOP ->-×15 hopEB 0.6<>99.4 TOP ->-×15 hopEB ->-×15 hopEB 8.58<>90.82 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB 65.86<>24.96 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB
-diffuseIB := TOP ->-×15 hopIB 0.6<>99.4 TOP ->-×15 hopIB ->-×15 hopIB 8.58<>90.82 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB 65.86<>24.96 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB
+diffuseEB >= round := TOP ->-×15 hopEB 0.6<>99.4 TOP ->-×15 hopEB ->-×15 hopEB 8.58<>90.82 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB 65.86<>24.96 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB
+diffuseIB >= round := TOP ->-×15 hopIB 0.6<>99.4 TOP ->-×15 hopIB ->-×15 hopIB 8.58<>90.82 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB 65.86<>24.96 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB
 far := CDF[(0.268, 1)] WITH net[(0, 5597), (0.268, 0)]
 farL := CDF[(0.531, 1)] WITH net[(0, 120527), (0.531, 0)]
 farXL := CDF[(1.598, 1)] WITH net[(0, 625782), (1.598, 0)]

@@ -1,4 +1,4 @@
-use crate::{delta_q::Name, CDFError, EvaluationContext, StepFunction, CDF};
+use crate::{delta_q::Name, CDFError, PersistentContext, StepFunction, CDF};
 use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::BTreeMap,
@@ -36,7 +36,7 @@ impl Outcome {
         self
     }
 
-    fn cdf_cloned(&self, ctx: &EvaluationContext) -> CDF {
+    fn cdf_cloned(&self, ctx: &PersistentContext) -> CDF {
         self.cdf
             .clone()
             .with_max_size(ctx.max_size)
@@ -45,7 +45,7 @@ impl Outcome {
 
     fn map_load(
         &self,
-        ctx: &EvaluationContext,
+        ctx: &PersistentContext,
         f: impl Fn(&StepFunction) -> StepFunction,
     ) -> BTreeMap<Name, StepFunction> {
         self.load
@@ -62,7 +62,7 @@ impl Outcome {
     fn map_loads(
         &self,
         other: &Self,
-        ctx: &EvaluationContext,
+        ctx: &PersistentContext,
         f: impl Fn(&StepFunction, &StepFunction) -> Result<StepFunction, CDFError>,
     ) -> Result<BTreeMap<Name, StepFunction>, CDFError> {
         self.load
@@ -77,14 +77,14 @@ impl Outcome {
             .try_collect()
     }
 
-    pub fn mult(&self, lf: f32, ctx: &EvaluationContext) -> Self {
+    pub fn mult(&self, lf: f32, ctx: &PersistentContext) -> Self {
         Self {
             cdf: self.cdf_cloned(ctx),
             load: self.map_load(ctx, |l| l.mult(lf)),
         }
     }
 
-    pub fn seq(&self, other: &Self, ctx: &EvaluationContext) -> Result<Self, CDFError> {
+    pub fn seq(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.convolve(&other.cdf)?,
             load: self.map_loads(other, ctx, |l, r| {
@@ -97,7 +97,7 @@ impl Outcome {
         &self,
         my_fraction: f32,
         other: &Self,
-        ctx: &EvaluationContext,
+        ctx: &PersistentContext,
     ) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.choice(my_fraction, &other.cdf)?,
@@ -105,14 +105,14 @@ impl Outcome {
         })
     }
 
-    pub fn for_all(&self, other: &Self, ctx: &EvaluationContext) -> Result<Self, CDFError> {
+    pub fn for_all(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.for_all(&other.cdf)?,
             load: self.map_loads(other, ctx, |l, r| Ok(l.add(r)))?,
         })
     }
 
-    pub fn for_some(&self, other: &Self, ctx: &EvaluationContext) -> Result<Self, CDFError> {
+    pub fn for_some(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.for_some(&other.cdf)?,
             load: self.map_loads(other, ctx, |l, r| Ok(l.add(r)))?,
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_choice() {
-        let ctx = EvaluationContext::default();
+        let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.choice(0.6, &outcome2, &ctx).unwrap();
         assert_eq!(res.to_string(), "CDF[(0, 0.04), (1, 0.28), (2, 0.64), (5, 1)] WITH m1[(0.1, 9), (0.5, 6), (1.9, 0)] WITH m2[(0, 20), (1.5, 80), (2, 20), (4.5, 0)] WITH m3[(4.5, 4.8), (5.5, 0)]");
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_for_all() {
-        let ctx = EvaluationContext::default();
+        let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.for_all(&outcome2, &ctx).unwrap();
         assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (5, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_for_some() {
-        let ctx = EvaluationContext::default();
+        let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.for_some(&outcome2, &ctx).unwrap();
         assert_eq!(res.to_string(), "CDF[(0, 0.1), (1, 0.46), (2, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_seq() {
-        let ctx = EvaluationContext::default();
+        let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.seq(&outcome2, &ctx).unwrap();
         assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (6, 0.46), (7, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(1, 20), (1.5, 120), (2, 50), (5.5, 30), (6.5, 0)] WITH m3[(5.5, 4.8), (6.5, 7.2), (7.5, 0)]");

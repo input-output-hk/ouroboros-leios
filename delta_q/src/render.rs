@@ -1,6 +1,6 @@
 use crate::{
-    delta_q::{DeltaQ, LoadUpdate},
-    EvaluationContext, Outcome,
+    delta_q::{DeltaQ, LoadUpdate, Name},
+    PersistentContext, Outcome,
 };
 use std::{rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
@@ -9,12 +9,12 @@ use yew::prelude::*;
 /// A piece of context that tells the DeltaQ rendering components to which named expression they belong.
 #[derive(Clone, PartialEq)]
 pub struct DeltaQContext {
-    pub eval_ctx: Rc<EvaluationContext>,
+    pub eval_ctx: Rc<PersistentContext>,
     pub name: String,
 }
 
 impl DeltaQContext {
-    pub fn new(eval_ctx: &EvaluationContext, name: &str) -> Self {
+    pub fn new(eval_ctx: &PersistentContext, name: &str) -> Self {
         Self {
             eval_ctx: Rc::new(eval_ctx.clone()),
             name: name.to_owned(),
@@ -487,10 +487,12 @@ fn branch(props: &BranchProps) -> Html {
 pub enum EvalCtxAction {
     Put(String, DeltaQ),
     Remove(String),
-    Set(EvaluationContext),
+    Set(PersistentContext),
+    ToggleConstraint(Name),
+    EditConstraint(Name, String),
 }
 
-impl Reducible for EvaluationContext {
+impl Reducible for PersistentContext {
     type Action = EvalCtxAction;
 
     fn reduce(self: Rc<Self>, act: Self::Action) -> Rc<Self> {
@@ -506,6 +508,20 @@ impl Reducible for EvaluationContext {
                 Rc::new(ret)
             }
             EvalCtxAction::Set(evaluation_context) => Rc::new(evaluation_context),
+            EvalCtxAction::ToggleConstraint(name) => {
+                let mut ret = (*self).clone();
+                if ret.constraint(&name).is_some() {
+                    ret.set_constraint(&name, None);
+                } else {
+                    ret.set_constraint(&name, Some("".into()));
+                }
+                Rc::new(ret)
+            }
+            EvalCtxAction::EditConstraint(name, value) => {
+                let mut ret = (*self).clone();
+                ret.set_constraint(&name, Some(value.into()));
+                Rc::new(ret)
+            }
         }
     }
 }

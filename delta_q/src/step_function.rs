@@ -310,7 +310,7 @@ impl<'a> Iterator for StepFunctionIterator<'a> {
 
 impl<'a> std::iter::FusedIterator for StepFunctionIterator<'a> {}
 
-#[derive(Debug, PartialEq, Default, Clone, Copy)]
+#[derive(Debug, PartialEq, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum CompactionMode {
     #[default]
     UnderApproximate,

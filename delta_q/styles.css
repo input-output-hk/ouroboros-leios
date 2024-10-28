@@ -37,5 +37,9 @@
 .center { align-items: center; justify-content: center; }
 .left { align-items: left; }
 
+.slack { background-color: lightgreen; }
+.danger { background-color: lightcoral; }
+.failed { background-color: lightgrey; }
+
 input[type="number"] { width: 5em; }
 input[type="text"] { width: 7em; }

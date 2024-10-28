@@ -36,18 +36,15 @@ impl From<CDFError> for DeltaQError {
 
 pub type Name = SmallString<[u8; 16]>;
 
+// Update EvaluationContext to contain only static data
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<Name, DeltaQ>")]
-pub struct EvaluationContext {
-    pub ctx: BTreeMap<Name, (DeltaQ, Option<Outcome>)>,
-    pub deps: BTreeMap<Name, BTreeSet<Name>>,
-    pub rec: BTreeMap<Name, Option<usize>>,
+pub struct PersistentContext {
+    pub ctx: BTreeMap<Name, (DeltaQ, Option<Name>)>,
     pub max_size: usize,
     pub mode: CompactionMode,
-    pub load_factor: f32,
 }
 
-impl FromStr for EvaluationContext {
+impl FromStr for PersistentContext {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -55,99 +52,82 @@ impl FromStr for EvaluationContext {
     }
 }
 
-impl Default for EvaluationContext {
+impl Default for PersistentContext {
     fn default() -> Self {
         Self {
             ctx: Default::default(),
-            deps: Default::default(),
-            rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: Default::default(),
-            load_factor: 1.0,
         }
     }
 }
 
-impl EvaluationContext {
+impl PersistentContext {
     pub fn put(&mut self, name: String, delta_q: DeltaQ) {
-        // first remove all computed values that depend on this name
         let name = Name::from(name);
-        let mut to_remove: Vec<Name> = vec![name.clone()];
-        while let Some(name) = to_remove.pop() {
-            if self.ctx.get_mut(&*name).and_then(|x| x.1.take()).is_some() {
-                tracing::info!("Removing computed value for {}", name);
-                for (k, v) in self.deps.iter() {
-                    if v.contains(&*name) {
-                        to_remove.push(k.clone());
-                    }
-                }
-            }
-        }
-        self.deps.insert(name.clone(), delta_q.deps());
         self.ctx.insert(name, (delta_q, None));
     }
 
     pub fn remove(&mut self, name: &str) -> Option<DeltaQ> {
-        // first remove all computed values that depend on this name
-        let name = Name::from(name);
-        let mut to_remove = vec![name.clone()];
-        while let Some(name) = to_remove.pop() {
-            if self.ctx.get_mut(&name).and_then(|x| x.1.take()).is_some() {
-                tracing::info!("Removing computed value for {}", name);
-                for (k, v) in self.deps.iter() {
-                    if v.contains(&name) {
-                        to_remove.push(k.clone());
-                    }
-                }
-            }
-        }
-        self.deps.remove(&name);
-        self.ctx.remove(&name).map(|(dq, _)| dq)
+        self.ctx.remove(name).map(|(dq, _)| dq)
     }
 
     pub fn get(&self, name: &str) -> Option<&DeltaQ> {
         self.ctx.get(name).map(|(dq, _)| dq)
     }
 
-    pub fn eval(&mut self, name: &str) -> Result<Outcome, DeltaQError> {
-        DeltaQ::name(name).eval(self)
+    pub fn eval(&self, name: &str) -> Result<Outcome, DeltaQError> {
+        DeltaQ::name(name).eval(self, &mut EphemeralContext::default())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Name, &DeltaQ)> {
         self.ctx.iter().map(|(k, (v, _))| (k, v))
     }
+
+    pub fn constraint(&self, name: &str) -> Option<&Name> {
+        self.ctx.get(name).and_then(|(_, c)| c.as_ref())
+    }
+
+    pub fn set_constraint(&mut self, name: &str, constraint: Option<Name>) {
+        if let Some((_, c)) = self.ctx.get_mut(name) {
+            *c = constraint;
+        }
+    }
+
+    pub fn constraints(&self) -> impl Iterator<Item = (&Name, &Name)> {
+        self.ctx
+            .iter()
+            .filter_map(|(k, (_, c))| c.as_ref().map(|c| (k, c)))
+    }
 }
 
-impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
+impl From<BTreeMap<String, DeltaQ>> for PersistentContext {
     fn from(value: BTreeMap<String, DeltaQ>) -> Self {
-        let deps = value
-            .iter()
-            .map(|(k, v)| (Name::from(&**k), v.deps()))
-            .collect();
         Self {
             ctx: value
                 .into_iter()
                 .map(|(k, v)| (Name::from(k), (v, None)))
                 .collect(),
-            deps,
-            rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
-            load_factor: 1.0,
         }
     }
 }
 
-impl Into<BTreeMap<Name, DeltaQ>> for EvaluationContext {
+impl Into<BTreeMap<Name, DeltaQ>> for PersistentContext {
     fn into(self) -> BTreeMap<Name, DeltaQ> {
         self.ctx.into_iter().map(|(k, (v, _))| (k, v)).collect()
     }
 }
 
-impl Display for EvaluationContext {
+impl Display for PersistentContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (k, v) in self.ctx.iter() {
-            writeln!(f, "{} := {}", k, v.0)?;
+        for (k, (v, c)) in self.ctx.iter() {
+            if let Some(c) = c {
+                writeln!(f, "{} >= {} := {}", k, c, v)?;
+            } else {
+                writeln!(f, "{} := {}", k, v)?;
+            }
         }
         Ok(())
     }
@@ -389,7 +369,11 @@ impl DeltaQ {
         }
     }
 
-    pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<Outcome, DeltaQError> {
+    pub fn eval(
+        &self,
+        ctx: &PersistentContext,
+        ephemeral: &mut EphemeralContext,
+    ) -> Result<Outcome, DeltaQError> {
         match self {
             DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
             DeltaQ::Name(n, r) => {
@@ -401,12 +385,18 @@ impl DeltaQ {
                 // Some(None) means recursing on this name without allowance
                 // Some(Some(n)) means recursing on this name with n as the remaining allowance
                 let recursion = if let Some(r) = r {
-                    if ctx.rec.contains_key(n) {
+                    if ephemeral.rec.contains_key(n) {
                         return Err(DeltaQError::RecursionError(n.to_owned()));
                     }
-                    Some(ctx.rec.entry(n.to_owned()).or_insert(Some(*r)).as_mut())
+                    Some(
+                        ephemeral
+                            .rec
+                            .entry(n.to_owned())
+                            .or_insert(Some(*r))
+                            .as_mut(),
+                    )
                 } else {
-                    ctx.rec.get_mut(n).map(|r| r.as_mut())
+                    ephemeral.rec.get_mut(n).map(|r| r.as_mut())
                 };
                 if let Some(Some(allowance)) = recursion {
                     match ctx.ctx.get(n) {
@@ -420,12 +410,12 @@ impl DeltaQ {
                                 })
                             } else {
                                 *allowance -= 1;
-                                dq.clone().eval(ctx)
+                                dq.clone().eval(ctx, ephemeral)
                             };
                             if r.is_some() {
-                                ctx.rec.remove(n);
+                                ephemeral.rec.remove(n);
                             } else if increment {
-                                *ctx.rec.get_mut(n).unwrap().as_mut().unwrap() += 1;
+                                *ephemeral.rec.get_mut(n).unwrap().as_mut().unwrap() += 1;
                             }
                             ret
                         }
@@ -434,37 +424,44 @@ impl DeltaQ {
                 } else if recursion.is_some() {
                     Err(DeltaQError::RecursionError(n.to_owned()))
                 } else {
-                    match ctx.ctx.get(n) {
-                        Some((_, Some(cdf))) if ctx.load_factor == 1.0 => Ok(cdf.clone()),
-                        Some((dq, _)) => {
-                            ctx.rec.insert(n.to_owned(), None);
-                            let cdf = dq.clone().eval(ctx);
-                            ctx.rec.remove(n);
-                            let cdf = cdf?;
-                            if ctx.load_factor == 1.0 {
-                                ctx.ctx.get_mut(n).unwrap().1 = Some(cdf.clone());
-                            }
-                            Ok(cdf)
+                    // Check if the outcome is cached
+                    if ephemeral.load_factor == 1.0 {
+                        if let Some(cached_outcome) = ephemeral.cache.get(n) {
+                            return Ok(cached_outcome.clone());
                         }
-                        None => Err(DeltaQError::NameError(n.to_owned())),
                     }
+
+                    // Proceed with evaluation
+                    let Some((dq, _)) = ctx.ctx.get(n) else {
+                        return Err(DeltaQError::NameError(n.to_owned()));
+                    };
+
+                    ephemeral.rec.insert(n.to_owned(), None);
+                    let outcome = dq.eval(ctx, ephemeral);
+                    ephemeral.rec.remove(n);
+
+                    let outcome = outcome?;
+                    if ephemeral.load_factor == 1.0 {
+                        ephemeral.cache.insert(n.clone(), outcome.clone());
+                    }
+                    Ok(outcome)
                 }
             }
-            DeltaQ::Outcome(outcome) => Ok(outcome.mult(ctx.load_factor, ctx)),
+            DeltaQ::Outcome(outcome) => Ok(outcome.mult(ephemeral.load_factor, ctx)),
             DeltaQ::Seq(first, load, second) => {
-                let first_cdf = first.eval(ctx)?;
-                let lf = ctx.load_factor;
-                ctx.load_factor = ctx.load_factor * load.factor + load.summand;
-                let second_cdf = second.eval(ctx);
-                ctx.load_factor = lf;
+                let first_cdf = first.eval(ctx, ephemeral)?;
+                let lf = ephemeral.load_factor;
+                ephemeral.load_factor = ephemeral.load_factor * load.factor + load.summand;
+                let second_cdf = second.eval(ctx, ephemeral);
+                ephemeral.load_factor = lf;
                 let second_cdf = second_cdf?;
                 first_cdf
                     .seq(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::Choice(first, first_fraction, second, second_fraction) => {
-                let first_cdf = first.eval(ctx)?;
-                let second_cdf = second.eval(ctx)?;
+                let first_cdf = first.eval(ctx, ephemeral)?;
+                let second_cdf = second.eval(ctx, ephemeral)?;
                 first_cdf
                     .choice(
                         *first_fraction / (*first_fraction + *second_fraction),
@@ -474,19 +471,36 @@ impl DeltaQ {
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::ForAll(first, second) => {
-                let first_cdf = first.eval(ctx)?;
-                let second_cdf = second.eval(ctx)?;
+                let first_cdf = first.eval(ctx, ephemeral)?;
+                let second_cdf = second.eval(ctx, ephemeral)?;
                 first_cdf
                     .for_all(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::ForSome(first, second) => {
-                let first_cdf = first.eval(ctx)?;
-                let second_cdf = second.eval(ctx)?;
+                let first_cdf = first.eval(ctx, ephemeral)?;
+                let second_cdf = second.eval(ctx, ephemeral)?;
                 first_cdf
                     .for_some(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
+        }
+    }
+}
+
+// Define the new EphemeralContext struct
+pub struct EphemeralContext {
+    pub rec: BTreeMap<Name, Option<usize>>,
+    pub load_factor: f32,
+    pub cache: BTreeMap<Name, Outcome>,
+}
+
+impl Default for EphemeralContext {
+    fn default() -> Self {
+        Self {
+            rec: Default::default(),
+            load_factor: 1.0,
+            cache: Default::default(),
         }
     }
 }
@@ -636,7 +650,9 @@ mod tests {
                     100.0,
                 ),
         };
-        let result = DeltaQ::name("model5").eval(&mut ctx.into()).unwrap();
+        let result = DeltaQ::name("model5")
+            .eval(&ctx.into(), &mut EphemeralContext::default())
+            .unwrap();
         assert_eq!(result.to_string(), "CDF[(0.024, 0.0033), (0.048, 0.00439), (0.072, 0.00475), (0.096, 0.00487), (0.12, 0.00882), (0.143, 0.01212), (0.167, 0.0143), (0.191, 0.01538), (0.215, 0.01585), (0.239, 0.03563), (0.286, 0.03672), (0.31, 0.03779), (0.334, 0.03851), (0.358, 0.07805), (0.429, 0.07841), (0.453, 0.07889), (0.477, 0.11843), (0.531, 0.12173), (0.555, 0.12391), (0.572, 0.12403), (0.579, 0.12511), (0.596, 0.14488), (0.603, 0.14536), (0.627, 0.16513), (0.674, 0.16731), (0.698, 0.16947), (0.715, 0.17342), (0.722, 0.17484), (0.746, 0.25394), (0.817, 0.25502), (0.841, 0.25644), (0.865, 0.37508), (0.96, 0.37555), (0.984, 0.45465), (1.062, 0.45574), (1.086, 0.45681), (1.103, 0.47659), (1.11, 0.4773), (1.134, 0.51685), (1.205, 0.51792), (1.229, 0.51935), (1.253, 0.63799), (1.348, 0.6387), (1.372, 0.75734), (1.491, 0.79689), (1.593, 0.79725), (1.617, 0.79772), (1.641, 0.83727), (1.736, 0.83774), (1.76, 0.91683), (1.879, 0.95638), (2.124, 0.9565), (2.148, 0.97627), (2.267, 0.99605), (2.655, 1)]");
     }
 
@@ -652,7 +668,9 @@ mod tests {
                 ),
             "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
         };
-        let result = DeltaQ::name("recursive").eval(&mut ctx.into()).unwrap_err();
+        let result = DeltaQ::name("recursive")
+            .eval(&ctx.into(), &mut EphemeralContext::default())
+            .unwrap_err();
         assert_eq!(result, DeltaQError::RecursionError("recursive".into()));
     }
 
@@ -702,15 +720,20 @@ mod tests {
 
     #[test]
     fn test_recursion() {
-        let mut ctx = EvaluationContext::default();
+        let mut ctx = PersistentContext::default();
+        let mut ephemeral = EphemeralContext::default();
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f ->- f".parse().unwrap());
-        let res = DeltaQ::Name("f".into(), Some(3)).eval(&mut ctx).unwrap();
+        let res = DeltaQ::Name("f".into(), Some(3))
+            .eval(&ctx, &mut ephemeral)
+            .unwrap();
         assert_eq!(DeltaQ::Outcome(res), outcome.parse("CDF[(7,1)]").unwrap());
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {
-            let res = DeltaQ::Name("f".into(), Some(i)).eval(&mut ctx).unwrap();
+            let res = DeltaQ::Name("f".into(), Some(i))
+                .eval(&ctx, &mut ephemeral)
+                .unwrap();
             assert_eq!(
                 DeltaQ::Outcome(res),
                 outcome.parse(&format!("CDF[({i},1)]")).unwrap()
@@ -727,7 +750,9 @@ mod tests {
                 .parse()
                 .unwrap(),
         );
-        let res = DeltaQ::Name("out".into(), Some(1)).eval(&mut ctx).unwrap();
+        let res = DeltaQ::Name("out".into(), Some(1))
+            .eval(&ctx, &mut ephemeral)
+            .unwrap();
         assert_eq!(
             res.cdf,
             CDF::from_steps(&[
@@ -818,8 +843,9 @@ mod tests {
             Arc::new(DeltaQ::Outcome(outcome)),
         );
         assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×2 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
-        let mut ctx = EvaluationContext::default();
-        let res = dq.eval(&mut ctx).unwrap();
+        let ctx = PersistentContext::default();
+        let mut ephemeral = EphemeralContext::default();
+        let res = dq.eval(&ctx, &mut ephemeral).unwrap();
         let expected = Outcome::new(CDF::from_steps(&[(3.0, 0.010000001)]).unwrap()).with_load(
             "net".into(),
             StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
@@ -829,7 +855,7 @@ mod tests {
 
     #[test]
     fn distributive_choice() {
-        let mut ctx = eval_ctx("\
+        let ctx = eval_ctx("\
             a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
@@ -837,11 +863,15 @@ mod tests {
             e1 := a ->- b 1<>2 a ->- c
             e2 := a ->- (b 1<>2 c)
             ").unwrap();
-        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
-        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        let e1 = DeltaQ::name("e1")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
+        let e2 = DeltaQ::name("e2")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
 
-        let mut ctx = eval_ctx("\
+        let ctx = eval_ctx("\
             a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
@@ -849,14 +879,18 @@ mod tests {
             e1 := a ->-×3 b 1<>2 a ->-×3 c
             e2 := a ->-×3 (b 1<>2 c)
             ").unwrap();
-        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
-        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        let e1 = DeltaQ::name("e1")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
+        let e2 = DeltaQ::name("e2")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
     }
 
     #[test]
     fn test_load_factor() {
-        let mut ctx = eval_ctx("\
+        let ctx = eval_ctx("\
             a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             
@@ -865,10 +899,12 @@ mod tests {
                 ->-×2 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
                 ->-×3+1 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             ").unwrap();
-        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
-        assert_eq!(ctx.load_factor, 1.0);
-        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
-        assert_eq!(ctx.load_factor, 1.0);
+        let e1 = DeltaQ::name("e1")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
+        let e2 = DeltaQ::name("e2")
+            .eval(&ctx, &mut EphemeralContext::default())
+            .unwrap();
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
         assert_eq!(e1.to_string(), "\
             CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \

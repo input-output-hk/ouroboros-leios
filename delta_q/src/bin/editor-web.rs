@@ -6,7 +6,8 @@ macro_rules! cloned {
 }
 
 use delta_q::{
-    CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvalCtxAction, EvaluationContext, StepFunction,
+    CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EphemeralContext, EvalCtxAction,
+    PersistentContext, StepFunction,
 };
 use gloo_utils::window;
 use js_sys::Reflect;
@@ -19,7 +20,7 @@ use yew_hooks::use_local_storage;
 
 #[function_component(AppMain)]
 fn app_main() -> HtmlResult {
-    let ctx_handle = use_local_storage::<EvaluationContext>("delta_q".to_owned());
+    let ctx_handle = use_local_storage::<PersistentContext>("delta_q".to_owned());
     let ctx = use_reducer(cloned!(ctx_handle; move || (*ctx_handle).clone().unwrap_or_default()));
     if Some(&*ctx) != ctx_handle.as_ref() {
         ctx_handle.set((*ctx).clone());
@@ -35,7 +36,7 @@ fn app_main() -> HtmlResult {
 
     let ctx_text_input = Callback::from(cloned!(ctx_text, ctx_text_status; move |e: InputEvent| {
         let text = e.target_unchecked_into::<HtmlInputElement>().value();
-        match text.parse::<EvaluationContext>() {
+        match text.parse::<PersistentContext>() {
             Ok(_) => ctx_text_status.set("OK".to_owned()),
             Err(e) => ctx_text_status.set(e),
         }
@@ -67,7 +68,7 @@ fn app_main() -> HtmlResult {
             if !save {
                 return;
             }
-            if let Ok(cx) = EvaluationContext::from_str(&*ctx_text) {
+            if let Ok(cx) = PersistentContext::from_str(&*ctx_text) {
                 ctx.dispatch(EvalCtxAction::Set(cx));
                 epoch.set(*epoch + 1);
             }
@@ -113,11 +114,45 @@ fn app_main() -> HtmlResult {
         })
     );
 
+    let focused_constraint = use_state(|| Option::<HtmlInputElement>::None);
+    use_effect(cloned!(focused_constraint; move || {
+        if let Some(focused) = focused_constraint.as_ref() {
+            focused.focus().expect("focus failed");
+            let escape = Closure::<dyn Fn(KeyboardEvent)>::new(cloned!(focused_constraint; move |e: KeyboardEvent| if e.key() == "Escape" {
+                focused_constraint.set(None)
+            })).into_js_value();
+            focused.add_event_listener_with_callback("keydown", escape.unchecked_ref()).expect("listening on keydown failed");
+        }
+    }));
+    let toggle_constraint = cloned!(ctx, epoch; Callback::from(move |name: smallstr::SmallString<[u8; 16]>| {
+        ctx.dispatch(EvalCtxAction::ToggleConstraint(name));
+        epoch.set(*epoch + 1);
+    }));
+    let edit_constraint = cloned!(ctx; Callback::from(move |(name, event): (smallstr::SmallString<[u8; 16]>, InputEvent)| {
+        let value = event.target_unchecked_into::<HtmlInputElement>().value();
+        ctx.dispatch(EvalCtxAction::EditConstraint(name, value));
+        epoch.set(*epoch + 1);
+    }));
+
     let mut sel_found = false;
+    let mut cache = EphemeralContext::default();
     let list_items = ctx
         .iter()
         .map(|(k, v)| {
             let name = k.clone();
+            let constraint = ctx.constraint(&name);
+            let check = (|| {
+                let c = ctx.get(&constraint?)?;
+                let c = c.eval(&ctx, &mut cache).ok()?;
+                let n = ctx.get(&name)?;
+                let n = n.eval(&ctx, &mut cache).ok()?;
+                Some(n.cdf >= c.cdf)
+            })();
+            let check = match check {
+                Some(true) => "slack",
+                Some(false) => "danger",
+                None => "failed",
+            };
             let select = select.clone();
             let sel = if selected.as_deref() == Some(k.as_str()) {
                 sel_found = true;
@@ -128,6 +163,12 @@ fn app_main() -> HtmlResult {
             html! {
                 <li class={classes!("row")}>
                     <button onclick={cloned!(name, on_change; move |_| on_change.emit((name.to_string(), None)))}>{ "delete "}</button>
+                    <button onclick={cloned!(toggle_constraint, name; move |_| toggle_constraint.emit(name.clone()))}>{ "constraint" }</button>
+                    if let Some(c) = constraint {
+                        <input type="text" value={c.to_string()} class={classes!(check)} oninput={edit_constraint.reform(cloned!(name; move |e| (name.clone(), e)))}
+                            onfocus={cloned!(focused_constraint; move |e: FocusEvent| focused_constraint.set(Some(e.target_unchecked_into::<HtmlInputElement>())))}
+                        />
+                    }
                     <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.to_string())}>
                         { k }{ ": " }<EditExpression name={k.to_string()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
                     </div>

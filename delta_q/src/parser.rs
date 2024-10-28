@@ -1,6 +1,6 @@
 use crate::{
     delta_q::{LoadUpdate, Name},
-    DeltaQ, EvaluationContext, Outcome, StepFunction, CDF,
+    DeltaQ, Outcome, PersistentContext, StepFunction, CDF,
 };
 use std::sync::Arc;
 use winnow::{
@@ -11,22 +11,33 @@ use winnow::{
     PResult, Parser,
 };
 
-pub fn eval_ctx(input: &str) -> Result<EvaluationContext, String> {
+pub fn eval_ctx(input: &str) -> Result<PersistentContext, String> {
     repeat(
         0..,
-        delimited(ws, separated_pair(name_bare, (ws, ":=", ws), delta_q), ws),
+        delimited(
+            ws,
+            separated_pair(
+                (name_bare, opt((ws, ">=", ws, name_bare).map(|x| x.3))),
+                (ws, ":=", ws),
+                delta_q,
+            ),
+            ws,
+        ),
     )
     .parse(input)
     .map_err(|e| format!("{e}"))
 }
 
-impl<'a> Accumulate<(&'a str, DeltaQ)> for EvaluationContext {
-    fn accumulate(&mut self, (name, dq): (&'a str, DeltaQ)) {
+impl<'a> Accumulate<((&'a str, Option<&'a str>), DeltaQ)> for PersistentContext {
+    fn accumulate(&mut self, ((name, constraint), dq): ((&'a str, Option<&'a str>), DeltaQ)) {
         self.put(name.to_owned(), dq);
+        if let Some(constraint) = constraint {
+            self.set_constraint(name, Some(constraint.into()));
+        }
     }
 
     fn initial(_capacity: Option<usize>) -> Self {
-        EvaluationContext::default()
+        PersistentContext::default()
     }
 }
 
