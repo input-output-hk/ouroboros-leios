@@ -199,11 +199,11 @@ impl EventMonitor {
             );
             info!(
                 "Each transaction was included in an average of {} IBs (stddev {}).",
-                txs_per_ib.mean, txs_per_ib.std_dev,
+                ibs_per_tx.mean, ibs_per_tx.std_dev,
             );
             info!(
                 "Each IB contained an average of {} transactions (stddev {}).",
-                ibs_per_tx.mean, ibs_per_tx.std_dev,
+                txs_per_ib.mean, txs_per_ib.std_dev,
             );
             info!(
                 "Each transaction took an average of {}s (stddev {}) to reach an IB.",
