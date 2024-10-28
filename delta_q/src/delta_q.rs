@@ -1,4 +1,4 @@
-use crate::{parser::eval_ctx, CDFError, CompactionMode, CDF, DEFAULT_MAX_SIZE};
+use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MAX_SIZE};
 use smallstr::SmallString;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -34,16 +34,17 @@ impl From<CDFError> for DeltaQError {
     }
 }
 
-type Name = SmallString<[u8; 16]>;
+pub type Name = SmallString<[u8; 16]>;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(from = "BTreeMap<String, DeltaQ>", into = "BTreeMap<Name, DeltaQ>")]
 pub struct EvaluationContext {
-    ctx: BTreeMap<Name, (DeltaQ, Option<CDF>)>,
-    deps: BTreeMap<Name, BTreeSet<Name>>,
-    rec: BTreeMap<Name, Option<usize>>,
-    max_size: usize,
-    mode: CompactionMode,
+    pub ctx: BTreeMap<Name, (DeltaQ, Option<Outcome>)>,
+    pub deps: BTreeMap<Name, BTreeSet<Name>>,
+    pub rec: BTreeMap<Name, Option<usize>>,
+    pub max_size: usize,
+    pub mode: CompactionMode,
+    pub load_factor: f32,
 }
 
 impl FromStr for EvaluationContext {
@@ -62,6 +63,7 @@ impl Default for EvaluationContext {
             rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: Default::default(),
+            load_factor: 1.0,
         }
     }
 }
@@ -107,7 +109,7 @@ impl EvaluationContext {
         self.ctx.get(name).map(|(dq, _)| dq)
     }
 
-    pub fn eval(&mut self, name: &str) -> Result<CDF, DeltaQError> {
+    pub fn eval(&mut self, name: &str) -> Result<Outcome, DeltaQError> {
         DeltaQ::name(name).eval(self)
     }
 
@@ -131,6 +133,7 @@ impl From<BTreeMap<String, DeltaQ>> for EvaluationContext {
             rec: Default::default(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            load_factor: 1.0,
         }
     }
 }
@@ -147,6 +150,39 @@ impl Display for EvaluationContext {
             writeln!(f, "{} := {}", k, v.0)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LoadUpdate {
+    pub factor: f32,
+    pub summand: f32,
+}
+
+impl LoadUpdate {
+    pub fn new(factor: f32, summand: f32) -> Self {
+        Self { factor, summand }
+    }
+}
+
+impl Display for LoadUpdate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.factor != 1.0 {
+            write!(f, "×{}", self.factor)?;
+        }
+        if self.summand != 0.0 {
+            write!(f, "+{}", self.summand)?;
+        }
+        Ok(())
+    }
+}
+
+impl Default for LoadUpdate {
+    fn default() -> Self {
+        Self {
+            factor: 1.0,
+            summand: 0.0,
+        }
     }
 }
 
@@ -167,10 +203,11 @@ pub enum DeltaQ {
     /// A named DeltaQ taken from the context, with an optional recursion allowance.
     Name(Name, Option<usize>),
     /// A CDF that is used as a DeltaQ.
-    CDF(CDF),
+    Outcome(Outcome),
     /// The convolution of two DeltaQs, describing the sequential execution of two outcomes.
     Seq(
         #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        LoadUpdate,
         #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
     ),
     /// A choice between two DeltaQs (i.e. their outcomes), with a given weight of each.
@@ -241,12 +278,12 @@ impl DeltaQ {
 
     /// Create a new DeltaQ from a CDF.
     pub fn cdf(cdf: CDF) -> DeltaQ {
-        DeltaQ::CDF(cdf)
+        DeltaQ::Outcome(Outcome::new(cdf))
     }
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
     pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::Seq(Arc::new(first), Arc::new(second))
+        DeltaQ::Seq(Arc::new(first), LoadUpdate::default(), Arc::new(second))
     }
 
     /// Create a new DeltaQ from a choice between two DeltaQs.
@@ -277,8 +314,8 @@ impl DeltaQ {
                 deps.insert(name.clone());
                 deps
             }
-            DeltaQ::CDF(_) => BTreeSet::new(),
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::Outcome { .. } => BTreeSet::new(),
+            DeltaQ::Seq(first, _load, second) => {
                 let mut deps = first.deps();
                 deps.extend(second.deps());
                 deps
@@ -313,16 +350,16 @@ impl DeltaQ {
                     write!(f, "{}", name)
                 }
             }
-            DeltaQ::CDF(cdf) => {
-                write!(f, "{}", cdf)
+            DeltaQ::Outcome(outcome) => {
+                write!(f, "{}", outcome)
             }
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::Seq(first, load, second) => {
                 if parens {
                     write!(f, "(")?;
                 }
                 first.display(f, true)?;
-                write!(f, " ->- ")?;
-                second.display(f, true)?;
+                write!(f, " ->-{load} ")?;
+                second.display(f, !matches!(**second, DeltaQ::Seq { .. }))?;
                 if parens {
                     write!(f, ")")?;
                 }
@@ -332,24 +369,27 @@ impl DeltaQ {
                 if parens {
                     write!(f, "(")?;
                 }
-                first.display(f, true)?;
+                first.display(f, !matches!(**first, DeltaQ::Seq { .. }))?;
                 write!(f, " {}<>{} ", first_weight, second_weight)?;
-                second.display(f, true)?;
+                second.display(
+                    f,
+                    !matches!(**second, DeltaQ::Seq { .. } | DeltaQ::Choice { .. }),
+                )?;
                 if parens {
                     write!(f, ")")?;
                 }
                 Ok(())
             }
             DeltaQ::ForAll(first, second) => {
-                write!(f, "all({} | {})", first, second)
+                write!(f, "∀({} | {})", first, second)
             }
             DeltaQ::ForSome(first, second) => {
-                write!(f, "some({} | {})", first, second)
+                write!(f, "∃({} | {})", first, second)
             }
         }
     }
 
-    pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<CDF, DeltaQError> {
+    pub fn eval(&self, ctx: &mut EvaluationContext) -> Result<Outcome, DeltaQError> {
         match self {
             DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
             DeltaQ::Name(n, r) => {
@@ -374,7 +414,10 @@ impl DeltaQ {
                             let mut increment = true;
                             let ret = if *allowance == 0 {
                                 increment = false;
-                                Ok(CDF::step(&[(0.0, 1.0)]).unwrap())
+                                Ok(Outcome {
+                                    cdf: CDF::from_steps(&[(0.0, 1.0)]).unwrap(),
+                                    load: BTreeMap::new(),
+                                })
                             } else {
                                 *allowance -= 1;
                                 dq.clone().eval(ctx)
@@ -392,25 +435,31 @@ impl DeltaQ {
                     Err(DeltaQError::RecursionError(n.to_owned()))
                 } else {
                     match ctx.ctx.get(n) {
-                        Some((_, Some(cdf))) => Ok(cdf.clone()),
-                        Some((dq, None)) => {
+                        Some((_, Some(cdf))) if ctx.load_factor == 1.0 => Ok(cdf.clone()),
+                        Some((dq, _)) => {
                             ctx.rec.insert(n.to_owned(), None);
                             let cdf = dq.clone().eval(ctx);
                             ctx.rec.remove(n);
                             let cdf = cdf?;
-                            ctx.ctx.get_mut(n).unwrap().1 = Some(cdf.clone());
+                            if ctx.load_factor == 1.0 {
+                                ctx.ctx.get_mut(n).unwrap().1 = Some(cdf.clone());
+                            }
                             Ok(cdf)
                         }
                         None => Err(DeltaQError::NameError(n.to_owned())),
                     }
                 }
             }
-            DeltaQ::CDF(cdf) => Ok(cdf.clone().with_max_size(ctx.max_size).with_mode(ctx.mode)),
-            DeltaQ::Seq(first, second) => {
+            DeltaQ::Outcome(outcome) => Ok(outcome.mult(ctx.load_factor, ctx)),
+            DeltaQ::Seq(first, load, second) => {
                 let first_cdf = first.eval(ctx)?;
-                let second_cdf = second.eval(ctx)?;
+                let lf = ctx.load_factor;
+                ctx.load_factor = ctx.load_factor * load.factor + load.summand;
+                let second_cdf = second.eval(ctx);
+                ctx.load_factor = lf;
+                let second_cdf = second_cdf?;
                 first_cdf
-                    .convolve(&second_cdf)
+                    .seq(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::Choice(first, first_fraction, second, second_fraction) => {
@@ -420,6 +469,7 @@ impl DeltaQ {
                     .choice(
                         *first_fraction / (*first_fraction + *second_fraction),
                         &second_cdf,
+                        ctx,
                     )
                     .map_err(DeltaQError::CDFError)
             }
@@ -427,14 +477,14 @@ impl DeltaQ {
                 let first_cdf = first.eval(ctx)?;
                 let second_cdf = second.eval(ctx)?;
                 first_cdf
-                    .for_all(&second_cdf)
+                    .for_all(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
             DeltaQ::ForSome(first, second) => {
                 let first_cdf = first.eval(ctx)?;
                 let second_cdf = second.eval(ctx)?;
                 first_cdf
-                    .for_some(&second_cdf)
+                    .for_some(&second_cdf, ctx)
                     .map_err(DeltaQError::CDFError)
             }
         }
@@ -444,8 +494,12 @@ impl DeltaQ {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::eval_ctx;
+    use crate::{
+        parser::{eval_ctx, outcome},
+        StepFunction,
+    };
     use maplit::btreemap;
+    use winnow::Parser;
 
     #[test]
     fn test_display_name() {
@@ -485,8 +539,8 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let for_all = DeltaQ::for_all(dq1, dq2);
-        assert_eq!(for_all.to_string(), "all(A | B)");
-        assert_eq!(for_all, "all(A | B)".parse().unwrap());
+        assert_eq!(for_all.to_string(), "∀(A | B)");
+        assert_eq!(for_all, "∀(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -494,8 +548,8 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let for_some = DeltaQ::for_some(dq1, dq2);
-        assert_eq!(for_some.to_string(), "some(A | B)");
-        assert_eq!(for_some, "some(A | B)".parse().unwrap());
+        assert_eq!(for_some.to_string(), "∃(A | B)");
+        assert_eq!(for_some, "∃(A | B)".parse().unwrap());
     }
 
     #[test]
@@ -503,9 +557,9 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
-        let nested_seq = DeltaQ::seq(DeltaQ::seq(dq1, dq2), dq3);
-        assert_eq!(nested_seq.to_string(), "(A ->- B) ->- C");
-        assert_eq!(nested_seq, "(A ->- B) ->- C".parse().unwrap());
+        let nested_seq = DeltaQ::seq(dq1, DeltaQ::seq(dq2, dq3));
+        assert_eq!(nested_seq.to_string(), "A ->- B ->- C");
+        assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
         assert_eq!(nested_seq, "A ->- B ->- C".parse().unwrap());
     }
 
@@ -515,7 +569,7 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
         let nested_choice = DeltaQ::choice(dq1, 0.3, DeltaQ::choice(dq2, 0.5, dq3, 0.5), 0.7);
-        assert_eq!(nested_choice.to_string(), "A 0.3<>0.7 (B 0.5<>0.5 C)");
+        assert_eq!(nested_choice.to_string(), "A 0.3<>0.7 B 0.5<>0.5 C");
         assert_eq!(nested_choice, "A 0.3<>0.7 (B 0.5<>0.5 C)".parse().unwrap());
         assert_eq!(nested_choice, "A 0.3<>0.7 B 0.5<>0.5 C".parse().unwrap());
     }
@@ -527,8 +581,8 @@ mod tests {
         let dq3 = DeltaQ::name("C");
         let dq4 = DeltaQ::name("D");
         let nested_for_all = DeltaQ::for_all(DeltaQ::for_all(dq1, dq2), DeltaQ::seq(dq3, dq4));
-        assert_eq!(nested_for_all.to_string(), "all(all(A | B) | C ->- D)");
-        assert_eq!(nested_for_all, "all(all(A | B) | C ->- D)".parse().unwrap());
+        assert_eq!(nested_for_all.to_string(), "∀(∀(A | B) | C ->- D)");
+        assert_eq!(nested_for_all, "∀(∀(A | B) | C ->- D)".parse().unwrap());
     }
 
     #[test]
@@ -541,18 +595,15 @@ mod tests {
             DeltaQ::for_some(dq1, dq2),
             DeltaQ::choice(dq3, 1.0, dq4, 2.0),
         );
-        assert_eq!(nested_for_some.to_string(), "some(some(A | B) | C 1<>2 D)");
-        assert_eq!(
-            nested_for_some,
-            "some(some(A | B) | C 1<>2 D)".parse().unwrap()
-        );
+        assert_eq!(nested_for_some.to_string(), "∃(∃(A | B) | C 1<>2 D)");
+        assert_eq!(nested_for_some, "∃(∃(A | B) | C 1<>2 D)".parse().unwrap());
     }
 
     #[test]
     fn test_scenario_from_paper_64k() {
         let ctx = btreemap! {
             "single".to_owned() =>
-                DeltaQ::cdf(CDF::step(
+                DeltaQ::cdf(CDF::from_steps(
                     &[(0.024, 1.0 / 3.0), (0.143, 2.0 / 3.0), (0.531, 1.0)],
                 )
                 .unwrap()),
@@ -608,17 +659,45 @@ mod tests {
     #[test]
     fn parse_cdf() {
         let res = "CDF[(2, 0.2), (2, 0.9)]".parse::<DeltaQ>().unwrap_err();
-        assert!(res.contains("must contain monotonic"), "{}", res);
+        assert!(res.contains("non-monotonic"), "{}", res);
 
         let res = "CDF[(2a, 0.2), (2, 0.9)]".parse::<DeltaQ>().unwrap_err();
-        assert!(res.contains("expected CDF[("), "{}", res);
+        assert!(res.contains("CDF"), "{}", res);
 
         let res = "+a".parse::<DeltaQ>().unwrap_err();
         assert!(
-            res.contains("expected 'BB', name, CDF, 'all(', 'some(', or a parentheses"),
+            res.contains("expected 'BB', name, CDF, 'all(', 'some(', or parentheses"),
             "{}",
             res
         );
+    }
+
+    #[test]
+    fn parse_outcome() {
+        let expected = Outcome::new(CDF::from_steps(&[(1.0, 0.1), (2.0, 0.3)]).unwrap()).with_load(
+            "metric".into(),
+            StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
+        );
+        assert_eq!(
+            DeltaQ::Outcome(expected),
+            "CDF[(1, 0.1), (2, 0.3)] WITH metric[(0, 12), (1.5, 0)]"
+                .parse::<DeltaQ>()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_load_update() {
+        let res = "BB ->-*3+4 BB".parse::<DeltaQ>().unwrap();
+        assert_eq!(
+            res,
+            DeltaQ::Seq(
+                Arc::new(DeltaQ::BlackBox),
+                LoadUpdate::new(3.0, 4.0),
+                Arc::new(DeltaQ::BlackBox)
+            )
+        );
+        assert_eq!(res.to_string(), "BB ->-×3+4 BB");
     }
 
     #[test]
@@ -627,12 +706,15 @@ mod tests {
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f ->- f".parse().unwrap());
         let res = DeltaQ::Name("f".into(), Some(3)).eval(&mut ctx).unwrap();
-        assert_eq!(res, "CDF[(7,1)]".parse::<CDF>().unwrap());
+        assert_eq!(DeltaQ::Outcome(res), outcome.parse("CDF[(7,1)]").unwrap());
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {
             let res = DeltaQ::Name("f".into(), Some(i)).eval(&mut ctx).unwrap();
-            assert_eq!(res, CDF::step(&[(i as f32, 1.0)]).unwrap());
+            assert_eq!(
+                DeltaQ::Outcome(res),
+                outcome.parse(&format!("CDF[({i},1)]")).unwrap()
+            );
         }
 
         ctx.put(
@@ -647,8 +729,8 @@ mod tests {
         );
         let res = DeltaQ::Name("out".into(), Some(1)).eval(&mut ctx).unwrap();
         assert_eq!(
-            res,
-            CDF::step(&[
+            res.cdf,
+            CDF::from_steps(&[
                 (0.2, 0.046360295),
                 (0.3, 0.20068718),
                 (0.4, 0.30865377),
@@ -705,15 +787,16 @@ mod tests {
             ";
         let ctx = eval_ctx(SOURCE).unwrap();
         assert_eq!(ctx.iter().count(), 13);
-        assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))");
+        assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop");
 
         const DEST: &'static str = "\
-            diffuse := hop 0.6<>99.4 ((hop ->- hop) 8.58<>90.82 (((hop ->- hop) ->- hop) 65.86<>24.96 (((hop ->- hop) ->- hop) ->- hop)))\n\
-            diffuseEB := hopEB 0.6<>99.4 ((hopEB ->- hopEB) 8.58<>90.82 (((hopEB ->- hopEB) ->- hopEB) 65.86<>24.96 (((hopEB ->- hopEB) ->- hopEB) ->- hopEB)))\nfar := CDF[(0.268, 1)]\n\
+            diffuse := hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop\n\
+            diffuseEB := hopEB 0.6<>99.4 hopEB ->- hopEB 8.58<>90.82 (hopEB ->- hopEB) ->- hopEB 65.86<>24.96 ((hopEB ->- hopEB) ->- hopEB) ->- hopEB\n\
+            far := CDF[(0.268, 1)]\n\
             farL := CDF[(0.531, 1)]\n\
             farXL := CDF[(1.598, 1)]\n\
-            hop := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))\n\
-            hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))\n\
+            hop := ((near ->- near) ->- near) ->- nearXL 1<>2 ((mid ->- mid) ->- mid) ->- midXL 1<>1 ((far ->- far) ->- far) ->- farXL\n\
+            hopEB := ((near ->- near) ->- near) ->- nearL 1<>2 ((mid ->- mid) ->- mid) ->- midL 1<>1 ((far ->- far) ->- far) ->- farL\n\
             mid := CDF[(0.069, 1)]\n\
             midL := CDF[(0.143, 1)]\n\
             midXL := CDF[(0.404, 1)]\n\
@@ -721,5 +804,77 @@ mod tests {
             nearL := CDF[(0.024, 1)]\n\
             nearXL := CDF[(0.078, 1)]\n";
         assert_eq!(ctx.to_string(), DEST);
+    }
+
+    #[test]
+    fn test_load_update() {
+        let outcome = Outcome::new(CDF::from_steps(&[(1.5, 0.1)]).unwrap()).with_load(
+            "net".into(),
+            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
+        );
+        let dq = DeltaQ::Seq(
+            Arc::new(DeltaQ::Outcome(outcome.clone())),
+            LoadUpdate::new(2.0, 0.0),
+            Arc::new(DeltaQ::Outcome(outcome)),
+        );
+        assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×2 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
+        let mut ctx = EvaluationContext::default();
+        let res = dq.eval(&mut ctx).unwrap();
+        let expected = Outcome::new(CDF::from_steps(&[(3.0, 0.010000001)]).unwrap()).with_load(
+            "net".into(),
+            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
+        );
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn distributive_choice() {
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
+
+            e1 := a ->- b 1<>2 a ->- c
+            e2 := a ->- (b 1<>2 c)
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
+
+            e1 := a ->-×3 b 1<>2 a ->-×3 c
+            e2 := a ->-×3 (b 1<>2 c)
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+    }
+
+    #[test]
+    fn test_load_factor() {
+        let mut ctx = eval_ctx("\
+            a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+            b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            
+            e1 := a ->-×2 a ->-×3+1 b
+            e2 := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+                ->-×2 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+                ->-×3+1 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+            ").unwrap();
+        let e1 = DeltaQ::name("e1").eval(&mut ctx).unwrap();
+        assert_eq!(ctx.load_factor, 1.0);
+        let e2 = DeltaQ::name("e2").eval(&mut ctx).unwrap();
+        assert_eq!(ctx.load_factor, 1.0);
+        assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
+        assert_eq!(e1.to_string(), "\
+            CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \
+            WITH a[(0, 1), (1, 0.8), (2, 1.2), (3, 0)] \
+            WITH ab[(0, 12), (1, 9.6), (2, 22.24), (3, 31.36), (4, 41.16), (5, 17.64), (6, 0)] \
+            WITH b[(2, 1.12), (3, 4.48), (4, 5.88), (5, 2.52), (6, 0)] \
+            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.712), (2.8, 0.112), (3.2, 0.56), (3.5, 0.336), (4.2, 0.924), (4.5, 0.252), (5.2, 0.504), (5.5, 0)]");
     }
 }

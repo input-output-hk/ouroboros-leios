@@ -5,7 +5,9 @@ macro_rules! cloned {
     }};
 }
 
-use delta_q::{CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvalCtxAction, EvaluationContext};
+use delta_q::{
+    CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EvalCtxAction, EvaluationContext, StepFunction,
+};
 use gloo_utils::window;
 use js_sys::Reflect;
 use std::str::FromStr;
@@ -90,11 +92,8 @@ fn app_main() -> HtmlResult {
                         return;
                     }
                 };
-                let data = js_sys::Object::new();
-                Reflect::set(&data, &"bins".into(), &cdf.iter().map(|x| JsValue::from(x.0)).collect::<js_sys::Array>()).unwrap();
-                Reflect::set(&data, &"values".into(), &cdf.iter().map(|x| JsValue::from(x.1)).collect::<js_sys::Array>()).unwrap();
-                Reflect::set(&data, &"max".into(), &(cdf.width() * 1.2).max(0.1).into()).unwrap();
-                Reflect::set(&data, &"name".into(), &name.into()).unwrap();
+                let data = mk_graph_obj(name, cdf.cdf.steps());
+                Reflect::set(&data, &"loads".into(), &cdf.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
                 let init = MessageEventInit::new();
                 init.set_data(&data);
                 let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).unwrap());
@@ -177,6 +176,31 @@ fn app_main() -> HtmlResult {
         }
     </div>
     })
+}
+
+fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
+    let data = js_sys::Object::new();
+    Reflect::set(
+        &data,
+        &"bins".into(),
+        &steps
+            .graph_iter()
+            .map(|x| JsValue::from(x.0))
+            .collect::<js_sys::Array>(),
+    )
+    .unwrap();
+    Reflect::set(
+        &data,
+        &"values".into(),
+        &steps
+            .graph_iter()
+            .map(|x| JsValue::from(x.1))
+            .collect::<js_sys::Array>(),
+    )
+    .unwrap();
+    Reflect::set(&data, &"max".into(), &(steps.max_x() * 1.2).max(0.1).into()).unwrap();
+    Reflect::set(&data, &"name".into(), &name.into()).unwrap();
+    data
 }
 
 #[derive(Properties, PartialEq, Clone)]
@@ -294,7 +318,10 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{ "DeltaQ Editor" }</h1>
-            <div id="output" style="width: 50%; height: 30%; border: 1px solid black;" />
+            <div style="display: flex; flex-direction: row; height: 30%;">
+                <div id="output" style="width: 50%; height: 100%; border: 1px solid black;" />
+                <div id="loads" style="width: 50%; height: 100%; border: 1px solid black;" />
+            </div>
             <Suspense fallback={waiting}>
                 <OneshotProvider<CalcCdf> path="worker.js">
                     <AppMain />

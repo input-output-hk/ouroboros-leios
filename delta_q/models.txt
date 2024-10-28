@@ -39,7 +39,9 @@ CDF[(1, 1)]
 validateIB:
 CDF[(3, 1)]
 
+=================================================================
 4 -- better modelling of Leios (in format for import into editor)
+=================================================================
 
 -- diffusion of one IB (assuming 1MB)
 diffuseIB := hopIB 0.6<>99.4 ((hopIB ->- hopIB) 8.58<>90.82 (((hopIB ->- hopIB) ->- hopIB) 65.86<>24.96 (((hopIB ->- hopIB) ->- hopIB) ->- hopIB)))
@@ -64,3 +66,25 @@ nearXL := CDF[(0.078, 1)]
 -- a hop (for an IB or EB) is a choice of near/mid/far with req-res-req-resLarge in each arm
 hopIB := (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
 hopEB := (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
+
+=======================================
+5 -- Leios model including network load
+=======================================
+(this isn’t yet a model of the actual Leios, just playing around with the necessary primitives)
+
+TOP := CDF[(0, 1)]
+diffuseEB := TOP ->-×15 hopEB 0.6<>99.4 TOP ->-×15 hopEB ->-×15 hopEB 8.58<>90.82 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB 65.86<>24.96 TOP ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB ->-×15 hopEB
+diffuseIB := TOP ->-×15 hopIB 0.6<>99.4 TOP ->-×15 hopIB ->-×15 hopIB 8.58<>90.82 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB 65.86<>24.96 TOP ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB ->-×15 hopIB
+far := CDF[(0.268, 1)] WITH net[(0, 5597), (0.268, 0)]
+farL := CDF[(0.531, 1)] WITH net[(0, 120527), (0.531, 0)]
+farXL := CDF[(1.598, 1)] WITH net[(0, 625782), (1.598, 0)]
+hopEB := ((near ->- near) ->- near) ->- nearL 1<>2 ((mid ->- mid) ->- mid) ->- midL 1<>1 ((far ->- far) ->- far) ->- farL
+hopIB := ((near ->- near) ->- near) ->- nearXL 1<>2 ((mid ->- mid) ->- mid) ->- midXL 1<>1 ((far ->- far) ->- far) ->- farXL
+mid := CDF[(0.069, 1)] WITH net[(0, 21739), (0.069, 0)]
+midL := CDF[(0.143, 1)] WITH net[(0, 447552), (0.143, 0)]
+midXL := CDF[(0.404, 1)] WITH net[(0, 2475247), (0.404, 0)]
+near := CDF[(0.012, 1)] WITH netNear[(0, 125000), (0.012, 0)]
+nearL := CDF[(0.024, 1)] WITH netNear[(0, 2666667), (0.024, 0)]
+nearXL := CDF[(0.078, 1)] WITH netNear[(0, 12820513), (0.078, 0)]
+round := CDF[(20, 1)]
+someRounds := ∀(round | TOP ->-×5 diffuseIB) ->- ∀(round | TOP ->-×20 diffuseEB)

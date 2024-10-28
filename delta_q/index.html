@@ -18,9 +18,15 @@
         const { data } = event;
         if (data === null || typeof data !== 'object') {
           cleanup('output');
+          const load_container = document.getElementById('loads');
+          while (load_container.firstChild) {
+            load_container.removeChild(load_container.firstChild);
+          }
         } else {
-          const { bins, values, max, name } = data;
+          const { bins, values, max, name, loads } = data;
+
           const hist = core.createHistogram('TH1F', bins.length);
+          window.hist = hist;
           hist.fXaxis.fXbins = bins;
           for (const idx in values) {
             hist.setBinContent(parseInt(idx) + 1, values[idx]);
@@ -32,6 +38,39 @@
           hist.fYaxis.fTitle = 'cumulative distribution';
           cleanup('output');
           draw.draw('output', hist, 'nostat minimum:0 maximum:1.1');
+
+          const load_container = document.getElementById('loads');
+          while (load_container.firstChild) {
+            load_container.removeChild(load_container.firstChild);
+          }
+          for (const idx in loads || []) {
+            const id = 'loads' + idx;
+            const pad = load_container.appendChild(document.createElement('div'));
+            pad.id = id;
+            pad.setAttribute('style', `width: 100%; height: ${100 / loads.length}%;`);
+          }
+
+          let canvas = 0;
+          for (const { bins, values, name } of loads || []) {
+            const load_hist = core.createHistogram('TH1F', bins.length);
+            load_hist.fXaxis.fXbins = bins;
+            for (const idx in values) {
+              load_hist.setBinContent(parseInt(idx) + 1, values[idx]);
+            }
+            load_hist.fXaxis.fXmin = 0;
+            load_hist.fXaxis.fXmax = max;
+            // ROOT scales the labels as a fraction of the canvas height → counter that effect
+            load_hist.fXaxis.fLabelSize *= loads.length;
+            load_hist.fXaxis.fLabelOffset *= loads.length;
+            load_hist.fYaxis.fLabelSize *= loads.length;
+            load_hist.fYaxis.fLabelOffset *= loads.length;
+            load_hist.fTitle = name;
+            const pad = 'loads' + canvas;
+            window[pad] = load_hist;
+            cleanup(pad);
+            draw.draw(pad, load_hist, 'nostat');
+            canvas++;
+          }
         }
       });
     </script>

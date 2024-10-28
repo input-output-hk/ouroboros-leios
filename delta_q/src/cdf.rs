@@ -1,5 +1,5 @@
 use crate::{step_function::PairIterators, CompactionMode, StepFunction, StepFunctionError};
-use iter_tools::Itertools;
+use itertools::Itertools;
 use std::{fmt, str::FromStr};
 
 #[derive(Debug, PartialEq)]
@@ -59,7 +59,7 @@ impl FromStr for CDF {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let steps = s.trim_start_matches("CDF").parse()?;
-        Self::from_steps(steps)
+        Self::from_step_function(steps)
     }
 }
 
@@ -91,8 +91,28 @@ impl CDF {
         })
     }
 
-    pub fn step(data: &[(f32, f32)]) -> Result<Self, CDFError> {
-        Self::from_steps(StepFunction::new(data)?)
+    /// Create a CDF from a step function.
+    ///
+    /// This validates that the y-values are in the range (0, 1] and are strictly monotonically increasing.
+    pub fn from_step_function(steps: StepFunction) -> Result<Self, CDFError> {
+        if !steps.iter().all(|(_x, y)| y > 0.0 && y <= 1.0) {
+            return Err(CDFError::InvalidDataRange);
+        }
+        if !steps
+            .iter()
+            .tuple_windows::<(_, _)>()
+            .all(|(a, b)| a.1 < b.1)
+        {
+            return Err(CDFError::NonMonotonicData);
+        }
+        Ok(Self { steps })
+    }
+
+    /// Create a step function CDF from a vector of (x, y) pairs.
+    /// The x values must be greater than 0 and must be strictly monotonically increasing.
+    /// The y values must be from (0, 1] and must be strictly monotonically increasing.
+    pub fn from_steps(data: &[(f32, f32)]) -> Result<Self, CDFError> {
+        Self::from_step_function(StepFunction::new(data)?)
     }
 
     /// Set the maximum size of the CDF using a mutable reference.
@@ -121,26 +141,17 @@ impl CDF {
         self.steps.iter()
     }
 
+    pub fn graph_iter(&self) -> impl Iterator<Item = (f32, f32)> + '_ {
+        self.steps.graph_iter()
+    }
+
     /// Get the width of the CDF.
     pub fn width(&self) -> f32 {
         self.steps.max_x()
     }
 
-    /// Create a step function CDF from a vector of (x, y) pairs.
-    /// The x values must be greater than 0 and must be strictly monotonically increasing.
-    /// The y values must be from (0, 1] and must be strictly monotonically increasing.
-    pub fn from_steps(steps: StepFunction) -> Result<Self, CDFError> {
-        if !steps.iter().all(|(_x, y)| y <= 1.0) {
-            return Err(CDFError::InvalidDataRange);
-        }
-        if !steps
-            .iter()
-            .tuple_windows::<(_, _)>()
-            .all(|(a, b)| a.1 < b.1)
-        {
-            return Err(CDFError::NonMonotonicData);
-        }
-        Ok(Self { steps })
+    pub fn steps(&self) -> &StepFunction {
+        &self.steps
     }
 
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for
@@ -188,6 +199,17 @@ impl CDF {
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
     /// two CDFs. This describes the distribution of the sum of two independent random variables.
     pub fn convolve(&self, other: &CDF) -> Result<CDF, CDFError> {
+        let steps = self.convolve_step(&other.steps, 1.0)?;
+        Ok(CDF { steps })
+    }
+
+    /// Convolve a CDF with a step function, which means smearing out the step function by the
+    /// gradual completion of the CDF.
+    pub fn convolve_step(
+        &self,
+        other: &StepFunction,
+        max: f32,
+    ) -> Result<StepFunction, StepFunctionError> {
         // start with the all-zero CDF
         let mut data = Vec::new();
         let mut prev_y = 0.0;
@@ -197,16 +219,16 @@ impl CDF {
             let mut d = Vec::new();
             let iter = PairIterators::new(
                 data.iter().copied(),
-                other.steps.iter().map(|(x, y)| (x + lx, y * step)),
+                other.iter().map(|(x, y)| (x + lx, y * step)),
             );
             for (x, (ly, ry)) in iter {
-                d.push((x, (ly + ry).min(1.0)));
+                d.push((x, (ly + ry).min(max)));
             }
             data = d;
             prev_y = ly;
         }
         let steps = self.steps.compact(data)?;
-        Ok(CDF { steps })
+        Ok(steps)
     }
 }
 

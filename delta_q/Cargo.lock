@@ -78,12 +78,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "clone_dyn_types"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4f0e34968641cc21b39c159b7d07e8c0f573cbc0ef9cd59e452fe6774c0579"
-
-[[package]]
 name = "console_error_panic_hook"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,7 +92,7 @@ name = "delta_q"
 version = "0.1.0"
 dependencies = [
  "gloo-utils 0.2.0",
- "iter_tools",
+ "itertools",
  "js-sys",
  "maplit",
  "serde",
@@ -709,20 +703,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "iter_tools"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27812bb0a056539d62930a899759af39dfab17ac73a17d5caf58365762657891"
-dependencies = [
- "clone_dyn_types",
- "itertools",
-]
-
-[[package]]
 name = "itertools"
-version = "0.11.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
