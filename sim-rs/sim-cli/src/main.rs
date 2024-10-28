@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     let config = read_config(&args)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
-    let monitor = EventMonitor::new(&config, events_source, args.output).run();
+    let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
     let clock = Clock::new(Instant::now(), config.timescale);
@@ -83,11 +83,11 @@ async fn main() -> Result<()> {
 
     select! {
         result = simulation.run() => { result? }
-        result = &mut monitor => { result? }
+        result = &mut monitor => { result?? }
         _ = ctrlc_source => {}
     };
 
     simulation.shutdown()?;
-    monitor.await?;
+    monitor.await??;
     Ok(())
 }
