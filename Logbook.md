@@ -1,5 +1,41 @@
 # Leios logbook
 
+## 2024-10-29
+
+### Team Meeting
+
+Agenda:
+
+* Introduce William Wolff
+* Short demo by Roland on newest ΔQ stuff
+* Ledger preliminary design from giorgos
+
+* Presentation by Roland of ΔQ modelling
+  * comparing with Simon's Rust simulation, even if it does not simulate fully Leios
+  * model the same things, ΔQ provide a high level comparable to Rust's simulation
+  * Articulate how what ΔQ tool coordinates
+* Ledger design presentation by Giorgos
+  * how to avoid duplicates? => sharding, assign each tx and IB to shards => ensure tx are included in a single block
+  * naive approach: use modulus, easy attack = add a nonce to a tx to be able to include it multiple IBs
+  * => all txs are double spending, but fees get only paid once
+* proposal:
+  * fees paying token / shard, can freely be converted w/ ADA
+  * IB of shard i should not have tx consuming token of shard j
+  * fees of IB i are paid with token shard i
+  * ensure IB from different shards will never consume token from other shards
+  * *important* : fees are always paid, even if tx is not included in the ledger
+  * Q: what about multiple tokens per UTxO?
+  * grinding with people trying to overload one shard?
+  * # shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
+* challenges:
+  * a tx could be discarded but its fees would still be paid
+  * pb in the case of apps which use "concurrent" state machine advance pattern -> perhaps this should not be free in the first place?
+* assign shards in a "random" way, tune shards in such a way that transmission time makes the probability of the shards to overlap very low
+  * needs to be grinding resistant
+  * if shards are concurrent only x% of the time that may be acceptable
+* multiple shard types on a single block to have more control over parallelism?
+  * use VRF to generate a random sequence of "colors" to include in a block, attach colors to txs
+
 
 ## 2024-10-25
 
