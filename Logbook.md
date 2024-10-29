@@ -36,6 +36,15 @@ Agenda:
 * multiple shard types on a single block to have more control over parallelism?
   * use VRF to generate a random sequence of "colors" to include in a block, attach colors to txs
 
+### Rust simulation
+
+Rewrote the simulation to use separate tokio tasks for each node, multithreading as much as possible. It can simulate 85tps in almost realtime, but the slowdown makes its results inaccurate (a smaller percentage of IBs propagated across the network compared to the non-netsim branch).
+
+## 2024-10-28
+
+### Rust simulation
+
+In a branch (`non-netsim`), replaced the netsim library with a priority queue to see how fast the simulation's current architecture could run. It was able to simulate 85tps in realtime, but 850tps was too slow to be usable.
 
 ## 2024-10-25
 
