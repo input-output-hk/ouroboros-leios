@@ -13,6 +13,7 @@ use tokio::{
     pin, select,
     sync::{mpsc, oneshot},
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{level_filters::LevelFilter, warn};
 use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, EnvFilter};
 
@@ -58,10 +59,14 @@ async fn main() -> Result<()> {
         .with(filter)
         .init();
 
+    let token = CancellationToken::new();
+
     // Handle ctrl+c (SIGINT) at an application level, so we can report on necessary stats before shutting down.
     let (ctrlc_sink, ctrlc_source) = oneshot::channel();
     let mut ctrlc_sink = Some(ctrlc_sink);
+    let ctrlc_token = token.clone();
     ctrlc::set_handler(move || {
+        ctrlc_token.cancel();
         if let Some(sink) = ctrlc_sink.take() {
             let _ = sink.send(());
         } else {
@@ -82,7 +87,7 @@ async fn main() -> Result<()> {
     let mut simulation = Simulation::new(config, tracker, clock)?;
 
     select! {
-        result = simulation.run() => { result? }
+        result = simulation.run(token) => { result? }
         result = &mut monitor => { result?? }
         _ = ctrlc_source => {}
     };

@@ -12,6 +12,7 @@ use tokio::{
     sync::{mpsc, watch},
     task::JoinSet,
 };
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 use crate::{
@@ -97,7 +98,7 @@ impl Simulation {
     }
 
     // Run the simulation indefinitely.
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self, token: CancellationToken) -> Result<()> {
         let mut set = JoinSet::new();
         let mut nodes = vec![];
         nodes.append(&mut self.nodes);
@@ -120,6 +121,8 @@ impl Simulation {
         };
 
         select! {
+            biased;
+            _ = token.cancelled() => {}
             _ = handle_events => {}
             results = set.join_all() => {
                 for res in results {
