@@ -11,7 +11,7 @@ import Control.Monad.Class.MonadAsync (
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer,
+  Tracer (Tracer),
   traceWith,
  )
 import Data.Foldable (sequenceA_)

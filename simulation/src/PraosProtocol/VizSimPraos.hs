@@ -111,7 +111,7 @@ data PraosSimVizState
   , vizMsgsAtNodeTotalBuffer :: !(Map NodeId Int)
   , -- these are `Block`s generated (globally).
     vizNumMsgsGenerated :: !Int
-  , vizMsgsDiffusionLatency :: !(Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time]))
+  , vizMsgsDiffusionLatency :: !DiffusionLatencyMap
   }
 
 -- | The end points where the each link, including the case where the link
@@ -132,6 +132,27 @@ data LinkPoints
       {-# UNPACK #-} !Point
       {-# UNPACK #-} !Point
   deriving (Show)
+
+type DiffusionLatencyMap = Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time])
+
+accumDiffusionLatency :: Time -> PraosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency now (PraosEventNode e) = accumDiffusionLatency' now e
+accumDiffusionLatency _ _ = id
+accumDiffusionLatency' :: Time -> LabelNode PraosNodeEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency' now (LabelNode nid (PraosNodeEventGenerate blk)) vs =
+  assert (not (blockHash blk `Map.member` vs)) $
+    Map.insert
+      (blockHash blk)
+      (blockHeader blk, nid, now, [now])
+      vs
+accumDiffusionLatency' now (LabelNode _nid (PraosNodeEventEnterState blk)) vs =
+  Map.adjust
+    ( \(hdr, nid', created, arrivals) ->
+        (hdr, nid', created, now : arrivals)
+    )
+    (blockHash blk)
+    vs
+accumDiffusionLatency' _ _ vs = vs
 
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.

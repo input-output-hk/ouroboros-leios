@@ -1,30 +1,39 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 module PraosProtocol.ExamplesPraosP2P where
 
+import Data.Aeson
 import qualified Data.ByteString.Char8 as BS8
 import Data.Functor.Contravariant (Contravariant (contramap))
-import System.Random (mkStdGen)
+import qualified Data.Map.Strict as Map
+import System.Random (StdGen, mkStdGen)
 
 import ChanDriver
+import Data.Coerce (coerce)
+import Data.List (foldl')
+import GHC.Generics
 import Network.TypedProtocol
-import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
 import PraosProtocol.Common
 import PraosProtocol.Common.Chain (Chain (Genesis))
 import PraosProtocol.PraosNode
+import PraosProtocol.SimPraos
 import PraosProtocol.SimPraosP2P
-import PraosProtocol.VizSimPraos (PraosVizConfig (..), examplesPraosSimVizConfig, praosSimVizModel)
+import PraosProtocol.VizSimPraos (DiffusionLatencyMap, PraosVizConfig (..), accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
 import Viz
+import VizSim (SimVizModel (SimVizModel))
 
 example1 :: Vizualisation
 example1 =
-  -- slowmoVizualisation 0.1 $
   Viz model $
     LayoutAbove
       [ layoutLabelTime
@@ -55,36 +64,8 @@ example1 =
           ]
       ]
  where
-  model = praosSimVizModel trace
-   where
-    trace =
-      tracePraosP2P
-        rng0
-        p2pTopography
-        (\latency -> mkTcpConnProps latency (kilobytes 1000))
-        ( \slotConfig nid rng ->
-            PraosNodeConfig
-              { blockGeneration =
-                  PoissonGenerationPattern
-                    (kilobytes 96)
-                    rng
-                    -- average seconds between blocks:
-                    (5 * fromIntegral p2pNumNodes)
-              , praosConfig =
-                  PraosConfig
-                    { slotConfig
-                    , blockValidationDelay = const 0.1 -- 100ms
-                    }
-              , blockMarker = BS8.pack $ show nid ++ ": "
-              , chain = Genesis
-              }
-        )
-
-  p2pTopography =
-    genArbitraryP2PTopography p2pTopographyCharacteristics rng0
-
-  rng0 = mkStdGen 4 -- TODO: make a param
-  p2pNumNodes = 100
+  model = praosSimVizModel $ example1Trace rng0 p2pTopography
+  p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng0
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
       { p2pWorldShape =
@@ -92,10 +73,119 @@ example1 =
             { worldDimensions = (0.600, 0.300)
             , worldIsCylinder = True
             }
-      , p2pNumNodes
+      , p2pNumNodes = 100
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5
       }
+  rng0 = mkStdGen 4 -- TODO make a param.
+
+data DiffusionEntry = DiffusionEntry
+  { hash :: Int
+  , node_id :: Int
+  , created :: DiffTime
+  , arrivals :: [DiffTime]
+  }
+  deriving (Generic, ToJSON)
+
+data DiffusionData = DiffusionData
+  { topography :: String
+  , entries :: [DiffusionEntry]
+  }
+  deriving (Generic, ToJSON)
+
+diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyMap
+diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty accumDiffusionLatency render
+ where
+  render result = do
+    encodeFile fp $
+      DiffusionData
+        { topography = show p2pTopographyCharacteristics
+        , entries =
+            [ DiffusionEntry
+              { hash = coerce hash'
+              , node_id = coerce i
+              , created = coerce t
+              , arrivals = coerce ts
+              }
+            | (hash', (_, i, t, ts)) <- Map.toList result
+            ]
+        }
+
+-- | Diffusion example with 1000 nodes.
+example1000Diffusion ::
+  -- | number of links (used both for close and random)
+  Int ->
+  -- | when to stop simulation.
+  Time ->
+  -- | file to write data to.
+  FilePath ->
+  IO ()
+example1000Diffusion nlinks stop fp =
+  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics fp) stop $
+    example1Trace rng p2pTopography
+ where
+  rng = mkStdGen 42
+  p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
+  p2pTopographyCharacteristics =
+    P2PTopographyCharacteristics
+      { p2pWorldShape =
+          WorldShape
+            { worldDimensions = (0.600, 0.300)
+            , worldIsCylinder = True
+            }
+      , p2pNumNodes = 1000
+      , p2pNodeLinksClose = nlinks
+      , p2pNodeLinksRandom = nlinks
+      }
+
+data SampleModel event state = SampleModel
+  { initState :: state
+  , accumState :: Time -> event -> state -> state
+  , renderState :: state -> IO ()
+  }
+
+runSampleModel ::
+  SampleModel event state ->
+  Time ->
+  [(Time, event)] ->
+  IO ()
+runSampleModel (SampleModel s0 accum render) stop = go . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
+ where
+  go m = case stepSimViz 1000 m of
+    m'@(SimVizModel ((now, _) : _) _) -> do
+      putStrLn $ "time reached: " ++ show now
+      go m'
+    (SimVizModel [] s) -> do
+      putStrLn $ "done."
+      render s
+  stepSimViz n (SimVizModel es s) = case splitAt n es of
+    (before, after) -> SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
+
+example1Trace :: StdGen -> P2P.P2PTopography -> PraosTrace
+example1Trace rng0 p2pTopography =
+  tracePraosP2P
+    rng0
+    p2pTopography
+    (\latency -> mkTcpConnProps latency (kilobytes 1000))
+    ( \slotConfig nid rng ->
+        PraosNodeConfig
+          { blockGeneration =
+              PoissonGenerationPattern
+                (kilobytes 96)
+                rng
+                -- average seconds between blocks:
+                (5 * fromIntegral p2pNumNodes)
+          , praosConfig =
+              PraosConfig
+                { slotConfig
+                , blockValidationDelay = const 0.1 -- 100ms
+                }
+          , blockMarker = BS8.pack $ show nid ++ ": "
+          , chain = Genesis
+          }
+    )
+ where
+  p2pNumNodes = Map.size $ p2pNodes p2pTopography
 
 example2 :: Vizualisation
 example2 =
