@@ -29,6 +29,7 @@ import PraosProtocol.VizSimPraos (DiffusionLatencyMap, PraosVizConfig (..), accu
 import PraosProtocol.VizSimPraosP2P
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
+import System.IO
 import Viz
 import VizSim (SimVizModel (SimVizModel))
 
@@ -154,6 +155,7 @@ runSampleModel (SampleModel s0 accum render) stop = go . flip SimVizModel s0 . t
   go m = case stepSimViz 1000 m of
     m'@(SimVizModel ((now, _) : _) _) -> do
       putStrLn $ "time reached: " ++ show now
+      hFlush stdout
       go m'
     (SimVizModel [] s) -> do
       putStrLn $ "done."
