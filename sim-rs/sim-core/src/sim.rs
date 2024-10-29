@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use event_queue::EventQueue;
-use netsim_async::{EdgePolicy, HasBytesSize, Latency};
+use netsim_async::{Bandwidth, EdgePolicy, HasBytesSize, Latency};
 use node::Node;
 use rand::{Rng as _, RngCore};
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
@@ -73,6 +73,8 @@ impl Simulation {
                 link_config.nodes.1,
                 EdgePolicy {
                     latency: Latency::new(link_config.latency),
+                    bandwidth_down: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
+                    bandwidth_up: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
                     ..EdgePolicy::default()
                 },
             )?;
