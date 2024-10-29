@@ -5,7 +5,7 @@ use serde::Serialize;
 
 macro_rules! id_wrapper {
     ($outer:ident, $inner:ty) => {
-        #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
         pub struct $outer($inner);
         impl Display for $outer {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,7 +25,7 @@ macro_rules! id_wrapper {
 pub struct Block {
     pub slot: u64,
     pub producer: NodeId,
-    pub conflicts: Vec<NodeId>,
+    pub vrf: u64,
     pub transactions: Vec<Arc<Transaction>>,
 }
 

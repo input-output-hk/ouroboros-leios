@@ -55,13 +55,13 @@ impl EventMonitor {
     pub async fn run(mut self) -> Result<()> {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
+        let mut blocks: BTreeMap<u64, (NodeId, u64)> = BTreeMap::new();
         let mut txs: BTreeMap<TransactionId, Transaction> = BTreeMap::new();
         let mut pending_txs: BTreeSet<TransactionId> = BTreeSet::new();
         let mut seen_ibs: BTreeMap<NodeId, f64> = BTreeMap::new();
         let mut txs_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
 
-        let mut filled_slots = 0u64;
         let mut total_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
@@ -100,11 +100,23 @@ impl EventMonitor {
                 Event::PraosBlockGenerated {
                     slot,
                     producer,
+                    vrf,
                     transactions,
-                    conflicts,
                 } => {
-                    info!("Pool {} produced a block in slot {slot}.", producer);
-                    filled_slots += 1;
+                    info!("Pool {} produced a praos block in slot {slot}.", producer);
+                    if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
+                        if *old_vrf > vrf {
+                            *blocks_published.entry(producer).or_default() += 1;
+                            *blocks_published.entry(*old_producer).or_default() -= 1;
+                            *blocks_rejected.entry(*old_producer).or_default() += 1;
+                            blocks.insert(slot, (producer, vrf));
+                        } else {
+                            *blocks_rejected.entry(producer).or_default() += 1;
+                        }
+                    } else {
+                        *blocks_published.entry(producer).or_default() += 1;
+                        blocks.insert(slot, (producer, vrf));
+                    }
                     for published_tx in transactions {
                         let tx = txs.get(&published_tx).unwrap();
                         published_txs += 1;
@@ -112,10 +124,6 @@ impl EventMonitor {
                         pending_txs.remove(&published_tx);
                     }
                     *blocks_published.entry(producer).or_default() += 1;
-
-                    for conflict in conflicts {
-                        *blocks_rejected.entry(conflict).or_default() += 1;
-                    }
                 }
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockGenerated {
@@ -149,8 +157,11 @@ impl EventMonitor {
         }
 
         info_span!("praos").in_scope(|| {
-            info!("{filled_slots} block(s) were published.");
-            info!("{} slot(s) had no blocks.", total_slots - filled_slots);
+            info!("{} block(s) were published.", blocks.len());
+            info!(
+                "{} slot(s) had no blocks.",
+                total_slots - blocks.len() as u64
+            );
             info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
             info!(
                 "{} transaction(s) ({} byte(s)) did not reach a block.",

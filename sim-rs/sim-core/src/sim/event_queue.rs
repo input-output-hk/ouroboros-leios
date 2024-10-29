@@ -1,29 +1,19 @@
-use std::{cmp::Reverse, collections::BinaryHeap, pin::Pin, time::Duration};
+use std::{cmp::Reverse, collections::BinaryHeap, time::Duration};
 
-use async_stream::stream;
-use futures::{stream::select_all, Stream, StreamExt};
-use tokio::select;
+use crate::clock::{Clock, Timestamp};
 
-use crate::{
-    clock::{Clock, Timestamp},
-    config::NodeId,
-    network::NetworkSource,
-};
-
-use super::{SimulationEvent, SimulationMessage};
+use super::SimulationEvent;
 
 pub struct EventQueue {
     clock: Clock,
     scheduled: BinaryHeap<FutureEvent>,
-    msg_source: Pin<Box<dyn Stream<Item = SimulationEvent>>>,
 }
 
 impl EventQueue {
-    pub fn new(clock: Clock, msg_sources: Vec<(NodeId, NetworkSource<SimulationMessage>)>) -> Self {
+    pub fn new(clock: Clock) -> Self {
         Self {
             clock,
             scheduled: BinaryHeap::new(),
-            msg_source: Box::pin(stream_incoming_messages(msg_sources)),
         }
     }
 
@@ -33,39 +23,11 @@ impl EventQueue {
     }
 
     pub async fn next_event(&mut self) -> Option<SimulationEvent> {
-        let scheduled_event = self.scheduled.peek().cloned();
-        let clock = self.clock.clone();
-
-        let next_scheduled_event = async move {
-            let FutureEvent(timestamp, event) = scheduled_event?;
-            clock.wait_until(timestamp).await;
-            Some(event)
-        };
-        let next_network_event = &mut self.msg_source.next();
-
-        select! {
-            biased; // always poll the "next scheduled event" future first
-            Some(event) = next_scheduled_event => {
-                self.scheduled.pop();
-                Some(event)
-            }
-            Some(event) = next_network_event => Some(event),
-            else => None
-        }
+        let scheduled_event = self.scheduled.peek().cloned()?;
+        self.clock.wait_until(scheduled_event.0).await;
+        self.scheduled.pop();
+        Some(scheduled_event.1)
     }
-}
-
-fn stream_incoming_messages(
-    msg_sources: Vec<(NodeId, NetworkSource<SimulationMessage>)>,
-) -> impl Stream<Item = SimulationEvent> {
-    select_all(msg_sources.into_iter().map(|(to, mut source)| {
-        let stream = stream! {
-            while let Some((from, msg)) = source.recv().await {
-                yield SimulationEvent::NetworkMessage { from, to, msg }
-            }
-        };
-        Box::pin(stream)
-    }))
 }
 
 // wrapper struct which holds a SimulationEvent,

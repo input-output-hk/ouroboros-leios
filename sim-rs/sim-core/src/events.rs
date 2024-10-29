@@ -26,8 +26,8 @@ pub enum Event {
     PraosBlockGenerated {
         slot: u64,
         producer: NodeId,
+        vrf: u64,
         transactions: Vec<TransactionId>,
-        conflicts: Vec<NodeId>,
     },
     PraosBlockReceived {
         slot: u64,
@@ -70,8 +70,8 @@ impl EventTracker {
         self.send(Event::PraosBlockGenerated {
             slot: block.slot,
             producer: block.producer,
+            vrf: block.vrf,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
-            conflicts: block.conflicts.clone(),
         });
     }
 
