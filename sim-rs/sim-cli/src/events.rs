@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf, time::Duration,
+    path::PathBuf,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -83,7 +84,7 @@ impl EventMonitor {
             None => OutputTarget::None,
         };
         while let Some((event, time)) = self.events_source.recv().await {
-            last_timestamp = time.clone();
+            last_timestamp = time;
             if should_log_event(&event) {
                 let output_event = OutputEvent {
                     time,
@@ -229,7 +230,7 @@ impl EventMonitor {
                 txs.len(),
             );
             let avg_age = pending_txs.iter().map(|id| {
-                let tx = txs.get(&id).unwrap();
+                let tx = txs.get(id).unwrap();
                 (last_timestamp - tx.generated).as_secs_f64()
             });
             let avg_age_stats = compute_stats(avg_age);
