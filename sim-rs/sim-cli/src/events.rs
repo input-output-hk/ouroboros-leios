@@ -133,7 +133,6 @@ impl EventMonitor {
                         published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
-                    *blocks_published.entry(producer).or_default() += 1;
                 }
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockGenerated {
