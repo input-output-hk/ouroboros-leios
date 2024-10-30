@@ -1,5 +1,5 @@
 use std::{
-    collections::{BinaryHeap, HashMap},
+    collections::{HashMap, VecDeque},
     time::Duration,
 };
 
@@ -63,9 +63,10 @@ impl<T> Network<T> {
 }
 
 pub struct NetworkSource<T> {
-    messages: BinaryHeap<PendingMessage<T>>,
-    source: mpsc::UnboundedReceiver<PendingMessage<T>>,
-    sink: mpsc::UnboundedSender<PendingMessage<T>>,
+    node_messages: HashMap<NodeId, VecDeque<Message<T>>>,
+    node_next_events: HashMap<NodeId, Timestamp>,
+    source: mpsc::UnboundedReceiver<Message<T>>,
+    sink: mpsc::UnboundedSender<Message<T>>,
     clock: Clock,
 }
 
@@ -73,30 +74,59 @@ impl<T> NetworkSource<T> {
     fn new(clock: Clock) -> Self {
         let (sink, source) = mpsc::unbounded_channel();
         Self {
-            messages: BinaryHeap::new(),
+            node_messages: HashMap::new(),
+            node_next_events: HashMap::new(),
             source,
             sink,
             clock,
         }
     }
+
     pub async fn recv(&mut self) -> Option<(NodeId, T)> {
-        while let Ok(pending) = self.source.try_recv() {
-            self.messages.push(pending);
+        // Pull in any messages we were waiting on
+        while let Ok(message) = self.source.try_recv() {
+            self.schedule_message(message);
         }
-        if self.messages.is_empty() {
+
+        // If we don't have anything pending yet, block until we do
+        if self.node_next_events.is_empty() {
             let next = self.source.recv().await?;
-            self.messages.push(next);
+            self.schedule_message(next);
         }
-        let next = self.messages.peek()?;
-        self.clock.wait_until(next.arrival).await;
-        let message = self.messages.pop()?;
-        Some((message.from, message.body))
+
+        // Now we have a pending message from at least one node. Sleep until the message "should" arrive...
+        let (next_from, next_timestamp) = self.node_next_events.iter().min_by_key(|(_, ts)| *ts)?;
+        let from = *next_from;
+        let timestamp = *next_timestamp;
+        self.clock.wait_until(timestamp).await;
+
+        let messages = self.node_messages.get_mut(&from)?;
+        let msg = messages.pop_front()?;
+
+        // Track when the next message from this sender will arrive
+        if let Some(next) = messages.front() {
+            self.node_next_events
+                .insert(from, next.departure + next.latency);
+        } else {
+            self.node_next_events.remove(&from);
+        }
+
+        Some((from, msg.body))
+    }
+
+    fn schedule_message(&mut self, message: Message<T>) {
+        let messages = self.node_messages.entry(message.from).or_default();
+        if messages.is_empty() {
+            let arrival = message.departure + message.latency;
+            self.node_next_events.insert(message.from, arrival);
+        }
+        messages.push_back(message);
     }
 }
 
 pub struct NetworkSink<T> {
     id: NodeId,
-    channels: HashMap<NodeId, (mpsc::UnboundedSender<PendingMessage<T>>, Duration)>,
+    channels: HashMap<NodeId, (mpsc::UnboundedSender<Message<T>>, Duration)>,
     clock: Clock,
 }
 
@@ -112,11 +142,11 @@ impl<T> NetworkSink<T> {
         let Some((sink, latency)) = self.channels.get(&to) else {
             bail!("Invalid connection")
         };
-        let arrival = self.clock.now() + *latency;
         if sink
-            .send(PendingMessage {
+            .send(Message {
                 from: self.id,
-                arrival,
+                departure: self.clock.now(),
+                latency: *latency,
                 body: msg,
             })
             .is_err()
@@ -127,28 +157,9 @@ impl<T> NetworkSink<T> {
     }
 }
 
-struct PendingMessage<T> {
+struct Message<T> {
     from: NodeId,
-    arrival: Timestamp,
+    departure: Timestamp,
+    latency: Duration,
     body: T,
-}
-
-impl<T> PartialEq for PendingMessage<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.arrival.eq(&other.arrival)
-    }
-}
-
-impl<T> Eq for PendingMessage<T> {}
-
-impl<T> PartialOrd for PendingMessage<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T> Ord for PendingMessage<T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.arrival.cmp(&self.arrival)
-    }
 }
