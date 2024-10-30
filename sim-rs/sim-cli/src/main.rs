@@ -24,7 +24,7 @@ struct Args {
     filename: PathBuf,
     output: Option<PathBuf>,
     #[clap(short, long)]
-    timescale: Option<u32>,
+    timescale: Option<f64>,
     #[clap(long)]
     trace_node: Vec<usize>,
     #[clap(short, long)]

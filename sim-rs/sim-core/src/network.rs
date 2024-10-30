@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use netsim_async::{
     Edge, EdgePolicy, HasBytesSize, SimContext, SimId, SimSocketReadHalf, SimSocketWriteHalf,
@@ -10,9 +12,10 @@ pub struct Network<T: HasBytesSize> {
 }
 
 impl<T: HasBytesSize> Network<T> {
-    pub fn new(timescale: u32) -> Self {
+    pub fn new(timescale: f64) -> Self {
         let mut config = netsim_async::SimConfiguration::default();
-        config.idle_duration /= timescale;
+        config.idle_duration =
+            Duration::from_secs_f64(config.idle_duration.as_secs_f64() / timescale);
         Self {
             context: SimContext::with_config(config),
         }

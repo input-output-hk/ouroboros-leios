@@ -50,7 +50,7 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Debug, Deserialize)]
 pub struct RawConfig {
     pub seed: Option<u64>,
-    pub timescale: Option<u32>,
+    pub timescale: Option<f64>,
     pub slots: Option<u64>,
     #[serde(default)]
     pub trace_nodes: HashSet<NodeId>,
@@ -81,7 +81,7 @@ pub struct RawLinkConfig {
 
 impl From<RawConfig> for SimConfiguration {
     fn from(value: RawConfig) -> Self {
-        let timescale = value.timescale.unwrap_or(1);
+        let timescale = value.timescale.unwrap_or(1.0);
         let mut nodes: Vec<NodeConfiguration> = value
             .nodes
             .into_iter()
@@ -100,8 +100,12 @@ impl From<RawConfig> for SimConfiguration {
             nodes[id2].peers.push(NodeId::new(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms)
-                    / timescale,
+                latency: compute_latency(
+                    nodes[id1].location,
+                    nodes[id2].location,
+                    link.latency_ms,
+                    timescale,
+                ),
             });
         }
         Self {
@@ -128,7 +132,7 @@ impl From<RawConfig> for SimConfiguration {
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
-    pub timescale: u32,
+    pub timescale: f64,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -176,12 +180,18 @@ fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
-fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Duration {
+fn compute_latency(
+    loc1: Location,
+    loc2: Location,
+    extra_ms: Option<u64>,
+    timescale: f64,
+) -> Duration {
     let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
         .map(|l| l.to_duration())
         .unwrap_or(Duration::ZERO);
     let extra_latency = Duration::from_millis(extra_ms.unwrap_or(5));
-    geo_latency + extra_latency
+    let latency = geo_latency + extra_latency;
+    Duration::from_secs_f64(latency.as_secs_f64() / timescale)
 }
 
 #[derive(Debug, Clone)]

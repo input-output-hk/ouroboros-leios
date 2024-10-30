@@ -35,20 +35,23 @@ impl Serialize for Timestamp {
 #[derive(Clone)]
 pub struct Clock {
     start: Instant,
-    scale: u32,
+    scale: f64,
 }
 
 impl Clock {
-    pub fn new(start: Instant, scale: u32) -> Self {
+    pub fn new(start: Instant, scale: f64) -> Self {
         Self { start, scale }
     }
 
     pub fn now(&self) -> Timestamp {
-        Timestamp(self.start.elapsed() * self.scale)
+        let duration = self.start.elapsed();
+        let scaled = Duration::from_secs_f64(duration.as_secs_f64() * self.scale);
+        Timestamp(scaled)
     }
 
     pub async fn wait_until(&self, timestamp: Timestamp) {
-        let instant = self.start + (timestamp.0 / self.scale);
+        let scaled = Duration::from_secs_f64(timestamp.0.as_secs_f64() / self.scale);
+        let instant = self.start + scaled;
         if instant > Instant::now() {
             time::sleep_until(instant.into()).await;
         }
