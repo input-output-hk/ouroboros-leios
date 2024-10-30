@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
+    path::PathBuf, time::Duration,
 };
 
 use anyhow::Result;
@@ -64,6 +64,7 @@ impl EventMonitor {
         let mut bytes_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
 
+        let mut last_timestamp = Timestamp(Duration::from_secs(0));
         let mut total_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
@@ -82,6 +83,7 @@ impl EventMonitor {
             None => OutputTarget::None,
         };
         while let Some((event, time)) = self.events_source.recv().await {
+            last_timestamp = time.clone();
             if should_log_event(&event) {
                 let output_event = OutputEvent {
                     time,
@@ -225,6 +227,15 @@ impl EventMonitor {
                 "{} out of {} transaction(s) were included in at least one IB.",
                 txs_which_reached_ib.len(),
                 txs.len(),
+            );
+            let avg_age = pending_txs.iter().map(|id| {
+                let tx = txs.get(&id).unwrap();
+                (last_timestamp - tx.generated).as_secs_f64()
+            });
+            let avg_age_stats = compute_stats(avg_age);
+            info!(
+                "The average age of the pending transactions is {:.3}s (stddev {:.3}).",
+                avg_age_stats.mean, avg_age_stats.std_dev,
             );
             info!(
                 "Each transaction was included in an average of {:.3} IB(s) (stddev {:.3}).",

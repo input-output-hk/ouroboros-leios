@@ -7,7 +7,7 @@ use serde::Serialize;
 use tokio::time;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Timestamp(Duration);
+pub struct Timestamp(pub Duration);
 impl Add<Duration> for Timestamp {
     type Output = Timestamp;
 
