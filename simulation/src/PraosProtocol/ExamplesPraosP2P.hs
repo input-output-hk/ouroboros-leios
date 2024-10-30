@@ -14,7 +14,6 @@ import System.Random (StdGen, mkStdGen)
 
 import ChanDriver
 import Data.Coerce (coerce)
-import Data.List (foldl')
 import GHC.Generics
 import Network.TypedProtocol
 import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
@@ -27,11 +26,10 @@ import PraosProtocol.SimPraos
 import PraosProtocol.SimPraosP2P
 import PraosProtocol.VizSimPraos (DiffusionLatencyMap, PraosVizConfig (..), accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
+import Sample
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
-import System.IO
 import Viz
-import VizSim (SimVizModel (SimVizModel))
 
 example1 :: Vizualisation
 example1 =
@@ -134,34 +132,10 @@ example1000Diffusion nlinks stop fp =
             { worldDimensions = (0.600, 0.300)
             , worldIsCylinder = True
             }
-      , p2pNumNodes = 1000
+      , p2pNumNodes = 600
       , p2pNodeLinksClose = nlinks
       , p2pNodeLinksRandom = nlinks
       }
-
-data SampleModel event state = SampleModel
-  { initState :: state
-  , accumState :: Time -> event -> state -> state
-  , renderState :: state -> IO ()
-  }
-
-runSampleModel ::
-  SampleModel event state ->
-  Time ->
-  [(Time, event)] ->
-  IO ()
-runSampleModel (SampleModel s0 accum render) stop = go . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
- where
-  go m = case stepSimViz 1000 m of
-    m'@(SimVizModel ((now, _) : _) _) -> do
-      putStrLn $ "time reached: " ++ show now
-      hFlush stdout
-      go m'
-    (SimVizModel [] s) -> do
-      putStrLn $ "done."
-      render s
-  stepSimViz n (SimVizModel es s) = case splitAt n es of
-    (before, after) -> SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
 
 example1Trace :: StdGen -> P2P.P2PTopography -> PraosTrace
 example1Trace rng0 p2pTopography =

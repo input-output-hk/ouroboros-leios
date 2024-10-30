@@ -51,6 +51,7 @@ library
     PraosProtocol.VizSimPraos
     PraosProtocol.VizSimPraosP2P
     RelayProtocol
+    Sample
     SimRelay
     SimRelayP2P
     SimTCPLinks
