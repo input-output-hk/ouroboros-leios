@@ -18,8 +18,7 @@ use tracing::{info, info_span};
 #[derive(Clone, Serialize)]
 struct OutputEvent {
     time: Timestamp,
-    #[serde(flatten)]
-    event: Event,
+    message: Event,
 }
 
 pub struct EventMonitor {
@@ -77,7 +76,7 @@ impl EventMonitor {
             if should_log_event(&event) {
                 let output_event = OutputEvent {
                     time,
-                    event: event.clone(),
+                    message: event.clone(),
                 };
                 output.write(output_event).await?;
             }

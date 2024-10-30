@@ -9,6 +9,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type")]
 pub enum Event {
     Slot {
         number: u64,
