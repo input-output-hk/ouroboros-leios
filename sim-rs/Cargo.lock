@@ -620,6 +620,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty-bytes-rust"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe9cf90f159a57d064a311cfcc6d65f189c12bf399080a7dd2b64de47181639b"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "priority-queue"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -826,6 +835,7 @@ dependencies = [
  "average",
  "clap",
  "ctrlc",
+ "pretty-bytes-rust",
  "serde",
  "serde_json",
  "sim-core",

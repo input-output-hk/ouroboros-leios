@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Result;
 use average::Variance;
+use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
@@ -69,6 +70,13 @@ impl EventMonitor {
         let mut generated_ibs = 0u64;
         let mut empty_ibs = 0u64;
 
+        // Pretty print options for bytes
+        let pbo = Some(PrettyBytesOptions {
+            use_1024_instead_of_1000: Some(false),
+            number_of_decimal: Some(2),
+            remove_zero_decimal: Some(true),
+        });
+
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
             None => OutputTarget::None,
@@ -132,10 +140,12 @@ impl EventMonitor {
                     transactions,
                 } => {
                     generated_ibs += 1;
+                    let mut ib_bytes = 0;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(header.id()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
+                        ib_bytes += tx.bytes;
                         *bytes_in_ib.entry(header.id()).or_default() += tx.bytes as f64;
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
@@ -143,10 +153,11 @@ impl EventMonitor {
                     }
                     *seen_ibs.entry(header.producer).or_default() += 1.;
                     info!(
-                        "Pool {} generated an IB with {} transaction(s) in slot {}",
+                        "Pool {} generated an IB with {} transaction(s) in slot {} ({})",
                         header.producer,
                         transactions.len(),
                         header.slot,
+                        pretty_bytes(ib_bytes, pbo.clone()),
                     )
                 }
                 Event::EmptyInputBlockNotGenerated { .. } => {
@@ -165,15 +176,18 @@ impl EventMonitor {
                 "{} slot(s) had no naive praos blocks.",
                 total_slots - blocks.len() as u64
             );
-            info!("{published_txs} transaction(s) ({published_bytes} byte(s)) finalized in a naive praos block.");
+            info!("{published_txs} transaction(s) ({}) finalized in a naive praos block.", pretty_bytes(published_bytes, pbo.clone()));
             info!(
-                "{} transaction(s) ({} byte(s)) did not reach a naive praos block.",
+                "{} transaction(s) ({}) did not reach a naive praos block.",
                 pending_txs.len(),
-                pending_txs
-                    .iter()
-                    .filter_map(|id| txs.get(id))
-                    .map(|tx| tx.bytes)
-                    .sum::<u64>(),
+                pretty_bytes(
+                    pending_txs
+                        .iter()
+                        .filter_map(|id| txs.get(id))
+                        .map(|tx| tx.bytes)
+                        .sum::<u64>(),
+                    pbo.clone(),
+                ),
             );
 
             for id in self.pool_ids {
@@ -217,9 +231,9 @@ impl EventMonitor {
                 ibs_per_tx.mean, ibs_per_tx.std_dev,
             );
             info!(
-                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {:.2} byte(s) (stddev {:.3}).",
+                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}).",
                 txs_per_ib.mean, txs_per_ib.std_dev,
-                bytes_per_ib.mean, bytes_per_ib.std_dev,
+                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo), bytes_per_ib.std_dev,
             );
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
