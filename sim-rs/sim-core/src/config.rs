@@ -100,12 +100,7 @@ impl From<RawConfig> for SimConfiguration {
             nodes[id2].peers.push(NodeId::new(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: compute_latency(
-                    nodes[id1].location,
-                    nodes[id2].location,
-                    link.latency_ms,
-                    timescale,
-                ),
+                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
             });
         }
         Self {
@@ -180,18 +175,12 @@ fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
-fn compute_latency(
-    loc1: Location,
-    loc2: Location,
-    extra_ms: Option<u64>,
-    timescale: f64,
-) -> Duration {
+fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Duration {
     let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
         .map(|l| l.to_duration())
         .unwrap_or(Duration::ZERO);
     let extra_latency = Duration::from_millis(extra_ms.unwrap_or(5));
-    let latency = geo_latency + extra_latency;
-    Duration::from_secs_f64(latency.as_secs_f64() / timescale)
+    geo_latency + extra_latency
 }
 
 #[derive(Debug, Clone)]

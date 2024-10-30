@@ -8,6 +8,7 @@ anyhow = "1"
 average = "0.15"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
+pretty-bytes-rust = "0.3.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sim-core = { path = "../sim-core" }
