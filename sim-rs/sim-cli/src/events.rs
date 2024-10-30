@@ -14,14 +14,17 @@ use sim_core::{
     events::Event,
     model::{InputBlockId, TransactionId},
 };
-use tokio::{fs::File, io::AsyncWriteExt as _, sync::mpsc};
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt as _,
+    sync::mpsc,
+};
 use tracing::{info, info_span};
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
     time: Timestamp,
-    #[serde(flatten)]
-    event: Event,
+    message: Event,
 }
 
 pub struct EventMonitor {
@@ -79,6 +82,12 @@ impl EventMonitor {
             remove_zero_decimal: Some(true),
         });
 
+        if let Some(path) = &self.output_path {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).await?;
+            }
+        }
+
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
             None => OutputTarget::None,
@@ -88,7 +97,7 @@ impl EventMonitor {
             if should_log_event(&event) {
                 let output_event = OutputEvent {
                     time,
-                    event: event.clone(),
+                    message: event.clone(),
                 };
                 output.write(output_event).await?;
             }
@@ -135,7 +144,6 @@ impl EventMonitor {
                         published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
-                    *blocks_published.entry(producer).or_default() += 1;
                 }
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockGenerated {
