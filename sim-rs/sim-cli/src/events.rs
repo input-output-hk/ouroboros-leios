@@ -12,7 +12,11 @@ use sim_core::{
     events::Event,
     model::{InputBlockId, TransactionId},
 };
-use tokio::{fs::File, io::AsyncWriteExt as _, sync::mpsc};
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt as _,
+    sync::mpsc,
+};
 use tracing::{info, info_span};
 
 #[derive(Clone, Serialize)]
@@ -67,6 +71,12 @@ impl EventMonitor {
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
         let mut empty_ibs = 0u64;
+
+        if let Some(path) = &self.output_path {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).await?;
+            }
+        }
 
         let mut output = match self.output_path {
             Some(ref path) => OutputTarget::File(File::create(path).await?),
