@@ -43,15 +43,27 @@ impl Simulation {
         let config = Arc::new(config);
         let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
-        let mut network = Network::new(config.timescale);
+        let mut network = Network::new(clock.clone());
         let slot_broadcaster = watch::Sender::new(0);
 
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
         let mut nodes = vec![];
         let mut tx_sinks = HashMap::new();
+        for link_config in config.links.iter() {
+            network.set_edge_policy(
+                link_config.nodes.0,
+                link_config.nodes.1,
+                EdgePolicy {
+                    latency: Latency::new(link_config.latency),
+                    bandwidth_down: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
+                    bandwidth_up: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
+                    ..EdgePolicy::default()
+                },
+            )?;
+        }
         for node_config in &config.nodes {
             let id = node_config.id;
-            let (msg_source, msg_sink) = network.open(id).context("could not open socket")?;
+            let (msg_sink, msg_source) = network.open(id).context("could not open socket")?;
             let (tx_sink, tx_source) = mpsc::unbounded_channel();
             tx_sinks.insert(id, tx_sink);
             let node = Node::new(
@@ -67,18 +79,6 @@ impl Simulation {
                 clock.clone(),
             );
             nodes.push(node);
-        }
-        for link_config in config.links.iter() {
-            network.set_edge_policy(
-                link_config.nodes.0,
-                link_config.nodes.1,
-                EdgePolicy {
-                    latency: Latency::new(link_config.latency),
-                    bandwidth_down: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
-                    bandwidth_up: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
-                    ..EdgePolicy::default()
-                },
-            )?;
         }
 
         let mut event_queue = EventQueue::new(clock);

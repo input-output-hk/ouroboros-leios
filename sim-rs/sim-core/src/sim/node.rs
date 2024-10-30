@@ -117,7 +117,7 @@ impl Node {
         loop {
             select! {
                 _ = self.slot_receiver.changed() => {
-                    let slot = *self.slot_receiver.borrow();
+                    let slot = *self.slot_receiver.borrow_and_update();
                     self.handle_new_slot(slot)?;
                 }
                 Some(tx) = self.tx_source.recv() => {
