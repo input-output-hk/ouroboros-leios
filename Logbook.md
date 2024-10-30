@@ -1,8 +1,38 @@
 # Leios logbook
 
+## 2024-10-30
+
+### ALBA voting
+
+The Jupyter notebook [analysis/stake_distribution.ipynb](analysis/stake_distribution.ipynb) (view [here](https://nbviewer.org/github/input-output-hk/ouroboros-leios/blob/stake-analysis/analysis/stake_distribution.ipynb)) analyzes the implications of the Cardano mainnet stake distribution upon the number of unique votes and votes for a Leios voting round.
+
+Leios needs to ensure the impossibility of an adversarial quorum, but it can accept adversarial activity causing quorum failures, since the latter just lowers throughput slightly. Hence we require a 60% quorum and 92% availability of honest votes, and set the committee size to 500 votes. An ALBA security parameter of 80 may provide adequate security. This translates to the following ALBA parameters and security for Leios.
+
+- $n_f = 0.60$
+- $n_p = 0.92$
+- $l_\text{sec} = 80$
+- $n_\text{votes} = 500$
+- $2^{-l_\text{sec}} = 8.27 \cdot 10^{-25}$
+- $u_\text{ALBA} = 148$
+- probability of adversarial quorum
+	- 35% adversarial stake: $p = 1.71 \cdot 10^{-21}$
+	- 40% adversarial stake: $p = 7.69 \cdot 10^{-13}$
+	- 45% adversarial stake: $p = 2.87 \cdot 10^{-7}$
+- probability of honest quorum
+	- 35% adversarial stake: $p = 0.917$$
+
+The plot below shows the number of votes that would have to be included in an ALBA certificate for Leios, given those parameters. If votes are 700 bytes each, then we have the following:
+
+- Incoming to node which creates a certificate: 500 votes of 700 bytes = 350 kB.
+- Contents of ALBA certificate: 140 votes of 700 bytes = 98 kB.
+
+The alternative is to use BLS certificates, which have higher CPU load but smaller size.
+
+![Number of unique votes in ALBA certificate for Leios](analysis/unique-votes-leios.png)
+
 ## 2024-10-29
 
-### Team Meeting
+### Team meeting
 
 Agenda:
 
