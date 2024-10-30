@@ -1,10 +1,20 @@
 block_generation_probability = 0.05
 ib_generation_probability = 5.0
-ib_shards = 8
+ib_shards = 16
 max_block_size = 90112
 max_ib_requests_per_peer = 1
 max_ib_size = 327680
 max_tx_size = 16384
+
+[transaction_frequency_ms]
+distribution = "exp"
+lambda = 0.85
+scale = 10.0
+
+[transaction_size_bytes]
+distribution = "log_normal"
+mu = 6.833
+sigma = 1.127
 
 [[nodes]]
 location = [
@@ -90175,13 +90185,3 @@ nodes = [
     1864,
     2645,
 ]
-
-[transaction_frequency_ms]
-distribution = "exp"
-lambda = 0.85
-scale = 1000.0
-
-[transaction_size_bytes]
-distribution = "log_normal"
-mu = 6.833
-sigma = 1.127

@@ -67,6 +67,12 @@ The alternative is to use BLS certificates, which have higher CPU load but small
 
 ![Number of unique votes in ALBA certificate for Leios](analysis/unique-votes-leios.png)
 
+### Rust simulation
+
+Temporarily replaced netsim with a decentralized networking layer. It can simulate 100x current transaction volume accurately in real time, and 1000x current tx volume at quarter-speed.
+
+This network model is simplified (and baked into this project instead of being reusable), so the eventual goal is to switch back to netsim. This just unblocks us studying network behavior at high traffic.
+
 ## 2024-10-29
 
 ### Team meeting
