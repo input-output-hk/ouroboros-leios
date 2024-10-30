@@ -34,8 +34,8 @@ The following questions were raised and answered:
 	- **A:** Regarding non-inclusion, the simplest example is that the user sees that his tx is on an IB that is not in any of the certified EBs of the respective pipeline. Then he can deduce that his tx is not going to be included by this IB in the ledger.
 
 Prompted by the discussion, there will be a separate, follow-up meeting to review delta-Q modeling:
-	- Network saturation (phase change)
-	- Modeling the node dynamically
+- Network saturation (phase change)
+- Modeling the node dynamically
 
 Finally, there was general agreement that we need specific, quantitative input from stakeholders (projects, SPOs, etc.) regarding throughput requirements, including operating costs.
 
