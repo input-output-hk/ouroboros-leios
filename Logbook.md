@@ -2,6 +2,43 @@
 
 ## 2024-10-30
 
+### Monthly demonstration and review
+
+The first Leios monthly demonstration and review was held today, with approximately thirty attendees.
+
+- [video recording](https://drive.google.com/file/d/12VE0__S0knHqXXpIVdXGWvDipK0g89p_/view?usp=sharing)
+- [chat transscript](https://drive.google.com/file/d/1gqquDcsa6ESWH2KDfsEt39j2M5CvwThD/view?usp=sharing)
+- [slides](https://docs.google.com/presentation/d/1KgjJyP6yZyZKCGum3deoIyooYUOretA9W6dTtXv1fso/edit?usp=sharing)
+ 
+The following questions where raised and answered:
+
+- **Q:** Will all pipeline stages be the same length? or will the implementation determine that?
+	- **A:** It is currently envisioned that they will be the same length, but the exploratory modeling and prototyping can assess whether that this optimal.
+- **Q:** Will IBs and EBs be stored forever after the chain has sync'ed after their inclusion in RBs?
+	- **A:** Just the EB/IBS reachable from the (immutable) Ranking Blocks.
+	- **A:** Some use cases will likely require examination of all IBs and EBs, so they need to be retained forever.
+	- **A:** However, Mithril snapshots (or equivalent) might be sufficient for many use cases.
+- **Q:** Do IB's contain unique TX?
+	- **A:** Different IBs may contain the same tx. We are working on a sharding proposal at the moment. Hopefully we will get to discuss it in the next demo.
+	- **Q:** So this is a DDoS vector?
+	- **A:** Yes if it is not handled properly for the DDoS. Assuming you generate your view based on the settled certificates I do not see a possibility for split views. If you want to speculate on the IB ordering, then yes  care must be taken regarding split views.
+- **Q**: Regarding non availability of IB, what is the effect on pipeline?
+	- **A:** If an IB is not available, then no certificate will be generated for the EBs referencing it.
+- **Q:** What about the selection processes? (How is permission to create or endorse being handled? Is it Praos 'like'?)
+	- **A:** IBs, EBs,votes are created based on the VRF mechanism used in Praos.
+- **Q:** The final certificates are being done on a Praos schedule? (I.e the certificate producer is selected the same way?) Hence has it same service interval distribution that we have at present?
+	- **A:** Regarding the certificate rate, we are still working on realistic parameters, so I think we do not have an answer on this yet.
+- **Q:** Regarding IB/EB lifetime, what happens if they don't diffuse within their assigned pipleline interval?
+	- **A:** There is an inclusion horizon, so there is also a lifetime yes. Hopefully, we can take advantage of what we see in the network and drop them as early as possible.
+- **Q:** This leads to 'how is an end user going to know if their tx has not been included' (so they can resubmit)?
+	- **A:** Regarding non-inclusion, the simplest example is that the user sees that his tx is on an IB that is not in any of the certified EBs of the respective pipeline. Then he can deduce that his tx is not going to be included by this IB in the ledger.
+
+Prompted by the discussion, there will be a separate, follow-up meeting to review delta-Q modeling:
+	- Network saturation (phase change)
+	- Modeling the node dynamically
+
+Finally, there was general agreement that we need specific, quantitative input from stakeholders (projects, SPOs, etc.) regarding throughput requirements, including operating costs.
+
 ### ALBA voting
 
 The Jupyter notebook [analysis/stake_distribution.ipynb](analysis/stake_distribution.ipynb) (view [here](https://nbviewer.org/github/input-output-hk/ouroboros-leios/blob/stake-analysis/analysis/stake_distribution.ipynb)) analyzes the implications of the Cardano mainnet stake distribution upon the number of unique votes and votes for a Leios voting round.
@@ -19,7 +56,7 @@ Leios needs to ensure the impossibility of an adversarial quorum, but it can acc
 	- 40% adversarial stake: $p = 7.69 \cdot 10^{-13}$
 	- 45% adversarial stake: $p = 2.87 \cdot 10^{-7}$
 - probability of honest quorum
-	- 35% adversarial stake: $p = 0.917$$
+	- 35% adversarial stake: $p = 0.917$
 
 The plot below shows the number of votes that would have to be included in an ALBA certificate for Leios, given those parameters. If votes are 700 bytes each, then we have the following:
 
