@@ -26,7 +26,7 @@ Agenda:
   * *important* : fees are always paid, even if tx is not included in the ledger
   * Q: what about multiple tokens per UTxO?
   * grinding with people trying to overload one shard?
-  * # shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
+  * \# shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
 * challenges:
   * a tx could be discarded but its fees would still be paid
   * pb in the case of apps which use "concurrent" state machine advance pattern -> perhaps this should not be free in the first place?
@@ -69,6 +69,25 @@ Later work and simulations will refine this.
 Discussion #53 proposes assessment criteria for the continuation of Leios after PI8. The basic idea is to estimate bounds for the Leios curve in the following diagram. This is an attempt to view the economic and technical aspects of Leios's viability on the same chart.
 
 ![Leios Assessment Criteria for PI8](https://github.com/user-attachments/assets/e94287fe-0ad6-4805-98da-21cbbd134361)
+
+The diagram above illustrates a techno-economic business case for Leios adoption that sheds light on the following questions.
+
+1. What is the practical maximum throughput of Leios?
+2. How far does that fall short of the theoretical maximum throughput?
+3. How much would Leios transactions have to cost for SPOs to make a reasonable profit?
+4. What is the worst-case bound for the throughput vs cost profile of Leios?
+5. How does Leios compare to other blockchains?
+6. Given current throughput targets, how much would Leios allow us to lower hardware requirements?
+7. Given current hardware requirements, how much would Leios allow us to increase throughput?
+8. What are the maximum limits Leios allows us to achieve at the maximum limits of currently available commodity hardware?
+
+We could consider the following goals for January 2025.
+
+- *Technical goal for PI8:* Estimate a reasonably tight upper bound on the cost of operating a Leios node, as a function of transaction throughput, and estimate the maximum practical throughput.
+	- Target level: SRL2
+- *Business goal for PI8:* Identify (a) the acceptable limit of transaction cost for Cardano stakeholders, (b) the maximum throughput required by stakeholders, and (c) the throughput-cost relationship for other major blockchains.
+	- Target level: IRL3
+- *Termination criteria for Leios:* Transaction costs are unacceptably high for Leios or the practical maximum throughput fails to meet stakeholder expectations. In this case the Leios protocol may need reconceptualization and redesign, or it may need to be abandoned.
 
 ### Haskell Simulation
 
