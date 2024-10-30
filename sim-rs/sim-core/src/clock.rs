@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::Serialize;
-use tokio::time::{self, Sleep};
+use tokio::time;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Timestamp(Duration);
@@ -47,8 +47,10 @@ impl Clock {
         Timestamp(self.start.elapsed() * self.scale)
     }
 
-    pub fn wait_until(&self, timestamp: Timestamp) -> Sleep {
+    pub async fn wait_until(&self, timestamp: Timestamp) {
         let instant = self.start + (timestamp.0 / self.scale);
-        time::sleep_until(instant.into())
+        if instant > Instant::now() {
+            time::sleep_until(instant.into()).await;
+        }
     }
 }

@@ -1,8 +1,38 @@
 # Leios logbook
 
+## 2024-10-30
+
+### ALBA voting
+
+The Jupyter notebook [analysis/stake_distribution.ipynb](analysis/stake_distribution.ipynb) (view [here](https://nbviewer.org/github/input-output-hk/ouroboros-leios/blob/stake-analysis/analysis/stake_distribution.ipynb)) analyzes the implications of the Cardano mainnet stake distribution upon the number of unique votes and votes for a Leios voting round.
+
+Leios needs to ensure the impossibility of an adversarial quorum, but it can accept adversarial activity causing quorum failures, since the latter just lowers throughput slightly. Hence we require a 60% quorum and 92% availability of honest votes, and set the committee size to 500 votes. An ALBA security parameter of 80 may provide adequate security. This translates to the following ALBA parameters and security for Leios.
+
+- $n_f = 0.60$
+- $n_p = 0.92$
+- $l_\text{sec} = 80$
+- $n_\text{votes} = 500$
+- $2^{-l_\text{sec}} = 8.27 \cdot 10^{-25}$
+- $u_\text{ALBA} = 148$
+- probability of adversarial quorum
+	- 35% adversarial stake: $p = 1.71 \cdot 10^{-21}$
+	- 40% adversarial stake: $p = 7.69 \cdot 10^{-13}$
+	- 45% adversarial stake: $p = 2.87 \cdot 10^{-7}$
+- probability of honest quorum
+	- 35% adversarial stake: $p = 0.917$$
+
+The plot below shows the number of votes that would have to be included in an ALBA certificate for Leios, given those parameters. If votes are 700 bytes each, then we have the following:
+
+- Incoming to node which creates a certificate: 500 votes of 700 bytes = 350 kB.
+- Contents of ALBA certificate: 140 votes of 700 bytes = 98 kB.
+
+The alternative is to use BLS certificates, which have higher CPU load but smaller size.
+
+![Number of unique votes in ALBA certificate for Leios](analysis/unique-votes-leios.png)
+
 ## 2024-10-29
 
-### Team Meeting
+### Team meeting
 
 Agenda:
 
@@ -26,7 +56,7 @@ Agenda:
   * *important* : fees are always paid, even if tx is not included in the ledger
   * Q: what about multiple tokens per UTxO?
   * grinding with people trying to overload one shard?
-  * # shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
+  * \# shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
 * challenges:
   * a tx could be discarded but its fees would still be paid
   * pb in the case of apps which use "concurrent" state machine advance pattern -> perhaps this should not be free in the first place?
@@ -36,6 +66,15 @@ Agenda:
 * multiple shard types on a single block to have more control over parallelism?
   * use VRF to generate a random sequence of "colors" to include in a block, attach colors to txs
 
+### Rust simulation
+
+Rewrote the simulation to use separate tokio tasks for each node, multithreading as much as possible. It can simulate 85tps in almost realtime, but the slowdown makes its results inaccurate (a smaller percentage of IBs propagated across the network compared to the non-netsim branch).
+
+## 2024-10-28
+
+### Rust simulation
+
+In a branch (`non-netsim`), replaced the netsim library with a priority queue to see how fast the simulation's current architecture could run. It was able to simulate 85tps in realtime, but 850tps was too slow to be usable.
 
 ## 2024-10-25
 
@@ -60,6 +99,25 @@ Later work and simulations will refine this.
 Discussion #53 proposes assessment criteria for the continuation of Leios after PI8. The basic idea is to estimate bounds for the Leios curve in the following diagram. This is an attempt to view the economic and technical aspects of Leios's viability on the same chart.
 
 ![Leios Assessment Criteria for PI8](https://github.com/user-attachments/assets/e94287fe-0ad6-4805-98da-21cbbd134361)
+
+The diagram above illustrates a techno-economic business case for Leios adoption that sheds light on the following questions.
+
+1. What is the practical maximum throughput of Leios?
+2. How far does that fall short of the theoretical maximum throughput?
+3. How much would Leios transactions have to cost for SPOs to make a reasonable profit?
+4. What is the worst-case bound for the throughput vs cost profile of Leios?
+5. How does Leios compare to other blockchains?
+6. Given current throughput targets, how much would Leios allow us to lower hardware requirements?
+7. Given current hardware requirements, how much would Leios allow us to increase throughput?
+8. What are the maximum limits Leios allows us to achieve at the maximum limits of currently available commodity hardware?
+
+We could consider the following goals for January 2025.
+
+- *Technical goal for PI8:* Estimate a reasonably tight upper bound on the cost of operating a Leios node, as a function of transaction throughput, and estimate the maximum practical throughput.
+	- Target level: SRL2
+- *Business goal for PI8:* Identify (a) the acceptable limit of transaction cost for Cardano stakeholders, (b) the maximum throughput required by stakeholders, and (c) the throughput-cost relationship for other major blockchains.
+	- Target level: IRL3
+- *Termination criteria for Leios:* Transaction costs are unacceptably high for Leios or the practical maximum throughput fails to meet stakeholder expectations. In this case the Leios protocol may need reconceptualization and redesign, or it may need to be abandoned.
 
 ### Haskell Simulation
 

@@ -55,13 +55,14 @@ impl EventMonitor {
     pub async fn run(mut self) -> Result<()> {
         let mut blocks_published: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
+        let mut blocks: BTreeMap<u64, (NodeId, u64)> = BTreeMap::new();
         let mut txs: BTreeMap<TransactionId, Transaction> = BTreeMap::new();
         let mut pending_txs: BTreeSet<TransactionId> = BTreeSet::new();
         let mut seen_ibs: BTreeMap<NodeId, f64> = BTreeMap::new();
         let mut txs_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
+        let mut bytes_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
 
-        let mut filled_slots = 0u64;
         let mut total_slots = 0u64;
         let mut published_txs = 0u64;
         let mut published_bytes = 0u64;
@@ -100,11 +101,23 @@ impl EventMonitor {
                 Event::PraosBlockGenerated {
                     slot,
                     producer,
+                    vrf,
                     transactions,
-                    conflicts,
                 } => {
-                    info!("Pool {} produced a block in slot {slot}.", producer);
-                    filled_slots += 1;
+                    info!("Pool {} produced a praos block in slot {slot}.", producer);
+                    if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
+                        if *old_vrf > vrf {
+                            *blocks_published.entry(producer).or_default() += 1;
+                            *blocks_published.entry(*old_producer).or_default() -= 1;
+                            *blocks_rejected.entry(*old_producer).or_default() += 1;
+                            blocks.insert(slot, (producer, vrf));
+                        } else {
+                            *blocks_rejected.entry(producer).or_default() += 1;
+                        }
+                    } else {
+                        *blocks_published.entry(producer).or_default() += 1;
+                        blocks.insert(slot, (producer, vrf));
+                    }
                     for published_tx in transactions {
                         let tx = txs.get(&published_tx).unwrap();
                         published_txs += 1;
@@ -112,10 +125,6 @@ impl EventMonitor {
                         pending_txs.remove(&published_tx);
                     }
                     *blocks_published.entry(producer).or_default() += 1;
-
-                    for conflict in conflicts {
-                        *blocks_rejected.entry(conflict).or_default() += 1;
-                    }
                 }
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockGenerated {
@@ -127,6 +136,7 @@ impl EventMonitor {
                         *txs_in_ib.entry(header.id()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
+                        *bytes_in_ib.entry(header.id()).or_default() += tx.bytes as f64;
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
                         }
@@ -149,11 +159,15 @@ impl EventMonitor {
         }
 
         info_span!("praos").in_scope(|| {
-            info!("{filled_slots} block(s) were published.");
-            info!("{} slot(s) had no blocks.", total_slots - filled_slots);
-            info!("{published_txs} transaction(s) ({published_bytes} byte(s)) made it on-chain.");
+            info!("{} transactions(s) were generated in total.", txs.len());
+            info!("{} naive praos block(s) were published.", blocks.len());
             info!(
-                "{} transaction(s) ({} byte(s)) did not reach a block.",
+                "{} slot(s) had no naive praos blocks.",
+                total_slots - blocks.len() as u64
+            );
+            info!("{published_txs} transaction(s) ({published_bytes} byte(s)) finalized in a naive praos block.");
+            info!(
+                "{} transaction(s) ({} byte(s)) did not reach a naive praos block.",
                 pending_txs.len(),
                 pending_txs
                     .iter()
@@ -164,10 +178,10 @@ impl EventMonitor {
 
             for id in self.pool_ids {
                 if let Some(published) = blocks_published.get(&id) {
-                    info!("Pool {id} published {published} block(s)");
+                    info!("Pool {id} published {published} naive praos block(s)");
                 }
                 if let Some(rejected) = blocks_rejected.get(&id) {
-                    info!("Pool {id} failed to publish {rejected} block(s) due to conflicts.");
+                    info!("Pool {id} failed to publish {rejected} naive praos block(s) due to slot battles.");
                 }
             }
         });
@@ -178,6 +192,7 @@ impl EventMonitor {
                 .filter(|tx| tx.included_in_ib.is_some())
                 .collect();
             let txs_per_ib = compute_stats(txs_in_ib.into_values());
+            let bytes_per_ib = compute_stats(bytes_in_ib.into_values());
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
             let times_to_reach_ibs = compute_stats(txs_which_reached_ib.iter().map(|tx| {
                 let duration = tx.included_in_ib.unwrap() - tx.generated;
@@ -189,28 +204,29 @@ impl EventMonitor {
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
             info!(
-                "{generated_ibs} IB(s) were generated, and {empty_ibs} empty IB(s) skipped; on average {} non-empty IB(s) per slot.",
+                "{generated_ibs} IB(s) were generated, and {empty_ibs} IB(s) were skipped because they were empty; on average there were {:.3} non-empty IB(s) per slot.",
                 generated_ibs as f64 / total_slots as f64
             );
             info!(
-                "{} out of {} transaction(s) reached an IB.",
+                "{} out of {} transaction(s) were included in at least one IB.",
                 txs_which_reached_ib.len(),
                 txs.len(),
             );
             info!(
-                "Each transaction was included in an average of {} IBs (stddev {}).",
+                "Each transaction was included in an average of {:.3} IB(s) (stddev {:.3}).",
                 ibs_per_tx.mean, ibs_per_tx.std_dev,
             );
             info!(
-                "Each IB contained an average of {} transactions (stddev {}).",
+                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {:.2} byte(s) (stddev {:.3}).",
                 txs_per_ib.mean, txs_per_ib.std_dev,
+                bytes_per_ib.mean, bytes_per_ib.std_dev,
             );
             info!(
-                "Each transaction took an average of {}s (stddev {}) to reach an IB.",
+                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
                 times_to_reach_ibs.mean, times_to_reach_ibs.std_dev,
             );
             info!(
-                "Each node received an average of {} IBs (stddev {}).",
+                "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
                 ibs_received.mean, ibs_received.std_dev,
             );
         });
