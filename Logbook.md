@@ -10,7 +10,7 @@ The first Leios monthly demonstration and review was held today, with approximat
 - [chat transscript](https://drive.google.com/file/d/1gqquDcsa6ESWH2KDfsEt39j2M5CvwThD/view?usp=sharing)
 - [slides](https://docs.google.com/presentation/d/1KgjJyP6yZyZKCGum3deoIyooYUOretA9W6dTtXv1fso/edit?usp=sharing)
  
-The following questions where raised and answered:
+The following questions were raised and answered:
 
 - **Q:** Will all pipeline stages be the same length? or will the implementation determine that?
 	- **A:** It is currently envisioned that they will be the same length, but the exploratory modeling and prototyping can assess whether that this optimal.
