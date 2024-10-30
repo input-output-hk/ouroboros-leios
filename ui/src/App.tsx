@@ -1,9 +1,9 @@
 import type { FC } from "react";
 
-import { World } from "./components/World";
+import { Graph } from "./Graph/Graph";
 
 export const App: FC = () => {
     return (
-        <World />
+        <Graph />
     )
 }
