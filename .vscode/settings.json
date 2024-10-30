@@ -1,0 +1,7 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "always",
+    "source.organizeImports": "explicit",
+  },
+  "editor.formatOnSave": true, // Disable default formatter if ESLint is handling formatting
+}
