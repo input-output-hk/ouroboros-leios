@@ -136,14 +136,16 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty acc
 
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
-  -- | number of links (used both for close and random)
+  -- | number of close links
+  Int ->
+  -- | number of random links
   Int ->
   -- | when to stop simulation.
   Time ->
   -- | file to write data to.
   FilePath ->
   IO ()
-example1000Diffusion nlinks stop fp =
+example1000Diffusion clinks rlinks stop fp =
   runSampleModel (diffusionSampleModel p2pTopographyCharacteristics fp) stop $
     example1Trace rng 20 p2pTopography
  where
@@ -157,8 +159,8 @@ example1000Diffusion nlinks stop fp =
             , worldIsCylinder = True
             }
       , p2pNumNodes = 1000
-      , p2pNodeLinksClose = nlinks
-      , p2pNodeLinksRandom = nlinks
+      , p2pNodeLinksClose = clinks
+      , p2pNodeLinksRandom = rlinks
       }
 
 example1Trace :: StdGen -> DiffTime -> P2P.P2PTopography -> PraosTrace

@@ -75,8 +75,8 @@ options =
 
 simulations :: [(String, Sim)]
 simulations =
-  [ ("praos-diffusion-5", (Time 40, VizPraosP2P.example1000Diffusion 5))
-  , ("praos-diffusion-10", (Time 40, VizPraosP2P.example1000Diffusion 10))
+  [ ("praos-diffusion-10-links", (Time 40, VizPraosP2P.example1000Diffusion 5 5))
+  , ("praos-diffusion-20-links", (Time 40, VizPraosP2P.example1000Diffusion 10 10))
   ]
 
 readViz :: String -> Either String (String, Sim)
