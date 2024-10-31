@@ -1,5 +1,3 @@
-{-# OPTIONS --erasure #-}
-
 module Leios.FFD where
 
 open import Leios.Prelude

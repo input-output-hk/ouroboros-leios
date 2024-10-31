@@ -4,6 +4,7 @@ module TimeCompat (
   module Control.Monad.Class.MonadTime.SI,
   threadDelayNDT,
   threadDelaySI,
+  MonadDelay,
 ) where
 
 import Control.Monad.Class.MonadTime.SI

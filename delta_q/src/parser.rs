@@ -4,7 +4,9 @@ use crate::{
 };
 use std::sync::Arc;
 use winnow::{
-    combinator::{alt, cut_err, delimited, fail, opt, preceded, repeat, separated, separated_pair},
+    combinator::{
+        alt, cut_err, delimited, fail, opt, preceded, repeat, separated, separated_pair, seq,
+    },
     error::{StrContext, StrContextValue},
     stream::{Accumulate, Stream},
     token::take_while,
@@ -97,11 +99,12 @@ fn atom(input: &mut &str) -> PResult<DeltaQ> {
             outcome,
             for_all,
             for_some,
+            gossip,
             name,
             delimited('(', delta_q, closing_paren),
             fail.context(StrContext::Label("atom"))
                 .context(StrContext::Expected(StrContextValue::Description(
-                    "'BB', name, CDF, 'all(', 'some(', or parentheses",
+                    "'BB', name, CDF, 'all(', 'some(', 'gossip(', or parentheses",
                 ))),
         )),
         ws,
@@ -191,6 +194,32 @@ fn for_some(input: &mut &str) -> PResult<DeltaQ> {
     )
     .map(|(left, right)| DeltaQ::ForSome(Arc::new(left), Arc::new(right)))
     .parse_next(input)
+}
+
+fn gossip(input: &mut &str) -> PResult<DeltaQ> {
+    delimited(
+        "gossip(",
+        cut_err(seq!(delta_q, _: comma, num, _: comma, num, _: comma, num))
+            .context(StrContext::Label("gossip specification"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                "hop, size, branching, cluster coefficient",
+            ))),
+        closing_paren,
+    )
+    .map(|(dq, size, branching, cluster_coeff)| DeltaQ::Gossip {
+        hop: Arc::new(dq),
+        size,
+        branching,
+        cluster_coeff,
+    })
+    .parse_next(input)
+}
+
+fn comma(input: &mut &str) -> PResult<()> {
+    cut_err((ws, ',', ws))
+        .void()
+        .context(StrContext::Label("comma"))
+        .parse_next(input)
 }
 
 fn num(input: &mut &str) -> PResult<f32> {
