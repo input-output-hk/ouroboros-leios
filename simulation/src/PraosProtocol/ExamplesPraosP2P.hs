@@ -132,7 +132,7 @@ example1000Diffusion nlinks stop fp =
             { worldDimensions = (0.600, 0.300)
             , worldIsCylinder = True
             }
-      , p2pNumNodes = 600
+      , p2pNumNodes = 1000
       , p2pNodeLinksClose = nlinks
       , p2pNodeLinksRandom = nlinks
       }
