@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { ForceGraph2D } from "react-force-graph";
 
+import { Slider } from "./Slider";
 import { EMessageType, type IMessage, type INodeMap } from "./types";
 
 export const Graph: FC = () => {
@@ -8,8 +9,9 @@ export const Graph: FC = () => {
   const [nodeMap, setNodeMap] = useState<INodeMap>();
   const [messages, setMessages] = useState<IMessage[]>();
   const [play, setPlay] = useState(false);
-  const [playSpeed, setPlaySpeed] = useState(1);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [blockProducers, setBlockProducers] = useState<Set<number>>(new Set());
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     import("./files/message.json").then(m => {
@@ -34,6 +36,8 @@ export const Graph: FC = () => {
       };
       setNodeMap(result);
     })
+
+    console.log(fgRef.current)
   }, [])
 
   const { refNodes, refLinks } = useMemo(() => {
@@ -70,12 +74,24 @@ export const Graph: FC = () => {
         fgRef.current.emitParticle(link);
       }
     }
+
+    if (currentMessage.type === EMessageType.InputBlockGenerated) {
+      const blockProducerId = currentMessage.data.producer;
+      setBlockProducers(prev => new Set(prev).add(blockProducerId));
+      setTimeout(() => {
+        setBlockProducers(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(blockProducerId)
+          return newSet;
+        })
+      }, 1000)
+    }
   }, [currentMessageIndex, messages, refLinks, play])
 
   useEffect(() => {
     let interval: Timer | undefined;
     if (!interval && play) {
-      interval = setInterval(() => setCurrentMessageIndex(prev => prev + 1), 1000 * playSpeed);
+      interval = setInterval(() => setCurrentMessageIndex(prev => prev + 1), 1000);
     }
 
     if (interval && !play) {
@@ -83,18 +99,22 @@ export const Graph: FC = () => {
     }
 
     return () => interval && clearInterval(interval);
-  }, [play, playSpeed])
+  }, [play])
 
   if (!refNodes || !refLinks) {
     return <p>Loading...</p>
   }
 
   return (
-    <>
-      <button onClick={() => setPlay(prev => !prev)}>{play ? "Pause" : "Play"}</button>
-      <input type="range" disabled value={currentMessageIndex} />
-      <button onClick={() => setPlaySpeed(0.5)}>2x</button>
-      <ForceGraph2D ref={fgRef}
+    <div className="container mx-auto">
+      <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
+        <Slider value={currentMessageIndex} setValue={setCurrentMessageIndex} />
+        <button className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2" onClick={() => setPlay(prev => !prev)}>{play ? "Stop" : "Start"}</button>
+      </div>
+      <ForceGraph2D
+        ref={fgRef}
+        width={1920}
+        height={1080}
         linkDirectionalParticleColor={() => 'red'}
         linkDirectionalParticleWidth={6}
         linkHoverPrecision={10}
@@ -102,9 +122,11 @@ export const Graph: FC = () => {
           nodes: refNodes,
           links: refLinks
         }}
-        height={600}
-        width={900}
         nodeColor={node => {
+          if (blockProducers.has(node.id)) {
+            return "green";
+          }
+
           if (node.data.stake) {
             return "red";
           }
@@ -116,6 +138,6 @@ export const Graph: FC = () => {
           node.fy = node.data.location[1];
         }}
       />
-    </>
+    </div>
   );
 }
