@@ -102,6 +102,16 @@ jobs:
       - name: Run tests
         run: cabal test all
 
+  fourmolu-check:
+    name: Check Haskell sources with fourmolu
+    runs-on: ubuntu-22.04
+    steps:
+      # Note that you must checkout your code before running haskell-actions/run-fourmolu
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/run-fourmolu@v11
+        with:
+          version: "0.15.0.0"
+
   build-docusaurus:
     runs-on: ubuntu-22.04
     steps:

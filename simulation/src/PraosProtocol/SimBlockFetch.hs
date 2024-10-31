@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module PraosProtocol.SimBlockFetch where
 
@@ -12,11 +13,10 @@ import Control.Monad.Class.MonadAsync (
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer,
+  Tracer (Tracer),
   traceWith,
  )
 import qualified Data.ByteString as BS
-import Data.Functor ((<&>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -69,8 +69,10 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      slotConfig <- slotConfigFromNow
+      let praosConfig = PraosConfig{slotConfig, blockValidationDelay = const 0.1}
       concurrently_
-        (nodeA outChan)
+        (nodeA praosConfig outChan)
         (nodeB inChan)
       return ()
  where
@@ -78,15 +80,15 @@ traceRelayLink1 tcpprops =
   bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
 
   -- Block-Fetch Controller & Consumer
-  nodeA :: (MonadAsync m, MonadSTM m) => Chan m (ProtocolMessage BlockFetchState) -> m ()
-  nodeA chan = do
+  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig -> Chan m (ProtocolMessage BlockFetchState) -> m ()
+  nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
-    st <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar) <&> fst
+    (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
     concurrently_
-      ( blockFetchController st
+      ( blockFetchController nullTracer st
       )
-      ( runBlockFetchConsumer chan $
-          initBlockFetchConsumerStateForPeerId 1 st
+      ( runBlockFetchConsumer nullTracer praosConfig chan $
+          initBlockFetchConsumerStateForPeerId nullTracer peerId st
       )
   -- Block-Fetch Producer
   nodeB chan = do
@@ -94,6 +96,9 @@ traceRelayLink1 tcpprops =
     runBlockFetchProducer chan st
 
   (na, nb) = (NodeId 0, NodeId 1)
+
+  nullTracer :: Monad m => Tracer m a
+  nullTracer = Tracer $ const $ return ()
 
   tracer :: Tracer (IOSim s) BlockFetchEvent
   tracer = simTracer

@@ -8,11 +8,10 @@ module PraosProtocol.SimPraosP2P where
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
  )
-import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer,
+  Tracer (Tracer),
   traceWith,
  )
 import Data.Foldable (sequenceA_)
@@ -23,8 +22,7 @@ import System.Random (StdGen, split)
 import ChanMux (newConnectionBundleTCP)
 import ChanTCP
 import P2P (P2PTopography (..))
-import PraosProtocol.BlockGeneration (slotConfigFromNow)
-import PraosProtocol.Common (SlotConfig)
+import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)

@@ -1,5 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
@@ -7,23 +8,23 @@
 module PraosProtocol.VizSimPraos where
 
 import ChanDriver
+import Control.Exception (assert)
 import Data.Coerce (coerce)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
-import Data.Word (Word8)
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.BlockFetch (BlockFetchMessage, blockFetchMessageLabel)
+import PraosProtocol.BlockFetch (BlockFetchMessage, Message (MsgBlock), blockFetchMessageLabel)
 import PraosProtocol.ChainSync (ChainSyncMessage, Message (..), chainSyncMessageLabel)
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import PraosProtocol.SimPraos (PraosEvent (..), PraosTrace, exampleTrace1)
 import SimTypes
-import System.Random (mkStdGen, uniform)
 import Viz
 import VizSim
 import VizSimTCP (
@@ -63,19 +64,14 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   blockFetchMessageColor ::
     BlockFetchMessage ->
     (Double, Double, Double)
-  blockFetchMessageColor _ = (1, 0, 0)
+  blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
+    MsgBlock blk -> blockBodyColor blk
+    _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
     BlockFetchMessage ->
     Maybe String
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
-
-blockHeaderColor :: BlockHeader -> (Double, Double, Double)
-blockHeaderColor hdr =
-  (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
- where
-  r, g, b :: Word8
-  ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
@@ -102,14 +98,20 @@ data PraosSimVizState
             )
           ]
        )
-  , vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
+  , vizNodeTip :: !(Map NodeId FullTip)
+  , -- the Buffer and Queue names are legacy from VizSimRelay.
+    -- In Praos we consider:
+    --  * Queue = seen by blockFetchConsumer and not yet in Buffer
+    --  * Buffer = added to blocksVar
+    vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
   , vizMsgsAtNodeBuffer :: !(Map NodeId [BlockHeader])
   , vizMsgsAtNodeRecentQueue :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeRecentBuffer :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeTotalQueue :: !(Map NodeId Int)
   , vizMsgsAtNodeTotalBuffer :: !(Map NodeId Int)
-  , vizNumMsgsGenerated :: !Int
-  , vizMsgsDiffusionLatency :: !(Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time]))
+  , -- these are `Block`s generated (globally).
+    vizNumMsgsGenerated :: !Int
+  , vizMsgsDiffusionLatency :: !DiffusionLatencyMap
   }
 
 -- | The end points where the each link, including the case where the link
@@ -131,6 +133,27 @@ data LinkPoints
       {-# UNPACK #-} !Point
   deriving (Show)
 
+type DiffusionLatencyMap = Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time])
+
+accumDiffusionLatency :: Time -> PraosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency now (PraosEventNode e) = accumDiffusionLatency' now e
+accumDiffusionLatency _ _ = id
+accumDiffusionLatency' :: Time -> LabelNode PraosNodeEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency' now (LabelNode nid (PraosNodeEventGenerate blk)) vs =
+  assert (not (blockHash blk `Map.member` vs)) $
+    Map.insert
+      (blockHash blk)
+      (blockHeader blk, nid, now, [now])
+      vs
+accumDiffusionLatency' now (LabelNode _nid (PraosNodeEventEnterState blk)) vs =
+  Map.adjust
+    ( \(hdr, nid', created, arrivals) ->
+        (hdr, nid', created, now : arrivals)
+    )
+    (blockHash blk)
+    vs
+accumDiffusionLatency' _ _ vs = vs
+
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
 praosSimVizModel ::
@@ -148,6 +171,7 @@ praosSimVizModel =
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
+      , vizNodeTip = Map.empty
       , vizMsgsAtNodeQueue = Map.empty
       , vizMsgsAtNodeBuffer = Map.empty
       , vizMsgsAtNodeRecentQueue = Map.empty
@@ -176,6 +200,63 @@ praosSimVizModel =
                   (nodes Map.! n2)
             )
             links
+      }
+  accumEventVizState _now (PraosEventNode (LabelNode nid (PraosNodeEventNewTip tip))) vs =
+    vs{vizNodeTip = Map.insert nid tip (vizNodeTip vs)}
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
+      , vizMsgsDiffusionLatency =
+          assert (not (blockHash blk `Map.member` vizMsgsDiffusionLatency vs)) $
+            Map.insert
+              (blockHash blk)
+              (blockHeader blk, nid, now, [now])
+              (vizMsgsDiffusionLatency vs)
+      }
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventReceived blk))) vs =
+    vs
+      { vizMsgsAtNodeQueue =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentQueue =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentQueue vs)
+      , vizMsgsAtNodeTotalQueue =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalQueue vs)
+      }
+  accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventEnterState blk))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeQueue =
+          Map.adjust
+            (filter (\blk' -> blockHash blk' /= blockHash blk))
+            nid
+            (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizMsgsDiffusionLatency =
+          Map.adjust
+            ( \(hdr, nid', created, arrivals) ->
+                (hdr, nid', created, now : arrivals)
+            )
+            (blockHash blk)
+            (vizMsgsDiffusionLatency vs)
       }
   accumEventVizState
     _now
@@ -211,18 +292,15 @@ praosSimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
-          Map.filter (\(_, _, t, _) -> t >= secondsAgo15) (vizMsgsDiffusionLatency vs)
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       }
    where
-    secondsAgo1 :: Time
-    secondsAgo1 = addTime (-1) now
-
-    secondsAgo15 :: Time
-    secondsAgo15 = addTime (-15) now
+    secondsAgo30 :: Time
+    secondsAgo30 = addTime (-30) now
 
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.

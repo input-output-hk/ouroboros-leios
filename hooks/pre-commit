@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# To install as a Git pre-commit hook, run:
+#
+# > ln hooks/pre-commit .git/hooks/pre-commit
+#
+
+# Check for fourmolu
+fourmolu_required_version="0.15.0.0"
+fourmolu="$(which fourmolu)"
+if [ "${fourmolu}" = "" ]; then
+    echo "pre-commit: Requires fourmolu version ${fourmolu_required_version}; no version found"
+    exit 1
+fi
+fourmolu_installed_version="$($fourmolu --version | head -n 1 | cut -d' ' -f2)"
+if [ ! "${fourmolu_installed_version}" = "${fourmolu_required_version}" ]; then
+    echo "pre-commit: Requires fourmolu version ${fourmolu_required_version}; found version ${fourmolu_installed_version}"
+    exit 1
+fi
+
+# Check for unstaged Haskell files
+unstaged_haskell_files="$(git ls-files --exclude-standard --no-deleted --deduplicate --modified '*.hs')"
+if [ ! "${unstaged_haskell_files}" = "" ]; then
+    echo "pre-commit: Found unstaged Haskell files"
+    echo "${unstaged_haskell_files}"
+    exit 1
+fi
+
+# Check Haskell files with fourmolu
+echo "Formatting Haskell source files with fourmolu version ${fourmolu_required_version}"
+if ! git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 fourmolu --mode=check --quiet; then
+    git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 fourmolu --mode=inplace --quiet
+    exit 1
+fi
