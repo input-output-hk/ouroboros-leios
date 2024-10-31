@@ -15,6 +15,7 @@ import Data.Maybe (catMaybes, maybeToList)
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 
+import Data.Bifunctor (second)
 import ModelTCP (TcpMsgForecast (..), segmentSize)
 import P2P
 import PraosProtocol.Common (BlockHeader, FullTip (FullTip), Time (..))
@@ -263,6 +264,15 @@ classifyInFlightMsgs msgs
 -- The charts
 --
 
+diffusionLatencyPerStakeFraction :: Int -> Time -> [Time] -> [(DiffTime, Double)]
+diffusionLatencyPerStakeFraction nnodes created arrivals =
+  [ (latency, percent)
+  | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
+  , let !latency = arrival `diffTime` created
+        !percent =
+          (fromIntegral n / fromIntegral nnodes)
+  ]
+
 chartDiffusionLatency ::
   PraosP2PSimVizConfig ->
   VizRender PraosSimVizModel
@@ -303,13 +313,8 @@ chartDiffusionLatency PraosP2PSimVizConfig{nodeMessageColor} =
               | let nnodes = Map.size vizNodePos
               , (blk, _nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
               , let timeseries =
-                      [ (latency, percent)
-                      | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
-                      , let !latency = arrival `diffTime` created
-                            !percent =
-                              Chart.Percent
-                                (fromIntegral n / fromIntegral nnodes)
-                      ]
+                      map (second Chart.Percent) $
+                        diffusionLatencyPerStakeFraction nnodes created arrivals
               ]
           }
 

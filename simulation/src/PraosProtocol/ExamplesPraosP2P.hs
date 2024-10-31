@@ -1,8 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.ExamplesPraosP2P where
 
@@ -84,30 +87,51 @@ data DiffusionEntry = DiffusionEntry
   , created :: DiffTime
   , arrivals :: [DiffTime]
   }
-  deriving (Generic, ToJSON)
+  deriving (Generic, ToJSON, FromJSON)
+
+data LatencyPerStake = LatencyPerStake
+  { hash :: Int
+  , latencies :: [(DiffTime, Double)]
+  }
+  deriving (Generic, ToJSON, FromJSON)
 
 data DiffusionData = DiffusionData
   { topography :: String
   , entries :: [DiffusionEntry]
+  , latency_per_stake :: [LatencyPerStake]
   }
-  deriving (Generic, ToJSON)
+  deriving (Generic, ToJSON, FromJSON)
+
+diffusionEntryToLatencyPerStake :: Int -> DiffusionEntry -> LatencyPerStake
+diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
+  LatencyPerStake
+    { hash
+    , latencies = bin $ diffusionLatencyPerStakeFraction nnodes (Time created) (map Time arrivals)
+    }
+ where
+  bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
+  bin xs = map (\b -> let ys = takeWhile (\(_, x) -> x <= b) xs in if null ys then (0, b) else (fst $ last ys, b)) $ bins
 
 diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyMap
 diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty accumDiffusionLatency render
  where
+  nnodes = p2pNumNodes p2pTopographyCharacteristics
   render result = do
+    let entries =
+          [ DiffusionEntry
+            { hash = coerce hash'
+            , node_id = coerce i
+            , created = coerce t
+            , arrivals = coerce ts
+            }
+          | (hash', (_, i, t, ts)) <- Map.toList result
+          ]
+
     encodeFile fp $
       DiffusionData
         { topography = show p2pTopographyCharacteristics
-        , entries =
-            [ DiffusionEntry
-              { hash = coerce hash'
-              , node_id = coerce i
-              , created = coerce t
-              , arrivals = coerce ts
-              }
-            | (hash', (_, i, t, ts)) <- Map.toList result
-            ]
+        , entries
+        , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
         }
 
 -- | Diffusion example with 1000 nodes.
