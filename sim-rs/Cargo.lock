@@ -836,6 +836,7 @@ dependencies = [
  "clap",
  "ctrlc",
  "pretty-bytes-rust",
+ "rand",
  "serde",
  "serde_json",
  "sim-core",
