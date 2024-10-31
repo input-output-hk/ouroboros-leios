@@ -5,7 +5,10 @@ module Leios.BaseFunctionality (a : LeiosAbstract) (let open LeiosAbstract a) wh
 
 open import Leios.Blocks a
 
-postulate StakeDistr Cert : Type
+StakeDistr : Type
+StakeDistr = PoolID ⇀ ℕ
+
+postulate Cert : Type
 
 data Input : Type₁ where
   INIT   : (EndorserBlock × Cert → Type) → Input

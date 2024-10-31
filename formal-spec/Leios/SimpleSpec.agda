@@ -3,10 +3,12 @@
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
+open import Leios.VRF
 import Leios.Blocks
 
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
-  (id : PoolID) (pKey : PrivKey) (FFD : FFDAbstract.Functionality ffdAbstract) where
+  (id : PoolID) (pKey : PrivKey) (FFD : FFDAbstract.Functionality ffdAbstract)
+  (vrf : LeiosVRF a) (let open LeiosVRF vrf) (pubKey : PubKey) where
 
 import Leios.BaseFunctionality
 
@@ -61,9 +63,7 @@ initLeiosState V SD = record
   ; slot     = initSlot V
   }
 
-postulate canProduceIB : ℕ → VrfPf → Type
-          canProduceEB : ℕ → VrfPf → Type
-          canProduceV1 : ℕ → Type
+postulate canProduceV1 : ℕ → Type
           canProduceV2 : ℕ → Type
 
 -- some predicates about EBs
@@ -89,6 +89,11 @@ private variable s     : LeiosState
                  π     : VrfPf
 
 open LeiosState using (FFDState; MemPool)
+
+stake : LeiosState → ℕ
+stake record { SD = SD } = case lookupᵐ? SD id of λ where
+  (just s) → s
+  nothing  → 0
 
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
   Init : ∀ {V bs bs' SD} →
@@ -117,7 +122,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 b = GenFFD.ibBody (record { txs = txs })
                 h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
           in
-          ∙ canProduceIB slot π
+          ∙ canProduceIB slot pKey (stake s)
           ∙ FFDAbstract.Send h (just b) FFD'.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ─────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
@@ -129,7 +134,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 h = mkEB slot id π pKey LI LE
                 ffds = s .FFDState
           in
-          ∙ canProduceEB slot π
+          ∙ canProduceEB slot pKey (stake s)
           ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing FFD'.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
