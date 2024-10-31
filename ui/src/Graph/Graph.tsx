@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FC } from "react";
+import { useEffect, useMemo, useRef, useState, type FC } from "react";
 import { ForceGraph2D } from "react-force-graph";
 
 import { EMessageType, type IMessage, type INodeMap } from "./types";
@@ -7,18 +7,9 @@ export const Graph: FC = () => {
   const fgRef = useRef();
   const [nodeMap, setNodeMap] = useState<INodeMap>();
   const [messages, setMessages] = useState<IMessage[]>();
-
-  const nodes = nodeMap?.nodes.map((n, i) => ({
-    id: i,
-    fx: n.location[0],
-    fy: n.location[1],
-    data: n
-  }));
-
-  const links = nodeMap?.links.map((l) => ({
-    source: l.nodes[0],
-    target: l.nodes[1],
-  }));
+  const [play, setPlay] = useState(false);
+  const [playSpeed, setPlaySpeed] = useState(1);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
   useEffect(() => {
     import("./files/message.json").then(m => {
@@ -45,59 +36,86 @@ export const Graph: FC = () => {
     })
   }, [])
 
+  const { refNodes, refLinks } = useMemo(() => {
+    const nodes = nodeMap?.nodes.map((n, i) => ({
+      id: i,
+      fx: n.location[0],
+      fy: n.location[1],
+      data: n
+    }));
+
+    const links = nodeMap?.links.map((l) => ({
+      source: l.nodes[0],
+      target: l.nodes[1],
+    }));
+
+    return {
+      refNodes: nodes,
+      refLinks: links
+    }
+  }, [nodeMap]);
+
   useEffect(() => {
-    debugger;
-    if (!messages || !fgRef.current || !links) {
+    if (!messages || !refLinks || !fgRef.current) {
       return;
     }
 
-    let lastMessage = 0;
-    const interval = setInterval(() => {
-      const currentMessage = messages[lastMessage].message;
-      if (currentMessage.type === EMessageType.TransactionReceived) {
-        // @ts-expect-error source and target get mutated with node data.
-        const link = links.find(({ source, target }) => source.id === currentMessage.data.sender && target.id === currentMessage.data.recipient);
-        if (link) {
-          // @ts-expect-error There are no instance exports, lame.
-          fgRef.current.emitParticle(link);
-          console.log('emitted')
-        }
+    const currentMessage = messages[currentMessageIndex].message;
+    if (currentMessage.type === EMessageType.TransactionReceived) {
+      // @ts-expect-error source and target get mutated with node data.
+      const link = refLinks.find(({ source, target }) => source.id === currentMessage.data.sender && target.id === currentMessage.data.recipient);
+
+      if (link) {
+        // @ts-expect-error There are no instance exports, lame.
+        fgRef.current.emitParticle(link);
       }
+    }
+  }, [currentMessageIndex, messages, refLinks, play])
 
-      lastMessage++;
-    }, 1000);
+  useEffect(() => {
+    let interval: Timer | undefined;
+    if (!interval && play) {
+      interval = setInterval(() => setCurrentMessageIndex(prev => prev + 1), 1000 * playSpeed);
+    }
 
-    return () => {
+    if (interval && !play) {
       clearInterval(interval);
     }
-  }, [links, messages])
 
-  if (!nodes || !links) {
+    return () => interval && clearInterval(interval);
+  }, [play, playSpeed])
+
+  if (!refNodes || !refLinks) {
     return <p>Loading...</p>
   }
 
   return (
-    <ForceGraph2D ref={fgRef}
-      linkDirectionalParticleColor={() => 'red'}
-      linkDirectionalParticleWidth={6}
-      linkHoverPrecision={10}
-      graphData={{
-        nodes,
-        links
-      }}
-      height={1024}
-      width={1920}
-      nodeColor={node => {
-        if (node.data.stake) {
-          return "red";
-        }
+    <>
+      <button onClick={() => setPlay(prev => !prev)}>{play ? "Pause" : "Play"}</button>
+      <input type="range" disabled value={currentMessageIndex} />
+      <button onClick={() => setPlaySpeed(0.5)}>2x</button>
+      <ForceGraph2D ref={fgRef}
+        linkDirectionalParticleColor={() => 'red'}
+        linkDirectionalParticleWidth={6}
+        linkHoverPrecision={10}
+        graphData={{
+          nodes: refNodes,
+          links: refLinks
+        }}
+        height={600}
+        width={900}
+        nodeColor={node => {
+          if (node.data.stake) {
+            return "red";
+          }
 
-        return "blue";
-      }}
-      onNodeDragEnd={(node) => {
-        node.fx = node.data.location[0];
-        node.fy = node.data.location[1];
-      }}
-    />
+          return "blue";
+        }}
+        onNodeDragEnd={(node) => {
+          node.fx = node.data.location[0];
+          node.fy = node.data.location[1];
+        }}
+      />
+    </>
   );
 }
