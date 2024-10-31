@@ -17,7 +17,6 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import qualified Data.ByteString as BS
-import Data.Functor ((<&>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -84,12 +83,12 @@ traceRelayLink1 tcpprops =
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig -> Chan m (ProtocolMessage BlockFetchState) -> m ()
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
-    st <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar) <&> fst
+    (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
     concurrently_
       ( blockFetchController nullTracer st
       )
       ( runBlockFetchConsumer nullTracer praosConfig chan $
-          initBlockFetchConsumerStateForPeerId nullTracer 1 st
+          initBlockFetchConsumerStateForPeerId nullTracer peerId st
       )
   -- Block-Fetch Producer
   nodeB chan = do
