@@ -91,7 +91,7 @@ data DiffusionEntry = DiffusionEntry
 
 data LatencyPerStake = LatencyPerStake
   { hash :: Int
-  , latencies :: [(DiffTime, Double)]
+  , latencies :: [(Maybe DiffTime, Double)]
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -110,7 +110,7 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     }
  where
   bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
-  bin xs = map (\b -> let ys = takeWhile (\(_, x) -> x <= b) xs in if null ys then (0, b) else (fst $ last ys, b)) $ bins
+  bin xs = map (\b -> let ys = takeWhile (\(_, x) -> x <= b) xs in if null ys then (Nothing, b) else (Just $ fst $ last ys, b)) $ bins
 
 diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyMap
 diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty accumDiffusionLatency render
