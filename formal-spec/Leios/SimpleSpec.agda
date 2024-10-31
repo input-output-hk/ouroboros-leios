@@ -14,8 +14,8 @@ open import Leios.Base a
 
 module _ (B' : BaseAbstract) (BF' : BaseAbstract.Functionality B') where
 
-  module B = BaseAbstract B'
-  module BF = BaseAbstract.Functionality BF'
+  module B   = BaseAbstract B'
+  module BF  = BaseAbstract.Functionality BF'
   module FFD = FFDAbstract.Functionality FFD' using (State) renaming (stepRel to _⇀⟦_⟧_)
 
   -- High level structure:
