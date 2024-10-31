@@ -1,5 +1,3 @@
-{-# OPTIONS --erasure #-}
-
 module Leios.Abstract where
 
 open import Leios.Prelude

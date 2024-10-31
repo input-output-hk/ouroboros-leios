@@ -1,4 +1,4 @@
-{-# OPTIONS --allow-unsolved-metas --erasure #-}
+{-# OPTIONS --allow-unsolved-metas #-}
 
 open import Leios.Prelude
 open import Leios.Abstract

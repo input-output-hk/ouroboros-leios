@@ -70,8 +70,8 @@ let
     src = pkgs.fetchFromGitHub {
       repo = "iog-agda-prelude";
       owner = "input-output-hk";
-      rev = "457d52576c2824647e96079557e5f04d459b8d4d";
-      sha256 = "sha256-gp+AJLVtltNnPM0wP4ou2QnxVfUzd380OZVdGUKzoH8=";
+      rev = "75e421ffb4741e8499f5c12104813cedbb7e67b7";
+      sha256 = "sha256-sVSAiTRmZtg4FIUDp4n+tot0oIbxEu6dB5BLlaeXcg4=";
     };
     meta = { };
     libraryFile = "iog-prelude.agda-lib";
