@@ -66,7 +66,7 @@ example1 =
           ]
       ]
  where
-  model = praosSimVizModel $ example1Trace rng0 p2pTopography
+  model = praosSimVizModel $ example1Trace rng0 5 p2pTopography
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng0
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
@@ -145,7 +145,7 @@ example1000Diffusion ::
   IO ()
 example1000Diffusion nlinks stop fp =
   runSampleModel (diffusionSampleModel p2pTopographyCharacteristics fp) stop $
-    example1Trace rng p2pTopography
+    example1Trace rng 20 p2pTopography
  where
   rng = mkStdGen 42
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
@@ -161,8 +161,8 @@ example1000Diffusion nlinks stop fp =
       , p2pNodeLinksRandom = nlinks
       }
 
-example1Trace :: StdGen -> P2P.P2PTopography -> PraosTrace
-example1Trace rng0 p2pTopography =
+example1Trace :: StdGen -> DiffTime -> P2P.P2PTopography -> PraosTrace
+example1Trace rng0 blockInterval p2pTopography =
   tracePraosP2P
     rng0
     p2pTopography
@@ -174,7 +174,7 @@ example1Trace rng0 p2pTopography =
                 (kilobytes 96)
                 rng
                 -- average seconds between blocks:
-                (5 * fromIntegral p2pNumNodes)
+                (realToFrac blockInterval * fromIntegral p2pNumNodes)
           , praosConfig =
               PraosConfig
                 { slotConfig
