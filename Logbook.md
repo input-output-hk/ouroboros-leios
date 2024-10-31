@@ -2,6 +2,22 @@
 
 ## 2024-10-31
 
+### Haskell Simulation
+
+- The `praos-p2p-1` and `praos-p2p-2` visualizations now chart block
+  diffusion latency and other metrics.
+- New exe `sample` to run larger simulations for data collection.
+  Currently we have `praos-diffusion-10-links` and
+  `praos-diffusion-20-links` with 1000 nodes each, but different link
+  numbers: 10 links is the theoretical recommended amount, 20 is what
+  is used in practice. They output block diffusion latency data, that
+  could be used to validate the simulation against mainnet.
+- Switched to a fork of `io-sim` to improve memory usage, planning to upstream changes.
+- On a modest AMD Ryzen 5 5500U, `praos-diffusion-10-links` runs on average 3x slower than realtime
+  over long (1000 simulated seconds) simulations. The 20 links version is considerably slower.
+- Next step is to look into low hanging fruits to improve simulation speed.
+
+
 ### ΔQ update
 
 - added resource tracking to outcomes:
