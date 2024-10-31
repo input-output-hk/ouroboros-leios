@@ -1,6 +1,6 @@
 use crate::{
-    delta_q::{DeltaQ, LoadUpdate, Name},
-    PersistentContext, Outcome,
+    delta_q::{expand_gossip, DeltaQ, LoadUpdate, Name},
+    Outcome, PersistentContext,
 };
 use std::{rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
@@ -53,6 +53,14 @@ pub fn delta_q_component(props: &Props) -> Html {
         }
         DeltaQ::ForSome(first, second) => {
             html!(<Branch top={(**first).clone()} bottom={(**second).clone()} kind={BranchKind::ForSome} {on_change} />)
+        }
+        DeltaQ::Gossip {
+            hop,
+            size,
+            branching,
+            cluster_coeff,
+        } => {
+            html! { <Gossip hop={(**hop).clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
         }
     }
 }
@@ -523,5 +531,44 @@ impl Reducible for PersistentContext {
                 Rc::new(ret)
             }
         }
+    }
+}
+
+#[derive(Properties, Clone, PartialEq)]
+pub struct GossipProps {
+    pub hop: DeltaQ,
+    pub size: f32,
+    pub branching: f32,
+    pub cluster_coeff: f32,
+    pub on_change: Callback<(String, Option<DeltaQ>)>,
+}
+
+#[function_component(Gossip)]
+pub fn gossip(props: &GossipProps) -> Html {
+    let GossipProps {
+        hop,
+        size,
+        branching,
+        cluster_coeff,
+        on_change,
+    } = props;
+
+    let popup = use_state(|| false);
+    let toggle_popup = Callback::from(cloned!(popup; move |_| popup.set(!*popup)));
+
+    html! {
+        <div class={classes!("frame")} onclick={toggle_popup}>
+            { format!("gossip({}, {}, {}, {})", hop, size, branching, cluster_coeff) }
+            if *popup {
+                <div class={classes!("popup")}>
+                    {
+                        match expand_gossip(&hop, *size, *branching, *cluster_coeff) {
+                            Ok(delta_q) => html! { <DeltaQComponent delta_q={delta_q} on_change={|_| {}} /> },
+                            Err(e) => html! { <div>{e.to_string()}</div> },
+                        }
+                    }
+                </div>
+            }
+        </div>
     }
 }

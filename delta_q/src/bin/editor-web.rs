@@ -143,9 +143,9 @@ fn app_main() -> HtmlResult {
             let constraint = ctx.constraint(&name);
             let check = (|| {
                 let c = ctx.get(&constraint?)?;
-                let c = c.eval(&ctx, &mut cache).ok()?;
+                let c = c.expand().ok()?.eval(&ctx, &mut cache).ok()?;
                 let n = ctx.get(&name)?;
-                let n = n.eval(&ctx, &mut cache).ok()?;
+                let n = n.expand().ok()?.eval(&ctx, &mut cache).ok()?;
                 Some(n.cdf >= c.cdf)
             })();
             let check = match check {
