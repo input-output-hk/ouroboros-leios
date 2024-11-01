@@ -17,7 +17,8 @@ record BaseAbstract : Type₁ where
 
   data Output : Type where
     STAKE : StakeDistr → Output
+    EMPTY : Output
 
   record Functionality : Type₁ where
     field State : Type
-          _⇀⟦_⟧_ : State → Input → State × Maybe Output → Type
+          _⇀⟦_⟧_ : State → Input → State × Output → Type

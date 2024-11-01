@@ -33,6 +33,7 @@ postulate VTy FTCHTy : Type
 
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
+  SUBMIT   : List Tx → LeiosInput
   SLOT     : LeiosInput
   FTCH-LDG : LeiosInput
 
@@ -102,8 +103,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   Init : ∀ {V bs bs' SD} →
        ∙ {!!} -- create & register the IB/EB lottery and voting keys with key reg
-       ∙ bs BF.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , just (B.STAKE SD))
-       ─────────────────────────────────────────────────────────────
+       ∙ bs BF.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , B.STAKE SD)
+       ──────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
   -- Network and Ledger
@@ -122,17 +123,17 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   -- Base chain
 
-  Base₁ : ∀ {bs bs' eb} → let open LeiosState s in
+  Base₁ : ∀ {bs bs' eb txs} → let open LeiosState s in
        ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-       ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , nothing)
+       ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SLOT ⟧ (s , EMPTY)
+         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
-  Base₂ : ∀ {bs bs'} → let open LeiosState s renaming (MemPool to txs) in
+  Base₂ : ∀ {bs bs' txs} → let open LeiosState s in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-       ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , nothing)
+       ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SLOT ⟧ (s , EMPTY)
+         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
   -- Protocol rules
 
