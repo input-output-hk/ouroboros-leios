@@ -73,6 +73,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   open LeiosState s
 
   postulate isVote1Certified : Type -- Q: what's the threshold? (pg 7, (5))
+  postulate isVote2Certified : Type
 
   vote2Eligible : Type
   vote2Eligible = length ebRefs ≥ lengthˢ candidateEBs / 2 -- should this be `>`?
@@ -84,12 +85,11 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
 
 postulate instance isVote1Certified? : ∀ {s eb} → isVote1Certified s eb ⁇
+                   isVote2Certified? : ∀ {s eb} → isVote2Certified s eb ⁇
 
 private variable s     : LeiosState
                  ffds' : FFD.State
                  π     : VrfPf
-
-open LeiosState using (FFDState; MemPool)
 
 stake : LeiosState → ℕ
 stake record { SD = SD } = case lookupᵐ? SD id of λ where
@@ -97,14 +97,20 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   nothing  → 0
 
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
+
+  -- Initialization
+
   Init : ∀ {V bs bs' SD} →
        ∙ {!!} -- create & register the IB/EB lottery and voting keys with key reg
-       ∙ bs BF.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , B.STAKE SD)
-       ───────────────────────────────────────────────────
+       ∙ bs BF.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , just (B.STAKE SD))
+       ─────────────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
+  -- Network and Ledger
+
   -- fix: we need to do Slot before every other SLOT transition
-  Slot : ∀ {msgs} → let ffds = s .FFDState
+  Slot : ∀ {msgs} → let open LeiosState s
+                        ffds = FFDState
                         l = {!!} -- construct ledger l
          in
        ∙ FFDAbstract.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.FetchRes msgs)
@@ -115,15 +121,29 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        ────────────────────────────────────
        just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG l)
 
-  -- TODO: Base chain
+  -- Base chain
+
+  Base₁ : ∀ {bs bs' eb} → let open LeiosState s in
+       ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+       ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , nothing)
+       ────────────────────────────────────────────────────────────────────────────────────
+         just s ⇀⟦ SLOT ⟧ (s , EMPTY)
+
+  Base₂ : ∀ {bs bs' txs} → let open LeiosState s in
+       ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+       ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , nothing)
+       ────────────────────────────────────────────────────────────────────────────────────
+         just s ⇀⟦ SLOT ⟧ (s , EMPTY)
+
+  -- Protocol rules
 
   IB-Role : let open LeiosState s
-                txs  = s .MemPool
-                ffds = s .FFDState
+                txs  = MemPool
+                ffds = FFDState
                 b = GenFFD.ibBody (record { txs = txs })
                 h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
           in
-          ∙ canProduceIB slot pKey (stake s)
+          ∙ canProduceIB slot pKey (stake s) -- TODO: let π be the corresponding proof
           ∙ FFDAbstract.Send h (just b) FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ─────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
@@ -133,7 +153,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
                            filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
                 h = mkEB slot id π pKey LI LE
-                ffds = s .FFDState
+                ffds = FFDState
           in
           ∙ canProduceEB slot pKey (stake s)
           ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
@@ -143,7 +163,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   V1-Role : let open LeiosState s
                 EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
                 votes = map (vote ∘ hash) (setToList EBs')
-                ffds = s .FFDState
+                ffds = FFDState
           in
           ∙ canProduceV1 slot
           ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
@@ -153,7 +173,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   V2-Role : let open LeiosState s
                 EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
                 votes = map (vote ∘ hash) (setToList EBs')
-                ffds = s .FFDState
+                ffds = FFDState
           in
           ∙ canProduceV2 slot
           ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
