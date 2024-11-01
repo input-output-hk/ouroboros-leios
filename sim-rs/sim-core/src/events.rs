@@ -19,6 +19,11 @@ pub enum Event {
         publisher: NodeId,
         bytes: u64,
     },
+    TransactionSent {
+        id: TransactionId,
+        sender: NodeId,
+        recipient: NodeId,
+    },
     TransactionReceived {
         id: TransactionId,
         sender: NodeId,
@@ -29,6 +34,11 @@ pub enum Event {
         producer: NodeId,
         vrf: u64,
         transactions: Vec<TransactionId>,
+    },
+    PraosBlockSent {
+        slot: u64,
+        sender: NodeId,
+        recipient: NodeId,
     },
     PraosBlockReceived {
         slot: u64,
@@ -43,6 +53,12 @@ pub enum Event {
     EmptyInputBlockNotGenerated {
         #[serde(flatten)]
         header: InputBlockHeader,
+    },
+    InputBlockSent {
+        #[serde(flatten)]
+        id: InputBlockId,
+        sender: NodeId,
+        recipient: NodeId,
     },
     InputBlockReceived {
         #[serde(flatten)]
@@ -76,6 +92,14 @@ impl EventTracker {
         });
     }
 
+    pub fn track_praos_block_sent(&self, block: &Block, sender: NodeId, recipient: NodeId) {
+        self.send(Event::PraosBlockSent {
+            slot: block.slot,
+            sender,
+            recipient,
+        });
+    }
+
     pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::PraosBlockReceived {
             slot: block.slot,
@@ -89,6 +113,14 @@ impl EventTracker {
             id: transaction.id,
             publisher,
             bytes: transaction.bytes,
+        });
+    }
+
+    pub fn track_transaction_sent(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
+        self.send(Event::TransactionSent {
+            id,
+            sender,
+            recipient,
         });
     }
 
@@ -110,6 +142,14 @@ impl EventTracker {
     pub fn track_empty_ib_not_generated(&self, header: &InputBlockHeader) {
         self.send(Event::EmptyInputBlockNotGenerated {
             header: header.clone(),
+        });
+    }
+
+    pub fn track_ib_sent(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
+        self.send(Event::InputBlockSent {
+            id,
+            sender,
+            recipient,
         });
     }
 

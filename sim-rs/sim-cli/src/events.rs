@@ -132,6 +132,7 @@ impl EventMonitor {
                     );
                     pending_txs.insert(id);
                 }
+                Event::TransactionSent { .. } => {}
                 Event::TransactionReceived { .. } => {}
                 Event::PraosBlockGenerated {
                     slot,
@@ -160,6 +161,7 @@ impl EventMonitor {
                         pending_txs.remove(&published_tx);
                     }
                 }
+                Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockGenerated {
                     header,
@@ -189,6 +191,7 @@ impl EventMonitor {
                 Event::EmptyInputBlockNotGenerated { .. } => {
                     empty_ibs += 1;
                 }
+                Event::InputBlockSent { .. } => {}
                 Event::InputBlockReceived { recipient, .. } => {
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
