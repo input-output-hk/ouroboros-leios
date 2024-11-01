@@ -109,8 +109,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- Network and Ledger
 
   -- fix: we need to do Slot before every other SLOT transition
-  Slot : ∀ {msgs} → let open LeiosState s
-                        ffds = FFDState
+  Slot : ∀ {msgs} → let open LeiosState s renaming (FFDState to ffds)
                         l = {!!} -- construct ledger l
          in
        ∙ FFDAbstract.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.FetchRes msgs)
