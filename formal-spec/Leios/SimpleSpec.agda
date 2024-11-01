@@ -129,7 +129,10 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        ────────────────────────────────────────────────────────────────────────────────────
          just s ⇀⟦ SLOT ⟧ (s , EMPTY)
 
-  Base₂ : ∀ {bs bs' txs} → let open LeiosState s in
+  Base₂ : ∀ {bs bs'} →
+         let open LeiosState s
+             txs = MemPool
+         in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , nothing)
        ────────────────────────────────────────────────────────────────────────────────────
