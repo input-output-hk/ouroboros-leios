@@ -129,10 +129,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        ────────────────────────────────────────────────────────────────────────────────────
          just s ⇀⟦ SLOT ⟧ (s , EMPTY)
 
-  Base₂ : ∀ {bs bs'} →
-         let open LeiosState s
-             txs = MemPool
-         in
+  Base₂ : ∀ {bs bs'} → let open LeiosState s renaming (MemPool to txs) in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , nothing)
        ────────────────────────────────────────────────────────────────────────────────────
@@ -140,9 +137,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   -- Protocol rules
 
-  IB-Role : let open LeiosState s
-                txs  = MemPool
-                ffds = FFDState
+  IB-Role : let open LeiosState s renaming (MemPool to txs; FFDState to ffds)
                 b = GenFFD.ibBody (record { txs = txs })
                 h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
           in
@@ -151,32 +146,29 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
           ─────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-  EB-Role : let open LeiosState s
+  EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map {F = List} getIBRef $ setToList $ filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs)
                 LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
                            filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
                 h = mkEB slot id π pKey LI LE
-                ffds = FFDState
           in
           ∙ canProduceEB slot pKey (stake s)
           ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-  V1-Role : let open LeiosState s
+  V1-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
                 votes = map (vote ∘ hash) (setToList EBs')
-                ffds = FFDState
           in
           ∙ canProduceV1 slot
           ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ─────────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-  V2-Role : let open LeiosState s
+  V2-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
                 votes = map (vote ∘ hash) (setToList EBs')
-                ffds = FFDState
           in
           ∙ canProduceV2 slot
           ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
