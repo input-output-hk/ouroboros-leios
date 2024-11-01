@@ -27,11 +27,18 @@ struct OutputEvent {
     message: Event,
 }
 
+#[derive(clap::ValueEnum, Clone, Copy)]
+pub enum OutputFormat {
+    EventStream,
+    SlotStream,
+}
+
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
+    output_format: OutputFormat,
 }
 
 impl EventMonitor {
@@ -39,6 +46,7 @@ impl EventMonitor {
         config: &SimConfiguration,
         events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
+        output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
         let pool_ids = config
@@ -52,6 +60,7 @@ impl EventMonitor {
             pool_ids,
             events_source,
             output_path,
+            output_format: output_format.unwrap_or(OutputFormat::EventStream),
         }
     }
 
@@ -89,7 +98,13 @@ impl EventMonitor {
         }
 
         let mut output = match self.output_path {
-            Some(ref path) => OutputTarget::File(File::create(path).await?),
+            Some(ref path) => {
+                let file = File::create(path).await?;
+                match self.output_format {
+                    OutputFormat::EventStream => OutputTarget::EventStream(file),
+                    OutputFormat::SlotStream => OutputTarget::SlotStream { file, next: None },
+                }
+            }
             None => OutputTarget::None,
         };
         while let Some((event, time)) = self.events_source.recv().await {
@@ -179,6 +194,8 @@ impl EventMonitor {
                 }
             }
         }
+
+        output.flush().await?;
 
         info_span!("praos").in_scope(|| {
             info!("{} transactions(s) were generated in total.", txs.len());
@@ -295,18 +312,65 @@ fn should_log_event(event: &Event) -> bool {
 }
 
 enum OutputTarget {
-    File(File),
+    EventStream(File),
+    SlotStream {
+        file: File,
+        next: Option<SlotEvents>,
+    },
     None,
 }
 
+#[derive(Serialize)]
+struct SlotEvents {
+    slot: u64,
+    start_time: Timestamp,
+    events: Vec<OutputEvent>,
+}
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
-        let Self::File(file) = self else {
-            return Ok(());
-        };
+        match self {
+            Self::EventStream(file) => {
+                Self::write_line(file, event).await?;
+            }
+            Self::SlotStream { file, next } => {
+                if let Event::Slot { number } = &event.message {
+                    if let Some(slot) = next.take() {
+                        Self::write_line(file, slot).await?;
+                    }
+                    *next = Some(SlotEvents {
+                        slot: *number,
+                        start_time: event.time,
+                        events: vec![],
+                    });
+                } else if let Some(slot) = next.as_mut() {
+                    slot.events.push(event);
+                }
+            }
+            Self::None => {}
+        }
+        Ok(())
+    }
+
+    async fn write_line<T: Serialize>(file: &mut File, event: T) -> Result<()> {
         let mut string = serde_json::to_string(&event)?;
         string.push('\n');
         file.write_all(string.as_bytes()).await?;
+        Ok(())
+    }
+
+    async fn flush(self) -> Result<()> {
+        match self {
+            Self::EventStream(mut file) => {
+                file.flush().await?;
+            }
+            Self::SlotStream { mut file, mut next } => {
+                if let Some(slot) = next.take() {
+                    Self::write_line(&mut file, slot).await?;
+                }
+                file.flush().await?;
+            }
+            Self::None => {}
+        };
         Ok(())
     }
 }

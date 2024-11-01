@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf, process, time::Instant};
 
 use anyhow::Result;
 use clap::Parser;
-use events::EventMonitor;
+use events::{EventMonitor, OutputFormat};
 use sim_core::{
     clock::Clock,
     config::{NodeId, RawConfig, SimConfiguration},
@@ -23,6 +23,8 @@ mod events;
 struct Args {
     filename: PathBuf,
     output: Option<PathBuf>,
+    #[clap(short, long)]
+    format: Option<OutputFormat>,
     #[clap(short, long)]
     timescale: Option<f64>,
     #[clap(long)]
@@ -79,7 +81,8 @@ async fn main() -> Result<()> {
     let config = read_config(&args)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
-    let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
+    let monitor =
+        tokio::spawn(EventMonitor::new(&config, events_source, args.output, args.format).run());
     pin!(monitor);
 
     let clock = Clock::new(Instant::now(), config.timescale);
