@@ -11,7 +11,6 @@ import Control.Tracer
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
-import Data.Foldable (sequenceA_)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
@@ -64,12 +63,11 @@ runPeer ::
   PraosNodeState m ->
   PeerId ->
   Praos (Chan m) ->
-  Concurrently m ()
+  [Concurrently m ()]
 runPeer tracer cfg st peerId chan = do
   let chainConsumerState = st.chainSyncConsumerStates Map.! peerId
   let blockFetchConsumerState = initBlockFetchConsumerStateForPeerId tracer peerId st.blockFetchControllerState
-  sequenceA_
-    [ Concurrently $ runChainConsumer (protocolChainSync chan) chainConsumerState
+  [ Concurrently $ runChainConsumer (protocolChainSync chan) chainConsumerState
     , Concurrently $ runBlockFetchConsumer tracer cfg (protocolBlockFetch chan) blockFetchConsumerState
     ]
 
@@ -89,12 +87,11 @@ runFollower ::
   PraosNodeState m ->
   FollowerId ->
   Praos (Chan m) ->
-  Concurrently m ()
+  [Concurrently m ()]
 runFollower st followerId chan = do
   let chainProducerStateVar = st.blockFetchControllerState.cpsVar
   let blockFetchProducerState = BlockFetchProducerState $ asReadOnly st.blockFetchControllerState.blocksVar
-  sequenceA_
-    [ Concurrently $ runChainProducer (protocolChainSync chan) followerId chainProducerStateVar
+  [ Concurrently $ runChainProducer (protocolChainSync chan) followerId chainProducerStateVar
     , Concurrently $ runBlockFetchProducer (protocolBlockFetch chan) blockFetchProducerState
     ]
 
@@ -115,7 +112,11 @@ runPraosNode ::
   m ()
 runPraosNode tracer cfg chain followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
-  runConcurrently =<< setupPraosThreads tracer cfg st0 followers peers
+  concurrentlyMany . map runConcurrently =<< setupPraosThreads tracer cfg st0 followers peers
+ where
+  -- Nested children threads are slow with IOSim, this impl forks them all as direct children.
+  concurrentlyMany :: MonadAsync m => [m ()] -> m ()
+  concurrentlyMany xs = mapM_ wait =<< mapM async xs
 
 setupPraosThreads ::
   (MonadAsync m, MonadSTM m, MonadDelay m) =>
@@ -124,14 +125,14 @@ setupPraosThreads ::
   PraosNodeState m ->
   [Praos (Chan m)] ->
   [Praos (Chan m)] ->
-  m (Concurrently m ())
+  m [Concurrently m ()]
 setupPraosThreads tracer cfg st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM addPeer (length peers) st1
   let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer tracer cfg st2) peerIds peers
-  return $ sequenceA_ (controllerThread : followerThreads <> peerThreads)
+  return (controllerThread : concat followerThreads <> concat peerThreads)
 
 data PraosNodeConfig = PraosNodeConfig
   { praosConfig :: PraosConfig
@@ -147,7 +148,7 @@ praosNode ::
   PraosNodeConfig ->
   [Praos (Chan m)] ->
   [Praos (Chan m)] ->
-  m ()
+  m ([m ()])
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
   praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers
@@ -159,4 +160,4 @@ praosNode tracer cfg followers peers = do
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
           nextBlock
-  runConcurrently $ sequenceA_ [Concurrently generationThread, praosThreads]
+  return $ map runConcurrently $ Concurrently generationThread : praosThreads

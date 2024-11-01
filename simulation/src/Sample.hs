@@ -18,7 +18,7 @@ runSampleModel ::
   IO ()
 runSampleModel (SampleModel s0 accum render) stop = go . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
  where
-  go m = case stepSimViz 1000 m of
+  go m = case stepSimViz 10000 m of
     m'@(SimVizModel ((now, _) : _) _) -> do
       putStrLn $ "time reached: " ++ show now
       hFlush stdout
