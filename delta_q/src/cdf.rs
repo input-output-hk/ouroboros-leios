@@ -91,6 +91,10 @@ impl CDF {
         })
     }
 
+    pub fn top() -> Self {
+        Self::from_steps(&[(0.0, 1.0)]).unwrap()
+    }
+
     /// Create a CDF from a step function.
     ///
     /// This validates that the y-values are in the range (0, 1] and are strictly monotonically increasing.

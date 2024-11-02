@@ -14,6 +14,7 @@ pub enum DeltaQError {
     RecursionError(Name),
     BlackBox,
     TooManySteps,
+    EvaluationError,
 }
 
 impl std::error::Error for DeltaQError {}
@@ -26,6 +27,7 @@ impl Display for DeltaQError {
             DeltaQError::RecursionError(name) => write!(f, "Recursion error: {}", name),
             DeltaQError::BlackBox => write!(f, "Black box encountered"),
             DeltaQError::TooManySteps => write!(f, "Too many steps in gossip expansion"),
+            DeltaQError::EvaluationError => write!(f, "Evaluation error"),
         }
     }
 }
@@ -249,7 +251,7 @@ impl FromStr for DeltaQ {
 
 impl DeltaQ {
     pub fn top() -> DeltaQ {
-        DeltaQ::Outcome(Outcome::new(CDF::from_steps(&[(0.0, 1.0)]).unwrap()))
+        DeltaQ::Outcome(Outcome::top())
     }
 
     /// Create a new DeltaQ from a name, referencing a variable.
@@ -390,118 +392,157 @@ impl DeltaQ {
         ctx: &PersistentContext,
         ephemeral: &mut EphemeralContext,
     ) -> Result<Outcome, DeltaQError> {
-        match self {
-            DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
-            DeltaQ::Name(n, r) => {
-                // recursion is only allowed if not yet recursing on this name or there is an existing allowance
-                // which means that a new allowance leads to error if there is an existing one (this would permit
-                // infinite recursion)
-                //
-                // None means not recursing on this name
-                // Some(None) means recursing on this name without allowance
-                // Some(Some(n)) means recursing on this name with n as the remaining allowance
-                let recursion = if let Some(r) = r {
-                    if ephemeral.rec.contains_key(n) {
-                        return Err(DeltaQError::RecursionError(n.to_owned()));
-                    }
-                    Some(
-                        ephemeral
-                            .rec
-                            .entry(n.to_owned())
-                            .or_insert(Some(*r))
-                            .as_mut(),
-                    )
-                } else {
-                    ephemeral.rec.get_mut(n).map(|r| r.as_mut())
-                };
-                if let Some(Some(allowance)) = recursion {
-                    match ctx.ctx.get(n) {
-                        Some((dq, _)) => {
-                            let mut increment = true;
-                            let ret = if *allowance == 0 {
-                                increment = false;
-                                Ok(Outcome {
-                                    cdf: CDF::from_steps(&[(0.0, 1.0)]).unwrap(),
-                                    load: BTreeMap::new(),
-                                })
+        // evaluation is done using a stack machine with memory on heap in order to avoid stack overflows
+        //
+        // The operation stack stores the continuation of a computation frame while the operand stack holds results.
+
+        #[derive(Debug)]
+        enum Op<'a> {
+            /// Evaluate a DeltaQ with the given load factor and push the result on the result stack
+            Eval(&'a DeltaQ, f32),
+            /// construct a sequence from the top two results on the result stack
+            Seq,
+            /// construct a choice from the top two results on the result stack
+            Choice(f32, f32),
+            /// construct a forall from the top two results on the result stack
+            ForAll,
+            /// construct a forsome from the top two results on the result stack
+            ForSome,
+            /// end recursion for a name
+            EndRec(&'a Name),
+            /// increment recursion allowance
+            IncAllowance(&'a Name),
+        }
+
+        let mut op_stack = Vec::new();
+        let mut res_stack = Vec::<Outcome>::new();
+
+        // Start with the initial DeltaQ
+        op_stack.push(Op::Eval(self, 1.0));
+
+        while let Some(op) = op_stack.pop() {
+            match op {
+                Op::Eval(dq, load_factor) => {
+                    match dq {
+                        DeltaQ::BlackBox => return Err(DeltaQError::BlackBox),
+                        DeltaQ::Name(n, r) => {
+                            // recursion is only allowed if not yet recursing on this name or there is an existing allowance
+                            // which means that a new allowance leads to error if there is an existing one (this would permit
+                            // infinite recursion)
+                            //
+                            // None means not recursing on this name
+                            // Some(None) means recursing on this name without allowance
+                            // Some(Some(n)) means recursing on this name with n as the remaining allowance
+                            if let Some(r) = r {
+                                if ephemeral.rec.contains_key(n) {
+                                    return Err(DeltaQError::RecursionError(n.to_owned()));
+                                }
+                                if *r == 0 {
+                                    res_stack.push(Outcome::top());
+                                    continue;
+                                }
+                                // subtract the allowance needed for running the evaluation below
+                                ephemeral.rec.insert(n.to_owned(), Some(*r - 1));
+                                op_stack.push(Op::EndRec(n));
                             } else {
-                                *allowance -= 1;
-                                dq.expand()?.eval(ctx, ephemeral)
-                            };
-                            if r.is_some() {
-                                ephemeral.rec.remove(n);
-                            } else if increment {
-                                *ephemeral.rec.get_mut(n).unwrap().as_mut().unwrap() += 1;
+                                match ephemeral.rec.get_mut(n) {
+                                    Some(Some(rec)) => {
+                                        // recursing with prior allowance
+                                        if *rec == 0 {
+                                            res_stack.push(Outcome::top());
+                                            continue;
+                                        } else {
+                                            *rec -= 1;
+                                            op_stack.push(Op::IncAllowance(n));
+                                        }
+                                    }
+                                    Some(None) => {
+                                        // recursing without allowance
+                                        return Err(DeltaQError::RecursionError(n.to_owned()));
+                                    }
+                                    None => {
+                                        // evaluating without allowance => prohibit further recursion
+                                        ephemeral.rec.insert(n.to_owned(), None);
+                                        op_stack.push(Op::EndRec(n));
+                                    }
+                                }
                             }
-                            ret
+
+                            // Check cache
+                            if load_factor == 1.0 {
+                                if let Some(cached_outcome) = ephemeral.cache.get(n) {
+                                    res_stack.push(cached_outcome.clone());
+                                    continue;
+                                }
+                            }
+
+                            // Proceed with evaluation
+                            let Some((dq, _constraint)) = ctx.ctx.get(n) else {
+                                return Err(DeltaQError::NameError(n.to_owned()));
+                            };
+                            op_stack.push(Op::Eval(dq, load_factor));
                         }
-                        None => Err(DeltaQError::NameError(n.to_owned())),
-                    }
-                } else if recursion.is_some() {
-                    Err(DeltaQError::RecursionError(n.to_owned()))
-                } else {
-                    // Check if the outcome is cached
-                    if ephemeral.load_factor == 1.0 {
-                        if let Some(cached_outcome) = ephemeral.cache.get(n) {
-                            return Ok(cached_outcome.clone());
+                        DeltaQ::Outcome(outcome) => {
+                            res_stack.push(outcome.mult(load_factor, ctx));
                         }
+                        DeltaQ::Seq(first, load, second) => {
+                            op_stack.push(Op::Seq);
+                            // evaluate second after first
+                            op_stack
+                                .push(Op::Eval(second, load_factor * load.factor + load.summand));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQ::Choice(first, w1, second, w2) => {
+                            op_stack.push(Op::Choice(*w1, *w2));
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQ::ForAll(first, second) => {
+                            op_stack.push(Op::ForAll);
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQ::ForSome(first, second) => {
+                            op_stack.push(Op::ForSome);
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQ::Gossip { .. } => panic!("gossip not expanded"),
                     }
-
-                    // Proceed with evaluation
-                    let Some((dq, _)) = ctx.ctx.get(n) else {
-                        return Err(DeltaQError::NameError(n.to_owned()));
-                    };
-
-                    ephemeral.rec.insert(n.to_owned(), None);
-                    let outcome = dq.expand()?.eval(ctx, ephemeral);
-                    ephemeral.rec.remove(n);
-
-                    let outcome = outcome?;
-                    if ephemeral.load_factor == 1.0 {
-                        ephemeral.cache.insert(n.clone(), outcome.clone());
+                }
+                Op::Seq => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.seq(&second, ctx)?);
+                }
+                Op::Choice(w1, w2) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.choice(w1 / (w1 + w2), &second, ctx)?);
+                }
+                Op::ForAll => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.for_all(&second, ctx)?);
+                }
+                Op::ForSome => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.for_some(&second, ctx)?);
+                }
+                Op::EndRec(n) => {
+                    ephemeral.rec.remove(n).unwrap();
+                }
+                Op::IncAllowance(n) => {
+                    if let Some(Some(rec)) = ephemeral.rec.get_mut(n) {
+                        *rec += 1;
                     }
-                    Ok(outcome)
                 }
             }
-            DeltaQ::Outcome(outcome) => Ok(outcome.mult(ephemeral.load_factor, ctx)),
-            DeltaQ::Seq(first, load, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let lf = ephemeral.load_factor;
-                ephemeral.load_factor = ephemeral.load_factor * load.factor + load.summand;
-                let second_cdf = second.eval(ctx, ephemeral);
-                ephemeral.load_factor = lf;
-                let second_cdf = second_cdf?;
-                first_cdf
-                    .seq(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::Choice(first, first_fraction, second, second_fraction) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .choice(
-                        *first_fraction / (*first_fraction + *second_fraction),
-                        &second_cdf,
-                        ctx,
-                    )
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::ForAll(first, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .for_all(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::ForSome(first, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .for_some(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::Gossip { .. } => panic!("gossip encountered in eval"),
         }
+
+        assert!(res_stack.len() == 1);
+        Ok(res_stack.pop().unwrap())
     }
 }
 
@@ -569,16 +610,16 @@ pub fn expand_gossip(
 // Define the new EphemeralContext struct
 pub struct EphemeralContext {
     pub rec: BTreeMap<Name, Option<usize>>,
-    pub load_factor: f32,
     pub cache: BTreeMap<Name, Outcome>,
+    pub expanded: BTreeMap<Name, DeltaQ>,
 }
 
 impl Default for EphemeralContext {
     fn default() -> Self {
         Self {
             rec: Default::default(),
-            load_factor: 1.0,
             cache: Default::default(),
+            expanded: Default::default(),
         }
     }
 }
@@ -762,7 +803,7 @@ mod tests {
 
         let res = "+a".parse::<DeltaQ>().unwrap_err();
         assert!(
-            res.contains("expected 'BB', name, CDF, 'all(', 'some(', or parentheses"),
+            res.contains("expected 'BB', name, CDF, 'all(', 'some(', 'gossip(', or parentheses"),
             "{}",
             res
         );
@@ -806,6 +847,10 @@ mod tests {
             .eval(&ctx, &mut ephemeral)
             .unwrap();
         assert_eq!(DeltaQ::Outcome(res), outcome.parse("CDF[(7,1)]").unwrap());
+        let res = DeltaQ::Name("f".into(), Some(0))
+            .eval(&ctx, &mut ephemeral)
+            .unwrap();
+        assert_eq!(DeltaQ::Outcome(res), outcome.parse("CDF[(0,1)]").unwrap());
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {

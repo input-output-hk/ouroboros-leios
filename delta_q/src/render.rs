@@ -550,7 +550,7 @@ pub fn gossip(props: &GossipProps) -> Html {
         size,
         branching,
         cluster_coeff,
-        on_change,
+        on_change: _,
     } = props;
 
     let popup = use_state(|| false);
