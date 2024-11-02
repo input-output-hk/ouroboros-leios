@@ -1,6 +1,6 @@
 use crate::{
     delta_q::{LoadUpdate, Name},
-    DeltaQ, Outcome, PersistentContext, StepFunction, CDF,
+    DeltaQ, DeltaQExpr, Outcome, PersistentContext, StepFunction, CDF,
 };
 use std::sync::Arc;
 use winnow::{
@@ -30,9 +30,9 @@ pub fn eval_ctx(input: &str) -> Result<PersistentContext, String> {
     .map_err(|e| format!("{e}"))
 }
 
-impl<'a> Accumulate<((&'a str, Option<&'a str>), DeltaQ)> for PersistentContext {
-    fn accumulate(&mut self, ((name, constraint), dq): ((&'a str, Option<&'a str>), DeltaQ)) {
-        self.put(name.to_owned(), dq);
+impl<'a> Accumulate<((&'a str, Option<&'a str>), DeltaQExpr)> for PersistentContext {
+    fn accumulate(&mut self, ((name, constraint), dq): ((&'a str, Option<&'a str>), DeltaQExpr)) {
+        self.put(name.to_owned(), DeltaQ::from(dq));
         if let Some(constraint) = constraint {
             self.set_constraint(name, Some(constraint.into()));
         }
@@ -43,13 +43,13 @@ impl<'a> Accumulate<((&'a str, Option<&'a str>), DeltaQ)> for PersistentContext 
     }
 }
 
-pub fn parse(input: &str) -> Result<DeltaQ, String> {
+pub fn parse(input: &str) -> Result<DeltaQExpr, String> {
     delta_q.parse(input).map_err(|e| format!("{e}"))
 }
 
-fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
+fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
     // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-    fn rec(input: &mut &str, min_bp: u8) -> PResult<DeltaQ> {
+    fn rec(input: &mut &str, min_bp: u8) -> PResult<DeltaQExpr> {
         let mut lhs = atom.parse_next(input)?;
 
         loop {
@@ -71,9 +71,9 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQ> {
             let rhs = rec(input, rbp)?;
             lhs = match op {
                 Op::Seq { mult, add } => {
-                    DeltaQ::Seq(Arc::new(lhs), LoadUpdate::new(mult, add), Arc::new(rhs))
+                    DeltaQExpr::Seq(Arc::new(lhs), LoadUpdate::new(mult, add), Arc::new(rhs))
                 }
-                Op::Choice(l, r) => DeltaQ::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
+                Op::Choice(l, r) => DeltaQExpr::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
             };
         }
         Ok(lhs)
@@ -91,7 +91,7 @@ fn op_seq(input: &mut &str) -> PResult<(f32, f32)> {
         .parse_next(input)
 }
 
-fn atom(input: &mut &str) -> PResult<DeltaQ> {
+fn atom(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         ws,
         alt((
@@ -120,24 +120,24 @@ fn ws(input: &mut &str) -> PResult<()> {
         .parse_next(input)
 }
 
-fn blackbox(input: &mut &str) -> PResult<DeltaQ> {
-    "BB".value(DeltaQ::BlackBox).parse_next(input)
+fn blackbox(input: &mut &str) -> PResult<DeltaQExpr> {
+    "BB".value(DeltaQExpr::BlackBox).parse_next(input)
 }
 
 fn name_bare<'a>(input: &mut &'a str) -> PResult<&'a str> {
     take_while(1.., |c: char| c.is_alphanumeric()).parse_next(input)
 }
 
-fn name(input: &mut &str) -> PResult<DeltaQ> {
+fn name(input: &mut &str) -> PResult<DeltaQExpr> {
     (name_bare, opt(preceded('^', int)))
         .parse_next(input)
-        .map(|(name, rec)| DeltaQ::name_rec(name, rec))
+        .map(|(name, rec)| DeltaQExpr::Name(name.into(), rec))
 }
 
-pub(crate) fn outcome(input: &mut &str) -> PResult<DeltaQ> {
+pub(crate) fn outcome(input: &mut &str) -> PResult<DeltaQExpr> {
     (cdf, repeat::<_, _, Vec<_>, _, _>(0.., preceded(ws, load)))
         .map(|(cdf, loads)| {
-            DeltaQ::Outcome(Outcome::new_with_load(cdf, loads.into_iter().collect()))
+            DeltaQExpr::Outcome(Outcome::new_with_load(cdf, loads.into_iter().collect()))
         })
         .parse_next(input)
 }
@@ -176,27 +176,27 @@ fn step_function_body(input: &mut &str) -> PResult<StepFunction> {
     .parse_next(input)
 }
 
-fn for_all(input: &mut &str) -> PResult<DeltaQ> {
+fn for_all(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         alt(("all(", "∀(")),
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )
-    .map(|(left, right)| DeltaQ::ForAll(Arc::new(left), Arc::new(right)))
+    .map(|(left, right)| DeltaQExpr::ForAll(Arc::new(left), Arc::new(right)))
     .parse_next(input)
 }
 
-fn for_some(input: &mut &str) -> PResult<DeltaQ> {
+fn for_some(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         alt(("some(", "∃(")),
         cut_err(separated_pair(delta_q, "|", delta_q)),
         closing_paren,
     )
-    .map(|(left, right)| DeltaQ::ForSome(Arc::new(left), Arc::new(right)))
+    .map(|(left, right)| DeltaQExpr::ForSome(Arc::new(left), Arc::new(right)))
     .parse_next(input)
 }
 
-fn gossip(input: &mut &str) -> PResult<DeltaQ> {
+fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         "gossip(",
         cut_err(seq!(delta_q, _: comma, num, _: comma, num, _: comma, num))
@@ -206,7 +206,7 @@ fn gossip(input: &mut &str) -> PResult<DeltaQ> {
             ))),
         closing_paren,
     )
-    .map(|(dq, size, branching, cluster_coeff)| DeltaQ::Gossip {
+    .map(|(dq, size, branching, cluster_coeff)| DeltaQExpr::Gossip {
         hop: Arc::new(dq),
         size,
         branching,
@@ -268,7 +268,9 @@ mod tests {
     fn parse_empty_cdf() {
         assert_eq!(
             parse("CDF[]"),
-            Ok(DeltaQ::Outcome(Outcome::new(CDF::from_steps(&[]).unwrap())))
+            Ok(DeltaQExpr::Outcome(Outcome::new(
+                CDF::from_steps(&[]).unwrap()
+            )))
         );
     }
 

@@ -34,7 +34,7 @@ pub const DEFAULT_MAX_SIZE: usize = 1000;
 pub struct StepFunction {
     /// invariants: first component strictly monotonically increasing and non-negative,
     /// with neighbouring x values being separated by at least five ε
-    data: Arc<[(f32, f32)]>,
+    data: Option<Arc<[(f32, f32)]>>,
     max_size: usize,
     mode: CompactionMode,
 }
@@ -59,11 +59,24 @@ impl StepFunction {
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
             return Err(StepFunctionError::NonMonotonicData);
         }
+        let data = if points.is_empty() {
+            None
+        } else {
+            Some(points.into())
+        };
         Ok(Self {
-            data: points.into(),
+            data,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
+    }
+
+    pub fn at(&self, x: f32) -> f32 {
+        self.data()
+            .iter()
+            .rev()
+            .find(|&&(x0, _)| x0 <= x)
+            .map_or(self.data().last().map_or(0.0, |&(_x, y)| y), |&(_, y)| y)
     }
 
     pub fn compact(&self, mut data: Vec<(f32, f32)>) -> Result<Self, StepFunctionError> {
@@ -93,9 +106,14 @@ impl StepFunction {
         self
     }
 
+    pub fn data(&self) -> &[(f32, f32)] {
+        static EMPTY: &[(f32, f32)] = &[];
+        self.data.as_deref().unwrap_or(EMPTY)
+    }
+
     pub fn iter(&self) -> StepFunctionIterator {
         StepFunctionIterator {
-            cdf: self.data.iter(),
+            cdf: self.data().iter(),
             prev: (0.0, 0.0),
             first: false,
             last: false,
@@ -104,7 +122,7 @@ impl StepFunction {
 
     pub fn graph_iter(&self) -> StepFunctionIterator {
         StepFunctionIterator {
-            cdf: self.data.iter(),
+            cdf: self.data().iter(),
             prev: (0.0, 0.0),
             first: true,
             last: false,
@@ -113,14 +131,14 @@ impl StepFunction {
 
     /// Get the width of the CDF.
     pub fn max_x(&self) -> f32 {
-        self.data.iter().next_back().map_or(0.0, |(x, _)| *x)
+        self.data().iter().next_back().map_or(0.0, |(x, _)| *x)
     }
 
     pub fn zip<'a>(
         &'a self,
         other: &'a StepFunction,
     ) -> impl Iterator<Item = (f32, (f32, f32))> + 'a {
-        PairIterators::new(self.data.iter().copied(), other.data.iter().copied())
+        PairIterators::new(self.data().iter().copied(), other.data().iter().copied())
     }
 
     pub fn mult(&self, factor: f32) -> Self {
@@ -131,7 +149,10 @@ impl StepFunction {
                 .with_mode(self.mode);
         }
         Self {
-            data: self.data.iter().map(|&(x, y)| (x, y * factor)).collect(),
+            data: self
+                .data
+                .as_ref()
+                .map(|d| d.iter().map(|&(x, y)| (x, y * factor)).collect()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -144,7 +165,7 @@ impl StepFunction {
         }
         compact(&mut data, self.mode, self.max_size);
         Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -157,7 +178,7 @@ impl StepFunction {
         }
         compact(&mut data, self.mode, self.max_size);
         Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -169,11 +190,11 @@ impl StepFunction {
                 || b == 0.0 && a.abs() < 1e-6
                 || (a - b).abs() / a.max(b) < 1e-6
         }
-        self.data.len() == other.data.len()
+        self.data().len() == other.data().len()
             && self
-                .data
+                .data()
                 .iter()
-                .zip(other.data.iter())
+                .zip(other.data().iter())
                 .all(|(a, b)| similar(a.0, b.0) && similar(a.1, b.1))
     }
 }
@@ -181,7 +202,7 @@ impl StepFunction {
 impl From<StepFunction> for StepFunctionSerial {
     fn from(cdf: StepFunction) -> Self {
         Self {
-            data: cdf.data[..].to_owned(),
+            data: cdf.data()[..].to_owned(),
         }
     }
 }
@@ -197,7 +218,7 @@ impl TryFrom<StepFunctionSerial> for StepFunction {
 impl fmt::Debug for StepFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StepFunction")
-            .field("data", &self.data)
+            .field("data", &self.data())
             .finish()
     }
 }
@@ -207,7 +228,7 @@ impl fmt::Display for StepFunction {
         let mut scratch = String::new();
 
         write!(f, "[")?;
-        for (i, (x, y)) in self.data.iter().enumerate() {
+        for (i, (x, y)) in self.data().iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
@@ -274,7 +295,7 @@ impl FromStr for StepFunction {
             data.push((x, y));
         }
         Ok(Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
