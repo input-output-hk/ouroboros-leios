@@ -79,6 +79,21 @@ impl StepFunction {
             .map_or(self.data().last().map_or(0.0, |&(_x, y)| y), |&(_, y)| y)
     }
 
+    pub fn integrate(&self, from: f32, to: f32) -> f32 {
+        self.func_iter()
+            .tuple_windows()
+            .filter_map(|((x0, y), (x1, _y))| {
+                let min = x0.max(from);
+                let max = x1.min(to);
+                if min < max {
+                    Some((max - min) * y)
+                } else {
+                    None
+                }
+            })
+            .sum()
+    }
+
     pub fn compact(&self, mut data: Vec<(f32, f32)>) -> Result<Self, StepFunctionError> {
         compact(&mut data, self.mode, self.max_size);
         Self::new(&data)
@@ -126,6 +141,15 @@ impl StepFunction {
             prev: (0.0, 0.0),
             first: true,
             last: false,
+        }
+    }
+
+    pub fn func_iter(&self) -> StepFunctionIterator {
+        StepFunctionIterator {
+            cdf: self.data().iter(),
+            prev: (0.0, 0.0),
+            first: true,
+            last: true,
         }
     }
 
@@ -321,8 +345,7 @@ impl<'a> Iterator for StepFunctionIterator<'a> {
             Some(*pair)
         } else if self.last {
             self.last = false;
-            let (x, y) = self.prev;
-            Some(((x * 1.2).max(0.1), y))
+            Some((f32::INFINITY, self.prev.1))
         } else {
             None
         }
@@ -369,7 +392,7 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
     // determine overall scale of the graph to determine the granularity of distances
     // (without this rounding the pruning will be dominated by floating point errors)
     let scale = data[data.len() - 1].0;
-    let granularity = scale / 300.0;
+    let granularity = scale / 10000.0;
 
     #[derive(Debug, PartialEq)]
     struct D {
@@ -414,75 +437,51 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
             } else {
                 return None;
             };
-            let dist = b.0 - a.0;
+            let dist = if use_left { c.0 - b.0 } else { b.0 - a.0 };
             Some(mk_d(dist, idx + 1, use_left))
         })
         .collect::<BinaryHeap<_>>();
 
     let mut to_remove = data.len() - max_size;
     let mut last_bin = -1;
-    while let Some(D {
-        bin,
-        idx,
-        dist,
-        use_left,
-    }) = heap.pop()
-    {
-        if bin == last_bin {
+    while let Some(d) = heap.pop() {
+        if d.bin == last_bin {
             last_bin = -1;
             continue;
         } else {
-            last_bin = bin;
+            last_bin = d.bin;
         }
         // skip points that have already been removed
-        if data[idx].1 < 0.0 {
+        if data[d.idx].1 < 0.0 {
             continue;
         }
 
-        if use_left {
-            // just remove this point, meaning that the left neighbour needs to be updated
-            let mut neighbours = data[..idx]
-                .iter()
-                .enumerate()
-                .rev()
-                .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(i));
+        // just remove this point, meaning that the left neighbour needs to be updated
+        let mut neighbours = data[..d.idx]
+            .iter()
+            .enumerate()
+            .rev()
+            .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(i));
 
-            if let Some(neighbour) = neighbours.next() {
-                if let Some(n2) = neighbours.next() {
-                    // only push to heap if the next neighbour is in the opposite quadrant
-                    if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[idx].1) <= 0.0 {
-                        heap.push(mk_d(data[idx].0 - data[neighbour].0 + dist, idx, use_left));
-                    }
-                }
-                data[idx] = data[neighbour];
-                data[neighbour].1 = -1.0;
-            }
-        } else {
-            // we update the y on this point and remove the right neighbour
-            let mut neighbours = data[idx + 1..]
-                .iter()
-                .enumerate()
-                .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(idx + 1 + i));
-            let n1 = neighbours.next();
-            let n2 = neighbours.next();
-            match (n1, n2) {
-                (Some(n1), Some(n2)) => {
-                    // drop n1 and update our distance (but only push to heap if the next neighbour is in the opposite quadrant)
-                    if (data[n2].1 - data[n1].1) * (data[n1].1 - data[idx].1) <= 0.0 {
-                        heap.push(mk_d(data[n2].0 - data[idx].0, idx, use_left));
-                    }
-                    data[idx].1 = data[n1].1;
-                    data[n1].1 = -1.0;
-                }
-                (Some(n1), None) => {
-                    // n1 is the rightmost, so don't submit us again because now we’re rightmost
-                    data[idx].1 = data[n1].1;
-                    data[n1].1 = -1.0;
-                }
-                _ => {
-                    debug_assert!(false, "shouldn’t get here because of the above");
+        if let Some(neighbour) = neighbours.next() {
+            if let Some(n2) = neighbours.next() {
+                // only push to heap if the next neighbour is in the opposite quadrant
+                if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[d.idx].1) <= 0.0 {
+                    heap.push(mk_d(
+                        data[d.idx].0 - data[neighbour].0 + d.dist,
+                        d.idx,
+                        d.use_left,
+                    ));
                 }
             }
+            // since we cannot remove the now changed neighbour from the heap, we mark it as removed instead
+            // and move the neighbour to our position
+            if d.use_left {
+                data[d.idx] = data[neighbour];
+            } else {
+                data[d.idx].0 = data[neighbour].0;
+            }
+            data[neighbour].1 = -1.0;
         }
 
         to_remove -= 1;
@@ -663,13 +662,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.3, 0.4), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.1, 0.2), (0.3, 0.4), (0.5, 0.6), (0.9, 1.0)]
         );
         let mut data2 = data.clone();
         compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.1), (0.1, 0.2), (0.2, 0.6), (0.6, 0.8), (0.8, 1.0)]
+            vec![(0.0, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
         );
     }
 
@@ -688,13 +687,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
+            vec![(0.0, 0.1), (0.1, 0.2), (0.3, 0.4), (0.5, 0.5), (0.9, 0.7)]
         );
         let mut data2 = data.clone();
         compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.1), (0.1, 0.3), (0.3, 0.5), (0.7, 0.6), (0.9, 0.7)]
+            vec![(0.0, 0.2), (0.2, 0.4), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
         );
     }
 
@@ -712,13 +711,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.5), (0.7, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.2, 0.3), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
         );
         let mut data1 = data.clone();
         compact(&mut data1, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.5), (0.5, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.6), (0.7, 0.8), (0.9, 1.0)]
         );
     }
 
@@ -743,7 +742,7 @@ mod tests {
         compact(&mut data1, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.1, 0.2), (0.2, 0.4), (0.5, 0.6), (0.7, 0.8), (0.8, 1.0)]
+            vec![(0.1, 0.3), (0.3, 0.4), (0.5, 0.6), (0.7, 0.9), (0.9, 1.0)]
         );
     }
 }

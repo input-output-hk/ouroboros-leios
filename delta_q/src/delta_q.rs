@@ -1330,6 +1330,11 @@ mod tests {
             .unwrap();
         let diffuse = ctx.eval("diffuse").unwrap();
         assert_eq!(diffuse.cdf.iter().count(), 1000);
+        assert!(
+            diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
+            "{}",
+            diffuse.cdf.steps().integrate(0.0, 1476.0)
+        );
         assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
     }
 }
