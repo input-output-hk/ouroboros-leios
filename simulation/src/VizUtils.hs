@@ -4,7 +4,9 @@ module VizUtils where
 
 import qualified Graphics.Rendering.Cairo as Cairo
 
+import Data.Word (Word8)
 import SimTypes (Point (..))
+import System.Random (StdGen, uniform)
 
 data Vector = Vector !Double !Double
 
@@ -96,3 +98,9 @@ simPointToPixel (!ww, !wh) (!sw, !sh) (Point wx wy) = Point sx sy
  where
   !sx = wx / ww * sw
   !sy = wy / wh * sh
+
+rngColor :: StdGen -> (Double, Double, Double)
+rngColor rng = (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
+ where
+  r, g, b :: Word8
+  ((r, g, b), _) = uniform rng

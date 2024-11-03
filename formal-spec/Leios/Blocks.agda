@@ -1,5 +1,3 @@
-{-# OPTIONS --erasure #-}
-
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD

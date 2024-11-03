@@ -26,7 +26,7 @@ impl NodeId {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "distribution", rename_all = "snake_case")]
 pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
@@ -47,12 +47,12 @@ impl From<DistributionConfig> for FloatDistribution {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RawConfig {
     pub seed: Option<u64>,
     pub timescale: Option<f64>,
     pub slots: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<RawNodeConfig>,
     pub links: Vec<RawLinkConfig>,
@@ -67,16 +67,16 @@ pub struct RawConfig {
     pub transaction_size_bytes: DistributionConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RawLinkConfig {
-    nodes: (usize, usize),
-    latency_ms: Option<u64>,
+    pub nodes: (usize, usize),
+    pub latency_ms: Option<u64>,
 }
 
 impl From<RawConfig> for SimConfiguration {

@@ -1,5 +1,3 @@
-{-# OPTIONS --erasure #-}
-
 module Leios.Prelude where
 
 open import abstract-set-theory.FiniteSetTheory public

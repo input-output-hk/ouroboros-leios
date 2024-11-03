@@ -1,6 +1,62 @@
 # Leios logbook
 
+## 2024-01-01
+
+### Haskell Simulation
+
+Successfully profiled and optimized the running of simulations:
+- Running praos-diffusion-20-links for 1000 simulation seconds went
+  from taking 120 minutes to 4 minutes.
+- Most of the improvement was gained by changes to get `io-sim` to
+  handle simulations of that scale:
+  * avoided nested forking of threads: changes introduced by IOSimPOR
+    give us a bad ThreadId representation for that use pattern.
+  * patched io-sim to use a more efficient priority search queue
+    implementation for timers (from a balanced-search-tree-inspired
+    one to a radix-tree one), the old one was taking up 95% of the
+    computation time for us.
+
+Giving a single ratio between simulated and execution time is complicated by the bursts of activity for every block production event (targeted to every 20s in expectation) and the initial ramp-up period where the nodes link to their peers and initialize the protocols. Logging real timestamps to the left of simulated seconds we get something like this:
+```
+00:00:02 time reached: Time 0s
+00:00:04 time reached: Time 0.000001s
+00:00:05 time reached: Time 0.014412s
+...
+00:00:14 time reached: Time 0.960055s
+00:00:15 time reached: Time 20.518214s
+...
+00:00:22 time reached: Time 40.418916s
+...
+00:04:01 time reached: Time 1000.194996s
+...
+00:08:21 time reached: Time 2000.009102s
+...
+00:13:25 done. -- i.e. reached Time 3000s
+```
+nevertheless the average is 3.7:1 for simulated:real.
+
+Next step for the praos simulation is to gather data from real running
+nodes to validate the block diffusion latency, possibly from a
+benchmark cluster, like the recent data shared by Brian, as mainnet
+might take too long.
+
 ## 2024-10-31
+
+### Haskell Simulation
+
+- The `praos-p2p-1` and `praos-p2p-2` visualizations now chart block
+  diffusion latency and other metrics.
+- New exe `sample` to run larger simulations for data collection.
+  Currently we have `praos-diffusion-10-links` and
+  `praos-diffusion-20-links` with 1000 nodes each, but different link
+  numbers: 10 links is the theoretical recommended amount, 20 is what
+  is used in practice. They output block diffusion latency data, that
+  could be used to validate the simulation against mainnet.
+- Switched to a fork of `io-sim` to improve memory usage, planning to upstream changes.
+- On a modest AMD Ryzen 5 5500U, `praos-diffusion-10-links` runs on average 3x slower than realtime
+  over long (1000 simulated seconds) simulations. The 20 links version is considerably slower.
+- Next step is to look into low hanging fruits to improve simulation speed.
+
 
 ### ΔQ update
 

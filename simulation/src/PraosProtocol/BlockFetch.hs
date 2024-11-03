@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -13,6 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -36,6 +38,7 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, unless, void, when, (<=<))
+import Control.Tracer (Tracer, traceWith)
 import Data.Bifunctor (second)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -239,16 +242,24 @@ data BlockFetchConsumerState m = BlockFetchConsumerState
   , removeInFlight :: [Point Block] -> m ()
   }
 
-runBlockFetchConsumer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchConsumerState m -> m ()
-runBlockFetchConsumer chan blockFetchConsumerState =
-  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer blockFetchConsumerState)
+runBlockFetchConsumer ::
+  (MonadSTM m, MonadDelay m) =>
+  Tracer m PraosNodeEvent ->
+  PraosConfig ->
+  Chan m BlockFetchMessage ->
+  BlockFetchConsumerState m ->
+  m ()
+runBlockFetchConsumer tracer cfg chan blockFetchConsumerState =
+  void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer tracer cfg blockFetchConsumerState)
 
 blockFetchConsumer ::
   forall m.
-  MonadSTM m =>
+  (MonadSTM m, MonadDelay m) =>
+  Tracer m PraosNodeEvent ->
+  PraosConfig ->
   BlockFetchConsumerState m ->
   TC.Client BlockFetchState NonPipelined StIdle m ()
-blockFetchConsumer st = idle
+blockFetchConsumer tracer cfg st = idle
  where
   -- does not support preemption of in-flight requests.
   blockRequest :: STM m (AnchoredFragment BlockHeader)
@@ -278,22 +289,18 @@ blockFetchConsumer st = idle
   streaming range headers = TC.Await $ \msg ->
     case (msg, headers) of
       (MsgBatchDone, []) -> idle
-      (MsgBlock block, header : headers') -> TC.Effect $ do
-        ifValidBlockBody
-          header
-          block
-          ( do
-              st.addFetchedBlock (Block header block)
-              return (streaming range headers')
-          )
-          (error $ "blockFetchConsumer: invalid block\n" ++ show (Block header block)) -- TODO
+      (MsgBlock body, header : headers') -> TC.Effect $ do
+        let block = Block header body
+        traceWith tracer $ PraosNodeEventReceived block
+        threadDelaySI (cfg.blockValidationDelay block)
+        if blockInvariant block
+          then do
+            st.addFetchedBlock block
+            traceWith tracer (PraosNodeEventEnterState block)
+            return (streaming range headers')
+          else error $ "blockFetchConsumer: invalid block\n" ++ show block -- TODO
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
-  ifValidBlockBody hdr bdy t f = do
-    -- TODO: threadDelay
-    if blockInvariant $ Block hdr bdy
-      then t
-      else f
 
 --------------------------------------------
 ---- BlockFetch controller
@@ -377,11 +384,11 @@ newBlockFetchControllerState chain = atomically $ do
   cpsVar <- newTVar $ initChainProducerState chain
   return BlockFetchControllerState{..}
 
-blockFetchController :: forall m. MonadSTM m => BlockFetchControllerState m -> m ()
-blockFetchController st@BlockFetchControllerState{..} = forever (atomically makeRequests)
+blockFetchController :: forall m. MonadSTM m => Tracer m PraosNodeEvent -> BlockFetchControllerState m -> m ()
+blockFetchController tracer st@BlockFetchControllerState{..} = forever makeRequests
  where
-  makeRequests :: STM m ()
-  makeRequests = do
+  makeRequests :: m ()
+  makeRequests = (traceNewTip tracer =<<) . atomically $ do
     let peerChainVars = (map . second) (.peerChainVar) $ Map.toList peers
     mchainSwitch <- longestChainSelection peerChainVars (asReadOnly cpsVar) blockHeader
     case mchainSwitch of
@@ -390,13 +397,14 @@ blockFetchController st@BlockFetchControllerState{..} = forever (atomically make
         blocks <- readTVar blocksVar
         chain <- chainState <$> readTVar cpsVar
         let chainUpdate = initMissingBlocksChain blocks chain fragment
-        useful <- updateChains st chainUpdate
+        (useful, mtip) <- updateChains st chainUpdate
         whenMissing chainUpdate $ \_missingChain -> do
           -- TODO: filterFetched could be reusing the missingChain suffix.
           br <- filterInFlight <=< filterFetched $ fragment
           if null br.blockRequestFragments
             then unless useful retry
             else addRequest peerId br
+        return mtip
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
   filterFetched fr = do
@@ -504,24 +512,26 @@ updateChains ::
   MonadSTM m =>
   BlockFetchControllerState m ->
   ChainsUpdate ->
-  STM m Bool
+  STM m (Bool, Maybe FullTip)
 updateChains BlockFetchControllerState{..} e =
   case e of
     FullChain fullChain -> do
       writeTVar targetChainVar Nothing
+      let !newTip = fullTip fullChain
       modifyTVar' cpsVar (switchFork fullChain)
-      return True
+      return (True, Just newTip)
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
       let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
+          !newTip = fullTip improvedChain
       modifyTVar' cpsVar (switchFork improvedChain)
-      return True
+      return (True, Just $ newTip)
     SamePrefix missingChain -> do
       target <- readTVar targetChainVar
       let useful = Just (headPointMChain missingChain) /= fmap headPointMChain target
       when useful $ do
         writeTVar targetChainVar (Just missingChain)
-      return useful
+      return (useful, Nothing)
 
 -----------------------------------------------------------
 ---- Methods for blockFetchConsumer and blockFetchProducer
@@ -536,16 +546,22 @@ removeInFlight BlockFetchControllerState{..} pId points = do
 --   * removes block from PeerId's in-flight set
 --   * adds block to blocksVar
 --   * @fillInBlocks@ on @selectedChain@, and @updateChains@
-addFetchedBlock :: MonadSTM m => BlockFetchControllerState m -> PeerId -> Block -> STM m ()
-addFetchedBlock st pId blk = do
+addFetchedBlock :: MonadSTM m => Tracer m PraosNodeEvent -> BlockFetchControllerState m -> PeerId -> Block -> m ()
+addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
   removeInFlight st pId [blockPoint blk]
   modifyTVar' st.blocksVar (Map.insert (blockHash blk) blk)
 
   selected <- readTVar st.targetChainVar
   case selected of
-    Nothing -> return () -- I suppose we do not need this block anymore.
+    Nothing -> return Nothing -- I suppose we do not need this block anymore.
     Just missingChain -> do
-      void $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
+      fmap snd $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
+
+traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe FullTip -> m ()
+traceNewTip tracer x =
+  case x of
+    Nothing -> return ()
+    (Just tip) -> traceWith tracer (PraosNodeEventNewTip tip)
 
 addProducedBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
 addProducedBlock BlockFetchControllerState{..} blk = do
@@ -565,9 +581,9 @@ blockRequestVarForPeerId peerId blockFetchControllerState =
     Nothing -> error $ "blockRequestVarForPeerId: no peer with id " <> show peerId
     Just peerStatus -> peerStatus.blockRequestVar
 
-initBlockFetchConsumerStateForPeerId :: MonadSTM m => PeerId -> BlockFetchControllerState m -> BlockFetchConsumerState m
-initBlockFetchConsumerStateForPeerId peerId blockFetchControllerState =
+initBlockFetchConsumerStateForPeerId :: MonadSTM m => Tracer m PraosNodeEvent -> PeerId -> BlockFetchControllerState m -> BlockFetchConsumerState m
+initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState =
   BlockFetchConsumerState
     (blockRequestVarForPeerId peerId blockFetchControllerState)
-    (atomically . addFetchedBlock blockFetchControllerState peerId)
+    (addFetchedBlock tracer blockFetchControllerState peerId)
     (atomically . removeInFlight blockFetchControllerState peerId)
