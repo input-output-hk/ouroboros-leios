@@ -14,10 +14,12 @@ record BaseAbstract : Type₁ where
   data Input : Type₁ where
     INIT   : (EndorserBlock × Cert → Type) → Input
     SUBMIT : EndorserBlock ⊎ List Tx → Input -- maybe we have both
+    FTCH-LDG : Input
 
   data Output : Type where
     STAKE : StakeDistr → Output
     EMPTY : Output
+    LDG : List EndorserBlock → Output -- TODO: EndorserBlock..?
 
   record Functionality : Type₁ where
     field State : Type

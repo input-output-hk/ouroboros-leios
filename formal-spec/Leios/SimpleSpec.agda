@@ -7,6 +7,8 @@ open import Leios.VRF
 import Leios.Base
 import Leios.Blocks
 
+open import Data.List.Properties using (length-map)
+
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
   (vrf : LeiosVRF a) (let open LeiosVRF vrf) (pubKey : PubKey)
@@ -51,6 +53,23 @@ record LeiosState : Type where
         EBs : List EndorserBlock
         Vs  : List (List Vote)
         slot : ℕ
+
+  lookupEB : EBRef → Maybe EndorserBlock
+  lookupEB r with i ← findIndex (_≟ r) (map getEBRef EBs) rewrite length-map getEBRef EBs
+    = map (lookup EBs) i
+
+  lookupIB : IBRef → Maybe InputBlock
+  lookupIB r with i ← findIndex (_≟ r) (map getIBRef IBs) rewrite length-map getIBRef IBs
+    = map (lookup IBs) i
+
+  lookupTxs : EndorserBlock → List Tx
+  lookupTxs = join ∘ map txs ∘ map body ∘ mapMaybe lookupIB ∘ join ∘ map ibRefs ∘ mapMaybe lookupEB ∘ ebRefs
+    where open EndorserBlockOSig
+          open IBBody
+          open InputBlock
+
+  constructLedger : List EndorserBlock → List Tx
+  constructLedger = join ∘ map lookupTxs
 
 initLeiosState : VTy → StakeDistr → LeiosState
 initLeiosState V SD = record
@@ -110,12 +129,11 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- Network and Ledger
 
   -- fix: we need to do Slot before every other SLOT transition
-  Slot : ∀ {msgs} → let open LeiosState s renaming (FFDState to ffds)
-                        l = {!!} -- construct ledger l
-         in
+  Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
+       ∙ bs BF.⇀⟦ B.FTCH-LDG ⟧ (bs' , B.LDG ebs)
        ∙ FFDAbstract.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.FetchRes msgs)
-       ──────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = l } , EMPTY)
+       ────────────────────────────────────────────────────────────────────────────────────────
+       just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } , EMPTY)
 
   Ftch : ∀ {l} →
        ────────────────────────────────────
@@ -127,13 +145,13 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
+       just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
   Base₂ : ∀ {bs bs' txs} → let open LeiosState s in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
+       just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
   -- Protocol rules
 
