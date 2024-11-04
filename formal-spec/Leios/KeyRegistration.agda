@@ -8,10 +8,10 @@ module Leios.KeyRegistration (a : LeiosAbstract) (open LeiosAbstract a)
 record KeyRegistrationAbstract : Type₁ where
 
   data Input : Type₁ where
-    Init : (PubKey → Type) → Input
+    INIT : PubKey → Input
 
   data Output : Type where
-    PubKeys : List PubKey → Output
+    PUBKEYS : List PubKey → Output
 
   record Functionality : Type₁ where
     field State : Type

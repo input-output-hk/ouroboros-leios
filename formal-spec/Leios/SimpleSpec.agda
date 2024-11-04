@@ -4,18 +4,23 @@ open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
 open import Leios.VRF
+
 import Leios.Base
 import Leios.Blocks
+import Leios.KeyRegistration
 
 open import Data.List.Properties using (length-map)
 
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
-  (vrf : LeiosVRF a) (let open LeiosVRF vrf) (pubKey : PubKey)
-  (let open Leios.Base a) (B' : BaseAbstract) (BF' : BaseAbstract.Functionality B') where
+  (vrf' : LeiosVRF a) (let open LeiosVRF vrf') (pubKey : PubKey)
+  (let open Leios.Base a) (B' : BaseAbstract) (BF' : BaseAbstract.Functionality B')
+  (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF' : KeyRegistrationAbstract.Functionality K') where
 
 module B   = BaseAbstract B'
 module BF  = BaseAbstract.Functionality BF'
+module K   = KeyRegistrationAbstract K'
+module KF  = KeyRegistrationAbstract.Functionality KF'
 module FFD = FFDAbstract.Functionality FFD' using (State) renaming (stepRel to _⇀⟦_⟧_)
 
 -- High level structure:
@@ -116,13 +121,16 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
 
+postulate
+  V_chkCerts : List PubKey → (EndorserBlock × B.Cert) → Type
+
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
   -- Initialization
 
-  Init : ∀ {V bs bs' SD} →
-       ∙ {!!} -- create & register the IB/EB lottery and voting keys with key reg
-       ∙ bs BF.⇀⟦ B.INIT {!V_chkCerts!} ⟧ (bs' , B.STAKE SD)
+  Init : ∀ {V bs bs' SD ks ks' pkey pkeys} →
+       ∙ ks KF.⇀⟦ K.INIT pkey ⟧ (ks' , K.PUBKEYS pkeys) -- create & register the IB/EB lottery and voting keys with key reg
+       ∙ bs BF.⇀⟦ B.INIT (V_chkCerts pkeys) ⟧ (bs' , B.STAKE SD)
        ──────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
