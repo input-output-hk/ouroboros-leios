@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-11-04
+
+### Uniform vs. Non-uniform IB generation in Short Leios
+
+Drafted a version of Short Leios where IB generation is uniform over the Propose stage. The reason for creating such a version of the protocol is discussions we had on whether releasing IBs at the start of Propose (as requried by the non-uniform version of short Leios) creates problems and underutilization of resources at the TCP level.
+
+
+
 ## 2024-01-01
 
 ### Haskell Simulation
