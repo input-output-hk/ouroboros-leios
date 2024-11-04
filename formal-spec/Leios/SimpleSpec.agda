@@ -122,16 +122,16 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   nothing  → 0
 
 postulate
-  V_chkCerts : List PubKey → (EndorserBlock × B.Cert) → Type
+  V_chkCerts : List PubKey → EndorserBlock × B.Cert → Type
 
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
   -- Initialization
 
-  Init : ∀ {V bs bs' SD ks ks' pkey pkeys} →
-       ∙ ks KF.⇀⟦ K.INIT pkey ⟧ (ks' , K.PUBKEYS pkeys) -- create & register the IB/EB lottery and voting keys with key reg
-       ∙ bs BF.⇀⟦ B.INIT (V_chkCerts pkeys) ⟧ (bs' , B.STAKE SD)
-       ──────────────────────────────────────────────────────
+  Init : ∀ {V bs bs' SD ks ks' pk pks} →
+       ∙ ks KF.⇀⟦ K.INIT pk ⟧ (ks' , K.PUBKEYS pks) -- create & register the IB/EB lottery and voting keys with key reg
+       ∙ bs BF.⇀⟦ B.INIT (V_chkCerts pks) ⟧ (bs' , B.STAKE SD)
+       ───────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
   -- Network and Ledger
