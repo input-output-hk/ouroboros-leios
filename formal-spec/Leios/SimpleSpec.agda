@@ -14,14 +14,15 @@ open import Data.List.Properties using (length-map)
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
   (vrf' : LeiosVRF a) (let open LeiosVRF vrf') (pubKey : PubKey)
-  (let open Leios.Base a) (B' : BaseAbstract) (BF' : BaseAbstract.Functionality B')
-  (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF' : KeyRegistrationAbstract.Functionality K') where
+  (let open Leios.Base a) (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
+  (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF : KeyRegistrationAbstract.Functionality K') where
 
 module B   = BaseAbstract B'
-module BF  = BaseAbstract.Functionality BF'
 module K   = KeyRegistrationAbstract K'
-module KF  = KeyRegistrationAbstract.Functionality KF'
 module FFD = FFDAbstract.Functionality FFD' using (State) renaming (stepRel to _⇀⟦_⟧_)
+
+open BaseAbstract.Functionality BF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴮ_)
+open KeyRegistrationAbstract.Functionality KF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴷ_)
 
 -- High level structure:
 
@@ -129,8 +130,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- Initialization
 
   Init : ∀ {V bs bs' SD ks ks' pk pks} →
-       ∙ ks KF.⇀⟦ K.INIT pk ⟧ (ks' , K.PUBKEYS pks) -- create & register the IB/EB lottery and voting keys with key reg
-       ∙ bs BF.⇀⟦ B.INIT (V_chkCerts pks) ⟧ (bs' , B.STAKE SD)
+       ∙ ks ⇀⟦ K.INIT pk ⟧ᴷ (ks' , K.PUBKEYS pks) -- create & register the IB/EB lottery and voting keys with key reg
+       ∙ bs ⇀⟦ B.INIT (V_chkCerts pks) ⟧ᴮ (bs' , B.STAKE SD)
        ───────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
@@ -138,7 +139,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   -- fix: we need to do Slot before every other SLOT transition
   Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
-       ∙ bs BF.⇀⟦ B.FTCH-LDG ⟧ (bs' , B.LDG ebs)
+       ∙ bs ⇀⟦ B.FTCH-LDG ⟧ᴮ (bs' , B.LDG ebs)
        ∙ FFDAbstract.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.FetchRes msgs)
        ────────────────────────────────────────────────────────────────────────────────────────
        just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } , EMPTY)
@@ -151,13 +152,13 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   Base₁ : ∀ {bs bs' eb txs} → let open LeiosState s in
        ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-       ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
+       ∙ bs ⇀⟦ B.SUBMIT (inj₁ eb) ⟧ᴮ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
        just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
   Base₂ : ∀ {bs bs' txs} → let open LeiosState s in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-       ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
+       ∙ bs ⇀⟦ B.SUBMIT (inj₂ txs) ⟧ᴮ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
        just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
