@@ -33,7 +33,7 @@ postulate VTy FTCHTy : Type
 
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
-  SUBMIT   : List Tx → LeiosInput
+  SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
   SLOT     : LeiosInput
   FTCH-LDG : LeiosInput
 
@@ -124,20 +124,20 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- Base chain
 
   Base₁ : ∀ {txs} → let open LeiosState s in
-       ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
+       ───────────────────────────────────────────────────────────────────────────────
+         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
 
   Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
        ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT [] ⟧ (s , EMPTY)
+         just s ⇀⟦ SUBMIT (inj₁ eb) ⟧ (s , EMPTY)
 
   Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (MemPool to txs) in
        ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
        ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
        ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT txs ⟧ (record s { MemPool = [] } , EMPTY)
+         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = [] } , EMPTY)
 
   -- Protocol rules
 
