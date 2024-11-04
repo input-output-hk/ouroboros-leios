@@ -19,10 +19,11 @@ module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open
 
 module B   = BaseAbstract B'
 module K   = KeyRegistrationAbstract K'
-module FFD = FFDAbstract.Functionality FFD' using (State) renaming (stepRel to _⇀⟦_⟧_)
+module FFD = FFDAbstract.Functionality FFD' using (State)
 
 open BaseAbstract.Functionality BF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴮ_)
 open KeyRegistrationAbstract.Functionality KF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴷ_)
+open FFDAbstract.Functionality FFD' renaming (stepRel to _⇀⟦_⟧ᴺ_)
 
 -- High level structure:
 
@@ -140,7 +141,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- fix: we need to do Slot before every other SLOT transition
   Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
        ∙ bs ⇀⟦ B.FTCH-LDG ⟧ᴮ (bs' , B.LDG ebs)
-       ∙ FFDAbstract.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.FetchRes msgs)
+       ∙ FFDAbstract.Fetch ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.FetchRes msgs)
        ────────────────────────────────────────────────────────────────────────────────────────
        just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } , EMPTY)
 
@@ -169,8 +170,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
           in
           ∙ canProduceIB slot pKey (stake s) -- TODO: let π be the corresponding proof
-          ∙ FFDAbstract.Send h (just b) FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
-          ─────────────────────────────────────────────────────────────────────────
+          ∙ FFDAbstract.Send h (just b) ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
+          ──────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
@@ -180,8 +181,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 h = mkEB slot id π pKey LI LE
           in
           ∙ canProduceEB slot pKey (stake s)
-          ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
-          ──────────────────────────────────────────────────────────────────────────────────────────
+          ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
+          ───────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
   V1-Role : let open LeiosState s renaming (FFDState to ffds)
@@ -189,8 +190,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 votes = map (vote ∘ hash) (setToList EBs')
           in
           ∙ canProduceV1 slot
-          ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
-          ─────────────────────────────────────────────────────────────────────────────────────────────
+          ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
+          ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
   V2-Role : let open LeiosState s renaming (FFDState to ffds)
@@ -198,6 +199,6 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 votes = map (vote ∘ hash) (setToList EBs')
           in
           ∙ canProduceV2 slot
-          ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
-          ─────────────────────────────────────────────────────────────────────────────────────────────
+          ∙ FFDAbstract.Send (GenFFD.vHeader votes) nothing ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
+          ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
