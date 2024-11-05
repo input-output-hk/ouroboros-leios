@@ -5,6 +5,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.ExamplesPraosP2P where
@@ -15,6 +16,7 @@ import qualified Data.ByteString.Char8 as BS8
 import Data.Coerce (coerce)
 import Data.Functor.Contravariant (Contravariant (contramap))
 import qualified Data.Map.Strict as Map
+import Data.Maybe (listToMaybe)
 import GHC.Generics
 import Network.TypedProtocol
 import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
@@ -109,7 +111,7 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     }
  where
   bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
-  bin xs = map (\b -> let ys = takeWhile (\(_, x) -> x <= b) xs in if null ys then (Nothing, b) else (Just $ fst $ last ys, b)) $ bins
+  bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) $ bins
 
 diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyMap
 diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty accumDiffusionLatency render
