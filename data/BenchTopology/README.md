@@ -3,7 +3,7 @@
 This folder contains latency measurements for a 54-node benchmarking cluster.
 
 
-## `topology-dense-52.json`
+## [`topology-dense-52.json`](topology-dense-52.json)
 
 The topology specification for our benchmarking cluster.
 We use 3 different AWS regions. Each node is connected to 6 other nodes:
@@ -15,17 +15,17 @@ The topology is static (i.e., no dynamic P2P), which is a requirement for reprod
 All nodes named 'node-*' are block producers for the benchmark. The 'explorer' node is an administrative node so to speak, which we use for monitoring an ongoing cluster run. You can probably disregard that one for a Leios simulation.
 
 
-## `topology-dense-52-by-region.pdf`
+## [`topology-dense-52-by-region.pdf`](topology-dense-52-by-region.pdf)
 
 A rendered graph grouping nodes by AWS region. (The AWS region labels 'US' and 'AP' appear swapped in the PDF, apologies).
 
 
-## `topology-dense-52-as-torus.pdf`
+## [`topology-dense-52-as-torus.pdf`](topology-dense-52-as-torus.pdf)
 
 A rendered graph illustrating the torus-like nature of the topology.
 
 
-## `example-node-configs/`
+## [`example-node-configs/`](example-node-configs.tar.gz)
 
 A directory containing the actual 'topology.json' files for each node used to configure a benchmarking run on the cluster.
 
@@ -34,7 +34,7 @@ The node-to-ip-mapping.txt is added only as a human-readable lookup for the IPs 
 Note that the IP addresses have been anonymized in a manner that preserves subnet relationships.
 
 
-## `latency.sqlite3`
+## [`latency.sqlite3`](latency.sqlite3.gz)
 
 The latency matrix for a deployed cluster. All of the machines are `AWS EC2 c5.2xlarge`.
 
