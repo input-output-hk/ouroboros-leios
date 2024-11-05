@@ -166,7 +166,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          just s ⇀⟦ SUBMIT (inj₁ eb) ⟧ (s , EMPTY)
 
   Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (ToPropose to txs) in
-         ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+         ∙ ∅ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
          ∙ bs ⇀⟦ B.SUBMIT (inj₂ txs) ⟧ᴮ (bs' , B.EMPTY)
          ────────────────────────────────────────────────────────────────────────────────────
          just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (s , EMPTY)
