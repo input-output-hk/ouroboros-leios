@@ -156,7 +156,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   --       for the given slot
 
   Base₁ : ∀ {txs} → let open LeiosState s in
-        ──────────────────────────────────────────────────────────────────
+        ────────────────────────────────────────────────────────────────────
         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { ToPropose = txs } , EMPTY)
 
   Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
