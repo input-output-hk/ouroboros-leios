@@ -266,6 +266,7 @@ impl Node {
 
     fn receive_request_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
         if let Some(TransactionView::Received(tx)) = self.txs.get(&id) {
+            self.tracker.track_transaction_sent(tx.id, self.id, from);
             self.send_to(from, SimulationMessage::Tx(tx.clone()))?;
         }
         Ok(())
@@ -303,6 +304,7 @@ impl Node {
 
     fn receive_request_block(&mut self, from: NodeId, slot: u64) -> Result<()> {
         if let Some(block) = self.praos.blocks.get(&slot) {
+            self.tracker.track_praos_block_sent(block, self.id, from);
             self.send_to(from, SimulationMessage::Block(block.clone()))?;
         }
         Ok(())
@@ -406,6 +408,7 @@ impl Node {
 
     fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(ib) = self.leios.ibs.get(&id) {
+            self.tracker.track_ib_sent(id, self.id, from);
             self.send_to(from, SimulationMessage::IB(ib.clone()))?;
         }
         Ok(())

@@ -65,8 +65,7 @@ options =
           )
       )
     <*> optional
-      ( Opts.option
-          Opts.auto
+      ( Opts.strOption
           ( Opts.long "output"
               <> Opts.metavar "FILENAME"
               <> Opts.help "output filename, (default SIMNAME.json)"

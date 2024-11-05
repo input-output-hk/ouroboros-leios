@@ -26,6 +26,53 @@ If you want to model that `b` can only start after `a` has been done, you should
 > Note that in the syntax `->-` binds more closely than `L<>R` and both operators are **right-associative**.
 > This is for convenience in modelling choice ladders and reading them from left to right, as well as managing load factors when reading left to right. `(a ->-+1 b) ->- c` only uses the increased load factor for `b` while `a ->-+1 b ->- c` also applies it to `c`.
 
+## Additional syntactic tools
+
+The following extensions do not change the underlying theory but provide syntactic abstractions that simplify the formulation of certain repetitive ΔQ expressions.
+
+### Bounded recursion
+
+Unfolding expressions using name resolution normally rejects names that are currently being expanded: as there are no conditionals or other logic to supply termination conditions, any recursion would be an infinite loop.
+Sometimes, ΔQ expressions feature a repeating structure, though, which can be expressed more succinctly as “do this thing five times”.
+A simple example is the sequencing of the same outcome for a number of times:
+
+    five := one ->- one ->- one ->- one ->- one
+
+This can be expressed more concisely as
+
+    oneRec := oneRec ->- one
+    five := oneRec^5
+
+(recall that `->-` is right-associative)
+The precise process is to allow the recursive name to be resolved five levels deep; at the sixth call the ⊤ (top) outcome is returned instead and recursion stops.
+The expression may use the recursive name any number of times, but beware of the exponential explosion of the expression size.
+The web application should fail gracefully, but computations may take many seconds when constructing expressions of millions of combinators.
+
+### Gossip operator
+
+Since this library is being developed in the context of the Cardano peer-to-peer network, epidemic information diffusion — a.k.a. a gossip protocol — plays a major role.
+Typical ΔQ expressions involve terms like
+
+    hopIB 0.6<>99.4 hopIB ->- hopIB 8.58<>90.82 hopIB ->- hopIB ->- hopIB 65.86<>24.96 hopIB ->- hopIB ->- hopIB ->- hopIB
+
+modelling an empirically determined distribution of the diffusion process using a combination of one through four messaging steps (the underlying network is assumed to consist of roughly 2500 nodes with a connection graph of average degree 15).
+
+Very similar expressions can be generated using the `gossip()` operator, where
+
+    gossip(hopIB, 2500, 15, 0.07)
+
+means that information starts out at a single node and is at each step spread to 15 neighbors until all 2500 nodes have been reached.
+The fourth parameter is the average local cluster coefficient of the network, which describes which fraction of a node’s neighbors are directly connected to each other — which will lead to duplicate information transfers that are then assumed to not actually perform the `hopIB` outcome via deduplication.
+
+Adding this operator makes it easier to play with different network sizes or suggested peering schemes.
+
+Mathematically, the gossip operator is expanded by computing expectation values for the number of new nodes reached within each diffusion “round”.
+You can see the resulting expression by clicking on the syntax element in the graphical representation.
+Note how the messaging steps are sequenced using the `->-` combinator which takes into account the probabilistic timing of each outcome; the rounds visible in the ΔQ structure are therefore not synchronised but describe the fully parallel spread of information across the network.
+
+Caveats are that non-scale-free networks exhibit structure that may not be adequately captured by the above parameters, the `gossip()` operator assumes a random small-world network.
+In the case of Cardano it may be more accurate to model the diffusion across computing centers using this operator, followed by the much quicker diffusion within a certain location as a second step.
+
 ## Building and Running
 
 The example application is a pure web application that runs in the browser and is built and served using `trunk`.

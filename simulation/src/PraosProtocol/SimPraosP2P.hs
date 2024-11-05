@@ -5,22 +5,20 @@
 
 module PraosProtocol.SimPraosP2P where
 
-import Control.Monad.Class.MonadAsync (
-  Concurrently (Concurrently, runConcurrently),
- )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer (Tracer),
+  Tracer,
   traceWith,
  )
-import Data.Foldable (sequenceA_)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
 import System.Random (StdGen, split)
 
 import ChanMux (newConnectionBundleTCP)
 import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import P2P (P2PTopography (..))
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
@@ -75,19 +73,21 @@ tracePraosP2P
                 ]
         -- Note that the incomming edges are the output ends of the
         -- channels and vice versa. That's why it looks backwards.
-        runConcurrently $
-          sequenceA_
-            [ Concurrently $
-              praosNode
-                (nodeTracer nid)
-                (praosConfig slotConfig nid rng)
-                (Map.findWithDefault [] nid tcplinksInChan)
-                (Map.findWithDefault [] nid tcplinksOutChan)
-            | (nid, rng) <-
-                zip
-                  (Map.keys p2pNodes)
-                  (unfoldr (Just . split) rng0)
-            ]
+
+        -- Nested children threads are slow with IOSim, this impl forks them all as direct children.
+        mapM_
+          (\m -> mapM_ forkIO =<< m)
+          [ praosNode
+            (nodeTracer nid)
+            (praosConfig slotConfig nid rng)
+            (Map.findWithDefault [] nid tcplinksInChan)
+            (Map.findWithDefault [] nid tcplinksOutChan)
+          | (nid, rng) <-
+              zip
+                (Map.keys p2pNodes)
+                (unfoldr (Just . split) rng0)
+          ]
+        forever $ threadDelaySI 1000
    where
     tracer :: Tracer (IOSim s) PraosEvent
     tracer = simTracer

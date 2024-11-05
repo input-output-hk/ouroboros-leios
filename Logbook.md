@@ -1,5 +1,53 @@
 # Leios logbook
 
+## 2024-11-04
+
+### Uniform vs. Non-uniform IB generation in Short Leios
+
+Drafted a version of Short Leios where IB generation is uniform over the Propose stage. The reason for creating such a version of the protocol is discussions we had on whether releasing IBs at the start of Propose (as requried by the non-uniform version of short Leios) creates problems and underutilization of resources at the TCP level.
+
+
+
+## 2024-01-01
+
+### Haskell Simulation
+
+Successfully profiled and optimized the running of simulations:
+- Running praos-diffusion-20-links for 1000 simulation seconds went
+  from taking 120 minutes to 4 minutes.
+- Most of the improvement was gained by changes to get `io-sim` to
+  handle simulations of that scale:
+  * avoided nested forking of threads: changes introduced by IOSimPOR
+    give us a bad ThreadId representation for that use pattern.
+  * patched io-sim to use a more efficient priority search queue
+    implementation for timers (from a balanced-search-tree-inspired
+    one to a radix-tree one), the old one was taking up 95% of the
+    computation time for us.
+
+Giving a single ratio between simulated and execution time is complicated by the bursts of activity for every block production event (targeted to every 20s in expectation) and the initial ramp-up period where the nodes link to their peers and initialize the protocols. Logging real timestamps to the left of simulated seconds we get something like this:
+```
+00:00:02 time reached: Time 0s
+00:00:04 time reached: Time 0.000001s
+00:00:05 time reached: Time 0.014412s
+...
+00:00:14 time reached: Time 0.960055s
+00:00:15 time reached: Time 20.518214s
+...
+00:00:22 time reached: Time 40.418916s
+...
+00:04:01 time reached: Time 1000.194996s
+...
+00:08:21 time reached: Time 2000.009102s
+...
+00:13:25 done. -- i.e. reached Time 3000s
+```
+nevertheless the average is 3.7:1 for simulated:real.
+
+Next step for the praos simulation is to gather data from real running
+nodes to validate the block diffusion latency, possibly from a
+benchmark cluster, like the recent data shared by Brian, as mainnet
+might take too long.
+
 ## 2024-10-31
 
 ### Haskell Simulation

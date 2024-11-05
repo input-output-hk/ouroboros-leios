@@ -20,6 +20,17 @@ maintainer:         duncan@well-typed.com
 build-type:         Simple
 extra-source-files: CHANGELOG.md
 
+flag perf
+  description: Ghc options for improved performance, disables asserts.
+  default:     False
+  manual:      True
+
+-- These give us another 10% improvement (on short runs at least)
+common performance-opts
+  ghc-options:
+    -fignore-asserts -O2 -fexpose-all-unfoldings
+    -fspecialise-aggressively
+
 library
   exposed-modules:
     Chan
@@ -97,9 +108,18 @@ library
 
   hs-source-dirs:   src
   default-language: Haskell2010
-  ghc-options:      -Wall -fno-ignore-asserts
+  ghc-options:      -Wall
+
+  if flag(perf)
+    import: performance-opts
+
+  else
+    ghc-options: -fno-ignore-asserts
 
 executable viz
+  if flag(perf)
+    import: performance-opts
+
   main-is:          src/Main.hs
   build-depends:
     , base
@@ -110,6 +130,9 @@ executable viz
   ghc-options:      -Wall
 
 executable sample
+  if flag(perf)
+    import: performance-opts
+
   main-is:          src/SampleMain.hs
   build-depends:
     , base

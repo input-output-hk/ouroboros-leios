@@ -1,19 +1,21 @@
 use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MAX_SIZE};
 use smallstr::SmallString;
 use std::{
+    cell::{Cell, OnceCell, RefCell},
     collections::BTreeMap,
     fmt::{self, Display},
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DeltaQError {
     CDFError(CDFError),
     NameError(Name),
     RecursionError(Name),
     BlackBox,
     TooManySteps,
+    EvaluationError,
 }
 
 impl std::error::Error for DeltaQError {}
@@ -26,6 +28,7 @@ impl Display for DeltaQError {
             DeltaQError::RecursionError(name) => write!(f, "Recursion error: {}", name),
             DeltaQError::BlackBox => write!(f, "Black box encountered"),
             DeltaQError::TooManySteps => write!(f, "Too many steps in gossip expansion"),
+            DeltaQError::EvaluationError => write!(f, "Evaluation error"),
         }
     }
 }
@@ -171,7 +174,15 @@ impl Default for LoadUpdate {
 /// A DeltaQ is a representation of a probability distribution that can be
 /// manipulated in various ways.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum DeltaQ {
+pub struct DeltaQ {
+    #[serde(with = "delta_q_serde")]
+    expr: Arc<DeltaQExpr>,
+    #[serde(skip)]
+    expanded: OnceCell<Result<Arc<DeltaQExpr>, DeltaQError>>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum DeltaQExpr {
     /// Un unelaborated and unknown DeltaQ.
     BlackBox,
     /// A named DeltaQ taken from the context, with an optional recursion allowance.
@@ -180,32 +191,32 @@ pub enum DeltaQ {
     Outcome(Outcome),
     /// The convolution of two DeltaQs, describing the sequential execution of two outcomes.
     Seq(
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
         LoadUpdate,
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
     ),
     /// A choice between two DeltaQs (i.e. their outcomes), with a given weight of each.
     Choice(
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
         f32,
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
         f32,
     ),
     /// A DeltaQ that is the result of a universal quantification over two DeltaQs,
     /// meaning that both outcomes must occur.
     ForAll(
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
     ),
     /// A DeltaQ that is the result of an existential quantification over two DeltaQs,
     /// meaning that at least one of the outcomes must occur.
     ForSome(
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
-        #[serde(with = "delta_q_serde")] Arc<DeltaQ>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
+        #[serde(with = "delta_q_serde")] Arc<DeltaQExpr>,
     ),
     Gossip {
         #[serde(with = "delta_q_serde")]
-        hop: Arc<DeltaQ>,
+        hop: Arc<DeltaQExpr>,
         size: f32,
         branching: f32,
         cluster_coeff: f32,
@@ -213,33 +224,39 @@ pub enum DeltaQ {
 }
 
 mod delta_q_serde {
-    use super::DeltaQ;
+    use super::DeltaQExpr;
     use serde::{Deserialize, Serialize};
     use std::sync::Arc;
 
-    pub(super) fn serialize<S>(this: &Arc<DeltaQ>, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(this: &Arc<DeltaQExpr>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         (**this).serialize(serializer)
     }
 
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Arc<DeltaQ>, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<Arc<DeltaQExpr>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let delta_q = DeltaQ::deserialize(deserializer)?;
+        let delta_q = DeltaQExpr::deserialize(deserializer)?;
         Ok(Arc::new(delta_q))
     }
 }
 
 impl Display for DeltaQ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.display(f, false)
+        DeltaQ::display(&self.expr, f, false)
     }
 }
 
-impl FromStr for DeltaQ {
+impl Display for DeltaQExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        DeltaQ::display(&Arc::new(self.clone()), f, false)
+    }
+}
+
+impl FromStr for DeltaQExpr {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -247,142 +264,355 @@ impl FromStr for DeltaQ {
     }
 }
 
+impl FromStr for DeltaQ {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(DeltaQ::from(DeltaQExpr::from_str(s)?))
+    }
+}
+
+impl From<DeltaQExpr> for DeltaQ {
+    fn from(expr: DeltaQExpr) -> Self {
+        DeltaQ {
+            expr: Arc::new(expr),
+            expanded: OnceCell::new(),
+        }
+    }
+}
+
+impl From<Arc<DeltaQExpr>> for DeltaQ {
+    fn from(expr: Arc<DeltaQExpr>) -> Self {
+        DeltaQ {
+            expr,
+            expanded: OnceCell::new(),
+        }
+    }
+}
+
+// dropping is stack recursive, so vulnerable to stack overflow
+// hence we carefully trampoline dropping it in chunks
+impl Drop for DeltaQExpr {
+    fn drop(&mut self) {
+        thread_local! {
+            static DROP_STACK: RefCell<Vec<Arc<DeltaQExpr>>> = RefCell::new(Vec::new());
+            static DEPTH: Cell<usize> = Cell::new(0);
+            static DROP: Cell<bool> = Cell::new(false);
+        }
+
+        if DROP.get() {
+            // just remove the custom drop logic exactly once; the contained data need to be dropped normally again
+            DROP.set(false);
+            return;
+        }
+
+        let depth = DEPTH.get();
+        DEPTH.set(depth + 1);
+
+        // replace such that the meaty part can actually be dropped before incrementing DEPTH again
+        let expr = std::mem::replace(self, DeltaQExpr::BlackBox);
+        match &expr {
+            DeltaQExpr::BlackBox | DeltaQExpr::Name(..) | DeltaQExpr::Outcome(..) => {}
+            DeltaQExpr::Seq(l, _, r) => {
+                save(depth, l);
+                save(depth, r);
+            }
+            DeltaQExpr::Choice(l, _, r, _) => {
+                save(depth, l);
+                save(depth, r);
+            }
+            DeltaQExpr::ForAll(l, r) => {
+                save(depth, l);
+                save(depth, r);
+            }
+            DeltaQExpr::ForSome(l, r) => {
+                save(depth, l);
+                save(depth, r);
+            }
+            DeltaQExpr::Gossip { hop, .. } => save(depth, hop),
+        };
+        // switch off special handling for this particular DeltaQExpr
+        DROP.set(true);
+        drop(expr);
+
+        if depth == 1 {
+            while let Some(expr) = DROP_STACK.with(|stack| stack.borrow_mut().pop()) {
+                std::mem::drop(expr);
+            }
+        }
+        DEPTH.set(depth);
+
+        fn save(depth: usize, expr: &Arc<DeltaQExpr>) {
+            if depth > 100 {
+                // retain one more refcount so that it will only be dropped in the `while` loop above
+                DROP_STACK.with(|stack| stack.borrow_mut().push(expr.clone()));
+            }
+        }
+    }
+}
+
 impl DeltaQ {
     pub fn top() -> DeltaQ {
-        DeltaQ::Outcome(Outcome::new(CDF::from_steps(&[(0.0, 1.0)]).unwrap()))
+        static TOP: OnceLock<Arc<DeltaQExpr>> = OnceLock::new();
+
+        let expr = TOP
+            .get_or_init(|| Arc::new(DeltaQExpr::Outcome(Outcome::top())))
+            .clone();
+        let expanded = OnceCell::new();
+        expanded.set(Ok(expr.clone())).unwrap();
+        DeltaQ { expr, expanded }
+    }
+
+    pub fn expr(&self) -> &DeltaQExpr {
+        &self.expr
+    }
+
+    pub fn arc(&self) -> Arc<DeltaQExpr> {
+        self.expr.clone()
     }
 
     /// Create a new DeltaQ from a name, referencing a variable.
     pub fn name(name: &str) -> DeltaQ {
-        DeltaQ::Name(name.into(), None)
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Name(name.into(), None)),
+            expanded: OnceCell::new(),
+        }
     }
 
     pub fn name_rec(name: &str, rec: Option<usize>) -> DeltaQ {
-        DeltaQ::Name(name.into(), rec)
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Name(name.into(), rec)),
+            expanded: OnceCell::new(),
+        }
     }
 
     /// Create a new DeltaQ from a CDF.
     pub fn cdf(cdf: CDF) -> DeltaQ {
-        DeltaQ::Outcome(Outcome::new(cdf))
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Outcome(Outcome::new(cdf))),
+            expanded: OnceCell::new(),
+        }
     }
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
-    pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::Seq(Arc::new(first), LoadUpdate::default(), Arc::new(second))
+    pub fn seq(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Seq(first.expr, load, second.expr)),
+            expanded: OnceCell::new(),
+        }
     }
 
     /// Create a new DeltaQ from a choice between two DeltaQs.
     pub fn choice(first: DeltaQ, first_weight: f32, second: DeltaQ, second_weight: f32) -> DeltaQ {
-        DeltaQ::Choice(
-            Arc::new(first),
-            first_weight,
-            Arc::new(second),
-            second_weight,
-        )
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Choice(
+                first.expr,
+                first_weight,
+                second.expr,
+                second_weight,
+            )),
+            expanded: OnceCell::new(),
+        }
     }
 
     /// Create a new DeltaQ from a universal quantification over two DeltaQs.
     pub fn for_all(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::ForAll(Arc::new(first), Arc::new(second))
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::ForAll(first.expr, second.expr)),
+            expanded: OnceCell::new(),
+        }
     }
 
     /// Create a new DeltaQ from an existential quantification over two DeltaQs.
     pub fn for_some(first: DeltaQ, second: DeltaQ) -> DeltaQ {
-        DeltaQ::ForSome(Arc::new(first), Arc::new(second))
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::ForSome(first.expr, second.expr)),
+            expanded: OnceCell::new(),
+        }
     }
 
-    fn display(&self, f: &mut fmt::Formatter<'_>, parens: bool) -> fmt::Result {
-        match self {
-            DeltaQ::BlackBox => {
+    fn display(this: &Arc<DeltaQExpr>, f: &mut fmt::Formatter<'_>, parens: bool) -> fmt::Result {
+        match &**this {
+            DeltaQExpr::BlackBox => {
                 write!(f, "BB")
             }
-            DeltaQ::Name(name, rec) => {
+            DeltaQExpr::Name(name, rec) => {
                 if let Some(rec) = rec {
                     write!(f, "{}^{}", name, rec)
                 } else {
                     write!(f, "{}", name)
                 }
             }
-            DeltaQ::Outcome(outcome) => {
+            DeltaQExpr::Outcome(outcome) => {
                 write!(f, "{}", outcome)
             }
-            DeltaQ::Seq(first, load, second) => {
+            DeltaQExpr::Seq(first, load, second) => {
                 if parens {
                     write!(f, "(")?;
                 }
-                first.display(f, true)?;
+                DeltaQ::display(first, f, true)?;
                 write!(f, " ->-{load} ")?;
-                second.display(f, !matches!(**second, DeltaQ::Seq { .. }))?;
+                DeltaQ::display(second, f, !matches!(**second, DeltaQExpr::Seq { .. }))?;
                 if parens {
                     write!(f, ")")?;
                 }
                 Ok(())
             }
-            DeltaQ::Choice(first, first_weight, second, second_weight) => {
+            DeltaQExpr::Choice(first, first_weight, second, second_weight) => {
                 if parens {
                     write!(f, "(")?;
                 }
-                first.display(f, !matches!(**first, DeltaQ::Seq { .. }))?;
+                DeltaQ::display(first, f, !matches!(**first, DeltaQExpr::Seq { .. }))?;
                 write!(f, " {}<>{} ", first_weight, second_weight)?;
-                second.display(
+                DeltaQ::display(
+                    second,
                     f,
-                    !matches!(**second, DeltaQ::Seq { .. } | DeltaQ::Choice { .. }),
+                    !matches!(**second, DeltaQExpr::Seq { .. } | DeltaQExpr::Choice { .. }),
                 )?;
                 if parens {
                     write!(f, ")")?;
                 }
                 Ok(())
             }
-            DeltaQ::ForAll(first, second) => {
-                write!(f, "∀({} | {})", first, second)
+            DeltaQExpr::ForAll(first, second) => {
+                write!(f, "∀(")?;
+                DeltaQ::display(first, f, true)?;
+                write!(f, " | ")?;
+                DeltaQ::display(second, f, false)?;
+                write!(f, ")")
             }
-            DeltaQ::ForSome(first, second) => {
-                write!(f, "∃({} | {})", first, second)
+            DeltaQExpr::ForSome(first, second) => {
+                write!(f, "∃(")?;
+                DeltaQ::display(first, f, true)?;
+                write!(f, " | ")?;
+                DeltaQ::display(second, f, false)?;
+                write!(f, ")")
             }
-            DeltaQ::Gossip {
+            DeltaQExpr::Gossip {
                 hop,
                 size,
                 branching,
                 cluster_coeff,
             } => {
-                write!(
-                    f,
-                    "gossip({}, {}, {}, {})",
-                    hop, size, branching, cluster_coeff
-                )
+                write!(f, "gossip(")?;
+                DeltaQ::display(hop, f, true)?;
+                write!(f, ", {}, {}, {})", size, branching, cluster_coeff)
             }
         }
     }
 
-    pub fn expand(&self) -> Result<DeltaQ, DeltaQError> {
-        // recursively expand gossip, depth first
-        match self {
-            DeltaQ::BlackBox | DeltaQ::Name(..) | DeltaQ::Outcome(_) => Ok(self.clone()),
-            DeltaQ::Seq(first, load, second) => Ok(DeltaQ::Seq(
-                Arc::new(first.expand()?),
-                *load,
-                Arc::new(second.expand()?),
-            )),
-            DeltaQ::Choice(first, first_weight, second, second_weight) => Ok(DeltaQ::choice(
-                first.expand()?,
-                *first_weight,
-                second.expand()?,
-                *second_weight,
-            )),
-            DeltaQ::ForAll(first, second) => Ok(DeltaQ::for_all(first.expand()?, second.expand()?)),
-            DeltaQ::ForSome(first, second) => {
-                Ok(DeltaQ::for_some(first.expand()?, second.expand()?))
+    fn expanded(&self) -> Result<&DeltaQExpr, DeltaQError> {
+        self.expanded
+            .get_or_init(|| self.expand())
+            .as_deref()
+            .map_err(|e| e.clone())
+    }
+
+    fn expand(&self) -> Result<Arc<DeltaQExpr>, DeltaQError> {
+        #[derive(Debug)]
+        enum Op<'a> {
+            Expand(&'a Arc<DeltaQExpr>),
+            AssembleSeq(&'a Arc<DeltaQExpr>, LoadUpdate),
+            AssembleChoice(&'a Arc<DeltaQExpr>, f32, f32),
+            AssembleForAll(&'a Arc<DeltaQExpr>),
+            AssembleForSome(&'a Arc<DeltaQExpr>),
+            ExpandGossip(f32, f32, f32),
+        }
+
+        let mut op_stack = Vec::new();
+        let mut res_stack = Vec::new();
+
+        op_stack.push(Op::Expand(&self.expr));
+
+        while let Some(op) = op_stack.pop() {
+            match op {
+                Op::Expand(delta_q) => match &**delta_q {
+                    DeltaQExpr::BlackBox | DeltaQExpr::Name(..) | DeltaQExpr::Outcome(_) => {
+                        res_stack.push(delta_q.clone());
+                    }
+                    DeltaQExpr::Seq(first, load, second) => {
+                        op_stack.push(Op::AssembleSeq(delta_q, *load));
+                        op_stack.push(Op::Expand(second));
+                        op_stack.push(Op::Expand(first));
+                    }
+                    DeltaQExpr::Choice(first, w1, second, w2) => {
+                        op_stack.push(Op::AssembleChoice(delta_q, *w1, *w2));
+                        op_stack.push(Op::Expand(second));
+                        op_stack.push(Op::Expand(first));
+                    }
+                    DeltaQExpr::ForAll(first, second) => {
+                        op_stack.push(Op::AssembleForAll(delta_q));
+                        op_stack.push(Op::Expand(second));
+                        op_stack.push(Op::Expand(first));
+                    }
+                    DeltaQExpr::ForSome(first, second) => {
+                        op_stack.push(Op::AssembleForSome(delta_q));
+                        op_stack.push(Op::Expand(second));
+                        op_stack.push(Op::Expand(first));
+                    }
+                    DeltaQExpr::Gossip {
+                        hop,
+                        size,
+                        branching,
+                        cluster_coeff,
+                    } => {
+                        op_stack.push(Op::ExpandGossip(*size, *branching, *cluster_coeff));
+                        op_stack.push(Op::Expand(hop));
+                    }
+                },
+                Op::AssembleSeq(delta_q, load) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    let expanded = DeltaQExpr::Seq(first, load, second);
+                    if expanded == **delta_q {
+                        res_stack.push(delta_q.clone());
+                    } else {
+                        res_stack.push(Arc::new(expanded));
+                    }
+                }
+                Op::AssembleChoice(delta_q, w1, w2) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    let expanded = DeltaQExpr::Choice(first, w1, second, w2);
+                    if expanded == **delta_q {
+                        res_stack.push(delta_q.clone());
+                    } else {
+                        res_stack.push(Arc::new(expanded));
+                    }
+                }
+                Op::AssembleForAll(delta_q) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    let expanded = DeltaQExpr::ForAll(first, second);
+                    if expanded == **delta_q {
+                        res_stack.push(delta_q.clone());
+                    } else {
+                        res_stack.push(Arc::new(expanded));
+                    }
+                }
+                Op::AssembleForSome(delta_q) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    let expanded = DeltaQExpr::ForSome(first, second);
+                    if expanded == **delta_q {
+                        res_stack.push(delta_q.clone());
+                    } else {
+                        res_stack.push(Arc::new(expanded));
+                    }
+                }
+                Op::ExpandGossip(size, branching, cluster_coeff) => {
+                    let hop = res_stack.pop().unwrap();
+                    let expanded = expand_gossip(&hop, size, branching, cluster_coeff)?;
+                    res_stack.push(expanded.expr);
+                }
             }
-            DeltaQ::Gossip {
-                hop,
-                size,
-                branching,
-                cluster_coeff,
-            } => {
-                let hop = hop.expand()?;
-                expand_gossip(&hop, *size, *branching, *cluster_coeff)
+            if std::mem::size_of_val(&op_stack[..]) > 1_000_000 {
+                return Err(DeltaQError::TooManySteps);
             }
         }
+
+        assert_eq!(res_stack.len(), 1);
+        Ok(res_stack.pop().unwrap())
     }
 
     pub fn eval(
@@ -390,124 +620,178 @@ impl DeltaQ {
         ctx: &PersistentContext,
         ephemeral: &mut EphemeralContext,
     ) -> Result<Outcome, DeltaQError> {
-        match self {
-            DeltaQ::BlackBox => Err(DeltaQError::BlackBox),
-            DeltaQ::Name(n, r) => {
-                // recursion is only allowed if not yet recursing on this name or there is an existing allowance
-                // which means that a new allowance leads to error if there is an existing one (this would permit
-                // infinite recursion)
-                //
-                // None means not recursing on this name
-                // Some(None) means recursing on this name without allowance
-                // Some(Some(n)) means recursing on this name with n as the remaining allowance
-                let recursion = if let Some(r) = r {
-                    if ephemeral.rec.contains_key(n) {
-                        return Err(DeltaQError::RecursionError(n.to_owned()));
-                    }
-                    Some(
-                        ephemeral
-                            .rec
-                            .entry(n.to_owned())
-                            .or_insert(Some(*r))
-                            .as_mut(),
-                    )
-                } else {
-                    ephemeral.rec.get_mut(n).map(|r| r.as_mut())
-                };
-                if let Some(Some(allowance)) = recursion {
-                    match ctx.ctx.get(n) {
-                        Some((dq, _)) => {
-                            let mut increment = true;
-                            let ret = if *allowance == 0 {
-                                increment = false;
-                                Ok(Outcome {
-                                    cdf: CDF::from_steps(&[(0.0, 1.0)]).unwrap(),
-                                    load: BTreeMap::new(),
-                                })
+        // evaluation is done using a stack machine with memory on heap in order to avoid stack overflows
+        //
+        // The operation stack stores the continuation of a computation frame while the operand stack holds results.
+
+        #[derive(Debug)]
+        enum Op<'a> {
+            /// Evaluate a DeltaQ with the given load factor and push the result on the result stack
+            Eval(&'a DeltaQExpr, f32),
+            /// construct a sequence from the top two results on the result stack
+            Seq,
+            /// construct a choice from the top two results on the result stack
+            Choice(f32, f32),
+            /// construct a forall from the top two results on the result stack
+            ForAll,
+            /// construct a forsome from the top two results on the result stack
+            ForSome,
+            /// end recursion for a name
+            EndRec(&'a Name),
+            /// increment recursion allowance
+            IncAllowance(&'a Name),
+            /// cache an outcome
+            Cache(&'a Name),
+        }
+
+        let mut op_stack = Vec::new();
+        let mut res_stack = Vec::<Outcome>::new();
+
+        // Start with the initial DeltaQ
+        op_stack.push(Op::Eval(self.expanded()?, 1.0));
+
+        while let Some(op) = op_stack.pop() {
+            match op {
+                Op::Eval(dq, load_factor) => {
+                    match dq {
+                        DeltaQExpr::BlackBox => return Err(DeltaQError::BlackBox),
+                        DeltaQExpr::Name(n, r) => {
+                            // recursion is only allowed if not yet recursing on this name or there is an existing allowance
+                            // which means that a new allowance leads to error if there is an existing one (this would permit
+                            // infinite recursion)
+                            //
+                            // None means not recursing on this name
+                            // Some(None) means recursing on this name without allowance
+                            // Some(Some(n)) means recursing on this name with n as the remaining allowance
+                            if let Some(r) = r {
+                                if ephemeral.rec.contains_key(n) {
+                                    return Err(DeltaQError::RecursionError(n.to_owned()));
+                                }
+                                if *r == 0 {
+                                    res_stack.push(Outcome::top());
+                                    continue;
+                                }
+                                // subtract the allowance needed for running the evaluation below
+                                ephemeral.rec.insert(n.to_owned(), Some(*r - 1));
+                                op_stack.push(Op::EndRec(n));
                             } else {
-                                *allowance -= 1;
-                                dq.expand()?.eval(ctx, ephemeral)
-                            };
-                            if r.is_some() {
-                                ephemeral.rec.remove(n);
-                            } else if increment {
-                                *ephemeral.rec.get_mut(n).unwrap().as_mut().unwrap() += 1;
+                                match ephemeral.rec.get_mut(n) {
+                                    Some(Some(rec)) => {
+                                        // recursing with prior allowance
+                                        if *rec == 0 {
+                                            res_stack.push(Outcome::top());
+                                            continue;
+                                        } else {
+                                            *rec -= 1;
+                                            op_stack.push(Op::IncAllowance(n));
+                                        }
+                                    }
+                                    Some(None) => {
+                                        // recursing without allowance
+                                        return Err(DeltaQError::RecursionError(n.to_owned()));
+                                    }
+                                    None => {
+                                        // evaluating without allowance => prohibit further recursion
+                                        ephemeral.rec.insert(n.to_owned(), None);
+                                        op_stack.push(Op::EndRec(n));
+                                    }
+                                }
                             }
-                            ret
+
+                            // Check cache
+                            let use_cache =
+                                matches!(ephemeral.rec.get(n), Some(None)) && load_factor == 1.0;
+                            if use_cache {
+                                if let Some(cached_outcome) = ephemeral.cache.get(n) {
+                                    res_stack.push(cached_outcome.clone());
+                                    continue;
+                                }
+                            }
+
+                            // Proceed with evaluation
+                            let Some((dq, _constraint)) = ctx.ctx.get(n) else {
+                                return Err(DeltaQError::NameError(n.to_owned()));
+                            };
+                            if use_cache {
+                                op_stack.push(Op::Cache(n));
+                            }
+                            op_stack.push(Op::Eval(dq.expanded()?, load_factor));
                         }
-                        None => Err(DeltaQError::NameError(n.to_owned())),
-                    }
-                } else if recursion.is_some() {
-                    Err(DeltaQError::RecursionError(n.to_owned()))
-                } else {
-                    // Check if the outcome is cached
-                    if ephemeral.load_factor == 1.0 {
-                        if let Some(cached_outcome) = ephemeral.cache.get(n) {
-                            return Ok(cached_outcome.clone());
+                        DeltaQExpr::Outcome(outcome) => {
+                            res_stack.push(outcome.mult(load_factor, ctx));
                         }
+                        DeltaQExpr::Seq(first, load, second) => {
+                            op_stack.push(Op::Seq);
+                            // evaluate second after first
+                            op_stack
+                                .push(Op::Eval(second, load_factor * load.factor + load.summand));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQExpr::Choice(first, w1, second, w2) => {
+                            op_stack.push(Op::Choice(*w1, *w2));
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQExpr::ForAll(first, second) => {
+                            op_stack.push(Op::ForAll);
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQExpr::ForSome(first, second) => {
+                            op_stack.push(Op::ForSome);
+                            op_stack.push(Op::Eval(second, load_factor));
+                            op_stack.push(Op::Eval(first, load_factor));
+                        }
+                        DeltaQExpr::Gossip { .. } => panic!("gossip not expanded"),
                     }
-
-                    // Proceed with evaluation
-                    let Some((dq, _)) = ctx.ctx.get(n) else {
-                        return Err(DeltaQError::NameError(n.to_owned()));
-                    };
-
-                    ephemeral.rec.insert(n.to_owned(), None);
-                    let outcome = dq.expand()?.eval(ctx, ephemeral);
-                    ephemeral.rec.remove(n);
-
-                    let outcome = outcome?;
-                    if ephemeral.load_factor == 1.0 {
-                        ephemeral.cache.insert(n.clone(), outcome.clone());
+                }
+                Op::Seq => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.seq(&second, ctx)?);
+                }
+                Op::Choice(w1, w2) => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.choice(w1 / (w1 + w2), &second, ctx)?);
+                }
+                Op::ForAll => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.for_all(&second, ctx)?);
+                }
+                Op::ForSome => {
+                    let second = res_stack.pop().unwrap();
+                    let first = res_stack.pop().unwrap();
+                    res_stack.push(first.for_some(&second, ctx)?);
+                }
+                Op::EndRec(n) => {
+                    ephemeral.rec.remove(n).unwrap();
+                }
+                Op::IncAllowance(n) => {
+                    if let Some(Some(rec)) = ephemeral.rec.get_mut(n) {
+                        *rec += 1;
                     }
-                    Ok(outcome)
+                }
+                Op::Cache(n) => {
+                    ephemeral
+                        .cache
+                        .insert(n.clone(), res_stack.last().unwrap().clone());
                 }
             }
-            DeltaQ::Outcome(outcome) => Ok(outcome.mult(ephemeral.load_factor, ctx)),
-            DeltaQ::Seq(first, load, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let lf = ephemeral.load_factor;
-                ephemeral.load_factor = ephemeral.load_factor * load.factor + load.summand;
-                let second_cdf = second.eval(ctx, ephemeral);
-                ephemeral.load_factor = lf;
-                let second_cdf = second_cdf?;
-                first_cdf
-                    .seq(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
+            if std::mem::size_of_val(&op_stack[..]) > 1_000_000 {
+                return Err(DeltaQError::TooManySteps);
             }
-            DeltaQ::Choice(first, first_fraction, second, second_fraction) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .choice(
-                        *first_fraction / (*first_fraction + *second_fraction),
-                        &second_cdf,
-                        ctx,
-                    )
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::ForAll(first, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .for_all(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::ForSome(first, second) => {
-                let first_cdf = first.eval(ctx, ephemeral)?;
-                let second_cdf = second.eval(ctx, ephemeral)?;
-                first_cdf
-                    .for_some(&second_cdf, ctx)
-                    .map_err(DeltaQError::CDFError)
-            }
-            DeltaQ::Gossip { .. } => panic!("gossip encountered in eval"),
         }
+
+        assert!(res_stack.len() == 1);
+        Ok(res_stack.pop().unwrap())
     }
 }
 
 // assume that gossiping to a node that already has been reached is free
 pub fn expand_gossip(
-    hop: &DeltaQ,
+    hop: &DeltaQExpr,
     size: f32,
     branching: f32,
     cluster_coeff: f32,
@@ -539,37 +823,36 @@ pub fn expand_gossip(
                 break;
             }
         }
-        web_sys::console::log_1(&format!("step: {prev} -> {remaining}").into());
         steps.push((prev - remaining, remaining));
-        if steps.len() > 100 {
+        if steps.len() > 10_000 {
             return Err(DeltaQError::TooManySteps);
         }
     }
 
-    let mut ret = DeltaQ::BlackBox;
+    let mut ret = Arc::new(DeltaQExpr::BlackBox);
     for (step, remaining) in steps.into_iter().rev() {
         if remaining > 1.0 {
-            ret = DeltaQ::Seq(
+            ret = Arc::new(DeltaQExpr::Seq(
                 Arc::new(hop.clone()),
                 LoadUpdate::new(cluster_branch, 0.0),
-                Arc::new(DeltaQ::choice(DeltaQ::top(), step, ret, remaining)),
-            );
+                Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, step, ret, remaining)),
+            ));
         } else {
-            ret = hop.clone();
+            ret = Arc::new(hop.clone());
         }
     }
 
-    Ok(DeltaQ::Seq(
-        Arc::new(DeltaQ::top()),
+    Ok(DeltaQExpr::Seq(
+        DeltaQ::top().expr,
         LoadUpdate::new(branching, 0.0),
-        Arc::new(DeltaQ::choice(DeltaQ::top(), 1.0, ret, size - 1.0)),
-    ))
+        Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, 1.0, ret, size - 1.0)),
+    )
+    .into())
 }
 
 // Define the new EphemeralContext struct
 pub struct EphemeralContext {
     pub rec: BTreeMap<Name, Option<usize>>,
-    pub load_factor: f32,
     pub cache: BTreeMap<Name, Outcome>,
 }
 
@@ -577,7 +860,6 @@ impl Default for EphemeralContext {
     fn default() -> Self {
         Self {
             rec: Default::default(),
-            load_factor: 1.0,
             cache: Default::default(),
         }
     }
@@ -612,7 +894,7 @@ mod tests {
     fn test_display_seq() {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
-        let seq = DeltaQ::seq(dq1, dq2);
+        let seq = DeltaQ::seq(dq1, LoadUpdate::default(), dq2);
         assert_eq!(seq.to_string(), "A ->- B");
         assert_eq!(seq, "A ->- B".parse().unwrap());
     }
@@ -649,7 +931,11 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
-        let nested_seq = DeltaQ::seq(dq1, DeltaQ::seq(dq2, dq3));
+        let nested_seq = DeltaQ::seq(
+            dq1,
+            LoadUpdate::default(),
+            DeltaQ::seq(dq2, LoadUpdate::default(), dq3),
+        );
         assert_eq!(nested_seq.to_string(), "A ->- B ->- C");
         assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
         assert_eq!(nested_seq, "A ->- B ->- C".parse().unwrap());
@@ -672,7 +958,10 @@ mod tests {
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
         let dq4 = DeltaQ::name("D");
-        let nested_for_all = DeltaQ::for_all(DeltaQ::for_all(dq1, dq2), DeltaQ::seq(dq3, dq4));
+        let nested_for_all = DeltaQ::for_all(
+            DeltaQ::for_all(dq1, dq2),
+            DeltaQ::seq(dq3, LoadUpdate::default(), dq4),
+        );
         assert_eq!(nested_for_all.to_string(), "∀(∀(A | B) | C ->- D)");
         assert_eq!(nested_for_all, "∀(∀(A | B) | C ->- D)".parse().unwrap());
     }
@@ -703,28 +992,44 @@ mod tests {
                 DeltaQ::choice(
                     DeltaQ::name("single"),
                     1.0,
-                    DeltaQ::seq(DeltaQ::name("single"), DeltaQ::name("single")),
+                    DeltaQ::seq(
+                        DeltaQ::name("single"),
+                        LoadUpdate::default(),
+                        DeltaQ::name("single"),
+                    ),
                     100.0,
                 ),
             "model3".to_owned() =>
                 DeltaQ::choice(
                     DeltaQ::name("single"),
                     1.0,
-                    DeltaQ::seq(DeltaQ::name("single"), DeltaQ::name("model2")),
+                    DeltaQ::seq(
+                        DeltaQ::name("single"),
+                        LoadUpdate::default(),
+                        DeltaQ::name("model2"),
+                    ),
                     100.0,
                 ),
             "model4".to_owned() =>
                 DeltaQ::choice(
                     DeltaQ::name("single"),
                     1.0,
-                    DeltaQ::seq(DeltaQ::name("single"), DeltaQ::name("model3")),
+                    DeltaQ::seq(
+                        DeltaQ::name("single"),
+                        LoadUpdate::default(),
+                        DeltaQ::name("model3"),
+                    ),
                     100.0,
                 ),
             "model5".to_owned() =>
                 DeltaQ::choice(
                     DeltaQ::name("single"),
                     1.0,
-                    DeltaQ::seq(DeltaQ::name("single"), DeltaQ::name("model4")),
+                    DeltaQ::seq(
+                        DeltaQ::name("single"),
+                        LoadUpdate::default(),
+                        DeltaQ::name("model4"),
+                    ),
                     100.0,
                 ),
         };
@@ -741,7 +1046,11 @@ mod tests {
                 DeltaQ::choice(
                     DeltaQ::name("base"),
                     1.0,
-                    DeltaQ::seq(DeltaQ::name("base"), DeltaQ::name("recursive")),
+                    DeltaQ::seq(
+                        DeltaQ::name("base"),
+                        LoadUpdate::default(),
+                        DeltaQ::name("recursive"),
+                    ),
                     1.0,
                 ),
             "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
@@ -762,7 +1071,7 @@ mod tests {
 
         let res = "+a".parse::<DeltaQ>().unwrap_err();
         assert!(
-            res.contains("expected 'BB', name, CDF, 'all(', 'some(', or parentheses"),
+            res.contains("expected 'BB', name, CDF, 'all(', 'some(', 'gossip(', or parentheses"),
             "{}",
             res
         );
@@ -775,22 +1084,22 @@ mod tests {
             StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
         );
         assert_eq!(
-            DeltaQ::Outcome(expected),
+            DeltaQExpr::Outcome(expected),
             "CDF[(1, 0.1), (2, 0.3)] WITH metric[(0, 12), (1.5, 0)]"
-                .parse::<DeltaQ>()
+                .parse::<DeltaQExpr>()
                 .unwrap()
         );
     }
 
     #[test]
     fn parse_load_update() {
-        let res = "BB ->-*3+4 BB".parse::<DeltaQ>().unwrap();
+        let res = "BB ->-*3+4 BB".parse::<DeltaQExpr>().unwrap();
         assert_eq!(
             res,
-            DeltaQ::Seq(
-                Arc::new(DeltaQ::BlackBox),
+            DeltaQExpr::Seq(
+                Arc::new(DeltaQExpr::BlackBox),
                 LoadUpdate::new(3.0, 4.0),
-                Arc::new(DeltaQ::BlackBox)
+                Arc::new(DeltaQExpr::BlackBox)
             )
         );
         assert_eq!(res.to_string(), "BB ->-×3+4 BB");
@@ -802,18 +1111,28 @@ mod tests {
         let mut ephemeral = EphemeralContext::default();
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f ->- f".parse().unwrap());
-        let res = DeltaQ::Name("f".into(), Some(3))
+        let res = DeltaQ::name_rec("f", Some(3))
             .eval(&ctx, &mut ephemeral)
             .unwrap();
-        assert_eq!(DeltaQ::Outcome(res), outcome.parse("CDF[(7,1)]").unwrap());
+        assert_eq!(
+            DeltaQExpr::Outcome(res),
+            outcome.parse("CDF[(7,1)]").unwrap()
+        );
+        let res = DeltaQ::name_rec("f", Some(0))
+            .eval(&ctx, &mut ephemeral)
+            .unwrap();
+        assert_eq!(
+            DeltaQExpr::Outcome(res),
+            outcome.parse("CDF[(0,1)]").unwrap()
+        );
 
         ctx.put("f".to_owned(), "CDF[(1,1)] ->- f".parse().unwrap());
         for i in 0..10 {
-            let res = DeltaQ::Name("f".into(), Some(i))
+            let res = DeltaQ::name_rec("f", Some(i))
                 .eval(&ctx, &mut ephemeral)
                 .unwrap();
             assert_eq!(
-                DeltaQ::Outcome(res),
+                DeltaQExpr::Outcome(res),
                 outcome.parse(&format!("CDF[({i},1)]")).unwrap()
             );
         }
@@ -828,7 +1147,7 @@ mod tests {
                 .parse()
                 .unwrap(),
         );
-        let res = DeltaQ::Name("out".into(), Some(1))
+        let res = DeltaQ::name_rec("out", Some(1))
             .eval(&ctx, &mut ephemeral)
             .unwrap();
         assert_eq!(
@@ -915,11 +1234,11 @@ mod tests {
             "net".into(),
             StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
         );
-        let dq = DeltaQ::Seq(
-            Arc::new(DeltaQ::Outcome(outcome.clone())),
+        let dq = DeltaQ::from(DeltaQExpr::Seq(
+            Arc::new(DeltaQExpr::Outcome(outcome.clone())),
             LoadUpdate::new(2.0, 0.0),
-            Arc::new(DeltaQ::Outcome(outcome)),
-        );
+            Arc::new(DeltaQExpr::Outcome(outcome)),
+        ));
         assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×2 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
         let ctx = PersistentContext::default();
         let mut ephemeral = EphemeralContext::default();
@@ -990,5 +1309,32 @@ mod tests {
             WITH ab[(0, 12), (1, 9.6), (2, 22.24), (3, 31.36), (4, 41.16), (5, 17.64), (6, 0)] \
             WITH b[(2, 1.12), (3, 4.48), (4, 5.88), (5, 2.52), (6, 0)] \
             WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.712), (2.8, 0.112), (3.2, 0.56), (3.5, 0.336), (4.2, 0.924), (4.5, 0.252), (5.2, 0.504), (5.5, 0)]");
+    }
+
+    #[test]
+    fn test_gossip() {
+        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0)
+            hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
+            .parse()
+            .unwrap();
+        let diffuse = ctx.eval("diffuse").unwrap();
+        assert_eq!(diffuse.to_string(), "\
+            CDF[(0, 0.00033), (1, 0.00067), (2, 0.00133), (3, 0.00266), (4, 0.00532), (5, 0.01062), (6, 0.02112), (7, 0.04147), (8, 0.0803), (9, 0.15133), (10, 0.27057), \
+                (11, 0.44361), (12, 0.64306), (13, 0.81241), (14, 0.91678), (15, 0.96674), (16, 0.98736), (17, 0.99529), (18, 0.99826), (19, 0.99936), (20, 1)] \
+            WITH net[(0, 0.99967), (1, 0.99933), (2, 0.99867), (3, 0.99734), (4, 0.99468), (5, 0.98938), (6, 0.97888), (7, 0.95853), (8, 0.9197), (9, 0.84867), (10, 0.72943), \
+                (11, 0.55639), (12, 0.35694), (13, 0.18759), (14, 0.08322), (15, 0.03326), (16, 0.01264), (17, 0.00471), (18, 0.00174), (19, 0.00064), (20, 0)]");
+
+        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0.99)
+                hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
+            .parse()
+            .unwrap();
+        let diffuse = ctx.eval("diffuse").unwrap();
+        assert_eq!(diffuse.cdf.iter().count(), 1000);
+        assert!(
+            diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
+            "{}",
+            diffuse.cdf.steps().integrate(0.0, 1476.0)
+        );
+        assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
     }
 }

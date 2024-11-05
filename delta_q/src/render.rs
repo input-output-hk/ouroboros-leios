@@ -1,6 +1,6 @@
 use crate::{
     delta_q::{expand_gossip, DeltaQ, LoadUpdate, Name},
-    Outcome, PersistentContext,
+    DeltaQExpr, Outcome, PersistentContext,
 };
 use std::{rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
@@ -24,50 +24,50 @@ impl DeltaQContext {
 
 #[derive(Properties, Clone, PartialEq, Debug)]
 pub struct Props {
-    pub delta_q: DeltaQ,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub delta_q: Arc<DeltaQExpr>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(DeltaQComponent)]
 pub fn delta_q_component(props: &Props) -> Html {
     // web_sys::console::log_1(&wasm_bindgen::JsValue::from_str(&format!("{props:?}")));
     let on_change = props.on_change.clone();
-    match &props.delta_q {
-        DeltaQ::BlackBox => {
+    match &*props.delta_q {
+        DeltaQExpr::BlackBox => {
             html! { <BlackBox {on_change} /> }
         }
-        DeltaQ::Name(name, rec) => {
+        DeltaQExpr::Name(name, rec) => {
             html! { <NameComponent name={(&**name).to_owned()} rec={*rec} {on_change} /> }
         }
-        DeltaQ::Outcome(outcome) => {
+        DeltaQExpr::Outcome(outcome) => {
             html! { <CdfComponent outcome={outcome.clone()} {on_change} /> }
         }
-        DeltaQ::Seq(first, load, second) => {
-            html!(<Seq first={(**first).clone()} load={*load} second={(**second).clone()} {on_change} />)
+        DeltaQExpr::Seq(first, load, second) => {
+            html!(<Seq first={first.clone()} load={*load} second={second.clone()} {on_change} />)
         }
-        DeltaQ::Choice(first, first_weight, second, second_weight) => {
-            html!(<Branch top={(**first).clone()} bottom={(**second).clone()} {on_change} kind={BranchKind::Choice(*first_weight, *second_weight)} />)
+        DeltaQExpr::Choice(first, first_weight, second, second_weight) => {
+            html!(<Branch top={first.clone()} bottom={second.clone()} {on_change} kind={BranchKind::Choice(*first_weight, *second_weight)} />)
         }
-        DeltaQ::ForAll(first, second) => {
-            html!(<Branch top={(**first).clone()} bottom={(**second).clone()} kind={BranchKind::ForAll} {on_change} />)
+        DeltaQExpr::ForAll(first, second) => {
+            html!(<Branch top={first.clone()} bottom={second.clone()} kind={BranchKind::ForAll} {on_change} />)
         }
-        DeltaQ::ForSome(first, second) => {
-            html!(<Branch top={(**first).clone()} bottom={(**second).clone()} kind={BranchKind::ForSome} {on_change} />)
+        DeltaQExpr::ForSome(first, second) => {
+            html!(<Branch top={first.clone()} bottom={second.clone()} kind={BranchKind::ForSome} {on_change} />)
         }
-        DeltaQ::Gossip {
+        DeltaQExpr::Gossip {
             hop,
             size,
             branching,
             cluster_coeff,
         } => {
-            html! { <Gossip hop={(**hop).clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
+            html! { <Gossip hop={hop.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
         }
     }
 }
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct BlackBoxProps {
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(BlackBox)]
@@ -83,7 +83,7 @@ pub fn black_box(props: &BlackBoxProps) -> Html {
     let onsubmit = Callback::from(cloned!(name, on_change, ctx;
         move |e: SubmitEvent| {
             e.prevent_default();
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&name))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&name).arc())));
         }
     ));
 
@@ -106,7 +106,7 @@ pub fn black_box(props: &BlackBoxProps) -> Html {
 pub struct NameProps {
     pub name: String,
     pub rec: Option<usize>,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(NameComponent)]
@@ -125,7 +125,7 @@ pub fn name_component(props: &NameProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::name_rec(&new_name, rec))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name_rec(&new_name, rec).arc())));
         }
     ));
 
@@ -151,17 +151,17 @@ pub fn name_component(props: &NameProps) -> Html {
                         <input type="text" value={(*new_name).clone()} {oninput} />
                     </form>
                     <button onclick={cloned!(on_change, name, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::name(&name), DeltaQ::BlackBox))))) }>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::name(&name), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
                     <button onclick={cloned!(on_change, name, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::name(&name), 1.0, DeltaQ::BlackBox, 1.0))))) }>{ "make choice" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::name(&name), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc())))) }>{ "make choice" }</button>
                     <button onclick={cloned!(on_change, name, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::name(&name), DeltaQ::BlackBox))))) }>{ "make forAll" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::name(&name), DeltaQExpr::BlackBox.into()).arc())))) }>{ "make forAll" }</button>
                     <button onclick={cloned!(on_change, name, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::name(&name), DeltaQ::BlackBox))))) }>{ "make forSome" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::name(&name), DeltaQExpr::BlackBox.into()).arc())))) }>{ "make forSome" }</button>
                     <button onclick={cloned!(on_change, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::BlackBox))))}>{ "black box" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::BlackBox.into()))))}>{ "black box" }</button>
                     <button onclick={cloned!(on_change, ctx, popup, name;
-                        move |_| { popup.set(false); if let Some(dq) = ctx.eval_ctx.get(&name) { on_change.emit((ctx.name.clone(), Some(dq.clone()))) } })}>{ "inline" }</button>
+                        move |_| { popup.set(false); if let Some(dq) = ctx.eval_ctx.get(&name) { on_change.emit((ctx.name.clone(), Some(dq.arc()))) } })}>{ "inline" }</button>
                 </div>
             }
         </div>
@@ -171,7 +171,7 @@ pub fn name_component(props: &NameProps) -> Html {
 #[derive(Properties, Clone, PartialEq)]
 pub struct CdfProps {
     pub outcome: Outcome,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(CdfComponent)]
@@ -187,8 +187,8 @@ pub fn cdf_component(props: &CdfProps) -> Html {
     let abstract_submit = Callback::from(cloned!(abstract_name, on_change, ctx, outcome;
         move |e: SubmitEvent| {
             e.prevent_default();
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&abstract_name))));
-            on_change.emit(((*abstract_name).clone(), Some(DeltaQ::Outcome(outcome.clone()))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&abstract_name).arc())));
+            on_change.emit(((*abstract_name).clone(), Some(DeltaQExpr::Outcome(outcome.clone()).into())));
         }
     ));
 
@@ -199,15 +199,15 @@ pub fn cdf_component(props: &CdfProps) -> Html {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup; move |_| popup.set(false))}>{ "abort" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQExpr::Outcome(outcome.clone()).into(), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::Outcome(outcome.clone()), 1.0, DeltaQ::BlackBox, 1.0))))) }>{ "make choice" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQExpr::Outcome(outcome.clone()).into(), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc())))) }>{ "make choice" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forAll" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQExpr::Outcome(outcome.clone()).into(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "make forAll" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::Outcome(outcome.clone()), DeltaQ::BlackBox))))) }>{ "make forSome" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQExpr::Outcome(outcome.clone()).into(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "make forSome" }</button>
                     <button onclick={cloned!(on_change, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::BlackBox))))}>{ "black box" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::BlackBox.into()))))}>{ "black box" }</button>
                     <form onsubmit={abstract_submit}>
                         <input type="submit" value="abstract" />
                         <input type="text" value={(*abstract_name).clone()} oninput={abstract_input} />
@@ -220,10 +220,10 @@ pub fn cdf_component(props: &CdfProps) -> Html {
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct SeqProps {
-    pub first: DeltaQ,
+    pub first: Arc<DeltaQExpr>,
     pub load: LoadUpdate,
-    pub second: DeltaQ,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub second: Arc<DeltaQExpr>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(Seq)]
@@ -231,6 +231,7 @@ pub fn seq(props: &SeqProps) -> Html {
     let on_change = props.on_change.clone();
     let first = props.first.clone();
     let second = props.second.clone();
+    let load = props.load;
     let ctx = use_context::<DeltaQContext>().unwrap();
 
     let on_first_change = Callback::from(cloned!(second, on_change, ctx;
@@ -239,7 +240,7 @@ pub fn seq(props: &SeqProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(DeltaQ::seq(delta_q, second.clone()))));
+                on_change.emit((name, Some(DeltaQExpr::Seq(delta_q, load, second.clone()).into())));
             }
         }
     ));
@@ -250,7 +251,7 @@ pub fn seq(props: &SeqProps) -> Html {
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(DeltaQ::seq(first.clone(), delta_q))));
+                on_change.emit((name, Some(DeltaQExpr::Seq(first.clone(), load, delta_q).into())));
             }
         }
     ));
@@ -263,8 +264,8 @@ pub fn seq(props: &SeqProps) -> Html {
     let onsubmit = Callback::from(cloned!(name, on_change, ctx, first, second;
         move |e: SubmitEvent| {
             e.prevent_default();
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&name))));
-            on_change.emit(((*name).clone(), Some(DeltaQ::seq(first.clone(), second.clone()))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&name).arc())));
+            on_change.emit(((*name).clone(), Some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into())));
         }
     ));
 
@@ -272,27 +273,27 @@ pub fn seq(props: &SeqProps) -> Html {
         <div class={classes!("row", "center", "frame")}>
             <DeltaQComponent delta_q={first.clone()} on_change={on_first_change} />
             <div class={classes!("seqSymbol", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
-                { format!("{}", props.load) }
+                { format!("{}", load) }
                 if *popup {
                     <div class={classes!("popup")}>
                     <button onclick={cloned!(popup;
                         move |_| popup.set(false))}> { "abort" } </button>
                     <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::seq(first.clone(), second.clone()), 1.0, DeltaQ::BlackBox, 1.0)))))}> { "make choice" } </button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc()))))}> { "make choice" } </button>
                     <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQ::seq(first.clone(), second.clone()), DeltaQ::BlackBox)))))}> { "make forAll" } </button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forAll" } </button>
                     <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQ::seq(first.clone(), second.clone()), DeltaQ::BlackBox)))))}> { "make forSome" } </button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forSome" } </button>
                     <button onclick={cloned!(on_change, first, second, popup, ctx;
-                        move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(second.clone(), first.clone())))) })}>{ "switch" }</button>
+                        move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(second.clone(), load, first.clone()).into()))) })}>{ "switch" }</button>
                     <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(first.clone(), second.clone())))))}>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into()))))}>{ "append" }</button>
                     <button onclick={cloned!(popup, on_change, first, ctx;
                         move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(first.clone()))) })}>{ "keep left" }</button>
                     <button onclick={cloned!(popup, on_change, second, ctx;
                         move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(second.clone()))) })}>{ "keep right" }</button>
                     <button onclick={cloned!(on_change, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::BlackBox))))}>{ "black box" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::BlackBox.into()))))}>{ "black box" }</button>
                     <form {onsubmit}>
                         <input type="submit" value="abstract" />
                         <input type="text" value={(*name).clone()} {oninput} />
@@ -307,9 +308,9 @@ pub fn seq(props: &SeqProps) -> Html {
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct BranchProps {
-    pub top: DeltaQ,
-    pub bottom: DeltaQ,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub top: Arc<DeltaQExpr>,
+    pub bottom: Arc<DeltaQExpr>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
     pub kind: BranchKind,
 }
 
@@ -367,7 +368,7 @@ pub fn branch_kind_component(props: &BranchProps) -> Html {
         move |e: SubmitEvent| {
             e.prevent_default();
             popup.set(false);
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(top.clone(), *top_frac, bottom.clone(), *bottom_frac))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Choice(top.clone(), *top_frac, bottom.clone(), *bottom_frac).into())));
         }),
     );
 
@@ -388,7 +389,7 @@ pub fn branch_kind_component(props: &BranchProps) -> Html {
     let abstract_submit = Callback::from(cloned!(abstract_name, on_change, ctx, bottom, top;
         move |e: SubmitEvent| {
             e.prevent_default();
-            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&abstract_name))));
+            on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&abstract_name).arc())));
             on_change.emit(((*abstract_name).clone(), Some(mk_branch(kind, top.clone(), bottom.clone()))));
         }
     ));
@@ -406,24 +407,24 @@ pub fn branch_kind_component(props: &BranchProps) -> Html {
                 </form>
                 <button onclick={cloned!(popup, on_change, top, bottom, ctx; move |_| {
                     popup.set(false);
-                    on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(top.clone(), bottom.clone()))))
+                    on_change.emit((ctx.name.clone(), Some(DeltaQExpr::ForAll(top.clone(), bottom.clone()).into())))
                 })}>{ "make forAll" }</button>
                 <button onclick={cloned!(popup, on_change, top, bottom, ctx; move |_| {
                     popup.set(false);
-                    on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(top.clone(), bottom.clone()))))
+                    on_change.emit((ctx.name.clone(), Some(DeltaQExpr::ForSome(top.clone(), bottom.clone()).into())))
                 })}>{ "make forSome" }</button>
                 <button onclick={cloned!(popup, on_change, top, bottom, ctx; move |_| {
                     popup.set(false);
                     on_change.emit((ctx.name.clone(), Some(mk_branch(kind, bottom.clone(), top.clone()))))
                 })}>{ "switch" }</button>
                 <button onclick={cloned!(popup, on_change, top, bottom, ctx;
-                    move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(mk_branch(kind, top.clone(), bottom.clone()), DeltaQ::BlackBox)))) })}>{ "append" }</button>
+                    move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(mk_branch(kind, top.clone(), bottom.clone()), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).into()))) })}>{ "append" }</button>
                 <button onclick={cloned!(popup, on_change, top, ctx;
                     move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(top.clone()))) })}>{ "keep top" }</button>
                 <button onclick={cloned!(popup, on_change, bottom, ctx;
                     move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(bottom.clone()))) })}>{ "keep bottom" }</button>
                 <button onclick={cloned!(on_change, ctx;
-                    move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::BlackBox))))}>{ "black box" }</button>
+                    move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::BlackBox.into()))))}>{ "black box" }</button>
                 <form onsubmit={abstract_submit}>
                     <input type="submit" value="abstract" />
                     <input type="text" value={(*abstract_name).clone()} oninput={abstract_input} />
@@ -433,11 +434,11 @@ pub fn branch_kind_component(props: &BranchProps) -> Html {
     </div>)
 }
 
-fn mk_branch(kind: BranchKind, top: DeltaQ, bottom: DeltaQ) -> DeltaQ {
+fn mk_branch(kind: BranchKind, top: Arc<DeltaQExpr>, bottom: Arc<DeltaQExpr>) -> Arc<DeltaQExpr> {
     match kind {
-        BranchKind::Choice(l, r) => DeltaQ::Choice(Arc::new(top), l, Arc::new(bottom), r),
-        BranchKind::ForAll => DeltaQ::ForAll(Arc::new(top), Arc::new(bottom)),
-        BranchKind::ForSome => DeltaQ::ForSome(Arc::new(top), Arc::new(bottom)),
+        BranchKind::Choice(l, r) => DeltaQExpr::Choice(top, l, bottom, r).into(),
+        BranchKind::ForAll => DeltaQExpr::ForAll(top, bottom).into(),
+        BranchKind::ForSome => DeltaQExpr::ForSome(top, bottom).into(),
     }
 }
 
@@ -536,11 +537,11 @@ impl Reducible for PersistentContext {
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct GossipProps {
-    pub hop: DeltaQ,
+    pub hop: Arc<DeltaQExpr>,
     pub size: f32,
     pub branching: f32,
     pub cluster_coeff: f32,
-    pub on_change: Callback<(String, Option<DeltaQ>)>,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(Gossip)]
@@ -550,7 +551,7 @@ pub fn gossip(props: &GossipProps) -> Html {
         size,
         branching,
         cluster_coeff,
-        on_change,
+        on_change: _,
     } = props;
 
     let popup = use_state(|| false);
@@ -563,7 +564,7 @@ pub fn gossip(props: &GossipProps) -> Html {
                 <div class={classes!("popup")}>
                     {
                         match expand_gossip(&hop, *size, *branching, *cluster_coeff) {
-                            Ok(delta_q) => html! { <DeltaQComponent delta_q={delta_q} on_change={|_| {}} /> },
+                            Ok(delta_q) => html! { <DeltaQComponent delta_q={delta_q.arc()} on_change={|_| {}} /> },
                             Err(e) => html! { <div>{e.to_string()}</div> },
                         }
                     }
