@@ -9,6 +9,9 @@ import Leios.Base
 import Leios.Blocks
 
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
+  ⦃ IsBlock-Vote : IsBlock (List Vote) ⦄
+  ⦃ Hashable-IBHeaderOSig : ∀ {b} → Hashable (IBHeaderOSig b) Hash ⦄
+  ⦃ Hashable-PreEndorserBlock : Hashable PreEndorserBlock Hash ⦄
   (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
   (vrf : LeiosVRF a) (let open LeiosVRF vrf) (pubKey : PubKey)
   (let open Leios.Base a) (B' : BaseAbstract) (BF' : BaseAbstract.Functionality B') where

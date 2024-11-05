@@ -1,4 +1,4 @@
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 
 open import Leios.Prelude
 open import Leios.Abstract
@@ -41,8 +41,6 @@ record IBHeaderOSig (b : Bool) : Type where
 IBHeader    = IBHeaderOSig true
 PreIBHeader = IBHeaderOSig false
 
-instance postulate Hashable-IBHeaderOSig : ∀ {b} → Hashable (IBHeaderOSig b) Hash
-
 record IBBody : Type where
   field txs : List Tx
 
@@ -62,7 +60,7 @@ instance
   IsBlock-InputBlock : IsBlock InputBlock
   IsBlock-InputBlock = record { InputBlock }
 
-mkIBHeader : ℕ → PoolID → VrfPf → PrivKey → List Tx → IBHeader
+mkIBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → IBHeader
 mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHeaderOSig h }
   where
     h : IBHeaderOSig false
@@ -73,7 +71,7 @@ mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHea
                ; signature  = _
                }
 
-getIBRef : InputBlock → IBRef
+getIBRef : ⦃ Hashable IBHeader Hash ⦄ → InputBlock → IBRef
 getIBRef = hash ∘ InputBlock.header
 
 --------------------------------------------------------------------------------
@@ -92,16 +90,14 @@ EndorserBlock    = EndorserBlockOSig true
 PreEndorserBlock = EndorserBlockOSig false
 
 instance
-  postulate Hashable-PreEndorserBlock : Hashable PreEndorserBlock Hash
-
-  Hashable-EndorserBlock : Hashable EndorserBlock Hash
+  Hashable-EndorserBlock : ⦃ Hashable PreEndorserBlock Hash ⦄ → Hashable EndorserBlock Hash
   Hashable-EndorserBlock .hash b = hash {T = PreEndorserBlock}
     record { EndorserBlockOSig b hiding (signature) ; signature = _ }
 
   IsBlock-EndorserBlockOSig : ∀ {b} → IsBlock (EndorserBlockOSig b)
   IsBlock-EndorserBlockOSig {b} = record { EndorserBlockOSig }
 
-mkEB : ℕ → PoolID → VrfPf → PrivKey → List IBRef → List EBRef → EndorserBlock
+mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List IBRef → List EBRef → EndorserBlock
 mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
   where
     b : PreEndorserBlock
@@ -113,7 +109,7 @@ mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserB
                ; signature  = _
                }
 
-getEBRef : EndorserBlock → EBRef
+getEBRef : ⦃ Hashable PreEndorserBlock Hash ⦄ → EndorserBlock → EBRef
 getEBRef = hash
 
 -- TODO
@@ -127,9 +123,7 @@ getEBRef = hash
 -- FFD for Leios Blocks
 --------------------------------------------------------------------------------
 
-postulate instance IsBlock-Vote : IsBlock (List Vote)
-
-module GenFFD where
+module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   data Header : Type where
     ibHeader : IBHeader → Header
     ebHeader : EndorserBlock → Header
@@ -152,5 +146,5 @@ module GenFFD where
   msgID (ebHeader h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
   msgID (vHeader  h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
 
-ffdAbstract : FFDAbstract
+ffdAbstract : ⦃ _ : IsBlock (List Vote) ⦄ → FFDAbstract
 ffdAbstract = record { GenFFD }
