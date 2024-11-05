@@ -3,9 +3,10 @@
   "module": "src/index.tsx",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "preview": "vite preview",
-    "build": "vite build",
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "seed": "bun src/components/files/convertTestData.ts"
   },
   "devDependencies": {
@@ -25,8 +26,11 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "d3": "^7.9.0",
+    "next": "^15.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-force-graph": "^1.44.6"
+    "react-force-graph": "^1.44.6",
+    "swr": "^2.2.5"
   }
 }

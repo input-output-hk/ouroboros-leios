@@ -81,3 +81,9 @@ export interface IMessage {
     time: number;
     message: TMessageType;
 }
+
+export interface ISlot {
+  slot: number;
+  start_time: number;
+  events: IMessage[];
+}
