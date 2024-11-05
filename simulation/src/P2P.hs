@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -7,6 +8,7 @@ module P2P where
 import Control.Monad (when)
 import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.ST (ST)
+import Data.Aeson.Types (FromJSON, ToJSON (..), defaultOptions, genericToEncoding)
 import Data.Array.ST as Array (
   Ix (range),
   MArray (newArray),
@@ -21,17 +23,22 @@ import qualified Data.KdMap.Static as KdMap
 import Data.List (mapAccumL, sort, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import GHC.Generics (Generic)
+import SimTypes (NodeId (..), Point (..), WorldShape (..))
 import System.Random (StdGen)
 import qualified System.Random as Random
-
-import SimTypes (NodeId (..), Point (..), WorldShape (..))
 
 data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)
   , p2pLinks :: !(Map (NodeId, NodeId) Latency)
   , p2pWorldShape :: !WorldShape
   }
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON P2PTopography where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON P2PTopography
 
 type Latency =
   -- | Double rather than DiffTime for efficiency
@@ -41,13 +48,19 @@ data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   { p2pWorldShape :: !WorldShape
   -- ^ Size of the world (in seconds): (Circumference, pole-to-pole)
   , -- \^ Number of nodes, e.g. 100, 1000, 10,000
+
     p2pNumNodes :: Int
   -- ^ Per-node upstream links picked as close peers, e.g. 5 of 10 total
   , p2pNodeLinksClose :: Int
   -- ^ Per-node upstream links picked as random peers, e.g. 5 of 10 total
   , p2pNodeLinksRandom :: Int
   }
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance ToJSON P2PTopographyCharacteristics where
+  toEncoding = genericToEncoding defaultOptions
+
+instance FromJSON P2PTopographyCharacteristics
 
 -- | Strategy for creating an arbitrary P2P network:
 --
