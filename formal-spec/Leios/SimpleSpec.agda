@@ -150,10 +150,14 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG l)
 
   -- Base chain
+  --
+  -- Note: Submitted data to the base chain is only taken into account
+  --       if the party submitting is the block producer on the base chain
+  --       for the given slot
 
   Base₁ : ∀ {txs} → let open LeiosState s in
-        ───────────────────────────────────────────────────────────────────────────────
-        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
+        ──────────────────────────────────────────────────────────────────
+        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = txs } , EMPTY)
 
   Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
          ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
@@ -165,7 +169,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
          ∙ bs ⇀⟦ B.SUBMIT (inj₂ txs) ⟧ᴮ (bs' , B.EMPTY)
          ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = [] } , EMPTY)
+         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (s , EMPTY)
 
   -- Protocol rules
 
