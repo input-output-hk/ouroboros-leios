@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2024-11-05
+
+### Latency measurements of 52-node cluster
+
+The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency measurments and topology for a 52-machine `cardano-node` cluster that is used for benchmarking. The machine is spread among three AWS regions.
+
 ## 2024-11-04
 
 ### Uniform vs. Non-uniform IB generation in Short Leios
@@ -8,7 +14,7 @@ Drafted a version of Short Leios where IB generation is uniform over the Propose
 
 
 
-## 2024-01-01
+## 2024-11-01
 
 ### Haskell Simulation
 
