@@ -128,8 +128,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   --       for the given slot
 
   Base₁ : ∀ {txs} → let open LeiosState s in
-        ─────────────────────────────────────────────────────────────────────────────
-        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = MemPool ++ txs } , EMPTY)
+        ──────────────────────────────────────────────────────────────────
+        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = txs } , EMPTY)
 
   Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
          ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
@@ -141,7 +141,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          ∙ ∅ˢ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
          ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
          ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = [] } , EMPTY)
+         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (s , EMPTY)
 
   -- Protocol rules
 
