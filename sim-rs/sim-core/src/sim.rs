@@ -33,7 +33,7 @@ pub struct Simulation {
     network: Network<SimulationMessage>,
     event_queue: EventQueue,
     nodes: Vec<Node>,
-    slot_broadcaster: watch::Sender<u64>,
+    slot_broadcaster: Option<watch::Sender<u64>>,
     tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
     next_tx_id: u64,
 }
@@ -91,7 +91,7 @@ impl Simulation {
             network,
             event_queue,
             nodes,
-            slot_broadcaster,
+            slot_broadcaster: Some(slot_broadcaster),
             tx_sinks,
             next_tx_id: 0,
         })
@@ -141,11 +141,15 @@ impl Simulation {
     fn handle_new_slot(&mut self, slot: u64) -> bool {
         if self.config.slots.is_some_and(|s| slot == s) {
             // done running
+            self.slot_broadcaster.take();
             return true;
         }
 
         self.tracker.track_slot(slot);
-        self.slot_broadcaster.send_replace(slot);
+        if let Some(broadcaster) = &self.slot_broadcaster {
+            // already finished running
+            broadcaster.send_replace(slot);
+        }
         self.event_queue
             .queue_event(SimulationEvent::NewSlot(slot + 1), Duration::from_secs(1));
 

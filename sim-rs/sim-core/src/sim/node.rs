@@ -116,14 +116,26 @@ impl Node {
     pub async fn run(mut self) -> Result<()> {
         loop {
             select! {
-                _ = self.slot_receiver.changed() => {
-                    let slot = *self.slot_receiver.borrow_and_update();
+                change_res = self.slot_receiver.changed() => {
+                    if change_res.is_err() {
+                        // sim has stopped running
+                        break;
+                    }
+                    let slot = *self.slot_receiver.borrow();
                     self.handle_new_slot(slot)?;
                 }
-                Some(tx) = self.tx_source.recv() => {
+                maybe_tx = self.tx_source.recv() => {
+                    let Some(tx) = maybe_tx else {
+                        // sim has stopped running
+                        break;
+                    };
                     self.receive_tx(self.id, tx)?;
                 }
-                Some((from, msg)) = self.msg_source.recv() => {
+                maybe_msg = self.msg_source.recv() => {
+                    let Some((from, msg)) = maybe_msg else {
+                        // sim has stopped running
+                        break;
+                    };
                     match msg {
                         // TX propagation
                         SimulationMessage::AnnounceTx(id) => {
@@ -172,24 +184,20 @@ impl Node {
                 }
             };
         }
+        Ok(())
     }
 
-    fn handle_new_slot(&mut self, slot: u64) -> Result<bool> {
+    fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
         // The beginning of a new slot is the end of an old slot.
         // Publish any input blocks left over from the last slot
         if slot > 0 {
             self.finish_generating_ibs(slot - 1)?;
         }
 
-        if self.sim_config.slots.is_some_and(|s| slot == s) {
-            // done running
-            return Ok(true);
-        }
-
         self.handle_input_block_generation(slot)?;
         self.try_generate_praos_block(slot)?;
 
-        Ok(false)
+        Ok(())
     }
 
     fn handle_input_block_generation(&mut self, slot: u64) -> Result<()> {

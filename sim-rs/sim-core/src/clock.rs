@@ -52,8 +52,6 @@ impl Clock {
     pub async fn wait_until(&self, timestamp: Timestamp) {
         let scaled = Duration::from_secs_f64(timestamp.0.as_secs_f64() / self.scale);
         let instant = self.start + scaled;
-        if instant > Instant::now() {
-            time::sleep_until(instant.into()).await;
-        }
+        time::sleep_until(instant.into()).await;
     }
 }
