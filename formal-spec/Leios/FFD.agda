@@ -1,3 +1,5 @@
+{-# OPTIONS --safe #-}
+
 module Leios.FFD where
 
 open import Leios.Prelude

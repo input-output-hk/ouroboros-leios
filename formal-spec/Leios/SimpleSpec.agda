@@ -1,3 +1,4 @@
+-- {-# OPTIONS --safe #-}
 {-# OPTIONS --allow-unsolved-metas #-}
 
 open import Leios.Prelude

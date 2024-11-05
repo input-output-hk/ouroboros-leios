@@ -1,3 +1,5 @@
+{-# OPTIONS --safe #-}
+
 module Leios.Prelude where
 
 open import abstract-set-theory.FiniteSetTheory public
