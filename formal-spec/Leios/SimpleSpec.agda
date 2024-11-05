@@ -46,7 +46,7 @@ record LeiosState : Type where
         SD : StakeDistr
         FFDState : FFD.State
         Ledger : List Tx
-        MemPool : List Tx
+        ToPropose : List Tx
         IBs : List InputBlock
         EBs : List EndorserBlock
         Vs  : List (List Vote)
@@ -54,15 +54,15 @@ record LeiosState : Type where
 
 initLeiosState : VTy → StakeDistr → LeiosState
 initLeiosState V SD = record
-  { V        = V
-  ; SD       = SD
-  ; FFDState = initFFDState
-  ; Ledger   = []
-  ; MemPool  = []
-  ; IBs      = []
-  ; EBs      = []
-  ; Vs       = []
-  ; slot     = initSlot V
+  { V         = V
+  ; SD        = SD
+  ; FFDState  = initFFDState
+  ; Ledger    = []
+  ; ToPropose = []
+  ; IBs       = []
+  ; EBs       = []
+  ; Vs        = []
+  ; slot      = initSlot V
   }
 
 postulate canProduceV1 : ℕ → Type
@@ -128,8 +128,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   --       for the given slot
 
   Base₁ : ∀ {txs} → let open LeiosState s in
-        ──────────────────────────────────────────────────────────────────
-        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { MemPool = txs } , EMPTY)
+        ────────────────────────────────────────────────────────────────────
+        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { ToPropose = txs } , EMPTY)
 
   Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
          ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
@@ -137,7 +137,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          ────────────────────────────────────────────────────────────────────────────────────
          just s ⇀⟦ SUBMIT (inj₁ eb) ⟧ (s , EMPTY)
 
-  Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (MemPool to txs) in
+  Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (ToPropose to txs) in
          ∙ ∅ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
          ∙ bs BF.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
          ────────────────────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   -- Protocol rules
 
-  IB-Role : let open LeiosState s renaming (MemPool to txs; FFDState to ffds)
+  IB-Role : let open LeiosState s renaming (ToPropose to txs; FFDState to ffds)
                 b = GenFFD.ibBody (record { txs = txs })
                 h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
           in
