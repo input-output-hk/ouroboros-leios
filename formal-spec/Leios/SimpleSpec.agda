@@ -63,11 +63,11 @@ record LeiosState : Type where
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r with i ← findIndex (_≟ r) (map getEBRef EBs) rewrite length-map getEBRef EBs
-    = map (lookup EBs) i
+    = lookup EBs <$> i
 
   lookupIB : IBRef → Maybe InputBlock
   lookupIB r with i ← findIndex (_≟ r) (map getIBRef IBs) rewrite length-map getIBRef IBs
-    = map (lookup IBs) i
+    = lookup IBs <$> i
 
   lookupTxs : EndorserBlock → List Tx
   lookupTxs = join ∘ map txs ∘ map body ∘ mapMaybe lookupIB ∘ join ∘ map ibRefs ∘ mapMaybe lookupEB ∘ ebRefs
