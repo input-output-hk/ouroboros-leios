@@ -1,3 +1,5 @@
+{-# OPTIONS --safe #-}
+
 module Leios.Abstract where
 
 open import Leios.Prelude
