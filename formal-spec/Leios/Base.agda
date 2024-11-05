@@ -19,7 +19,7 @@ record BaseAbstract : Type₁ where
   data Output : Type where
     STAKE : StakeDistr → Output
     EMPTY : Output
-    LDG : List EndorserBlock → Output -- TODO: EndorserBlock..?
+    BASE-LDG : List EndorserBlock → Output
 
   record Functionality : Type₁ where
     field State : Type
