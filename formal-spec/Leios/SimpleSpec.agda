@@ -62,12 +62,12 @@ record LeiosState : Type where
         slot : ℕ
 
   lookupEB : EBRef → Maybe EndorserBlock
-  lookupEB r with i ← findIndex (_≟ r) (map getEBRef EBs) rewrite length-map getEBRef EBs
-    = lookup EBs <$> i
+  lookupEB r with i ← findIndex (_≟ r) (map getEBRef EBs) rewrite length-map getEBRef EBs =
+    lookup EBs <$> i
 
   lookupIB : IBRef → Maybe InputBlock
-  lookupIB r with i ← findIndex (_≟ r) (map getIBRef IBs) rewrite length-map getIBRef IBs
-    = lookup IBs <$> i
+  lookupIB r with i ← findIndex (_≟ r) (map getIBRef IBs) rewrite length-map getIBRef IBs =
+    lookup IBs <$> i
 
   lookupTxs : EndorserBlock → List Tx
   lookupTxs = join ∘ map txs ∘ map body ∘ mapMaybe lookupIB ∘ join ∘ map ibRefs ∘ mapMaybe lookupEB ∘ ebRefs
