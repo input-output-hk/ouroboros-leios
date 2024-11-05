@@ -323,10 +323,15 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
   let
     chain = fmap getHeader cps.chainState
     aux (mpId, c1) (pId, c2) =
-      let c = Chain.selectChain c1 c2
-       in if Chain.headPoint c == Chain.headPoint c1
-            then (mpId, c1)
-            else (Just pId, c2)
+      let
+        c =
+          if (Chain.headBlockNo c1, Chain.headHash c1) >= (Chain.headBlockNo c2, Chain.headHash c2)
+            then c1
+            else c2
+       in
+        if Chain.headPoint c == Chain.headPoint c1
+          then (mpId, c1)
+          else (Just pId, c2)
     -- using foldl' since @selectChain@ is left biased
     (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
   return $ do
