@@ -1,4 +1,4 @@
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 
 open import Leios.Prelude
 open import Leios.Abstract
