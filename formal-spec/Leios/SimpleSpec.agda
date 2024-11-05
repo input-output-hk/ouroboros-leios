@@ -122,6 +122,10 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG l)
 
   -- Base chain
+  --
+  -- Note: Submitted data to the base chain is only taken into account
+  --       if the party submitting is the block producer on the base chain
+  --       for the given slot
 
   Base₁ : ∀ {txs} → let open LeiosState s in
         ─────────────────────────────────────────────────────────────────────────────
