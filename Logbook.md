@@ -1,6 +1,62 @@
 # Leios logbook
 
-## 2024-01-01
+## 2024-11-05
+
+### Team session
+
+- Documenting discussions
+    - We should consider a rule or standard practice for documenting discussions.
+    - We might want to experiment more with github discussions: slack seems more convenient, but isn't transparent.
+    - Summarize lengthy slack discussions in the log book, and it's okay to tag someone if no one volunteers.
+    - We'll check in two weeks to see how things are going.
+- We might try stronger collaboration between work streams now that opportunities have emerged.
+    - Please comment on github discussions even if it isn't immediately relevant for your day's work.
+- Opportunities for comparing results of models and simulations
+    - The tools aren't quite ripe for comparisons, but will be soon.
+    - We definitely should present comparison results at the monthly demo.
+    - Compare two-node Haskell simulation to Delta Q?
+    - Compare all models/simulations to 52-node benchmark cluster?
+- We need to be careful about measuring latency.
+    - Adoption of a preferred chain proceeds in "waves" accross the network.
+    - In case of battles between forks, the winner might should a higher latency, depending upon how that is measured.
+    - Chains are only partially ordered (by length).
+    - Using a total ordering (by length then a hash) may make propagation and measurement faster.
+    - The Haskell simulator shows some extreme outliers, and these are being investigated.
+- The presence of relays add two extra hops on mainnet.
+    - Typically, there are at least two relays per block producer and all reside in the same data center.
+    - Block validation takes ~100 ms for a typical block, which is on the order of diffusion time between the block producer and the relays.
+- Uniform/non-uniform IBs in Short Leios
+    - The protocol should tolerate spikes of 2-3x.
+    - Uniformity may leave the network idle at the guaranteed delivery time.
+    - Non-uniformity creates more spikiness.
+    - Elastic cloud vs bare metal pricing models have different implications for optimizing the protocol to handle spikes.
+        - The original design was optimized to tolerate spikes; Short Leios assumed elastic hosting in order to deal with spikes.
+        - Not having a well-defined cost model somewhat blocks Research.
+        - For now, assume bare metal pricing.
+        - We should see whether the typical connection used in bare metal (e.g., 1 GBit) is already 10x what our target throughput is (e.g., 100MBit), and thus may be already capable of handling spikes of that magnitude.
+- Two types of robustness in Leios
+    - Handling of spikes (i.e., short vs simplified Leios)
+    - Guarantee of all IBs arriving (i.e., non-full vs full Leios)
+- Next meeting
+    - Manually simulation Leios
+    - Tag stages with parameters describing them and estimates of those parameters
+- Action times
+    - Pie chart of mainnet hosting types (@bwbush)
+    - Work on pricing model (@bwbush)
+  
+### Latency measurements of 52-node cluster
+
+The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency measurments and topology for a 52-machine `cardano-node` cluster that is used for benchmarking. The machine is spread among three AWS regions.
+
+## 2024-11-04
+
+### Uniform vs. Non-uniform IB generation in Short Leios
+
+Drafted a version of Short Leios where IB generation is uniform over the Propose stage. The reason for creating such a version of the protocol is discussions we had on whether releasing IBs at the start of Propose (as requried by the non-uniform version of short Leios) creates problems and underutilization of resources at the TCP level.
+
+
+
+## 2024-11-01
 
 ### Haskell Simulation
 

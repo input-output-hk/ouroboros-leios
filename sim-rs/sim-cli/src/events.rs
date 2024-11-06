@@ -16,7 +16,7 @@ use sim_core::{
 };
 use tokio::{
     fs::{self, File},
-    io::AsyncWriteExt as _,
+    io::{AsyncWriteExt as _, BufWriter},
     sync::mpsc,
 };
 use tracing::{info, info_span};
@@ -101,8 +101,11 @@ impl EventMonitor {
             Some(ref path) => {
                 let file = File::create(path).await?;
                 match self.output_format {
-                    OutputFormat::EventStream => OutputTarget::EventStream(file),
-                    OutputFormat::SlotStream => OutputTarget::SlotStream { file, next: None },
+                    OutputFormat::EventStream => OutputTarget::EventStream(BufWriter::new(file)),
+                    OutputFormat::SlotStream => OutputTarget::SlotStream {
+                        file: BufWriter::new(file),
+                        next: None,
+                    },
                 }
             }
             None => OutputTarget::None,
@@ -315,9 +318,9 @@ fn should_log_event(event: &Event) -> bool {
 }
 
 enum OutputTarget {
-    EventStream(File),
+    EventStream(BufWriter<File>),
     SlotStream {
-        file: File,
+        file: BufWriter<File>,
         next: Option<SlotEvents>,
     },
     None,
@@ -354,7 +357,7 @@ impl OutputTarget {
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(file: &mut File, event: T) -> Result<()> {
+    async fn write_line<T: Serialize>(file: &mut BufWriter<File>, event: T) -> Result<()> {
         let mut string = serde_json::to_string(&event)?;
         string.push('\n');
         file.write_all(string.as_bytes()).await?;
