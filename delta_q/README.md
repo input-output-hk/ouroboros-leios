@@ -12,7 +12,7 @@ One shortcoming of the published theory is that it doesn't make it obvious how t
 To this end, this tool contains an extension of the syntax in two ways:
 
 1. the basic outcome constructor `CDF[...]` accepts a postfix `WITH <metric>[...]` that may be supplied any number of times to register some step functions for resource usage of performing this outcome
-2. the sequence operator `->-` accepts a load factor update of the form `->-×X+Y` which means that the right-hand side will have its load metrics scaled up by a factor that is obtained by taking the factor currently in effect, multiplying it by X and then adding Y (both components are optional)
+2. the sequence operator `->-` accepts an optional load factor update of the form `->-×X` which means that the right-hand side will have its load metrics scaled up by the given factor
 
 The rules for evaluating the load metrics of outcomes are as follows:
 

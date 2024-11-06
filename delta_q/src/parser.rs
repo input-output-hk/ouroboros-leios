@@ -55,7 +55,7 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
         loop {
             let snap = input.checkpoint();
             let Ok(op) = alt((
-                op_seq.map(|(mult, add)| Op::Seq { mult, add }),
+                op_seq.map(|mult| Op::Seq { mult }),
                 (num, "<>", num).map(|(l, _, r)| Op::Choice(l, r)),
             ))
             .parse_next(input) else {
@@ -70,8 +70,8 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
 
             let rhs = rec(input, rbp)?;
             lhs = match op {
-                Op::Seq { mult, add } => {
-                    DeltaQExpr::Seq(Arc::new(lhs), LoadUpdate::new(mult, add), Arc::new(rhs))
+                Op::Seq { mult } => {
+                    DeltaQExpr::Seq(Arc::new(lhs), LoadUpdate::new(mult), Arc::new(rhs))
                 }
                 Op::Choice(l, r) => DeltaQExpr::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
             };
@@ -81,13 +81,12 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
     rec(input, 0)
 }
 
-fn op_seq(input: &mut &str) -> PResult<(f32, f32)> {
+fn op_seq(input: &mut &str) -> PResult<f32> {
     (
         "->-",
         opt(preceded(alt(('*', '×', '⋅')), num)).map(|x| x.unwrap_or(1.0)),
-        opt(preceded('+', num)).map(|x| x.unwrap_or(0.0)),
     )
-        .map(|x| (x.1, x.2))
+        .map(|x| x.1)
         .parse_next(input)
 }
 
@@ -247,7 +246,7 @@ fn closing_paren(input: &mut &str) -> PResult<()> {
 
 #[derive(Debug, Clone, Copy)]
 enum Op {
-    Seq { mult: f32, add: f32 },
+    Seq { mult: f32 },
     Choice(f32, f32),
 }
 

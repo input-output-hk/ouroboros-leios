@@ -141,12 +141,11 @@ impl Display for PersistentContext {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoadUpdate {
     pub factor: f32,
-    pub summand: f32,
 }
 
 impl LoadUpdate {
-    pub fn new(factor: f32, summand: f32) -> Self {
-        Self { factor, summand }
+    pub fn new(factor: f32) -> Self {
+        Self { factor }
     }
 }
 
@@ -155,19 +154,13 @@ impl Display for LoadUpdate {
         if self.factor != 1.0 {
             write!(f, "×{}", self.factor)?;
         }
-        if self.summand != 0.0 {
-            write!(f, "+{}", self.summand)?;
-        }
         Ok(())
     }
 }
 
 impl Default for LoadUpdate {
     fn default() -> Self {
-        Self {
-            factor: 1.0,
-            summand: 0.0,
-        }
+        Self { factor: 1.0 }
     }
 }
 
@@ -627,9 +620,9 @@ impl DeltaQ {
         #[derive(Debug)]
         enum Op<'a> {
             /// Evaluate a DeltaQ with the given load factor and push the result on the result stack
-            Eval(&'a DeltaQExpr, f32),
+            Eval(&'a DeltaQExpr),
             /// construct a sequence from the top two results on the result stack
-            Seq,
+            Seq { load_factor: f32 },
             /// construct a choice from the top two results on the result stack
             Choice(f32, f32),
             /// construct a forall from the top two results on the result stack
@@ -648,11 +641,11 @@ impl DeltaQ {
         let mut res_stack = Vec::<Outcome>::new();
 
         // Start with the initial DeltaQ
-        op_stack.push(Op::Eval(self.expanded()?, 1.0));
+        op_stack.push(Op::Eval(self.expanded()?));
 
         while let Some(op) = op_stack.pop() {
             match op {
-                Op::Eval(dq, load_factor) => {
+                Op::Eval(dq) => {
                     match dq {
                         DeltaQExpr::BlackBox => return Err(DeltaQError::BlackBox),
                         DeltaQExpr::Name(n, r) => {
@@ -699,8 +692,7 @@ impl DeltaQ {
                             }
 
                             // Check cache
-                            let use_cache =
-                                matches!(ephemeral.rec.get(n), Some(None)) && load_factor == 1.0;
+                            let use_cache = matches!(ephemeral.rec.get(n), Some(None));
                             if use_cache {
                                 if let Some(cached_outcome) = ephemeral.cache.get(n) {
                                     res_stack.push(cached_outcome.clone());
@@ -715,38 +707,39 @@ impl DeltaQ {
                             if use_cache {
                                 op_stack.push(Op::Cache(n));
                             }
-                            op_stack.push(Op::Eval(dq.expanded()?, load_factor));
+                            op_stack.push(Op::Eval(dq.expanded()?));
                         }
                         DeltaQExpr::Outcome(outcome) => {
-                            res_stack.push(outcome.mult(load_factor, ctx));
+                            res_stack.push(outcome.clone());
                         }
                         DeltaQExpr::Seq(first, load, second) => {
-                            op_stack.push(Op::Seq);
+                            op_stack.push(Op::Seq {
+                                load_factor: load.factor,
+                            });
                             // evaluate second after first
-                            op_stack
-                                .push(Op::Eval(second, load_factor * load.factor + load.summand));
-                            op_stack.push(Op::Eval(first, load_factor));
+                            op_stack.push(Op::Eval(second));
+                            op_stack.push(Op::Eval(first));
                         }
                         DeltaQExpr::Choice(first, w1, second, w2) => {
                             op_stack.push(Op::Choice(*w1, *w2));
-                            op_stack.push(Op::Eval(second, load_factor));
-                            op_stack.push(Op::Eval(first, load_factor));
+                            op_stack.push(Op::Eval(second));
+                            op_stack.push(Op::Eval(first));
                         }
                         DeltaQExpr::ForAll(first, second) => {
                             op_stack.push(Op::ForAll);
-                            op_stack.push(Op::Eval(second, load_factor));
-                            op_stack.push(Op::Eval(first, load_factor));
+                            op_stack.push(Op::Eval(second));
+                            op_stack.push(Op::Eval(first));
                         }
                         DeltaQExpr::ForSome(first, second) => {
                             op_stack.push(Op::ForSome);
-                            op_stack.push(Op::Eval(second, load_factor));
-                            op_stack.push(Op::Eval(first, load_factor));
+                            op_stack.push(Op::Eval(second));
+                            op_stack.push(Op::Eval(first));
                         }
                         DeltaQExpr::Gossip { .. } => panic!("gossip not expanded"),
                     }
                 }
-                Op::Seq => {
-                    let second = res_stack.pop().unwrap();
+                Op::Seq { load_factor } => {
+                    let second = res_stack.pop().unwrap().mult(load_factor, ctx);
                     let first = res_stack.pop().unwrap();
                     res_stack.push(first.seq(&second, ctx)?);
                 }
@@ -834,7 +827,7 @@ pub fn expand_gossip(
         if remaining > 1.0 {
             ret = Arc::new(DeltaQExpr::Seq(
                 Arc::new(hop.clone()),
-                LoadUpdate::new(cluster_branch, 0.0),
+                LoadUpdate::new(cluster_branch),
                 Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, step, ret, remaining)),
             ));
         } else {
@@ -844,7 +837,7 @@ pub fn expand_gossip(
 
     Ok(DeltaQExpr::Seq(
         DeltaQ::top().expr,
-        LoadUpdate::new(branching, 0.0),
+        LoadUpdate::new(branching),
         Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, 1.0, ret, size - 1.0)),
     )
     .into())
@@ -1093,16 +1086,16 @@ mod tests {
 
     #[test]
     fn parse_load_update() {
-        let res = "BB ->-*3+4 BB".parse::<DeltaQExpr>().unwrap();
+        let res = "BB ->-*3 BB".parse::<DeltaQExpr>().unwrap();
         assert_eq!(
             res,
             DeltaQExpr::Seq(
                 Arc::new(DeltaQExpr::BlackBox),
-                LoadUpdate::new(3.0, 4.0),
+                LoadUpdate::new(3.0),
                 Arc::new(DeltaQExpr::BlackBox)
             )
         );
-        assert_eq!(res.to_string(), "BB ->-×3+4 BB");
+        assert_eq!(res.to_string(), "BB ->-×3 BB");
     }
 
     #[test]
@@ -1236,7 +1229,7 @@ mod tests {
         );
         let dq = DeltaQ::from(DeltaQExpr::Seq(
             Arc::new(DeltaQExpr::Outcome(outcome.clone())),
-            LoadUpdate::new(2.0, 0.0),
+            LoadUpdate::new(2.0),
             Arc::new(DeltaQExpr::Outcome(outcome)),
         ));
         assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×2 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
@@ -1291,10 +1284,10 @@ mod tests {
             a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             
-            e1 := a ->-×2 a ->-×3+1 b
+            e1 := a ->-×2 a ->-×3 b
             e2 := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
                 ->-×2 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
-                ->-×3+1 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+                ->-×3 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             ").unwrap();
         let e1 = DeltaQ::name("e1")
             .eval(&ctx, &mut EphemeralContext::default())
@@ -1306,9 +1299,9 @@ mod tests {
         assert_eq!(e1.to_string(), "\
             CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \
             WITH a[(0, 1), (1, 0.8), (2, 1.2), (3, 0)] \
-            WITH ab[(0, 12), (1, 9.6), (2, 22.24), (3, 31.36), (4, 41.16), (5, 17.64), (6, 0)] \
-            WITH b[(2, 1.12), (3, 4.48), (4, 5.88), (5, 2.52), (6, 0)] \
-            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.712), (2.8, 0.112), (3.2, 0.56), (3.5, 0.336), (4.2, 0.924), (4.5, 0.252), (5.2, 0.504), (5.5, 0)]");
+            WITH ab[(0, 12), (1, 9.6), (2, 21.12), (3, 26.88), (4, 35.28), (5, 15.12), (6, 0)] \
+            WITH b[(2, 0.96), (3, 3.84), (4, 5.04), (5, 2.16), (6, 0)] \
+            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.696), (2.8, 0.096), (3.2, 0.48), (3.5, 0.288), (4.2, 0.792), (4.5, 0.216), (5.2, 0.432), (5.5, 0)]");
     }
 
     #[test]
