@@ -62,21 +62,22 @@ record LeiosState : Type where
         slot : ℕ
 
   lookupEB : EBRef → Maybe EndorserBlock
-  lookupEB r with i ← findIndex (_≟ r) (map getEBRef EBs) rewrite length-map getEBRef EBs =
-    lookup EBs <$> i
+  lookupEB r = find (λ b → getEBRef b ≟ r) EBs
 
   lookupIB : IBRef → Maybe InputBlock
-  lookupIB r with i ← findIndex (_≟ r) (map getIBRef IBs) rewrite length-map getIBRef IBs =
-    lookup IBs <$> i
+  lookupIB r = find (λ b → getIBRef b ≟ r) IBs
 
   lookupTxs : EndorserBlock → List Tx
-  lookupTxs = join ∘ map txs ∘ map body ∘ mapMaybe lookupIB ∘ join ∘ map ibRefs ∘ mapMaybe lookupEB ∘ ebRefs
+  lookupTxs eb = do
+    eb′ ← mapMaybe lookupEB $ ebRefs eb
+    ib  ← mapMaybe lookupIB $ ibRefs eb′
+    txs $ body ib
     where open EndorserBlockOSig
           open IBBody
           open InputBlock
 
   constructLedger : List EndorserBlock → List Tx
-  constructLedger = join ∘ map lookupTxs
+  constructLedger = concatMap lookupTxs
 
 initLeiosState : VTy → StakeDistr → LeiosState
 initLeiosState V SD = record
