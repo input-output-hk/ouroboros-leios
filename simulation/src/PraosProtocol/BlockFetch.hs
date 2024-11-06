@@ -322,16 +322,15 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
   cps <- readReadOnlyTVar cpsVar
   let
     chain = fmap getHeader cps.chainState
-    aux (mpId, c1) (pId, c2) =
-      let
-        c =
-          if (Chain.headBlockNo c1, Chain.headHash c1) >= (Chain.headBlockNo c2, Chain.headHash c2)
-            then c1
-            else c2
-       in
-        if Chain.headPoint c == Chain.headPoint c1
-          then (mpId, c1)
-          else (Just pId, c2)
+    aux x1@(_mpId, c1) (pId, c2) =
+      -- We use headHash to refine the order, so that we have less
+      -- partitioning in the network.
+      -- Actual implementation uses the VRF hash to be adversarial
+      -- resistant, but that's not a concern here.
+      let measure c = (Chain.headBlockNo c, Chain.headHash c)
+       in if measure c1 >= measure c2
+            then x1
+            else (Just pId, c2)
     -- using foldl' since @selectChain@ is left biased
     (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
   return $ do
