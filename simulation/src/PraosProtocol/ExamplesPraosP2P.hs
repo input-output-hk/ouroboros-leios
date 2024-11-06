@@ -9,14 +9,12 @@
 
 module PraosProtocol.ExamplesPraosP2P where
 
+import ChanDriver
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BS8
+import Data.Coerce (coerce)
 import Data.Functor.Contravariant (Contravariant (contramap))
 import qualified Data.Map.Strict as Map
-import System.Random (StdGen, mkStdGen)
-
-import ChanDriver
-import Data.Coerce (coerce)
 import GHC.Generics
 import Network.TypedProtocol
 import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
@@ -32,6 +30,7 @@ import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
+import System.Random (StdGen, mkStdGen)
 import Viz
 
 example1 :: Vizualisation
@@ -96,7 +95,7 @@ data LatencyPerStake = LatencyPerStake
   deriving (Generic, ToJSON, FromJSON)
 
 data DiffusionData = DiffusionData
-  { topography :: String
+  { topography :: P2PTopographyCharacteristics
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
   }
@@ -129,7 +128,7 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty acc
 
     encodeFile fp $
       DiffusionData
-        { topography = show p2pTopographyCharacteristics
+        { topography = p2pTopographyCharacteristics
         , entries
         , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
         }

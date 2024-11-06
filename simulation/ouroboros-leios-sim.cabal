@@ -68,6 +68,7 @@ library
     SimTCPLinks
     SimTypes
     TimeCompat
+    Topology
     Viz
     VizChart
     VizSim
@@ -103,8 +104,10 @@ library
     , random
     , serialise
     , si-timers
+    , text
     , time
     , typed-protocols         >=0.3
+    , vector
 
   hs-source-dirs:   src
   default-language: Haskell2010
