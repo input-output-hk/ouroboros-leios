@@ -9,8 +9,6 @@ import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
 
-open import Data.List.Properties using (length-map)
-
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
   (vrf' : LeiosVRF a) (let open LeiosVRF vrf') (pubKey : PubKey)
