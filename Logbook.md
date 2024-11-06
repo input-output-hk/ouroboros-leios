@@ -33,6 +33,7 @@
         - The original design was optimized to tolerate spikes; Short Leios assumed elastic hosting in order to deal with spikes.
         - Not having a well-defined cost model somewhat blocks Research.
         - For now, assume bare metal pricing.
+        - We should see whether the typical connection used in bare metal (e.g., 1 GBit) is already 10x what our target throughput is (e.g., 100MBit), and thus may be already capable of handling spikes of that magnitude.
 - Two types of robustness in Leios
     - Handling of spikes (i.e., short vs simplified Leios)
     - Guarantee of all IBs arriving (i.e., non-full vs full Leios)
