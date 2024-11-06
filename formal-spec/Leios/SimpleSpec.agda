@@ -1,5 +1,4 @@
 -- {-# OPTIONS --safe #-}
-{-# OPTIONS --allow-unsolved-metas #-}
 
 open import Leios.Prelude
 open import Leios.Abstract
@@ -50,18 +49,18 @@ data LeiosInput : Type where
 
 data LeiosOutput : Type where
   FTCH-LDG : FTCHTy → LeiosOutput
-  EMPTY : LeiosOutput
+  EMPTY    : LeiosOutput
 
 record LeiosState : Type where
-  field V : VTy
-        SD : StakeDistr
-        FFDState : FFD.State
-        Ledger : List Tx
+  field V         : VTy
+        SD        : StakeDistr
+        FFDState  : FFD.State
+        Ledger    : List Tx
         ToPropose : List Tx
-        IBs : List InputBlock
-        EBs : List EndorserBlock
-        Vs  : List (List Vote)
-        slot : ℕ
+        IBs       : List InputBlock
+        EBs       : List EndorserBlock
+        Vs        : List (List Vote)
+        slot      : ℕ
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
