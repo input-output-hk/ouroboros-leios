@@ -135,9 +135,16 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   ID : Type
   ID = ℕ × PoolID
 
-  match : Header → Body → Type
-  match (ibHeader h) (ibBody b) = bodyHash ≡ hash b
+  matchIB : IBHeader → IBBody → Type
+  matchIB h b = bodyHash ≡ hash b
     where open IBHeaderOSig h; open IBBody b
+
+  matchIB? :  ∀ (h : IBHeader) → (b : IBBody) → Dec (matchIB h b)
+  matchIB? h b = bodyHash ≟ hash b
+    where open IBHeaderOSig h; open IBBody b
+
+  match : Header → Body → Type
+  match (ibHeader h) (ibBody b) = matchIB h b
   match _ _ = ⊥
 
   -- can we express uniqueness wrt pipelines as a property?

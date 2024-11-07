@@ -37,7 +37,7 @@ open FFDAbstract.Functionality FFD' renaming (stepRel to _⇀⟦_⟧ᴺ_)
 --                                        \      /
 --                                        Network
 
-postulate VTy FTCHTy : Type
+postulate VTy : Type
           initSlot : VTy → ℕ
           initFFDState : FFD.State
 
@@ -48,7 +48,7 @@ data LeiosInput : Type where
   FTCH-LDG : LeiosInput
 
 data LeiosOutput : Type where
-  FTCH-LDG : FTCHTy → LeiosOutput
+  FTCH-LDG : List Tx → LeiosOutput
   EMPTY    : LeiosOutput
 
 record LeiosState : Type where
@@ -61,6 +61,8 @@ record LeiosState : Type where
         EBs       : List EndorserBlock
         Vs        : List (List Vote)
         slot      : ℕ
+        IBHeaders : List IBHeader
+        IBBodies  : List IBBody
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -91,6 +93,8 @@ initLeiosState V SD = record
   ; EBs       = []
   ; Vs        = []
   ; slot      = initSlot V
+  ; IBHeaders = []
+  ; IBBodies  = []
   }
 
 postulate canProduceV1 : ℕ → Type
@@ -125,6 +129,24 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
 
+import Data.List.Relation.Unary.Any as A
+
+updState : LeiosState → List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosState
+updState = foldr upd
+  where
+    open LeiosState
+    open Leios.Blocks.GenFFD
+
+    upd : FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract → LeiosState → LeiosState
+    upd (inj₁ (ebHeader eb)) s = record s { EBs = eb ∷ (s .EBs) }
+    upd (inj₁ (vHeader vs)) s = record s { Vs = vs ∷ (s .Vs) }
+    upd (inj₁ (ibHeader h)) s with A.any? (GenFFD.matchIB? h) (s .IBBodies)
+    ... | yes p = record s { IBs = record { header = h ; body = A.lookup p } ∷ (s .IBs) }
+    ... | no _ = record s { IBHeaders = h ∷ (s .IBHeaders) }
+    upd (inj₂ (ibBody b)) s with A.any? (flip GenFFD.matchIB? b) (s .IBHeaders)
+    ... | yes p = record s { IBs = record { header = A.lookup p ; body = b } ∷ (s .IBs) }
+    ... | no _ = record s { IBBodies = b ∷ (s .IBBodies) }
+
 postulate
   V_chkCerts : List PubKey → EndorserBlock × B.Cert → Type
 
@@ -145,11 +167,12 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
        ∙ bs ⇀⟦ B.FTCH-LDG ⟧ᴮ (bs' , B.BASE-LDG ebs)
        ∙ FFDAbstract.Fetch ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.FetchRes msgs)
        ────────────────────────────────────────────────────────────────────────────────────────
-       just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } , EMPTY)
+       just s ⇀⟦ SLOT ⟧ (updState (record s { FFDState = ffds' ; Ledger = constructLedger ebs }) msgs
+                        , EMPTY)
 
-  Ftch : ∀ {l} →
-       ────────────────────────────────────
-       just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG l)
+  Ftch : let open LeiosState s in
+       ──────────────────────────────────────────
+       just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG Ledger)
 
   -- Base chain
   --
