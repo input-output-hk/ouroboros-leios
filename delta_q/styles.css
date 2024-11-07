@@ -23,6 +23,7 @@
   margin: 4px;
   cursor: pointer;
 }
+.ctx_list { max-height: 30%; overflow-y: scroll; }
 .selected { font-weight: bold; }
 .dq_edit { vertical-align: text-top; flex-grow: 1; margin-left: 16px; }
 .dq_edit form { display: flex; }

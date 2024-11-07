@@ -194,7 +194,7 @@ fn app_main() -> HtmlResult {
     Ok(html! {
     <div>
         <p>{ "context:" }<button onclick={ctx_popup_show}>{ "edit" }</button></p>
-        <ul>
+        <ul class={classes!("ctx_list")}>
         { list_items }
         </ul>
         <AddExpression on_change={add_on_change} />
@@ -361,7 +361,7 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{ "DeltaQ Editor" }</h1>
-            <div style="display: flex; flex-direction: row; height: 30%;">
+            <div style="display: flex; flex-direction: row; height: 40%;">
                 <div id="output" style="width: 50%; height: 100%; border: 1px solid black;" />
                 <div id="loads" style="width: 50%; height: 100%; border: 1px solid black;" />
             </div>

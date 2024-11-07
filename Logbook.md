@@ -1,48 +1,58 @@
 # Leios logbook
 
+## 2024-11-07
+
+### Formal Methods Meeting on ΔQ
+
+- Peter & Neil gave background information on where ΔQ came from and what it has been used for, both concerning Cardano and outside (which includes a diverse set of applications ranging from municipal bus lines via high intensity financial trading to military communication).
+  The current work focuses on algebraic representations and the ability to rewrite ΔQ expressions while maintaining equivalence of timeliness results (cf. [arXiv:2308.10654](https://arxiv.org/abs/2308.10654)).
+- Roland presented the current state of the Rust-based graphical ΔQ tool, which is based on the initial [Mind your Outcomes](https://www.preprints.org/manuscript/202112.0132/v3) paper, with initial but still naive extensions towards the inclusion of load metrics like network or CPU usage.
+  He used a [sketch model](./delta_q/models.txt) (section 6) to demonstrate that the tool can rather quickly compare two proposed variants of IB generation in Short Leios; this model is to be taken with a grain of salt, though, as it is too simplistic for other purposes.
+- The next steps in this effort shall be to clarify the load modelling, especially to fix the unrealistic assumption of infinite resource availability, and to define a common DSL to be shared by the Rust and Haskell tooling so that  ΔQ models can be easily exchanged between different user groups.
+
 ## 2024-11-05
 
 ### Team session
 
 - Documenting discussions
-    - We should consider a rule or standard practice for documenting discussions.
-    - We might want to experiment more with github discussions: slack seems more convenient, but isn't transparent.
-    - Summarize lengthy slack discussions in the log book, and it's okay to tag someone if no one volunteers.
-    - We'll check in two weeks to see how things are going.
+  - We should consider a rule or standard practice for documenting discussions.
+  - We might want to experiment more with github discussions: slack seems more convenient, but isn't transparent.
+  - Summarize lengthy slack discussions in the log book, and it's okay to tag someone if no one volunteers.
+  - We'll check in two weeks to see how things are going.
 - We might try stronger collaboration between work streams now that opportunities have emerged.
-    - Please comment on github discussions even if it isn't immediately relevant for your day's work.
+  - Please comment on github discussions even if it isn't immediately relevant for your day's work.
 - Opportunities for comparing results of models and simulations
-    - The tools aren't quite ripe for comparisons, but will be soon.
-    - We definitely should present comparison results at the monthly demo.
-    - Compare two-node Haskell simulation to Delta Q?
-    - Compare all models/simulations to 52-node benchmark cluster?
+  - The tools aren't quite ripe for comparisons, but will be soon.
+  - We definitely should present comparison results at the monthly demo.
+  - Compare two-node Haskell simulation to Delta Q?
+  - Compare all models/simulations to 52-node benchmark cluster?
 - We need to be careful about measuring latency.
-    - Adoption of a preferred chain proceeds in "waves" accross the network.
-    - In case of battles between forks, the winner might should a higher latency, depending upon how that is measured.
-    - Chains are only partially ordered (by length).
-    - Using a total ordering (by length then a hash) may make propagation and measurement faster.
-    - The Haskell simulator shows some extreme outliers, and these are being investigated.
+  - Adoption of a preferred chain proceeds in "waves" accross the network.
+  - In case of battles between forks, the winner might should a higher latency, depending upon how that is measured.
+  - Chains are only partially ordered (by length).
+  - Using a total ordering (by length then a hash) may make propagation and measurement faster.
+  - The Haskell simulator shows some extreme outliers, and these are being investigated.
 - The presence of relays add two extra hops on mainnet.
-    - Typically, there are at least two relays per block producer and all reside in the same data center.
-    - Block validation takes ~100 ms for a typical block, which is on the order of diffusion time between the block producer and the relays.
+  - Typically, there are at least two relays per block producer and all reside in the same data center.
+  - Block validation takes ~100 ms for a typical block, which is on the order of diffusion time between the block producer and the relays.
 - Uniform/non-uniform IBs in Short Leios
-    - The protocol should tolerate spikes of 2-3x.
-    - Uniformity may leave the network idle at the guaranteed delivery time.
-    - Non-uniformity creates more spikiness.
-    - Elastic cloud vs bare metal pricing models have different implications for optimizing the protocol to handle spikes.
-        - The original design was optimized to tolerate spikes; Short Leios assumed elastic hosting in order to deal with spikes.
-        - Not having a well-defined cost model somewhat blocks Research.
-        - For now, assume bare metal pricing.
-        - We should see whether the typical connection used in bare metal (e.g., 1 GBit) is already 10x what our target throughput is (e.g., 100MBit), and thus may be already capable of handling spikes of that magnitude.
+  - The protocol should tolerate spikes of 2-3x.
+  - Uniformity may leave the network idle at the guaranteed delivery time.
+  - Non-uniformity creates more spikiness.
+  - Elastic cloud vs bare metal pricing models have different implications for optimizing the protocol to handle spikes.
+    - The original design was optimized to tolerate spikes; Short Leios assumed elastic hosting in order to deal with spikes.
+    - Not having a well-defined cost model somewhat blocks Research.
+    - For now, assume bare metal pricing.
+    - We should see whether the typical connection used in bare metal (e.g., 1 GBit) is already 10x what our target throughput is (e.g., 100MBit), and thus may be already capable of handling spikes of that magnitude.
 - Two types of robustness in Leios
-    - Handling of spikes (i.e., short vs simplified Leios)
-    - Guarantee of all IBs arriving (i.e., non-full vs full Leios)
+  - Handling of spikes (i.e., short vs simplified Leios)
+  - Guarantee of all IBs arriving (i.e., non-full vs full Leios)
 - Next meeting
-    - Manually simulation Leios
-    - Tag stages with parameters describing them and estimates of those parameters
+  - Manually simulation Leios
+  - Tag stages with parameters describing them and estimates of those parameters
 - Action times
-    - Pie chart of mainnet hosting types (@bwbush)
-    - Work on pricing model (@bwbush)
+  - Pie chart of mainnet hosting types (@bwbush)
+  - Work on pricing model (@bwbush)
   
 ### Latency measurements of 52-node cluster
 
@@ -54,25 +64,25 @@ The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency 
 
 Drafted a version of Short Leios where IB generation is uniform over the Propose stage. The reason for creating such a version of the protocol is discussions we had on whether releasing IBs at the start of Propose (as requried by the non-uniform version of short Leios) creates problems and underutilization of resources at the TCP level.
 
-
-
 ## 2024-11-01
 
 ### Haskell Simulation
 
 Successfully profiled and optimized the running of simulations:
+
 - Running praos-diffusion-20-links for 1000 simulation seconds went
   from taking 120 minutes to 4 minutes.
 - Most of the improvement was gained by changes to get `io-sim` to
   handle simulations of that scale:
-  * avoided nested forking of threads: changes introduced by IOSimPOR
+  - avoided nested forking of threads: changes introduced by IOSimPOR
     give us a bad ThreadId representation for that use pattern.
-  * patched io-sim to use a more efficient priority search queue
+  - patched io-sim to use a more efficient priority search queue
     implementation for timers (from a balanced-search-tree-inspired
     one to a radix-tree one), the old one was taking up 95% of the
     computation time for us.
 
 Giving a single ratio between simulated and execution time is complicated by the bursts of activity for every block production event (targeted to every 20s in expectation) and the initial ramp-up period where the nodes link to their peers and initialize the protocols. Logging real timestamps to the left of simulated seconds we get something like this:
+
 ```
 00:00:02 time reached: Time 0s
 00:00:04 time reached: Time 0.000001s
@@ -89,6 +99,7 @@ Giving a single ratio between simulated and execution time is complicated by the
 ...
 00:13:25 done. -- i.e. reached Time 3000s
 ```
+
 nevertheless the average is 3.7:1 for simulated:real.
 
 Next step for the praos simulation is to gather data from real running
@@ -112,7 +123,6 @@ might take too long.
 - On a modest AMD Ryzen 5 5500U, `praos-diffusion-10-links` runs on average 3x slower than realtime
   over long (1000 simulated seconds) simulations. The 20 links version is considerably slower.
 - Next step is to look into low hanging fruits to improve simulation speed.
-
 
 ### ΔQ update
 
@@ -454,7 +464,7 @@ Discussing ΔQSD progress (and plans for next months)
 
 ### AB - Conformance testing exploration
 
-Investigating how https://github.com/stevana/coverage-guided-pbt/ could be used to explore traces in Leios, in the context of state-machine based tests
+Investigating how <https://github.com/stevana/coverage-guided-pbt/> could be used to explore traces in Leios, in the context of state-machine based tests
 
 - Ensure the implementation generates logs on top of results => combined "language" that can be used in coverage assertions
 - Define some combinators that checks some logs have been covered, possibly using a predicate?
@@ -1044,7 +1054,7 @@ During a discussion about Leios and FM, Briand suggested we write a white paper 
   - Work focus
     - Roland and Yves will collaborate on DeltaQ
     - Everyone should familiarize themselves with the [simulation/](simulation/) and [leios-sim/](leios-sim/) code
-      - Live version of `leios-sim` at https://leios-simulation.cardano-scaling.org/index.html
+      - Live version of `leios-sim` at <https://leios-simulation.cardano-scaling.org/index.html>
       - Run `simulation` locally via [instructions below](#running-ouroborous-net-viz-in-the-browser)
 
 ## 2024-08-30
@@ -1143,10 +1153,10 @@ Added some documentation to the Leios simulator:
 
 Started working on simnulation deployment on AWS.
 
-- Found this repository for setting up ECS which sounds the most promising option: https://github.com/ajimbong/terraform-ecs-cicd-project.
-- This article contains the GHA workflow part: https://ajimbong.medium.com/deploy-a-docker-container-to-amazon-ecs-using-github-actions-fd50261b8e03
-- Following tutorial here: https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build
-- installing AWS command-line from https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+- Found this repository for setting up ECS which sounds the most promising option: <https://github.com/ajimbong/terraform-ecs-cicd-project>.
+- This article contains the GHA workflow part: <https://ajimbong.medium.com/deploy-a-docker-container-to-amazon-ecs-using-github-actions-fd50261b8e03>
+- Following tutorial here: <https://developer.hashicorp.com/terraform/tutorials/aws-get-started/aws-build>
+- installing AWS command-line from <https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html>
 
 Created service account `leios-build` with power user rights, and generated access keys. TODO: reduce rights to the strict minimum
 
@@ -1154,7 +1164,7 @@ Managed to deploy ECS cluster with defined service, but there's no EC2 instance 
 
 Managed to configure the ECS cluster, service, and task to run the image, but it now fails to download the manifest from ghcr.io which seems a permissions issue. I need to add the necessary configuration to the task/service?
 
-need to configure a secret containing a PAT for pulling the manifest: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_repositoryCredentials
+need to configure a secret containing a PAT for pulling the manifest: <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_repositoryCredentials>
 
 I gave up trying to run on AWS, every solution I found is an insanely intricate maze of stupidly complicated solution which I don't care about as I only need to deploy a _single_ image without any data dependency attached.
 
@@ -1195,7 +1205,7 @@ Invalid argument `2024-07-11'
 
 ### Network pricing
 
-Did some quick research on network pricing for a few major Cloud or VPS providers: https://docs.google.com/document/d/1JJJk4XPqmP61eNWYNfqL8FSbKAF9cWazKWFZP6tMGa0/edit
+Did some quick research on network pricing for a few major Cloud or VPS providers: <https://docs.google.com/document/d/1JJJk4XPqmP61eNWYNfqL8FSbKAF9cWazKWFZP6tMGa0/edit>
 
 Comparison table in USD/mo for different outgoing data transfer volumes expressed as bytes/seconds and similar VMs (32GB RAM, 4+ Cores, 500GB+ SSD disk). The base cost of the VM is added to the network cost to yield total costs:
 
@@ -1282,7 +1292,7 @@ From discussion with researchers about voting with Leios, it seems that:
 ### Presentation by Sandro
 
 Sandro gave us an introductory talk about Leios, motivating the decisions behind the details of the protocol.
-The recording is available on GDrive: https://drive.google.com/file/d/1r04nrjMtHijJNTLW3FuE5vEu_y3a0ssi/view
+The recording is available on GDrive: <https://drive.google.com/file/d/1r04nrjMtHijJNTLW3FuE5vEu_y3a0ssi/view>
 
 ## 2024-06-17
 
@@ -1317,8 +1327,8 @@ Discussing with researchers on some early simulations that are being worked on f
 
 ### Weekly meeting
 
-- Eth has blobs with a 2-weeks TTL: https://vitalik.eth.limo/general/2024/03/28/blobs.html
-  - https://www.eip4844.com/
+- Eth has blobs with a 2-weeks TTL: <https://vitalik.eth.limo/general/2024/03/28/blobs.html>
+  - <https://www.eip4844.com/>
 - Leios could be used to store other data than tx -> put unstructured data, possibly transient
 - Intermediate state where we accomodate transient unstructured data
   - easier to build and deploy -> no need for concurrency/tx validation/CPU
