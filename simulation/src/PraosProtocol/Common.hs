@@ -141,7 +141,7 @@ data PraosNodeEvent
   = PraosNodeEventGenerate Block
   | PraosNodeEventReceived Block
   | PraosNodeEventEnterState Block
-  | PraosNodeEventNewTip FullTip
+  | PraosNodeEventNewTip (Chain Block)
   deriving (Show)
 
 data PraosConfig = PraosConfig

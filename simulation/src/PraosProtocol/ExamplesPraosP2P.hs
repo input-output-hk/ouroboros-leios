@@ -4,6 +4,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE NoFieldSelectors #-}
@@ -11,12 +12,15 @@
 module PraosProtocol.ExamplesPraosP2P where
 
 import ChanDriver
+import Control.Monad
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BS8
 import Data.Coerce (coerce)
 import Data.Functor.Contravariant (Contravariant (contramap))
+import qualified Data.IntMap.Strict as IMap
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import Data.Maybe (listToMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import GHC.Generics
 import Network.TypedProtocol
 import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
@@ -24,10 +28,11 @@ import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
 import PraosProtocol.Common
 import PraosProtocol.Common.Chain (Chain (Genesis))
+import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import PraosProtocol.SimPraosP2P
-import PraosProtocol.VizSimPraos (DiffusionLatencyMap, PraosVizConfig (..), accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
+import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig (..), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)
@@ -100,6 +105,7 @@ data DiffusionData = DiffusionData
   { topography :: P2PTopographyCharacteristics
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
+  , stable_chain_hashes :: [Int]
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -113,11 +119,29 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
   bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
   bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) $ bins
 
-diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyMap
-diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty accumDiffusionLatency render
+data DiffusionLatencyState = DiffusionLatencyState
+  { chains :: !ChainsMap
+  , diffusions :: !DiffusionLatencyMap
+  }
+
+diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
+diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState accum render
  where
+  initState = DiffusionLatencyState IMap.empty Map.empty
+  accum t e DiffusionLatencyState{..} =
+    DiffusionLatencyState
+      { chains = accumChains t e chains
+      , diffusions = accumDiffusionLatency t e diffusions
+      }
   nnodes = p2pNumNodes p2pTopographyCharacteristics
-  render result = do
+  render DiffusionLatencyState{..} = do
+    let stable_chain = fromMaybe Genesis $ do
+          guard $ not $ IMap.null chains
+          pure $ List.foldl1' aux (IMap.elems chains)
+        aux c1 c2 = fromMaybe Genesis $ do
+          p <- Chain.intersectChains c1 c2
+          Chain.rollback p c1
+    let stable_chain_hashes = coerce $ map blockHash $ Chain.toNewestFirst stable_chain
     let entries =
           [ DiffusionEntry
             { hash = coerce hash'
@@ -125,15 +149,24 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel Map.empty acc
             , created = coerce t
             , arrivals = coerce ts
             }
-          | (hash', (_, i, t, ts)) <- Map.toList result
+          | (hash', (_, i, t, ts)) <- Map.toList diffusions
           ]
+    let diffusionData =
+          DiffusionData
+            { topography = p2pTopographyCharacteristics
+            , entries
+            , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
+            , stable_chain_hashes
+            }
 
-    encodeFile fp $
-      DiffusionData
-        { topography = p2pTopographyCharacteristics
-        , entries
-        , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
-        }
+    encodeFile fp diffusionData
+    putStrLn $ "Diffusion data written to " ++ fp
+
+    let arrived98 = unzip [(l.hash, d) | l <- diffusionData.latency_per_stake, (Just d, p) <- l.latencies, p == 0.98]
+    let missing = filter (not . (`elem` fst arrived98)) diffusionData.stable_chain_hashes
+    putStrLn $ "Number of blocks that reached 98% stake: " ++ show (length $ fst arrived98)
+    putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ snd arrived98)
+    putStrLn $ "Blocks in longest common prefix that did not reach 98% stake: " ++ show missing
 
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::

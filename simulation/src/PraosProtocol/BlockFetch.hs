@@ -516,20 +516,18 @@ updateChains ::
   MonadSTM m =>
   BlockFetchControllerState m ->
   ChainsUpdate ->
-  STM m (Bool, Maybe FullTip)
+  STM m (Bool, Maybe (Chain Block))
 updateChains BlockFetchControllerState{..} e =
   case e of
-    FullChain fullChain -> do
+    FullChain !fullChain -> do
       writeTVar targetChainVar Nothing
-      let !newTip = fullTip fullChain
       modifyTVar' cpsVar (switchFork fullChain)
-      return (True, Just newTip)
+      return (True, Just fullChain)
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
-      let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
-          !newTip = fullTip improvedChain
+      let !improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
       modifyTVar' cpsVar (switchFork improvedChain)
-      return (True, Just $ newTip)
+      return (True, Just improvedChain)
     SamePrefix missingChain -> do
       target <- readTVar targetChainVar
       let useful = Just (headPointMChain missingChain) /= fmap headPointMChain target
@@ -561,7 +559,7 @@ addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
     Just missingChain -> do
       fmap snd $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
 
-traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe FullTip -> m ()
+traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe (Chain Block) -> m ()
 traceNewTip tracer x =
   case x of
     Nothing -> return ()
