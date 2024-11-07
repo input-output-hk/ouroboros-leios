@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -150,18 +151,24 @@ newtype ChainConsumerState m = ChainConsumerState
   { chainVar :: TVar m (Chain BlockHeader)
   }
 
-runChainConsumer :: MonadSTM m => Chan m ChainSyncMessage -> ChainConsumerState m -> m ()
-runChainConsumer chan st =
-  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer st)
+runChainConsumer ::
+  (MonadSTM m, MonadDelay m) =>
+  PraosConfig ->
+  Chan m ChainSyncMessage ->
+  ChainConsumerState m ->
+  m ()
+runChainConsumer cfg chan st =
+  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer cfg st)
 
 type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
 chainConsumer ::
   forall m.
-  MonadSTM m =>
+  (MonadSTM m, MonadDelay m) =>
+  PraosConfig ->
   ChainConsumerState m ->
   ChainConsumer 'StIdle m ()
-chainConsumer (ChainConsumerState hchainVar) = idle True
+chainConsumer cfg (ChainConsumerState hchainVar) = idle True
  where
   -- NOTE: The specification says to do an initial intersection with
   --       exponentially spaced points, and perform binary search to
@@ -194,9 +201,11 @@ chainConsumer (ChainConsumerState hchainVar) = idle True
 
   rollForward :: BlockHeader -> ChainConsumer 'StIdle m ()
   rollForward header =
-    TC.Effect $ atomically $ do
-      modifyTVar' hchainVar $ Chain.addBlock header
-      return $ idle False
+    TC.Effect $ do
+      threadDelaySI (cfg.headerValidationDelay header)
+      atomically $ do
+        modifyTVar' hchainVar $ Chain.addBlock header
+        return $ idle False
 
   rollBackward :: Point BlockHeader -> ChainConsumer 'StIdle m ()
   rollBackward hpoint =

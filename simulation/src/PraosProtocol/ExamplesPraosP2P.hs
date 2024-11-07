@@ -215,6 +215,7 @@ example1Trace rng0 blockInterval p2pTopography =
               PraosConfig
                 { slotConfig
                 , blockValidationDelay = const 0.1 -- 100ms
+                , headerValidationDelay = const 0.005 -- 5ms
                 }
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
@@ -297,6 +298,7 @@ example2 =
                   PraosConfig
                     { slotConfig
                     , blockValidationDelay = const 0.1 -- 100ms
+                    , headerValidationDelay = const 0.005 -- 5ms
                     }
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "

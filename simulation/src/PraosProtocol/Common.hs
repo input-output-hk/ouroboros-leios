@@ -34,6 +34,7 @@ module PraosProtocol.Common (
   MessageSize (..),
   kilobytes,
   module TimeCompat,
+  defaultPraosConfig,
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
@@ -145,9 +146,20 @@ data PraosNodeEvent
   deriving (Show)
 
 data PraosConfig = PraosConfig
-  { slotConfig :: SlotConfig
-  , blockValidationDelay :: Block -> DiffTime
+  { slotConfig :: !SlotConfig
+  , blockValidationDelay :: !(Block -> DiffTime)
+  , headerValidationDelay :: !(BlockHeader -> DiffTime)
   }
+
+defaultPraosConfig :: MonadTime m => m PraosConfig
+defaultPraosConfig = do
+  slotConfig <- slotConfigFromNow
+  return
+    PraosConfig
+      { slotConfig
+      , blockValidationDelay = const 0.1
+      , headerValidationDelay = const 0.005
+      }
 
 --------------------------------
 ---- Common Utility Types
