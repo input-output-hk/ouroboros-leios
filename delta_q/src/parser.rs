@@ -124,7 +124,7 @@ fn blackbox(input: &mut &str) -> PResult<DeltaQExpr> {
 }
 
 fn name_bare<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    take_while(1.., |c: char| c.is_alphanumeric()).parse_next(input)
+    take_while(1.., |c: char| c.is_alphanumeric() || c == '_').parse_next(input)
 }
 
 fn name(input: &mut &str) -> PResult<DeltaQExpr> {

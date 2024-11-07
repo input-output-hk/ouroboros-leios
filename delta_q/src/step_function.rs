@@ -26,7 +26,7 @@ impl fmt::Display for StepFunctionError {
 }
 impl std::error::Error for StepFunctionError {}
 
-pub const DEFAULT_MAX_SIZE: usize = 1000;
+pub const DEFAULT_MAX_SIZE: usize = 10000;
 
 /// A step function represented as a list of (x, y) pairs.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
