@@ -122,6 +122,7 @@ fn main() -> Result<()> {
         ib_generation_probability: 5.0,
         ib_shards: 8,
         max_block_size: 90112,
+        stage_length: 2,
         max_ib_requests_per_peer: 1,
         max_ib_size: 327680,
         max_tx_size: 16384,
