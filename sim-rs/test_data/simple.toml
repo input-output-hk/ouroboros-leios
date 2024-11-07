@@ -51,6 +51,7 @@ max_block_size = 90112
 
 # IB parameters
 stage_length = 2
+uniform_ib_generation = true
 ib_generation_probability = 0.5 # corresponds to 𝑓I in the model
 ib_shards = 2
 max_ib_size = 327680

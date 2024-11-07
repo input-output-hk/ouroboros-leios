@@ -210,7 +210,13 @@ impl Node {
         while probability > 0.0 {
             let next_p = f64::min(probability, 1.0);
             if let Some(vrf) = self.run_vrf(next_p) {
-                let vrf_slot = slot + self.rng.gen_range(0..self.sim_config.stage_length);
+                let vrf_slot = if self.sim_config.uniform_ib_generation {
+                    // IBs are generated at the start of any slot within this stage
+                    slot + self.rng.gen_range(0..self.sim_config.stage_length)
+                } else {
+                    // IBs are generated at the start of the first slot of this stage
+                    slot
+                };
                 slot_vrfs.entry(vrf_slot).or_default().push(vrf);
             }
             probability -= 1.0;
