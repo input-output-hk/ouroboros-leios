@@ -141,10 +141,10 @@ updState = foldr upd
     upd (inj₁ (ebHeader eb)) s = record s { EBs = eb ∷ (s .EBs) }
     upd (inj₁ (vHeader vs)) s = record s { Vs = vs ∷ (s .Vs) }
     upd (inj₁ (ibHeader h)) s with A.any? (GenFFD.matchIB? h) (s .IBBodies)
-    ... | yes p = record s { IBs = record { header = h ; body = A.lookup p } ∷ (s .IBs) }
+    ... | yes p = record s { IBs = record { header = h ; body = A.lookup p } ∷ (s .IBs) ; IBBodies = (s .IBBodies) A.─ p }
     ... | no _ = record s { IBHeaders = h ∷ (s .IBHeaders) }
     upd (inj₂ (ibBody b)) s with A.any? (flip GenFFD.matchIB? b) (s .IBHeaders)
-    ... | yes p = record s { IBs = record { header = A.lookup p ; body = b } ∷ (s .IBs) }
+    ... | yes p = record s { IBs = record { header = A.lookup p ; body = b } ∷ (s .IBs) ; IBHeaders = (s .IBHeaders) A.─ p }
     ... | no _ = record s { IBBodies = b ∷ (s .IBBodies) }
 
 postulate
