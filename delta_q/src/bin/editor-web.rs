@@ -6,14 +6,14 @@ macro_rules! cloned {
 }
 
 use delta_q::{
-    CalcCdf, DeltaQ, DeltaQComponent, DeltaQContext, EphemeralContext, EvalCtxAction,
+    CalcCdf, DeltaQComponent, DeltaQContext, DeltaQExpr, EphemeralContext, EvalCtxAction,
     PersistentContext, StepFunction,
 };
 use gloo_utils::window;
 use js_sys::Reflect;
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{HtmlInputElement, HtmlTextAreaElement, MessageEvent, MessageEventInit};
+use web_sys::{HtmlElement, HtmlInputElement, HtmlTextAreaElement, MessageEvent, MessageEventInit};
 use yew::{prelude::*, suspense::use_future_with};
 use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
 use yew_hooks::use_local_storage;
@@ -104,9 +104,9 @@ fn app_main() -> HtmlResult {
     )?;
 
     let on_change = cloned!(ctx, epoch;
-        Callback::from(move |(name, dq): (String, Option<DeltaQ>)| {
+        Callback::from(move |(name, dq): (String, Option<Arc<DeltaQExpr>>)| {
             if let Some(dq) = dq {
-                ctx.dispatch(EvalCtxAction::Put(name.clone(), dq));
+                ctx.dispatch(EvalCtxAction::Put(name.clone(), dq.into()));
             } else {
                 ctx.dispatch(EvalCtxAction::Remove(name));
             }
@@ -143,9 +143,9 @@ fn app_main() -> HtmlResult {
             let constraint = ctx.constraint(&name);
             let check = (|| {
                 let c = ctx.get(&constraint?)?;
-                let c = c.expand().ok()?.eval(&ctx, &mut cache).ok()?;
+                let c = c.eval(&ctx, &mut cache).ok()?;
                 let n = ctx.get(&name)?;
-                let n = n.expand().ok()?.eval(&ctx, &mut cache).ok()?;
+                let n = n.eval(&ctx, &mut cache).ok()?;
                 Some(n.cdf >= c.cdf)
             })();
             let check = match check {
@@ -170,7 +170,7 @@ fn app_main() -> HtmlResult {
                         />
                     }
                     <div class={classes!("expression", sel)} style="margin-left: 8px;" onclick={select.reform(move |_| name.to_string())}>
-                        { k }{ ": " }<EditExpression name={k.to_string()} value={v.clone()} on_change={on_change.clone()} selected={sel.is_some()} />
+                        { k }{ ": " }<EditExpression name={k.to_string()} value={v.arc()} on_change={on_change.clone()} selected={sel.is_some()} />
                     </div>
                 </li>
             }
@@ -181,18 +181,28 @@ fn app_main() -> HtmlResult {
         // this only takes effect on the next render!
     }
 
+    let list = use_node_ref();
+    let scroll = use_state(|| 0);
+    use_effect(cloned!(scroll, list; move || {
+        if let Some(list) = list.cast::<HtmlElement>() {
+            list.set_scroll_top(*scroll);
+        }
+    }));
+
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
     // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
-    let add_on_change = on_change.reform(cloned!(selected; move |x: (String, Option<DeltaQ>)| {
-        selected.set(Some(x.0.clone()));
-        x
-    }));
+    let add_on_change = on_change.reform(
+        cloned!(selected; move |x: (String, Option<Arc<DeltaQExpr>>)| {
+            selected.set(Some(x.0.clone()));
+            x
+        }),
+    );
 
     Ok(html! {
     <div>
         <p>{ "context:" }<button onclick={ctx_popup_show}>{ "edit" }</button></p>
-        <ul>
+        <ul class={classes!("ctx_list")} ref={list} onscroll={cloned!(scroll; move |e: Event| scroll.set(e.target_unchecked_into::<HtmlElement>().scroll_top()))}>
         { list_items }
         </ul>
         <AddExpression on_change={add_on_change} />
@@ -200,7 +210,7 @@ fn app_main() -> HtmlResult {
             <p>{ "selected: " } { name }</p>
             <div style="background-color: #f0f0f0; padding: 4px; margin: 4px; display: flex; flex-direction: row;">
                 <ContextProvider<DeltaQContext> context={DeltaQContext::new(&ctx, &name)}>
-                    <DeltaQComponent delta_q={dq.clone()} {on_change} />
+                    <DeltaQComponent delta_q={dq.arc()} {on_change} />
                 </ContextProvider<DeltaQContext>>
             </div>
         }
@@ -246,7 +256,7 @@ fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
 
 #[derive(Properties, PartialEq, Clone)]
 struct AddExpressionProps {
-    on_change: Callback<(String, Option<DeltaQ>)>,
+    on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(AddExpression)]
@@ -257,7 +267,7 @@ fn add_expression(props: &AddExpressionProps) -> HtmlResult {
     let on_submit = cloned!(name, on_change; Callback::from(move |e: SubmitEvent| {
         e.prevent_default();
         name.set("".to_owned());
-        on_change.emit(((*name).clone(), Some(DeltaQ::BlackBox)));
+        on_change.emit(((*name).clone(), Some(DeltaQExpr::BlackBox.into())));
     }));
     let on_input = Callback::from(move |e: InputEvent| {
         name.set(e.target_unchecked_into::<HtmlInputElement>().value())
@@ -274,9 +284,9 @@ fn add_expression(props: &AddExpressionProps) -> HtmlResult {
 #[derive(Properties, PartialEq, Clone, Debug)]
 struct EditExpressionProps {
     name: String,
-    value: DeltaQ,
+    value: Arc<DeltaQExpr>,
     selected: bool,
-    on_change: Callback<(String, Option<DeltaQ>)>,
+    on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
 #[function_component(EditExpression)]
@@ -298,9 +308,9 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
     let on_input = cloned!(buffer, value, result; Callback::from(move |e: InputEvent| {
         let v = e.target_unchecked_into::<HtmlInputElement>().value();
         buffer.set(v.clone());
-        match v.parse::<DeltaQ>() {
+        match v.parse::<DeltaQExpr>() {
             Ok(dq) => {
-                value.set(dq);
+                value.set(dq.into());
                 result.set("OK".to_owned());
             }
             Err(e) => {
@@ -359,7 +369,7 @@ fn app() -> Html {
     html! {
         <div>
             <h1>{ "DeltaQ Editor" }</h1>
-            <div style="display: flex; flex-direction: row; height: 30%;">
+            <div style="display: flex; flex-direction: row; height: 40%;">
                 <div id="output" style="width: 50%; height: 100%; border: 1px solid black;" />
                 <div id="loads" style="width: 50%; height: 100%; border: 1px solid black;" />
             </div>

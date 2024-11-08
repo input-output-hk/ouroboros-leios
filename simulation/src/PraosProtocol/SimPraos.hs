@@ -68,8 +68,7 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
-      slotConfig <- slotConfigFromNow
-      let praosConfig = PraosConfig{slotConfig, blockValidationDelay = const 0.1}
+      praosConfig <- defaultPraosConfig
       let chainA = mkChainSimple $ [BlockBody (BS.singleton word) | word <- [0 .. 9]]
       let chainB = Genesis
       (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops

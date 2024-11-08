@@ -2,7 +2,7 @@ use crate::{step_function::PairIterators, CompactionMode, StepFunction, StepFunc
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CDFError {
     InvalidDataRange,
     NonMonotonicData,
@@ -89,6 +89,16 @@ impl CDF {
                     .collect::<Vec<_>>(),
             )?,
         })
+    }
+
+    pub fn top() -> Self {
+        Self::from_steps(&[(0.0, 1.0)]).unwrap()
+    }
+
+    pub fn bottom() -> Self {
+        Self {
+            steps: StepFunction::zero(),
+        }
     }
 
     /// Create a CDF from a step function.

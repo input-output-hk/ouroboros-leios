@@ -88,3 +88,47 @@ nearL := CDF[(0.024, 1)] WITH netNear[(0, 2666667), (0.024, 0)]
 nearXL := CDF[(0.078, 1)] WITH netNear[(0, 12820513), (0.078, 0)]
 round := CDF[(20, 1)]
 someRounds := ∀(round | TOP ->-×5 diffuseIB) ->- ∀(round | TOP ->-×20 diffuseEB)
+
+=============================================
+6 -- Short-Leios model including network load
+=============================================
+
+_1_parallelBurst := all(_2_pipelineBurst | all(_4_slices^1 ->- _2_pipelineBurst | all(_4_slices^2 ->- _2_pipelineBurst | all(_4_slices^3 ->- _2_pipelineBurst | all(_4_slices^4 ->- _2_pipelineBurst | all(_4_slices^5 ->- _2_pipelineBurst | all(_4_slices^6 ->- _2_pipelineBurst | _4_slices^7 ->- _2_pipelineBurst)))))))
+_1_parallelUniform := all(_2_pipelineUniform | all(_4_slices^1 ->- _2_pipelineUniform | all(_4_slices^2 ->- _2_pipelineUniform | all(_4_slices^3 ->- _2_pipelineUniform | all(_4_slices^4 ->- _2_pipelineUniform | all(_4_slices^5 ->- _2_pipelineUniform | all(_4_slices^6 ->- _2_pipelineUniform | _4_slices^7 ->- _2_pipelineUniform)))))))
+_2_pipelineBurst := _3_pipelin_B ->- _3_endorse
+_2_pipelineUniform := _3_pipelin_U ->- _3_endorse
+_3_endorse := CDF[(0, 1)] ->-*2.5 _3_endorse1
+_3_endorse1 := all(gossip(_7_hopEB, 2500, 15, 0.07) | _4_slice) ->- gossip(_7_hopVote, 2500, 15, 0.07)
+_3_pipelin_B := CDF[(0, 1)] ->-*10 all(gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice)
+_3_pipelin_U := all(_3_pipeline0 | all(_3_pipeline1 | all(_3_pipeline2 | all(_3_pipeline3 | all(_3_pipeline4 | all(_3_pipeline5 | all(_3_pipeline6 | all(_3_pipeline7 | all(_3_pipeline8 | _3_pipeline9)))))))))
+_3_pipeline0 := all(gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline1 := all(CDF[(1,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline2 := all(CDF[(2,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline3 := all(CDF[(3,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline4 := all(CDF[(4,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline5 := all(CDF[(5,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline6 := all(CDF[(6,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline7 := all(CDF[(7,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline8 := all(CDF[(8,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_3_pipeline9 := all(CDF[(9,1)] ->- gossip(_7_hopIB, 2500, 15, 0.07) | _4_slice ->- _4_slice) ->- _4_slice
+_4_slice := CDF[(10, 1)]
+_4_slices := _4_slice ->- _4_slices
+_7_hopEB := _7_sendEB_near ->- (_7_sendEB_near 1<>1 _7_sendEB_far) ->- _7_sendEB_near
+_7_hopIB := _7_sendIB_near ->- (_7_sendIB_near 1<>1 _7_sendIB_far) ->- _7_sendIB_near
+_7_hopVote := _7_sendVote_near ->- (_7_sendVote_near 1<>1 _7_sendVote_far) ->- _7_sendVote_near
+_7_sendEB_far := (_9_mid ->- _9_mid ->- _9_mid ->- _9_midL 1<>1 _9_far ->- _9_far ->- _9_far ->- _9_farL) ->- _8_validate
+_7_sendEB_near := _9_near ->- _9_near ->- _9_near ->- _9_nearL ->- _8_validate
+_7_sendIB_far := (_9_mid ->- _9_mid ->- _9_mid ->- _9_midXL 1<>1 _9_far ->- _9_far ->- _9_far ->- _9_farXL) ->- _8_validate
+_7_sendIB_near := _9_near ->- _9_near ->- _9_near ->- _9_nearXL ->- _8_validate
+_7_sendVote_far := (_9_mid ->- _9_mid ->- _9_mid ->- _9_mid 1<>1 _9_far ->- _9_far ->- _9_far ->- _9_far) ->- _8_validate
+_7_sendVote_near := _9_near ->- _9_near ->- _9_near ->- _9_near ->- _8_validate
+_8_validate := CDF[(0.1, 1)] WITH cpu[(0, 1), (0.1, 0)]
+_9_far := CDF[(0.268, 1)] WITH net[(0, 5597), (0.268, 0)]
+_9_farL := CDF[(0.531, 1)] WITH net[(0, 120527), (0.531, 0)]
+_9_farXL := CDF[(1.598, 1)] WITH net[(0, 625782), (1.598, 0)]
+_9_mid := CDF[(0.069, 1)] WITH net[(0, 21739), (0.069, 0)]
+_9_midL := CDF[(0.143, 1)] WITH net[(0, 447552), (0.143, 0)]
+_9_midXL := CDF[(0.404, 1)] WITH net[(0, 2475247), (0.404, 0)]
+_9_near := CDF[(0.012, 1)]
+_9_nearL := CDF[(0.024, 1)]
+_9_nearXL := CDF[(0.078, 1)]

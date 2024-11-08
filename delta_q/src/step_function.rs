@@ -26,7 +26,7 @@ impl fmt::Display for StepFunctionError {
 }
 impl std::error::Error for StepFunctionError {}
 
-pub const DEFAULT_MAX_SIZE: usize = 1000;
+pub const DEFAULT_MAX_SIZE: usize = 10000;
 
 /// A step function represented as a list of (x, y) pairs.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -34,7 +34,7 @@ pub const DEFAULT_MAX_SIZE: usize = 1000;
 pub struct StepFunction {
     /// invariants: first component strictly monotonically increasing and non-negative,
     /// with neighbouring x values being separated by at least five ε
-    data: Arc<[(f32, f32)]>,
+    data: Option<Arc<[(f32, f32)]>>,
     max_size: usize,
     mode: CompactionMode,
 }
@@ -59,11 +59,39 @@ impl StepFunction {
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
             return Err(StepFunctionError::NonMonotonicData);
         }
+        let data = if points.is_empty() {
+            None
+        } else {
+            Some(points.into())
+        };
         Ok(Self {
-            data: points.into(),
+            data,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
+    }
+
+    pub fn at(&self, x: f32) -> f32 {
+        self.data()
+            .iter()
+            .rev()
+            .find(|&&(x0, _)| x0 <= x)
+            .map_or(self.data().last().map_or(0.0, |&(_x, y)| y), |&(_, y)| y)
+    }
+
+    pub fn integrate(&self, from: f32, to: f32) -> f32 {
+        self.func_iter()
+            .tuple_windows()
+            .filter_map(|((x0, y), (x1, _y))| {
+                let min = x0.max(from);
+                let max = x1.min(to);
+                if min < max {
+                    Some((max - min) * y)
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 
     pub fn compact(&self, mut data: Vec<(f32, f32)>) -> Result<Self, StepFunctionError> {
@@ -93,9 +121,14 @@ impl StepFunction {
         self
     }
 
+    pub fn data(&self) -> &[(f32, f32)] {
+        static EMPTY: &[(f32, f32)] = &[];
+        self.data.as_deref().unwrap_or(EMPTY)
+    }
+
     pub fn iter(&self) -> StepFunctionIterator {
         StepFunctionIterator {
-            cdf: self.data.iter(),
+            cdf: self.data().iter(),
             prev: (0.0, 0.0),
             first: false,
             last: false,
@@ -104,23 +137,32 @@ impl StepFunction {
 
     pub fn graph_iter(&self) -> StepFunctionIterator {
         StepFunctionIterator {
-            cdf: self.data.iter(),
+            cdf: self.data().iter(),
             prev: (0.0, 0.0),
             first: true,
             last: false,
         }
     }
 
+    pub fn func_iter(&self) -> StepFunctionIterator {
+        StepFunctionIterator {
+            cdf: self.data().iter(),
+            prev: (0.0, 0.0),
+            first: true,
+            last: true,
+        }
+    }
+
     /// Get the width of the CDF.
     pub fn max_x(&self) -> f32 {
-        self.data.iter().next_back().map_or(0.0, |(x, _)| *x)
+        self.data().iter().next_back().map_or(0.0, |(x, _)| *x)
     }
 
     pub fn zip<'a>(
         &'a self,
         other: &'a StepFunction,
     ) -> impl Iterator<Item = (f32, (f32, f32))> + 'a {
-        PairIterators::new(self.data.iter().copied(), other.data.iter().copied())
+        PairIterators::new(self.data().iter().copied(), other.data().iter().copied())
     }
 
     pub fn mult(&self, factor: f32) -> Self {
@@ -131,7 +173,10 @@ impl StepFunction {
                 .with_mode(self.mode);
         }
         Self {
-            data: self.data.iter().map(|&(x, y)| (x, y * factor)).collect(),
+            data: self
+                .data
+                .as_ref()
+                .map(|d| d.iter().map(|&(x, y)| (x, y * factor)).collect()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -144,7 +189,7 @@ impl StepFunction {
         }
         compact(&mut data, self.mode, self.max_size);
         Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -157,7 +202,7 @@ impl StepFunction {
         }
         compact(&mut data, self.mode, self.max_size);
         Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
         }
@@ -169,11 +214,11 @@ impl StepFunction {
                 || b == 0.0 && a.abs() < 1e-6
                 || (a - b).abs() / a.max(b) < 1e-6
         }
-        self.data.len() == other.data.len()
+        self.data().len() == other.data().len()
             && self
-                .data
+                .data()
                 .iter()
-                .zip(other.data.iter())
+                .zip(other.data().iter())
                 .all(|(a, b)| similar(a.0, b.0) && similar(a.1, b.1))
     }
 }
@@ -181,7 +226,7 @@ impl StepFunction {
 impl From<StepFunction> for StepFunctionSerial {
     fn from(cdf: StepFunction) -> Self {
         Self {
-            data: cdf.data[..].to_owned(),
+            data: cdf.data()[..].to_owned(),
         }
     }
 }
@@ -197,7 +242,7 @@ impl TryFrom<StepFunctionSerial> for StepFunction {
 impl fmt::Debug for StepFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StepFunction")
-            .field("data", &self.data)
+            .field("data", &self.data())
             .finish()
     }
 }
@@ -207,7 +252,7 @@ impl fmt::Display for StepFunction {
         let mut scratch = String::new();
 
         write!(f, "[")?;
-        for (i, (x, y)) in self.data.iter().enumerate() {
+        for (i, (x, y)) in self.data().iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
@@ -274,7 +319,7 @@ impl FromStr for StepFunction {
             data.push((x, y));
         }
         Ok(Self {
-            data: data.into(),
+            data: (!data.is_empty()).then_some(data.into()),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         })
@@ -300,8 +345,7 @@ impl<'a> Iterator for StepFunctionIterator<'a> {
             Some(*pair)
         } else if self.last {
             self.last = false;
-            let (x, y) = self.prev;
-            Some(((x * 1.2).max(0.1), y))
+            Some((f32::INFINITY, self.prev.1))
         } else {
             None
         }
@@ -348,7 +392,7 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
     // determine overall scale of the graph to determine the granularity of distances
     // (without this rounding the pruning will be dominated by floating point errors)
     let scale = data[data.len() - 1].0;
-    let granularity = scale / 300.0;
+    let granularity = scale / 10000.0;
 
     #[derive(Debug, PartialEq)]
     struct D {
@@ -393,75 +437,51 @@ fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
             } else {
                 return None;
             };
-            let dist = b.0 - a.0;
+            let dist = if use_left { c.0 - b.0 } else { b.0 - a.0 };
             Some(mk_d(dist, idx + 1, use_left))
         })
         .collect::<BinaryHeap<_>>();
 
     let mut to_remove = data.len() - max_size;
     let mut last_bin = -1;
-    while let Some(D {
-        bin,
-        idx,
-        dist,
-        use_left,
-    }) = heap.pop()
-    {
-        if bin == last_bin {
+    while let Some(d) = heap.pop() {
+        if d.bin == last_bin {
             last_bin = -1;
             continue;
         } else {
-            last_bin = bin;
+            last_bin = d.bin;
         }
         // skip points that have already been removed
-        if data[idx].1 < 0.0 {
+        if data[d.idx].1 < 0.0 {
             continue;
         }
 
-        if use_left {
-            // just remove this point, meaning that the left neighbour needs to be updated
-            let mut neighbours = data[..idx]
-                .iter()
-                .enumerate()
-                .rev()
-                .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(i));
+        // just remove this point, meaning that the left neighbour needs to be updated
+        let mut neighbours = data[..d.idx]
+            .iter()
+            .enumerate()
+            .rev()
+            .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(i));
 
-            if let Some(neighbour) = neighbours.next() {
-                if let Some(n2) = neighbours.next() {
-                    // only push to heap if the next neighbour is in the opposite quadrant
-                    if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[idx].1) <= 0.0 {
-                        heap.push(mk_d(data[idx].0 - data[neighbour].0 + dist, idx, use_left));
-                    }
-                }
-                data[idx] = data[neighbour];
-                data[neighbour].1 = -1.0;
-            }
-        } else {
-            // we update the y on this point and remove the right neighbour
-            let mut neighbours = data[idx + 1..]
-                .iter()
-                .enumerate()
-                .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(idx + 1 + i));
-            let n1 = neighbours.next();
-            let n2 = neighbours.next();
-            match (n1, n2) {
-                (Some(n1), Some(n2)) => {
-                    // drop n1 and update our distance (but only push to heap if the next neighbour is in the opposite quadrant)
-                    if (data[n2].1 - data[n1].1) * (data[n1].1 - data[idx].1) <= 0.0 {
-                        heap.push(mk_d(data[n2].0 - data[idx].0, idx, use_left));
-                    }
-                    data[idx].1 = data[n1].1;
-                    data[n1].1 = -1.0;
-                }
-                (Some(n1), None) => {
-                    // n1 is the rightmost, so don't submit us again because now we’re rightmost
-                    data[idx].1 = data[n1].1;
-                    data[n1].1 = -1.0;
-                }
-                _ => {
-                    debug_assert!(false, "shouldn’t get here because of the above");
+        if let Some(neighbour) = neighbours.next() {
+            if let Some(n2) = neighbours.next() {
+                // only push to heap if the next neighbour is in the opposite quadrant
+                if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[d.idx].1) <= 0.0 {
+                    heap.push(mk_d(
+                        data[d.idx].0 - data[neighbour].0 + d.dist,
+                        d.idx,
+                        d.use_left,
+                    ));
                 }
             }
+            // since we cannot remove the now changed neighbour from the heap, we mark it as removed instead
+            // and move the neighbour to our position
+            if d.use_left {
+                data[d.idx] = data[neighbour];
+            } else {
+                data[d.idx].0 = data[neighbour].0;
+            }
+            data[neighbour].1 = -1.0;
         }
 
         to_remove -= 1;
@@ -642,13 +662,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.3, 0.4), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.1, 0.2), (0.3, 0.4), (0.5, 0.6), (0.9, 1.0)]
         );
         let mut data2 = data.clone();
         compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.1), (0.1, 0.2), (0.2, 0.6), (0.6, 0.8), (0.8, 1.0)]
+            vec![(0.0, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
         );
     }
 
@@ -667,13 +687,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
+            vec![(0.0, 0.1), (0.1, 0.2), (0.3, 0.4), (0.5, 0.5), (0.9, 0.7)]
         );
         let mut data2 = data.clone();
         compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.1), (0.1, 0.3), (0.3, 0.5), (0.7, 0.6), (0.9, 0.7)]
+            vec![(0.0, 0.2), (0.2, 0.4), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
         );
     }
 
@@ -691,13 +711,13 @@ mod tests {
         compact(&mut data1, CompactionMode::UnderApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.5), (0.7, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.2, 0.3), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
         );
         let mut data1 = data.clone();
         compact(&mut data1, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.5), (0.5, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.6), (0.7, 0.8), (0.9, 1.0)]
         );
     }
 
@@ -722,7 +742,7 @@ mod tests {
         compact(&mut data1, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.1, 0.2), (0.2, 0.4), (0.5, 0.6), (0.7, 0.8), (0.8, 1.0)]
+            vec![(0.1, 0.3), (0.3, 0.4), (0.5, 0.6), (0.7, 0.9), (0.9, 1.0)]
         );
     }
 }

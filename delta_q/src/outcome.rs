@@ -19,6 +19,10 @@ impl Outcome {
         }
     }
 
+    pub fn top() -> Self {
+        Self::new(CDF::top())
+    }
+
     pub fn new_with_load(cdf: CDF, load: BTreeMap<Name, StepFunction>) -> Self {
         Self { cdf, load }
     }

@@ -60,6 +60,8 @@ pub struct RawConfig {
     pub ib_generation_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
+    pub stage_length: u64,
+    pub uniform_ib_generation: bool,
     pub max_ib_size: u64,
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
@@ -114,6 +116,8 @@ impl From<RawConfig> for SimConfiguration {
             ib_generation_probability: value.ib_generation_probability,
             max_block_size: value.max_block_size,
             max_tx_size: value.max_tx_size,
+            stage_length: value.stage_length,
+            uniform_ib_generation: value.uniform_ib_generation,
             max_ib_size: value.max_ib_size,
             max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             ib_shards: value.ib_shards,
@@ -135,6 +139,8 @@ pub struct SimConfiguration {
     pub ib_generation_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
+    pub stage_length: u64,
+    pub uniform_ib_generation: bool,
     pub max_ib_size: u64,
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
@@ -175,11 +181,14 @@ fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
-fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Duration {
+fn compute_latency(loc1: Location, loc2: Location, explicit: Option<u64>) -> Duration {
+    if let Some(ms) = explicit {
+        return Duration::from_millis(ms);
+    }
     let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
         .map(|l| l.to_duration())
         .unwrap_or(Duration::ZERO);
-    let extra_latency = Duration::from_millis(extra_ms.unwrap_or(5));
+    let extra_latency = Duration::from_millis(5);
     geo_latency + extra_latency
 }
 
