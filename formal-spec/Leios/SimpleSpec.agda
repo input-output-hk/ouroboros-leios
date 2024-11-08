@@ -9,6 +9,8 @@ import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
 
+import Data.List.Relation.Unary.Any as L
+
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   ⦃ IsBlock-Vote : IsBlock (List Vote) ⦄
   ⦃ Hashable-IBHeaderOSig : ∀ {b} → Hashable (IBHeaderOSig b) Hash ⦄
@@ -129,10 +131,8 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
 
-import Data.List.Relation.Unary.Any as A
-
-updState : LeiosState → List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosState
-updState = foldr upd
+_↑_ : LeiosState → List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosState
+_↑_ = foldr upd
   where
     open LeiosState
     open Leios.Blocks.GenFFD
@@ -140,12 +140,25 @@ updState = foldr upd
     upd : FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract → LeiosState → LeiosState
     upd (inj₁ (ebHeader eb)) s = record s { EBs = eb ∷ (s .EBs) }
     upd (inj₁ (vHeader vs)) s = record s { Vs = vs ∷ (s .Vs) }
-    upd (inj₁ (ibHeader h)) s with A.any? (GenFFD.matchIB? h) (s .IBBodies)
-    ... | yes p = record s { IBs = record { header = h ; body = A.lookup p } ∷ (s .IBs) ; IBBodies = (s .IBBodies) A.─ p }
-    ... | no _ = record s { IBHeaders = h ∷ (s .IBHeaders) }
-    upd (inj₂ (ibBody b)) s with A.any? (flip GenFFD.matchIB? b) (s .IBHeaders)
-    ... | yes p = record s { IBs = record { header = A.lookup p ; body = b } ∷ (s .IBs) ; IBHeaders = (s .IBHeaders) A.─ p }
-    ... | no _ = record s { IBBodies = b ∷ (s .IBBodies) }
+    upd (inj₁ (ibHeader h)) s with L.any? (GenFFD.matchIB? h) (s .IBBodies)
+    ... | yes p =
+      record s
+        { IBs = record { header = h ; body = L.lookup p } ∷ (s .IBs)
+        ; IBBodies = (s .IBBodies) L.─ p
+        }
+    ... | no _ =
+      record s
+        { IBHeaders = h ∷ (s .IBHeaders)
+        }
+    upd (inj₂ (ibBody b)) s with L.any? (flip GenFFD.matchIB? b) (s .IBHeaders)
+    ... | yes p =
+      record s
+        { IBs = record { header = L.lookup p ; body = b } ∷ (s .IBs)
+        ; IBHeaders = (s .IBHeaders) L.─ p }
+    ... | no _ =
+      record s
+        { IBBodies = b ∷ (s .IBBodies)
+        }
 
 postulate
   V_chkCerts : List PubKey → EndorserBlock × B.Cert → Type
@@ -166,9 +179,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
        ∙ bs ⇀⟦ B.FTCH-LDG ⟧ᴮ (bs' , B.BASE-LDG ebs)
        ∙ FFDAbstract.Fetch ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.FetchRes msgs)
-       ────────────────────────────────────────────────────────────────────────────────────────
-       just s ⇀⟦ SLOT ⟧ (updState (record s { FFDState = ffds' ; Ledger = constructLedger ebs }) msgs
-                        , EMPTY)
+       ──────────────────────────────────────────────────────────────────────────────────────────────
+       just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } ↑ msgs , EMPTY)
 
   Ftch : let open LeiosState s in
        ──────────────────────────────────────────
