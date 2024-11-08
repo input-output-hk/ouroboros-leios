@@ -1,11 +1,17 @@
 import { Graph } from "@/components/Graph/Graph";
+import { getMessages, getTopography } from "@/components/Graph/queries";
 import Image from "next/image";
 
-export default function Home() {
+export default async function Home() {
+  const [messages, topography] = await Promise.all([
+    getMessages(),
+    getTopography()
+  ])
+
   return (
     <div>
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Graph />
+        <Graph messages={messages} topography={topography} />
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         <a

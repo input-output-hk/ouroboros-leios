@@ -1,89 +1,113 @@
-export interface INodeMap {
-    nodes: {
-        location: number[];
-        stake?: number;
-    }[];
-    links: {
-        nodes: number[];
-        id?: number;
-    }[]
+export interface IServerNodeMap {
+  nodes: {
+    location: number[];
+    stake?: number;
+  }[];
+  links: {
+    nodes: number[];
+    id?: number;
+  }[];
+}
+
+export interface ITransformedNodeMap<
+  T = {
+    location: number[];
+    stake?: number;
+  },
+> {
+  nodes: {
+    id: number;
+    fx: number;
+    fy: number;
+    data: T;
+  }[];
+  links: {
+    source: number;
+    target: number;
+  }[];
 }
 
 export enum EMessageType {
-    TransactionGenerated = "TransactionGenerated",
-    TransactionReceived = "TransactionReceived",
-    InputBlockReceived = "InputBlockReceived",
-    PraosBlockReceived = "PraosBlockReceived",
-    Slot = "Slot",
-    InputBlockGenerated = "InputBlockGenerated"
+  TransactionGenerated = "TransactionGenerated",
+  TransactionReceived = "TransactionReceived",
+  TransactionSent = "TransactionSent",
+  InputBlockReceived = "InputBlockReceived",
+  PraosBlockReceived = "PraosBlockReceived",
+  Slot = "Slot",
+  InputBlockGenerated = "InputBlockGenerated",
 }
 
 export interface ITransactionGenerated {
-    type: EMessageType.TransactionGenerated,
-    data: {
-        id: number;
-        publisher: number;
-        bytes: number;
-    }
+  type: EMessageType.TransactionGenerated;
+  id: number;
+  publisher: number;
+  bytes: number;
 }
 
 export interface ITransactionReceived {
-    type: EMessageType.TransactionReceived,
-    data: {
-        id: number;
-        sender: number;
-        recipient: number;
-    }
+  type: EMessageType.TransactionReceived;
+  id: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface ITransactionSent {
+  type: EMessageType.TransactionSent;
+  id: number;
+  sender: number;
+  recipient: number;
 }
 
 export interface IInputBlockReceived {
-    type: EMessageType.InputBlockReceived,
-    data: {
-        slot: number;
-        producer: number;
-        index: number;
-        sender: number;
-        recipient: number;
-    }
+  type: EMessageType.InputBlockReceived;
+  slot: number;
+  producer: number;
+  index: number;
+  sender: number;
+  recipient: number;
 }
 
 export interface IPraosBlockReceived {
-    type: EMessageType.PraosBlockReceived,
-    data: {
-        slot: number;
-        sender: number;
-        recipient: number;
-    }
+  type: EMessageType.PraosBlockReceived;
+  slot: number;
+  sender: number;
+  recipient: number;
 }
 
 export interface ISlot {
-    type: EMessageType.Slot,
-    data: {
-        number: number;
-    }
+  type: EMessageType.Slot;
+  number: number;
 }
 
 export interface IInputBlockGenerated {
-    type: EMessageType.InputBlockGenerated,
-    data: {
-        slot: number;
-        producer: number;
-        index: number;
-        vrf: number;
-        timestamp: number;
-        transactions: number[];
-    }
-}
-
-export type TMessageType = IInputBlockGenerated | IInputBlockReceived | IPraosBlockReceived | ISlot | ITransactionGenerated | ITransactionReceived;
-
-export interface IMessage {
-    time: number;
-    message: TMessageType;
-}
-
-export interface ISlot {
+  type: EMessageType.InputBlockGenerated;
   slot: number;
-  start_time: number;
-  events: IMessage[];
+  producer: number;
+  index: number;
+  vrf: number;
+  timestamp: number;
+  transactions: number[];
+}
+
+export type TMessageType =
+  | IInputBlockGenerated
+  | IInputBlockReceived
+  | IPraosBlockReceived
+  | ISlot
+  | ITransactionGenerated
+  | ITransactionReceived
+  | ITransactionSent;
+
+export interface IServerMessage {
+  time: number;
+  message: TMessageType;
+}
+
+export interface ITransactionRoundTrip {
+  generated: number;
+  trip: {
+    source: number;
+    target: number;
+    duration: number;
+  }[];
 }
