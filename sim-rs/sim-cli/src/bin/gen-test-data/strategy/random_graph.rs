@@ -1,17 +1,14 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
-    fs,
-    path::PathBuf,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use sim_core::config::{DistributionConfig, RawConfig, RawLinkConfig, RawNodeConfig};
+use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
+use sim_core::config::{RawLinkConfig, RawNodeConfig};
+
+use crate::strategy::utils::LinkTracker;
 
 #[derive(Debug, Parser)]
-struct Args {
-    path: PathBuf,
+pub struct RandomGraphArgs {
     node_count: usize,
     stake_pool_count: usize,
 }
@@ -23,14 +20,15 @@ fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
     (dist_x.powi(2) + dist_y.powi(2)).sqrt()
 }
 
-fn main() -> Result<()> {
-    let args = Args::parse();
-    assert!(args.stake_pool_count < args.node_count);
+pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+    if args.stake_pool_count >= args.node_count {
+        bail!("At least one node must not be a stake pool");
+    }
 
     let mut rng = thread_rng();
 
     let mut nodes = vec![];
-    let mut links = vec![];
+    let mut links = LinkTracker::new();
 
     println!("generating nodes...");
     for id in 0..args.node_count {
@@ -49,7 +47,6 @@ fn main() -> Result<()> {
     let alpha = 0.15;
     let beta = 0.2;
     let max_distance = distance((0.0, 90.0), (90.0, 180.0));
-    let mut connections: BTreeMap<usize, BTreeSet<usize>> = BTreeMap::new();
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
         let first_candidate_connection = if from < args.stake_pool_count {
@@ -63,83 +60,44 @@ fn main() -> Result<()> {
             let dist = distance(nodes[from].location, nodes[to].location);
             let probability = alpha * (-dist / (beta * max_distance)).exp();
             if rng.gen_bool(probability) {
-                links.push(RawLinkConfig {
-                    nodes: (from, to),
-                    latency_ms: None,
-                });
-                connections.entry(from).or_default().insert(to);
-                connections.entry(to).or_default().insert(from);
+                links.add(from, to, None);
             }
         }
     }
 
     // Every node must connect to at least one other node
     for from in 0..args.node_count {
-        if !connections.contains_key(&from) {
+        if !links.connections.contains_key(&from) {
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
                 (0..args.node_count).filter(|&to| to == from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
-            links.push(RawLinkConfig {
-                nodes: (from, to),
-                latency_ms: None,
-            });
-            connections.entry(from).or_default().insert(to);
-            connections.entry(to).or_default().insert(from);
+            links.add(from, to, None);
         }
     }
 
     // Make sure the relays are fully connected
     let mut connected_nodes = BTreeSet::new();
-    track_connections(&mut connected_nodes, &connections, args.stake_pool_count);
+    track_connections(
+        &mut connected_nodes,
+        &links.connections,
+        args.stake_pool_count,
+    );
 
     let mut last_conn = args.stake_pool_count;
     for relay in (args.stake_pool_count + 1)..args.node_count {
         if !connected_nodes.contains(&relay) {
             let from = last_conn;
             let to = relay;
-            links.push(RawLinkConfig {
-                nodes: (from, to),
-                latency_ms: None,
-            });
-            connections.entry(from).or_default().insert(to);
-            connections.entry(to).or_default().insert(from);
-            track_connections(&mut connected_nodes, &connections, relay);
+            links.add(from, to, None);
+            track_connections(&mut connected_nodes, &links.connections, relay);
             last_conn = relay;
         }
     }
 
-    let data = RawConfig {
-        seed: None,
-        timescale: None,
-        slots: None,
-        nodes,
-        trace_nodes: HashSet::new(),
-        links,
-        block_generation_probability: 0.05,
-        ib_generation_probability: 5.0,
-        ib_shards: 8,
-        max_block_size: 90112,
-        stage_length: 2,
-        uniform_ib_generation: true,
-        max_ib_requests_per_peer: 1,
-        max_ib_size: 327680,
-        max_tx_size: 16384,
-        transaction_frequency_ms: DistributionConfig::Exp {
-            lambda: 0.85,
-            scale: Some(1000.0),
-        },
-        transaction_size_bytes: DistributionConfig::LogNormal {
-            mu: 6.833,
-            sigma: 1.127,
-        },
-    };
-
-    fs::write(args.path, toml::to_string_pretty(&data)?)?;
-
-    Ok(())
+    Ok((nodes, links.links))
 }
 
 fn track_connections(
