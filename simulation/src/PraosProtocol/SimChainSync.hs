@@ -81,14 +81,15 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      praosConfig <- defaultPraosConfig
       concurrently_
-        (consumerNode inChan)
+        (consumerNode praosConfig inChan)
         (producerNode outChan)
       return ()
  where
-  consumerNode chan = do
+  consumerNode cfg chan = do
     st <- ChainConsumerState <$> newTVarIO Chain.Genesis
-    runChainConsumer chan st
+    runChainConsumer cfg chan st
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain

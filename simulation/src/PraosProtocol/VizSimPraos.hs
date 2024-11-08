@@ -10,6 +10,8 @@ module PraosProtocol.VizSimPraos where
 import ChanDriver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap.Strict as IMap
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -133,6 +135,12 @@ data LinkPoints
       {-# UNPACK #-} !Point
   deriving (Show)
 
+type ChainsMap = IntMap (Chain Block)
+
+accumChains :: Time -> PraosEvent -> ChainsMap -> ChainsMap
+accumChains _ (PraosEventNode (LabelNode nid (PraosNodeEventNewTip ch))) = IMap.insert (coerce nid) ch
+accumChains _ _ = id
+
 type DiffusionLatencyMap = Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time])
 
 accumDiffusionLatency :: Time -> PraosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
@@ -202,7 +210,7 @@ praosSimVizModel =
             links
       }
   accumEventVizState _now (PraosEventNode (LabelNode nid (PraosNodeEventNewTip tip))) vs =
-    vs{vizNodeTip = Map.insert nid tip (vizNodeTip vs)}
+    vs{vizNodeTip = Map.insert nid (fullTip tip) (vizNodeTip vs)}
   accumEventVizState now (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) vs =
     vs
       { vizMsgsAtNodeBuffer =

@@ -322,10 +322,14 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
   cps <- readReadOnlyTVar cpsVar
   let
     chain = fmap getHeader cps.chainState
-    aux (mpId, c1) (pId, c2) =
-      let c = Chain.selectChain c1 c2
-       in if Chain.headPoint c == Chain.headPoint c1
-            then (mpId, c1)
+    aux x1@(_mpId, c1) (pId, c2) =
+      -- We use headHash to refine the order, so that we have less
+      -- partitioning in the network.
+      -- Actual implementation uses the VRF hash to be adversarial
+      -- resistant, but that's not a concern here.
+      let measure c = (Chain.headBlockNo c, Chain.headHash c)
+       in if measure c1 >= measure c2
+            then x1
             else (Just pId, c2)
     -- using foldl' since @selectChain@ is left biased
     (selectedPeer, chain') = List.foldl' aux (Nothing, chain) candidateChains
@@ -512,20 +516,18 @@ updateChains ::
   MonadSTM m =>
   BlockFetchControllerState m ->
   ChainsUpdate ->
-  STM m (Bool, Maybe FullTip)
+  STM m (Bool, Maybe (Chain Block))
 updateChains BlockFetchControllerState{..} e =
   case e of
-    FullChain fullChain -> do
+    FullChain !fullChain -> do
       writeTVar targetChainVar Nothing
-      let !newTip = fullTip fullChain
       modifyTVar' cpsVar (switchFork fullChain)
-      return (True, Just newTip)
+      return (True, Just fullChain)
     ImprovedPrefix missingChain -> do
       writeTVar targetChainVar (Just missingChain)
-      let improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
-          !newTip = fullTip improvedChain
+      let !improvedChain = fromMaybe (error "prefix not from Genesis") $ Chain.fromAnchoredFragment missingChain.prefix
       modifyTVar' cpsVar (switchFork improvedChain)
-      return (True, Just $ newTip)
+      return (True, Just improvedChain)
     SamePrefix missingChain -> do
       target <- readTVar targetChainVar
       let useful = Just (headPointMChain missingChain) /= fmap headPointMChain target
@@ -557,7 +559,7 @@ addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
     Just missingChain -> do
       fmap snd $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
 
-traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe FullTip -> m ()
+traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe (Chain Block) -> m ()
 traceNewTip tracer x =
   case x of
     Nothing -> return ()

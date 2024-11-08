@@ -67,7 +67,7 @@ runPeer ::
 runPeer tracer cfg st peerId chan = do
   let chainConsumerState = st.chainSyncConsumerStates Map.! peerId
   let blockFetchConsumerState = initBlockFetchConsumerStateForPeerId tracer peerId st.blockFetchControllerState
-  [ Concurrently $ runChainConsumer (protocolChainSync chan) chainConsumerState
+  [ Concurrently $ runChainConsumer cfg (protocolChainSync chan) chainConsumerState
     , Concurrently $ runBlockFetchConsumer tracer cfg (protocolBlockFetch chan) blockFetchConsumerState
     ]
 
