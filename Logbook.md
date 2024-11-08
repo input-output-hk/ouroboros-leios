@@ -10,6 +10,13 @@
   He used a [sketch model](./delta_q/models.txt) (section 6) to demonstrate that the tool can rather quickly compare two proposed variants of IB generation in Short Leios; this model is to be taken with a grain of salt, though, as it is too simplistic for other purposes.
 - The next steps in this effort shall be to clarify the load modelling, especially to fix the unrealistic assumption of infinite resource availability, and to define a common DSL to be shared by the Rust and Haskell tooling so that  ΔQ models can be easily exchanged between different user groups.
 
+### Rust simulation
+
+Implemented uniform and non-uniform IB generation.
+
+Work continues on visualization; we're still deciding which data to visualize first for an attractive demo. Most likely, it will be IB propagation.
+
+
 ## 2024-11-05
 
 ### Team session
@@ -57,6 +64,13 @@
 ### Latency measurements of 52-node cluster
 
 The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency measurments and topology for a 52-machine `cardano-node` cluster that is used for benchmarking. The machine is spread among three AWS regions.
+
+### Rust Simulation
+
+Bug fixes and performance improvements. The sim was slow, because of
+ - Not batching filesystem operations
+ - Not yielding in the main thread when too many items were in play
+ - Not correctly handling when the simulation ends early
 
 ## 2024-11-04
 
@@ -106,6 +120,10 @@ Next step for the praos simulation is to gather data from real running
 nodes to validate the block diffusion latency, possibly from a
 benchmark cluster, like the recent data shared by Brian, as mainnet
 might take too long.
+
+### Rust simulation
+
+Still working on visualization, updated the output to make it easier to track latency of requests
 
 ## 2024-10-31
 
