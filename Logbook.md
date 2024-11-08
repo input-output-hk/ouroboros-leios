@@ -2,6 +2,48 @@
 
 ## 2024-11-08
 
+### System-dynamics simulation of throughput techno-economics
+
+A first draft system-dynamics simulation models the techno-economics of changes in throughtput on Cardano:
+
+- Features
+    - Movement of funds from the Reserve to the Treasury and to the rewards.
+    - Collection of fees from transactions into the rewards pot.
+    - Dispersement of the rewards pot to pools and users.
+    - Ledger size
+    - Pool costs and profitability
+- Input parameters
+    - Growth of transaction volume
+    - Hardware costs for pools
+    - Withdrawal of funds from the treasury
+    - Ada price
+- Graphics
+    - Funds in Reseve, Treasury, and under user control
+    - Pool costs, rewards, profit, and return
+    - Ledger size
+    - Diagnostic consistency checks for the simulation
+- Calibrated against Epoch 500-519
+
+This techno-economic simulation highlights is the tension between the following variables:
+
+- A linear growth in throughput would cause a quadratic growth in ledger size.
+- Storage cost per gigabyte typically decays exponentially over time, but with a small rate (maybe 10%/year).
+- Thus storage cost is the product of a quadratic increase and a mild exponential decrease, so (given the current cost trends) higher throughput will hurt stakepool economics.
+- At current levels of throughput and fees, the rewards accruing to stakepools will drop to half of their current value by 2031, as the Cardano reserves become depleted.
+- Ada price is a wildcard.
+
+Artifacts:
+
+- Online simulator: [Cardano Throughput Cost Model v0.1](https://www.insightmaker.com/insight/3IDsmADe7eetanZxUiIwkd/Cardano-Throughput-Cost-Model-v0-1)
+- Model archive: [analysis/Cardano-Throughput.InsightMaker](analysis/Cardano-Throughput.InsightMaker), created with https://www.insightmaker.com/
+
+Next steps:
+
+- More QA and testing
+- Sensitivity analysis
+- Input parameters specific to Leios
+- Develop dynamic model of economics of individual stakepools
+
 ### Haskell simulation
 
 - praos simulation now uses hash of the tip to refine order on chains,
