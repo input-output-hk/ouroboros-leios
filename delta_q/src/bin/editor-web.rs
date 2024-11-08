@@ -13,7 +13,7 @@ use gloo_utils::window;
 use js_sys::Reflect;
 use std::{str::FromStr, sync::Arc};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{HtmlInputElement, HtmlTextAreaElement, MessageEvent, MessageEventInit};
+use web_sys::{HtmlElement, HtmlInputElement, HtmlTextAreaElement, MessageEvent, MessageEventInit};
 use yew::{prelude::*, suspense::use_future_with};
 use yew_agent::{oneshot::OneshotProvider, prelude::use_oneshot_runner};
 use yew_hooks::use_local_storage;
@@ -181,6 +181,14 @@ fn app_main() -> HtmlResult {
         // this only takes effect on the next render!
     }
 
+    let list = use_node_ref();
+    let scroll = use_state(|| 0);
+    use_effect(cloned!(scroll, list; move || {
+        if let Some(list) = list.cast::<HtmlElement>() {
+            list.set_scroll_top(*scroll);
+        }
+    }));
+
     let dq = selected.as_ref().and_then(|name| ctx.get(name));
     // web_sys::console::log_1(&JsValue::from_str(&format!("{dq:?}")));
 
@@ -194,7 +202,7 @@ fn app_main() -> HtmlResult {
     Ok(html! {
     <div>
         <p>{ "context:" }<button onclick={ctx_popup_show}>{ "edit" }</button></p>
-        <ul class={classes!("ctx_list")}>
+        <ul class={classes!("ctx_list")} ref={list} onscroll={cloned!(scroll; move |e: Event| scroll.set(e.target_unchecked_into::<HtmlElement>().scroll_top()))}>
         { list_items }
         </ul>
         <AddExpression on_change={add_on_change} />
