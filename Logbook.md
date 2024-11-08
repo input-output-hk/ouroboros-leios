@@ -1,5 +1,16 @@
 # Leios logbook
 
+## 2024-11-08
+
+### Haskell simulation
+
+- praos simulation now uses hash of the tip to refine order on chains,
+  this makes for more consistent fork preference among nodes, and
+  eliminates diffusion latency outliers (>5s) we were observing.
+- actual `cardano-node` implementation uses hash of vrf proof to
+  defend against adversarial behavior, but the simulation does not include those.
+- also added an `headerValidationDelay` parameter (using 5ms atm).
+
 ## 2024-11-07
 
 ### Formal Methods Meeting on ΔQ
