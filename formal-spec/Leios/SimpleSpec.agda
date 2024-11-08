@@ -26,6 +26,7 @@ module FFD = FFDAbstract.Functionality FFD' using (State)
 
 open BaseAbstract.Functionality BF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴮ_)
 open KeyRegistrationAbstract.Functionality KF renaming (_⇀⟦_⟧_ to _⇀⟦_⟧ᴷ_)
+open FFDAbstract ffdAbstract
 open FFDAbstract.Functionality FFD' renaming (stepRel to _⇀⟦_⟧ᴺ_)
 
 -- High level structure:
@@ -131,34 +132,37 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
 
-_↑_ : LeiosState → List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosState
-_↑_ = foldr upd
-  where
-    open LeiosState
-    open Leios.Blocks.GenFFD
 
-    upd : FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract → LeiosState → LeiosState
-    upd (inj₁ (ebHeader eb)) s = record s { EBs = eb ∷ (s .EBs) }
-    upd (inj₁ (vHeader vs)) s = record s { Vs = vs ∷ (s .Vs) }
-    upd (inj₁ (ibHeader h)) s with L.any? (GenFFD.matchIB? h) (s .IBBodies)
-    ... | yes p =
-      record s
-        { IBs = record { header = h ; body = L.lookup p } ∷ (s .IBs)
-        ; IBBodies = (s .IBBodies) L.─ p
-        }
-    ... | no _ =
-      record s
-        { IBHeaders = h ∷ (s .IBHeaders)
-        }
-    upd (inj₂ (ibBody b)) s with L.any? (flip GenFFD.matchIB? b) (s .IBHeaders)
-    ... | yes p =
-      record s
-        { IBs = record { header = L.lookup p ; body = b } ∷ (s .IBs)
-        ; IBHeaders = (s .IBHeaders) L.─ p }
-    ... | no _ =
-      record s
-        { IBBodies = b ∷ (s .IBBodies)
-        }
+module _ (s : LeiosState) where
+
+  open LeiosState s
+  open GenFFD hiding (Header; Body)
+
+  upd : Header ⊎ Body → LeiosState
+  upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
+  upd (inj₁ (vHeader vs)) = record s { Vs = vs ∷ Vs }
+  upd (inj₁ (ibHeader h)) with L.any? (matchIB? h) IBBodies
+  ... | yes p =
+    record s
+      { IBs = record { header = h ; body = L.lookup p } ∷ IBs
+      ; IBBodies = IBBodies L.─ p
+      }
+  ... | no _ =
+    record s
+      { IBHeaders = h ∷ IBHeaders
+      }
+  upd (inj₂ (ibBody b)) with L.any? (flip matchIB? b) IBHeaders
+  ... | yes p =
+    record s
+      { IBs = record { header = L.lookup p ; body = b } ∷ IBs
+      ; IBHeaders = IBHeaders L.─ p }
+  ... | no _ =
+    record s
+      { IBBodies = b ∷ IBBodies
+      }
+
+_↑_ : LeiosState → List (Header ⊎ Body) → LeiosState
+_↑_ = foldr (flip upd)
 
 postulate
   V_chkCerts : List PubKey → EndorserBlock × B.Cert → Type
