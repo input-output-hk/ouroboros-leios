@@ -1,5 +1,58 @@
 # Leios logbook
 
+## 2024-11-08
+
+### System-dynamics simulation of throughput techno-economics
+
+A first draft system-dynamics simulation models the techno-economics of changes in throughtput on Cardano:
+
+- Features
+    - Movement of funds from the Reserve to the Treasury and to the rewards.
+    - Collection of fees from transactions into the rewards pot.
+    - Dispersement of the rewards pot to pools and users.
+    - Ledger size
+    - Pool costs and profitability
+- Input parameters
+    - Growth of transaction volume
+    - Hardware costs for pools
+    - Withdrawal of funds from the treasury
+    - Ada price
+- Graphics
+    - Funds in Reseve, Treasury, and under user control
+    - Pool costs, rewards, profit, and return
+    - Ledger size
+    - Diagnostic consistency checks for the simulation
+- Calibrated against Epoch 500-519
+
+This techno-economic simulation highlights is the tension between the following variables:
+
+- A linear growth in throughput would cause a quadratic growth in ledger size.
+- Storage cost per gigabyte typically decays exponentially over time, but with a small rate (maybe 10%/year).
+- Thus storage cost is the product of a quadratic increase and a mild exponential decrease, so (given the current cost trends) higher throughput will hurt stakepool economics.
+- At current levels of throughput and fees, the rewards accruing to stakepools will drop to half of their current value by 2031, as the Cardano reserves become depleted.
+- Ada price is a wildcard.
+
+Artifacts:
+
+- Online simulator: [Cardano Throughput Cost Model v0.1](https://www.insightmaker.com/insight/3IDsmADe7eetanZxUiIwkd/Cardano-Throughput-Cost-Model-v0-1)
+- Model archive: [analysis/Cardano-Throughput.InsightMaker](analysis/Cardano-Throughput.InsightMaker), created with https://www.insightmaker.com/
+
+Next steps:
+
+- More QA and testing
+- Sensitivity analysis
+- Input parameters specific to Leios
+- Develop dynamic model of economics of individual stakepools
+
+### Haskell simulation
+
+- praos simulation now uses hash of the tip to refine order on chains,
+  this makes for more consistent fork preference among nodes, and
+  eliminates diffusion latency outliers (>5s) we were observing.
+- actual `cardano-node` implementation uses hash of vrf proof to
+  defend against adversarial behavior, but the simulation does not include those.
+- also added an `headerValidationDelay` parameter (using 5ms atm).
+
 ## 2024-11-07
 
 ### Formal Methods Meeting on ΔQ
@@ -9,6 +62,13 @@
 - Roland presented the current state of the Rust-based graphical ΔQ tool, which is based on the initial [Mind your Outcomes](https://www.preprints.org/manuscript/202112.0132/v3) paper, with initial but still naive extensions towards the inclusion of load metrics like network or CPU usage.
   He used a [sketch model](./delta_q/models.txt) (section 6) to demonstrate that the tool can rather quickly compare two proposed variants of IB generation in Short Leios; this model is to be taken with a grain of salt, though, as it is too simplistic for other purposes.
 - The next steps in this effort shall be to clarify the load modelling, especially to fix the unrealistic assumption of infinite resource availability, and to define a common DSL to be shared by the Rust and Haskell tooling so that  ΔQ models can be easily exchanged between different user groups.
+
+### Rust simulation
+
+Implemented uniform and non-uniform IB generation.
+
+Work continues on visualization; we're still deciding which data to visualize first for an attractive demo. Most likely, it will be IB propagation.
+
 
 ## 2024-11-05
 
@@ -58,6 +118,13 @@
 
 The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency measurments and topology for a 52-machine `cardano-node` cluster that is used for benchmarking. The machine is spread among three AWS regions.
 
+### Rust Simulation
+
+Bug fixes and performance improvements. The sim was slow, because of
+ - Not batching filesystem operations
+ - Not yielding in the main thread when too many items were in play
+ - Not correctly handling when the simulation ends early
+
 ## 2024-11-04
 
 ### Uniform vs. Non-uniform IB generation in Short Leios
@@ -106,6 +173,10 @@ Next step for the praos simulation is to gather data from real running
 nodes to validate the block diffusion latency, possibly from a
 benchmark cluster, like the recent data shared by Brian, as mainnet
 might take too long.
+
+### Rust simulation
+
+Still working on visualization, updated the output to make it easier to track latency of requests
 
 ## 2024-10-31
 

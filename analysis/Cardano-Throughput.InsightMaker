@@ -1,0 +1,960 @@
+<InsightMakerModel>
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <Display name="Accounts" Note="" Type="Time Series" xAxis="Year" yAxis="ADA" Primitives="97,98,110,109" AutoAddPrimitives="false" ScatterplotOrder="X Primitive, Y Primitive" Image="Display" yAxis2="" Primitives2="" showMarkers="false" showLines="false" showArea="true" legendPosition="Automatic" yAxisMin="0" yAxisMin2="" id="3">
+      <mxCell style="roundImage;image=/editor/images/DisplayFull.png;" parent="1" vertex="1" visible="0">
+        <mxGeometry x="50" y="20" width="64" height="64" as="geometry" />
+      </mxCell>
+    </Display>
+    <Setting Note="" Version="37" TimeLength="11" TimeStart="2024.574" TimeStep="0.01369863013" TimeUnits="Years" Units="" SolutionAlgorithm="RK1" BackgroundColor="white" Throttle="5" Macros="" SensitivityPrimitives="" SensitivityRuns="50" SensitivityBounds="50, 80, 95, 100" SensitivityShowRuns="false" StyleSheet="{}" SlidersList="[{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;192&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;194&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;173&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;229&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;228&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;227&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;230&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;181&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;204&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;197&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;117&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;102&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;100&quot;},{&quot;type&quot;:&quot;primitive&quot;,&quot;id&quot;:&quot;101&quot;}]" ScenariosList="[{&quot;name&quot;:&quot;Business as usual&quot;,&quot;primitives&quot;:{&quot;100&quot;:&quot;0.2&quot;,&quot;101&quot;:&quot;0.003&quot;,&quot;102&quot;:&quot;0.981&quot;,&quot;117&quot;:&quot;0.58&quot;,&quot;173&quot;:&quot;0.22&quot;,&quot;181&quot;:&quot;0.35&quot;,&quot;192&quot;:&quot;0&quot;,&quot;194&quot;:&quot;0.286&quot;,&quot;197&quot;:&quot;50000000&quot;,&quot;204&quot;:&quot;1850&quot;,&quot;227&quot;:&quot;6000&quot;,&quot;228&quot;:&quot;0.0000000012&quot;,&quot;229&quot;:&quot;3000&quot;}},{&quot;name&quot;:&quot;+5x present tx/year&quot;,&quot;primitives&quot;:{&quot;100&quot;:&quot;0.2&quot;,&quot;101&quot;:&quot;0.003&quot;,&quot;102&quot;:&quot;0.981&quot;,&quot;117&quot;:&quot;0.58&quot;,&quot;173&quot;:&quot;0.22&quot;,&quot;181&quot;:&quot;0.35&quot;,&quot;192&quot;:&quot;5&quot;,&quot;194&quot;:&quot;0.286&quot;,&quot;197&quot;:&quot;50000000&quot;,&quot;204&quot;:&quot;1850&quot;,&quot;227&quot;:&quot;6000&quot;,&quot;228&quot;:&quot;0.0000000012&quot;,&quot;229&quot;:&quot;3000&quot;,&quot;230&quot;:&quot;0.925&quot;}}]" id="2">
+      <mxCell parent="1" vertex="1" visible="0">
+        <mxGeometry x="20" y="20" width="80" height="40" as="geometry" />
+      </mxCell>
+    </Setting>
+    <Stock name="Assets under Management" Note="" InitialValue="35593944681.84" StockMode="Store" Delay="1" Volume="100" NonNegative="true" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="97" id="97">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="330" y="270" width="135" height="85" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Stock name="Accumulated Fees" Note="" InitialValue="62216.16" StockMode="Store" Delay="10" Volume="100" NonNegative="true" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="98" id="98">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="795" y="80" width="135" height="85" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Variable name="Treasury Cut" Note="" Equation="0.2" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="0.5" SliderMin="0" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="100" id="100">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="970" y="530" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Monetary Expansion" Note="" Equation="0.003" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="0.01" SliderMin="0.001" SliderStep="0.001" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="101" id="101">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1280" y="580" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Block Producer Efficiency" Note="" Equation="0.981" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="1" SliderMin="0.8" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="102" id="102">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1160" y="630" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Flow name="pay fees" Note="" FlowRate="[Epoch Fees] / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="104" id="104">
+      <mxCell style="flow" parent="1" source="97" target="98" edge="1">
+        <mxGeometry x="-92.5" y="-7.5" width="100" height="100" as="geometry">
+          <mxPoint x="627.5" y="212.5" as="sourcePoint" />
+          <mxPoint x="7.5" y="-7.5" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="625" y="282.5" />
+            <mxPoint x="705" y="182.5" />
+            <mxPoint x="707.5" y="77.5" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Variable name="Epoch Fees" Note="" Equation="[Fee per Transaction] * [Epoch Transactions]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="106" id="106">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="410" y="50" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="107" id="107">
+      <mxCell style="link" parent="1" source="106" target="104" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="550" y="150" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Stock name="Reserve" Note="" InitialValue="7910589154.08" StockMode="Store" Delay="10" Volume="100" NonNegative="true" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="109" id="109">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="1337.5" y="270" width="135" height="85" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Stock name="Treasury" Note="" InitialValue="1495403947.92" StockMode="Store" Delay="10" Volume="100" NonNegative="true" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="110" id="110">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="795" y="495" width="135" height="90" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Stock name="Distribution of Rewards" Note="" InitialValue="0" StockMode="Store" Delay="10" Volume="100" NonNegative="false" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="111" id="111">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="795" y="270" width="135" height="85" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Flow name="distribute fees" Note="" FlowRate="[Accumulated Fees] / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="113" id="113">
+      <mxCell style="flow" parent="1" source="98" target="111" edge="1">
+        <mxGeometry x="-110" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-110" y="55" as="sourcePoint" />
+          <mxPoint x="-10" y="-45" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Variable name="One Epoch" Note="" Equation="1 / 73" Units="Years" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="115" id="115">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="980" y="140" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="116" id="116">
+      <mxCell style="link;strokeWidth=1;" parent="1" source="115" target="113" edge="1">
+        <mxGeometry x="-359.17999999999995" y="-145.37" width="100" height="100" as="geometry">
+          <mxPoint x="-359.17999999999995" y="-45.370000000000005" as="sourcePoint" />
+          <mxPoint x="-259.17999999999995" y="-145.37" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Fraction Staked" Note="" Equation="0.58" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="1" SliderMin="0" SliderStep="0.01" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="117" id="117">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="570" y="730" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Fraction Unreserved" Note="" Equation="1 - [Reserve] / [Total Ada]" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="118" id="118">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="990" y="760" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Total Ada" Note="" Equation="45000000000" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="119" id="119">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1310" y="720" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="120" id="120">
+      <mxCell style="link" parent="1" source="119" target="118" edge="1">
+        <mxGeometry x="737.5699999999999" y="-222.67999999999995" width="100" height="100" as="geometry">
+          <mxPoint x="737.5699999999999" y="-122.68" as="sourcePoint" />
+          <mxPoint x="837.5699999999999" y="-222.67999999999995" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1230" y="790" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="121" id="121">
+      <mxCell style="link" parent="1" source="109" target="118" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1520" y="720" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Δr₁" Note="" Equation="[Block Producer Efficiency] * [Monetary Expansion] * [Reserve]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="122" id="122">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1290" y="430" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="123" id="123">
+      <mxCell style="link" parent="1" source="102" target="122" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1260" y="560" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="124" id="124">
+      <mxCell style="link" parent="1" source="101" target="122" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1370" y="520" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="125" id="125">
+      <mxCell style="link" parent="1" source="109" target="122" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1400" y="400" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="R" Note="" Equation="(1 - [Treasury Cut]) * [Reward Pot]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="127" id="127">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="890" y="660" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="128" id="128">
+      <mxCell style="link" parent="1" source="100" target="127" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="129" id="129">
+      <mxCell style="link" parent="1" source="168" target="127" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="940" y="450" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Δt₁" Note="" Equation="[Treasury Cut] * [Reward Pot]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="130" id="130">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="990" y="430" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="131" id="131">
+      <mxCell style="link" parent="1" source="100" target="130" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1050" y="510" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="132" id="132">
+      <mxCell style="link" parent="1" source="168" target="130" edge="1">
+        <mxGeometry x="-103.27999999999997" y="-130" width="100" height="100" as="geometry">
+          <mxPoint x="-103.27999999999997" y="-30" as="sourcePoint" />
+          <mxPoint x="-3.2799999999999727" y="-130" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Flow name="rewards to treasury" Note="" FlowRate="[Δt₁] / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="133" id="133">
+      <mxCell style="flow" parent="1" source="111" target="110" edge="1">
+        <mxGeometry x="-110" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-110" y="55" as="sourcePoint" />
+          <mxPoint x="-10" y="-45" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Link name="Link" Note="" BiDirectional="false" oldId="134" id="134">
+      <mxCell style="link" parent="1" source="130" target="133" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="930" y="500" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="135" id="135">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="115" target="133" edge="1">
+        <mxGeometry x="-212.5" y="-45" width="100" height="100" as="geometry">
+          <mxPoint x="-212.5" y="55" as="sourcePoint" />
+          <mxPoint x="-112.5" y="-45" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1000" y="300" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Δr₂" Note="" Equation="[R] - [Epoch Rewards]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="137" id="137">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1140" y="430" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="138" id="138">
+      <mxCell style="link" parent="1" source="127" target="137" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1140" y="560" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="139" id="139">
+      <mxCell style="link" parent="1" source="118" target="152" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="710" y="790" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="140" id="140">
+      <mxCell style="link" parent="1" source="117" target="152" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="600" y="660" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Flow name="distribute reserve" Note="" FlowRate="([Δr₁] - [Δr₂]) / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="141" id="141">
+      <mxCell style="flow" parent="1" source="109" target="111" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Link name="Link" Note="" BiDirectional="false" oldId="142" id="142">
+      <mxCell style="link" parent="1" source="122" target="141" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1260" y="350" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="143" id="143">
+      <mxCell style="link" parent="1" source="137" target="141" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1150" y="390" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="146" id="146">
+      <mxCell style="link;strokeWidth=1;dashed=1;strokeColor=#C0C0C0;" parent="1" source="115" target="104" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="770" y="170" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="147" id="147">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="115" target="141" edge="1">
+        <mxGeometry x="92.42000000000002" y="-204.68" width="100" height="100" as="geometry">
+          <mxPoint x="92.42000000000002" y="-104.68" as="sourcePoint" />
+          <mxPoint x="192.42000000000002" y="-204.68" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1140" y="240" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Flow name="receive rewards" Note="" FlowRate="[Epoch Rewards] / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="148" id="148">
+      <mxCell style="flow" parent="1" source="111" target="97" edge="1">
+        <mxGeometry x="77.5" y="-97.5" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="2.5" as="sourcePoint" />
+          <mxPoint x="440" y="400" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Link name="Link" Note="" BiDirectional="false" oldId="151" id="151">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="115" target="148" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="780" y="210" />
+            <mxPoint x="730" y="240" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Epoch Rewards" Note="" Equation="[Fraction Staked] * [Fraction Unreserved] * [R]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="152" id="152">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="540" y="600" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="153" id="153">
+      <mxCell style="link" parent="1" source="127" target="152" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="750" y="650" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="154" id="154">
+      <mxCell style="link" parent="1" source="152" target="148" edge="1">
+        <mxGeometry x="77.5" y="-30" width="100" height="100" as="geometry">
+          <mxPoint x="77.5" y="70" as="sourcePoint" />
+          <mxPoint x="177.5" y="-30" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="700" y="400" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="157" id="157">
+      <mxCell style="link" parent="1" source="152" target="137" edge="1">
+        <mxGeometry x="173.13" y="-11.539999999999992" width="100" height="100" as="geometry">
+          <mxPoint x="173.13" y="88.46000000000001" as="sourcePoint" />
+          <mxPoint x="273.13" y="-11.539999999999992" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="983.1300000000001" y="898.46" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Conservation of Ada" Note="" Equation="[Accumulated Fees] + [Assets under Management] + [Distribution of Rewards] + [Reserve] + [Treasury] - [Total Ada]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="158" id="158">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="1280" y="90" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="159" id="159">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="98" target="158" edge="1">
+        <mxGeometry x="290" y="60" width="100" height="100" as="geometry">
+          <mxPoint x="290" y="160" as="sourcePoint" />
+          <mxPoint x="390" y="60" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="160" id="160">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="111" target="158" edge="1">
+        <mxGeometry x="291.45" y="72.14" width="100" height="100" as="geometry">
+          <mxPoint x="291.45" y="172.14" as="sourcePoint" />
+          <mxPoint x="391.45" y="72.14" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1081.45" y="192.14" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="161" id="161">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="109" target="158" edge="1">
+        <mxGeometry x="290" y="60" width="100" height="100" as="geometry">
+          <mxPoint x="290" y="160" as="sourcePoint" />
+          <mxPoint x="390" y="60" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1320" y="220" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="162" id="162">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="110" target="158" edge="1">
+        <mxGeometry x="290" y="60" width="100" height="100" as="geometry">
+          <mxPoint x="290" y="160" as="sourcePoint" />
+          <mxPoint x="390" y="60" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="970" y="230" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="163" id="163">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="97" target="158" edge="1">
+        <mxGeometry x="150" y="-10" width="100" height="100" as="geometry">
+          <mxPoint x="150" y="90" as="sourcePoint" />
+          <mxPoint x="250" y="-10" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="470" y="-50" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="166" id="166">
+      <mxCell style="link;strokeWidth=1;dashed=1;strokeColor=#C0C0C0;" parent="1" source="119" target="158" edge="1">
+        <mxGeometry x="150" y="60" width="100" height="100" as="geometry">
+          <mxPoint x="150" y="160" as="sourcePoint" />
+          <mxPoint x="250" y="60" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1560" y="430" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Reward Pot" Note="" Equation="[Accumulated Fees] + [Δr₁]" Units="ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="168" id="168">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="980" y="355" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="169" id="169">
+      <mxCell style="link" parent="1" source="98" target="168" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="970" y="210" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="170" id="170">
+      <mxCell style="link" parent="1" source="122" target="168" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1210" y="400" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Pool Reward Fraction" Note="" Equation="0.22" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="1" SliderMin="0" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="173" id="173">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="380" y="710" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Pools Reward ADA" Note="" Equation="[receive rewards] * [Pool Reward Fraction]" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="174" id="174">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="390" y="560" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="176" id="176">
+      <mxCell style="link" parent="1" source="173" target="174" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="480" y="660" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="177" id="177">
+      <mxCell style="link" parent="1" source="148" target="174" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="530" y="400" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Delegator Rewards" Note="" Equation="[receive rewards] - [Pools Reward ADA]" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="178" id="178">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="390" y="400" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="179" id="179">
+      <mxCell style="link" parent="1" source="148" target="178" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="530" y="350" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="180" id="180">
+      <mxCell style="link" parent="1" source="174" target="178" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="460" y="470" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Ada Price" Note="" Equation="0.35" Units="USD/ADA" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="4" SliderMin="0.1" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="181" id="181">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="40" y="700" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Pools Reward" Note="" Equation="[Ada Price] * [Pools Reward ADA]" Units="USD/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="184" id="184">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="210" y="650" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="185" id="185">
+      <mxCell style="link" parent="1" source="181" target="184" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="170" y="670" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="186" id="186">
+      <mxCell style="link" parent="1" source="174" target="184" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="360" y="590" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Market Cap" Note="" Equation="[Ada Price] * [Fraction Unreserved] * [Total Ada]" Units="USD" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="187" id="187">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="40" y="800" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="188" id="188">
+      <mxCell style="link" parent="1" source="181" target="187" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="70" y="770" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="189" id="189">
+      <mxCell style="link" parent="1" source="118" target="187" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="730" y="810" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="190" id="190">
+      <mxCell style="link" parent="1" source="119" target="187" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="1070" y="880" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Throughput Growth" Note="" Equation="0" Units="1/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="50" SliderMin="0" SliderStep="0.01" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="192" id="192">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="20" y="170" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="193" id="193">
+      <mxCell style="link" parent="1" source="192" target="203" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="210" y="160" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Fee per Transaction" Note="" Equation="0.286" Units="ADA/Tx" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="3" SliderMin="0" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="194" id="194">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="20" y="15" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="195" id="195">
+      <mxCell style="link" parent="1" source="194" target="106" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="390" y="10" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Flow name="treasury withdrawal" Note="" FlowRate="[Funds from Treasury]" OnlyPositive="true" TimeIndependent="false" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="196" id="196">
+      <mxCell style="flow" parent="1" source="110" target="97" edge="1">
+        <mxGeometry x="17.5" y="436.25" width="100" height="100" as="geometry">
+          <mxPoint x="-5" y="762.5" as="sourcePoint" />
+          <mxPoint x="570" y="380" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="580" y="340" />
+          </Array>
+          <mxPoint x="-40" as="offset" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Variable name="Funds from Treasury" Note="" Equation="50000000" Units="ADA/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="300000000" SliderMin="0" SliderStep="100000" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="197" id="197">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="690" y="400" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="199" id="199">
+      <mxCell style="link" parent="1" source="197" target="196" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="640" y="440" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Display name="Pool Economics" Note="" Type="Time Series" xAxis="Time (%u)" yAxis="USD/year" yAxis2="Pool Return" showMarkers="false" showLines="true" showArea="false" Primitives="184,213,220" Primitives2="223" AutoAddPrimitives="false" ScatterplotOrder="X Primitive, Y Primitive" Image="Display" FlipHorizontal="false" FlipVertical="false" LabelPosition="Bottom" oldId="200" yAxisMin="" legendPosition="Automatic" id="200">
+      <mxCell style="display" parent="1" vertex="1" visible="0">
+        <mxGeometry x="10" y="10" width="64" height="64" as="geometry" />
+      </mxCell>
+    </Display>
+    <Variable name="Epoch 500 Transactions" Note="" Equation="216886" Units="Tx" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="202" id="202">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="20" y="85" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Epoch Transactions" Note="" Equation="(1 + [Throughput Growth] * (Time() - TimeStart())) * [Epoch 500 Transactions]" Units="Tx" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="203" id="203">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="210" y="90" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Transaction Size" Note="" Equation="1850" Units="B/Tx" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="16384" SliderMin="50" SliderStep="50" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="204" id="204">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="320" y="165" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="205" id="205">
+      <mxCell style="link" parent="1" source="202" target="203" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="210" y="60" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="206" id="206">
+      <mxCell style="link" parent="1" source="203" target="106" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="370" y="70" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Stock name="Ledger Size" Note="" InitialValue="189270954478" StockMode="Store" Delay="10" Volume="100" NonNegative="true" Units="B" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="207" id="207">
+      <mxCell style="stock" parent="1" vertex="1">
+        <mxGeometry x="160" y="330" width="100" height="40" as="geometry" />
+      </mxCell>
+    </Stock>
+    <Flow name="ledger growth" Note="" FlowRate="[Transaction Size] * [Epoch Transactions] / [One Epoch]" OnlyPositive="true" TimeIndependent="false" Units="B/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" oldId="208" id="208">
+      <mxCell style="flow" parent="1" target="207" edge="1">
+        <mxGeometry x="110" y="-50" width="100" height="100" as="geometry">
+          <mxPoint x="210" y="240" as="sourcePoint" />
+          <mxPoint x="110" y="50" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Flow>
+    <Link name="Link" Note="" BiDirectional="false" oldId="209" id="209">
+      <mxCell style="link" parent="1" source="204" target="208" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="270" y="250" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="210" id="210">
+      <mxCell style="link" parent="1" source="203" target="208" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="300" y="190" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="211" id="211">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="115" target="208" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="680" y="220" />
+            <mxPoint x="530" y="210" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Display name="Ledger" Note="" Type="Time Series" xAxis="Year" yAxis="%o (B)" yAxis2="%o" showMarkers="false" showLines="true" showArea="false" Primitives="207" Primitives2="203" AutoAddPrimitives="false" ScatterplotOrder="X Primitive, Y Primitive" Image="Display" FlipHorizontal="false" FlipVertical="false" LabelPosition="Bottom" oldId="212" yAxisMin="0" legendPosition="Automatic" yAxisMin2="0" id="212">
+      <mxCell style="display" parent="1" vertex="1" visible="0">
+        <mxGeometry x="10" y="10" width="64" height="64" as="geometry" />
+      </mxCell>
+    </Display>
+    <Variable name="Pools Cost" Note="" Equation="[Number of Pools] * ([Compute Base Cost] + [Disk Base Cost] * [Ledger Size]) * [Hardware Cost Trend] ^ ((Time() - TimeStart()) / [One Year])" Units="USD/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="213" id="213">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="150" y="440" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="214" id="214">
+      <mxCell style="link" parent="1" source="207" target="213" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="One Gigabyte" Note="" Equation="1e9" Units="B" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="215" id="215">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="300" y="460" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="216" id="216">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="215" target="213" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="290" y="450" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="One Year" Note="" Equation="1" Units="Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="217" id="217">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="260" y="370" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="218" id="218">
+      <mxCell style="link;strokeWidth=1;strokeColor=#C0C0C0;" parent="1" source="217" target="213" edge="1">
+        <mxGeometry x="140" width="100" height="100" as="geometry">
+          <mxPoint x="140" y="100" as="sourcePoint" />
+          <mxPoint x="240" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="250" y="410" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Pool Profit" Note="" Equation="[Pools Reward] - [Pools Cost]" Units="USD/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="220" id="220">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="210" y="530" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="221" id="221">
+      <mxCell style="link" parent="1" source="213" target="220" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="260" y="500" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="222" id="222">
+      <mxCell style="link" parent="1" source="184" target="220" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="300" y="610" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Variable name="Pool Return" Note="" Equation="[Pool Profit] / [Pools Cost]" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="false" SliderMax="100" SliderMin="0" SliderStep="" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="223" id="223">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="50" y="610" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="224" id="224">
+      <mxCell style="link" parent="1" source="220" target="223" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="180" y="540" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="225" id="225">
+      <mxCell style="link" parent="1" source="213" target="223" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="140" y="500" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Display name="Consistency Checks" Note="" Type="Tabular" xAxis="Time (%u)" yAxis="" yAxis2="" showMarkers="false" showLines="true" showArea="false" Primitives="158,111" Primitives2="" AutoAddPrimitives="false" ScatterplotOrder="X Primitive, Y Primitive" Image="Display" FlipHorizontal="false" FlipVertical="false" LabelPosition="Bottom" oldId="226" legendPosition="Automatic" id="226">
+      <mxCell style="display" parent="1" vertex="1" visible="0">
+        <mxGeometry x="10" y="10" width="64" height="64" as="geometry" />
+      </mxCell>
+    </Display>
+    <Variable name="Compute Base Cost" Note="" Equation="6000" Units="USD/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="10000" SliderMin="1000" SliderStep="100" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="227" id="227">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="10" y="370" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Disk Base Cost" Note="" Equation="0.0000000012" Units="USD/B/Year" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="3e-9" SliderMin="6e-10" SliderStep="1e-11" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="228" id="228">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="10" y="440" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Number of Pools" Note="" Equation="3000" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="5000" SliderMin="500" SliderStep="10" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="229" id="229">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="10" y="300" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Variable name="Hardware Cost Trend" Note="" Equation="0.925" Units="Unitless" MaxConstraintUsed="false" MinConstraintUsed="false" MaxConstraint="100" MinConstraint="0" ShowSlider="true" SliderMax="1" SliderMin="0" SliderStep="0.005" Image="None" FlipHorizontal="false" FlipVertical="false" LabelPosition="Middle" oldId="230" id="230">
+      <mxCell style="variable" parent="1" vertex="1">
+        <mxGeometry x="10" y="510" width="120" height="50" as="geometry" />
+      </mxCell>
+    </Variable>
+    <Link name="Link" Note="" BiDirectional="false" oldId="231" id="231">
+      <mxCell style="link" parent="1" source="230" target="213" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="130" y="490" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="232" id="232">
+      <mxCell style="link" parent="1" source="228" target="213" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="233" id="233">
+      <mxCell style="link" parent="1" source="227" target="213" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="150" y="420" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Link name="Link" Note="" BiDirectional="false" oldId="234" id="234">
+      <mxCell style="link" parent="1" source="229" target="213" edge="1">
+        <mxGeometry width="100" height="100" as="geometry">
+          <mxPoint y="100" as="sourcePoint" />
+          <mxPoint x="100" as="targetPoint" />
+          <Array as="points">
+            <mxPoint x="160" y="390" />
+          </Array>
+        </mxGeometry>
+      </mxCell>
+    </Link>
+    <Text name="Cardano Throughput Cost Model v0.1" LabelPosition="Middle" oldId="235" id="235">
+      <mxCell style="text;fontStyle=1" parent="1" vertex="1">
+        <mxGeometry x="930" width="570" height="50" as="geometry" />
+      </mxCell>
+    </Text>
+    <Text name="DRAFT: DO NOT CITE" LabelPosition="Middle" oldId="236" id="236">
+      <mxCell style="text;fontColor=#FF0000;fontFamily=Helvetica;fontStyle=1" parent="1" vertex="1">
+        <mxGeometry x="545" width="345" height="50" as="geometry" />
+      </mxCell>
+    </Text>
+  </root>
+</InsightMakerModel>

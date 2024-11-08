@@ -69,8 +69,7 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
-      slotConfig <- slotConfigFromNow
-      let praosConfig = PraosConfig{slotConfig, blockValidationDelay = const 0.1}
+      praosConfig <- defaultPraosConfig
       concurrently_
         (nodeA praosConfig outChan)
         (nodeB inChan)

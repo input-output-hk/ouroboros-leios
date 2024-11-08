@@ -88,13 +88,13 @@ blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever $
       let block = mkBlock chain sl body
       if (Chain.headSlot chain <= At sl)
         then
-          addBlockSt block >> return (Just block)
+          addBlockSt block >> return (Just (block, chain))
         else return Nothing
     case mblk of
       Nothing -> return ()
-      Just blk -> do
+      Just (blk, chain) -> do
         traceWith tracer (PraosNodeEventGenerate blk)
-        traceWith tracer (PraosNodeEventNewTip (FullTip (blockHeader blk)))
+        traceWith tracer (PraosNodeEventNewTip (chain Chain.:> blk))
   waitForSlot sl = do
     let tgt = slotTime praosConfig.slotConfig sl
     now <- getCurrentTime
