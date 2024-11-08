@@ -9,14 +9,15 @@ import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
 
-import Data.List.Relation.Unary.Any as L
+import Data.List as L
+import Data.List.Relation.Unary.Any as A
 
 module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open Leios.Blocks a)
   ⦃ IsBlock-Vote : IsBlock (List Vote) ⦄
   ⦃ Hashable-IBHeaderOSig : ∀ {b} → Hashable (IBHeaderOSig b) Hash ⦄
   ⦃ Hashable-PreEndorserBlock : Hashable PreEndorserBlock Hash ⦄
-  (id : PoolID) (pKey : PrivKey) (FFD' : FFDAbstract.Functionality ffdAbstract)
-  (vrf' : LeiosVRF a) (let open LeiosVRF vrf') (pubKey : PubKey)
+  (id : PoolID) (FFD' : FFDAbstract.Functionality ffdAbstract)
+  (vrf' : LeiosVRF a) (let open LeiosVRF vrf')
   (let open Leios.Base a) (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
   (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF : KeyRegistrationAbstract.Functionality K') where
 
@@ -123,15 +124,16 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
 postulate instance isVote1Certified? : ∀ {s eb} → isVote1Certified s eb ⁇
                    isVote2Certified? : ∀ {s eb} → isVote2Certified s eb ⁇
 
-private variable s     : LeiosState
-                 ffds' : FFD.State
-                 π     : VrfPf
+private variable s                : LeiosState
+                 ffds'            : FFD.State
+                 sk-IB sk-EB sk-V : PrivKey
+                 pk-IB pk-EB pk-V : PubKey
+                 π                : VrfPf
 
 stake : LeiosState → ℕ
 stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
-
 
 module _ (s : LeiosState) where
 
@@ -141,21 +143,21 @@ module _ (s : LeiosState) where
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
   upd (inj₁ (vHeader vs)) = record s { Vs = vs ∷ Vs }
-  upd (inj₁ (ibHeader h)) with L.any? (matchIB? h) IBBodies
+  upd (inj₁ (ibHeader h)) with A.any? (matchIB? h) IBBodies
   ... | yes p =
     record s
-      { IBs = record { header = h ; body = L.lookup p } ∷ IBs
-      ; IBBodies = IBBodies L.─ p
+      { IBs = record { header = h ; body = A.lookup p } ∷ IBs
+      ; IBBodies = IBBodies A.─ p
       }
   ... | no _ =
     record s
       { IBHeaders = h ∷ IBHeaders
       }
-  upd (inj₂ (ibBody b)) with L.any? (flip matchIB? b) IBHeaders
+  upd (inj₂ (ibBody b)) with A.any? (flip matchIB? b) IBHeaders
   ... | yes p =
     record s
-      { IBs = record { header = L.lookup p ; body = b } ∷ IBs
-      ; IBHeaders = IBHeaders L.─ p }
+      { IBs = record { header = A.lookup p ; body = b } ∷ IBs
+      ; IBHeaders = IBHeaders A.─ p }
   ... | no _ =
     record s
       { IBBodies = b ∷ IBBodies
@@ -166,15 +168,17 @@ _↑_ = foldr (flip upd)
 
 postulate
   V_chkCerts : List PubKey → EndorserBlock × B.Cert → Type
+  isValid : Header ⊎ Body → Type
+  isValid? : ∀ (b : Header ⊎ Body) → Dec (isValid b)
 
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
   -- Initialization
 
-  Init : ∀ {V bs bs' SD ks ks' pk pks} →
-       ∙ ks ⇀⟦ K.INIT pk ⟧ᴷ (ks' , K.PUBKEYS pks) -- create & register the IB/EB lottery and voting keys with key reg
+  Init : ∀ {V bs bs' SD ks ks' pks} →
+       ∙ ks ⇀⟦ K.INIT pk-IB pk-EB pk-V ⟧ᴷ (ks' , K.PUBKEYS pks)
        ∙ bs ⇀⟦ B.INIT (V_chkCerts pks) ⟧ᴮ (bs' , B.STAKE SD)
-       ───────────────────────────────────────────────────────
+       ─────────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
   -- Network and Ledger
@@ -183,8 +187,13 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
        ∙ bs ⇀⟦ B.FTCH-LDG ⟧ᴮ (bs' , B.BASE-LDG ebs)
        ∙ FFDAbstract.Fetch ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.FetchRes msgs)
-       ──────────────────────────────────────────────────────────────────────────────────────────────
-       just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' ; Ledger = constructLedger ebs } ↑ msgs , EMPTY)
+       ────────────────────────────────────────────────────────────────────────────
+       just s ⇀⟦ SLOT ⟧
+         (record s
+           { FFDState = ffds'
+           ; Ledger = constructLedger ebs
+           } ↑ L.filter isValid? msgs
+         , EMPTY)
 
   Ftch : let open LeiosState s in
        ──────────────────────────────────────────
@@ -216,9 +225,9 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
 
   IB-Role : let open LeiosState s renaming (ToPropose to txs; FFDState to ffds)
                 b = GenFFD.ibBody (record { txs = txs })
-                h = GenFFD.ibHeader (mkIBHeader slot id π pKey txs)
+                h = GenFFD.ibHeader (mkIBHeader slot id π sk-IB txs)
           in
-          ∙ canProduceIB slot pKey (stake s) -- TODO: let π be the corresponding proof
+          ∙ canProduceIB slot sk-IB (stake s) π
           ∙ FFDAbstract.Send h (just b) ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
           ──────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
@@ -227,9 +236,9 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 LI = map {F = List} getIBRef $ setToList $ filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs)
                 LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
                            filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
-                h = mkEB slot id π pKey LI LE
+                h = mkEB slot id π sk-EB LI LE
           in
-          ∙ canProduceEB slot pKey (stake s)
+          ∙ canProduceEB slot sk-EB (stake s) π
           ∙ FFDAbstract.Send (GenFFD.ebHeader h) nothing ⇀⟦ ffds ⟧ᴺ (ffds' , FFDAbstract.SendRes)
           ───────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)

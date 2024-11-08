@@ -8,7 +8,7 @@ module Leios.KeyRegistration (a : LeiosAbstract) (open LeiosAbstract a)
 record KeyRegistrationAbstract : Type₁ where
 
   data Input : Type₁ where
-    INIT : PubKey → Input
+    INIT : PubKey → PubKey → PubKey → Input
 
   data Output : Type where
     PUBKEYS : List PubKey → Output
