@@ -41,6 +41,7 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
+    LeiosProtocol.Relay
     ModelTCP
     P2P
     PlotTCP
@@ -90,6 +91,7 @@ library
     , colour
     , containers
     , contra-tracer
+    , deepseq
     , fingertree
     , gnuplot
     , gtk3
@@ -97,13 +99,16 @@ library
     , io-sim
     , kdt
     , mtl
+    , nothunks
     , ouroboros-network-api
     , ouroboros-network-mock
     , pango
     , pqueue
+    , quiet
     , random
     , serialise
     , si-timers
+    , singletons
     , text
     , time
     , typed-protocols         >=0.3

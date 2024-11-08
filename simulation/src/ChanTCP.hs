@@ -72,6 +72,9 @@ data LabelTcpDir e = DirClientToServer e | DirServerToClient e
 class MessageSize msg where
   messageSizeBytes :: msg -> Bytes
 
+instance (MessageSize a, MessageSize b) => MessageSize (a, b) where
+  messageSizeBytes (a, b) = messageSizeBytes a + messageSizeBytes b
+
 -- | Make a pair of 'Chan's, connected with a simulated bi-directional bearer
 -- that emulates simple TCP performance behaviour.
 --
