@@ -18,6 +18,8 @@ module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open
   ⦃ Hashable-PreEndorserBlock : Hashable PreEndorserBlock Hash ⦄
   (id : PoolID) (FFD' : FFDAbstract.Functionality ffdAbstract)
   (vrf' : LeiosVRF a) (let open LeiosVRF vrf')
+  (sk-IB sk-EB sk-V : PrivKey)
+  (pk-IB pk-EB pk-V : PubKey)
   (let open Leios.Base a) (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
   (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF : KeyRegistrationAbstract.Functionality K') where
 
@@ -124,11 +126,9 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
 postulate instance isVote1Certified? : ∀ {s eb} → isVote1Certified s eb ⁇
                    isVote2Certified? : ∀ {s eb} → isVote2Certified s eb ⁇
 
-private variable s                : LeiosState
-                 ffds'            : FFD.State
-                 sk-IB sk-EB sk-V : PrivKey
-                 pk-IB pk-EB pk-V : PubKey
-                 π                : VrfPf
+private variable s     : LeiosState
+                 ffds' : FFD.State
+                 π     : VrfPf
 
 stake : LeiosState → ℕ
 stake record { SD = SD } = case lookupᵐ? SD id of λ where
