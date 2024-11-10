@@ -1,5 +1,10 @@
 # Leios logbook
 
+## 2024-11-10
+
+- added first somewhat complete-ish list of [simulation model parameters](./docs/simulation-model-parameters.md)
+- added current state of figuring out [ΔQ load analyses](./delta_q/Towards_Load_Analysis.md)
+
 ## 2024-11-08
 
 ### System-dynamics simulation of throughput techno-economics
@@ -7,21 +12,21 @@
 A first draft system-dynamics simulation models the techno-economics of changes in throughtput on Cardano:
 
 - Features
-    - Movement of funds from the Reserve to the Treasury and to the rewards.
-    - Collection of fees from transactions into the rewards pot.
-    - Dispersement of the rewards pot to pools and users.
-    - Ledger size
-    - Pool costs and profitability
+  - Movement of funds from the Reserve to the Treasury and to the rewards.
+  - Collection of fees from transactions into the rewards pot.
+  - Dispersement of the rewards pot to pools and users.
+  - Ledger size
+  - Pool costs and profitability
 - Input parameters
-    - Growth of transaction volume
-    - Hardware costs for pools
-    - Withdrawal of funds from the treasury
-    - Ada price
+  - Growth of transaction volume
+  - Hardware costs for pools
+  - Withdrawal of funds from the treasury
+  - Ada price
 - Graphics
-    - Funds in Reseve, Treasury, and under user control
-    - Pool costs, rewards, profit, and return
-    - Ledger size
-    - Diagnostic consistency checks for the simulation
+  - Funds in Reseve, Treasury, and under user control
+  - Pool costs, rewards, profit, and return
+  - Ledger size
+  - Diagnostic consistency checks for the simulation
 - Calibrated against Epoch 500-519
 
 This techno-economic simulation highlights is the tension between the following variables:
@@ -35,7 +40,7 @@ This techno-economic simulation highlights is the tension between the following 
 Artifacts:
 
 - Online simulator: [Cardano Throughput Cost Model v0.1](https://www.insightmaker.com/insight/3IDsmADe7eetanZxUiIwkd/Cardano-Throughput-Cost-Model-v0-1)
-- Model archive: [analysis/Cardano-Throughput.InsightMaker](analysis/Cardano-Throughput.InsightMaker), created with https://www.insightmaker.com/
+- Model archive: [analysis/Cardano-Throughput.InsightMaker](analysis/Cardano-Throughput.InsightMaker), created with <https://www.insightmaker.com/>
 
 Next steps:
 
@@ -68,7 +73,6 @@ Next steps:
 Implemented uniform and non-uniform IB generation.
 
 Work continues on visualization; we're still deciding which data to visualize first for an attractive demo. Most likely, it will be IB propagation.
-
 
 ## 2024-11-05
 
@@ -121,9 +125,10 @@ The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency 
 ### Rust Simulation
 
 Bug fixes and performance improvements. The sim was slow, because of
- - Not batching filesystem operations
- - Not yielding in the main thread when too many items were in play
- - Not correctly handling when the simulation ends early
+
+- Not batching filesystem operations
+- Not yielding in the main thread when too many items were in play
+- Not correctly handling when the simulation ends early
 
 ## 2024-11-04
 
