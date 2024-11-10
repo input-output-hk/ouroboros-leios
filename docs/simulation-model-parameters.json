@@ -1,0 +1,71 @@
+{
+  "network": {
+    "announcement_size": null,
+    "data_request_size": null,
+    "Txn_size": null,
+    "Txn_reserved_bandwidth": null,
+    "IB_header_size": null,
+    "IB_body_size": null,
+    "EB_header_size": null,
+    "EB_body_size": null,
+    "EB_vote_size": null,
+    "Leios_reserved_bandwidth": null,
+    "RB_size": null,
+    "Praos_reserved_bandwidth": null
+  },
+  "net_model": {
+    "topology": {
+      "size": 2500,
+      "avg_degree": 15,
+      "cluster_coeff": 0.07,
+      "block_producers": 500
+    },
+    "simple": {
+      "short": {
+        "small": 0.012,
+        "midsize": 0.024,
+        "large": 0.078
+      },
+      "medium": {
+        "small": 0.069,
+        "midsize": 0.143,
+        "large": 0.404
+      },
+      "long": {
+        "small": 0.268,
+        "midsize": 0.531,
+        "large": 1.598
+      }
+    }
+  },
+  "computation": {
+    "Txn_validation_latency": null,
+    "Txn_validation_intensity": null,
+    "VRF_lottery_latency": null,
+    "VRF_lottery_intensity": null,
+    "IB_creation_latency": null,
+    "IB_creation_intensity": null,
+    "IB_validation_latency": null,
+    "IB_validation_intensity": null,
+    "EB_creation_latency": null,
+    "EB_creation_intensity": null,
+    "EB_validation_latency": null,
+    "EB_validation_intensity": null,
+    "EB_vote_creation_latency": null,
+    "EB_vote_creation_intensity": null,
+    "EB_vote_validation_latency": null,
+    "EB_vote_validation_intensity": null,
+    "RB_creation_latency": null,
+    "RB_creation_intensity": null
+  },
+  "storage": {
+    "Txn_store_delay": null,
+    "IB_store_delay": null,
+    "EB_store_delay": null,
+    "EB_vote_store_delay": null,
+    "RB_store_delay": null,
+    "Ledger_store_delay": null,
+    "Ledger_update_delay": null,
+    "Txn_prune_delay": null
+  }
+}
