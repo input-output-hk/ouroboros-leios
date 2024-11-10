@@ -41,6 +41,7 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
+    LeiosProtocol.DataPropagation
     ModelTCP
     P2P
     PlotTCP
@@ -104,6 +105,7 @@ library
     , random
     , serialise
     , si-timers
+    , singletons
     , text
     , time
     , typed-protocols         >=0.3
