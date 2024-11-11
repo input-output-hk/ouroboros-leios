@@ -173,12 +173,12 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   headerValid : Header → Type
   headerValid (ibHeader h) = ibHeaderValid h
   headerValid (ebHeader h) = ebValid h
-  headerValid (vHeader h) = vsValid h
+  headerValid (vHeader h)  = vsValid h
 
   headerValid? : (h : Header) → Dec (headerValid h)
   headerValid? (ibHeader h) = ibHeaderValid? h
   headerValid? (ebHeader h) = ebValid? h
-  headerValid? (vHeader h) = vsValid? h
+  headerValid? (vHeader h)  = vsValid? h
 
   bodyValid : Body → Type
   bodyValid (ibBody b) = ibBodyValid b
