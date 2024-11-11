@@ -86,6 +86,7 @@ library
     , bytestring
     , cairo
     , cardano-slotting
+    , cardano-strict-containers
     , Chart
     , Chart-cairo
     , colour

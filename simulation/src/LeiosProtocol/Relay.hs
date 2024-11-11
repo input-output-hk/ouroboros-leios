@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -6,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -18,27 +20,39 @@
 module LeiosProtocol.Relay (
   Relay (..),
   Message (..),
-  SingTxSubmission (..),
+  SingRelay (..),
   SingBlockingStyle (..),
   StBlockingStyle (..),
   BlockingReplyList (..),
   NumBlkIdsToAck (..),
   NumBlkIdsToReq (..),
+  BlockRelayMessage,
+  relayProducer,
 ) where
 
 import ChanTCP
+import Control.Concurrent.Class.MonadSTM
 import Control.DeepSeq
+import Control.Exception
+import Control.Monad
 import Data.Bits
 import Data.Kind (Type)
+import Data.List (find)
 import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NonEmpty
+import Data.Maybe (catMaybes, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
+import Data.Sequence.Strict (StrictSeq)
+import qualified Data.Sequence.Strict as Seq
 import Data.Singletons
 import Data.Word (Word16)
 import GHC.Generics
 import Network.TypedProtocol.Core
+import qualified Network.TypedProtocol.Peer.Client as TC
 import NoThunks.Class (NoThunks (..))
 import Ouroboros.Network.Util.ShowProxy
 import Quiet (Quiet (..))
+import RelayProtocol (BlockWithTicket (BlockWithTicket), RelayBuffer (RelayBuffer), Ticket, lookupByTicket, takeAfterTicket, zeroTicket)
 
 -- | The kind of the transaction-submission protocol, and the types of the
 -- states in the protocol state machine.
@@ -54,7 +68,7 @@ import Quiet (Quiet (..))
 -- sometimes clarify by using the terms inbound and outbound. This refers to
 -- whether transactions are flowing towards a peer or away, and thus indicates
 -- what role the peer is playing.
-data Relay blkid blk blkmd where
+data Relay (blkid :: Type) (blk :: Type) (blkmd :: Type) where
   -- | Initial protocol message.
   StInit :: Relay blkid blk blkmd
   -- | The server (inbound side) has agency; it can either terminate, ask for
@@ -93,19 +107,19 @@ instance
 instance ShowProxy (StIdle :: Relay blkid blk blkmd) where
   showProxy _ = "StIdle"
 
-type SingTxSubmission ::
+type SingRelay ::
   Relay blkid blk blkmd ->
   Type
-data SingTxSubmission k where
-  SingInit :: SingTxSubmission StInit
-  SingIdle :: SingTxSubmission StIdle
+data SingRelay k where
+  SingInit :: SingRelay StInit
+  SingIdle :: SingRelay StIdle
   SingBlkIds ::
     SingBlockingStyle stBlocking ->
-    SingTxSubmission (StBlkIds stBlocking)
-  SingTxs :: SingTxSubmission StBlks
-  SingDone :: SingTxSubmission StDone
+    SingRelay (StBlkIds stBlocking)
+  SingTxs :: SingRelay StBlks
+  SingDone :: SingRelay StDone
 
-deriving instance Show (SingTxSubmission k)
+deriving instance Show (SingRelay k)
 
 instance StateTokenI StInit where stateToken = SingInit
 instance StateTokenI StIdle where stateToken = SingIdle
@@ -270,7 +284,7 @@ instance Protocol (Relay blkid blk blkmd) where
   type StateAgency StIdle = ServerAgency
   type StateAgency StDone = NobodyAgency
 
-  type StateToken = SingTxSubmission
+  type StateToken = SingRelay
 
 instance
   ( NFData blkid
@@ -347,3 +361,124 @@ deriving instance
 instance MessageSize a => MessageSize (BlockingReplyList blocking a) where
   messageSizeBytes (BlockingReply xs) = sum $ fmap messageSizeBytes xs
   messageSizeBytes (NonBlockingReply xs) = sum $ map messageSizeBytes xs
+
+type BlockRelayMessage blkid blk blkmd = Message (Relay blkid blk blkmd)
+
+data RelayProtocolError
+  = ProtocolErrorAckedTooManyBlkids
+  | ProtocolErrorRequestedNothing
+  | ProtocolErrorRequestedTooManyBlkids NumBlkIdsToReq NumBlkIdsToAck
+  | ProtocolErrorRequestBlocking
+  | ProtocolErrorRequestNonBlocking
+  | ProtocolErrorRequestedUnavailableBlk
+  deriving (Show)
+
+instance Exception RelayProtocolError
+
+-- | Protocol agent that sends the blocks.
+--
+--   The implementation is mostly cribbed from
+--   ouroboros-netowork:Ouroboros.Network.TxSubmission.Outbound but
+--   adapted to use `RelayBuffer` and implemented directly as a
+--   TypedProtocol peer.
+--
+--   Locally keeps track of a window of blkids that the consumer is allowed to ask for.
+relayProducer ::
+  forall m blk blkid blkmd.
+  (MonadSTM m, Ord blkid) =>
+  (blk -> blkmd) ->
+  -- | Maximum number of unacknowledged blkids allowed
+  NumBlkIdsToAck ->
+  RelayBuffer m blk blkid ->
+  TC.Client (Relay blkid blk blkmd) NonPipelined StIdle m ()
+relayProducer blkMetaData maxUnacked (RelayBuffer buffer) = idle Seq.empty zeroTicket
+ where
+  idle :: StrictSeq (blkid, Ticket) -> Ticket -> TC.Client (Relay blkid blk blkmd) NonPipelined StIdle m ()
+  idle !unackedSeq !lastIdx = TC.Await $ \case
+    MsgRequestBlkIds blocking ackNo reqNo -> TC.Effect $ do
+      when (getNumBlkIdsToAck ackNo > fromIntegral (Seq.length unackedSeq)) $
+        throw ProtocolErrorAckedTooManyBlkids
+
+      when
+        ( fromIntegral (Seq.length unackedSeq)
+            - getNumBlkIdsToAck ackNo
+            + getNumBlkIdsToReq reqNo
+            > getNumBlkIdsToAck maxUnacked
+        )
+        $ throw (ProtocolErrorRequestedTooManyBlkids reqNo maxUnacked)
+
+      -- Update our tracking state to remove the number of blkids that the
+      -- peer has acknowledged.
+      let !unackedSeq' = Seq.drop (fromIntegral ackNo) unackedSeq
+
+      -- Updates our tracking state with any extra blks available.
+      let update blks =
+            -- These blks should all be fresh
+            assert (all (\(BlockWithTicket _ _ idx) -> idx > lastIdx) blks) $
+              let !unackedSeq'' =
+                    unackedSeq'
+                      <> Seq.fromList
+                        [(blkid, idx) | BlockWithTicket _ blkid idx <- blks]
+                  !lastIdx'
+                    | null blks = lastIdx
+                    | otherwise = idx
+                   where
+                    BlockWithTicket _ _ idx = last blks
+                  blks' :: [(blkid, blkmd)]
+                  blks' = [(blkid, blkMetaData blk) | BlockWithTicket blk blkid _ <- blks]
+                  client' = idle unackedSeq'' lastIdx'
+               in (blks', client')
+
+      -- Grab info about any new txs after the last tx idx we've seen,
+      -- up to the number that the peer has requested.
+      case blocking of
+        SingBlocking -> do
+          when (reqNo == 0) $
+            throw ProtocolErrorRequestedNothing
+          unless (Seq.null unackedSeq') $
+            throw ProtocolErrorRequestBlocking
+
+          blkids <- atomically $ do
+            blkq <- readTVar buffer
+            let blkids = takeAfterTicket blkq lastIdx
+            when (null $ blkids) retry
+            pure $ take (fromIntegral reqNo) blkids
+
+          let !(blkids', client') = update blkids
+              blkids'' = case NonEmpty.nonEmpty blkids' of
+                Just x -> x
+                -- Assert blkids is non-empty: we blocked until blkids was non-null,
+                -- and we know reqNo > 0, hence `take reqNo blkids` is non-null.
+                Nothing -> error "blkidsubmissionOutbound: empty transaction's list"
+          return (TC.Yield (MsgReplyBlkIds (BlockingReply blkids'')) client')
+        SingNonBlocking -> do
+          when (reqNo == 0 && ackNo == 0) $
+            throw ProtocolErrorRequestedNothing
+          when (Seq.null unackedSeq') $
+            throw ProtocolErrorRequestNonBlocking
+
+          blkids <- atomically $ do
+            blkq <- readTVar buffer
+            let blkids = takeAfterTicket blkq lastIdx
+            return (take (fromIntegral reqNo) blkids)
+
+          let !(blkids', client') = update blkids
+          pure (TC.Yield (MsgReplyBlkIds (NonBlockingReply blkids')) client')
+    MsgRequestBlks blkids -> TC.Effect $ do
+      blkq <- atomically $ readTVar buffer
+
+      -- The window size is expected to be small (currently 10) so the find is acceptable.
+      -- TODO Andrea: is `10` good enough for freshest first?
+      let blkidxs = [find (\(t, _) -> t == blkid) unackedSeq | blkid <- blkids]
+          blkidxs' = map snd $ catMaybes blkidxs
+
+      when (any isNothing blkidxs) $
+        throw ProtocolErrorRequestedUnavailableBlk
+
+      -- The 'lookupByTicket' call will return nothing if the block is no
+      -- longer in the buffer. This is good. Neither the sending nor
+      -- receiving side wants to forward blks that are no longer of interest.
+      let txs = mapMaybe (lookupByTicket blkq) blkidxs'
+          client' = idle unackedSeq lastIdx
+
+      return $ TC.Yield (MsgReplyBlks txs) client'
