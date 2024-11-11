@@ -166,8 +166,6 @@ _↑_ = foldr (flip upd)
 
 postulate
   V_chkCerts : List PubKey → EndorserBlock × Cert → Type
-  isValid : Header ⊎ Body → Type
-  isValid? : ∀ (b : Header ⊎ Body) → Dec (isValid b)
 
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
@@ -190,7 +188,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          (record s
            { FFDState = ffds'
            ; Ledger = constructLedger ebs
-           } ↑ L.filter isValid? msgs
+           } ↑ L.filter GenFFD.isValid? msgs
          , EMPTY)
 
   Ftch : let open LeiosState s in
