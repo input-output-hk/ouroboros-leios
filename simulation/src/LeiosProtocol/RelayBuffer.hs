@@ -64,7 +64,7 @@ instance Monoid TicketRange where
   mappend = (<>)
 
 empty :: RelayBuffer key value
-empty = RelayBuffer FingerTree.empty Map.empty (Ticket 0)
+empty = RelayBuffer FingerTree.empty Map.empty minBound
 
 null :: RelayBuffer key value -> Bool
 null = FingerTree.null . (.entries)

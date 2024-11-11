@@ -27,12 +27,12 @@ import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
 import Control.Monad (forM_, when)
-import Control.Monad.Class.MonadTimer (MonadDelay)
-import Data.Bits (Bits, FiniteBits)
+import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Map (Map)
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
@@ -52,6 +52,7 @@ import Network.TypedProtocol (
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import NoThunks.Class (NoThunks)
+import PraosProtocol.Common
 import Quiet (Quiet (..))
 
 data BlockingStyle
@@ -69,7 +70,11 @@ deriving instance Show (SingBlockingStyle blocking)
 type instance Sing @BlockingStyle = SingBlockingStyle
 
 instance SingI StBlocking where sing = SingBlocking
+
 instance SingI StNonBlocking where sing = SingNonBlocking
+
+instance MessageSize (SingBlockingStyle blocking) where
+  messageSizeBytes _ = 1
 
 withSingIBlockingStyle :: SingBlockingStyle blocking -> (SingI blocking => a) -> a
 withSingIBlockingStyle SingBlocking = id
@@ -86,36 +91,36 @@ decideSingBlockingStyle _ _ = Nothing
 isBlocking :: SingBlockingStyle blocking -> Bool
 isBlocking = isJust . decideSingBlockingStyle SingBlocking
 
--- | The kind of the transaction-submission protocol, and the types of the
+-- | The kind of the body-submission protocol, and the types of the
 -- states in the protocol state machine.
 --
 -- We describe this protocol using the label \"client\" for the peer that is
--- submitting transactions, and \"server\" for the one receiving them. The
+-- submitting bodies, and \"server\" for the one receiving them. The
 -- protocol is however pull based, so it is typically the server that has
 -- agency in this protocol. This is the opposite of the chain sync and block
 -- fetch protocols, but that makes sense because the information flow is also
--- reversed: submitting transactions rather than receiving headers and blocks.
+-- reversed: submitting bodies rather than receiving headers and blocks.
 --
 -- Because these client\/server labels are somewhat confusing in this case, we
 -- sometimes clarify by using the terms inbound and outbound. This refers to
--- whether transactions are flowing towards a peer or away, and thus indicates
+-- whether bodies are flowing towards a peer or away, and thus indicates
 -- what role the peer is playing.
 type RelayState :: Type -> Type -> Type -> Type
 data RelayState id header body
   = -- | Initial protocol message.
     StInit
   | -- | The server (inbound side) has agency; it can either terminate, ask for
-    -- transaction identifiers or ask for transactions.
+    -- body identifiers or ask for bodies.
     --
     -- There is no timeout in this state.
     StIdle
   | -- | The client (outbound side) has agency; it must reply with a
-    -- list of transaction identifiers that it wishes to submit.
+    -- list of body identifiers that it wishes to submit.
     --
     -- There are two sub-states for this, for blocking and non-blocking cases.
     StHeaders BlockingStyle
   | -- | The client (outbound side) has agency; it must reply with the list of
-    -- transactions.
+    -- bodies.
     StBodies
   | -- | Nobody has agency; termination state.
     StDone
@@ -140,9 +145,13 @@ decideSingRelayState SingStDone SingStDone = Just Refl
 decideSingRelayState _ _ = Nothing
 
 instance StateTokenI StInit where stateToken = SingStInit
+
 instance StateTokenI StIdle where stateToken = SingStIdle
+
 instance SingI blocking => StateTokenI (StHeaders blocking) where stateToken = SingStHeaders sing
+
 instance StateTokenI StBodies where stateToken = SingStBodies
+
 instance StateTokenI StDone where stateToken = SingStDone
 
 decideRelayState ::
@@ -171,9 +180,15 @@ data ResponseList blocking a where
   NonBlockingResponse :: [a] -> ResponseList StNonBlocking a
 
 deriving instance Eq a => Eq (ResponseList blocking a)
+
 deriving instance Show a => Show (ResponseList blocking a)
+
 deriving instance Functor (ResponseList blocking)
+
 deriving instance Foldable (ResponseList blocking)
+
+instance MessageSize a => MessageSize (ResponseList blocking a) where
+  messageSizeBytes = Foldable.sum . fmap messageSizeBytes
 
 data RelayProtocolError
   = ShrankTooMuch WindowSize WindowShrink
@@ -297,7 +312,7 @@ instance Protocol (RelayState id header body) where
     -- should be considered as if this peer had never announced them. (Note
     -- that this is no guarantee that the block is invalid, it may still
     -- be valid and available from another peer).
-    MsgResponseBodies ::
+    MsgRespondBodies ::
       [body] ->
       Message (RelayState id header body) StBodies StIdle
     -- \| Termination message, initiated by the client when the server is
@@ -315,23 +330,23 @@ instance Protocol (RelayState id header body) where
 
 deriving instance (Show id, Show header, Show body) => Show (Message (RelayState id header body) from to)
 
--- finiteByteSize :: (Integral a, FiniteBits b) => b -> a
--- finiteByteSize x = ceiling (realToFrac (finiteBitSize x) / 8 :: Double)
+finiteByteSize :: (Integral a, FiniteBits b) => b -> a
+finiteByteSize x = ceiling (realToFrac (finiteBitSize x) / 8 :: Double)
 
--- instance
---   ( MessageSize id
---   , MessageSize header
---   , MessageSize body
---   ) =>
---   MessageSize (Message (RelayState id header body) from to)
---   where
---   messageSizeBytes MsgInit = 1
---   messageSizeBytes (MsgRequestHeaders blocking windowGrow windowShrink) =
---     messageSizeBytes blocking + finiteByteSize windowGrow + finiteByteSize windowShrink
---   messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
---   messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
---   messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
---   messageSizeBytes MsgDone = 1
+instance
+  ( MessageSize id
+  , MessageSize header
+  , MessageSize body
+  ) =>
+  MessageSize (Message (RelayState id header body) from to)
+  where
+  messageSizeBytes MsgInit = 1
+  messageSizeBytes (MsgRequestHeaders blocking expand shrink) =
+    messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
+  messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
+  messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
+  messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
+  messageSizeBytes MsgDone = 1
 
 relayMessageLabel :: Message (RelayState id header body) st st' -> String
 relayMessageLabel = \case
@@ -339,7 +354,7 @@ relayMessageLabel = \case
   MsgRequestHeaders{} -> "MsgRequestHeaders"
   MsgRespondHeaders{} -> "MsgRespondHeaders"
   MsgRequestBodies{} -> "MsgRequestBodies"
-  MsgResponseBodies{} -> "MsgResponseBodies"
+  MsgRespondBodies{} -> "MsgRespondBodies"
   MsgDone{} -> "MsgDone"
 
 type RelayMessage id header body = ProtocolMessage (RelayState id header body)
@@ -363,36 +378,17 @@ newtype RelayConfig = RelayConfig
 ---- Relay Producer
 --------------------------------
 
-data Window id = Window
-  { values :: !(StrictSeq (id, RB.Ticket))
+newtype RelayProducerState id header body m = RelayProducerState
+  { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
+  }
+
+data RelayProducerLocalState id = RelayProducerLocalState
+  { window :: !(StrictSeq (id, RB.Ticket))
   , lastTicket :: !RB.Ticket
   }
 
-emptyWindow :: Window id
-emptyWindow = Window Seq.empty (RB.Ticket 0)
-
-newtype RelayProducerState id header body m = RelayProducerState
-  { relayBufferVar :: TVar m (RelayBuffer id (header, body))
-  }
-
-readEntriesAfterTicket ::
-  MonadSTM m =>
-  RelayProducerState id header body m ->
-  SingBlockingStyle blocking ->
-  WindowExpand ->
-  RB.Ticket ->
-  m (ResponseList blocking (RB.EntryWithTicket id (header, body)))
-readEntriesAfterTicket state blocking windowExpand t = atomically $ do
-  newEntries <-
-    take (fromIntegral windowExpand)
-      . (`RB.takeAfterTicket` t)
-      <$> readTVar state.relayBufferVar
-  assert (and [entry.ticket > t | entry <- newEntries]) $
-    case blocking of
-      SingBlocking ->
-        maybe retry (return . BlockingResponse) (NonEmpty.nonEmpty newEntries)
-      SingNonBlocking ->
-        return $ NonBlockingResponse newEntries
+initRelayProducerLocalState :: RelayProducerLocalState id
+initRelayProducerLocalState = RelayProducerLocalState Seq.empty minBound
 
 type RelayProducer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
 
@@ -402,56 +398,130 @@ relayProducer ::
   RelayConfig ->
   RelayProducerState id header body m ->
   RelayProducer id header body 'StIdle m ()
-relayProducer config state = idle emptyWindow
+relayProducer config state = idle initRelayProducerLocalState
  where
-  idle :: Window id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
-  idle !window = TC.Await $ \case
-    MsgRequestHeaders blocking windowShrink windowExpand -> TC.Effect $ do
+  idle :: RelayProducerLocalState id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
+  idle st = TC.Await $ \case
+    MsgRequestHeaders blocking shrink expand -> TC.Effect $ do
       -- Validate the request:
-      -- 1. windowShrink <= windowSize
-      let windowSize = fromIntegral (Seq.length window.values)
-      when @m (windowShrink.value > windowSize.value) $ do
-        throw $ ShrankTooMuch windowSize windowShrink
-      -- 2. windowSize - windowShrink + windowExpand <= maxWindowSize
-      let newWindowSize = WindowSize $ windowSize.value - windowShrink.value + windowExpand.value
+      -- 1. shrink <= windowSize
+      let windowSize = fromIntegral (Seq.length st.window)
+      when @m (shrink.value > windowSize.value) $ do
+        throw $ ShrankTooMuch windowSize shrink
+      -- 2. windowSize - shrink + expand <= maxWindowSize
+      let newWindowSize = WindowSize $ windowSize.value - shrink.value + expand.value
       when (newWindowSize > config.maxWindowSize) $ do
-        throw $ ExpandTooMuch windowSize windowShrink windowExpand
-      -- 3. windowShrink, windowExpand /= 0 if non-blocking
-      --    windowExpand /= 0 if blocking
-      when (windowExpand.value == 0 && (isBlocking blocking || windowShrink.value == 0)) $ do
+        throw $ ExpandTooMuch windowSize shrink expand
+      -- 3. shrink, expand /= 0 if non-blocking
+      --    expand /= 0 if blocking
+      when (expand.value == 0 && (isBlocking blocking || shrink.value == 0)) $ do
         throw RequestedNoChange
       -- Shrink the window:
-      let keptValues =
-            Seq.drop (fromIntegral windowShrink) window.values
+      let keptValues = Seq.drop (fromIntegral shrink) st.window
       -- Find the new entries:
-      newEntries <-
-        readEntriesAfterTicket state blocking windowExpand window.lastTicket
-      let newValues =
-            Seq.fromList [(entry.key, entry.ticket) | entry <- Foldable.toList newEntries]
-      let newLastTicket = case newValues of
-            Seq.Empty -> window.lastTicket
+      newEntries <- readEntriesAfterTicket state blocking expand st.lastTicket
+      -- Expand the window:
+      let newValues = Seq.fromList [(e.key, e.ticket) | e <- Foldable.toList newEntries]
+      let window' = keptValues <> newValues
+      let lastTicket' = case newValues of
+            Seq.Empty -> st.lastTicket
             _ Seq.:|> (_, ticket) -> ticket
-      let newWindow =
-            Window{values = keptValues <> newValues, lastTicket = newLastTicket}
-      let responseList =
-            fmap (fst . (.value)) newEntries
+      let st' = st{window = window', lastTicket = lastTicket'}
+      let responseList = fmap (fst . (.value)) newEntries
+      -- Yield the new entries:
       withSingIBlockingStyle blocking $ do
-        return $ TC.Yield (MsgRespondHeaders responseList) (idle newWindow)
+        return $ TC.Yield (MsgRespondHeaders responseList) (idle st')
     MsgRequestBodies ids -> TC.Effect $ do
       -- Check that all ids are in the window:
       forM_ ids $ \id' -> do
-        when (isNothing (Seq.findIndexL ((== id') . fst) window.values)) $ do
+        when (isNothing (Seq.findIndexL ((== id') . fst) st.window)) $ do
           throw RequestedUnknownId
       -- Read the bodies from the RelayBuffer:
-      relayBuffer <- readTVarIO state.relayBufferVar
+      relayBuffer <- readReadOnlyTVarIO state.relayBufferVar
       let bodies = mapMaybe (fmap snd . RB.lookup relayBuffer) ids
-      return $ TC.Yield (MsgResponseBodies bodies) (idle window)
+      return $ TC.Yield (MsgRespondBodies bodies) (idle st)
+
+readEntriesAfterTicket ::
+  MonadSTM m =>
+  RelayProducerState id header body m ->
+  SingBlockingStyle blocking ->
+  WindowExpand ->
+  RB.Ticket ->
+  m (ResponseList blocking (RB.EntryWithTicket id (header, body)))
+readEntriesAfterTicket state blocking expand t = atomically $ do
+  newEntries <-
+    take (fromIntegral expand)
+      . (`RB.takeAfterTicket` t)
+      <$> readReadOnlyTVar state.relayBufferVar
+  assert (and [entry.ticket > t | entry <- newEntries]) $
+    case blocking of
+      SingBlocking ->
+        maybe retry (return . BlockingResponse) (NonEmpty.nonEmpty newEntries)
+      SingNonBlocking ->
+        return $ NonBlockingResponse newEntries
 
 --------------------------------
 ---- Relay Consumer
 --------------------------------
 
-data RelayConsumerState id header body m = RelayConsumerState {}
+newtype RelayConsumerState id header body m = RelayConsumerState
+  { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
+  }
+
+-- | Information maintained internally in the 'txSubmissionInbound' server
+-- implementation.
+data RelayConsumerLocalState id header = RelayConsumerLocalState
+  { pendingRequests :: !Word16
+  -- ^ The number of body identifiers that we have requested but
+  -- which have not yet been replied to. We need to track this it keep
+  -- our requests within the maximum window size.
+  , window :: !(StrictSeq id)
+  -- ^ Those bodies (by their identifier) that the client has told
+  -- us about, and which we have not yet acknowledged. This is kept in
+  -- the order in which the client gave them to us. This is the same order
+  -- in which we submit them to the mempool (or for this example, the final
+  -- result order). It is also the order we acknowledge in.
+  , available :: !(Map id header)
+  -- ^ Those bodies (by their identifier) that we can request. These
+  -- are a subset of the 'window' that we have not yet
+  -- requested. This is not ordered to illustrate the fact that we can
+  -- request bodies out of order. We also remember their header.
+  , buffer :: !(Map id (Maybe header))
+  -- ^ Bodies we have successfully downloaded but have not yet added
+  -- to the mempool or acknowledged. This needed because we can request
+  -- bodies out of order but must use the original order when adding
+  -- to the mempool or acknowledging bodies.
+  --
+  -- However, it's worth noting that, in a few situations, some of the
+  -- IDs in this 'Map' may be mapped to 'Nothing':
+  --
+  -- * IDs mapped to 'Nothing' can represent IDs
+  --   that were requested, but not received. This can occur because the
+  --   client will not necessarily send all of the bodies that we
+  --   asked for, but we still need to acknowledge those bodies.
+  --
+  --   For example, if we request a body that no longer exists in
+  --   the client's mempool, the client will just exclude it from the
+  --   response. However, we still need to acknowledge it (i.e. remove it
+  --   from the 'window') in order to note that we're no
+  --   longer awaiting receipt of that body.
+  --
+  -- * IDs mapped to 'Nothing' can represent bodies
+  --   that were not requested from the client because they're already
+  --   in the mempool.
+  --
+  --   For example, if we request some IDs and notice that
+  --   some subset of them have are already in the mempool, we wouldn't
+  --   want to bother asking for those specific bodies. Therefore,
+  --   we would just insert those IDs mapped to 'Nothing' to
+  --   the 'bufferedTxs' such that those bodies are acknowledged,
+  --   but never actually requested.
+  , pendingShrink :: !WindowShrink
+  -- ^ The number of bodies we can acknowledge on our next request
+  -- for more bodies. The number here have already been removed from
+  -- 'window'.
+  }
+  deriving (Show, Generic)
 
 type RelayConsumer id header body st m a = TS.Server (RelayState id header body) 'NonPipelined st m a
 

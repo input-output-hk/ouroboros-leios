@@ -22,6 +22,7 @@ module PraosProtocol.Common (
   ReadOnly,
   asReadOnly,
   readReadOnlyTVar,
+  readReadOnlyTVarIO,
   TakeOnly,
   asTakeOnly,
   takeTakeOnlyTMVar,
@@ -38,14 +39,7 @@ module PraosProtocol.Common (
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TMVar,
-    TVar,
-    readTVar,
-    takeTMVar,
-    tryTakeTMVar
-  ),
+  MonadSTM (..),
  )
 import Control.Exception (assert)
 import Data.Map.Strict (Map)
@@ -173,6 +167,9 @@ asReadOnly = ReadOnly
 
 readReadOnlyTVar :: MonadSTM m => ReadOnly (TVar m a) -> STM m a
 readReadOnlyTVar ReadOnly{unReadOnly} = readTVar unReadOnly
+
+readReadOnlyTVarIO :: MonadSTM m => ReadOnly (TVar m a) -> m a
+readReadOnlyTVarIO ReadOnly{unReadOnly} = readTVarIO unReadOnly
 
 newtype TakeOnly a = TakeOnly {unTakeOnly :: a}
 
