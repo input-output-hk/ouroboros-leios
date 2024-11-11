@@ -41,6 +41,8 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
+    LeiosProtocol.DataPool
+    LeiosProtocol.DataTransfer
     LeiosProtocol.Relay
     ModelTCP
     P2P
@@ -112,7 +114,7 @@ library
     , singletons
     , text
     , time
-    , typed-protocols         >=0.3
+    , typed-protocols            >=0.3
     , vector
 
   hs-source-dirs:   src

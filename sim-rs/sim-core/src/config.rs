@@ -181,11 +181,14 @@ fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
-fn compute_latency(loc1: Location, loc2: Location, extra_ms: Option<u64>) -> Duration {
+fn compute_latency(loc1: Location, loc2: Location, explicit: Option<u64>) -> Duration {
+    if let Some(ms) = explicit {
+        return Duration::from_millis(ms);
+    }
     let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
         .map(|l| l.to_duration())
         .unwrap_or(Duration::ZERO);
-    let extra_latency = Duration::from_millis(extra_ms.unwrap_or(5));
+    let extra_latency = Duration::from_millis(5);
     geo_latency + extra_latency
 }
 
