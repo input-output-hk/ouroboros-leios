@@ -27,8 +27,8 @@ module B   = BaseAbstract.Functionality BF
 module K   = KeyRegistrationAbstract.Functionality KF
 module FFD = FFDAbstract.Functionality FFD' renaming (stepRel to _⇀⟦_⟧_)
 
-open FFDAbstract ffdAbstract
 open BaseAbstract B' using (Cert)
+open GenFFD
 
 -- High level structure:
 
@@ -136,7 +136,6 @@ stake record { SD = SD } = case lookupᵐ? SD id of λ where
 module _ (s : LeiosState) where
 
   open LeiosState s
-  open GenFFD hiding (Header; Body)
 
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
@@ -188,7 +187,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
          (record s
            { FFDState = ffds'
            ; Ledger = constructLedger ebs
-           } ↑ L.filter GenFFD.isValid? msgs
+           } ↑ L.filter isValid? msgs
          , EMPTY)
 
   Ftch : let open LeiosState s in
@@ -220,8 +219,8 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
   -- Protocol rules
 
   IB-Role : let open LeiosState s renaming (ToPropose to txs; FFDState to ffds)
-                b = GenFFD.ibBody (record { txs = txs })
-                h = GenFFD.ibHeader (mkIBHeader slot id π sk-IB txs)
+                b = ibBody (record { txs = txs })
+                h = ibHeader (mkIBHeader slot id π sk-IB txs)
           in
           ∙ canProduceIB slot sk-IB (stake s) π
           ∙ FFD.Send h (just b) FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
@@ -235,7 +234,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 h = mkEB slot id π sk-EB LI LE
           in
           ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ FFD.Send (GenFFD.ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+          ∙ FFD.Send (ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
           ───────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
@@ -244,7 +243,7 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 votes = map (vote ∘ hash) (setToList EBs')
           in
           ∙ canProduceV1 slot
-          ∙ FFD.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
           ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
@@ -253,6 +252,6 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 votes = map (vote ∘ hash) (setToList EBs')
           in
           ∙ canProduceV2 slot
-          ∙ FFD.Send (GenFFD.vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
+          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
           ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
