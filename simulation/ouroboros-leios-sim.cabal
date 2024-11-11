@@ -41,9 +41,8 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
-    LeiosProtocol.DataPool
-    LeiosProtocol.DataTransfer
     LeiosProtocol.Relay
+    LeiosProtocol.RelayBuffer
     ModelTCP
     P2P
     PlotTCP

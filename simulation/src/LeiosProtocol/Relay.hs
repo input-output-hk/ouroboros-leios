@@ -1,58 +1,91 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
--- | Generic block relay protocol.
---
--- Modeled after TxSubmission2 from ouroboros-network.
-module LeiosProtocol.Relay (
-  Relay (..),
-  Message (..),
-  SingRelay (..),
-  SingBlockingStyle (..),
-  StBlockingStyle (..),
-  BlockingReplyList (..),
-  NumBlkIdsToAck (..),
-  NumBlkIdsToReq (..),
-  BlockRelayMessage,
-  relayProducer,
-) where
+module LeiosProtocol.Relay where
 
-import ChanTCP
-import Control.Concurrent.Class.MonadSTM
-import Control.DeepSeq
-import Control.Exception
-import Control.Monad
-import Data.Bits
+import ChanDriver (ProtocolMessage)
+import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
+import Control.DeepSeq (NFData)
+import Control.Exception (Exception, assert, throw)
+import Control.Monad (when)
+import Control.Monad.Class.MonadTimer (MonadDelay)
+import Data.Bits (Bits, FiniteBits)
+import qualified Data.FingerTree as FingerTree
+import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
-import Data.List (find)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import Data.Maybe (catMaybes, isNothing, mapMaybe)
+import Data.Maybe (isJust)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
-import Data.Singletons
+import Data.Singletons (Sing, SingI (..))
+import Data.Type.Equality ((:~:) (Refl))
 import Data.Word (Word16)
-import GHC.Generics
-import Network.TypedProtocol.Core
+import GHC.Generics (Generic)
+import LeiosProtocol.RelayBuffer (RelayBuffer)
+import qualified LeiosProtocol.RelayBuffer as RB
+import Network.TypedProtocol (
+  Agency (ClientAgency, NobodyAgency, ServerAgency),
+  IsPipelined (..),
+  Protocol (..),
+  StateTokenI (..),
+ )
 import qualified Network.TypedProtocol.Peer.Client as TC
-import NoThunks.Class (NoThunks (..))
-import Ouroboros.Network.Util.ShowProxy
+import qualified Network.TypedProtocol.Peer.Server as TS
+import NoThunks.Class (NoThunks)
 import Quiet (Quiet (..))
-import RelayProtocol (BlockWithTicket (BlockWithTicket), RelayBuffer (RelayBuffer), Ticket, lookupByTicket, takeAfterTicket, zeroTicket)
+
+data BlockingStyle
+  = StBlocking
+  | StNonBlocking
+  deriving (Show, Eq)
+
+type SingBlockingStyle :: BlockingStyle -> Type
+data SingBlockingStyle blocking where
+  SingBlocking :: SingBlockingStyle StBlocking
+  SingNonBlocking :: SingBlockingStyle StNonBlocking
+
+deriving instance Show (SingBlockingStyle blocking)
+
+type instance Sing @BlockingStyle = SingBlockingStyle
+
+instance SingI StBlocking where sing = SingBlocking
+instance SingI StNonBlocking where sing = SingNonBlocking
+
+withSingIBlockingStyle :: SingBlockingStyle blocking -> (SingI blocking => a) -> a
+withSingIBlockingStyle SingBlocking = id
+withSingIBlockingStyle SingNonBlocking = id
+
+decideSingBlockingStyle ::
+  SingBlockingStyle st ->
+  SingBlockingStyle st' ->
+  Maybe (st :~: st')
+decideSingBlockingStyle SingBlocking SingBlocking = Just Refl
+decideSingBlockingStyle SingNonBlocking SingNonBlocking = Just Refl
+decideSingBlockingStyle _ _ = Nothing
+
+isBlocking :: SingBlockingStyle blocking -> Bool
+isBlocking = isJust . decideSingBlockingStyle SingBlocking
 
 -- | The kind of the transaction-submission protocol, and the types of the
 -- states in the protocol state machine.
@@ -68,97 +101,94 @@ import RelayProtocol (BlockWithTicket (BlockWithTicket), RelayBuffer (RelayBuffe
 -- sometimes clarify by using the terms inbound and outbound. This refers to
 -- whether transactions are flowing towards a peer or away, and thus indicates
 -- what role the peer is playing.
-data Relay (blkid :: Type) (blk :: Type) (blkmd :: Type) where
-  -- | Initial protocol message.
-  StInit :: Relay blkid blk blkmd
-  -- | The server (inbound side) has agency; it can either terminate, ask for
-  -- transaction identifiers or ask for transactions.
-  --
-  -- There is no timeout in this state.
-  StIdle :: Relay blkid blk blkmd
-  -- | The client (outbound side) has agency; it must reply with a
-  -- list of transaction identifiers that it wishes to submit.
-  --
-  -- There are two sub-states for this, for blocking and non-blocking cases.
-  StBlkIds :: StBlockingStyle -> Relay blkid blk blkmd
-  -- | The client (outbound side) has agency; it must reply with the list of
-  -- transactions.
-  StBlks :: Relay blkid blk blkmd
-  -- | Nobody has agency; termination state.
-  StDone :: Relay blkid blk blkmd
+type RelayState :: Type -> Type -> Type -> Type
+data RelayState id header body
+  = -- | Initial protocol message.
+    StInit
+  | -- | The server (inbound side) has agency; it can either terminate, ask for
+    -- transaction identifiers or ask for transactions.
+    --
+    -- There is no timeout in this state.
+    StIdle
+  | -- | The client (outbound side) has agency; it must reply with a
+    -- list of transaction identifiers that it wishes to submit.
+    --
+    -- There are two sub-states for this, for blocking and non-blocking cases.
+    StHeaders BlockingStyle
+  | -- | The client (outbound side) has agency; it must reply with the list of
+    -- transactions.
+    StBodies
+  | -- | Nobody has agency; termination state.
+    StDone
 
-instance
-  ( ShowProxy blkid
-  , ShowProxy blk
-  , ShowProxy blkmd
-  ) =>
-  ShowProxy (Relay blkid blk blkmd)
-  where
-  showProxy _ =
-    concat
-      [ "Relay "
-      , showProxy (Proxy :: Proxy blkid)
-      , " "
-      , showProxy (Proxy :: Proxy blk)
-      , " "
-      , showProxy (Proxy :: Proxy blkmd)
-      ]
+data SingRelayState (st :: RelayState id header body) where
+  SingStInit :: SingRelayState StInit
+  SingStIdle :: SingRelayState StIdle
+  SingStHeaders :: Sing blocking -> SingRelayState (StHeaders blocking)
+  SingStBodies :: SingRelayState StBodies
+  SingStDone :: SingRelayState StDone
 
-instance ShowProxy (StIdle :: Relay blkid blk blkmd) where
-  showProxy _ = "StIdle"
+decideSingRelayState ::
+  SingRelayState st ->
+  SingRelayState st' ->
+  Maybe (st :~: st')
+decideSingRelayState SingStInit SingStInit = Just Refl
+decideSingRelayState SingStIdle SingStIdle = Just Refl
+decideSingRelayState (SingStHeaders b1) (SingStHeaders b2) =
+  fmap (\Refl -> Refl) (decideSingBlockingStyle b1 b2)
+decideSingRelayState SingStBodies SingStBodies = Just Refl
+decideSingRelayState SingStDone SingStDone = Just Refl
+decideSingRelayState _ _ = Nothing
 
-type SingRelay ::
-  Relay blkid blk blkmd ->
-  Type
-data SingRelay k where
-  SingInit :: SingRelay StInit
-  SingIdle :: SingRelay StIdle
-  SingBlkIds ::
-    SingBlockingStyle stBlocking ->
-    SingRelay (StBlkIds stBlocking)
-  SingTxs :: SingRelay StBlks
-  SingDone :: SingRelay StDone
+instance StateTokenI StInit where stateToken = SingStInit
+instance StateTokenI StIdle where stateToken = SingStIdle
+instance SingI blocking => StateTokenI (StHeaders blocking) where stateToken = SingStHeaders sing
+instance StateTokenI StBodies where stateToken = SingStBodies
+instance StateTokenI StDone where stateToken = SingStDone
 
-deriving instance Show (SingRelay k)
+decideRelayState ::
+  forall (id :: Type) (header :: Type) (body :: Type) (st :: RelayState id header body) (st' :: RelayState id header body).
+  (StateTokenI st, StateTokenI st') =>
+  Maybe (st :~: st')
+decideRelayState = decideSingRelayState stateToken stateToken
 
-instance StateTokenI StInit where stateToken = SingInit
-instance StateTokenI StIdle where stateToken = SingIdle
-instance
-  SingI stBlocking =>
-  StateTokenI (StBlkIds stBlocking)
-  where
-  stateToken = SingBlkIds sing
-instance StateTokenI StBlks where stateToken = SingTxs
-instance StateTokenI StDone where stateToken = SingDone
-
-data StBlockingStyle where
-  -- | In this sub-state the reply need not be prompt. There is no timeout.
-  StBlocking :: StBlockingStyle
-  -- | In this state the peer must reply. There is a timeout.
-  StNonBlocking :: StBlockingStyle
-
-newtype NumBlkIdsToAck = NumBlkIdsToAck {getNumBlkIdsToAck :: Word16}
+newtype WindowShrink = WindowShrink {value :: Word16}
   deriving (Eq, Ord, NFData, Generic)
   deriving newtype (Num, Enum, Real, Integral, Bounded, Bits, FiniteBits, NoThunks)
   deriving (Semigroup) via (Sum Word16)
   deriving (Monoid) via (Sum Word16)
-  deriving (Show) via (Quiet NumBlkIdsToAck)
+  deriving (Show) via (Quiet WindowShrink)
 
-newtype NumBlkIdsToReq = NumBlkIdsToReq {getNumBlkIdsToReq :: Word16}
+newtype WindowExpand = WindowExpand {value :: Word16}
   deriving (Eq, Ord, NFData, Generic)
   deriving newtype (Num, Enum, Real, Integral, Bounded, Bits, FiniteBits, NoThunks)
   deriving (Semigroup) via (Sum Word16)
   deriving (Monoid) via (Sum Word16)
-  deriving (Show) via (Quiet NumBlkIdsToReq)
+  deriving (Show) via (Quiet WindowExpand)
 
-finiteByteSize :: (Integral a, FiniteBits b) => b -> a
-finiteByteSize x = ceiling (realToFrac (finiteBitSize x) / 8 :: Double)
+type ResponseList :: BlockingStyle -> Type -> Type
+data ResponseList blocking a where
+  BlockingResponse :: NonEmpty a -> ResponseList StBlocking a
+  NonBlockingResponse :: [a] -> ResponseList StNonBlocking a
+
+deriving instance Eq a => Eq (ResponseList blocking a)
+deriving instance Show a => Show (ResponseList blocking a)
+deriving instance Functor (ResponseList blocking)
+deriving instance Foldable (ResponseList blocking)
+
+data RelayProtocolError
+  = ShrankTooMuch WindowSize WindowShrink
+  | ExpandTooMuch WindowSize WindowShrink WindowExpand
+  | RequestedNoChange
+  deriving (Show)
+
+instance Exception RelayProtocolError
 
 -- | There are some constraints of the protocol that are not captured in the
 -- types of the messages, but are documented with the messages. Violation
 -- of these constraints is also a protocol error. The constraints are intended
 -- to ensure that implementations are able to work in bounded space.
-instance Protocol (Relay blkid blk blkmd) where
+instance Protocol (RelayState id header body) where
   -- \| The messages in the block relay protocol.
   --
   -- In this protocol the consumer (inbound side, server role) always
@@ -179,9 +209,9 @@ instance Protocol (Relay blkid blk blkmd) where
   -- acknowledged in the same FIFO order they were provided in. The
   -- acknowledgement is included in the same messages used to ask for more
   -- block identifiers.
-  data Message (Relay blkid blk blkmd) from to where
+  data Message (RelayState id header body) from to where
     MsgInit ::
-      Message (Relay blkid blk blkmd) StInit StIdle
+      Message (RelayState id header body) StInit StIdle
     -- \| Request a non-empty list of block identifiers from the client,
     -- and confirm a number of outstanding block identifiers.
     --
@@ -219,14 +249,11 @@ instance Protocol (Relay blkid blk blkmd) where
     --
     -- \* The non-blocking case must be used when there are non-zero remaining
     --   unacknowledged blocks.
-    MsgRequestBlkIds ::
-      forall (blocking :: StBlockingStyle) blk blkid blkmd.
+    MsgRequestHeaders ::
       SingBlockingStyle blocking ->
-      NumBlkIdsToAck ->
-      -- \^ Acknowledge this number of outstanding txids
-      NumBlkIdsToReq ->
-      -- \^ Request up to this number of txids.
-      Message (Relay blkid blk blkmd) StIdle (StBlkIds blocking)
+      WindowShrink ->
+      WindowExpand ->
+      Message (RelayState id header body) StIdle (StHeaders blocking)
     -- \| Reply with a list of block identifiers for available
     -- blocks, along with metadata for each block.
     --
@@ -242,9 +269,9 @@ instance Protocol (Relay blkid blk blkmd) where
     -- The order in which these block identifiers are returned must be
     -- the order in which they are submitted to the mempool, to preserve
     -- dependent blocks.
-    MsgReplyBlkIds ::
-      BlockingReplyList blocking (blkid, blkmd) ->
-      Message (Relay blkid blk blkmd) (StBlkIds blocking) StIdle
+    MsgRespondHeaders ::
+      ResponseList blocking header ->
+      Message (RelayState id header body) (StHeaders blocking) StIdle
     -- \| Request one or more blocks corresponding to the given
     -- block identifiers.
     --
@@ -257,9 +284,9 @@ instance Protocol (Relay blkid blk blkmd) where
     --
     -- It is an error to ask for block identifiers that are not
     -- outstanding or that were already asked for.
-    MsgRequestBlks ::
-      [blkid] ->
-      Message (Relay blkid blk blkmd) StIdle StBlks
+    MsgRequestBodies ::
+      [id] ->
+      Message (RelayState id header body) StIdle StBodies
     -- \| Reply with the requested blocks, or implicitly discard.
     --
     -- Blocks can become invalid between the time the block
@@ -270,215 +297,162 @@ instance Protocol (Relay blkid blk blkmd) where
     -- should be considered as if this peer had never announced them. (Note
     -- that this is no guarantee that the block is invalid, it may still
     -- be valid and available from another peer).
-    MsgReplyBlks ::
-      [blk] ->
-      Message (Relay blkid blk blkmd) StBlks StIdle
+    MsgResponseBodies ::
+      [body] ->
+      Message (RelayState id header body) StBodies StIdle
     -- \| Termination message, initiated by the client when the server is
     -- making a blocking call for more block identifiers.
     MsgDone ::
-      Message (Relay blkid blk blkmd) (StBlkIds StBlocking) StDone
+      Message (RelayState id header body) (StHeaders StBlocking) StDone
 
   type StateAgency StInit = ClientAgency
-  type StateAgency (StBlkIds b) = ClientAgency
-  type StateAgency StBlks = ClientAgency
   type StateAgency StIdle = ServerAgency
+  type StateAgency (StHeaders _blocking) = ClientAgency
+  type StateAgency StBodies = ClientAgency
   type StateAgency StDone = NobodyAgency
 
-  type StateToken = SingRelay
+  type StateToken = SingRelayState
 
-instance
-  ( NFData blkid
-  , NFData blk
-  , NFData blkmd
-  ) =>
-  NFData (Message (Relay blkid blk blkmd) from to)
-  where
-  rnf MsgInit = ()
-  rnf (MsgRequestBlkIds tkbs w1 w2) = rnf tkbs `seq` rnf w1 `seq` rnf w2
-  rnf (MsgReplyBlkIds brl) = rnf brl
-  rnf (MsgRequestBlks txids) = rnf txids
-  rnf (MsgReplyBlks txs) = rnf txs
-  rnf MsgDone = ()
+deriving instance (Show id, Show header, Show body) => Show (Message (RelayState id header body) from to)
 
-instance
-  ( MessageSize blkid
-  , MessageSize blk
-  , MessageSize blkmd
-  ) =>
-  MessageSize (Message (Relay blkid blk blkmd) from to)
-  where
-  messageSizeBytes MsgInit = 1
-  messageSizeBytes (MsgRequestBlkIds tkbs w1 w2) = messageSizeBytes tkbs + finiteByteSize w1 + finiteByteSize w2
-  messageSizeBytes (MsgReplyBlkIds brl) = messageSizeBytes brl
-  messageSizeBytes (MsgRequestBlks txids) = sum $ map messageSizeBytes txids
-  messageSizeBytes (MsgReplyBlks txs) = sum $ map messageSizeBytes txs
-  messageSizeBytes MsgDone = 1
+-- finiteByteSize :: (Integral a, FiniteBits b) => b -> a
+-- finiteByteSize x = ceiling (realToFrac (finiteBitSize x) / 8 :: Double)
 
--- | The value level equivalent of 'BlockingStyle'.
---
--- This is also used in 'MsgRequestBlkIds' where it is interpreted (and can be
--- encoded) as a 'Bool' with 'True' for blocking, and 'False' for non-blocking.
-data SingBlockingStyle (k :: StBlockingStyle) where
-  SingBlocking :: SingBlockingStyle StBlocking
-  SingNonBlocking :: SingBlockingStyle StNonBlocking
+-- instance
+--   ( MessageSize id
+--   , MessageSize header
+--   , MessageSize body
+--   ) =>
+--   MessageSize (Message (RelayState id header body) from to)
+--   where
+--   messageSizeBytes MsgInit = 1
+--   messageSizeBytes (MsgRequestHeaders blocking windowGrow windowShrink) =
+--     messageSizeBytes blocking + finiteByteSize windowGrow + finiteByteSize windowShrink
+--   messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
+--   messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
+--   messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
+--   messageSizeBytes MsgDone = 1
 
-deriving instance Eq (SingBlockingStyle b)
-deriving instance Show (SingBlockingStyle b)
+relayMessageLabel :: Message (RelayState id header body) st st' -> String
+relayMessageLabel = \case
+  MsgInit{} -> "MsgInit"
+  MsgRequestHeaders{} -> "MsgRequestHeaders"
+  MsgRespondHeaders{} -> "MsgRespondHeaders"
+  MsgRequestBodies{} -> "MsgRequestBodies"
+  MsgResponseBodies{} -> "MsgResponseBodies"
+  MsgDone{} -> "MsgDone"
 
-type instance Sing = SingBlockingStyle
-instance SingI StBlocking where sing = SingBlocking
-instance SingI StNonBlocking where sing = SingNonBlocking
+type RelayMessage id header body = ProtocolMessage (RelayState id header body)
 
-instance NFData (SingBlockingStyle b) where
-  rnf SingBlocking = ()
-  rnf SingNonBlocking = ()
+--------------------------------
+---- Relay Configuration
+--------------------------------
 
-instance MessageSize (SingBlockingStyle blocking) where
-  messageSizeBytes _ = 1
+newtype WindowSize = WindowSize {value :: Word16}
+  deriving (Eq, Ord, NFData, Generic)
+  deriving newtype (Num, Enum, Real, Integral, Bounded, Bits, FiniteBits, NoThunks)
+  deriving (Semigroup) via (Sum Word16)
+  deriving (Monoid) via (Sum Word16)
+  deriving (Show) via (Quiet WindowSize)
 
--- | We have requests for lists of things. In the blocking case the
--- corresponding reply must be non-empty, whereas in the non-blocking case
--- and empty reply is fine.
-data BlockingReplyList (blocking :: StBlockingStyle) a where
-  BlockingReply :: NonEmpty a -> BlockingReplyList StBlocking a
-  NonBlockingReply :: [a] -> BlockingReplyList StNonBlocking a
+newtype RelayConfig = RelayConfig
+  { maxWindowSize :: WindowSize
+  }
 
-deriving instance Eq a => Eq (BlockingReplyList blocking a)
-deriving instance Show a => Show (BlockingReplyList blocking a)
+--------------------------------
+---- Relay Producer
+--------------------------------
 
-instance NFData a => NFData (BlockingReplyList blocking a) where
-  rnf (BlockingReply as) = rnf as
-  rnf (NonBlockingReply as) = rnf as
+data Window id = Window
+  { values :: !(StrictSeq (id, RB.Ticket))
+  , lastTicket :: !RB.Ticket
+  }
 
-deriving instance
-  (Eq blkid, Eq blk, Eq blkmd) =>
-  Eq (Message (Relay blkid blk blkmd) from to)
+-- , lastTicket :: !RB.Ticket
 
-deriving instance
-  (Show blkid, Show blk, Show blkmd) =>
-  Show (Message (Relay blkid blk blkmd) from to)
+newtype RelayProducerState id header body m = RelayProducerState
+  { relayBufferVar :: TVar m (RelayBuffer id (header, body))
+  }
 
-instance MessageSize a => MessageSize (BlockingReplyList blocking a) where
-  messageSizeBytes (BlockingReply xs) = sum $ fmap messageSizeBytes xs
-  messageSizeBytes (NonBlockingReply xs) = sum $ map messageSizeBytes xs
+readEntriesAfterTicket ::
+  MonadSTM m =>
+  RelayProducerState id header body m ->
+  SingBlockingStyle blocking ->
+  WindowExpand ->
+  RB.Ticket ->
+  m (ResponseList blocking (RB.EntryWithTicket id (header, body)))
+readEntriesAfterTicket state blocking windowExpand t = atomically $ do
+  newEntries <-
+    take (fromIntegral windowExpand)
+      . (`RB.takeAfterTicket` t)
+      <$> readTVar state.relayBufferVar
+  assert (and [entry.ticket > t | entry <- newEntries]) $
+    case blocking of
+      SingBlocking ->
+        maybe retry (return . BlockingResponse) (NonEmpty.nonEmpty newEntries)
+      SingNonBlocking ->
+        return $ NonBlockingResponse newEntries
 
-type BlockRelayMessage blkid blk blkmd = Message (Relay blkid blk blkmd)
+-- -- For blocking request, retry until there are new values available.
+-- if isBlocking blocking && null newEntries then retry else return newEntries
 
-data RelayProtocolError
-  = ProtocolErrorAckedTooManyBlkids
-  | ProtocolErrorRequestedNothing
-  | ProtocolErrorRequestedTooManyBlkids NumBlkIdsToReq NumBlkIdsToAck
-  | ProtocolErrorRequestBlocking
-  | ProtocolErrorRequestNonBlocking
-  | ProtocolErrorRequestedUnavailableBlk
-  deriving (Show)
+type RelayProducer id header body st m a = TS.Server (RelayState id header body) 'NonPipelined st m a
 
-instance Exception RelayProtocolError
-
--- | Protocol agent that sends the blocks.
---
---   The implementation is mostly cribbed from
---   ouroboros-netowork:Ouroboros.Network.TxSubmission.Outbound but
---   adapted to use `RelayBuffer` and implemented directly as a
---   TypedProtocol peer.
---
---   Locally keeps track of a window of blkids that the consumer is allowed to ask for.
 relayProducer ::
-  forall m blk blkid blkmd.
-  (MonadSTM m, Ord blkid) =>
-  (blk -> blkmd) ->
-  -- | Maximum number of unacknowledged blkids allowed
-  NumBlkIdsToAck ->
-  RelayBuffer m blk blkid ->
-  TC.Client (Relay blkid blk blkmd) NonPipelined StIdle m ()
-relayProducer blkMetaData maxUnacked (RelayBuffer buffer) = idle Seq.empty zeroTicket
+  forall id header body m.
+  (MonadSTM m, MonadDelay m) =>
+  RelayConfig ->
+  RelayProducerState id header body m ->
+  RelayProducer id header body 'StIdle m ()
+relayProducer config state = undefined
  where
-  idle :: StrictSeq (blkid, Ticket) -> Ticket -> TC.Client (Relay blkid blk blkmd) NonPipelined StIdle m ()
-  idle !unackedSeq !lastIdx = TC.Await $ \case
-    MsgRequestBlkIds blocking ackNo reqNo -> TC.Effect $ do
-      when (getNumBlkIdsToAck ackNo > fromIntegral (Seq.length unackedSeq)) $
-        throw ProtocolErrorAckedTooManyBlkids
+  idle :: Window id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
+  idle !window = TC.Await $ \case
+    MsgRequestHeaders blocking windowShrink windowExpand -> TC.Effect $ do
+      -- Validate the request:
+      -- 1. windowShrink <= windowSize
+      let windowSize = fromIntegral (Seq.length window.values)
+      when @m (windowShrink.value > windowSize.value) $ do
+        throw $ ShrankTooMuch windowSize windowShrink
+      -- 2. windowSize - windowShrink + windowExpand <= maxWindowSize
+      let newWindowSize = WindowSize $ windowSize.value - windowShrink.value + windowExpand.value
+      when (newWindowSize > config.maxWindowSize) $ do
+        throw $ ExpandTooMuch windowSize windowShrink windowExpand
+      -- 3. windowShrink, windowExpand /= 0 if non-blocking
+      --    windowExpand /= 0 if blocking
+      when (windowExpand.value == 0 && (isBlocking blocking || windowShrink.value == 0)) $ do
+        throw RequestedNoChange
+      -- Shrink the window:
+      let keptValues =
+            Seq.drop (fromIntegral windowShrink) window.values
+      -- Find the new entries:
+      newEntries <-
+        readEntriesAfterTicket state blocking windowExpand window.lastTicket
+      let newValues =
+            Seq.fromList [(entry.key, entry.ticket) | entry <- Foldable.toList newEntries]
+      let newLastTicket = case newValues of
+            Seq.Empty -> window.lastTicket
+            _ Seq.:|> (_, ticket) -> ticket
+      let newWindow =
+            Window{values = keptValues <> newValues, lastTicket = newLastTicket}
+      let responseList =
+            fmap (fst . (.value)) newEntries
+      withSingIBlockingStyle blocking $ do
+        return $ TC.Yield (MsgRespondHeaders responseList) (idle newWindow)
+    MsgRequestBodies ids -> TC.Effect $ do
+      _
 
-      when
-        ( fromIntegral (Seq.length unackedSeq)
-            - getNumBlkIdsToAck ackNo
-            + getNumBlkIdsToReq reqNo
-            > getNumBlkIdsToAck maxUnacked
-        )
-        $ throw (ProtocolErrorRequestedTooManyBlkids reqNo maxUnacked)
+--------------------------------
+---- Relay Consumer
+--------------------------------
 
-      -- Update our tracking state to remove the number of blkids that the
-      -- peer has acknowledged.
-      let !unackedSeq' = Seq.drop (fromIntegral ackNo) unackedSeq
+data RelayConsumerState id header body m = RelayConsumerState {}
 
-      -- Updates our tracking state with any extra blks available.
-      let update blks =
-            -- These blks should all be fresh
-            assert (all (\(BlockWithTicket _ _ idx) -> idx > lastIdx) blks) $
-              let !unackedSeq'' =
-                    unackedSeq'
-                      <> Seq.fromList
-                        [(blkid, idx) | BlockWithTicket _ blkid idx <- blks]
-                  !lastIdx'
-                    | null blks = lastIdx
-                    | otherwise = idx
-                   where
-                    BlockWithTicket _ _ idx = last blks
-                  blks' :: [(blkid, blkmd)]
-                  blks' = [(blkid, blkMetaData blk) | BlockWithTicket blk blkid _ <- blks]
-                  client' = idle unackedSeq'' lastIdx'
-               in (blks', client')
+type RelayConsumer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
 
-      -- Grab info about any new txs after the last tx idx we've seen,
-      -- up to the number that the peer has requested.
-      case blocking of
-        SingBlocking -> do
-          when (reqNo == 0) $
-            throw ProtocolErrorRequestedNothing
-          unless (Seq.null unackedSeq') $
-            throw ProtocolErrorRequestBlocking
-
-          blkids <- atomically $ do
-            blkq <- readTVar buffer
-            let blkids = takeAfterTicket blkq lastIdx
-            when (null $ blkids) retry
-            pure $ take (fromIntegral reqNo) blkids
-
-          let !(blkids', client') = update blkids
-              blkids'' = case NonEmpty.nonEmpty blkids' of
-                Just x -> x
-                -- Assert blkids is non-empty: we blocked until blkids was non-null,
-                -- and we know reqNo > 0, hence `take reqNo blkids` is non-null.
-                Nothing -> error "blkidsubmissionOutbound: empty transaction's list"
-          return (TC.Yield (MsgReplyBlkIds (BlockingReply blkids'')) client')
-        SingNonBlocking -> do
-          when (reqNo == 0 && ackNo == 0) $
-            throw ProtocolErrorRequestedNothing
-          when (Seq.null unackedSeq') $
-            throw ProtocolErrorRequestNonBlocking
-
-          blkids <- atomically $ do
-            blkq <- readTVar buffer
-            let blkids = takeAfterTicket blkq lastIdx
-            return (take (fromIntegral reqNo) blkids)
-
-          let !(blkids', client') = update blkids
-          pure (TC.Yield (MsgReplyBlkIds (NonBlockingReply blkids')) client')
-    MsgRequestBlks blkids -> TC.Effect $ do
-      blkq <- atomically $ readTVar buffer
-
-      -- The window size is expected to be small (currently 10) so the find is acceptable.
-      -- TODO Andrea: is `10` good enough for freshest first?
-      let blkidxs = [find (\(t, _) -> t == blkid) unackedSeq | blkid <- blkids]
-          blkidxs' = map snd $ catMaybes blkidxs
-
-      when (any isNothing blkidxs) $
-        throw ProtocolErrorRequestedUnavailableBlk
-
-      -- The 'lookupByTicket' call will return nothing if the block is no
-      -- longer in the buffer. This is good. Neither the sending nor
-      -- receiving side wants to forward blks that are no longer of interest.
-      let txs = mapMaybe (lookupByTicket blkq) blkidxs'
-          client' = idle unackedSeq lastIdx
-
-      return $ TC.Yield (MsgReplyBlks txs) client'
+relayConsumer ::
+  forall id header body m.
+  (MonadSTM m, MonadDelay m) =>
+  RelayConsumerState id header body m ->
+  RelayConsumer id header body 'StIdle m ()
+relayConsumer = undefined
