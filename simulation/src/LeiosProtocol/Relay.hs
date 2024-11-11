@@ -26,15 +26,14 @@ import ChanDriver (ProtocolMessage)
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
-import Control.Monad (when)
+import Control.Monad (forM_, when)
 import Control.Monad.Class.MonadTimer (MonadDelay)
 import Data.Bits (Bits, FiniteBits)
-import qualified Data.FingerTree as FingerTree
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
@@ -180,6 +179,7 @@ data RelayProtocolError
   = ShrankTooMuch WindowSize WindowShrink
   | ExpandTooMuch WindowSize WindowShrink WindowExpand
   | RequestedNoChange
+  | RequestedUnknownId
   deriving (Show)
 
 instance Exception RelayProtocolError
@@ -368,7 +368,8 @@ data Window id = Window
   , lastTicket :: !RB.Ticket
   }
 
--- , lastTicket :: !RB.Ticket
+emptyWindow :: Window id
+emptyWindow = Window Seq.empty (RB.Ticket 0)
 
 newtype RelayProducerState id header body m = RelayProducerState
   { relayBufferVar :: TVar m (RelayBuffer id (header, body))
@@ -393,18 +394,15 @@ readEntriesAfterTicket state blocking windowExpand t = atomically $ do
       SingNonBlocking ->
         return $ NonBlockingResponse newEntries
 
--- -- For blocking request, retry until there are new values available.
--- if isBlocking blocking && null newEntries then retry else return newEntries
-
-type RelayProducer id header body st m a = TS.Server (RelayState id header body) 'NonPipelined st m a
+type RelayProducer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
 
 relayProducer ::
   forall id header body m.
-  (MonadSTM m, MonadDelay m) =>
+  (Ord id, MonadSTM m, MonadDelay m) =>
   RelayConfig ->
   RelayProducerState id header body m ->
   RelayProducer id header body 'StIdle m ()
-relayProducer config state = undefined
+relayProducer config state = idle emptyWindow
  where
   idle :: Window id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
   idle !window = TC.Await $ \case
@@ -440,7 +438,14 @@ relayProducer config state = undefined
       withSingIBlockingStyle blocking $ do
         return $ TC.Yield (MsgRespondHeaders responseList) (idle newWindow)
     MsgRequestBodies ids -> TC.Effect $ do
-      _
+      -- Check that all ids are in the window:
+      forM_ ids $ \id' -> do
+        when (isNothing (Seq.findIndexL ((== id') . fst) window.values)) $ do
+          throw RequestedUnknownId
+      -- Read the bodies from the RelayBuffer:
+      relayBuffer <- readTVarIO state.relayBufferVar
+      let bodies = mapMaybe (fmap snd . RB.lookup relayBuffer) ids
+      return $ TC.Yield (MsgResponseBodies bodies) (idle window)
 
 --------------------------------
 ---- Relay Consumer
@@ -448,7 +453,7 @@ relayProducer config state = undefined
 
 data RelayConsumerState id header body m = RelayConsumerState {}
 
-type RelayConsumer id header body st m a = TC.Client (RelayState id header body) 'NonPipelined st m a
+type RelayConsumer id header body st m a = TS.Server (RelayState id header body) 'NonPipelined st m a
 
 relayConsumer ::
   forall id header body m.
