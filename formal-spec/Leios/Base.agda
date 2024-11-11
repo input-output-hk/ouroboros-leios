@@ -26,3 +26,6 @@ record BaseAbstract : Type₁ where
   record Functionality : Type₁ where
     field State : Type
           _⇀⟦_⟧_ : State → Input → State × Output → Type
+
+    open Input public
+    open Output public
