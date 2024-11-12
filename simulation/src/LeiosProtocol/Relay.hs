@@ -631,14 +631,22 @@ relayConsumerPipelined config sst =
       )
       (requestHeadersNonBlocking lst')
 
+  windowAdjust ::
+    forall (n :: N).
+    RelayConsumerLocalState id header body n ->
+    (WindowShrink, WindowExpand)
+  windowAdjust lst = (windowShrink, windowExpand)
+   where
+    windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
+    windowShrink = lst.pendingShrink
+    windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+
   requestHeadersNonBlocking ::
     forall (n :: N).
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
   requestHeadersNonBlocking lst = do
-    let windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
-    let windowShrink = lst.pendingShrink
-    let windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+    let (windowShrink, windowExpand) = windowAdjust lst
     TS.YieldPipelined
       (MsgRequestHeaders SingNonBlocking windowShrink windowExpand)
       ( TS.ReceiverAwait $ \case
@@ -657,9 +665,7 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body Z ->
     RelayConsumer id header body Z 'StIdle m ()
   requestHeadersBlocking lst = do
-    let windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
-    let windowShrink = lst.pendingShrink
-    let windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+    let (windowShrink, windowExpand) = windowAdjust lst
     TS.Yield (MsgRequestHeaders SingBlocking windowShrink windowExpand) $
       assert (lst.pendingExpand == 0) $ do
         let lst' = lst{pendingShrink = 0, pendingExpand = windowExpand}
