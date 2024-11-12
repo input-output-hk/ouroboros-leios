@@ -419,7 +419,7 @@ relayProducer config state = idle initRelayProducerLocalState
       -- Shrink the window:
       let keptValues = Seq.drop (fromIntegral shrink) st.window
       -- Find the new entries:
-      newEntries <- readEntriesAfterTicket state blocking expand st.lastTicket
+      newEntries <- readNewEntries state blocking expand st.lastTicket
       -- Expand the window:
       let newValues = Seq.fromList [(e.key, e.ticket) | e <- Foldable.toList newEntries]
       let window' = keptValues <> newValues
@@ -441,14 +441,14 @@ relayProducer config state = idle initRelayProducerLocalState
       let bodies = mapMaybe (fmap snd . RB.lookup relayBuffer) ids
       return $ TC.Yield (MsgRespondBodies bodies) (idle st)
 
-readEntriesAfterTicket ::
+readNewEntries ::
   MonadSTM m =>
   RelayProducerState id header body m ->
   SingBlockingStyle blocking ->
   WindowExpand ->
   RB.Ticket ->
   m (ResponseList blocking (RB.EntryWithTicket id (header, body)))
-readEntriesAfterTicket state blocking expand t = atomically $ do
+readNewEntries state blocking expand t = atomically $ do
   newEntries <-
     take (fromIntegral expand)
       . (`RB.takeAfterTicket` t)
@@ -456,7 +456,10 @@ readEntriesAfterTicket state blocking expand t = atomically $ do
   assert (and [entry.ticket > t | entry <- newEntries]) $
     case blocking of
       SingBlocking ->
-        maybe retry (return . BlockingResponse) (NonEmpty.nonEmpty newEntries)
+        case NonEmpty.nonEmpty newEntries of
+          Nothing -> retry
+          Just newEntries' ->
+            return $ BlockingResponse newEntries'
       SingNonBlocking ->
         return $ NonBlockingResponse newEntries
 
