@@ -98,9 +98,17 @@ export type TMessageType =
   | ITransactionReceived
   | ITransactionSent;
 
-export interface IServerMessage {
+export interface IServerMessage<T = TMessageType> {
   time: number;
-  message: TMessageType;
+  message: T;
+}
+
+export interface ITransactionMessage {
+  generated: number;
+  duration: number;
+  sentTime: number;
+  source: number;
+  target: number;
 }
 
 export interface ITransactionRoundTrip {

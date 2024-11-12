@@ -9,7 +9,15 @@ import {
 } from "react";
 
 import { Slider } from "./Slider";
-import { EMessageType, IServerMessage, ITransformedNodeMap } from "./types";
+import {
+  EMessageType,
+  IServerMessage,
+  ITransactionGenerated,
+  ITransactionMessage,
+  ITransactionReceived,
+  ITransactionSent,
+  ITransformedNodeMap,
+} from "./types";
 
 interface IGraphProps {
   messages: IServerMessage[];
@@ -32,26 +40,52 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const transactions = useMemo(() => {
-    const transactionsById: Map<number, IServerMessage[]> = new Map();
+    const transactionsById: Map<number, ITransactionMessage[]> = new Map();
 
-    for (const input of messages) {
-      if (
-        EMessageType.TransactionGenerated === input.message?.type ||
-        EMessageType.TransactionReceived === input.message?.type ||
-        EMessageType.TransactionSent === input.message?.type
-      ) {
-        if (transactionsById.has(input.message.id)) {
-          transactionsById.get(input.message.id)?.push(input);
-        } else {
-          transactionsById.set(input.message.id, [input]);
+    const generatedMessages = messages.filter(
+      ({ message }) => message.type === EMessageType.TransactionGenerated,
+    ) as IServerMessage<ITransactionGenerated>[];
+    const sentMessages = messages.filter(
+      ({ message }) => message.type === EMessageType.TransactionSent,
+    ) as IServerMessage<ITransactionSent>[];
+    const receivedMessages = messages.filter(
+      ({ message }) => message.type === EMessageType.TransactionReceived,
+    ) as IServerMessage<ITransactionReceived>[];
+
+    for (const input of generatedMessages) {
+      const transactions: ITransactionMessage[] = [];
+
+      for (const sentMsg of sentMessages) {
+        if (sentMsg.message.id === input.message.id) {
+          const receivedMsg = receivedMessages.find(
+            (r) =>
+              r.message.id === input.message.id &&
+              r.message.sender === sentMsg.message.sender &&
+              r.message.recipient === sentMsg.message.recipient,
+          );
+
+          if (!receivedMsg) {
+            console.log("Could not find matching transaction for " + sentMsg.message.id);
+            continue;
+          }
+
+          transactions.push({
+            duration: receivedMsg.time - sentMsg.time,
+            source: sentMsg.message.sender,
+            target: sentMsg.message.recipient,
+            sentTime: sentMsg.time,
+            generated: input.time,
+          });
         }
       }
+
+      transactionsById.set(input.message.id, transactions);
     }
 
     return transactionsById;
   }, [messages]);
 
-  console.log(transactions)
+  console.log(transactions);
 
   // Function to draw the scene
   const draw = useCallback(() => {
@@ -248,6 +282,11 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     // Start the animation
     // animateParticles();
   }, [topography, messages]); // Empty dependency array to run once when the component mounts
+
+  // Draw on initial mount.
+  useEffect(() => {
+    draw();
+  }, [])
 
   if (!topography.links.length || !topography.nodes.length) {
     return <p>Loading...</p>;
