@@ -579,7 +579,13 @@ relayConsumerPipelined config sst =
           -- ask for so the only remaining thing to do is to ask for more
           -- txids. Since this is the only thing to do now, we make this a
           -- blocking call.
-          requestHeadersBlocking lst
+          assert
+            ( lst.pendingExpand == 0
+                && Seq.null lst.window
+                && Map.null lst.available
+                && Map.null lst.buffer
+            )
+            $ requestHeadersBlocking lst
     Succ pendingRequests'
       | canRequestMoreBodies -> do
           -- We have replies in flight and we should eagerly collect them if
