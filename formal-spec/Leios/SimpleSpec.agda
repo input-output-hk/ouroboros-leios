@@ -252,6 +252,6 @@ data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutpu
                 votes = map (vote ∘ hash) (setToList EBs')
           in
           ∙ canProduceV2 slot
-          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFDAbstract.SendRes)
+          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
           ──────────────────────────────────────────────────────────────────────────────────────────
           just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
