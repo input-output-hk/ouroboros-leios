@@ -20,14 +20,14 @@ module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open
   (vrf' : LeiosVRF a) (let open LeiosVRF vrf')
   (sk-IB sk-EB sk-V : PrivKey)
   (pk-IB pk-EB pk-V : PubKey)
-  (let open Leios.Base a) (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
+  (let open Leios.Base a vrf') (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
   (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF : KeyRegistrationAbstract.Functionality K') where
 
 module B   = BaseAbstract.Functionality BF
 module K   = KeyRegistrationAbstract.Functionality KF
 module FFD = FFDAbstract.Functionality FFD' renaming (stepRel to _⇀⟦_⟧_)
 
-open BaseAbstract B' using (Cert)
+open BaseAbstract B' using (Cert; V-chkCerts)
 open GenFFD
 
 -- High level structure:
@@ -163,16 +163,13 @@ module _ (s : LeiosState) where
 _↑_ : LeiosState → List (Header ⊎ Body) → LeiosState
 _↑_ = foldr (flip upd)
 
-postulate
-  V_chkCerts : List PubKey → EndorserBlock × Cert → Type
-
 data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
   -- Initialization
 
   Init : ∀ {V bs bs' SD ks ks' pks} →
        ∙ ks K.⇀⟦ K.INIT pk-IB pk-EB pk-V ⟧ (ks' , K.PUBKEYS pks)
-       ∙ bs B.⇀⟦ B.INIT (V_chkCerts pks) ⟧ (bs' , B.STAKE SD)
+       ∙ bs B.⇀⟦ B.INIT (V-chkCerts pks) ⟧ (bs' , B.STAKE SD)
        ─────────────────────────────────────────────────────────
        nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
