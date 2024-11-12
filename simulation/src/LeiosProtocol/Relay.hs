@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -33,6 +32,7 @@ import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
@@ -46,6 +46,8 @@ import qualified LeiosProtocol.RelayBuffer as RB
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (..),
+  N (..),
+  Nat (..),
   Protocol (..),
   StateTokenI (..),
  )
@@ -378,7 +380,7 @@ newtype RelayConfig = RelayConfig
 ---- Relay Producer
 --------------------------------
 
-newtype RelayProducerState id header body m = RelayProducerState
+newtype RelayProducerSharedState id header body m = RelayProducerSharedState
   { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
   }
 
@@ -396,16 +398,16 @@ relayProducer ::
   forall id header body m.
   (Ord id, MonadSTM m, MonadDelay m) =>
   RelayConfig ->
-  RelayProducerState id header body m ->
+  RelayProducerSharedState id header body m ->
   RelayProducer id header body 'StIdle m ()
-relayProducer config state = idle initRelayProducerLocalState
+relayProducer config sst = idle initRelayProducerLocalState
  where
   idle :: RelayProducerLocalState id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
-  idle st = TC.Await $ \case
+  idle lst = TC.Await $ \case
     MsgRequestHeaders blocking shrink expand -> TC.Effect $ do
       -- Validate the request:
       -- 1. shrink <= windowSize
-      let windowSize = fromIntegral (Seq.length st.window)
+      let windowSize = fromIntegral (Seq.length lst.window)
       when @m (shrink.value > windowSize.value) $ do
         throw $ ShrankTooMuch windowSize shrink
       -- 2. windowSize - shrink + expand <= maxWindowSize
@@ -417,42 +419,44 @@ relayProducer config state = idle initRelayProducerLocalState
       when (expand.value == 0 && (isBlocking blocking || shrink.value == 0)) $ do
         throw RequestedNoChange
       -- Shrink the window:
-      let keptValues = Seq.drop (fromIntegral shrink) st.window
+      let keptValues = Seq.drop (fromIntegral shrink) lst.window
       -- Find the new entries:
-      newEntries <- readNewEntries state blocking expand st.lastTicket
+      newEntries <- readNewEntries sst blocking expand lst.lastTicket
       -- Expand the window:
       let newValues = Seq.fromList [(e.key, e.ticket) | e <- Foldable.toList newEntries]
       let window' = keptValues <> newValues
       let lastTicket' = case newValues of
-            Seq.Empty -> st.lastTicket
+            Seq.Empty -> lst.lastTicket
             _ Seq.:|> (_, ticket) -> ticket
-      let st' = st{window = window', lastTicket = lastTicket'}
+      let lst' = lst{window = window', lastTicket = lastTicket'}
       let responseList = fmap (fst . (.value)) newEntries
       -- Yield the new entries:
       withSingIBlockingStyle blocking $ do
-        return $ TC.Yield (MsgRespondHeaders responseList) (idle st')
+        return $ TC.Yield (MsgRespondHeaders responseList) (idle lst')
     MsgRequestBodies ids -> TC.Effect $ do
       -- Check that all ids are in the window:
+      -- NOTE: This is O(n^2) which is acceptable only if maxWindowSize is small.
+      -- TODO: Andrea: is a maxWindowSize of 10 large enough for freshest first?
       forM_ ids $ \id' -> do
-        when (isNothing (Seq.findIndexL ((== id') . fst) st.window)) $ do
+        when (isNothing (Seq.findIndexL ((== id') . fst) lst.window)) $ do
           throw RequestedUnknownId
       -- Read the bodies from the RelayBuffer:
-      relayBuffer <- readReadOnlyTVarIO state.relayBufferVar
+      relayBuffer <- readReadOnlyTVarIO sst.relayBufferVar
       let bodies = mapMaybe (fmap snd . RB.lookup relayBuffer) ids
-      return $ TC.Yield (MsgRespondBodies bodies) (idle st)
+      return $ TC.Yield (MsgRespondBodies bodies) (idle lst)
 
 readNewEntries ::
   MonadSTM m =>
-  RelayProducerState id header body m ->
+  RelayProducerSharedState id header body m ->
   SingBlockingStyle blocking ->
   WindowExpand ->
   RB.Ticket ->
   m (ResponseList blocking (RB.EntryWithTicket id (header, body)))
-readNewEntries state blocking expand t = atomically $ do
+readNewEntries sst blocking expand t = atomically $ do
   newEntries <-
     take (fromIntegral expand)
       . (`RB.takeAfterTicket` t)
-      <$> readReadOnlyTVar state.relayBufferVar
+      <$> readReadOnlyTVar sst.relayBufferVar
   assert (and [entry.ticket > t | entry <- newEntries]) $
     case blocking of
       SingBlocking ->
@@ -467,17 +471,23 @@ readNewEntries state blocking expand t = atomically $ do
 ---- Relay Consumer
 --------------------------------
 
-newtype RelayConsumerState id header body m = RelayConsumerState
+newtype RelayConsumerSharedState id header body m = RelayConsumerSharedState
   { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
   }
 
 -- | Information maintained internally in the 'txSubmissionInbound' server
 -- implementation.
-data RelayConsumerLocalState id header = RelayConsumerLocalState
-  { pendingRequests :: !Word16
-  -- ^ The number of body identifiers that we have requested but
+type RelayConsumerLocalState :: Type -> Type -> Type -> N -> Type
+data RelayConsumerLocalState id header body n = RelayConsumerLocalState
+  { pendingRequests :: Nat n
+  , pendingExpand :: !WindowExpand
+  -- ^ The number of headers that we have requested but
   -- which have not yet been replied to. We need to track this it keep
   -- our requests within the maximum window size.
+  , pendingShrink :: !WindowShrink
+  -- ^ The number of bodies we can acknowledge on our next request
+  -- for more bodies. The number here have already been removed from
+  -- 'window'.
   , window :: !(StrictSeq id)
   -- ^ Those bodies (by their identifier) that the client has told
   -- us about, and which we have not yet acknowledged. This is kept in
@@ -489,7 +499,7 @@ data RelayConsumerLocalState id header = RelayConsumerLocalState
   -- are a subset of the 'window' that we have not yet
   -- requested. This is not ordered to illustrate the fact that we can
   -- request bodies out of order. We also remember their header.
-  , buffer :: !(Map id (Maybe header))
+  , buffer :: !(Map id (Maybe (header, body)))
   -- ^ Bodies we have successfully downloaded but have not yet added
   -- to the mempool or acknowledged. This needed because we can request
   -- bodies out of order but must use the original order when adding
@@ -517,20 +527,149 @@ data RelayConsumerLocalState id header = RelayConsumerLocalState
   --   some subset of them have are already in the mempool, we wouldn't
   --   want to bother asking for those specific bodies. Therefore,
   --   we would just insert those IDs mapped to 'Nothing' to
-  --   the 'bufferedTxs' such that those bodies are acknowledged,
+  --   the 'buffer' such that those bodies are acknowledged,
   --   but never actually requested.
-  , pendingShrink :: !WindowShrink
-  -- ^ The number of bodies we can acknowledge on our next request
-  -- for more bodies. The number here have already been removed from
-  -- 'window'.
   }
   deriving (Show, Generic)
 
-type RelayConsumer id header body st m a = TS.Server (RelayState id header body) 'NonPipelined st m a
+initRelayConsumerLocalState :: RelayConsumerLocalState id header body Z
+initRelayConsumerLocalState =
+  RelayConsumerLocalState
+    { pendingRequests = Zero
+    , pendingExpand = 0
+    , pendingShrink = 0
+    , window = Seq.empty
+    , available = Map.empty
+    , buffer = Map.empty
+    }
 
-relayConsumer ::
+data Collect id header body
+  = CollectHeaders WindowExpand [header]
+  | CollectBodies [id] [body]
+
+type RelayConsumer id header body n st m a = TS.Server (RelayState id header body) ('Pipelined n (Collect id header body)) st m a
+
+type RelayConsumerPipelined id header body st m a = TS.ServerPipelined (RelayState id header body) st m a
+
+relayConsumerPipelined ::
   forall id header body m.
   (MonadSTM m, MonadDelay m) =>
-  RelayConsumerState id header body m ->
-  RelayConsumer id header body 'StIdle m ()
-relayConsumer = undefined
+  RelayConfig ->
+  RelayConsumerSharedState id header body m ->
+  RelayConsumerPipelined id header body 'StInit m ()
+relayConsumerPipelined config sst =
+  TS.ServerPipelined $
+    TS.Await @_ @('Pipelined TS.Z (Collect id header body)) $ \case
+      MsgInit -> idle initRelayConsumerLocalState
+ where
+  maxHeadersToRequest = 3 :: Word16
+  maxBodiesToRequest = 2 :: Word16
+
+  idle ::
+    RelayConsumerLocalState id header body n ->
+    RelayConsumer id header body n 'StIdle m ()
+  idle lst = case lst.pendingRequests of
+    Zero
+      | canRequestMoreBodies -> do
+          -- There are no replies in flight, but we do know some more bodies we
+          -- can ask for, so lets ask for them and more headers.
+          requestBodies lst
+      | otherwise -> do
+          -- There's no replies in flight, and we have no more txs we can
+          -- ask for so the only remaining thing to do is to ask for more
+          -- txids. Since this is the only thing to do now, we make this a
+          -- blocking call.
+          requestHeadersBlocking lst
+    Succ pendingRequests'
+      | canRequestMoreBodies -> do
+          -- We have replies in flight and we should eagerly collect them if
+          -- available, but there are bodies to request too so we
+          -- should not block waiting for replies.
+          --
+          -- Having requested more bodies, we opportunistically ask
+          -- for more headers in a non-blocking way. This is how we pipeline
+          -- asking for both bodies and headers.
+          --
+          -- It's important not to pipeline more requests for headers when we
+          -- have no bodies to ask for, since (with no other guard) this will
+          -- put us into a busy-polling loop.
+          let lst' = lst{pendingRequests = pendingRequests'}
+          TS.Collect (Just (requestBodies lst)) (handleResponse lst')
+      | otherwise -> do
+          -- In this case there is nothing else to do so we block until we
+          -- collect a reply.
+          let lst' = lst{pendingRequests = pendingRequests'}
+          TS.Collect Nothing (handleResponse lst')
+   where
+    canRequestMoreBodies = not (Map.null lst.available)
+
+  done ::
+    RelayConsumerLocalState id header body Z ->
+    RelayConsumer id header body Z 'StDone m ()
+  done _lst = TS.Done ()
+
+  requestBodies ::
+    forall (n :: N).
+    RelayConsumerLocalState id header body n ->
+    RelayConsumer id header body n 'StIdle m ()
+  requestBodies lst = do
+    let (idsAndHeadersToRequest, available') =
+          Map.splitAt (fromIntegral maxBodiesToRequest) lst.available
+    let idsToRequest = Map.keys idsAndHeadersToRequest
+    let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
+    TS.YieldPipelined
+      (MsgRequestBodies idsToRequest)
+      ( TS.ReceiverAwait $ \case
+          MsgRespondBodies bodies ->
+            TS.ReceiverDone (CollectBodies idsToRequest bodies)
+      )
+      (requestHeadersNonBlocking lst')
+
+  requestHeadersNonBlocking ::
+    forall (n :: N).
+    RelayConsumerLocalState id header body n ->
+    RelayConsumer id header body n 'StIdle m ()
+  requestHeadersNonBlocking lst = do
+    let windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
+    let windowShrink = lst.pendingShrink
+    let windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+    TS.YieldPipelined
+      (MsgRequestHeaders SingNonBlocking windowShrink windowExpand)
+      ( TS.ReceiverAwait $ \case
+          MsgRespondHeaders (NonBlockingResponse headers) ->
+            TS.ReceiverDone (CollectHeaders windowExpand headers)
+      )
+      ( idle
+          lst
+            { pendingRequests = Succ lst.pendingRequests
+            , pendingShrink = 0
+            , pendingExpand = lst.pendingExpand + windowExpand
+            }
+      )
+
+  requestHeadersBlocking ::
+    RelayConsumerLocalState id header body Z ->
+    RelayConsumer id header body Z 'StIdle m ()
+  requestHeadersBlocking lst = do
+    let windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
+    let windowShrink = lst.pendingShrink
+    let windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+    TS.Yield (MsgRequestHeaders SingBlocking windowShrink windowExpand) $
+      assert (lst.pendingExpand == 0) $ do
+        let lst' = lst{pendingShrink = 0, pendingExpand = windowExpand}
+        TS.Await $ \case
+          MsgDone -> done lst'
+          MsgRespondHeaders (BlockingResponse headers) ->
+            handleResponse lst' $
+              CollectHeaders windowExpand (NonEmpty.toList headers)
+
+  handleResponse ::
+    forall (n :: N).
+    RelayConsumerLocalState id header body n ->
+    Collect id header body ->
+    RelayConsumer id header body n 'StIdle m ()
+  handleResponse lst = \case
+    CollectHeaders windowExpand idsAndHeaders -> do
+      _
+    CollectBodies ids bodies -> do
+      _
