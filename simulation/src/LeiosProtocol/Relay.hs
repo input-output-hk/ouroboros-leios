@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -403,7 +404,7 @@ relayProducer ::
 relayProducer config sst = idle initRelayProducerLocalState
  where
   idle :: RelayProducerLocalState id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
-  idle lst = TC.Await $ \case
+  idle !lst = TC.Await $ \case
     MsgRequestHeaders blocking shrink expand -> TC.Effect $ do
       -- Validate the request:
       -- 1. shrink <= windowSize
