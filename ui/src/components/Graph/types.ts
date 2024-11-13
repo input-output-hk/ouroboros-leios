@@ -1,26 +1,28 @@
+export interface INode {
+  location: number[];
+  stake?: number;
+}
+
 export interface IServerNodeMap {
-  nodes: {
-    location: number[];
-    stake?: number;
-  }[];
+  nodes: INode[];
   links: {
     nodes: number[];
     id?: number;
   }[];
 }
 
-export interface ITransformedNodeMap<
-  T = {
+export interface ITransformedNode {
+  id: number;
+  fx: number;
+  fy: number;
+  data: {
     location: number[];
     stake?: number;
-  },
-> {
-  nodes: {
-    id: number;
-    fx: number;
-    fy: number;
-    data: T;
-  }[];
+  };
+};
+
+export interface ITransformedNodeMap {
+  nodes: ITransformedNode[];
   links: {
     source: number;
     target: number;

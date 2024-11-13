@@ -27,7 +27,7 @@ interface IGraphProps {
 const width = 1024;
 const height = 600;
 const zoomSensitivity = 0.1;
-let scale = 1,
+let scale = 2,
   isDragging = false,
   startX: number,
   startY: number,
@@ -36,24 +36,26 @@ let scale = 1,
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const simulationStart = useRef(performance.now());
   const [play, setPlay] = useState(false);
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [speed, setSpeed] = useState<1 | 2 | 3>(3);
+
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
 
     const generatedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionGenerated,
+      ({ message }) => message.type === EMessageType.TransactionGenerated
     ) as IServerMessage<ITransactionGenerated>[];
     const sentMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionSent,
+      ({ message }) => message.type === EMessageType.TransactionSent
     ) as IServerMessage<ITransactionSent>[];
     const receivedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionReceived,
+      ({ message }) => message.type === EMessageType.TransactionReceived
     ) as IServerMessage<ITransactionReceived>[];
 
     for (const input of generatedMessages) {
-      const transactions: ITransactionMessage[] = [];
+      const transactionList: ITransactionMessage[] = [];
 
       for (const sentMsg of sentMessages) {
         if (sentMsg.message.id === input.message.id) {
@@ -61,102 +63,53 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
             (r) =>
               r.message.id === input.message.id &&
               r.message.sender === sentMsg.message.sender &&
-              r.message.recipient === sentMsg.message.recipient,
+              r.message.recipient === sentMsg.message.recipient
           );
 
           if (!receivedMsg) {
-            console.log("Could not find matching transaction for " + sentMsg.message.id);
+            console.log(
+              "Could not find matching transaction for " + sentMsg.message.id
+            );
             continue;
           }
 
-          transactions.push({
-            duration: receivedMsg.time - sentMsg.time,
+          // Convert time to miliseconds from nanoseconds.
+          transactionList.push({
+            duration:
+              Math.floor(receivedMsg.time / 10000) -
+              Math.floor(sentMsg.time / 10000),
             source: sentMsg.message.sender,
             target: sentMsg.message.recipient,
-            sentTime: sentMsg.time,
-            generated: input.time,
+            sentTime: Math.floor(sentMsg.time / 10000),
+            generated: Math.floor(input.time / 10000),
           });
         }
       }
 
-      transactionsById.set(input.message.id, transactions);
+      transactionsById.set(input.message.id, transactionList);
     }
 
     return transactionsById;
   }, [messages]);
 
-  console.log(transactions);
-
   // Function to draw the scene
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
-    if (!context) {
+    if (!context || !canvas) {
       return;
     }
 
-    // Clear the canvas
-    context.clearRect(0, 0, width, height);
-    context.save();
-
-    // Apply translation
-    context.translate(offsetX, offsetY);
-    context.scale(scale, scale);
-
-    // Draw the particle
-    // particles.forEach(p => {
-    //   context.beginPath();
-    //   context.arc(p.x, p.y, 2, 0 , 2 * Math.PI);
-    //   context.fillStyle = "red";
-    //   context.fill();
-    // })
-
-    // Draw the links
-    topography.links.forEach((n) => {
-      const nodeStart = topography.nodes.find(({ id }) => id === n.source);
-      const nodeEnd = topography.nodes.find(({ id }) => id === n.target);
-      if (!nodeStart || !nodeEnd) {
-        return;
-      }
-
-      context.beginPath();
-      context.moveTo(nodeStart.fx, nodeStart.fy);
-      context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = "#ddd";
-      context.lineWidth = 1;
-      context.stroke();
-    });
-
-    // Draw the nodes
-    topography.nodes.forEach((n) => {
-      context.beginPath();
-      context.arc(n.fx, n.fy, 6, 0, 2 * Math.PI);
-      context.fillStyle = n.data.stake ? "green" : "blue";
-      context.fill();
-    });
-
-    context.restore();
-  }, [currentTime]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (
-      !canvas ||
-      !messages.length ||
-      !topography.nodes.length ||
-      !topography.links.length
-    ) {
-      return;
-    }
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      return;
-    }
+    // Current time in simulation
+    const simulationTime = (performance.now() - simulationStart.current) * speed;
 
     // Set canvas dimensions
     canvas.width = width;
     canvas.height = height;
+
+    // Clear the canvas
+    context.clearRect(0, 0, width, height);
+    context.save();
 
     // Calculate the bounds
     const coordinates: { xValues: number[]; yValues: number[] } = {
@@ -183,110 +136,112 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     offsetX = canvasCenterX - (minX + pathWidth / 2);
     offsetY = canvasCenterY - (minY + pathHeight / 2);
 
-    canvas.addEventListener("mousedown", (event) => {
-      // Start dragging
-      isDragging = true;
+    // Apply translation and scaling
+    context.translate(offsetX, offsetY);
+    context.scale(scale, scale);
 
-      // Get the initial mouse position
-      const rect = canvas.getBoundingClientRect();
-      startX = event.clientX - rect.left;
-      startY = event.clientY - rect.top;
-    });
-
-    canvas.addEventListener("mousemove", (event) => {
-      if (isDragging) {
-        // Calculate how far the mouse has moved
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-
-        // Update the translation offsets
-        offsetX += (mouseX - startX) / scale;
-        offsetY += (mouseY - startY) / scale;
-
-        // Update the starting position for the next move event
-        startX = mouseX;
-        startY = mouseY;
-
-        // Redraw the canvas
-        draw();
+    // Draw the links
+    topography.links.forEach((link) => {
+      const nodeStart = topography.nodes.find(({ id }) => id === link.source);
+      const nodeEnd = topography.nodes.find(({ id }) => id === link.target);
+      if (!nodeStart || !nodeEnd) {
+        return;
       }
+
+      context.beginPath();
+      context.moveTo(nodeStart.fx, nodeStart.fy);
+      context.lineTo(nodeEnd.fx, nodeEnd.fy);
+      context.strokeStyle = "#ddd";
+      context.lineWidth = 1;
+      context.stroke();
     });
 
-    canvas.addEventListener("mouseup", () => {
-      // Stop dragging
-      isDragging = false;
+    // Draw the transactions
+    transactions.forEach((txList) => {
+      txList.forEach((transaction) => {
+        const { duration, source, target, sentTime } = transaction;
+        const sourceNode = topography.nodes.find((n) => n.id === source);
+        const targetNode = topography.nodes.find((n) => n.id === target);
+
+        if (!sourceNode || !targetNode) {
+          console.log("Could not find source and target nodes for this transaction.");
+          return;
+        }
+
+        const startX = sourceNode.fx;
+        const startY = sourceNode.fy;
+        const endX = targetNode.fx;
+        const endY = targetNode.fy;
+        const elapsed = simulationTime - sentTime;
+
+        if (elapsed > duration || elapsed < 0) return; // Skip if the animation is done or hasn't started
+
+        // Calculate the interpolation factor
+        const t = elapsed / duration;
+        const x = startX + t * (endX - startX);
+        const y = startY + t * (endY - startY);
+
+        // Draw the moving circle
+        context.beginPath();
+        context.arc(x, y, 2, 0, 2 * Math.PI);
+        context.fillStyle = "red";
+        context.fill();
+      });
     });
 
-    canvas.addEventListener("mouseout", () => {
-      // Stop dragging if the mouse leaves the canvas
-      isDragging = false;
+    // Draw the nodes
+    topography.nodes.forEach((node) => {
+      context.beginPath();
+      context.arc(node.fx, node.fy, 6, 0, 2 * Math.PI);
+      context.fillStyle = node.data.stake ? "green" : "blue";
+      context.fill();
     });
 
-    canvas.addEventListener("wheel", (event) => {
-      // Prevent the default scrolling behavior
-      event.preventDefault();
+    context.restore();
 
-      // Calculate the new scale factor
-      const zoom = event.deltaY > 0 ? 1 - zoomSensitivity : 1 + zoomSensitivity;
-      scale *= zoom;
+    if (play) {
+      requestAnimationFrame(draw);
+    }
+  }, [topography, transactions, play, speed]);
 
-      // Redraw the canvas with the new scale
-      draw();
-    });
+  // Function to toggle play/pause
+  const togglePlayPause = () => {
+    setPlay((prevPlay) => !prevPlay);
+  };
 
-    // Function to animate the particle
-    let slotIndex = 0;
-    // const animateParticles = () => {
-    //   const slotStartTime = messages[slotIndex].start_time / 100000;
-    //   const slotEndTime =
-    //     slotIndex === messages.length - 1
-    //       ? messages[slotIndex].events[messages[slotIndex].events.length - 1]
-    //           .time / 100000
-    //       : messages[slotIndex + 1].start_time / 100000;
-    //   const duration = slotEndTime - slotStartTime; // duration of the animation in milliseconds
-    //   const startTime = Date.now();
+  // Function to reset the simulation
+  const resetSimulation = () => {
+    setPlay(false);
+    setCurrentTime(0);
+    simulationStart.current = performance.now(); // Reset start time
+  };
 
-    //   function animate() {
-    //     const elapsed = Date.now() - startTime;
-    //     const t = Math.min(elapsed / duration, 1); // Normalize time to [0, 1]
+  // Effect to start/stop the animation loop
+  useEffect(() => {
+    if (play) {
+      simulationStart.current = performance.now();
+      requestAnimationFrame(draw);
+    }
+  }, [play, draw]);
 
-    //     // Interpolate the particle's position
-    //     // for (const message of messages) {
-    //     /**
-    //      * particles.forEach((p, index) => {
-    //      *  const link = refLinks[index];
-    //      *
-    //      * })
-    //      */
-    //     // }
-    //     // particles.forEach(p => {
-    //     //   p.x = nodes[0].x + (nodes[1].x - nodes[0].x) * t;
-    //     //   p.y = nodes[0].y + (nodes[1].y - nodes[0].y) * t;
-    //     // })
+  // Effect to update the simulation time
+  useEffect(() => {
+    let interval: NodeJS.Timer | undefined;
+    if (play) {
+      interval = setInterval(() => {
+        setCurrentTime((prev) => prev + speed);
+      }, 1000 / 60); // 60 FPS
+    } else {
+      clearInterval(interval);
+    }
+    
+    return () => clearInterval(interval);
+  }, [play, speed]);
 
-    //     // Draw the scene
-    //     draw();
-
-    //     if (t < 1) {
-    //       requestAnimationFrame(animate); // Continue the animation
-    //       slotIndex++;
-    //     }
-    //   }
-
-    //   animate();
-    // };
-
-    // animateParticles();
-
-    // Start the animation
-    // animateParticles();
-  }, [topography, messages]); // Empty dependency array to run once when the component mounts
-
-  // Draw on initial mount.
+  // Initial draw on mount
   useEffect(() => {
     draw();
-  }, [])
+  }, [draw]);
 
   if (!topography.links.length || !topography.nodes.length) {
     return <p>Loading...</p>;
@@ -295,12 +250,18 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   return (
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-        <Slider value={currentMessageIndex} setValue={setCurrentMessageIndex} />
+        <Slider value={currentTime} max={messages[messages.length - 1].time} setValue={setCurrentTime} />
         <button
           className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-          onClick={() => setPlay((prev) => !prev)}
+          onClick={togglePlayPause}
         >
-          {play ? "Stop" : "Start"}
+          {play ? "Pause" : "Play"}
+        </button>
+        <button
+          className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
+          onClick={resetSimulation}
+        >
+          Reset
         </button>
       </div>
       <canvas ref={canvasRef} />
