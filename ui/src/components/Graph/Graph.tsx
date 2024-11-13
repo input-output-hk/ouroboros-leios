@@ -1,5 +1,6 @@
 "use client";
 import {
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -26,20 +27,25 @@ interface IGraphProps {
 
 const width = 1024;
 const height = 600;
-const zoomSensitivity = 0.1;
 let scale = 2,
-  isDragging = false,
-  startX: number,
-  startY: number,
   offsetX = 0,
   offsetY = 0;
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationStart = useRef(performance.now());
-  const [play, setPlay] = useState(false);
+  const pauseTime = useRef<number | null>(null);
+  const animationFrameId = useRef<number | null>(null);
+  const currentTimeRef = useRef<number>(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [play, setPlay] = useState(false);
   const [speed, setSpeed] = useState<1 | 2 | 3>(3);
+
+  useEffect(() => {
+    setCurrentTime(currentTimeRef.current);
+  }, [currentTimeRef.current])
+
+  console.log(currentTime)
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
@@ -102,6 +108,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
 
     // Current time in simulation
     const simulationTime = (performance.now() - simulationStart.current) * speed;
+    currentTimeRef.current += 1;
 
     // Set canvas dimensions
     canvas.width = width;
@@ -192,7 +199,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     // Draw the nodes
     topography.nodes.forEach((node) => {
       context.beginPath();
-      context.arc(node.fx, node.fy, 6, 0, 2 * Math.PI);
+      context.arc(node.fx, node.fy, 3, 0, 2 * Math.PI);
       context.fillStyle = node.data.stake ? "green" : "blue";
       context.fill();
     });
@@ -200,43 +207,39 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     context.restore();
 
     if (play) {
-      requestAnimationFrame(draw);
+      animationFrameId.current = requestAnimationFrame(draw);
+      // setCurrentTime(prev => prev + speed);
     }
-  }, [topography, transactions, play, speed]);
+  }, [topography, transactions, play, speed, currentTimeRef]);
 
   // Function to toggle play/pause
   const togglePlayPause = () => {
-    setPlay((prevPlay) => !prevPlay);
+    setPlay((playing) => !playing);
+    if (!play) {
+      simulationStart.current = performance.now() - (pauseTime.current ?? 0);
+      animationFrameId.current = requestAnimationFrame(draw);
+    } else {
+      pauseTime.current = performance.now() - (simulationStart.current ?? 0);
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+      }
+    }
   };
 
   // Function to reset the simulation
   const resetSimulation = () => {
     setPlay(false);
-    setCurrentTime(0);
-    simulationStart.current = performance.now(); // Reset start time
-  };
-
-  // Effect to start/stop the animation loop
-  useEffect(() => {
-    if (play) {
-      simulationStart.current = performance.now();
-      requestAnimationFrame(draw);
-    }
-  }, [play, draw]);
-
-  // Effect to update the simulation time
-  useEffect(() => {
-    let interval: NodeJS.Timer | undefined;
-    if (play) {
-      interval = setInterval(() => {
-        setCurrentTime((prev) => prev + speed);
-      }, 1000 / 60); // 60 FPS
-    } else {
-      clearInterval(interval);
-    }
+    currentTimeRef.current = 0;
+    simulationStart.current = performance.now();
+    pauseTime.current = 0;
+    startTransition(draw);
     
-    return () => clearInterval(interval);
-  }, [play, speed]);
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+  };
 
   // Initial draw on mount
   useEffect(() => {
@@ -250,7 +253,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   return (
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-        <Slider value={currentTime} max={messages[messages.length - 1].time} setValue={setCurrentTime} />
+        <Slider value={currentTimeRef.current} max={messages[messages.length - 1].time} setValue={v => currentTimeRef.current = Number(v)} />
         <button
           className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
           onClick={togglePlayPause}
