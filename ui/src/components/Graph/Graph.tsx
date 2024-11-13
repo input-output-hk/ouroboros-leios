@@ -27,8 +27,8 @@ interface IGraphProps {
 
 const width = 1024;
 const height = 600;
-let scale = 2,
-  offsetX = 0,
+const scale = 2;
+let offsetX = 0,
   offsetY = 0;
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
@@ -37,27 +37,20 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const pauseTime = useRef<number | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const currentTimeRef = useRef<number>(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [play, setPlay] = useState(false);
   const [speed, setSpeed] = useState<1 | 2 | 3>(3);
-
-  useEffect(() => {
-    setCurrentTime(currentTimeRef.current);
-  }, [currentTimeRef.current])
-
-  console.log(currentTime)
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
 
     const generatedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionGenerated
+      ({ message }) => message.type === EMessageType.TransactionGenerated,
     ) as IServerMessage<ITransactionGenerated>[];
     const sentMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionSent
+      ({ message }) => message.type === EMessageType.TransactionSent,
     ) as IServerMessage<ITransactionSent>[];
     const receivedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionReceived
+      ({ message }) => message.type === EMessageType.TransactionReceived,
     ) as IServerMessage<ITransactionReceived>[];
 
     for (const input of generatedMessages) {
@@ -69,12 +62,12 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
             (r) =>
               r.message.id === input.message.id &&
               r.message.sender === sentMsg.message.sender &&
-              r.message.recipient === sentMsg.message.recipient
+              r.message.recipient === sentMsg.message.recipient,
           );
 
           if (!receivedMsg) {
             console.log(
-              "Could not find matching transaction for " + sentMsg.message.id
+              "Could not find matching transaction for " + sentMsg.message.id,
             );
             continue;
           }
@@ -107,7 +100,8 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     }
 
     // Current time in simulation
-    const simulationTime = (performance.now() - simulationStart.current) * speed;
+    const simulationTime =
+      (performance.now() - simulationStart.current) * speed;
     currentTimeRef.current += 1;
 
     // Set canvas dimensions
@@ -171,7 +165,9 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         const targetNode = topography.nodes.find((n) => n.id === target);
 
         if (!sourceNode || !targetNode) {
-          console.log("Could not find source and target nodes for this transaction.");
+          console.log(
+            "Could not find source and target nodes for this transaction.",
+          );
           return;
         }
 
@@ -234,7 +230,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     simulationStart.current = performance.now();
     pauseTime.current = 0;
     startTransition(draw);
-    
+
     if (animationFrameId.current) {
       cancelAnimationFrame(animationFrameId.current);
       animationFrameId.current = null;
@@ -253,7 +249,11 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   return (
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-        <Slider value={currentTimeRef.current} max={messages[messages.length - 1].time} setValue={v => currentTimeRef.current = Number(v)} />
+        <Slider
+          value={currentTimeRef.current}
+          max={messages[messages.length - 1].time}
+          setValue={(v) => (currentTimeRef.current = Number(v))}
+        />
         <button
           className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
           onClick={togglePlayPause}
