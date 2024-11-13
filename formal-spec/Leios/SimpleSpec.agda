@@ -154,7 +154,8 @@ module _ (s : LeiosState) where
   ... | yes p =
     record s
       { IBs = record { header = A.lookup p ; body = b } ∷ IBs
-      ; IBHeaders = IBHeaders A.─ p }
+      ; IBHeaders = IBHeaders A.─ p
+      }
   ... | no _ =
     record s
       { IBBodies = b ∷ IBBodies
