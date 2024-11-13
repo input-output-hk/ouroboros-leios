@@ -30,6 +30,7 @@ import Control.Monad (forM_, when)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
+import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
@@ -471,6 +472,11 @@ readNewEntries sst blocking expand t = atomically $ do
 --------------------------------
 ---- Relay Consumer
 --------------------------------
+data RelayConsumerConfig id header = RelayConsumerConfig
+  { relay :: RelayConfig
+  , prioritize :: Map id header -> [id]
+  -- ^ returns a subset of keys, in order of what should be fetched first.
+  }
 
 newtype RelayConsumerSharedState id header body m = RelayConsumerSharedState
   { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
@@ -554,8 +560,8 @@ type RelayConsumerPipelined id header body st m a = TS.ServerPipelined (RelaySta
 
 relayConsumerPipelined ::
   forall id header body m.
-  (MonadSTM m, MonadDelay m) =>
-  RelayConfig ->
+  (Ord id, MonadSTM m, MonadDelay m) =>
+  RelayConsumerConfig id header ->
   RelayConsumerSharedState id header body m ->
   RelayConsumerPipelined id header body 'StInit m ()
 relayConsumerPipelined config sst =
@@ -620,9 +626,8 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
   requestBodies lst = do
-    let (idsAndHeadersToRequest, available') =
-          Map.splitAt (fromIntegral maxBodiesToRequest) lst.available
-    let idsToRequest = Map.keys idsAndHeadersToRequest
+    let idsToRequest = take (fromIntegral maxBodiesToRequest) $ config.prioritize lst.available
+    let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
     let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
     TS.YieldPipelined
       (MsgRequestBodies idsToRequest)
@@ -640,7 +645,7 @@ relayConsumerPipelined config sst =
    where
     windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
     windowShrink = lst.pendingShrink
-    windowExpand = WindowExpand $ maxHeadersToRequest `min` config.maxWindowSize.value - windowSize.value
+    windowExpand = WindowExpand $ maxHeadersToRequest `min` config.relay.maxWindowSize.value - windowSize.value
 
   requestHeadersNonBlocking ::
     forall (n :: N).
