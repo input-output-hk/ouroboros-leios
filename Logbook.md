@@ -1,5 +1,15 @@
 # Leios logbook
 
+## 2024-11-12
+
+### Team session
+- ran manual simulation of short Leios from local node perspective ([meeting recording](https://input-output-rnd.slack.com/files/U02L6J0TP36/F080MPLCMJQ/12_07_58_mst_-_recording))
+- Next meeting
+  - Continue manual simulation of short Leios from distributed perspective
+- Action items:
+  - List of pending open questions for R&D (link will come)
+  - List of tunable parts to optimize cost and resource use for further exploration (link will come)
+
 ## 2024-11-10
 
 - added first somewhat complete-ish list of [simulation model parameters](./docs/simulation-model-parameters.md)
