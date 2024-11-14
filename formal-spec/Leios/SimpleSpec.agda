@@ -1,9 +1,10 @@
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
 open import Leios.VRF
+import Leios.Voting
 
 import Leios.Base
 import Leios.Blocks
@@ -102,9 +103,6 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   open EndorserBlockOSig eb
   open LeiosState s
 
-  postulate isVote1Certified : Type -- Q: what's the threshold? (pg 7, (5))
-  postulate isVote2Certified : Type
-
   vote2Eligible : Type
   vote2Eligible = length ebRefs ≥ lengthˢ candidateEBs / 2 -- should this be `>`?
                 × fromList ebRefs ⊆ candidateEBs
@@ -113,9 +111,6 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
 
   allIBRefsKnown : Type
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
-
-postulate instance isVote1Certified? : ∀ {s eb} → isVote1Certified s eb ⁇
-                   isVote2Certified? : ∀ {s eb} → isVote2Certified s eb ⁇
 
 private variable s     : LeiosState
                  ffds' : FFD.State
@@ -157,92 +152,96 @@ module _ (s : LeiosState) where
 _↑_ : LeiosState → List (Header ⊎ Body) → LeiosState
 _↑_ = foldr (flip upd)
 
-data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
+module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbstract va)
+         ⦃ _ : ∀ {vs} {eb} → isVote1Certified vs eb ⁇ ⦄
+         ⦃ _ : ∀ {vs} {eb} → isVote2Certified vs eb ⁇ ⦄ where
 
-  -- Initialization
+  data _⇀⟦_⟧_ : Maybe LeiosState → LeiosInput → LeiosState × LeiosOutput → Type where
 
-  Init : ∀ {V bs bs' SD ks ks' pks} →
-       ∙ ks K.⇀⟦ K.INIT pk-IB pk-EB pk-V ⟧ (ks' , K.PUBKEYS pks)
-       ∙ bs B.⇀⟦ B.INIT (V-chkCerts pks) ⟧ (bs' , B.STAKE SD)
-       ─────────────────────────────────────────────────────────
-       nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
+    -- Initialization
 
-  -- Network and Ledger
+    Init : ∀ {V bs bs' SD ks ks' pks} →
+         ∙ ks K.⇀⟦ K.INIT pk-IB pk-EB pk-V ⟧ (ks' , K.PUBKEYS pks)
+         ∙ bs B.⇀⟦ B.INIT (V-chkCerts pks) ⟧ (bs' , B.STAKE SD)
+         ─────────────────────────────────────────────────────────
+         nothing ⇀⟦ INIT V ⟧ (initLeiosState V SD , EMPTY)
 
-  Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
-       ∙ bs B.⇀⟦ B.FTCH-LDG ⟧ (bs' , B.BASE-LDG ebs)
-       ∙ FFD.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFD.FetchRes msgs)
-       ────────────────────────────────────────────────────────────────────────────
-       just s ⇀⟦ SLOT ⟧
-         (record s
-           { FFDState = ffds'
-           ; Ledger = constructLedger ebs
-           ; slot = suc slot
-           } ↑ L.filter isValid? msgs
-         , EMPTY)
+    -- Network and Ledger
 
-  Ftch : let open LeiosState s in
-       ──────────────────────────────────────────
-       just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG Ledger)
+    Slot : ∀ {bs bs' msgs ebs} → let open LeiosState s renaming (FFDState to ffds) in
+         ∙ bs B.⇀⟦ B.FTCH-LDG ⟧ (bs' , B.BASE-LDG ebs)
+         ∙ FFD.Fetch FFD.⇀⟦ ffds ⟧ (ffds' , FFD.FetchRes msgs)
+         ────────────────────────────────────────────────────────────────────────────
+         just s ⇀⟦ SLOT ⟧
+           (record s
+             { FFDState = ffds'
+             ; Ledger = constructLedger ebs
+             ; slot = suc slot
+             } ↑ L.filter isValid? msgs
+           , EMPTY)
 
-  -- Base chain
-  --
-  -- Note: Submitted data to the base chain is only taken into account
-  --       if the party submitting is the block producer on the base chain
-  --       for the given slot
+    Ftch : let open LeiosState s in
+         ──────────────────────────────────────────
+         just s ⇀⟦ FTCH-LDG ⟧ (s , FTCH-LDG Ledger)
 
-  Base₁ : ∀ {txs} → let open LeiosState s in
-        ────────────────────────────────────────────────────────────────────
-        just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { ToPropose = txs } , EMPTY)
+    -- Base chain
+    --
+    -- Note: Submitted data to the base chain is only taken into account
+    --       if the party submitting is the block producer on the base chain
+    --       for the given slot
 
-  Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
-         ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-         ∙ bs B.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
-         ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT (inj₁ eb) ⟧ (s , EMPTY)
+    Base₁ : ∀ {txs} → let open LeiosState s in
+          ────────────────────────────────────────────────────────────────────
+          just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (record s { ToPropose = txs } , EMPTY)
 
-  Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (ToPropose to txs) in
-         ∙ ∅ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
-         ∙ bs B.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
-         ────────────────────────────────────────────────────────────────────────────────────
-         just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (s , EMPTY)
+    Base₂a : ∀ {bs bs' eb} → let open LeiosState s in
+           ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+           ∙ bs B.⇀⟦ B.SUBMIT (inj₁ eb) ⟧ (bs' , B.EMPTY)
+           ────────────────────────────────────────────────────────────────────────────────────
+           just s ⇀⟦ SUBMIT (inj₁ eb) ⟧ (s , EMPTY)
 
-  -- Protocol rules
+    Base₂b : ∀ {bs bs'} → let open LeiosState s renaming (ToPropose to txs) in
+           ∙ ∅ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+           ∙ bs B.⇀⟦ B.SUBMIT (inj₂ txs) ⟧ (bs' , B.EMPTY)
+           ────────────────────────────────────────────────────────────────────────────────────
+           just s ⇀⟦ SUBMIT (inj₂ txs) ⟧ (s , EMPTY)
 
-  IB-Role : let open LeiosState s renaming (ToPropose to txs; FFDState to ffds)
-                b = ibBody (record { txs = txs })
-                h = ibHeader (mkIBHeader slot id π sk-IB txs)
-          in
-          ∙ canProduceIB slot sk-IB (stake s) π
-          ∙ FFD.Send h (just b) FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
-          ──────────────────────────────────────────────────────────────────────
-          just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
+    -- Protocol rules
 
-  EB-Role : let open LeiosState s renaming (FFDState to ffds)
-                LI = map {F = List} getIBRef $ setToList $ filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs)
-                LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
-                           filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
-                h = mkEB slot id π sk-EB LI LE
-          in
-          ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ FFD.Send (ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
-          ───────────────────────────────────────────────────────────────────────────────────────
-          just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
+    IB-Role : let open LeiosState s renaming (ToPropose to txs; FFDState to ffds)
+                  b = ibBody (record { txs = txs })
+                  h = ibHeader (mkIBHeader slot id π sk-IB txs)
+            in
+            ∙ canProduceIB slot sk-IB (stake s) π
+            ∙ FFD.Send h (just b) FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+            ──────────────────────────────────────────────────────────────────────
+            just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-  V1-Role : let open LeiosState s renaming (FFDState to ffds)
-                EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
-                votes = map (vote sk-V ∘ hash) (setToList EBs')
-          in
-          ∙ canProduceV1 slot sk-V (stake s)
-          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
-          ──────────────────────────────────────────────────────────────────────────────────────────
-          just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
+    EB-Role : let open LeiosState s renaming (FFDState to ffds)
+                  LI = map {F = List} getIBRef $ setToList $ filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs)
+                  LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
+                             filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
+                  h = mkEB slot id π sk-EB LI LE
+            in
+            ∙ canProduceEB slot sk-EB (stake s) π
+            ∙ FFD.Send (ebHeader h) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+            ───────────────────────────────────────────────────────────────────────────────────────
+            just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
 
-  V2-Role : let open LeiosState s renaming (FFDState to ffds)
-                EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
-                votes = map (vote sk-V ∘ hash) (setToList EBs')
-          in
-          ∙ canProduceV2 slot sk-V (stake s)
-          ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
-          ──────────────────────────────────────────────────────────────────────────────────────────
-          just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
+    V1-Role : let open LeiosState s renaming (FFDState to ffds)
+                  EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
+                  votes = map (vote sk-V ∘ hash) (setToList EBs')
+            in
+            ∙ canProduceV1 slot sk-V (stake s)
+            ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+            ──────────────────────────────────────────────────────────────────────────────────────────
+            just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
+
+    V2-Role : let open LeiosState s renaming (FFDState to ffds)
+                  EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
+                  votes = map (vote sk-V ∘ hash) (setToList EBs')
+            in
+            ∙ canProduceV2 slot sk-V (stake s)
+            ∙ FFD.Send (vHeader votes) nothing FFD.⇀⟦ ffds ⟧ (ffds' , FFD.SendRes)
+            ──────────────────────────────────────────────────────────────────────────────────────────
+            just s ⇀⟦ SLOT ⟧ (record s { FFDState = ffds' } , EMPTY)
