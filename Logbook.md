@@ -1,5 +1,15 @@
 # Leios logbook
 
+## 2024-11-14
+
+### Rust simulation
+
+Updated sim to generate input blocks, even when they don't include any transactions. 
+
+Added endorser block generation to the sim, with relevant parameters in the config.
+
+Added animation to the visualization. It now shows transmission of TXs across the network, along with a graph displaying their running total. Eventually, viewers will be able to choose what data to visualize live, and notable messages (such as empty IBs) will be displayed specially to make them stand out.
+
 ## 2024-11-12
 
 ### Team session
@@ -67,6 +77,10 @@ Next steps:
 - actual `cardano-node` implementation uses hash of vrf proof to
   defend against adversarial behavior, but the simulation does not include those.
 - also added an `headerValidationDelay` parameter (using 5ms atm).
+
+### Rust simulation
+
+Created a set of test data to match ΔQ, in an effort to make the output of simulations comparable.
 
 ## 2024-11-07
 
