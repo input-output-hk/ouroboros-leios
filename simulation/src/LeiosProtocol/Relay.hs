@@ -524,9 +524,9 @@ data RelayConsumerLocalState id header body n = RelayConsumerLocalState
   -- request bodies out of order. We also remember their header.
   , buffer :: !(Map id (Maybe (header, body)))
   -- ^ Bodies we have successfully downloaded but have not yet added
-  -- to the mempool or acknowledged. This needed because we can request
-  -- bodies out of order but must use the original order when adding
-  -- to the mempool or acknowledging bodies.
+  -- to the RelayBuffer or acknowledged. This needed because we can request
+  -- bodies out of order but must use the original order when acknowledging bodies.
+  --
   --
   -- However, it's worth noting that, in a few situations, some of the
   -- IDs in this 'Map' may be mapped to 'Nothing':
@@ -537,25 +537,33 @@ data RelayConsumerLocalState id header body n = RelayConsumerLocalState
   --   asked for, but we still need to acknowledge those bodies.
   --
   --   For example, if we request a body that no longer exists in
-  --   the client's mempool, the client will just exclude it from the
+  --   the client's RelayBuffer, the client will just exclude it from the
   --   response. However, we still need to acknowledge it (i.e. remove it
   --   from the 'window') in order to note that we're no
   --   longer awaiting receipt of that body.
   --
   -- * IDs mapped to 'Nothing' can represent bodies
   --   that were not requested from the client because they're already
-  --   in the mempool.
+  --   in the RelayBuffer.
   --
-  --   For example, if we request some IDs and notice that
-  --   some subset of them have are already in the mempool, we wouldn't
+  --   For example, if we request IDs and the client reply contains
+  --   a subset that are already in the RelayBuffer, we wouldn't
   --   want to bother asking for those specific bodies. Therefore,
   --   we would just insert those IDs mapped to 'Nothing' to
   --   the 'buffer' such that those bodies are acknowledged,
   --   but never actually requested.
+  --
+  -- * IDs mapped to 'Nothing' can represent bodies that were already
+  --   submitted for inclusion into the RelayBuffer. This can happen
+  --   with `SubmitAll` as the submission policy, otherwise blocks
+  --   will be submitted in the same order they are acknowledged, so
+  --   they can be removed entirely from the buffer.
   }
   deriving (Show, Generic)
 
-{- Inbound StateServer vs. RelayConsumerLocalState fields
+{-
+Note [Inbound StateServer vs. RelayConsumerLocalState fields reference]
+
 requestedTxIdsInFlight -- pendingExpand
 numTxsToAcknowledge    -- pendingShrink
 unacknowledgedTxIds    -- window
