@@ -17,7 +17,7 @@ record LeiosVRF : Type₁ where
   open VRF vrf public
 
   -- transforming slot numbers into VRF seeds
-  field genIBInput genEBInput : ℕ → ℕ
+  field genIBInput genEBInput genVInput : ℕ → ℕ
 
   canProduceIB : ℕ → PrivKey → ℕ → VrfPf → Type
   canProduceIB slot k stake π = let (val , pf) = eval k (genIBInput slot) in val < stake × pf ≡ π
@@ -30,3 +30,9 @@ record LeiosVRF : Type₁ where
 
   canProduceEBPub : ℕ → ℕ → PubKey → VrfPf → ℕ → Type
   canProduceEBPub slot val k pf stake = verify k (genEBInput slot) val pf × val < stake
+
+  canProduceV1 : ℕ → PrivKey → ℕ → Type
+  canProduceV1 slot k stake = proj₁ (eval k (genVInput slot)) < stake
+
+  canProduceV2 : ℕ → PrivKey → ℕ → Type
+  canProduceV2 slot k stake = proj₁ (eval k (genVInput slot)) < stake

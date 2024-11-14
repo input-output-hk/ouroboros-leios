@@ -11,7 +11,7 @@ record LeiosAbstract : Type₁ where
         BodyHash VrfPf PrivKey Sig Hash : Type -- these could have been byte strings, but this is safer
         ⦃ DecEq-Hash ⦄ : DecEq Hash
         Vote : Type
-        vote : Hash → Vote
+        vote : PrivKey → Hash → Vote
         sign : PrivKey → Hash → Sig
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
         L Λ μ : ℕ

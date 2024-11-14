@@ -14,6 +14,8 @@ StakeDistr = PoolID ⇀ ℕ
 
 record BaseAbstract : Type₁ where
   field Cert : Type
+        VTy : Type
+        initSlot : VTy → ℕ
         V-chkCerts : List PubKey → EndorserBlock × Cert → Type
 
   data Input : Type₁ where
