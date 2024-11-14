@@ -492,6 +492,8 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   -- the relayBuffer. Note: also means we would need other mechanism
   -- to stop the protocol with a producer that sends invalid bodies.
   , submitPolicy :: SubmitPolicy
+  , maxHeadersToRequest :: Word16
+  , maxBodiesToRequest :: Word16
   }
 
 newtype RelayConsumerSharedState id header body m = RelayConsumerSharedState
@@ -601,9 +603,6 @@ relayConsumerPipelined config sst =
     TS.Await @_ @('Pipelined TS.Z (Collect id header body)) $ \case
       MsgInit -> idle initRelayConsumerLocalState
  where
-  maxHeadersToRequest = 3 :: Word16
-  maxBodiesToRequest = 2 :: Word16
-
   idle ::
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
@@ -658,7 +657,7 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
   requestBodies lst = do
-    let hdrsToRequest = take (fromIntegral maxBodiesToRequest) $ config.prioritize lst.available
+    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize lst.available
     let idsToRequest = map config.headerId hdrsToRequest
     let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
     let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
@@ -678,7 +677,7 @@ relayConsumerPipelined config sst =
    where
     windowSize = WindowSize $ fromIntegral (Seq.length lst.window) + lst.pendingExpand.value
     windowShrink = lst.pendingShrink
-    windowExpand = WindowExpand $ maxHeadersToRequest `min` config.relay.maxWindowSize.value - windowSize.value
+    windowExpand = WindowExpand $ config.maxHeadersToRequest `min` config.relay.maxWindowSize.value - windowSize.value
 
   requestHeadersNonBlocking ::
     forall (n :: N).
