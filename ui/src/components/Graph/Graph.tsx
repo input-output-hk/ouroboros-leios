@@ -25,9 +25,13 @@ interface IGraphProps {
   topography: ITransformedNodeMap;
 }
 
-const width = 1024;
-const height = 600;
-const scale = 2;
+enum ESpeedOptions {
+  "1x" = 10,
+  "2x" = 20,
+  "3x" = 30
+}
+
+const scale = 3;
 let offsetX = 0,
   offsetY = 0;
 
@@ -36,9 +40,10 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const simulationStart = useRef(performance.now());
   const pauseTime = useRef<number | null>(null);
   const animationFrameId = useRef<number | null>(null);
-  const currentTimeRef = useRef<number>(0);
+  const [currentTime, setCurrentTime]= useState<number>(0);
   const [play, setPlay] = useState(false);
-  const [speed, setSpeed] = useState<1 | 2 | 3>(3);
+  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1x"]);
+  const maxTime = useMemo(() => messages[messages.length - 1].time / 10000, [messages, speed])
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
@@ -72,7 +77,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
             continue;
           }
 
-          // Convert time to miliseconds from nanoseconds.
+          // Convert time from nanoseconds to miliseconds.
           transactionList.push({
             duration:
               Math.floor(receivedMsg.time / 10000) -
@@ -102,9 +107,10 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     // Current time in simulation
     const simulationTime =
       (performance.now() - simulationStart.current) * speed;
-    currentTimeRef.current += 1;
 
     // Set canvas dimensions
+    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
     canvas.width = width;
     canvas.height = height;
 
@@ -134,8 +140,8 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     const canvasCenterY = height / 2;
 
     // Calculate the offset to center the path
-    offsetX = canvasCenterX - (minX + pathWidth / 2);
-    offsetY = canvasCenterY - (minY + pathHeight / 2);
+    offsetX = (canvasCenterX - (minX + pathWidth / 2) * scale);
+    offsetY = (canvasCenterY - (minY + pathHeight / 2) * scale);
 
     // Apply translation and scaling
     context.translate(offsetX, offsetY);
@@ -204,9 +210,9 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
 
     if (play) {
       animationFrameId.current = requestAnimationFrame(draw);
-      // setCurrentTime(prev => prev + speed);
+      setCurrentTime(prev => prev + speed)
     }
-  }, [topography, transactions, play, speed, currentTimeRef]);
+  }, [topography, transactions, play, speed]);
 
   // Function to toggle play/pause
   const togglePlayPause = () => {
@@ -226,7 +232,8 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   // Function to reset the simulation
   const resetSimulation = () => {
     setPlay(false);
-    currentTimeRef.current = 0;
+    setCurrentTime(0);
+    setSpeed(ESpeedOptions["1x"])
     simulationStart.current = performance.now();
     pauseTime.current = 0;
     startTransition(draw);
@@ -250,9 +257,11 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
         <Slider
-          value={currentTimeRef.current}
-          max={messages[messages.length - 1].time}
-          setValue={(v) => (currentTimeRef.current = Number(v))}
+          value={currentTime}
+          max={maxTime}
+          setValue={(v) => {
+            setCurrentTime(Number(v));
+          }}
         />
         <button
           className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
@@ -266,8 +275,21 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         >
           Reset
         </button>
+        <div className="flex items-center justify-center gap-2">
+          <label htmlFor="speed">Speed:</label>
+          <select id="speed" disabled={play} onChange={e => {
+            resetSimulation();
+            setSpeed(Number(e.target.value) as ESpeedOptions)
+          }}>
+            {Object.keys(ESpeedOptions).filter((key) => isNaN(Number(key))).map((name) => {
+              return <option key={name} value={ESpeedOptions[name as keyof typeof ESpeedOptions]}>{name}</option>
+            })}
+          </select>
+        </div>
       </div>
-      <canvas ref={canvasRef} />
+      <div className="w-full h-[80vh] border-2 border-gray-200 rounded mb-8">
+        <canvas ref={canvasRef} />
+      </div>
     </div>
   );
 };
