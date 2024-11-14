@@ -65,10 +65,10 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     [messages, speed],
   );
 
-  const data = useMemo(() => [...sentMessages.values().map((v, index) => ({
+  const data = useMemo(() => [...sentMessages.values()].map((v, index) => ({
     message: index + 1,
     time: Number(v.split("#")[1])
-  }))], [sentMessages.size])
+  })), [sentMessages.size])
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
