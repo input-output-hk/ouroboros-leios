@@ -19,7 +19,10 @@ use crate::{
     clock::Clock,
     config::{NodeId, SimConfiguration},
     events::EventTracker,
-    model::{Block, InputBlock, InputBlockHeader, InputBlockId, Transaction, TransactionId},
+    model::{
+        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
+        Transaction, TransactionId,
+    },
     network::Network,
 };
 
@@ -216,6 +219,10 @@ enum SimulationMessage {
     AnnounceIB(InputBlockId),
     RequestIB(InputBlockId),
     IB(Arc<InputBlock>),
+    // EB propagation
+    AnnounceEB(EndorserBlockId),
+    RequestEB(EndorserBlockId),
+    EB(Arc<EndorserBlock>),
 }
 
 impl HasBytesSize for SimulationMessage {
@@ -236,6 +243,10 @@ impl HasBytesSize for SimulationMessage {
             Self::AnnounceIB(_) => 8,
             Self::RequestIB(_) => 8,
             Self::IB(ib) => ib.bytes(),
+
+            Self::AnnounceEB(_) => 8,
+            Self::RequestEB(_) => 8,
+            Self::EB(_) => 32,
         }
     }
 }

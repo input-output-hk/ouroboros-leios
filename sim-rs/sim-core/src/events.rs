@@ -5,7 +5,10 @@ use tracing::warn;
 use crate::{
     clock::{Clock, Timestamp},
     config::NodeId,
-    model::{Block, InputBlock, InputBlockHeader, InputBlockId, Transaction, TransactionId},
+    model::{
+        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
+        Transaction, TransactionId,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +66,23 @@ pub enum Event {
     InputBlockReceived {
         #[serde(flatten)]
         id: InputBlockId,
+        sender: NodeId,
+        recipient: NodeId,
+    },
+    EndorserBlockGenerated {
+        #[serde(flatten)]
+        id: EndorserBlockId,
+        input_blocks: Vec<InputBlockId>,
+    },
+    EndorserBlockSent {
+        #[serde(flatten)]
+        id: EndorserBlockId,
+        sender: NodeId,
+        recipient: NodeId,
+    },
+    EndorserBlockReceived {
+        #[serde(flatten)]
+        id: EndorserBlockId,
         sender: NodeId,
         recipient: NodeId,
     },
@@ -155,6 +175,29 @@ impl EventTracker {
 
     pub fn track_ib_received(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::InputBlockReceived {
+            id,
+            sender,
+            recipient,
+        });
+    }
+
+    pub fn track_eb_generated(&self, block: &EndorserBlock) {
+        self.send(Event::EndorserBlockGenerated {
+            id: block.id(),
+            input_blocks: block.ibs.clone(),
+        });
+    }
+
+    pub fn track_eb_sent(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
+        self.send(Event::EndorserBlockSent {
+            id,
+            sender,
+            recipient,
+        });
+    }
+
+    pub fn track_eb_received(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
+        self.send(Event::EndorserBlockReceived {
             id,
             sender,
             recipient,

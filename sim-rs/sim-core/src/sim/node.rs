@@ -18,7 +18,10 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
-    model::{Block, InputBlock, InputBlockHeader, InputBlockId, Transaction, TransactionId},
+    model::{
+        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
+        Transaction, TransactionId,
+    },
     network::{NetworkSink, NetworkSource},
 };
 
@@ -62,6 +65,8 @@ struct NodeLeiosState {
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
+    ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
+    ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
 }
 
 enum InputBlockState {
@@ -189,6 +194,17 @@ impl Node {
                         SimulationMessage::IB(ib) => {
                             self.receive_ib(from, ib)?;
                         }
+
+                        // EB propagation
+                        SimulationMessage::AnnounceEB(id) => {
+                            self.receive_announce_eb(from, id)?;
+                        }
+                        SimulationMessage::RequestEB(id) => {
+                            self.receive_request_eb(from, id)?;
+                        }
+                        SimulationMessage::EB(eb) => {
+                            self.receive_eb(from, eb)?;
+                        }
                     }
                 }
             };
@@ -201,8 +217,11 @@ impl Node {
         // Publish any input blocks left over from the last slot
 
         if slot % self.sim_config.stage_length == 0 {
-            // A new stage has begun. Decide how many IBs to generate in each slot.
+            // A new stage has begun.
+            // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
+            // Generate any EBs we're allowed to in this slot
+            self.generate_endorser_blocks(slot)?;
         }
 
         // Generate any IBs scheduled for this slot.
@@ -244,6 +263,26 @@ impl Node {
                 .collect();
             self.leios.ibs_to_generate.insert(slot, headers);
         }
+    }
+
+    fn generate_endorser_blocks(&mut self, slot: u64) -> Result<()> {
+        let mut probability = self.sim_config.eb_generation_probability;
+        while probability > 0.0 {
+            let next_p = f64::min(probability, 1.0);
+            if self.run_vrf(next_p).is_some() {
+                let mut eb = EndorserBlock {
+                    slot,
+                    producer: self.id,
+                    ibs: vec![],
+                };
+                self.try_filling_eb(&mut eb);
+                self.generate_eb(eb)?;
+                // A node should only generate at most 1 EB per slot
+                return Ok(());
+            }
+            probability -= 1.0;
+        }
+        Ok(())
     }
 
     fn generate_input_blocks(&mut self, slot: u64) -> Result<()> {
@@ -460,6 +499,11 @@ impl Node {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
         }
+        self.leios
+            .ibs_by_slot
+            .entry(ib.header.slot)
+            .or_default()
+            .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
 
         for peer in &self.peers {
@@ -489,6 +533,35 @@ impl Node {
             break;
         }
 
+        Ok(())
+    }
+
+    fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
+        self.send_to(from, SimulationMessage::RequestEB(id))?;
+        Ok(())
+    }
+
+    fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
+        if let Some(eb) = self.leios.ebs.get(&id) {
+            self.tracker.track_eb_sent(id, self.id, from);
+            self.send_to(from, SimulationMessage::EB(eb.clone()))?;
+        }
+        Ok(())
+    }
+
+    fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
+        let id = eb.id();
+        self.tracker.track_eb_received(id, from, self.id);
+        if self.leios.ebs.insert(id, eb).is_some() {
+            return Ok(());
+        }
+        // We haven't seen this EB before, so propagate it to our neighbors
+        for peer in &self.peers {
+            if *peer == from {
+                continue;
+            }
+            self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
+        }
         Ok(())
     }
 
@@ -523,9 +596,42 @@ impl Node {
         self.tracker.track_ib_generated(&ib);
 
         let id = ib.header.id();
+        self.leios
+            .ibs_by_slot
+            .entry(ib.header.slot)
+            .or_default()
+            .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
         for peer in &self.peers {
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
+        }
+        Ok(())
+    }
+
+    fn try_filling_eb(&mut self, eb: &mut EndorserBlock) {
+        let config = &self.sim_config;
+        let Some(earliest_slot) = eb
+            .slot
+            .checked_sub(config.deliver_stage_count * config.stage_length)
+        else {
+            return;
+        };
+        for slot in earliest_slot..(earliest_slot + config.stage_length) {
+            let Some(ibs) = self.leios.ibs_by_slot.remove(&slot) else {
+                continue;
+            };
+            eb.ibs.extend(ibs);
+        }
+    }
+
+    fn generate_eb(&mut self, eb: EndorserBlock) -> Result<()> {
+        let eb = Arc::new(eb);
+        self.tracker.track_eb_generated(&eb);
+
+        let id = eb.id();
+        self.leios.ebs.insert(id, eb.clone());
+        for peer in &self.peers {
+            self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
         }
         Ok(())
     }

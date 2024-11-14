@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
     events::Event,
-    model::{InputBlockId, TransactionId},
+    model::{EndorserBlockId, InputBlockId, TransactionId},
 };
 use tokio::{
     fs::{self, File},
@@ -36,6 +36,8 @@ pub enum OutputFormat {
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
+    stage_length: u64,
+    maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
     output_format: OutputFormat,
@@ -55,9 +57,13 @@ impl EventMonitor {
             .filter(|p| p.stake > 0)
             .map(|p| p.id)
             .collect();
+        let stage_length = config.stage_length;
+        let maximum_ib_age = stage_length * config.deliver_stage_count;
         Self {
             node_ids,
             pool_ids,
+            stage_length,
+            maximum_ib_age,
             events_source,
             output_path,
             output_format: output_format.unwrap_or(OutputFormat::EventStream),
@@ -75,7 +81,10 @@ impl EventMonitor {
         let mut seen_ibs: BTreeMap<NodeId, f64> = BTreeMap::new();
         let mut txs_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut bytes_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
+        let mut ibs_in_eb: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
+        let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
+        let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
         let mut total_slots = 0u64;
@@ -83,6 +92,8 @@ impl EventMonitor {
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
         let mut empty_ibs = 0u64;
+        let mut expired_ibs = 0u64;
+        let mut generated_ebs = 0u64;
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -123,6 +134,19 @@ impl EventMonitor {
                 Event::Slot { number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
+                    if number % self.stage_length == 0 {
+                        let Some(oldest_live_stage) = number.checked_sub(self.maximum_ib_age)
+                        else {
+                            continue;
+                        };
+                        pending_ibs.retain(|ib| {
+                            if ib.slot < oldest_live_stage {
+                                expired_ibs += 1;
+                                return false;
+                            }
+                            true
+                        });
+                    }
                 }
                 Event::TransactionGenerated { id, bytes, .. } => {
                     txs.insert(
@@ -171,6 +195,7 @@ impl EventMonitor {
                     transactions,
                 } => {
                     generated_ibs += 1;
+                    pending_ibs.insert(header.id());
                     let mut ib_bytes = 0;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(header.id()).or_default() += 1.;
@@ -184,7 +209,7 @@ impl EventMonitor {
                     }
                     *seen_ibs.entry(header.producer).or_default() += 1.;
                     info!(
-                        "Pool {} generated an IB with {} transaction(s) in slot {} ({})",
+                        "Pool {} generated an IB with {} transaction(s) in slot {} ({}).",
                         header.producer,
                         transactions.len(),
                         header.slot,
@@ -198,6 +223,22 @@ impl EventMonitor {
                 Event::InputBlockReceived { recipient, .. } => {
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
+                Event::EndorserBlockGenerated { id, input_blocks } => {
+                    generated_ebs += 1;
+                    for ib_id in &input_blocks {
+                        *ibs_in_eb.entry(id).or_default() += 1.0;
+                        *ebs_containing_ib.entry(*ib_id).or_default() += 1.0;
+                        pending_ibs.remove(ib_id);
+                    }
+                    info!(
+                        "Pool {} generated an EB with {} IBs(s) in slot {}.",
+                        id.producer,
+                        input_blocks.len(),
+                        id.slot,
+                    )
+                }
+                Event::EndorserBlockSent { .. } => {}
+                Event::EndorserBlockReceived { .. } => {}
             }
         }
 
@@ -239,9 +280,13 @@ impl EventMonitor {
                 .values()
                 .filter(|tx| tx.included_in_ib.is_some())
                 .collect();
+            let empty_ebs = generated_ebs - ibs_in_eb.len() as u64;
+            let ibs_which_reached_eb = ebs_containing_ib.len();
             let txs_per_ib = compute_stats(txs_in_ib.into_values());
             let bytes_per_ib = compute_stats(bytes_in_ib.into_values());
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
+            let ibs_per_eb = compute_stats(ebs_containing_ib.into_values());
+            let ebs_per_ib = compute_stats(ibs_in_eb.into_values());
             let times_to_reach_ibs = compute_stats(txs_which_reached_ib.iter().map(|tx| {
                 let duration = tx.included_in_ib.unwrap() - tx.generated;
                 duration.as_secs_f64()
@@ -285,6 +330,26 @@ impl EventMonitor {
             info!(
                 "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
                 ibs_received.mean, ibs_received.std_dev,
+            );
+            info!(
+                "{generated_ebs} EB(s) were generated; on average there were {:.3} EB(s) per slot.",
+                generated_ebs as f64 / total_slots as f64
+            );
+            info!(
+                "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). There were {} empty EB(s).",
+                ibs_per_eb.mean, ibs_per_eb.std_dev, empty_ebs
+            );
+            info!(
+                "Each IB was included in an average of {:.3} EB(s) (stddev {:.3}).",
+                ebs_per_ib.mean, ebs_per_ib.std_dev,
+            );
+            info!(
+                "{} out of {} IBs were included in at least one EB.",
+                ibs_which_reached_eb, generated_ibs,
+            );
+            info!(
+                "{} out of {} IBs expired before they reached an EB.",
+                expired_ibs, generated_ibs,
             );
         });
         Ok(())
