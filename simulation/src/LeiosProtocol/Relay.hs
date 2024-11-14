@@ -40,6 +40,7 @@ import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Singletons (Sing, SingI (..))
 import Data.Type.Equality ((:~:) (Refl))
@@ -482,22 +483,32 @@ readNewEntries sst blocking expand t = atomically $ do
 data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
-  { relay :: RelayConfig
-  , headerId :: header -> id
-  , prioritize :: Map id header -> [header]
+  { relay :: !RelayConfig
+  , headerId :: !(header -> id)
+  , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
-  , submitBlocks :: [(header, body)] -> m ()
-  -- ^ sends blocks to be validated/added to the buffer. Allowed to
-  -- block, but relayConsumer does not assume the blocks made it into
-  -- the relayBuffer. Note: also means we would need other mechanism
-  -- to stop the protocol with a producer that sends invalid bodies.
-  , submitPolicy :: SubmitPolicy
-  , maxHeadersToRequest :: Word16
-  , maxBodiesToRequest :: Word16
+  , submitBlocks :: !([(header, body)] -> UTCTime -> ([(header, body)] -> STM m ()) -> m ())
+  -- ^ sends blocks to be validated/added to the buffer. Allowed to be
+  -- blocking, but relayConsumer does not assume the blocks made it
+  -- into the relayBuffer. Also takes a delivery time (relevant for
+  -- e.g. IB endorsement) and a callback that expects the subset of
+  -- validated blocks.
+  , submitPolicy :: !SubmitPolicy
+  , maxHeadersToRequest :: !Word16
+  , maxBodiesToRequest :: !Word16
   }
 
-newtype RelayConsumerSharedState id header body m = RelayConsumerSharedState
-  { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
+data RelayConsumerSharedState id header body m = RelayConsumerSharedState
+  { relayBufferVar :: TVar m (RelayBuffer id (header, body))
+  , inFlightVar :: TVar m (Set id)
+  -- ^ Set of ids for which a consumer requested bodies, until they are validated and added to the buffer.
+  --   Ids are also removed if the bodies are not included in the reply or do not validate.
+  --
+  -- Current handling not fault tolerant:
+  --   * other consumers will ignore those ids and push them out of
+  --     their window, so they might not be asked for again.
+  --   * if a consumer exits with an exception between requesting bodies and the correponding
+  --     submitBlocks those ids will not be cleared from the in-flight set.
   }
 
 -- | Information maintained internally in the 'txSubmissionInbound' server
@@ -594,7 +605,7 @@ type RelayConsumerPipelined id header body st m a = TS.ServerPipelined (RelaySta
 
 relayConsumerPipelined ::
   forall id header body m.
-  (Ord id, MonadSTM m, MonadDelay m) =>
+  (Ord id, MonadSTM m, MonadDelay m, MonadTime m) =>
   RelayConsumerConfig id header body m ->
   RelayConsumerSharedState id header body m ->
   RelayConsumerPipelined id header body 'StInit m ()
@@ -606,46 +617,56 @@ relayConsumerPipelined config sst =
   idle ::
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
-  idle lst = case lst.pendingRequests of
-    Zero
-      | canRequestMoreBodies -> do
-          -- There are no replies in flight, but we do know some more bodies we
-          -- can ask for, so lets ask for them and more headers.
-          requestBodies lst
-      | otherwise -> do
-          -- There's no replies in flight, and we have no more txs we can
-          -- ask for so the only remaining thing to do is to ask for more
-          -- txids. Since this is the only thing to do now, we make this a
-          -- blocking call.
-          assert
-            ( lst.pendingExpand == 0
-                && Seq.null lst.window
-                && Map.null lst.available
-                && Map.null lst.buffer
-            )
-            $ requestHeadersBlocking lst
-    Succ pendingRequests'
-      | canRequestMoreBodies -> do
-          -- We have replies in flight and we should eagerly collect them if
-          -- available, but there are bodies to request too so we
-          -- should not block waiting for replies.
-          --
-          -- Having requested more bodies, we opportunistically ask
-          -- for more headers in a non-blocking way. This is how we pipeline
-          -- asking for both bodies and headers.
-          --
-          -- It's important not to pipeline more requests for headers when we
-          -- have no bodies to ask for, since (with no other guard) this will
-          -- put us into a busy-polling loop.
-          let lst' = lst{pendingRequests = pendingRequests'}
-          TS.Collect (Just (requestBodies lst)) (handleResponse lst')
-      | otherwise -> do
-          -- In this case there is nothing else to do so we block until we
-          -- collect a reply.
-          let lst' = lst{pendingRequests = pendingRequests'}
-          TS.Collect Nothing (handleResponse lst')
-   where
-    canRequestMoreBodies = not (Map.null lst.available)
+  idle = TS.Effect . idleM . return
+
+  -- \| Takes an STM action for the updated local state, so that
+  -- requestBodies can update inFlightVar in the same STM tx.
+  idleM ::
+    STM m (RelayConsumerLocalState id header body n) ->
+    m (RelayConsumer id header body n 'StIdle m ())
+  idleM mlst = atomically $ do
+    lst <- mlst
+    let canRequestMoreBodies = not (Map.null lst.available)
+    case lst.pendingRequests of
+      Zero
+        | canRequestMoreBodies -> do
+            -- There are no replies in flight, but we do know some more bodies we
+            -- can ask for, so lets ask for them and more headers.
+            requestBodies lst
+        | otherwise -> do
+            -- There's no replies in flight, and we have no more txs we can
+            -- ask for so the only remaining thing to do is to ask for more
+            -- txids. Since this is the only thing to do now, we make this a
+            -- blocking call.
+            assert
+              ( lst.pendingExpand == 0
+                  && Seq.null lst.window
+                  && Map.null lst.available
+                  && Map.null lst.buffer
+              )
+              $ return
+              $ requestHeadersBlocking lst
+      Succ pendingRequests'
+        | canRequestMoreBodies -> do
+            -- We have replies in flight and we should eagerly collect them if
+            -- available, but there are bodies to request too so we
+            -- should not block waiting for replies.
+            --
+            -- Having requested more bodies, we opportunistically ask
+            -- for more headers in a non-blocking way. This is how we pipeline
+            -- asking for both bodies and headers.
+            --
+            -- It's important not to pipeline more requests for headers when we
+            -- have no bodies to ask for, since (with no other guard) this will
+            -- put us into a busy-polling loop.
+            let lst' = lst{pendingRequests = pendingRequests'}
+            rb <- requestBodies lst
+            return $ TS.Collect (Just rb) (handleResponse lst')
+        | otherwise -> do
+            -- In this case there is nothing else to do so we block until we
+            -- collect a reply.
+            let lst' = lst{pendingRequests = pendingRequests'}
+            return $ TS.Collect Nothing (handleResponse lst')
 
   done ::
     RelayConsumerLocalState id header body Z ->
@@ -655,19 +676,21 @@ relayConsumerPipelined config sst =
   requestBodies ::
     forall (n :: N).
     RelayConsumerLocalState id header body n ->
-    RelayConsumer id header body n 'StIdle m ()
+    STM m (RelayConsumer id header body n 'StIdle m ())
   requestBodies lst = do
     let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize lst.available
     let idsToRequest = map config.headerId hdrsToRequest
+    modifyTVar' sst.inFlightVar (Set.union $ Set.fromList idsToRequest)
     let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
     let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
-    TS.YieldPipelined
-      (MsgRequestBodies idsToRequest)
-      ( TS.ReceiverAwait $ \case
-          MsgRespondBodies bodies ->
-            TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
-      )
-      (requestHeadersNonBlocking lst')
+    return $
+      TS.YieldPipelined
+        (MsgRequestBodies idsToRequest)
+        ( TS.ReceiverAwait $ \case
+            MsgRespondBodies bodies ->
+              TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
+        )
+        (requestHeadersNonBlocking lst')
 
   windowAdjust ::
     forall (n :: N).
@@ -739,8 +762,7 @@ relayConsumerPipelined config sst =
               { pendingExpand = lst.pendingExpand - fromIntegral windowExpand.value
               }
 
-      relayBuffer <- atomically $ readReadOnlyTVar sst.relayBufferVar
-      return $ idle (acknowledgeIds lst' idsSeq idsMap relayBuffer)
+      idleM $ acknowledgeIds lst' idsSeq idsMap
     CollectBodies hdrs bodies -> TS.Effect $ do
       -- To start with we have to verify that the bodies they have sent us do
       -- correspond to the ones we asked for. This is slightly complicated by
@@ -819,7 +841,14 @@ relayConsumerPipelined config sst =
                 <> Map.fromList (zip live (repeat Nothing))
 
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
-      config.submitBlocks $ txsReady ++ extraToSubmit
+      now <- getCurrentTime
+      config.submitBlocks (txsReady ++ extraToSubmit) now $ \validated -> do
+        -- Note: here we could set a flag to drop this producer if not
+        -- all blocks validated.
+        modifyTVar' sst.relayBufferVar $
+          flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
+        -- TODO?: the ids we did not receive could be taken out earlier.
+        modifyTVar' sst.inFlightVar (`Set.difference` idsRequested)
 
       return $
         idle
@@ -836,64 +865,68 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     StrictSeq id ->
     Map id header ->
-    RelayBuffer id (header, body) ->
-    RelayConsumerLocalState id header body n
-  acknowledgeIds lst idsSeq _ _ | Seq.null idsSeq = lst
-  acknowledgeIds lst idsSeq idsMap relayBuffer =
+    STM m (RelayConsumerLocalState id header body n)
+  acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
+  acknowledgeIds lst idsSeq idsMap = do
+    relayBuffer <- readTVar sst.relayBufferVar
+    inFlight <- readTVar sst.inFlightVar
+
+    let
+      -- Divide the new ids in two: those that are already in the
+      -- relay buffer or in flight (both locally and shared in-flight)
+      -- and those that are not. We'll request some bodies from the latter.
+      (ignoredIds, availableIdsMp) =
+        Map.partitionWithKey
+          (\id' _ -> id' `RB.member` relayBuffer || id' `Set.member` inFlight)
+          idsMap
+
+      availableIdsU =
+        Map.filterWithKey
+          (\txid _ -> notElem txid lst.window)
+          idsMap
+
+      available' = lst.available <> Map.intersection availableIdsMp availableIdsU
+
+      -- The txs that we intentionally don't request, because they are
+      -- already in the mempool, need to be acknowledged.
+      --
+      -- So we extend buffer with those txs (so of course they have
+      -- no corresponding reply).
+      buffer' =
+        lst.buffer
+          <> Map.map (const Nothing) ignoredIds
+
+      window' = lst.window <> idsSeq
+
+      -- Check if having decided not to request more bodies we can now
+      -- confirm any ids (in strict order in the window
+      -- sequence). This is used in the 'numTxsToAcknowledge' below
+      -- which will then be used next time we MsgRequestHeaders.
+      --
+      (acknowledgedIds, window'') =
+        Seq.spanl (`Map.member` buffer') window'
+
+      -- If so we can remove acknowledged txs from our buffer provided that they
+      -- are not still in window''. This happens in case of duplicate
+      -- ids.
+      buffer'' =
+        forceElemsToWHNF $
+          Foldable.foldl'
+            ( \m txid ->
+                if elem txid window''
+                  then m
+                  else Map.delete txid m
+            )
+            buffer'
+            acknowledgedIds
+
     -- Return the next local state
-    lst
-      { available = available'
-      , buffer = buffer''
-      , window = window''
-      , pendingShrink =
-          lst.pendingShrink
-            + fromIntegral (Seq.length acknowledgedIds)
-      }
-   where
-    -- Divide the new ids in two: those that are already in the
-    -- relay buffer or in flight (TODO/NOTE Andrea: only local in-flight, at best?)
-    -- and those that are not. We'll request some bodies from the latter.
-    (ignoredIds, availableIdsMp) =
-      Map.partitionWithKey
-        (\id' _ -> id' `RB.member` relayBuffer)
-        idsMap
-
-    availableIdsU =
-      Map.filterWithKey
-        (\txid _ -> notElem txid lst.window)
-        idsMap
-
-    available' = lst.available <> Map.intersection availableIdsMp availableIdsU
-
-    -- The txs that we intentionally don't request, because they are
-    -- already in the mempool, need to be acknowledged.
-    --
-    -- So we extend buffer with those txs (so of course they have
-    -- no corresponding reply).
-    buffer' =
-      lst.buffer
-        <> Map.map (const Nothing) ignoredIds
-
-    window' = lst.window <> idsSeq
-
-    -- Check if having decided not to request more bodies we can now
-    -- confirm any ids (in strict order in the window
-    -- sequence). This is used in the 'numTxsToAcknowledge' below
-    -- which will then be used next time we MsgRequestHeaders.
-    --
-    (acknowledgedIds, window'') =
-      Seq.spanl (`Map.member` buffer') window'
-
-    -- If so we can remove acknowledged txs from our buffer provided that they
-    -- are not still in window''. This happens in case of duplicate
-    -- ids.
-    buffer'' =
-      forceElemsToWHNF $
-        Foldable.foldl'
-          ( \m txid ->
-              if elem txid window''
-                then m
-                else Map.delete txid m
-          )
-          buffer'
-          acknowledgedIds
+    return $
+      lst
+        { available = available'
+        , buffer = buffer''
+        , window = window''
+        , pendingShrink =
+            lst.pendingShrink
+              + fromIntegral (Seq.length acknowledgedIds)
+        }
