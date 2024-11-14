@@ -123,13 +123,11 @@ impl EventMonitor {
         };
         while let Some((event, time)) = self.events_source.recv().await {
             last_timestamp = time;
-            if should_log_event(&event) {
-                let output_event = OutputEvent {
-                    time,
-                    message: event.clone(),
-                };
-                output.write(output_event).await?;
-            }
+            let output_event = OutputEvent {
+                time,
+                message: event.clone(),
+            };
+            output.write(output_event).await?;
             match event {
                 Event::Slot { number } => {
                     info!("Slot {number} has begun.");
@@ -195,6 +193,9 @@ impl EventMonitor {
                     transactions,
                 } => {
                     generated_ibs += 1;
+                    if transactions.is_empty() {
+                        empty_ibs += 1;
+                    }
                     pending_ibs.insert(header.id());
                     let mut ib_bytes = 0;
                     for tx_id in &transactions {
@@ -215,9 +216,6 @@ impl EventMonitor {
                         header.slot,
                         pretty_bytes(ib_bytes, pbo.clone()),
                     )
-                }
-                Event::EmptyInputBlockNotGenerated { .. } => {
-                    empty_ibs += 1;
                 }
                 Event::InputBlockSent { .. } => {}
                 Event::InputBlockReceived { recipient, .. } => {
@@ -297,7 +295,7 @@ impl EventMonitor {
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
             info!(
-                "{generated_ibs} IB(s) were generated, and {empty_ibs} IB(s) were skipped because they were empty; on average there were {:.3} non-empty IB(s) per slot.",
+                "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
                 generated_ibs as f64 / total_slots as f64
             );
             info!(
@@ -319,9 +317,10 @@ impl EventMonitor {
                 ibs_per_tx.mean, ibs_per_tx.std_dev,
             );
             info!(
-                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}).",
+                "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
                 txs_per_ib.mean, txs_per_ib.std_dev,
                 pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo), bytes_per_ib.std_dev,
+                empty_ibs,
             );
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
@@ -336,7 +335,7 @@ impl EventMonitor {
                 generated_ebs as f64 / total_slots as f64
             );
             info!(
-                "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). There were {} empty EB(s).",
+                "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). {} EB(s) were empty.",
                 ibs_per_eb.mean, ibs_per_eb.std_dev, empty_ebs
             );
             info!(
@@ -373,13 +372,6 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
         mean: v.mean(),
         std_dev: v.population_variance().sqrt(),
     }
-}
-
-fn should_log_event(event: &Event) -> bool {
-    if matches!(event, Event::EmptyInputBlockNotGenerated { .. }) {
-        return false;
-    }
-    true
 }
 
 enum OutputTarget {

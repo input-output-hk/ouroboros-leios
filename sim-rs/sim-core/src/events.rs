@@ -53,10 +53,6 @@ pub enum Event {
         header: InputBlockHeader,
         transactions: Vec<TransactionId>,
     },
-    EmptyInputBlockNotGenerated {
-        #[serde(flatten)]
-        header: InputBlockHeader,
-    },
     InputBlockSent {
         #[serde(flatten)]
         id: InputBlockId,
@@ -156,12 +152,6 @@ impl EventTracker {
         self.send(Event::InputBlockGenerated {
             header: block.header.clone(),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
-        });
-    }
-
-    pub fn track_empty_ib_not_generated(&self, header: &InputBlockHeader) {
-        self.send(Event::EmptyInputBlockNotGenerated {
-            header: header.clone(),
         });
     }
 

@@ -295,11 +295,7 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            if !ib.transactions.is_empty() {
-                self.generate_ib(ib)?;
-            } else {
-                self.tracker.track_empty_ib_not_generated(&ib.header);
-            }
+            self.generate_ib(ib)?;
         }
         Ok(())
     }
