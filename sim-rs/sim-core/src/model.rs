@@ -75,3 +75,25 @@ impl InputBlock {
         self.transactions.iter().map(|tx| tx.bytes).sum()
     }
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub struct EndorserBlockId {
+    pub slot: u64,
+    pub producer: NodeId,
+}
+
+#[derive(Debug)]
+pub struct EndorserBlock {
+    pub slot: u64,
+    pub producer: NodeId,
+    // The real impl will store hashes
+    pub ibs: Vec<InputBlockId>,
+}
+impl EndorserBlock {
+    pub fn id(&self) -> EndorserBlockId {
+        EndorserBlockId {
+            slot: self.slot,
+            producer: self.producer,
+        }
+    }
+}
