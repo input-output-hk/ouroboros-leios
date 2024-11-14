@@ -109,6 +109,9 @@ toList rb = Foldable.toList rb.entries
 keySet :: Ord key => RelayBuffer key value -> Set key
 keySet rb = Map.keysSet rb.index
 
+member :: Ord key => key -> RelayBuffer key value -> Bool
+member k rb = Map.member k rb.index
+
 takeAfterTicket :: RelayBuffer key value -> Ticket -> [EntryWithTicket key value]
 takeAfterTicket rb t = Foldable.toList $
   case FingerTree.search (ticketSearchMeasure t) rb.entries of

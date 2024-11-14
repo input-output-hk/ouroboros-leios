@@ -16,6 +16,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -26,7 +27,7 @@ import ChanDriver (ProtocolMessage)
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
-import Control.Monad (forM_, when)
+import Control.Monad (forM_, join, unless, when)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
@@ -39,8 +40,10 @@ import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
 import qualified Data.Sequence.Strict as Seq
+import qualified Data.Set as Set
 import Data.Singletons (Sing, SingI (..))
 import Data.Type.Equality ((:~:) (Refl))
+import Data.Unit.Strict (forceElemsToWHNF)
 import Data.Word (Word16)
 import GHC.Generics (Generic)
 import LeiosProtocol.RelayBuffer (RelayBuffer)
@@ -199,6 +202,8 @@ data RelayProtocolError
   | ExpandTooMuch WindowSize WindowShrink WindowExpand
   | RequestedNoChange
   | RequestedUnknownId
+  | IdsNotRequested
+  | BodiesNotRequested
   deriving (Show)
 
 instance Exception RelayProtocolError
@@ -317,7 +322,7 @@ instance Protocol (RelayState id header body) where
     -- that this is no guarantee that the block is invalid, it may still
     -- be valid and available from another peer).
     MsgRespondBodies ::
-      [body] ->
+      [(id, body)] ->
       Message (RelayState id header body) StBodies StIdle
     -- \| Termination message, initiated by the client when the server is
     -- making a blocking call for more block identifiers.
@@ -443,8 +448,8 @@ relayProducer config sst = idle initRelayProducerLocalState
         when (isNothing (Seq.findIndexL ((== id') . fst) lst.window)) $ do
           throw RequestedUnknownId
       -- Read the bodies from the RelayBuffer:
-      relayBuffer <- readReadOnlyTVarIO sst.relayBufferVar
-      let bodies = mapMaybe (fmap snd . RB.lookup relayBuffer) ids
+      relayBuffer <- atomically $ readReadOnlyTVar sst.relayBufferVar
+      let bodies = mapMaybe (\id' -> fmap ((id',) . snd) . RB.lookup relayBuffer $ id') ids
       return $ TC.Yield (MsgRespondBodies bodies) (idle lst)
 
 readNewEntries ::
@@ -472,10 +477,21 @@ readNewEntries sst blocking expand t = atomically $ do
 --------------------------------
 ---- Relay Consumer
 --------------------------------
-data RelayConsumerConfig id header = RelayConsumerConfig
+
+-- | Should we submit blocks in window-order (like for txs) or as they become available?
+data SubmitPolicy = SubmitInOrder | SubmitAll
+
+data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: RelayConfig
-  , prioritize :: Map id header -> [id]
-  -- ^ returns a subset of keys, in order of what should be fetched first.
+  , headerId :: header -> id
+  , prioritize :: Map id header -> [header]
+  -- ^ returns a subset of headers, in order of what should be fetched first.
+  , submitBlocks :: [(header, body)] -> m ()
+  -- ^ sends blocks to be validated/added to the buffer. Allowed to
+  -- block, but relayConsumer does not assume the blocks made it into
+  -- the relayBuffer. Note: also means we would need other mechanism
+  -- to stop the protocol with a producer that sends invalid bodies.
+  , submitPolicy :: SubmitPolicy
   }
 
 newtype RelayConsumerSharedState id header body m = RelayConsumerSharedState
@@ -539,6 +555,14 @@ data RelayConsumerLocalState id header body n = RelayConsumerLocalState
   }
   deriving (Show, Generic)
 
+{- Inbound StateServer vs. RelayConsumerLocalState fields
+requestedTxIdsInFlight -- pendingExpand
+numTxsToAcknowledge    -- pendingShrink
+unacknowledgedTxIds    -- window
+availableTxids         -- available
+bufferedTxs            -- buffer
+-}
+
 initRelayConsumerLocalState :: RelayConsumerLocalState id header body Z
 initRelayConsumerLocalState =
   RelayConsumerLocalState
@@ -552,7 +576,7 @@ initRelayConsumerLocalState =
 
 data Collect id header body
   = CollectHeaders WindowExpand [header]
-  | CollectBodies [id] [body]
+  | CollectBodies [header] [(id, body)]
 
 type RelayConsumer id header body n st m a = TS.Server (RelayState id header body) ('Pipelined n (Collect id header body)) st m a
 
@@ -561,7 +585,7 @@ type RelayConsumerPipelined id header body st m a = TS.ServerPipelined (RelaySta
 relayConsumerPipelined ::
   forall id header body m.
   (Ord id, MonadSTM m, MonadDelay m) =>
-  RelayConsumerConfig id header ->
+  RelayConsumerConfig id header body m ->
   RelayConsumerSharedState id header body m ->
   RelayConsumerPipelined id header body 'StInit m ()
 relayConsumerPipelined config sst =
@@ -626,14 +650,15 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     RelayConsumer id header body n 'StIdle m ()
   requestBodies lst = do
-    let idsToRequest = take (fromIntegral maxBodiesToRequest) $ config.prioritize lst.available
+    let hdrsToRequest = take (fromIntegral maxBodiesToRequest) $ config.prioritize lst.available
+    let idsToRequest = map config.headerId hdrsToRequest
     let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
     let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
     TS.YieldPipelined
       (MsgRequestBodies idsToRequest)
       ( TS.ReceiverAwait $ \case
           MsgRespondBodies bodies ->
-            TS.ReceiverDone (CollectBodies idsToRequest bodies)
+            TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
       )
       (requestHeadersNonBlocking lst')
 
@@ -687,7 +712,181 @@ relayConsumerPipelined config sst =
     Collect id header body ->
     RelayConsumer id header body n 'StIdle m ()
   handleResponse lst = \case
-    CollectHeaders windowExpand idsAndHeaders -> do
-      _
-    CollectBodies ids bodies -> do
-      _
+    CollectHeaders windowExpand headers -> TS.Effect $ do
+      let idsSeq = Seq.fromList (map config.headerId headers)
+          idsMap = Map.fromList [(config.headerId h, h) | h <- headers]
+
+      -- Check they didn't send more than we asked for.
+      unless (Seq.length idsSeq <= fromIntegral windowExpand) $
+        throw IdsNotRequested
+
+      -- Upon receiving a batch of new headers we extend our available set,
+      -- and extend the unacknowledged sequence.
+      --
+      -- We also pre-emptively acknowledge those ids that are already in
+      -- the buffer. This prevents us from requesting their corresponding
+      -- bodies again in the future.
+
+      let lst' =
+            lst
+              { pendingExpand = lst.pendingExpand - fromIntegral windowExpand.value
+              }
+
+      relayBuffer <- atomically $ readReadOnlyTVar sst.relayBufferVar
+      return $ idle (acknowledgeIds lst' idsSeq idsMap relayBuffer)
+    CollectBodies hdrs bodies -> TS.Effect $ do
+      -- To start with we have to verify that the bodies they have sent us do
+      -- correspond to the ones we asked for. This is slightly complicated by
+      -- the fact that in general we get a subset of the bodies that we asked
+      -- for. We should never get a body we did not ask for. We take a strict
+      -- approach to this and check it.
+      --
+      let bodiesMap :: Map id body
+          bodiesMap = Map.fromList bodies
+          requestedMap :: Map id header
+          requestedMap = Map.fromList [(config.headerId h, h) | h <- hdrs]
+          idsReceived = Map.keysSet bodiesMap
+          idsRequested = Map.keysSet requestedMap
+
+      unless (idsReceived `Set.isSubsetOf` idsRequested) $
+        throw BodiesNotRequested
+
+      -- We can match up all the txids we requested, with those we
+      -- received.
+      let idsRequestedWithBodiesReceived :: Map id (Maybe (header, body))
+          idsRequestedWithBodiesReceived =
+            Map.mapWithKey (\id' h -> (h,) <$> Map.lookup id' bodiesMap) requestedMap
+
+          -- We still have to acknowledge the ids we were given. This
+          -- combined with the fact that we request bodies out of order means
+          -- our buffer has to track all the ids we asked for, even
+          -- though not all have replies.
+          buffer1 = lst.buffer <> idsRequestedWithBodiesReceived
+
+          -- We have to update the window here eagerly and not
+          -- delay it to requestBodies, otherwise we could end up blocking in
+          -- idle on more pipelined results rather than being able to
+          -- move on.
+
+          -- Check if having received more bodies we can now acknowledge any (in
+          -- strict order in the window sequence).
+          (idsToAcknowledge, window') =
+            Seq.spanl (`Map.member` buffer1) lst.window
+
+          -- If so we can submit the acknowledged bodies to our RelayBuffer
+          txsReady =
+            foldr
+              (\txid r -> maybe r (: r) (buffer1 Map.! txid))
+              []
+              idsToAcknowledge
+
+          -- And remove acknowledged bodies from our buffer
+          buffer2 =
+            Foldable.foldl'
+              (flip Map.delete)
+              buffer1
+              idsToAcknowledge
+
+          -- If config allows we also include the bodies from the rest of the window.
+          extraToSubmit = case config.submitPolicy of
+            SubmitInOrder -> []
+            SubmitAll ->
+              mapMaybe (\id' -> join (Map.lookup id' buffer1)) $
+                Foldable.toList window'
+
+          -- And set them to `Nothing` in the buffer so they can be
+          -- acknowledged later, but not resubmitted.
+          buffer3 =
+            Foldable.foldl' (flip $ Map.adjust (const Nothing)) buffer2
+              . map (config.headerId . fst)
+              $ extraToSubmit
+
+          -- If we are acknowledging blocks that are still in
+          -- window' we need to re-add them to the buffer so that we also can
+          -- acknowledge them again later. This will happen in case of
+          -- duplicate ids within the same window.
+          live = filter (`elem` window') $ Foldable.toList idsToAcknowledge
+          buffer4 =
+            forceElemsToWHNF $
+              buffer3
+                <> Map.fromList (zip live (repeat Nothing))
+
+      -- if lst.window has duplicated ids, we might submit duplicated blocks.
+      config.submitBlocks $ txsReady ++ extraToSubmit
+
+      return $
+        idle
+          lst
+            { buffer = buffer4
+            , window = window'
+            , pendingShrink =
+                lst.pendingShrink
+                  + fromIntegral (Seq.length idsToAcknowledge)
+            }
+
+  acknowledgeIds ::
+    forall (n :: N).
+    RelayConsumerLocalState id header body n ->
+    StrictSeq id ->
+    Map id header ->
+    RelayBuffer id (header, body) ->
+    RelayConsumerLocalState id header body n
+  acknowledgeIds lst idsSeq _ _ | Seq.null idsSeq = lst
+  acknowledgeIds lst idsSeq idsMap relayBuffer =
+    -- Return the next local state
+    lst
+      { available = available'
+      , buffer = buffer''
+      , window = window''
+      , pendingShrink =
+          lst.pendingShrink
+            + fromIntegral (Seq.length acknowledgedIds)
+      }
+   where
+    -- Divide the new ids in two: those that are already in the
+    -- relay buffer or in flight (TODO/NOTE Andrea: only local in-flight, at best?)
+    -- and those that are not. We'll request some bodies from the latter.
+    (ignoredIds, availableIdsMp) =
+      Map.partitionWithKey
+        (\id' _ -> id' `RB.member` relayBuffer)
+        idsMap
+
+    availableIdsU =
+      Map.filterWithKey
+        (\txid _ -> notElem txid lst.window)
+        idsMap
+
+    available' = lst.available <> Map.intersection availableIdsMp availableIdsU
+
+    -- The txs that we intentionally don't request, because they are
+    -- already in the mempool, need to be acknowledged.
+    --
+    -- So we extend buffer with those txs (so of course they have
+    -- no corresponding reply).
+    buffer' =
+      lst.buffer
+        <> Map.map (const Nothing) ignoredIds
+
+    window' = lst.window <> idsSeq
+
+    -- Check if having decided not to request more bodies we can now
+    -- confirm any ids (in strict order in the window
+    -- sequence). This is used in the 'numTxsToAcknowledge' below
+    -- which will then be used next time we MsgRequestHeaders.
+    --
+    (acknowledgedIds, window'') =
+      Seq.spanl (`Map.member` buffer') window'
+
+    -- If so we can remove acknowledged txs from our buffer provided that they
+    -- are not still in window''. This happens in case of duplicate
+    -- ids.
+    buffer'' =
+      forceElemsToWHNF $
+        Foldable.foldl'
+          ( \m txid ->
+              if elem txid window''
+                then m
+                else Map.delete txid m
+          )
+          buffer'
+          acknowledgedIds
