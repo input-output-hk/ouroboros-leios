@@ -122,7 +122,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     return transactionsById;
   }, [messages]);
 
-  const maxTransactions = useMemo(() => transactions.values().reduce((t, v) => t += v.length, transactions.size), [transactions.size])
+  const maxTransactions = useMemo(() => [...transactions.values()].reduce((t, v) => t += v.length, transactions.size), [transactions.size])
 
   // Function to draw the scene
   const draw = useCallback(() => {
