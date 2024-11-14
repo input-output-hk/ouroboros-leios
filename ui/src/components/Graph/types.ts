@@ -106,6 +106,7 @@ export interface IServerMessage<T = TMessageType> {
 }
 
 export interface ITransactionMessage {
+  id: number;
   generated: number;
   duration: number;
   sentTime: number;
