@@ -2,8 +2,10 @@
 
 open import Leios.Prelude
 open import Leios.Abstract
+open import Leios.VRF
 
-module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) where
+module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) (vrf' : LeiosVRF a)
+  (let open LeiosVRF vrf') where
 
 open import Leios.Blocks a using (EndorserBlock)
 
@@ -12,6 +14,9 @@ StakeDistr = PoolID ⇀ ℕ
 
 record BaseAbstract : Type₁ where
   field Cert : Type
+        VTy : Type
+        initSlot : VTy → ℕ
+        V-chkCerts : List PubKey → EndorserBlock × Cert → Type
 
   data Input : Type₁ where
     INIT   : (EndorserBlock × Cert → Type) → Input
