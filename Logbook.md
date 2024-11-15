@@ -2,6 +2,23 @@
 
 ## 2024-11-15
 
+### Analysis of Leios challenges, part 1
+
+See [Challenges for Leios, Part 1](analysis/challenges-1.md) for analysis of the following:
+- Cost of block storage for nodes.
+- Fees and rewards received for each block.
+- Break-even costs for the perpetual storage of blocks
+- Importance of the Cardano Reserves to SPO profitability
+
+Findings:
+1. Fees currently average 173.01 lovelace per byte of block.
+    1. Under best-case conditions, that fee will cover a cost of 115 ADA per GB of storage across 500 stakepools.
+    2. Under more realistic conditions, that fee will only cover a cost of 8 ADA per GB of storage across 2500 stakepools.
+2. Stake pools receive on average 20.91% of rewards.
+3. The cost of perpetual storage of blocks at VMs ranges $7/GB to $30/GB, strongly depending upon the assumption of how rapidly storage costs decrease in the future.
+4. The Cardano Reserves currently supply 99% of the rewards that stake pools and delegators receive.
+5. Break even-costs for the price of Ada needed to cover perpetual storage of blocks range from a best case of $0.06/ADA to a worst case of $3.68/ADA.
+
 ### Haskell simulation
 
 - Implemented new parametrized relay protocol that we plan to specialize
