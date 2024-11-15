@@ -811,6 +811,7 @@ relayConsumerPipelined config sst =
       -- received.
       let idsRequestedWithBodiesReceived :: Map id (Maybe (header, body))
           idsRequestedWithBodiesReceived =
+            -- TODO: shortcut when bodiesMap empty.
             Map.mapWithKey (\id' h -> (h,) <$> Map.lookup id' bodiesMap) requestedMap
 
           -- We still have to acknowledge the ids we were given. This
@@ -830,9 +831,9 @@ relayConsumerPipelined config sst =
             Seq.spanl (`Map.member` buffer1) lst.window
 
           -- If so we can submit the acknowledged bodies to our RelayBuffer
-          txsReady =
+          bodiesReady =
             foldr
-              (\txid r -> maybe r (: r) (buffer1 Map.! txid))
+              (\id' r -> maybe r (: r) (buffer1 Map.! id'))
               []
               idsToAcknowledge
 
@@ -857,6 +858,8 @@ relayConsumerPipelined config sst =
               . map (config.headerId . fst)
               $ extraToSubmit
 
+          bodiesToSubmit = bodiesReady ++ extraToSubmit
+
           -- If we are acknowledging blocks that are still in
           -- window' we need to re-add them to the buffer so that we also can
           -- acknowledge them again later. This will happen in case of
@@ -868,14 +871,15 @@ relayConsumerPipelined config sst =
                 <> Map.fromList (zip live (repeat Nothing))
 
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
-      now <- getCurrentTime
-      config.submitBlocks (txsReady ++ extraToSubmit) now $ \validated -> do
-        -- Note: here we could set a flag to drop this producer if not
-        -- all blocks validated.
-        modifyTVar' sst.relayBufferVar $
-          flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
-        -- TODO?: the ids we did not receive could be taken out earlier.
-        modifyTVar' sst.inFlightVar (`Set.difference` idsRequested)
+      unless (null bodiesToSubmit) $ do
+        now <- getCurrentTime
+        config.submitBlocks bodiesToSubmit now $ \validated -> do
+          -- Note: here we could set a flag to drop this producer if not
+          -- all blocks validated.
+          modifyTVar' sst.relayBufferVar $
+            flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
+          -- TODO?: the ids we did not receive could be taken out earlier.
+          modifyTVar' sst.inFlightVar (`Set.difference` idsRequested)
 
       return $
         idle
