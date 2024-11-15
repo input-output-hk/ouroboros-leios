@@ -2,6 +2,29 @@
 
 ## 2024-11-15
 
+### Techno-economic analysis of SPO nodes
+
+The *Refined Estimate* tab of the [Leios High-Level Resources Estimates spreadsheet](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) computes node costs for SPOs under Praos and Leios.
+
+- Each SPO has one block producer and two relays.
+- CPU, IOPS, disk, and network costs are estimated.
+- Results are provided from 1 to 10,000 TPS.
+- Leios parameters can be varied.
+- IBs, EBs, votes, certificates, and RBs are accounted for.
+
+The main findings confirm the insights from the earlier [system-dynamics simulation](#system-dynamics-simulation-of-throughput-techno-economics).
+
+1. Long-term storage of IBs, EBs, and RBs will dominate operating costs.
+2. We need to investigate options such as archiving, sharding, and pruning the transaction history.
+3. It is critical that hardware costs continue to drop: even a 15% reduction per year is not sufficient.
+4. Current fees are insufficient to sustain Leios.
+
+### Example schedule for short-pipeline Leios
+
+The following table illustrate when proposing, endorsing, voting, and forging can take place in short-pipeline Leios.
+
+![Example schedule for short-pipeline leios](analysis/short-pipeline-leios-example-schedule.png)
+
 ### Formal specification
 
 The Agda formal specification for the Simplified Leios Protocol has been updated:
@@ -51,6 +74,7 @@ Added animation to the visualization. It now shows transmission of TXs across th
 ## 2024-11-12
 
 ### Team session
+
 - ran manual simulation of short Leios from local node perspective ([meeting recording](https://input-output-rnd.slack.com/files/U02L6J0TP36/F080MPLCMJQ/12_07_58_mst_-_recording))
 - Next meeting
   - Continue manual simulation of short Leios from distributed perspective
