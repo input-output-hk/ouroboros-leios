@@ -8,6 +8,7 @@ import Data.String (IsString (fromString))
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import qualified Options.Applicative as Opts
 import Options.Applicative.Help (line)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
@@ -145,6 +146,8 @@ vizualisations =
   , ("praos-1", VizPraos.example1)
   , ("praos-p2p-1", VizPraosP2P.example1)
   , ("praos-p2p-2", VizPraosP2P.example2)
+  , ("relay-test-1", VizSimTestRelay.example1)
+  , ("relay-test-2", VizSimTestRelay.example2)
   ]
 
 readViz :: String -> Either String Vizualisation

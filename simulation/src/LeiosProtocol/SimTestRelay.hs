@@ -184,6 +184,9 @@ relayNode
         <* traverse_ Concurrently clients
         <* traverse_ Concurrently servers
    where
+    addBlock b =
+      assert (testBlockId b == testHeaderId (testHeader b)) $
+        RB.snoc (testBlockId b) (testHeader b, b)
     generation :: TestRelayBuffer m -> m ()
     generation buffer = case blockGeneration of
       NoPacketGeneration -> return ()
@@ -201,7 +204,7 @@ relayNode
                   , testBlockExpiry = blklifetime `addUTCTime` now
                   }
           atomically $
-            modifyTVar' buffer (RB.snoc blkid (testHeader blk, blk))
+            modifyTVar' buffer (addBlock blk)
           traceWith tracer (RelayNodeEventGenerate blk)
           go (succ blkid)
       PoissonGenerationPattern sz rng0 lambda blklifetime ->
@@ -221,7 +224,7 @@ relayNode
                   , testBlockExpiry = blklifetime `addUTCTime` now -- TODO: round to seconds.
                   }
           atomically $
-            modifyTVar' buffer (RB.snoc blkid (testHeader blk, blk))
+            modifyTVar' buffer (addBlock blk)
           traceWith tracer (RelayNodeEventGenerate blk)
           go rng''
 

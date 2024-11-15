@@ -44,6 +44,7 @@ library
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.SimTestRelay
+    LeiosProtocol.VizSimTestRelay
     ModelTCP
     P2P
     PlotTCP
