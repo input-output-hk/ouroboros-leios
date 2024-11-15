@@ -10,14 +10,14 @@ import {
 } from "react";
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   TooltipProps,
   XAxis,
-  YAxis,
+  YAxis
 } from "recharts";
 import {
   NameType,
@@ -286,7 +286,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
       if (!play) {
         simulationStart.current = now - simulationPauseTime.current;
         simulationPauseTime.current = now;
-        intervalId.current = setInterval(draw, 1000 / 120); // 60 FPS
+        intervalId.current = setInterval(draw, 1000 / 120); // 120 FPS
       } else {
         simulationPauseTime.current = now - simulationStart.current;
         if (intervalId.current) {
@@ -395,7 +395,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         <div className="flex flex-col w-1/3 items-center justify-between gap-4">
           <div className="w-full h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
+              <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   tick={false}
@@ -411,15 +411,16 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
                   domain={[0, maxTime]}
                   dataKey="time"
                 />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="time"
-                  stroke="#82ca9d"
+                  stroke="#8884d8"
+                  fill="#8884d8"
                   strokeWidth={2}
                   dot={false}
                 />
                 <Tooltip content={(props) => <CustomTooltip {...props} />} />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="w-full"></div>
