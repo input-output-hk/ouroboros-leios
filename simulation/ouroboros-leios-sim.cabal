@@ -43,6 +43,7 @@ library
     ExamplesTCP
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
+    LeiosProtocol.SimTestRelay
     ModelTCP
     P2P
     PlotTCP

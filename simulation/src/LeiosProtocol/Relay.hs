@@ -20,14 +20,17 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Relay where
 
-import ChanDriver (ProtocolMessage)
+import Chan
+import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
-import Control.Monad (forM_, join, unless, when)
+import Control.Monad (forM_, join, unless, void, when)
+import Control.Monad.Class.MonadAsync (MonadAsync)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
@@ -56,6 +59,8 @@ import Network.TypedProtocol (
   Nat (..),
   Protocol (..),
   StateTokenI (..),
+  runPeerWithDriver,
+  runPipelinedPeerWithDriver,
  )
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
@@ -392,6 +397,15 @@ newtype RelayProducerSharedState id header body m = RelayProducerSharedState
   { relayBufferVar :: ReadOnly (TVar m (RelayBuffer id (header, body)))
   }
 
+runRelayProducer ::
+  (MonadSTM m, Ord id, MonadDelay m) =>
+  RelayConfig ->
+  RelayProducerSharedState id header body m ->
+  Chan m (RelayMessage id header body) ->
+  m ()
+runRelayProducer config sst chan =
+  void $ runPeerWithDriver (chanDriver decideRelayState chan) (relayProducer config sst)
+
 data RelayProducerLocalState id = RelayProducerLocalState
   { window :: !(StrictSeq (id, RB.Ticket))
   , lastTicket :: !RB.Ticket
@@ -510,6 +524,15 @@ data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   --   * if a consumer exits with an exception between requesting bodies and the correponding
   --     submitBlocks those ids will not be cleared from the in-flight set.
   }
+
+runRelayConsumer ::
+  (MonadSTM m, MonadAsync m, Ord id, MonadDelay m, MonadTime m) =>
+  RelayConsumerConfig id header body m ->
+  RelayConsumerSharedState id header body m ->
+  Chan m (RelayMessage id header body) ->
+  m ()
+runRelayConsumer config sst chan =
+  void $ runPipelinedPeerWithDriver (chanDriver decideRelayState chan) (relayConsumerPipelined config sst)
 
 -- | Information maintained internally in the 'txSubmissionInbound' server
 -- implementation.
