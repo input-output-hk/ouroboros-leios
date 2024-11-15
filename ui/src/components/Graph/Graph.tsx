@@ -1,12 +1,11 @@
 "use client";
 import {
-  startTransition,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type FC,
+  type FC
 } from "react";
 
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, TooltipProps, XAxis, YAxis } from "recharts";
@@ -28,9 +27,9 @@ interface IGraphProps {
 }
 
 enum ESpeedOptions {
-  "1x" = 0.1,
-  "2x" = 0.2,
-  "3x" = 0.3,
+  "1/10" = 0.1,
+  "2/10" = 0.2,
+  "3/10" = 0.3,
 }
 
 const scale = 3;
@@ -53,16 +52,16 @@ let offsetX = 0,
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const simulationStart = useRef(performance.now());
-  const pauseTime = useRef<number | null>(null);
-  const animationFrameId = useRef<number | null>(null);
-  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [simulationStart, setSimulationStart] = useState(performance.now());
+  const [pauseTime, setPauseTime] = useState<number | null>(null);
+  const intervalId = useRef<Timer | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
   const [play, setPlay] = useState(false);
-  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1x"]);
+  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1/10"]);
   const [sentMessages, setSentMessages] = useState<Set<string>>(new Set());
   const maxTime = useMemo(
     () => Math.floor(messages[messages.length - 1].time / 1000000),
-    [messages, speed],
+    [messages, simulationStart],
   );
 
   const data = useMemo(() => [...sentMessages.values()].map((v, index) => ({
@@ -133,8 +132,10 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     }
 
     // Current time in simulation
-    const simulationTime =
-      (performance.now() - simulationStart.current) * speed;
+    const now = performance.now();
+    const elapsed =
+      (now - simulationStart) * speed;
+    setCurrentTime(elapsed);
 
     // Set canvas dimensions
     const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
@@ -209,13 +210,13 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         const startY = sourceNode.fy;
         const endX = targetNode.fx;
         const endY = targetNode.fy;
-        const elapsed = simulationTime - sentTime;
+        const transactionElapsedTime = elapsed - sentTime;
 
-        if (elapsed < 0) {
+        if (transactionElapsedTime < 0) {
           return; // Skip if the animation is done or hasn't started
         }
 
-        if (elapsed > duration) {
+        if (transactionElapsedTime > duration) {
           setSentMessages((prev) => {
             prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
             return prev;
@@ -225,7 +226,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         }
 
         // Calculate the interpolation factor
-        const t = elapsed / duration;
+        const t = transactionElapsedTime / duration;
         const x = startX + t * (endX - startX);
         const y = startY + t * (endY - startY);
 
@@ -246,24 +247,21 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     });
 
     context.restore();
-
-    if (play) {
-      animationFrameId.current = requestAnimationFrame(draw);
-      setCurrentTime((prev) => prev + 1);
-    }
   }, [topography, transactions, play, speed]);
 
   // Function to toggle play/pause
   const togglePlayPause = () => {
     setPlay((playing) => !playing);
+    const now = performance.now();
     if (!play) {
-      simulationStart.current = performance.now() - (pauseTime.current ?? 0);
-      animationFrameId.current = requestAnimationFrame(draw);
+      setSimulationStart(now - (pauseTime ?? 0));
+      setPauseTime(null);
+      intervalId.current = setInterval(draw, 1000 / 60); // 60 FPS
     } else {
-      pauseTime.current = performance.now() - (simulationStart.current ?? 0);
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
-        animationFrameId.current = null;
+      setPauseTime(now - simulationStart);
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+        intervalId.current = null;
       }
     }
   };
@@ -272,22 +270,31 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const resetSimulation = () => {
     setPlay(false);
     setCurrentTime(0);
-    setSpeed(ESpeedOptions["1x"]);
+    setSpeed(ESpeedOptions["1/10"]);
     setSentMessages(new Set());
-    simulationStart.current = performance.now();
-    pauseTime.current = 0;
-    startTransition(draw);
+    setSimulationStart(performance.now());
+    setPauseTime(null);
 
-    if (animationFrameId.current) {
-      cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = null;
+    if (intervalId.current) {
+      clearInterval(intervalId.current);
+      intervalId.current = null;
     }
+
+    draw();
   };
 
-  // Initial draw on mount
+  // Clear the interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     draw();
-  }, [draw]);
+  }, []);
 
   if (!topography.links.length || !topography.nodes.length) {
     return <p>Loading...</p>;
