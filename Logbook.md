@@ -2,7 +2,15 @@
 
 ## 2024-11-15
 
-### Core-parameter model 
+### Formal specification
+
+The Agda formal specification for the Simplified Leios Protocol has been updated:
+- The formal specification has been completed:
+  - there are no more holes or postulates
+  - the relation corresponding to the Simplified Leios Protocol (Figure 2, in the paper) is implemented
+  - functionalities are mostly kept abstract for now
+
+### Core-parameter model
 
 A first draft of a model of the core system parameters:
 
@@ -13,12 +21,12 @@ A first draft of a model of the core system parameters:
   - The relation of IB rate to IB size and available bandwidth.
 - Input parameters
   - EB rate
-  - Bandwith
+  - Bandwidth
   - IB size
 - Graphics
-  - IB rate v.s. available bandwith
+  - IB rate v.s. available bandwidth
 
-What the model shows is that even with conservative bandwith numbers, if IBs are of similar size as current Praos blocks, the IB rate is going to be a lot more than 1 per second.
+What the model shows is that even with conservative bandwidth numbers, if IBs are of similar size as current Praos blocks, the IB rate is going to be a lot more than 1 per second.
 
 Artifacts:
 
