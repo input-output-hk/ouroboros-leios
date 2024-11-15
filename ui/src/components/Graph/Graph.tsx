@@ -9,8 +9,20 @@ import {
   type FC,
 } from "react";
 
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, TooltipProps, XAxis, YAxis } from "recharts";
-import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  TooltipProps,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  NameType,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 import { Slider } from "./Slider";
 import {
   EMessageType,
@@ -28,47 +40,55 @@ interface IGraphProps {
 }
 
 enum ESpeedOptions {
-  "1x" = 0.1,
-  "2x" = 0.2,
-  "3x" = 0.3,
+  "1/10" = 0.1,
+  "2/10" = 0.2,
+  "3/10" = 0.3,
 }
 
 const scale = 3;
 let offsetX = 0,
   offsetY = 0;
 
-  const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
-    if (active && payload && payload.length) {
-      console.log(payload)
-      return (
-        <div className="custom-tooltip">
-          <p className="label">{`Message: #${payload[0].payload.message}`}</p>
-          <p className="intro">{`Time Sent: ${payload[0].payload.time}ms`}</p>
-        </div>
-      );
-    }
-  
-    return null;
-  };
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: TooltipProps<ValueType, NameType>) => {
+  if (active && payload && payload.length) {
+    console.log(payload);
+    return (
+      <div className="custom-tooltip">
+        <p className="label">{`Message: #${payload[0].payload.message}`}</p>
+        <p className="intro">{`Time Sent: ${payload[0].payload.time}ms`}</p>
+      </div>
+    );
+  }
+
+  return null;
+};
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const simulationStart = useRef(performance.now());
-  const pauseTime = useRef<number | null>(null);
-  const animationFrameId = useRef<number | null>(null);
-  const [currentTime, setCurrentTime] = useState<number>(0);
+  const simulationStart = useRef<number>(0);
+  const simulationPauseTime = useRef<number>(0);
+  const intervalId = useRef<Timer | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
   const [play, setPlay] = useState(false);
-  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1x"]);
+  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1/10"]);
   const [sentMessages, setSentMessages] = useState<Set<string>>(new Set());
   const maxTime = useMemo(
     () => Math.floor(messages[messages.length - 1].time / 1000000),
-    [messages, speed],
+    [messages],
   );
 
-  const data = useMemo(() => [...sentMessages.values()].map((v, index) => ({
-    message: index + 1,
-    time: Number(v.split("#")[1])
-  })), [sentMessages.size])
+  const data = useMemo(
+    () =>
+      [...sentMessages.values()].map((v, index) => ({
+        message: index + 1,
+        time: Number(v.split("#")[1]),
+      })),
+    [sentMessages.size],
+  );
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
@@ -122,7 +142,14 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     return transactionsById;
   }, [messages]);
 
-  const maxTransactions = useMemo(() => [...transactions.values()].reduce((t, v) => t += v.length, transactions.size), [transactions.size])
+  const maxTransactions = useMemo(
+    () =>
+      [...transactions.values()].reduce(
+        (t, v) => (t += v.length),
+        transactions.size,
+      ),
+    [transactions.size],
+  );
 
   // Function to draw the scene
   const draw = useCallback(() => {
@@ -133,8 +160,12 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     }
 
     // Current time in simulation
-    const simulationTime =
-      (performance.now() - simulationStart.current) * speed;
+    const now = performance.now();
+    const elapsed =
+      simulationStart.current !== 0
+        ? (now - simulationStart.current) * speed
+        : 0;
+    setCurrentTime(elapsed);
 
     // Set canvas dimensions
     const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
@@ -209,13 +240,13 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         const startY = sourceNode.fy;
         const endX = targetNode.fx;
         const endY = targetNode.fy;
-        const elapsed = simulationTime - sentTime;
+        const transactionElapsedTime = elapsed - sentTime;
 
-        if (elapsed < 0) {
+        if (transactionElapsedTime < 0) {
           return; // Skip if the animation is done or hasn't started
         }
 
-        if (elapsed > duration) {
+        if (transactionElapsedTime > duration) {
           setSentMessages((prev) => {
             prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
             return prev;
@@ -225,7 +256,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         }
 
         // Calculate the interpolation factor
-        const t = elapsed / duration;
+        const t = transactionElapsedTime / duration;
         const x = startX + t * (endX - startX);
         const y = startY + t * (endY - startY);
 
@@ -246,48 +277,59 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     });
 
     context.restore();
-
-    if (play) {
-      animationFrameId.current = requestAnimationFrame(draw);
-      setCurrentTime((prev) => prev + 1);
-    }
   }, [topography, transactions, play, speed]);
 
   // Function to toggle play/pause
-  const togglePlayPause = () => {
-    setPlay((playing) => !playing);
-    if (!play) {
-      simulationStart.current = performance.now() - (pauseTime.current ?? 0);
-      animationFrameId.current = requestAnimationFrame(draw);
-    } else {
-      pauseTime.current = performance.now() - (simulationStart.current ?? 0);
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
-        animationFrameId.current = null;
+  const togglePlayPause = useCallback(() => {
+    startTransition(() => {
+      const now = performance.now();
+      if (!play) {
+        simulationStart.current = now - simulationPauseTime.current;
+        simulationPauseTime.current = now;
+        intervalId.current = setInterval(draw, 1000 / 120); // 60 FPS
+      } else {
+        simulationPauseTime.current = now - simulationStart.current;
+        if (intervalId.current) {
+          clearInterval(intervalId.current);
+          intervalId.current = null;
+        }
       }
-    }
-  };
+
+      setPlay((playing) => {
+        return !playing;
+      });
+    });
+  }, [draw]);
 
   // Function to reset the simulation
   const resetSimulation = () => {
     setPlay(false);
     setCurrentTime(0);
-    setSpeed(ESpeedOptions["1x"]);
+    setSpeed(ESpeedOptions["1/10"]);
     setSentMessages(new Set());
-    simulationStart.current = performance.now();
-    pauseTime.current = 0;
-    startTransition(draw);
+    simulationStart.current = 0;
+    simulationPauseTime.current = 0;
 
-    if (animationFrameId.current) {
-      cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = null;
+    if (intervalId.current) {
+      clearInterval(intervalId.current);
+      intervalId.current = null;
     }
+
+    draw();
   };
 
-  // Initial draw on mount
+  // Clear the interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     draw();
-  }, [draw]);
+  }, []);
 
   if (!topography.links.length || !topography.nodes.length) {
     return <p>Loading...</p>;
@@ -342,29 +384,48 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         </div>
       </div>
       <div className="flex items-center justify-between gap-4">
-
-      <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
-        <div className="flex items-center justify-center gap-4">
-          <div><h4>Transactions Sent: {sentMessages.size}</h4></div>
+        <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
+          <div className="flex items-center justify-center gap-4">
+            <div>
+              <h4>Transactions Sent: {sentMessages.size}</h4>
+            </div>
+          </div>
+          <canvas ref={canvasRef} />
         </div>
-        <canvas ref={canvasRef} />
-      </div>
-      <div className="flex flex-col w-1/3 items-center justify-between gap-4">
-        <div className="w-full h-[400px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis tick={false} label="Transactions Sent" domain={[0, maxTransactions]} allowDataOverflow type="number" dataKey="message" />
-              <YAxis tick={false} label="Time" domain={[0, maxTime]} dataKey="time" />
-              <Line type="monotone" dataKey="time" stroke="#82ca9d" strokeWidth={2} dot={false} />
-              <Tooltip content={props => <CustomTooltip {...props} />} />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="flex flex-col w-1/3 items-center justify-between gap-4">
+          <div className="w-full h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  tick={false}
+                  label="Transactions Sent"
+                  domain={[0, maxTransactions]}
+                  allowDataOverflow
+                  type="number"
+                  dataKey="message"
+                />
+                <YAxis
+                  tick={false}
+                  label="Time"
+                  domain={[0, maxTime]}
+                  dataKey="time"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="time"
+                  stroke="#82ca9d"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Tooltip content={(props) => <CustomTooltip {...props} />} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="w-full"></div>
+          <div className="w-full"></div>
         </div>
-        <div className="w-full"></div>
-        <div className="w-full"></div>
       </div>
     </div>
-      </div>
   );
 };
