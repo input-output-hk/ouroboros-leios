@@ -3,6 +3,10 @@
 The focus of published work on ΔQSD (that I’m aware of) is to model the timeliness of outcomes without resource constraints, with strong results on algebraic equivalences to help with efficient expression evaluation.
 Within the context of Ouroboros Leios we very much need to model resource constraints and their non-linear effects on timeliness, though, because the focus of that work is to approach as closely as possible the allocated network bandwidth of the system — which implies that resources will frequently be used at their limits.
 
+> This article documents my journey in understanding how ΔQSD can be used, with some missteps and wrong interpretations along the way.
+> One important thing I learnt was that ΔQSD is meant only for timeliness analysis, complemented by load tracking _synthesis_.
+> In other words, the effect of resource constraint is fed into the model, not an output of the evaluation of the model.
+
 ## High fidelity resource usage tracking
 
 Timeliness analyses are performed while retaining full detail on possible executions; this is achieved by computing over cumulative distribution functions (CDF) instead of scalar values.
@@ -35,6 +39,8 @@ This means that a resource constraint violating discovered when combining this e
 
 ## Possibly correct but horrible solution
 
+> _(This section documents a misunderstanding of how ΔQSD should be used, so take it with a spoonful of salt)_
+
 The above problems seem solvable by the algorithm described below, which makes my spidey senses tingle that predict unacceptable computational latency.
 
 1. compute the CDF and time-dependent CUDFs without regard for constraints
@@ -56,3 +62,35 @@ It would be nice if a single diffusion activity could be computed once and then 
 Unfortunately we will want to simulate the interaction of overlapping pipeline instances, which may hit a given node at different times; adversarial behaviour may exacerbate this problem.
 So for some analyses we may not be able to greatly simplify the outcome expression back to the 1, 2, 3, 4 hop model, which in combination with an iterative algorithm like the one sketched above smells like it will require substantial computational resources.
 And this runs counter to the impetus for this whole work, which is to offer an _interactive_ tool to the whole community, both within and without of IOG.
+
+## Good news everyone: focusing on timeliness is actually good enough
+
+When presented with the difficulties above, a conversation with Neil & Peter from PNSol brought clarity and enlightenment:
+ΔQSD isn’t meant to be used that way, it is meant to be driven by timeliness, and timeliness alone.
+
+Instead of using load metrics to drive the evaluation of the model, the model is supposed to be evaluated only for timeliness _under the assumption that all resource constraints have already been included in the modelling_.
+So the correct approach is to model resource usage in such a way that it already probabilistically delays some outcomes, avoiding that the resource will actually be exhausted _by design_.
+
+As an example we now model the sending of network packets from a given network node over a given network interface.
+Nominally, sending 1500 octets on a 1Gbps link takes 120µs, but we anticipate that there is a queue of depth ten in front of that interface that may already hold between zero and ten packets, leading to either a delay of up to 1.08ms or failure (if the queue is full).
+We could thus model this outcome with a timeliness CDF that has ten steps and tops out at (1 − `failure`).
+
+Now using this model in a larger expression, e.g. to express the Praos chain sync algorithm, will lead to a distribution of timeliness that reflects the assumed effect of the network queue.
+
+The big question then is: do the assumed queue fill probabilities match actual system behaviour?
+
+### Approach 1: measure
+
+We could run the real system and keep tabs on the network interface queue usage to assess whether our assumption was correct.
+This result will depend on the precise workload we put on the system.
+
+### Approach 2: model it
+
+We could also use the ΔQ expression itself to give us a hint as to how realistic our assumption was.
+This requires the load tracking described in the sections above, which will then provide an answer for the probability distribution of the usage of each resource over time.
+
+In the above example, we would attach the load metric “network interface on node X used” to the network sending outcome, with a value of one for the whole maximum duration of 1.2ms.
+When the expression containing this outcome (potentially multiple times) has been evaluated with load tracking, we have for each point in time a probability distribution of how many times this network interface is being used in parallel.
+Since we designed it with a queue depth of ten, exceeding ten parallel usages constitutes a resource constraint violation — we can then compare how often this occurs with the probability we assigned to the corresponding failure.
+If the real system doesn’t actually fail in this case but just gets slower, we would respond to a violation by increasing the assumed queue depth until no violation occurs anymore.
+It is at this point that ΔQ tells us _via the timeliness constraints_ whether the system is feasible under realistic load constraints.
