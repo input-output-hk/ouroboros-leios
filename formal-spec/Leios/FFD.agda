@@ -21,7 +21,7 @@ record FFDAbstract : Type₁ where
   record Functionality : Type₁ where
     field State : Type
           initFFDState : State
-          stepRel : Input → State → State × Output → Type
+          _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
 
     open Input public
     open Output public

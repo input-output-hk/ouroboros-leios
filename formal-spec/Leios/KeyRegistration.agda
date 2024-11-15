@@ -17,7 +17,7 @@ record KeyRegistrationAbstract : Type₁ where
 
   record Functionality : Type₁ where
     field State : Type
-          _⇀⟦_⟧_ : State → Input → State × Output → Type
+          _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
 
     open Input public
     open Output public
