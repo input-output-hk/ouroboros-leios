@@ -206,7 +206,7 @@ instance MessageSize a => MessageSize (ResponseList blocking a) where
 data RelayProtocolError
   = ShrankTooMuch WindowSize WindowShrink
   | ExpandTooMuch WindowSize WindowShrink WindowExpand
-  | RequestedNoChange
+  | RequestedNoChange Bool WindowShrink WindowExpand
   | RequestedUnknownId
   | IdsNotRequested
   | BodiesNotRequested
@@ -439,7 +439,7 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       -- 3. shrink, expand /= 0 if non-blocking
       --    expand /= 0 if blocking
       when (expand.value == 0 && (isBlocking blocking || shrink.value == 0)) $ do
-        throw RequestedNoChange
+        throw $ RequestedNoChange (isBlocking blocking) shrink expand
       -- Shrink the window:
       let keptValues = Seq.drop (fromIntegral shrink) lst.window
       -- Find the new entries:
@@ -526,7 +526,7 @@ data RelayConsumerSharedState id header body m = RelayConsumerSharedState
   }
 
 runRelayConsumer ::
-  (MonadSTM m, MonadAsync m, Ord id, MonadDelay m, MonadTime m) =>
+  (Ord id, MonadSTM m, MonadAsync m, MonadDelay m, MonadTime m) =>
   RelayConsumerConfig id header body m ->
   RelayConsumerSharedState id header body m ->
   Chan m (RelayMessage id header body) ->
@@ -731,33 +731,37 @@ relayConsumerPipelined config sst =
     RelayConsumer id header body n 'StIdle m ()
   requestHeadersNonBlocking lst = do
     let (windowShrink, windowExpand) = windowAdjust lst
-    TS.YieldPipelined
-      (MsgRequestHeaders SingNonBlocking windowShrink windowExpand)
-      ( TS.ReceiverAwait $ \case
-          MsgRespondHeaders (NonBlockingResponse headers) ->
-            TS.ReceiverDone (CollectHeaders windowExpand headers)
-      )
-      ( idle
-          lst
-            { pendingRequests = Succ lst.pendingRequests
-            , pendingShrink = 0
-            , pendingExpand = lst.pendingExpand + windowExpand
-            }
-      )
+    if windowShrink.value > 0 || windowExpand.value > 0
+      then
+        TS.YieldPipelined
+          (MsgRequestHeaders SingNonBlocking windowShrink windowExpand)
+          ( TS.ReceiverAwait $ \case
+              MsgRespondHeaders (NonBlockingResponse headers) ->
+                TS.ReceiverDone (CollectHeaders windowExpand headers)
+          )
+          ( idle
+              lst
+                { pendingRequests = Succ lst.pendingRequests
+                , pendingShrink = 0
+                , pendingExpand = lst.pendingExpand + windowExpand
+                }
+          )
+      else idle lst
 
   requestHeadersBlocking ::
     RelayConsumerLocalState id header body Z ->
     RelayConsumer id header body Z 'StIdle m ()
   requestHeadersBlocking lst = do
     let (windowShrink, windowExpand) = windowAdjust lst
-    TS.Yield (MsgRequestHeaders SingBlocking windowShrink windowExpand) $
-      assert (lst.pendingExpand == 0) $ do
-        let lst' = lst{pendingShrink = 0, pendingExpand = windowExpand}
-        TS.Await $ \case
-          MsgDone -> done lst'
-          MsgRespondHeaders (BlockingResponse headers) ->
-            handleResponse lst' $
-              CollectHeaders windowExpand (NonEmpty.toList headers)
+    assert (windowExpand.value > 0) $
+      TS.Yield (MsgRequestHeaders SingBlocking windowShrink windowExpand) $
+        assert (lst.pendingExpand == 0) $ do
+          let lst' = lst{pendingShrink = 0, pendingExpand = windowExpand}
+          TS.Await $ \case
+            MsgDone -> done lst'
+            MsgRespondHeaders (BlockingResponse headers) ->
+              handleResponse lst' $
+                CollectHeaders windowExpand (NonEmpty.toList headers)
 
   handleResponse ::
     forall (n :: N).
