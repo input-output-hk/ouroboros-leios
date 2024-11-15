@@ -74,7 +74,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const intervalId = useRef<Timer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [play, setPlay] = useState(false);
-  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["1/10"]);
+  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["3/10"]);
   const [sentMessages, setSentMessages] = useState<Set<string>>(new Set());
   const maxTime = useMemo(
     () => Math.floor(messages[messages.length - 1].time / 1000000),
@@ -166,6 +166,12 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         ? (now - simulationStart.current) * speed
         : 0;
     setCurrentTime(elapsed);
+
+    if (elapsed >= maxTime) {
+      intervalId.current && clearInterval(intervalId.current);
+      setPlay(false);
+      return;
+    }
 
     // Set canvas dimensions
     const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
@@ -277,7 +283,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     });
 
     context.restore();
-  }, [topography, transactions, play, speed]);
+  }, [topography, transactions, play, speed, maxTime]);
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -363,6 +369,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
           <select
             id="speed"
             disabled={play}
+            defaultValue={speed}
             onChange={(e) => {
               resetSimulation();
               setSpeed(Number(e.target.value) as ESpeedOptions);
