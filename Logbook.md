@@ -2,6 +2,12 @@
 
 ## 2024-11-15
 
+### Example schedule for short-pipeline Leios
+
+The following table illustrate when proposing, endorsing, voting, and forging can take place in short-pipeline Leios.
+
+![Example schedule for short-pipeline leios](analysis/short-pipeline-leios-example-schedule.png)
+
 ### Formal specification
 
 The Agda formal specification for the Simplified Leios Protocol has been updated:
@@ -51,6 +57,7 @@ Added animation to the visualization. It now shows transmission of TXs across th
 ## 2024-11-12
 
 ### Team session
+
 - ran manual simulation of short Leios from local node perspective ([meeting recording](https://input-output-rnd.slack.com/files/U02L6J0TP36/F080MPLCMJQ/12_07_58_mst_-_recording))
 - Next meeting
   - Continue manual simulation of short Leios from distributed perspective
