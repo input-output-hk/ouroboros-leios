@@ -2,6 +2,18 @@
 
 ## 2024-11-15
 
+### Haskell simulation
+
+- Implemented new parametrized relay protocol that we plan to specialize
+  for diffusion of IB, EB, and votes.
+- Adapted original relay simulation to use the new protocol, adding
+  relay-test-1 and relay-test-2 visualizations, meant as a first test.
+- Changes currently on branch `haskell-leios-sim`[1] as some more debugging
+  still needed: the consumer peer is pipelined and we seem to have
+  problems with messages being read in the wrong context.
+
+[1]: 0284b75727dd6770a4a4f0455e5dc0be9d89412e
+
 ### Techno-economic analysis of SPO nodes
 
 The *Refined Estimate* tab of the [Leios High-Level Resources Estimates spreadsheet](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) computes node costs for SPOs under Praos and Leios.
