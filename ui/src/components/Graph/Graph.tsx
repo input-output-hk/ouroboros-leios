@@ -33,6 +33,7 @@ import {
   ITransactionSent,
   ITransformedNodeMap,
 } from "./types";
+import { isWithinRange } from "./utils";
 
 interface IGraphProps {
   messages: IServerMessage[];
@@ -75,7 +76,8 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [play, setPlay] = useState(false);
   const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["3/10"]);
-  const [sentMessages, setSentMessages] = useState<Set<string>>(new Set());
+  const [sentTxs, setSentTxs] = useState<Set<string>>(new Set());
+  const [generatedTxs, setGeneratedTxs] = useState<Set<number>>(new Set());
   const maxTime = useMemo(
     () => Math.floor(messages[messages.length - 1].time / 1000000),
     [messages],
@@ -83,32 +85,34 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
 
   const data = useMemo(
     () =>
-      [...sentMessages.values()].map((v, index) => ({
+      [...sentTxs.values()].map((v, index) => ({
         message: index + 1,
         time: Number(v.split("#")[1]),
       })),
-    [sentMessages.size],
+    [sentTxs.size],
   );
+
+  const txGeneratedMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionGenerated,
+  ) as IServerMessage<ITransactionGenerated>[], [messages]);
+
+  const txSentMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionSent,
+  ) as IServerMessage<ITransactionSent>[], [messages]);
+
+  const txReceivedMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionReceived,
+  ) as IServerMessage<ITransactionReceived>[], [messages]);
 
   const transactions = useMemo(() => {
     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
 
-    const generatedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionGenerated,
-    ) as IServerMessage<ITransactionGenerated>[];
-    const sentMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionSent,
-    ) as IServerMessage<ITransactionSent>[];
-    const receivedMessages = messages.filter(
-      ({ message }) => message.type === EMessageType.TransactionReceived,
-    ) as IServerMessage<ITransactionReceived>[];
-
-    for (const generatedMsg of generatedMessages) {
+    for (const generatedMsg of txGeneratedMessages) {
       const transactionList: ITransactionMessage[] = [];
 
-      for (const sentMsg of sentMessages) {
+      for (const sentMsg of txSentMessages) {
         if (sentMsg.message.id === generatedMsg.message.id) {
-          const receivedMsg = receivedMessages.find(
+          const receivedMsg = txReceivedMessages.find(
             (r) =>
               r.message.id === generatedMsg.message.id &&
               r.message.sender === sentMsg.message.sender &&
@@ -140,7 +144,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     }
 
     return transactionsById;
-  }, [messages]);
+  }, [messages, txGeneratedMessages, txSentMessages]);
 
   const maxTransactions = useMemo(
     () =>
@@ -253,7 +257,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
         }
 
         if (transactionElapsedTime > duration) {
-          setSentMessages((prev) => {
+          setSentTxs((prev) => {
             prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
             return prev;
           });
@@ -279,11 +283,30 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
       context.beginPath();
       context.arc(node.fx, node.fy, 3, 0, 2 * Math.PI);
       context.fillStyle = node.data.stake ? "green" : "blue";
+      context.stroke();
+      context.strokeStyle = "black";
+
+      txGeneratedMessages.forEach(m => {
+        const target = m.time / 1_000_000;
+        if (m.message.publisher === node.id && isWithinRange(elapsed, target, 500)) {
+          context.fillStyle = "red";
+        }
+
+        if (m.message.publisher === node.id && elapsed > target) {
+          setGeneratedTxs(prev => {
+            prev.add(m.time);
+            return prev;
+          });
+        }
+      })
+
       context.fill();
     });
 
     context.restore();
-  }, [topography, transactions, play, speed, maxTime]);
+  }, [topography, transactions, play, speed, maxTime, txGeneratedMessages]);
+
+  console.log(generatedTxs)
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -312,7 +335,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     setPlay(false);
     setCurrentTime(0);
     setSpeed(ESpeedOptions["1/10"]);
-    setSentMessages(new Set());
+    setSentTxs(new Set());
     simulationStart.current = 0;
     simulationPauseTime.current = 0;
 
@@ -392,9 +415,12 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
       </div>
       <div className="flex items-center justify-between gap-4">
         <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 mt-4">
             <div>
-              <h4>Transactions Sent: {sentMessages.size}</h4>
+              <h4>Transactions Generated: {generatedTxs.size}</h4>
+            </div>
+            <div>
+              <h4>Transactions Sent: {sentTxs.size}</h4>
             </div>
           </div>
           <canvas ref={canvasRef} />
