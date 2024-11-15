@@ -1,5 +1,35 @@
 # Leios logbook
 
+## 2024-11-15
+
+### Core-parameter model 
+
+A first draft of a model of the core system parameters:
+
+
+- Features
+  - Traffic spike tolerance coming either from the protocol or network level.
+  - EB/voting overhead.
+  - The relation of IB rate to IB size and available bandwidth.
+- Input parameters
+  - EB rate
+  - Bandwith
+  - IB size
+- Graphics
+  - IB rate v.s. available bandwith
+
+What the model shows is that even with conservative bandwith numbers, if IBs are of similar size as current Praos blocks, the IB rate is going to be a lot more than 1 per second.
+
+Artifacts:
+
+- Online simulator: [Short Leios parameters model v0.1](https://insightmaker.com/insight/70N5xaPTULaxhMaYcS0JZ8)
+
+Next steps:
+
+- Revisit numbers in the model related to EBs/voting.
+
+
+
 ## 2024-11-14
 
 ### Rust simulation
