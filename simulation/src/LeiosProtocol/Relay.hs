@@ -398,7 +398,7 @@ newtype RelayProducerSharedState id header body m = RelayProducerSharedState
   }
 
 runRelayProducer ::
-  (MonadSTM m, Ord id, MonadDelay m) =>
+  (Ord id, MonadSTM m, MonadDelay m) =>
   RelayConfig ->
   RelayProducerSharedState id header body m ->
   Chan m (RelayMessage id header body) ->
@@ -421,8 +421,8 @@ relayProducer ::
   (Ord id, MonadSTM m, MonadDelay m) =>
   RelayConfig ->
   RelayProducerSharedState id header body m ->
-  RelayProducer id header body 'StIdle m ()
-relayProducer config sst = idle initRelayProducerLocalState
+  RelayProducer id header body 'StInit m ()
+relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
  where
   idle :: RelayProducerLocalState id -> TC.Client (RelayState id header body) 'NonPipelined 'StIdle m ()
   idle !lst = TC.Await $ \case
