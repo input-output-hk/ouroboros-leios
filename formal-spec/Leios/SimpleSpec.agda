@@ -31,6 +31,13 @@ module FFD = FFDAbstract.Functionality FFD'
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
 
+filter : {A : Set} → (P : A → Type) ⦃ _ : P ⁇¹ ⦄ → List A → List A
+filter P = L.filter ¿ P ¿¹
+
+instance
+  IsSet-List : {A : Set} → IsSet (List A) A
+  IsSet-List .toSet A = fromList A
+
 -- High level structure:
 
 
@@ -175,7 +182,7 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
     Init :
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
          ∙ bs B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
-         ─────────────────────────────────────────────────────────
+         ────────────────────────────────────────────────────────
          nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD
 
     -- Network and Ledger
@@ -183,7 +190,7 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
     Slot : let open LeiosState s renaming (FFDState to ffds) in
          ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG ebs ⟧⇀ bs'
          ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
-         ─────────────────────────────────────────────────────────────────
+         ──────────────────────────────────────────────────────
          just s -⟦ SLOT / EMPTY ⟧⇀ record s
              { FFDState = ffds'
              ; Ledger   = constructLedger ebs
@@ -205,15 +212,15 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
           just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
 
     Base₂a : let open LeiosState s in
-           ∙ eb ∈ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+           ∙ eb ∈ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
-           ────────────────────────────────────────────────────────────────────────────────────
+           ───────────────────────────────────────────────────────────────────────
            just s -⟦ SLOT / EMPTY ⟧⇀ s
 
     Base₂b : let open LeiosState s in
-           ∙ ∅ ≡ filterˢ (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) (fromList EBs)
+           ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
-           ────────────────────────────────────────────────────────────────────────────────────
+           ───────────────────────────────────────────────────────────────────────
            just s -⟦ SLOT / EMPTY ⟧⇀ s
 
     -- Protocol rules
@@ -228,9 +235,9 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' }
 
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
-                  LI = map {F = List} getIBRef $ setToList $ filterˢ (_∈ᴮ slice L slot (Λ + 1)) (fromList IBs)
-                  LE = map getEBRef $ setToList $ filterˢ (isVote1Certified s) $
-                             filterˢ (_∈ᴮ slice L slot (μ + 2)) (fromList EBs)
+                  LI = map getIBRef $ filter (_∈ᴮ slice L slot (Λ + 1)) IBs
+                  LE = map getEBRef $ filter (isVote1Certified s) $
+                             filter (_∈ᴮ slice L slot (μ + 2)) EBs
                   h = mkEB slot id π sk-EB LI LE
             in
             ∙ canProduceEB slot sk-EB (stake s) π
@@ -239,17 +246,17 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' }
 
     V1-Role : let open LeiosState s renaming (FFDState to ffds)
-                  EBs' = filterˢ (allIBRefsKnown s) $ filterˢ (_∈ᴮ slice L slot (μ + 1)) (fromList EBs)
-                  votes = map (vote sk-V ∘ hash) (setToList EBs')
+                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot (μ + 1)) EBs
+                  votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ canProduceV1 slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
-            ─────────────────────────────────────────────────────────────────────
+            ──────────────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' }
 
     V2-Role : let open LeiosState s renaming (FFDState to ffds)
-                  EBs' = filterˢ (vote2Eligible s) $ filterˢ (_∈ᴮ slice L slot 1) (fromList EBs)
-                  votes = map (vote sk-V ∘ hash) (setToList EBs')
+                  EBs' = filter (vote2Eligible s) $ filter (_∈ᴮ slice L slot 1) EBs
+                  votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ canProduceV2 slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
