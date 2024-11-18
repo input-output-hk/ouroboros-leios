@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-11-18
+
+# Items of interest from Intersect Network WG
+
+- Many SPOs have a hot backup of their block producer running.
+- Relays actually have more than 200 downstream p2p connections.
+    - For example, the IOG ones have ~500 downstream peers.
+
 ## 2024-11-15
 
 ### Analysis of Leios challenges, part 1
