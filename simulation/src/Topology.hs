@@ -9,34 +9,37 @@ import Data.Aeson (decode)
 import Data.Aeson.Types (FromJSON (..), Options (..), ToJSON (..), defaultOptions, genericParseJSON, genericToEncoding)
 import qualified Data.ByteString.Lazy as BSL (readFile)
 import Data.GraphViz (X11Color (..))
-import qualified Data.GraphViz.Attributes as GVA
-import qualified Data.GraphViz.Commands as GVC
-import qualified Data.GraphViz.Types as GV (PrintDot)
-import qualified Data.GraphViz.Types.Graph as G
+import qualified Data.GraphViz.Attributes as G
+import qualified Data.GraphViz.Attributes.Complete as G
+import qualified Data.GraphViz.Commands as G
+import qualified Data.GraphViz.Types as G (PrintDot)
+import qualified Data.GraphViz.Types.Generalised as G
 import qualified Data.Map as M
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
+import Data.Text.Lazy (LazyText)
 import qualified Data.Text.Lazy as TL
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word (Word16)
 import GHC.Generics (Generic)
 
-newtype NodeName = NodeName Text
+newtype NodeName = NodeName {unNodeName :: Text}
   deriving (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
-  deriving newtype (GV.PrintDot)
+  deriving newtype (G.PrintDot)
 
-newtype NodeId = NodeId Word16
-  deriving (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
-newtype OrgName = OrgName Text
+newtype NodeId = NodeId {unNodeId :: Word16}
   deriving (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
-newtype RegionName = RegionName Text
+newtype OrgName = OrgName {unOrgName :: Text}
+  deriving (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+newtype RegionName = RegionName {unRegionName :: Text}
   deriving (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
@@ -82,9 +85,11 @@ readTopology = fmap decode . BSL.readFile
 regions :: Topology -> Set RegionName
 regions = foldr (S.insert . region) S.empty . coreNodes
 
+regionNameToLazyText :: RegionName -> LazyText
+regionNameToLazyText = TL.fromStrict . unRegionName
+
 regionNameToGraphID :: RegionName -> G.GraphID
-regionNameToGraphID (RegionName regionName) =
-  G.Str (TL.fromStrict regionName)
+regionNameToGraphID = G.Str . regionNameToLazyText
 
 -- NOTE: Taken from https://sashamaps.net/docs/resources/20-colors/
 simpleDistinctColors :: [X11Color]
@@ -114,43 +119,117 @@ simpleDistinctColors =
     , Black
     ]
 
-toDotGraph :: Topology -> G.DotGraph NodeName
-toDotGraph topology = addEdges . addNodes $ G.emptyGraph
+toDotGraphAsTorus :: Topology -> G.DotGraph NodeName
+toDotGraphAsTorus topology =
+  G.DotGraph True True Nothing . Seq.fromList $
+    globalStatements : nodeStatements <> edgeStatements
  where
-  -- NOTE: Visualising regions as clusters looks AWFUL.
-  -- addRegions =
-  --   foldr (.) id $
-  --     [ G.addCluster
-  --       (regionNameToGraphID regionName)
-  --       Nothing -- the parent cluster is the root graph
-  --       [] -- no attributes
-  --     | regionName <- S.toList (regions topology)
-  --     ]
+  globalStatements =
+    G.GA . G.GraphAttrs $
+      [ G.Smoothing G.Spring
+      , G.K 0.5
+      , G.RepulsiveForce 2.0
+      ]
+  nodeStatements =
+    [ G.DN . G.DotNode nodeName $
+      [ G.style G.filled
+      , G.fillColor nodeRegionColor
+      ]
+    | node <- V.toList $ coreNodes topology
+    , let nodeName = name node
+    , let nodeRegionColor = regionColorMap M.! region node
+    ]
+  edgeStatements =
+    [ G.DE . G.DotEdge producerName consumerName $
+      [ G.fillColor producerRegionColor
+      ]
+    | consumer <- V.toList (coreNodes topology)
+    , let consumerName = name consumer
+    , producerName <- V.toList (producers consumer)
+    , let producerRegionColor = regionColorMap M.! (nodeRegionMap M.! producerName)
+    ]
+  nodeRegionMap =
+    M.fromList [(name node, region node) | node <- V.toList (coreNodes topology)]
   regionColorMap =
     M.fromList $ zip (S.toList $ regions topology) simpleDistinctColors
 
-  addNodes =
-    foldr (.) id $
-      [ G.addNode
-        (name node)
-        -- For regions as clusters, replace Nothing with the following:
-        -- (Just $ regionNameToGraphID $ region node)
-        Nothing
-        [ GVA.style GVA.filled
-        , GVA.fillColor (regionColorMap M.! region node)
-        ]
-      | node <- V.toList (coreNodes topology)
+toDotGraphByRegion :: Topology -> G.DotGraph NodeName
+toDotGraphByRegion topology =
+  G.DotGraph True True Nothing . Seq.fromList $
+    graphAttributes : subGraphStatements <> edgeStatements
+ where
+  graphAttributes =
+    G.GA . G.GraphAttrs $
+      []
+  subGraphStatements =
+    [ G.SG . G.DotSG True (Just subGraphId) . Seq.fromList $
+      subGraphAttributtes : subGraphNodeStatements <> subGraphEdgeStatements
+    | regionName <- S.toList $ regions topology
+    , let subGraphId = regionNameToGraphID regionName
+    , let subGraphAttributtes =
+            G.GA . G.GraphAttrs $
+              [ G.textLabel (regionNameToLazyText regionName)
+              ]
+    , let subGraphNodeStatements =
+            [ G.DN . G.DotNode nodeName $
+              [ G.style G.filled
+              , G.fillColor nodeRegionColor
+              ]
+            | node <- V.toList $ coreNodes topology
+            , let nodeName = name node
+            , let nodeRegionName = region node
+            , nodeRegionName == regionName
+            , let nodeRegionColor = regionColorMap M.! nodeRegionName
+            ]
+    , let subGraphEdgeStatements =
+            [ G.DE . G.DotEdge producerName consumerName $
+              [ G.fillColor producerRegionColor
+              ]
+            | consumer <- V.toList (coreNodes topology)
+            , let consumerName = name consumer
+            , let consumerRegionName = region consumer
+            , consumerRegionName == regionName
+            , producerName <- V.toList (producers consumer)
+            , let producerRegionName = nodeRegionMap M.! producerName
+            , producerRegionName == regionName
+            , let producerRegionColor = regionColorMap M.! producerRegionName
+            ]
+    ]
+  edgeStatements =
+    [ G.DE . G.DotEdge producerName consumerName $
+      [ G.fillColor producerRegionColor
       ]
-  addEdges =
-    foldr (.) id $
-      [ G.addEdge
-        producer
-        (name consumer)
-        []
-      | consumer <- V.toList (coreNodes topology)
-      , producer <- V.toList (producers consumer)
-      ]
+    | consumer <- V.toList (coreNodes topology)
+    , let consumerName = name consumer
+    , let consumerRegionName = region consumer
+    , producerName <- V.toList (producers consumer)
+    , let producerRegionName = nodeRegionMap M.! producerName
+    , let producerRegionColor = regionColorMap M.! producerRegionName
+    , consumerRegionName /= producerRegionName
+    ]
+  nodeRegionMap =
+    M.fromList [(name node, region node) | node <- V.toList (coreNodes topology)]
+  regionColorMap =
+    M.fromList $ zip (S.toList $ regions topology) simpleDistinctColors
 
-renderTopology :: Topology -> FilePath -> IO ()
-renderTopology topology outputFile =
-  void $ GVC.runGraphviz (toDotGraph topology) GVC.Png outputFile
+renderTopologyAsTorus :: FilePath -> Topology -> IO ()
+renderTopologyAsTorus outputFile topology =
+  void $ G.runGraphvizCommand G.Sfdp (toDotGraphAsTorus topology) G.Png outputFile
+
+renderTopologyFileAsTorus :: FilePath -> FilePath -> IO ()
+renderTopologyFileAsTorus topologyFile outputFile =
+  readTopology topologyFile
+    >>= maybe
+      (error $ "Could not read " <> topologyFile)
+      (renderTopologyAsTorus outputFile)
+
+renderTopologyByRegion :: FilePath -> Topology -> IO ()
+renderTopologyByRegion outputFile topology =
+  void $ G.runGraphvizCommand G.Dot (toDotGraphByRegion topology) G.Png outputFile
+
+renderTopologyFileByRegion :: FilePath -> FilePath -> IO ()
+renderTopologyFileByRegion topologyFile outputFile =
+  readTopology topologyFile
+    >>= maybe
+      (error $ "Could not read " <> topologyFile)
+      (renderTopologyByRegion outputFile)
