@@ -2,7 +2,7 @@
 
 ## 2024-11-18
 
-# Items of interest from Intersect Network WG
+### Items of interest from Intersect Network WG
 
 - Many SPOs have a hot backup of their block producer running.
 - Relays actually have more than 200 downstream p2p connections.
