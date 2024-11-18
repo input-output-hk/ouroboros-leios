@@ -284,3 +284,29 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } V2-Role
+
+    -- Note: Base doesn't need a negative rule, since it can always be invoked
+
+    No-IB-Role : let open LeiosState s in
+            ∙ needsUpkeep IB-Role
+            ∙ ¬ canProduceIB slot sk-IB (stake s) π
+            ─────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s IB-Role
+
+    No-EB-Role : let open LeiosState s in
+            ∙ needsUpkeep EB-Role
+            ∙ ¬ canProduceEB slot sk-EB (stake s) π
+            ─────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s EB-Role
+
+    No-V1-Role : let open LeiosState s in
+            ∙ needsUpkeep V1-Role
+            ∙ ¬ canProduceV1 slot sk-V (stake s)
+            ─────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s V1-Role
+
+    No-V2-Role : let open LeiosState s in
+            ∙ needsUpkeep V2-Role
+            ∙ ¬ canProduceV2 slot sk-V (stake s)
+            ─────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s V2-Role
