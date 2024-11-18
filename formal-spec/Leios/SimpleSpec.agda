@@ -22,6 +22,7 @@ module Leios.SimpleSpec (a : LeiosAbstract) (let open LeiosAbstract a) (let open
   (sk-IB sk-EB sk-V : PrivKey)
   (pk-IB pk-EB pk-V : PubKey)
   (let open Leios.Base a vrf') (B' : BaseAbstract) (BF : BaseAbstract.Functionality B')
+  (initBaseState : BaseAbstract.Functionality.State BF)
   (let open Leios.KeyRegistration a vrf') (K' : KeyRegistrationAbstract) (KF : KeyRegistrationAbstract.Functionality K') where
 
 module B   = BaseAbstract.Functionality BF
@@ -78,6 +79,7 @@ record LeiosState : Type where
         IBHeaders : List IBHeader
         IBBodies  : List IBBody
         Upkeep    : ℙ SlotUpkeep
+        BaseState : B.State
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -103,8 +105,8 @@ record LeiosState : Type where
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 
-initLeiosState : VTy → StakeDistr → LeiosState
-initLeiosState V SD = record
+initLeiosState : VTy → StakeDistr → B.State → LeiosState
+initLeiosState V SD bs = record
   { V         = V
   ; SD        = SD
   ; FFDState  = FFD.initFFDState
@@ -117,6 +119,7 @@ initLeiosState V SD = record
   ; IBHeaders = []
   ; IBBodies  = []
   ; Upkeep    = ∅
+  ; BaseState = bs
   }
 
 -- some predicates about EBs
@@ -175,7 +178,7 @@ open FFD hiding (_-⟦_/_⟧⇀_)
 private variable s      : LeiosState
                  ffds'  : FFD.State
                  π      : VrfPf
-                 bs bs' : B.State
+                 bs'    : B.State
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
                  eb     : EndorserBlock
@@ -195,17 +198,17 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
 
     Init :
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
-         ∙ bs B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
-         ────────────────────────────────────────────────────────
-         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD
+         ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
+         ────────────────────────────────────────────────────────────────
+         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
 
     -- Network and Ledger
 
-    Slot : let open LeiosState s renaming (FFDState to ffds) in
+    Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs) in
          ∙ Upkeep ≡ᵉ allUpkeep
          ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG ebs ⟧⇀ bs'
          ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
-         ──────────────────────────────────────────────────────
+         ───────────────────────────────────────────────────────────────────────
          just s -⟦ SLOT / EMPTY ⟧⇀ record s
              { FFDState = ffds'
              ; Ledger   = constructLedger ebs
@@ -227,14 +230,14 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ───────────────────────────────────────────────────────────────────
             just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
 
-    Base₂a  : let open LeiosState s in
+    Base₂a  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ eb ∈ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
             ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
-    Base₂b  : let open LeiosState s in
+    Base₂b  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
             ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
