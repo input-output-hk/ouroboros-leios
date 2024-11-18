@@ -92,6 +92,7 @@ library
     , contra-tracer
     , fingertree
     , gnuplot
+    , graphviz
     , gtk3
     , io-classes
     , io-sim
