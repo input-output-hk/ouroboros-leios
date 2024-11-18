@@ -741,7 +741,7 @@ impl DeltaQ {
                 Op::Seq { load_factor } => {
                     let second = res_stack.pop().unwrap().mult(load_factor, ctx);
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.seq(&second, ctx)?);
+                    res_stack.push(first.seq(&second, ctx));
                 }
                 Op::Choice(w1, w2) => {
                     let second = res_stack.pop().unwrap();
@@ -751,12 +751,12 @@ impl DeltaQ {
                 Op::ForAll => {
                     let second = res_stack.pop().unwrap();
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.for_all(&second, ctx)?);
+                    res_stack.push(first.for_all(&second, ctx));
                 }
                 Op::ForSome => {
                     let second = res_stack.pop().unwrap();
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.for_some(&second, ctx)?);
+                    res_stack.push(first.for_some(&second, ctx));
                 }
                 Op::EndRec(n) => {
                     ephemeral.rec.remove(n).unwrap();
@@ -877,7 +877,7 @@ mod tests {
 
     #[test]
     fn test_display_cdf() {
-        let cdf = CDF::new(&[0.0, 0.2, 0.9], 1.0).unwrap();
+        let cdf = CDF::new(&[(1.0, 0.2), (2.0, 0.9)]).unwrap();
         let dq = DeltaQ::cdf(cdf.clone());
         assert_eq!(dq.to_string(), "CDF[(1, 0.2), (2, 0.9)]");
         assert_eq!(dq, "CDF[(1, 0.2), (2, 0.9)]".parse().unwrap());
@@ -977,7 +977,7 @@ mod tests {
     fn test_scenario_from_paper_64k() {
         let ctx = btreemap! {
             "single".to_owned() =>
-                DeltaQ::cdf(CDF::from_steps(
+                DeltaQ::cdf(CDF::new(
                     &[(0.024, 1.0 / 3.0), (0.143, 2.0 / 3.0), (0.531, 1.0)],
                 )
                 .unwrap()),
@@ -1046,7 +1046,7 @@ mod tests {
                     ),
                     1.0,
                 ),
-            "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
+            "base".to_owned() => DeltaQ::cdf(CDF::new(&[(1.0, 0.5), (2.0,1.0)]).unwrap()),
         };
         let result = DeltaQ::name("recursive")
             .eval(&ctx.into(), &mut EphemeralContext::default())
@@ -1072,9 +1072,11 @@ mod tests {
 
     #[test]
     fn parse_outcome() {
-        let expected = Outcome::new(CDF::from_steps(&[(1.0, 0.1), (2.0, 0.3)]).unwrap()).with_load(
-            "metric".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
+        let expected = Outcome::new_with_load(
+            CDF::new(&[(1.0, 0.1), (2.0, 0.3)]).unwrap(),
+            btreemap! {
+                "metric".into() => StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
+            },
         );
         assert_eq!(
             DeltaQExpr::Outcome(expected),
@@ -1145,7 +1147,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.cdf,
-            CDF::from_steps(&[
+            CDF::new(&[
                 (0.2, 0.046360295),
                 (0.3, 0.20068718),
                 (0.4, 0.30865377),
@@ -1223,9 +1225,11 @@ mod tests {
 
     #[test]
     fn test_load_update() {
-        let outcome = Outcome::new(CDF::from_steps(&[(1.5, 0.1)]).unwrap()).with_load(
-            "net".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
+        let outcome = Outcome::new_with_load(
+            CDF::new(&[(1.5, 0.1)]).unwrap(),
+            btreemap! {
+                "net".into() => StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
+            },
         );
         let dq = DeltaQ::from(DeltaQExpr::Seq(
             Arc::new(DeltaQExpr::Outcome(outcome.clone())),
@@ -1236,9 +1240,11 @@ mod tests {
         let ctx = PersistentContext::default();
         let mut ephemeral = EphemeralContext::default();
         let res = dq.eval(&ctx, &mut ephemeral).unwrap();
-        let expected = Outcome::new(CDF::from_steps(&[(3.0, 0.010000001)]).unwrap()).with_load(
-            "net".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
+        let expected = Outcome::new_with_load(
+            CDF::new(&[(3.0, 0.010000001)]).unwrap(),
+            btreemap! {
+                "net".into() => StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
+            },
         );
         assert_eq!(res, expected);
     }

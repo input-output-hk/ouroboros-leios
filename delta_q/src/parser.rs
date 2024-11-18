@@ -267,9 +267,7 @@ mod tests {
     fn parse_empty_cdf() {
         assert_eq!(
             parse("CDF[]"),
-            Ok(DeltaQExpr::Outcome(Outcome::new(
-                CDF::from_steps(&[]).unwrap()
-            )))
+            Ok(DeltaQExpr::Outcome(Outcome::new(CDF::new(&[]).unwrap())))
         );
     }
 
@@ -281,7 +279,7 @@ mod tests {
         );
         assert_eq!(
             parse("CDF[(1, 2)]").unwrap_err(),
-            "CDF[(1, 2)]\n   ^\ninvalid CDF\nData vector must contain values between 0 and 1"
+            "CDF[(1, 2)]\n   ^\ninvalid CDF\nData vector must contain values between 0 and 1, found y=2"
         );
     }
 }

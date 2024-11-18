@@ -1,4 +1,3 @@
-use crate::CDF;
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BinaryHeap};
 
@@ -9,32 +8,11 @@ pub enum CompactionMode {
     OverApproximate,
 }
 
-pub trait Compact: Sized {
-    fn compact(_this: &mut Vec<(f32, Self)>, _mode: CompactionMode, _max_size: usize) {}
-    fn similar(_a: &Self, _b: &Self) -> bool {
-        false
-    }
-}
-
-impl Compact for f32 {
-    fn compact(this: &mut Vec<(f32, Self)>, mode: CompactionMode, max_size: usize) {
-        compact(this, mode, max_size);
-    }
-
-    fn similar(a: &f32, b: &f32) -> bool {
-        *a == 0.0 && b.abs() < 1e-6
-            || *b == 0.0 && a.abs() < 1e-6
-            || (a - b).abs() / a.max(*b) < 1e-6
-    }
-}
-
-impl Compact for CDF {}
-
 /// Repeated computation with a CDF can lead to an unbounded number of data points, hence we limit its size.
 /// This function ensures a maximal data length of `max_size` points by collapsing point pairs that are closest to each other on the x axis.
 /// Under CompactionMode::UnderApproximate, the new point gets the greater x coordinate while under CompactionMode::OverApproximate, the new point gets the smaller x coordinate.
 /// The resulting point always has the higher y value of the pair.
-fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
+pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size: usize) {
     {
         let mut pos = 0;
         let mut prev_y = 0.0;

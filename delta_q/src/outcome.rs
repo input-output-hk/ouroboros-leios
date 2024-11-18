@@ -8,7 +8,7 @@ use std::{
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Outcome {
     pub cdf: CDF,
-    pub load: BTreeMap<Name, StepFunction>,
+    pub load: BTreeMap<Name, StepFunction<CDF>>,
 }
 
 impl Outcome {
@@ -24,6 +24,10 @@ impl Outcome {
     }
 
     pub fn new_with_load(cdf: CDF, load: BTreeMap<Name, StepFunction>) -> Self {
+        let load = load
+            .into_iter()
+            .map(|(n, l)| (n, l.map(|y| CDF::new(&[(*y, 1.0)]).unwrap())))
+            .collect();
         Self { cdf, load }
     }
 
@@ -31,11 +35,11 @@ impl Outcome {
         &self.cdf
     }
 
-    pub fn load(&self) -> &BTreeMap<Name, StepFunction> {
+    pub fn load(&self) -> &BTreeMap<Name, StepFunction<CDF>> {
         &self.load
     }
 
-    pub fn with_load(mut self, metric: Name, load: StepFunction) -> Self {
+    pub fn with_load(mut self, metric: Name, load: StepFunction<CDF>) -> Self {
         self.load.insert(metric, load);
         self
     }
@@ -50,8 +54,8 @@ impl Outcome {
     fn map_load(
         &self,
         ctx: &PersistentContext,
-        f: impl Fn(&StepFunction) -> StepFunction,
-    ) -> BTreeMap<Name, StepFunction> {
+        f: impl Fn(&StepFunction<CDF>) -> StepFunction<CDF>,
+    ) -> BTreeMap<Name, StepFunction<CDF>> {
         self.load
             .iter()
             .map(|(n, l)| {
@@ -67,8 +71,8 @@ impl Outcome {
         &self,
         other: &Self,
         ctx: &PersistentContext,
-        f: impl Fn(&StepFunction, &StepFunction) -> Result<StepFunction, CDFError>,
-    ) -> Result<BTreeMap<Name, StepFunction>, CDFError> {
+        f: impl Fn(&StepFunction<CDF>, &StepFunction<CDF>) -> Result<StepFunction<CDF>, CDFError>,
+    ) -> Result<BTreeMap<Name, StepFunction<CDF>>, CDFError> {
         self.load
             .iter()
             .merge_join_by(other.load.iter(), |(nl, _), (nr, _)| nl.cmp(nr))
@@ -84,17 +88,17 @@ impl Outcome {
     pub fn mult(&self, lf: f32, ctx: &PersistentContext) -> Self {
         Self {
             cdf: self.cdf_cloned(ctx),
-            load: self.map_load(ctx, |l| l.mult(lf)),
+            load: self.map_load(ctx, |l| l.scale(lf)),
         }
     }
 
-    pub fn seq(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
-        Ok(Self {
-            cdf: self.cdf.convolve(&other.cdf)?,
-            load: self.map_loads(other, ctx, |l, r| {
-                Ok(l.add(&self.cdf.convolve_step(r, f32::INFINITY)?))
-            })?,
-        })
+    pub fn seq(&self, other: &Self, ctx: &PersistentContext) -> Self {
+        Self {
+            cdf: self.cdf.convolve(&other.cdf),
+            load: self
+                .map_loads(other, ctx, |l, r| Ok(l.sum_up(&self.cdf.convolve_step(r))))
+                .expect("infallible"),
+        }
     }
 
     pub fn choice(
@@ -105,22 +109,26 @@ impl Outcome {
     ) -> Result<Self, CDFError> {
         Ok(Self {
             cdf: self.cdf.choice(my_fraction, &other.cdf)?,
-            load: self.map_loads(other, ctx, |l, r| Ok(l.choice(my_fraction, r)))?,
+            load: self.map_loads(other, ctx, |l, r| Ok(l.choice(my_fraction, r)?))?,
         })
     }
 
-    pub fn for_all(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
-        Ok(Self {
-            cdf: self.cdf.for_all(&other.cdf)?,
-            load: self.map_loads(other, ctx, |l, r| Ok(l.add(r)))?,
-        })
+    pub fn for_all(&self, other: &Self, ctx: &PersistentContext) -> Self {
+        Self {
+            cdf: self.cdf.for_all(&other.cdf),
+            load: self
+                .map_loads(other, ctx, |l, r| Ok(l.sum_up(r)))
+                .expect("infallible"),
+        }
     }
 
-    pub fn for_some(&self, other: &Self, ctx: &PersistentContext) -> Result<Self, CDFError> {
-        Ok(Self {
-            cdf: self.cdf.for_some(&other.cdf)?,
-            load: self.map_loads(other, ctx, |l, r| Ok(l.add(r)))?,
-        })
+    pub fn for_some(&self, other: &Self, ctx: &PersistentContext) -> Self {
+        Self {
+            cdf: self.cdf.for_some(&other.cdf),
+            load: self
+                .map_loads(other, ctx, |l, r| Ok(l.sum_up(r)))
+                .expect("infallible"),
+        }
     }
 
     pub fn similar(&self, other: &Self) -> bool {
@@ -148,26 +156,23 @@ impl Display for Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use maplit::btreemap;
 
     fn outcomes() -> (Outcome, Outcome) {
-        let outcome1 = Outcome::new(CDF::from_steps(&[(1.0, 0.4), (2.0, 1.0)]).unwrap())
-            .with_load(
-                "m1".into(),
-                StepFunction::new(&[(0.1, 15.0), (0.5, 10.0), (1.9, 0.0)]).unwrap(),
-            )
-            .with_load(
-                "m2".into(),
-                StepFunction::new(&[(1.5, 100.0), (2.0, 0.0)]).unwrap(),
-            );
-        let outcome2 = Outcome::new(CDF::from_steps(&[(0.0, 0.1), (5.0, 1.0)]).unwrap())
-            .with_load(
-                "m2".into(),
-                StepFunction::new(&[(0.0, 50.0), (4.5, 0.0)]).unwrap(),
-            )
-            .with_load(
-                "m3".into(),
-                StepFunction::new(&[(4.5, 12.0), (5.5, 0.0)]).unwrap(),
-            );
+        let outcome1 = Outcome::new_with_load(
+            CDF::new(&[(1.0, 0.4), (2.0, 1.0)]).unwrap(),
+            btreemap! {
+                "m1".into() => StepFunction::new(&[(0.1, 15.0), (0.5, 10.0), (1.9, 0.0)]).unwrap(),
+                "m2".into() => StepFunction::new(&[(1.5, 100.0), (2.0, 0.0)]).unwrap(),
+            },
+        );
+        let outcome2 = Outcome::new_with_load(
+            CDF::new(&[(0.0, 0.1), (5.0, 1.0)]).unwrap(),
+            btreemap! {
+                "m2".into() => StepFunction::new(&[(0.0, 50.0), (4.5, 0.0)]).unwrap(),
+                "m3".into() => StepFunction::new(&[(4.5, 12.0), (5.5, 0.0)]).unwrap(),
+            },
+        );
         (outcome1, outcome2)
     }
 
@@ -176,30 +181,51 @@ mod tests {
         let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
         let res = outcome1.choice(0.6, &outcome2, &ctx).unwrap();
-        assert_eq!(res.to_string(), "CDF[(0, 0.04), (1, 0.28), (2, 0.64), (5, 1)] WITH m1[(0.1, 9), (0.5, 6), (1.9, 0)] WITH m2[(0, 20), (1.5, 80), (2, 20), (4.5, 0)] WITH m3[(4.5, 4.8), (5.5, 0)]");
+        assert_eq!(res.to_string(), "CDF[(0, 0.04), (1, 0.28), (2, 0.64), (5, 1)] \
+            WITH m1[(0.1, CDF[(0, 0.4), (15, 1)]), (0.5, CDF[(0, 0.4), (10, 1)]), (1.9, 0)] \
+            WITH m2[(0, CDF[(0, 0.6), (50, 1)]), (1.5, CDF[(50, 0.4), (100, 1)]), (2, CDF[(0, 0.6), (50, 1)]), (4.5, 0)] \
+            WITH m3[(4.5, CDF[(0, 0.6), (12, 1)]), (5.5, 0)]");
     }
 
     #[test]
     fn test_for_all() {
         let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
-        let res = outcome1.for_all(&outcome2, &ctx).unwrap();
-        assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (5, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
+        let res = outcome1.for_all(&outcome2, &ctx);
+        assert_eq!(
+            res.to_string(),
+            "CDF[(1, 0.04), (2, 0.1), (5, 1)] \
+            WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] \
+            WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] \
+            WITH m3[(4.5, 12), (5.5, 0)]"
+        );
     }
 
     #[test]
     fn test_for_some() {
         let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
-        let res = outcome1.for_some(&outcome2, &ctx).unwrap();
-        assert_eq!(res.to_string(), "CDF[(0, 0.1), (1, 0.46), (2, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] WITH m3[(4.5, 12), (5.5, 0)]");
+        let res = outcome1.for_some(&outcome2, &ctx);
+        assert_eq!(
+            res.to_string(),
+            "CDF[(0, 0.1), (1, 0.46), (2, 1)] \
+            WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] \
+            WITH m2[(0, 50), (1.5, 150), (2, 50), (4.5, 0)] \
+            WITH m3[(4.5, 12), (5.5, 0)]"
+        );
     }
 
     #[test]
     fn test_seq() {
         let ctx = PersistentContext::default();
         let (outcome1, outcome2) = outcomes();
-        let res = outcome1.seq(&outcome2, &ctx).unwrap();
-        assert_eq!(res.to_string(), "CDF[(1, 0.04), (2, 0.1), (6, 0.46), (7, 1)] WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] WITH m2[(1, 20), (1.5, 120), (2, 50), (5.5, 30), (6.5, 0)] WITH m3[(5.5, 4.8), (6.5, 7.2), (7.5, 0)]");
+        let res = outcome1.seq(&outcome2, &ctx);
+        assert_eq!(
+            res.to_string(),
+            "CDF[(1, 0.04), (2, 0.1), (6, 0.46), (7, 1)] \
+            WITH m1[(0.1, 15), (0.5, 10), (1.9, 0)] \
+            WITH m2[(1, 20), (1.5, 120), (2, 50), (5.5, 30), (6.5, 0)] \
+            WITH m3[(5.5, 4.8), (6.5, 7.2), (7.5, 0)]"
+        );
     }
 }

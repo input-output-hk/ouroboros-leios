@@ -1,27 +1,32 @@
-use crate::{step_function::PairIterators, CompactionMode, StepFunction, StepFunctionError};
+use crate::{CompactionMode, StepFunction, StepFunctionError, StepValue, DEFAULT_MAX_SIZE};
 use itertools::Itertools;
-use std::{fmt, str::FromStr};
+use std::{fmt, str::FromStr, sync::OnceLock};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CDFError {
-    InvalidDataRange,
+    InvalidDataRange(&'static str, f32),
     NonMonotonicData,
-    InvalidFraction,
+    InvalidFraction(f32),
     InvalidFormat(&'static str, usize),
+    ProbabilityOverflow(f32),
 }
 
 impl fmt::Display for CDFError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CDFError::InvalidDataRange => {
-                write!(f, "Data vector must contain values between 0 and 1")
+            CDFError::InvalidDataRange(s, y) => {
+                write!(
+                    f,
+                    "Data vector must contain values between 0 and 1, found {s}={y}"
+                )
             }
             CDFError::NonMonotonicData => write!(
                 f,
                 "Data vector must contain monotonically increasing values"
             ),
-            CDFError::InvalidFraction => write!(f, "Fraction must be between 0 and 1"),
+            CDFError::InvalidFraction(y) => write!(f, "Fraction must be between 0 and 1: {y}"),
             CDFError::InvalidFormat(s, pos) => write!(f, "Invalid format: {s} at {pos}"),
+            CDFError::ProbabilityOverflow(y) => write!(f, "Probability overflow: {y}"),
         }
     }
 }
@@ -32,8 +37,10 @@ impl From<StepFunctionError> for CDFError {
     fn from(err: StepFunctionError) -> Self {
         match err {
             StepFunctionError::InvalidFormat(s, p) => CDFError::InvalidFormat(s, p),
-            StepFunctionError::InvalidDataRange => CDFError::InvalidDataRange,
+            StepFunctionError::InvalidDataRange(s, y) => CDFError::InvalidDataRange(s, y),
             StepFunctionError::NonMonotonicData => CDFError::NonMonotonicData,
+            StepFunctionError::InvalidFraction(y) => CDFError::InvalidFraction(y),
+            StepFunctionError::ProbabilityOverflow(y) => CDFError::ProbabilityOverflow(y),
         }
     }
 }
@@ -44,6 +51,12 @@ impl From<StepFunctionError> for CDFError {
 pub struct CDF {
     /// invariants: y-values are in the range (0, 1] and must be strictly monotonically increasing
     steps: StepFunction,
+}
+
+impl Default for CDF {
+    fn default() -> Self {
+        Self::top()
+    }
 }
 
 impl fmt::Display for CDF {
@@ -64,49 +77,29 @@ impl FromStr for CDF {
 }
 
 impl CDF {
-    /// Create a new CDF from a vector of data and a bin size.
-    /// The data vector must contain values between 0 and 1, and must be
-    /// monotonically increasing.
-    pub fn new(data: &[f32], bin_size: f32) -> Result<Self, CDFError> {
-        if !data.iter().all(|&y| y >= 0.0 && y <= 1.0) {
-            return Err(CDFError::InvalidDataRange);
-        }
-        if !data.windows(2).all(|w| w[0] <= w[1]) {
-            return Err(CDFError::NonMonotonicData);
-        }
-        let mut prev = 0.0;
-        Ok(Self {
-            steps: StepFunction::new(
-                &data
-                    .iter()
-                    .enumerate()
-                    .map(|(i, &x)| (i as f32 * bin_size, x))
-                    .filter(|&(_, y)| {
-                        let ret = y > prev;
-                        prev = y;
-                        ret
-                    })
-                    .collect::<Vec<_>>(),
-            )?,
-        })
-    }
-
     pub fn top() -> Self {
-        Self::from_steps(&[(0.0, 1.0)]).unwrap()
+        static TOP: OnceLock<CDF> = OnceLock::new();
+        TOP.get_or_init(|| Self::new(&[(0.0, 1.0)]).unwrap())
+            .clone()
     }
 
     pub fn bottom() -> Self {
-        Self {
-            steps: StepFunction::zero(),
-        }
+        static BOTTOM: OnceLock<CDF> = OnceLock::new();
+        BOTTOM
+            .get_or_init(|| Self {
+                steps: StepFunction::zero(),
+            })
+            .clone()
     }
 
     /// Create a CDF from a step function.
     ///
     /// This validates that the y-values are in the range (0, 1] and are strictly monotonically increasing.
     pub fn from_step_function(steps: StepFunction) -> Result<Self, CDFError> {
-        if !steps.iter().all(|(_x, y)| y > 0.0 && y <= 1.0) {
-            return Err(CDFError::InvalidDataRange);
+        for (_, y) in steps.iter() {
+            if y <= 0.0 || y > 1.0 {
+                return Err(CDFError::InvalidDataRange("y", y));
+            }
         }
         if !steps
             .iter()
@@ -121,7 +114,7 @@ impl CDF {
     /// Create a step function CDF from a vector of (x, y) pairs.
     /// The x values must be greater than 0 and must be strictly monotonically increasing.
     /// The y values must be from (0, 1] and must be strictly monotonically increasing.
-    pub fn from_steps(data: &[(f32, f32)]) -> Result<Self, CDFError> {
+    pub fn new(data: &[(f32, f32)]) -> Result<Self, CDFError> {
         Self::from_step_function(StepFunction::new(data)?)
     }
 
@@ -168,7 +161,7 @@ impl CDF {
     /// the first CDF.
     pub fn choice(&self, my_fraction: f32, other: &CDF) -> Result<CDF, CDFError> {
         if my_fraction < 0.0 || my_fraction > 1.0 {
-            return Err(CDFError::InvalidFraction);
+            return Err(CDFError::InvalidFraction(my_fraction));
         }
         let fraction = 1.0 - my_fraction;
         let mut data = Vec::new();
@@ -180,65 +173,89 @@ impl CDF {
                 data.push((x, y));
             }
         }
-        let steps = self.steps.compact(data)?;
-        Ok(CDF { steps })
+        f32::compact(&mut data, self.steps.mode(), self.steps.max_size());
+        Ok(CDF {
+            steps: StepFunction::try_from(data)?
+                .with_mode(self.steps.mode())
+                .with_max_size(self.steps.max_size()),
+        })
     }
 
     /// Combine two CDFs by universal quantification, meaning that both outcomes must occur.
-    pub fn for_all(&self, other: &CDF) -> Result<CDF, CDFError> {
+    pub fn for_all(&self, other: &CDF) -> CDF {
         let mut data = Vec::new();
         for (x, (ly, ry)) in self.steps.zip(&other.steps) {
             let y = ly * ry;
             data.push((x, y));
         }
-        let steps = self.steps.compact(data)?;
-        Ok(CDF { steps })
+        f32::compact(&mut data, self.steps.mode(), self.steps.max_size());
+        CDF {
+            steps: StepFunction::try_from(data)
+                .expect("step function error")
+                .with_mode(self.steps.mode())
+                .with_max_size(self.steps.max_size()),
+        }
     }
 
     /// Combine two CDFs by existential quantification, meaning that at least one of the outcomes
-    pub fn for_some(&self, other: &CDF) -> Result<CDF, CDFError> {
+    pub fn for_some(&self, other: &CDF) -> CDF {
         let mut data = Vec::new();
         for (x, (ly, ry)) in self.steps.zip(&other.steps) {
             let y = (ly + ry - ly * ry).clamp(0.0, 1.0);
             data.push((x, y));
         }
-        let steps = self.steps.compact(data)?;
-        Ok(CDF { steps })
+        f32::compact(&mut data, self.steps.mode(), self.steps.max_size());
+        CDF {
+            steps: StepFunction::try_from(data)
+                .expect("step function error")
+                .with_mode(self.steps.mode())
+                .with_max_size(self.steps.max_size()),
+        }
     }
 
     /// Convolve two CDFs, which is equivalent to taking the sum of all possible outcomes of the
     /// two CDFs. This describes the distribution of the sum of two independent random variables.
-    pub fn convolve(&self, other: &CDF) -> Result<CDF, CDFError> {
-        let steps = self.convolve_step(&other.steps, 1.0)?;
-        Ok(CDF { steps })
+    pub fn convolve(&self, other: &CDF) -> CDF {
+        let steps = self.convolve_step(&other.steps);
+        CDF { steps }
     }
 
     /// Convolve a CDF with a step function, which means smearing out the step function by the
     /// gradual completion of the CDF.
-    pub fn convolve_step(
-        &self,
-        other: &StepFunction,
-        max: f32,
-    ) -> Result<StepFunction, StepFunctionError> {
+    pub fn convolve_step<T: StepValue>(&self, other: &StepFunction<T>) -> StepFunction<T> {
         // start with the all-zero CDF
         let mut data = Vec::new();
         let mut prev_y = 0.0;
+        let zero = T::default();
         for (lx, ly) in self.steps.iter() {
             let step = ly - prev_y;
             // take the other CDF, scale it by the step size, shift it by the current x value, and add it into the data
             let mut d = Vec::new();
-            let iter = PairIterators::new(
-                data.iter().copied(),
-                other.iter().map(|(x, y)| (x + lx, y * step)),
+            let iter = crate::step_function::zip(
+                data.iter().map(|(x, y)| (*x, y)),
+                other.iter().map(|(x, y)| (x + lx, y.diminish(step))),
+                &zero,
+                zero.clone(),
             );
             for (x, (ly, ry)) in iter {
-                d.push((x, (ly + ry).min(max)));
+                d.push((x, ly.add_prob(&ry).expect("probability overflow")));
             }
             data = d;
             prev_y = ly;
         }
-        let steps = self.steps.compact(data)?;
-        Ok(steps)
+        T::compact(&mut data, self.steps.mode(), self.steps.max_size());
+        StepFunction::try_from(data)
+            .expect("step function error")
+            .with_mode(self.steps.mode())
+            .with_max_size(self.steps.max_size())
+    }
+}
+
+impl FromIterator<(f32, f32)> for CDF {
+    fn from_iter<I: IntoIterator<Item = (f32, f32)>>(iter: I) -> Self {
+        let mut data = iter.into_iter().collect::<Vec<_>>();
+        f32::compact(&mut data, CompactionMode::default(), DEFAULT_MAX_SIZE);
+        Self::new(&data).unwrap()
     }
 }
 
@@ -248,69 +265,75 @@ mod tests {
 
     #[test]
     fn test_new() {
-        CDF::new(&[0.0, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap();
+        CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1.0, 1.0)]).unwrap();
 
-        let cdf = CDF::new(&[0.0, 0.25, 0.5, 0.75, 1.1], 0.25);
-        assert_eq!(cdf, Err(CDFError::InvalidDataRange));
+        let cdf = CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1.0, 1.1)]);
+        assert_eq!(cdf, Err(CDFError::InvalidDataRange("y", 1.1)));
 
-        let cdf = CDF::new(&[0.0, 0.25, 0.5, 0.75, 0.5], 0.25);
+        let cdf = CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1.0, 0.5)]);
         assert_eq!(cdf, Err(CDFError::NonMonotonicData));
     }
 
     #[test]
     fn test_choice() {
-        let left = CDF::new(&[0.0, 0.0, 0.5, 1.0, 1.0], 0.25).unwrap();
-        let right = CDF::new(&[0.0, 1.0, 1.0, 1.0, 1.0], 0.25).unwrap();
+        let left = CDF::new(&[(0.5, 0.5), (0.75, 1.0)]).unwrap();
+        let right = CDF::new(&[(0.25, 1.0)]).unwrap();
         let added = left.choice(0.7, &right).unwrap();
-        assert_eq!(added, CDF::new(&[0.0, 0.3, 0.65, 1.0, 1.0], 0.25).unwrap());
+        assert_eq!(
+            added,
+            CDF::new(&[(0.25, 0.3), (0.5, 0.65), (0.75, 1.0)]).unwrap()
+        );
         let added = left.choice(1.0, &right).unwrap();
-        assert_eq!(added, CDF::new(&[0.0, 0.0, 0.5, 1.0, 1.0], 0.25).unwrap());
+        assert_eq!(added, CDF::new(&[(0.5, 0.5), (0.75, 1.0)]).unwrap());
     }
 
     #[test]
     fn test_convolve_step() {
-        let left = CDF::new(&[0.0, 1.0, 1.0, 1.0, 1.0], 1.0).unwrap();
-        let right = CDF::new(&[0.0, 0.0, 1.0, 1.0, 1.0], 1.0).unwrap();
-        let convolved = left.convolve(&right).unwrap();
-        assert_eq!(
-            convolved,
-            CDF::new(&[0.0, 0.0, 0.0, 1.0, 1.0], 1.0).unwrap()
-        );
+        let left = CDF::new(&[(1.0, 1.0)]).unwrap();
+        let right = CDF::new(&[(2.0, 1.0)]).unwrap();
+        let convolved = left.convolve(&right);
+        assert_eq!(convolved, CDF::new(&[(3.0, 1.0)]).unwrap());
     }
 
     #[test]
     fn test_convolve_two() {
-        let left = CDF::new(&[0.0, 0.3, 0.3, 1.0, 1.0, 1.0, 1.0], 1.0).unwrap();
-        let right = CDF::new(&[0.0, 0.0, 0.6, 1.0, 1.0, 1.0, 1.0], 1.0).unwrap();
-        let convolved = left.convolve(&right).unwrap();
+        let left = CDF::new(&[(1.0, 0.3), (3.0, 1.0)]).unwrap();
+        let right = CDF::new(&[(2.0, 0.6), (3.0, 1.0)]).unwrap();
+        let convolved = left.convolve(&right);
         assert_eq!(
             convolved,
-            CDF::new(&[0.0, 0.0, 0.0, 0.18, 0.3, 0.72, 1.0], 1.0).unwrap()
+            CDF::new(&[(3.0, 0.18), (4.0, 0.3), (5.0, 0.72), (6.0, 1.0)]).unwrap()
         );
     }
 
     #[test]
     fn test_for_all() {
-        let left = CDF::new(&[0.0, 0.5, 0.75, 1.0], 0.25).unwrap();
-        let right = CDF::new(&[0.0, 0.25, 0.5, 1.0], 0.25).unwrap();
-        let result = left.for_all(&right).unwrap();
-        assert_eq!(result, CDF::new(&[0.0, 0.125, 0.375, 1.0], 0.25).unwrap());
+        let left = CDF::new(&[(0.25, 0.5), (0.5, 0.75), (0.75, 1.0)]).unwrap();
+        let right = CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 1.0)]).unwrap();
+        let result = left.for_all(&right);
+        assert_eq!(
+            result,
+            CDF::new(&[(0.25, 0.125), (0.5, 0.375), (0.75, 1.0)]).unwrap()
+        );
     }
 
     #[test]
     fn test_for_some() {
-        let left = CDF::new(&[0.0, 0.5, 0.75, 1.0], 0.25).unwrap();
-        let right = CDF::new(&[0.0, 0.25, 0.5, 1.0], 0.25).unwrap();
-        let result = left.for_some(&right).unwrap();
-        assert_eq!(result, CDF::new(&[0.0, 0.625, 0.875, 1.0], 0.25).unwrap());
+        let left = CDF::new(&[(0.25, 0.5), (0.5, 0.75), (0.75, 1.0)]).unwrap();
+        let right = CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 1.0)]).unwrap();
+        let result = left.for_some(&right);
+        assert_eq!(
+            result,
+            CDF::new(&[(0.25, 0.625), (0.5, 0.875), (0.75, 1.0)]).unwrap()
+        );
     }
 
     #[test]
     fn partial_ord() {
-        let left = CDF::new(&[0.0, 0.3, 0.3, 1.0], 1.0).unwrap();
-        let right = CDF::new(&[0.0, 0.0, 0.6, 1.0], 1.0).unwrap();
-        let top = CDF::new(&[0.0, 0.3, 0.6, 1.0], 1.0).unwrap();
-        let bottom = CDF::new(&[0.0, 0.0, 0.3, 1.0], 1.0).unwrap();
+        let left = CDF::new(&[(1.0, 0.3), (3.0, 1.0)]).unwrap();
+        let right = CDF::new(&[(2.0, 0.6), (3.0, 1.0)]).unwrap();
+        let top = CDF::new(&[(1.0, 0.3), (2.0, 0.6), (3.0, 1.0)]).unwrap();
+        let bottom = CDF::new(&[(2.0, 0.3), (3.0, 1.0)]).unwrap();
         assert_ne!(left, right);
         assert!(!(left < right));
         assert!(!(right > left));
@@ -336,7 +359,14 @@ mod tests {
 
     #[test]
     fn test_display() {
-        let cdf = CDF::new(&[0.1, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap();
+        let cdf = CDF::new(&[
+            (0.0, 0.1),
+            (0.25, 0.25),
+            (0.5, 0.5),
+            (0.75, 0.75),
+            (1.0, 1.0),
+        ])
+        .unwrap();
         assert_eq!(
             format!("{}", cdf),
             "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1)]"
@@ -347,11 +377,21 @@ mod tests {
     fn test_from_str() {
         let cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1)]";
         let cdf: CDF = cdf_str.parse().unwrap();
-        assert_eq!(cdf, CDF::new(&[0.1, 0.25, 0.5, 0.75, 1.0], 0.25).unwrap());
+        assert_eq!(
+            cdf,
+            CDF::new(&[
+                (0.0, 0.1),
+                (0.25, 0.25),
+                (0.5, 0.5),
+                (0.75, 0.75),
+                (1.0, 1.0)
+            ])
+            .unwrap()
+        );
 
-        let invalid_cdf_str = "CDF[(0, 0), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1.1)]";
+        let invalid_cdf_str = "CDF[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1, 1.1)]";
         let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
-        assert_eq!(cdf, Err(CDFError::InvalidDataRange));
+        assert_eq!(cdf, Err(CDFError::InvalidDataRange("y", 1.1)));
 
         let invalid_format_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.5), (0.75, 0.75), 1, 1)]";
         let cdf: Result<CDF, CDFError> = invalid_format_str.parse();

@@ -1,9 +1,8 @@
-use crate::{Compact, CompactionMode};
+use crate::{CompactionMode, StepValue};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
     fmt::{self, Write},
-    iter::Peekable,
     str::FromStr,
     sync::Arc,
 };
@@ -11,35 +10,39 @@ use std::{
 #[derive(Debug)]
 pub enum StepFunctionError {
     InvalidFormat(&'static str, usize),
-    InvalidDataRange,
+    InvalidDataRange(&'static str, f32),
     NonMonotonicData,
+    InvalidFraction(f32),
+    ProbabilityOverflow(f32),
 }
 
 impl fmt::Display for StepFunctionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidFormat(s, pos) => write!(f, "invalid format: {} at position {}", s, pos),
-            Self::InvalidDataRange => write!(f, "invalid data range"),
+            Self::InvalidDataRange(axis, y) => write!(f, "invalid data range: {axis}={y}"),
             Self::NonMonotonicData => write!(f, "non-monotonic data"),
+            Self::InvalidFraction(y) => {
+                write!(f, "invalid fraction: {y} (must be between 0 and 1)")
+            }
+            Self::ProbabilityOverflow(y) => write!(f, "probability overflow: {y}"),
         }
     }
 }
 impl std::error::Error for StepFunctionError {}
 
-pub const DEFAULT_MAX_SIZE: usize = 10000;
+pub const DEFAULT_MAX_SIZE: usize = 1000;
 
 /// A step function represented as a list of (x, y) pairs.
 #[derive(Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "StepFunctionSerial<T>", into = "StepFunctionSerial<T>")]
-pub struct StepFunction<T = f32>
-where
-    T: Clone + Default,
-{
+pub struct StepFunction<T: StepValue = f32> {
     /// invariants: first component strictly monotonically increasing and non-negative,
     /// with neighbouring x values being separated by at least five ε
     data: Option<Arc<[(f32, T)]>>,
     max_size: usize,
     mode: CompactionMode,
+    zero: T,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -52,8 +55,13 @@ impl StepFunction {
     /// The x values must be greater than 0 and must be strictly monotonically increasing.
     /// The y values must be from (0, 1] and must be strictly monotonically increasing.
     pub fn new(points: &[(f32, f32)]) -> Result<Self, StepFunctionError> {
-        if !points.iter().all(|&(x, y)| x >= 0.0 && y >= 0.0) {
-            return Err(StepFunctionError::InvalidDataRange);
+        for &(x, y) in points.iter() {
+            if x < 0.0 {
+                return Err(StepFunctionError::InvalidDataRange("x", x));
+            }
+            if y < 0.0 {
+                return Err(StepFunctionError::InvalidDataRange("y", y));
+            }
         }
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
             return Err(StepFunctionError::NonMonotonicData);
@@ -67,12 +75,8 @@ impl StepFunction {
             data,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            zero: 0.0,
         })
-    }
-
-    pub fn compact(&self, mut data: Vec<(f32, f32)>) -> Result<Self, StepFunctionError> {
-        f32::compact(&mut data, self.mode, self.max_size);
-        Self::new(&data)
     }
 
     pub fn integrate(&self, from: f32, to: f32) -> f32 {
@@ -91,23 +95,22 @@ impl StepFunction {
     }
 }
 
-impl<T> StepFunction<T>
-where
-    T: Clone + Default,
-{
+impl<T: StepValue> StepFunction<T> {
     pub fn zero() -> Self {
         Self {
             data: None,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            zero: T::default(),
         }
     }
 
     pub fn at(&self, x: f32) -> T {
-        self.data().iter().rev().find(|&&(x0, _)| x0 <= x).map_or(
-            self.data().last().map_or(T::default(), |(_x, y)| y.clone()),
-            |(_, y)| y.clone(),
-        )
+        self.data()
+            .iter()
+            .rev()
+            .find(|&&(x0, _)| x0 <= x)
+            .map_or(T::default(), |(_, y)| y.clone())
     }
 
     /// Set the maximum size of the CDF using a mutable reference.
@@ -130,6 +133,14 @@ where
     pub fn with_mode(mut self, mode: CompactionMode) -> Self {
         self.mode = mode;
         self
+    }
+
+    pub fn max_size(&self) -> usize {
+        self.max_size
+    }
+
+    pub fn mode(&self) -> CompactionMode {
+        self.mode
     }
 
     pub fn data(&self) -> &[(f32, T)] {
@@ -171,65 +182,75 @@ where
     pub fn zip<'a>(
         &'a self,
         other: &'a StepFunction<T>,
-    ) -> impl Iterator<Item = (f32, (T, T))> + 'a {
-        PairIterators::new(self.data().iter().cloned(), other.data().iter().cloned())
+    ) -> impl Iterator<Item = (f32, (&'a T, &'a T))> + 'a {
+        zip(
+            self.data().iter().map(|(x, y)| (*x, y)),
+            other.data().iter().map(|(x, y)| (*x, y)),
+            &self.zero,
+            &other.zero,
+        )
     }
 
-    pub fn mult(&self, factor: f32) -> Self
-    where
-        for<'a> &'a T: std::ops::Mul<f32, Output = T>,
-    {
+    pub fn map<U: StepValue>(&self, f: impl Fn(&T) -> U) -> StepFunction<U> {
+        StepFunction::<U> {
+            data: self
+                .data
+                .as_ref()
+                .map(|d| d.iter().map(|(x, y)| (*x, f(y))).collect()),
+            max_size: self.max_size,
+            mode: self.mode,
+            zero: U::default(),
+        }
+    }
+
+    pub fn scale(&self, factor: f32) -> Self {
         if factor == 0.0 {
             return Self::zero()
                 .with_max_size(self.max_size)
                 .with_mode(self.mode);
         }
         Self {
-            data: self
-                .data
-                .as_ref()
-                .map(|d| d.iter().map(|(x, y)| (*x, y * factor)).collect()),
+            data: self.data.as_ref().map(|d| {
+                d.iter()
+                    .map(|(x, y)| (*x, y.scale(factor)))
+                    .collect::<Vec<_>>()
+                    .into()
+            }),
             max_size: self.max_size,
             mode: self.mode,
+            zero: T::default(),
         }
     }
 
-    pub fn add(&self, other: &Self) -> Self
-    where
-        T: std::ops::Add<T, Output = T> + Compact,
-    {
+    pub fn sum_up(&self, other: &Self) -> Self {
         let mut data = Vec::new();
         for (x, (l, r)) in self.zip(other) {
-            data.push((x, l + r));
+            data.push((x, l.sum_up(&r)));
         }
         T::compact(&mut data, self.mode, self.max_size);
         Self {
             data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
+            zero: T::default(),
         }
     }
 
-    pub fn choice(&self, my_fraction: f32, other: &Self) -> Self
-    where
-        T: std::ops::Mul<f32, Output = T> + std::ops::Add<T, Output = T> + Compact,
-    {
+    pub fn choice(&self, my_fraction: f32, other: &Self) -> Result<Self, T::Error> {
         let mut data = Vec::new();
         for (x, (l, r)) in self.zip(other) {
-            data.push((x, l * my_fraction + r * (1.0 - my_fraction)));
+            data.push((x, l.choice(my_fraction, r)?));
         }
         T::compact(&mut data, self.mode, self.max_size);
-        Self {
+        Ok(Self {
             data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
-        }
+            zero: T::default(),
+        })
     }
 
-    pub fn similar(&self, other: &Self) -> bool
-    where
-        T: Compact,
-    {
+    pub fn similar(&self, other: &Self) -> bool {
         self.data().len() == other.data().len()
             && self
                 .data()
@@ -239,10 +260,7 @@ where
     }
 }
 
-impl<T> From<StepFunction<T>> for StepFunctionSerial<T>
-where
-    T: Clone + Default,
-{
+impl<T: StepValue> From<StepFunction<T>> for StepFunctionSerial<T> {
     fn from(cdf: StepFunction<T>) -> Self {
         Self {
             data: cdf.data()[..].to_owned(),
@@ -250,16 +268,14 @@ where
     }
 }
 
-impl<T> TryFrom<StepFunctionSerial<T>> for StepFunction<T>
-where
-    T: Clone + Default,
-{
+impl<T: StepValue> TryFrom<&[(f32, T)]> for StepFunction<T> {
     type Error = StepFunctionError;
 
-    fn try_from(serial: StepFunctionSerial<T>) -> Result<Self, Self::Error> {
-        let points = &serial.data;
-        if !points.iter().all(|(x, _y)| *x >= 0.0) {
-            return Err(StepFunctionError::InvalidDataRange);
+    fn try_from(points: &[(f32, T)]) -> Result<Self, Self::Error> {
+        for (x, _y) in points.iter() {
+            if *x < 0.0 {
+                return Err(StepFunctionError::InvalidDataRange("x", *x));
+            }
         }
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
             return Err(StepFunctionError::NonMonotonicData);
@@ -267,19 +283,36 @@ where
         let data = if points.is_empty() {
             None
         } else {
-            Some(points.as_slice().into())
+            Some(points.into())
         };
         Ok(Self {
             data,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            zero: T::default(),
         })
+    }
+}
+
+impl<T: StepValue> TryFrom<Vec<(f32, T)>> for StepFunction<T> {
+    type Error = StepFunctionError;
+
+    fn try_from(points: Vec<(f32, T)>) -> Result<Self, Self::Error> {
+        points.as_slice().try_into()
+    }
+}
+
+impl<T: StepValue> TryFrom<StepFunctionSerial<T>> for StepFunction<T> {
+    type Error = StepFunctionError;
+
+    fn try_from(serial: StepFunctionSerial<T>) -> Result<Self, Self::Error> {
+        serial.data.as_slice().try_into()
     }
 }
 
 impl<T> fmt::Debug for StepFunction<T>
 where
-    T: Clone + Default + fmt::Debug,
+    T: StepValue + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StepFunction")
@@ -290,7 +323,7 @@ where
 
 impl<T> fmt::Display for StepFunction<T>
 where
-    T: Clone + Default + fmt::Display,
+    T: StepValue,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut scratch = String::new();
@@ -303,7 +336,7 @@ where
             write!(&mut scratch, "{:.5}", x)?;
             write!(f, "({}, ", trim(&scratch))?;
             scratch.clear();
-            write!(&mut scratch, "{:.5}", y)?;
+            y.pretty_print(&mut scratch)?;
             write!(f, "{})", trim(&scratch))?;
             scratch.clear();
         }
@@ -342,7 +375,7 @@ impl FromStr for StepFunction {
                 .parse()
                 .map_err(|_| err("expecting number", &x[1..], s))?;
             if x < 0.0 {
-                return Err(StepFunctionError::InvalidDataRange);
+                return Err(StepFunctionError::InvalidDataRange("x", x));
             }
             if x <= x_prev {
                 return Err(StepFunctionError::NonMonotonicData);
@@ -358,7 +391,7 @@ impl FromStr for StepFunction {
                 .parse()
                 .map_err(|_| err("expecting number", y, s))?;
             if y < 0.0 {
-                return Err(StepFunctionError::InvalidDataRange);
+                return Err(StepFunctionError::InvalidDataRange("y", y));
             }
             data.push((x, y));
         }
@@ -366,6 +399,7 @@ impl FromStr for StepFunction {
             data: (!data.is_empty()).then_some(data.into()),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
+            zero: 0.0,
         })
     }
 }
@@ -421,134 +455,55 @@ impl PartialOrd for StepFunction {
     }
 }
 
-/// Iterator over a pair of iterators, yielding the x value and the pair of y values for each
-/// point where one of the iterators has a point.
-///
-/// This iterator will coalesce points with approximately the same x value.
-pub(crate) struct PairIterators<I1, I2, T>
-where
-    I1: Iterator<Item = (f32, T)>,
-    I2: Iterator<Item = (f32, T)>,
-    T: Clone,
-{
-    left: AggregatingIterator<I1, T>,
-    l_prev: T,
-    right: AggregatingIterator<I2, T>,
-    r_prev: T,
-}
-
-impl<I1, I2, T> PairIterators<I1, I2, T>
-where
-    I1: Iterator<Item = (f32, T)>,
-    I2: Iterator<Item = (f32, T)>,
-    T: Clone + Default,
-{
-    pub fn new(left: I1, right: I2) -> Self {
-        Self {
-            left: AggregatingIterator::new(left),
-            l_prev: T::default(),
-            right: AggregatingIterator::new(right),
-            r_prev: T::default(),
-        }
-    }
-}
-
-impl<I1, I2, T> Iterator for PairIterators<I1, I2, T>
-where
-    I1: Iterator<Item = (f32, T)>,
-    I2: Iterator<Item = (f32, T)>,
-    T: Clone,
-{
-    /// yields (x, (left_y, right_y))
-    type Item = (f32, (T, T));
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let left = self.left.peek();
-        let right = self.right.peek();
-
-        match (left, right) {
-            (Some((lx, ly)), Some((rx, ry))) => {
-                if (lx - rx).abs() / rx.max(1.0e-10) <= 5.0 * f32::EPSILON {
-                    self.l_prev = self.left.next().unwrap().1;
-                    self.r_prev = self.right.next().unwrap().1;
-                    Some((lx, (ly, ry)))
-                } else if lx < rx {
-                    self.l_prev = self.left.next().unwrap().1;
-                    Some((lx, (ly, self.r_prev.clone())))
-                } else {
-                    self.r_prev = self.right.next().unwrap().1;
-                    Some((rx, (self.l_prev.clone(), ry)))
-                }
-            }
-            (Some((lx, ly)), None) => {
-                self.l_prev = self.left.next().unwrap().1;
-                Some((lx, (ly, self.r_prev.clone())))
-            }
-            (None, Some((rx, ry))) => {
-                self.r_prev = self.right.next().unwrap().1;
-                Some((rx, (self.l_prev.clone(), ry)))
-            }
-            (None, None) => None,
-        }
-    }
-}
-
-/// An iterator that aggregates values for which the first component of the pair
-/// is within 5*f32::EPSILON of each other.
-pub struct AggregatingIterator<I: Iterator, T> {
-    inner: Peekable<I>,
-    current: Option<(f32, T)>,
-}
-
-impl<I, T> AggregatingIterator<I, T>
-where
-    I: Iterator<Item = (f32, T)>,
-    T: Clone,
-{
-    pub fn new(iter: I) -> Self {
-        AggregatingIterator {
-            inner: iter.peekable(),
-            current: None,
-        }
-    }
-
-    fn peek(&mut self) -> Option<(f32, T)> {
-        if self.current.is_some() {
-            // already computed
-            return self.current.clone();
+/// Iterator over a pair of iterators that emit pairs ordered by their first component,
+/// coalescing points with approximately the same x value.
+pub fn zip<T1: Clone, T2: Clone>(
+    left: impl Iterator<Item = (f32, T1)>,
+    right: impl Iterator<Item = (f32, T2)>,
+    mut l_prev: T1,
+    mut r_prev: T2,
+) -> impl Iterator<Item = (f32, (T1, T2))> {
+    fn similar_cmp(a: f32, b: f32) -> Ordering {
+        if f32::similar(&a, &b) {
+            Ordering::Equal
+        } else if a < b {
+            Ordering::Less
         } else {
-            // compute the next value
-            self.current = self.inner.next();
+            Ordering::Greater
         }
+    }
 
-        let first = self.current.clone()?;
-        let mut last = first.clone();
+    let left = left.coalesce(|a, b| {
+        if f32::similar(&a.0, &b.0) {
+            Ok((a.0 + (b.0 - a.0) / 2.0, b.1))
+        } else {
+            Err((a, b))
+        }
+    });
+    let right = right.coalesce(|a, b| {
+        if f32::similar(&a.0, &b.0) {
+            Ok((a.0 + (b.0 - a.0) / 2.0, b.1))
+        } else {
+            Err((a, b))
+        }
+    });
 
-        while let Some(next) = self.inner.peek() {
-            if (next.0 - first.0).abs() / first.0 <= 5.0 * f32::EPSILON {
-                last = next.clone();
-                self.inner.next();
-            } else {
-                break;
+    left.merge_join_by(right, |a, b| similar_cmp(a.0, b.0))
+        .map(move |eob| match eob {
+            itertools::EitherOrBoth::Both(l, r) => {
+                l_prev = l.1.clone();
+                r_prev = r.1.clone();
+                (l.0, (l.1, r.1))
             }
-        }
-
-        self.current = Some((first.0 + (last.0 - first.0) / 2.0, last.1));
-        self.current.clone()
-    }
-}
-
-impl<I, T> Iterator for AggregatingIterator<I, T>
-where
-    I: Iterator<Item = (f32, T)>,
-    T: Clone,
-{
-    type Item = (f32, T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.peek();
-        self.current.take()
-    }
+            itertools::EitherOrBoth::Left(l) => {
+                l_prev = l.1.clone();
+                (l.0, (l.1, r_prev.clone()))
+            }
+            itertools::EitherOrBoth::Right(r) => {
+                r_prev = r.1.clone();
+                (r.0, (l_prev.clone(), r.1))
+            }
+        })
 }
 
 #[cfg(test)]
@@ -655,5 +610,15 @@ mod tests {
             data1,
             vec![(0.1, 0.3), (0.3, 0.4), (0.5, 0.6), (0.7, 0.9), (0.9, 1.0)]
         );
+    }
+
+    #[test]
+    fn test_at() {
+        let sf = StepFunction::from_str("[(0.5, 0.1), (1, 1)]").unwrap();
+        assert_eq!(sf.at(-1.0), 0.0);
+        assert_eq!(sf.at(0.0), 0.0);
+        assert_eq!(sf.at(0.5), 0.1);
+        assert_eq!(sf.at(1.0), 1.0);
+        assert_eq!(sf.at(1.5), 1.0);
     }
 }
