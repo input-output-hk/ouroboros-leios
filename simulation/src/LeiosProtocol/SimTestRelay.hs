@@ -4,11 +4,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# HLINT ignore "Use void" #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use void" #-}
 
 module LeiosProtocol.SimTestRelay where
 
@@ -62,6 +63,7 @@ import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import TimeCompat (threadDelayNDT, threadDelaySI)
 
+import ChanMux
 import Control.Exception (assert)
 import Data.Foldable (forM_)
 import Data.List (sortOn)
@@ -270,6 +272,22 @@ testHeader blk = TestBlockHeader (testBlockId blk) (testBlockExpiry blk)
 symmetric :: Ord a => Set (a, a) -> Set (a, a)
 symmetric xys = xys <> Set.map (\(x, y) -> (y, x)) xys
 
+data TestRelayBundle f = TestRelayBundle
+  { testMsg :: f TestBlockRelayMessage
+  }
+
+instance MuxBundle TestRelayBundle where
+  type MuxMsg TestRelayBundle = TestBlockRelayMessage
+
+  toFromMuxMsgBundle =
+    TestRelayBundle
+      { testMsg = ToFromMuxMsg id id
+      }
+
+  traverseMuxBundle f TestRelayBundle{..} =
+    TestRelayBundle
+      <$> f testMsg
+
 traceRelayLink1 ::
   TcpConnProps ->
   PacketGenerationPattern ->
@@ -291,7 +309,7 @@ traceRelayLink1 tcpprops generationPattern =
           ( Set.fromList
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
-      (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      (TestRelayBundle inChan, TestRelayBundle outChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
       concurrently_
         (relayNode (nodeTracer na) configNode0 [] [inChan])
         (relayNode (nodeTracer nb) configNode1 [outChan] [])
@@ -344,10 +362,10 @@ traceRelayLink4 tcpprops generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcpprops
-      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcpprops
-      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcpprops
-      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcpprops
+      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
+      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcpprops
+      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcpprops
+      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcpprops
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $
@@ -406,10 +424,10 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcppropsLong
-      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcppropsShort
-      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcppropsLong
-      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcppropsShort
+      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcppropsLong
+      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcppropsShort
+      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcppropsLong
+      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcppropsShort
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $
