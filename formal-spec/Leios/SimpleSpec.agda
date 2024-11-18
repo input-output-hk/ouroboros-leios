@@ -100,6 +100,9 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∈ Upkeep
 
+addUpkeep : LeiosState → SlotUpkeep → LeiosState
+addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
+
 initLeiosState : VTy → StakeDistr → LeiosState
 initLeiosState V SD = record
   { V         = V
@@ -220,23 +223,23 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
     --       if the party submitting is the block producer on the base chain
     --       for the given slot
 
-    Base₁ :
-          ────────────────────────────────────────────────────────────────────
-          just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
+    Base₁   :
+            ───────────────────────────────────────────────────────────────────
+            just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
 
-    Base₂a : let open LeiosState s in
-           ∙ needsUpkeep Base
-           ∙ eb ∈ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
-           ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
-           ───────────────────────────────────────────────────────────────────────
-           just s -⟦ SLOT / EMPTY ⟧⇀ record s { Upkeep = Upkeep ∪ ❴ Base ❵ }
+    Base₂a  : let open LeiosState s in
+            ∙ needsUpkeep Base
+            ∙ eb ∈ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
+            ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
+            ───────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
 
-    Base₂b : let open LeiosState s in
-           ∙ needsUpkeep Base
-           ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
-           ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
-           ───────────────────────────────────────────────────────────────────────
-           just s -⟦ SLOT / EMPTY ⟧⇀ record s { Upkeep = Upkeep ∪ ❴ Base ❵ }
+    Base₂b  : let open LeiosState s in
+            ∙ needsUpkeep Base
+            ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
+            ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
+            ───────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
 
     -- Protocol rules
 
@@ -247,8 +250,8 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ∙ needsUpkeep IB-Role
             ∙ canProduceIB slot sk-IB (stake s) π
             ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
-            ────────────────────────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' ; Upkeep = Upkeep ∪ ❴ IB-Role ❵ }
+            ─────────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } IB-Role
 
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
                   LI = map getIBRef $ filter (_∈ᴮ slice L slot (Λ + 1)) IBs
@@ -259,8 +262,8 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ∙ needsUpkeep EB-Role
             ∙ canProduceEB slot sk-EB (stake s) π
             ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
-            ────────────────────────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' ; Upkeep = Upkeep ∪ ❴ EB-Role ❵ }
+            ─────────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } EB-Role
 
     V1-Role : let open LeiosState s renaming (FFDState to ffds)
                   EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot (μ + 1)) EBs
@@ -269,8 +272,8 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ∙ needsUpkeep V1-Role
             ∙ canProduceV1 slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
-            ────────────────────────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' ; Upkeep = Upkeep ∪ ❴ V1-Role ❵ }
+            ─────────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } V1-Role
 
     V2-Role : let open LeiosState s renaming (FFDState to ffds)
                   EBs' = filter (vote2Eligible s) $ filter (_∈ᴮ slice L slot 1) EBs
@@ -279,5 +282,5 @@ module _ (open Leios.Voting a) (va : VotingAbstract LeiosState) (open VotingAbst
             ∙ needsUpkeep V2-Role
             ∙ canProduceV2 slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
-            ────────────────────────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ record s { FFDState = ffds' ; Upkeep = Upkeep ∪ ❴ V2-Role ❵ }
+            ─────────────────────────────────────────────────────────────────────────
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } V2-Role
