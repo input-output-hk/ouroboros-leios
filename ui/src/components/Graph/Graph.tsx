@@ -1,44 +1,13 @@
 "use client";
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FC,
-} from "react";
 
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  TooltipProps,
-  XAxis,
-  YAxis
-} from "recharts";
-import {
-  NameType,
-  ValueType,
-} from "recharts/types/component/DefaultTooltipContent";
-import { streamTopography } from "./queries";
-import { Slider } from "./Slider";
-import {
-  EMessageType,
-  IServerMessage,
-  ITransactionGenerated,
-  ITransactionMessage,
-  ITransactionReceived,
-  ITransactionSent,
-  ITransformedNodeMap,
-} from "./types";
-import { isWithinRange } from "./utils";
+import { type FC } from "react";
 
-interface IGraphProps {
-  messages: IServerMessage[];
-}
+import { Test } from "@/app/Test";
+import { GraphContextProvider } from "@/contexts/GraphContext/GraphContextProvider";
+import { Canvas } from "./modules/Canvas";
+import { ChartTransactionsSent } from "./modules/Chart.TransactionsSent";
+import { Controls } from "./modules/Controls";
+import { Slider } from "./modules/Slider";
 
 enum ESpeedOptions {
   "1/10" = 0.1,
@@ -52,422 +21,376 @@ const scale = 3;
 let offsetX = 0,
   offsetY = 0;
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: TooltipProps<ValueType, NameType>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="custom-tooltip">
-        <p className="label">{`Message: #${payload[0].payload.message}`}</p>
-        <p className="intro">{`Time Sent: ${payload[0].payload.time}ms`}</p>
-      </div>
-    );
-  }
+// export const Graph: FC = () => {
+//   // const [topography, setTopography] = useState<ITransformedNodeMap>({
+//   //   links: [],
+//   //   nodes: []
+//   // });
 
-  return null;
-};
+//   // const [messages, setMessages] = useState<IServerMessage[] | null>(null);
 
-export const Graph: FC<IGraphProps> = ({ messages }) => {
-  const [topography, setTopography] = useState<ITransformedNodeMap>({
-    links: [],
-    nodes: []
-  });
-  
-  useEffect(() => {
-    streamTopography(setTopography)
-  }, [])
+//   // useEffect(() => {
+//   //   streamTopography(setTopography)
+//   // }, [])
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const simulationStart = useRef<number>(0);
-  const simulationPauseTime = useRef<number>(0);
-  const intervalId = useRef<Timer | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [play, setPlay] = useState(false);
-  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["3/10"]);
-  const [sentTxs, setSentTxs] = useState<Set<string>>(new Set());
-  const [generatedTxs, setGeneratedTxs] = useState<Set<number>>(new Set());
-  const maxTime = useMemo(
-    () => Math.floor(messages[messages.length - 1].time / 1000000),
-    [messages],
-  );
+//   // useEffect(() => {
+//   //   streamMessages(setMessages, 0);
+//   // }, [])
 
-  const data = useMemo(
-    () =>
-      [...sentTxs.values()].map((v, index) => ({
-        message: index + 1,
-        time: Number(v.split("#")[1]),
-      })),
-    [sentTxs.size],
-  );
+//   const canvasRef = useRef<HTMLCanvasElement>(null);
+//   const simulationStart = useRef<number>(0);
+//   const simulationPauseTime = useRef<number>(0);
+//   const intervalId = useRef<Timer | null>(null);
+//   const [currentTime, setCurrentTime] = useState(0);
+//   const [play, setPlay] = useState(false);
+//   const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["3/10"]);
+//   const [sentTxs, setSentTxs] = useState<Set<string>>(new Set());
+//   const [generatedTxs, setGeneratedTxs] = useState<Set<number>>(new Set());
+//   const maxTime = useMemo(
+//     () => messages ? Math.floor(messages[messages.length - 1].time / 1000000) : 0,
+//     [messages],
+//   );
 
-  const txGeneratedMessages = useMemo(() => messages.filter(
-    ({ message }) => message.type === EMessageType.TransactionGenerated,
-  ) as IServerMessage<ITransactionGenerated>[], [messages]);
+//   const data = useMemo(
+//     () =>
+//       [...sentTxs.values()].map((v, index) => ({
+//         message: index + 1,
+//         time: Number(v.split("#")[1]),
+//       })),
+//     [sentTxs.size],
+//   );
 
-  const txSentMessages = useMemo(() => messages.filter(
-    ({ message }) => message.type === EMessageType.TransactionSent,
-  ) as IServerMessage<ITransactionSent>[], [messages]);
+//   const txGeneratedMessages = useMemo(() => messages?.filter(
+//     ({ message }) => message.type === EMessageType.TransactionGenerated,
+//   ) as IServerMessage<ITransactionGenerated>[] || [], [messages]);
 
-  const txReceivedMessages = useMemo(() => messages.filter(
-    ({ message }) => message.type === EMessageType.TransactionReceived,
-  ) as IServerMessage<ITransactionReceived>[], [messages]);
+//   const txSentMessages = useMemo(() => messages?.filter(
+//     ({ message }) => message.type === EMessageType.TransactionSent,
+//   ) as IServerMessage<ITransactionSent>[] || [], [messages]);
 
-  const transactions = useMemo(() => {
-    const transactionsById: Map<number, ITransactionMessage[]> = new Map();
+//   const txReceivedMessages = useMemo(() => messages?.filter(
+//     ({ message }) => message.type === EMessageType.TransactionReceived,
+//   ) as IServerMessage<ITransactionReceived>[] || [], [messages]);
 
-    for (const generatedMsg of txGeneratedMessages) {
-      const transactionList: ITransactionMessage[] = [];
+//   const transactions = useMemo(() => {
+//     const transactionsById: Map<number, ITransactionMessage[]> = new Map();
 
-      for (const sentMsg of txSentMessages) {
-        if (sentMsg.message.id === generatedMsg.message.id) {
-          const receivedMsg = txReceivedMessages.find(
-            (r) =>
-              r.message.id === generatedMsg.message.id &&
-              r.message.sender === sentMsg.message.sender &&
-              r.message.recipient === sentMsg.message.recipient,
-          );
+//     for (const generatedMsg of txGeneratedMessages) {
+//       const transactionList: ITransactionMessage[] = [];
 
-          if (!receivedMsg) {
-            console.log(
-              "Could not find matching transaction for " + sentMsg.message.id,
-            );
-            continue;
-          }
+//       for (const sentMsg of txSentMessages) {
+//         if (sentMsg.message.id === generatedMsg.message.id) {
+//           const receivedMsg = txReceivedMessages.find(
+//             (r) =>
+//               r.message.id === generatedMsg.message.id &&
+//               r.message.sender === sentMsg.message.sender &&
+//               r.message.recipient === sentMsg.message.recipient,
+//           );
 
-          // Convert time from nanoseconds to miliseconds.
-          transactionList.push({
-            id: generatedMsg.message.id,
-            duration:
-              Math.floor(receivedMsg.time / 1000000) -
-              Math.floor(sentMsg.time / 1000000),
-            source: sentMsg.message.sender,
-            target: sentMsg.message.recipient,
-            sentTime: Math.floor(sentMsg.time / 1000000),
-            generated: Math.floor(generatedMsg.time / 1000000),
-          });
-        }
-      }
+//           if (!receivedMsg) {
+//             console.log(
+//               "Could not find matching transaction for " + sentMsg.message.id,
+//             );
+//             continue;
+//           }
 
-      transactionsById.set(generatedMsg.message.id, transactionList);
-    }
+//           // Convert time from nanoseconds to miliseconds.
+//           transactionList.push({
+//             id: generatedMsg.message.id,
+//             duration:
+//               Math.floor(receivedMsg.time / 1000000) -
+//               Math.floor(sentMsg.time / 1000000),
+//             source: sentMsg.message.sender,
+//             target: sentMsg.message.recipient,
+//             sentTime: Math.floor(sentMsg.time / 1000000),
+//             generated: Math.floor(generatedMsg.time / 1000000),
+//           });
+//         }
+//       }
 
-    return transactionsById;
-  }, [messages, txGeneratedMessages, txSentMessages]);
+//       transactionsById.set(generatedMsg.message.id, transactionList);
+//     }
 
-  const maxTransactions = useMemo(
-    () =>
-      [...transactions.values()].reduce(
-        (t, v) => (t += v.length),
-        transactions.size,
-      ),
-    [transactions.size],
-  );
+//     return transactionsById;
+//   }, [txGeneratedMessages, txSentMessages]);
 
-  // Function to draw the scene
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!context || !canvas) {
-      return;
-    }
+//   const maxTransactions = useMemo(
+//     () =>
+//       [...transactions.values()].reduce(
+//         (t, v) => (t += v.length),
+//         transactions.size,
+//       ),
+//     [transactions.size],
+//   );
 
-    // Current time in simulation
-    const now = performance.now();
-    const elapsed =
-      simulationStart.current !== 0
-        ? (now - simulationStart.current) * speed
-        : 0;
-    setCurrentTime(elapsed);
+//   // Function to draw the scene
+//   const draw = useCallback(() => {
+//     const canvas = canvasRef.current;
+//     const context = canvas?.getContext("2d");
+//     if (!context || !canvas) {
+//       return;
+//     }
 
-    if (elapsed >= maxTime) {
-      intervalId.current && clearInterval(intervalId.current);
-      setPlay(false);
-      return;
-    }
+//     // Current time in simulation
+//     const now = performance.now();
+//     const elapsed =
+//       simulationStart.current !== 0
+//         ? (now - simulationStart.current) * speed
+//         : 0;
+//     setCurrentTime(elapsed);
 
-    // Set canvas dimensions
-    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
-    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
-    canvas.width = width;
-    canvas.height = height;
+//     if (elapsed >= maxTime) {
+//       intervalId.current && clearInterval(intervalId.current);
+//       setPlay(false);
+//       return;
+//     }
 
-    // Clear the canvas
-    context.clearRect(0, 0, width, height);
-    context.save();
+//     // Set canvas dimensions
+//     const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
+//     const height = canvas.parentElement?.getBoundingClientRect().height || 800;
+//     canvas.width = width;
+//     canvas.height = height;
 
-    // Calculate the bounds
-    const coordinates: { xValues: number[]; yValues: number[] } = {
-      xValues: [],
-      yValues: [],
-    };
-    for (const { fx, fy } of topography.nodes) {
-      coordinates.xValues.push(fx);
-      coordinates.yValues.push(fy);
-    }
-    const minX = Math.min(...coordinates.xValues);
-    const maxX = Math.max(...coordinates.xValues);
-    const minY = Math.min(...coordinates.yValues);
-    const maxY = Math.max(...coordinates.yValues);
+//     // Clear the canvas
+//     context.clearRect(0, 0, width, height);
+//     context.save();
 
-    const pathWidth = maxX - minX;
-    const pathHeight = maxY - minY;
+//     // Calculate the bounds
+//     const coordinates: { xValues: number[]; yValues: number[] } = {
+//       xValues: [],
+//       yValues: [],
+//     };
+//     for (const { fx, fy } of topography.nodes) {
+//       coordinates.xValues.push(fx);
+//       coordinates.yValues.push(fy);
+//     }
+//     const minX = Math.min(...coordinates.xValues);
+//     const maxX = Math.max(...coordinates.xValues);
+//     const minY = Math.min(...coordinates.yValues);
+//     const maxY = Math.max(...coordinates.yValues);
 
-    // Compute the canvas center
-    const canvasCenterX = width / 2;
-    const canvasCenterY = height / 2;
+//     const pathWidth = maxX - minX;
+//     const pathHeight = maxY - minY;
 
-    // Calculate the offset to center the path
-    offsetX = canvasCenterX - (minX + pathWidth / 2) * scale;
-    offsetY = canvasCenterY - (minY + pathHeight / 2) * scale;
+//     // Compute the canvas center
+//     const canvasCenterX = width / 2;
+//     const canvasCenterY = height / 2;
 
-    // Apply translation and scaling
-    context.translate(offsetX, offsetY);
-    context.scale(scale, scale);
+//     // Calculate the offset to center the path
+//     offsetX = canvasCenterX - (minX + pathWidth / 2) * scale;
+//     offsetY = canvasCenterY - (minY + pathHeight / 2) * scale;
 
-    // Draw the links
-    topography.links.forEach((link) => {
-      const nodeStart = topography.nodes.find(({ id }) => id === link.source);
-      const nodeEnd = topography.nodes.find(({ id }) => id === link.target);
-      if (!nodeStart || !nodeEnd) {
-        return;
-      }
+//     // Apply translation and scaling
+//     context.translate(offsetX, offsetY);
+//     context.scale(scale, scale);
 
-      context.beginPath();
-      context.moveTo(nodeStart.fx, nodeStart.fy);
-      context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = "#ddd";
-      context.lineWidth = 1;
-      context.stroke();
-    });
+//     // Draw the links
+//     topography.links.forEach((link) => {
+//       const nodeStart = topography.nodes.find(({ id }) => id === link.source);
+//       const nodeEnd = topography.nodes.find(({ id }) => id === link.target);
+//       if (!nodeStart || !nodeEnd) {
+//         return;
+//       }
 
-    // Draw the transactions
-    transactions.forEach((txList) => {
-      txList.forEach((transaction) => {
-        const { duration, source, target, sentTime, id } = transaction;
-        const sourceNode = topography.nodes.find((n) => n.id === source);
-        const targetNode = topography.nodes.find((n) => n.id === target);
+//       context.beginPath();
+//       context.moveTo(nodeStart.fx, nodeStart.fy);
+//       context.lineTo(nodeEnd.fx, nodeEnd.fy);
+//       context.strokeStyle = "#ddd";
+//       context.lineWidth = 1;
+//       context.stroke();
+//     });
 
-        if (!sourceNode || !targetNode) {
-          console.log(
-            "Could not find source and target nodes for this transaction.",
-          );
-          return;
-        }
+//     // Draw the transactions
+//     transactions.forEach((txList) => {
+//       txList.forEach((transaction) => {
+//         const { duration, source, target, sentTime, id } = transaction;
+//         const sourceNode = topography.nodes.find((n) => n.id === source);
+//         const targetNode = topography.nodes.find((n) => n.id === target);
 
-        const startX = sourceNode.fx;
-        const startY = sourceNode.fy;
-        const endX = targetNode.fx;
-        const endY = targetNode.fy;
-        const transactionElapsedTime = elapsed - sentTime;
+//         if (!sourceNode || !targetNode) {
+//           console.log(
+//             "Could not find source and target nodes for this transaction.",
+//           );
+//           return;
+//         }
 
-        if (transactionElapsedTime < 0) {
-          return; // Skip if the animation is done or hasn't started
-        }
+//         const startX = sourceNode.fx;
+//         const startY = sourceNode.fy;
+//         const endX = targetNode.fx;
+//         const endY = targetNode.fy;
+//         const transactionElapsedTime = elapsed - sentTime;
 
-        if (transactionElapsedTime > duration) {
-          setSentTxs((prev) => {
-            prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
-            return prev;
-          });
+//         if (transactionElapsedTime < 0) {
+//           return; // Skip if the animation is done or hasn't started
+//         }
 
-          return;
-        }
+//         if (transactionElapsedTime > duration) {
+//           setSentTxs((prev) => {
+//             prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
+//             return prev;
+//           });
 
-        // Calculate the interpolation factor
-        const t = transactionElapsedTime / duration;
-        const x = startX + t * (endX - startX);
-        const y = startY + t * (endY - startY);
+//           return;
+//         }
 
-        // Draw the moving circle
-        context.beginPath();
-        context.arc(x, y, 2, 0, 2 * Math.PI);
-        context.fillStyle = "red";
-        context.fill();
-      });
-    });
+//         // Calculate the interpolation factor
+//         const t = transactionElapsedTime / duration;
+//         const x = startX + t * (endX - startX);
+//         const y = startY + t * (endY - startY);
 
-    // Draw the nodes
-    topography.nodes.forEach((node) => {
-      context.beginPath();
-      context.arc(node.fx, node.fy, 3, 0, 2 * Math.PI);
-      context.fillStyle = node.data.stake ? "green" : "blue";
-      context.stroke();
-      context.strokeStyle = "black";
+//         // Draw the moving circle
+//         context.beginPath();
+//         context.arc(x, y, 2, 0, 2 * Math.PI);
+//         context.fillStyle = "red";
+//         context.fill();
+//       });
+//     });
 
-      txGeneratedMessages.forEach(m => {
-        const target = m.time / 1_000_000;
-        if (m.message.publisher === node.id && isWithinRange(elapsed, target, MILLISECOND_RANGE)) {
-          context.fillStyle = "red";
-        }
+//     // Draw the nodes
+//     topography.nodes.forEach((node) => {
+//       context.beginPath();
+//       context.arc(node.fx, node.fy, 3, 0, 2 * Math.PI);
+//       context.fillStyle = node.data.stake ? "green" : "blue";
+//       context.stroke();
+//       context.strokeStyle = "black";
 
-        if (m.message.publisher === node.id && elapsed > target) {
-          setGeneratedTxs(prev => {
-            prev.add(m.time);
-            return prev;
-          });
-        }
-      })
+//       txGeneratedMessages.forEach(m => {
+//         const target = m.time / 1_000_000;
+//         if (m.message.publisher === node.id && isWithinRange(elapsed, target, MILLISECOND_RANGE)) {
+//           context.fillStyle = "red";
+//         }
 
-      context.fill();
-    });
+//         if (m.message.publisher === node.id && elapsed > target) {
+//           setGeneratedTxs(prev => {
+//             prev.add(m.time);
+//             return prev;
+//           });
+//         }
+//       })
 
-    context.restore();
-  }, [topography, transactions, play, speed, maxTime, txGeneratedMessages]);
+//       context.fill();
+//     });
 
-  // Function to toggle play/pause
-  const togglePlayPause = useCallback(() => {
-    startTransition(() => {
-      const now = performance.now();
-      if (!play) {
-        simulationStart.current = now - simulationPauseTime.current;
-        simulationPauseTime.current = now;
-        intervalId.current = setInterval(draw, 1000 / 120); // 120 FPS
-      } else {
-        simulationPauseTime.current = now - simulationStart.current;
-        if (intervalId.current) {
-          clearInterval(intervalId.current);
-          intervalId.current = null;
-        }
-      }
+//     context.restore();
+//   }, [topography, transactions, play, speed, maxTime, txGeneratedMessages]);
 
-      setPlay((playing) => {
-        return !playing;
-      });
-    });
-  }, [draw]);
+//   // Function to toggle play/pause
+//   const togglePlayPause = useCallback(() => {
+//     startTransition(() => {
+//       const now = performance.now();
+//       if (!play) {
+//         simulationStart.current = now - simulationPauseTime.current;
+//         simulationPauseTime.current = now;
+//         intervalId.current = setInterval(draw, 1000 / 120); // 120 FPS
+//       } else {
+//         simulationPauseTime.current = now - simulationStart.current;
+//         if (intervalId.current) {
+//           clearInterval(intervalId.current);
+//           intervalId.current = null;
+//         }
+//       }
 
-  // Function to reset the simulation
-  const resetSimulation = () => {
-    setPlay(false);
-    setCurrentTime(0);
-    setSpeed(ESpeedOptions["1/10"]);
-    setSentTxs(new Set());
-    simulationStart.current = 0;
-    simulationPauseTime.current = 0;
+//       setPlay((playing) => {
+//         return !playing;
+//       });
+//     });
+//   }, [draw]);
 
-    if (intervalId.current) {
-      clearInterval(intervalId.current);
-      intervalId.current = null;
-    }
+//   // Function to reset the simulation
+//   const resetSimulation = () => {
+//     setPlay(false);
+//     setCurrentTime(0);
+//     setSpeed(ESpeedOptions["1/10"]);
+//     setSentTxs(new Set());
+//     simulationStart.current = 0;
+//     simulationPauseTime.current = 0;
 
-    draw();
-  };
+//     if (intervalId.current) {
+//       clearInterval(intervalId.current);
+//       intervalId.current = null;
+//     }
 
-  // Clear the interval on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalId.current) {
-        clearInterval(intervalId.current);
-      }
-    };
-  }, []);
+//     draw();
+//   };
 
-  useEffect(() => {
-    draw();
-  }, []);
+//   // Clear the interval on unmount
+//   useEffect(() => {
+//     return () => {
+//       if (intervalId.current) {
+//         clearInterval(intervalId.current);
+//       }
+//     };
+//   }, []);
 
-  if (!topography.links.length || !topography.nodes.length) {
-    return <p>Loading...</p>;
-  }
+//   useEffect(() => {
+//     draw();
+//   }, []);
 
+//   if (!topography.links.length || !topography.nodes.length) {
+//     return <p>Loading...</p>;
+//   }
+
+//   return (
+//     <div className="container mx-auto">
+//       <div className="flex items-center justify-between gap-4">
+//         <div className="flex flex-col w-1/3 items-center justify-between gap-4">
+//           <div className="w-full h-[400px]">
+//             <ResponsiveContainer width="100%" height="100%">
+//               <AreaChart data={data}>
+//                 <CartesianGrid strokeDasharray="3 3" />
+//                 <XAxis
+//                   tick={false}
+//                   label="Transactions Sent"
+//                   domain={[0, maxTransactions]}
+//                   allowDataOverflow
+//                   type="number"
+//                   dataKey="message"
+//                 />
+//                 <YAxis
+//                   tick={false}
+//                   label="Time"
+//                   domain={[0, maxTime]}
+//                   dataKey="time"
+//                 />
+//                 <Area
+//                   type="monotone"
+//                   dataKey="time"
+//                   stroke="#8884d8"
+//                   fill="#8884d8"
+//                   strokeWidth={2}
+//                   dot={false}
+//                 />
+//                 <Tooltip content={(props) => <CustomTooltip {...props} />} />
+//               </AreaChart>
+//             </ResponsiveContainer>
+//           </div>
+//           <div className="w-full"></div>
+//           <div className="w-full"></div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+export const Graph: FC = () => {
   return (
-    <div className="container mx-auto">
-      <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-        <Slider
-          value={currentTime}
-          max={maxTime}
-          setValue={(v) => {
-            setCurrentTime(Number(v));
-          }}
-        />
-        <button
-          className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-          onClick={togglePlayPause}
-        >
-          {play ? "Pause" : "Play"}
-        </button>
-        <button
-          disabled={play}
-          className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-          onClick={resetSimulation}
-        >
-          Reset
-        </button>
-        <div className="flex items-center justify-center gap-2">
-          <label htmlFor="speed">Speed:</label>
-          <select
-            id="speed"
-            disabled={play}
-            defaultValue={speed}
-            onChange={(e) => {
-              resetSimulation();
-              setSpeed(Number(e.target.value) as ESpeedOptions);
-            }}
-          >
-            {Object.keys(ESpeedOptions)
-              .filter((key) => isNaN(Number(key)))
-              .map((name) => {
-                return (
-                  <option
-                    key={name}
-                    value={ESpeedOptions[name as keyof typeof ESpeedOptions]}
-                  >
-                    {name}
-                  </option>
-                );
-              })}
-          </select>
+    <GraphContextProvider>
+      <Test />
+      <div className="container mx-auto">
+        <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
+          <Slider />
+          <Controls />
         </div>
-      </div>
-      <div className="flex items-center justify-between gap-4">
-        <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
-          <div className="flex items-center justify-center gap-4 mt-4">
-            <div>
-              <h4>Transactions Generated: {generatedTxs.size}</h4>
-            </div>
-            <div>
-              <h4>Transactions Sent: {sentTxs.size}</h4>
+        
+        <div className="flex items-center justify-between gap-4">
+          <Canvas />  
+          <div className="flex flex-col w-1/3 items-center justify-between gap-4">
+            <div className="w-full h-[400px]">
+              <ChartTransactionsSent />
             </div>
           </div>
-          <canvas ref={canvasRef} />
-        </div>
-        <div className="flex flex-col w-1/3 items-center justify-between gap-4">
-          <div className="w-full h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  tick={false}
-                  label="Transactions Sent"
-                  domain={[0, maxTransactions]}
-                  allowDataOverflow
-                  type="number"
-                  dataKey="message"
-                />
-                <YAxis
-                  tick={false}
-                  label="Time"
-                  domain={[0, maxTime]}
-                  dataKey="time"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="time"
-                  stroke="#8884d8"
-                  fill="#8884d8"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Tooltip content={(props) => <CustomTooltip {...props} />} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="w-full"></div>
-          <div className="w-full"></div>
         </div>
       </div>
-    </div>
+    </GraphContextProvider>
   );
 };

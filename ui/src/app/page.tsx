@@ -1,5 +1,5 @@
+import { Graph } from "@/components/Graph/Graph";
 import Image from "next/image";
-import { Test } from "./Test";
 
 export default async function Home() {
   // const [messages, topography] = await Promise.all([
@@ -10,8 +10,7 @@ export default async function Home() {
   return (
     <div>
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Test />
-        {/* <Graph messages={[]} /> */}
+        <Graph />
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         <a

@@ -1,18 +1,10 @@
-import { type Dispatch, type FC, type SetStateAction } from "react";
-
-interface ISliderProps {
-    max?: number;
-    value: number;
-    setValue: Dispatch<SetStateAction<number>>;
-}
+import { useGraphContext } from "@/contexts/GraphContext/context";
+import { type FC } from "react";
 
 /** Built with AI !! */
-export const Slider: FC<ISliderProps> = ({
-    max = 100,
-    value
-}) => {
+export const Slider: FC = () => {
     const min = 0;
-    const step = 1;
+    const { currentTime, setCurrentTime, maxTime } = useGraphContext();
 
     // const handleClick: MouseEventHandler<HTMLDivElement> = (e) => {
     //     // Get the slider's bounding rectangle
@@ -35,7 +27,7 @@ export const Slider: FC<ISliderProps> = ({
 
     return (
         <div className="w-full mx-auto p-4">
-          Time in Milliseconds: {value}
+          Time in Milliseconds: {currentTime}
             <div
                 className="relative w-full h-12 cursor-pointer"
                 draggable={false}
@@ -46,7 +38,7 @@ export const Slider: FC<ISliderProps> = ({
                     {/* Filled portion */}
                     <div
                         className="absolute h-full rounded-full bg-blue-500"
-                        style={{ width: `${(value - min) / (max - min) * 100}%` }}
+                        style={{ width: `${(currentTime - min) / (maxTime - min) * 100}%` }}
                     />
                 </div>
                 {/* Thumb */}

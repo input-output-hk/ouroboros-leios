@@ -1,68 +1,48 @@
-// import { headers } from "next/headers";
 import oboe from "oboe";
 import { Dispatch, SetStateAction } from "react";
-import { EServerType, IServerMessage, ITransformedNodeMap, TServerNodeMap } from "./types";
 
-// export const getFullUrl = async (endpoint: string) => {
-//   const headersList = await headers()
-//   const domain = headersList.get('host')
-//   const protocol = headersList.get('x-forwarded-proto') || 'http'
-//   const fullUrl = `${protocol}://${domain}`
-//   return new URL(endpoint, fullUrl).toString();
-// }
+import { EServerType, IServerMessage, ITransactionReceived, ITransformedNodeMap, TServerNodeMap } from "./types";
 
-export const getMessages = async (): Promise<IServerMessage[]> => {
-  // const url = await getFullUrl("/api/messages");
-  // return fetch(url, {
-  //   cache: "force-cache"
-  // }).then(async ({ body }) => {
-  //   if (!body) {
-  //     throw new Error("No body found.")
-  //   }
+export const getSimulationTime = async (setMaxTime: Dispatch<SetStateAction<number>>) => {
+  const url = new URL("/api/transactions/last", window.location.href);
+  const time = fetch(url)
+    .then(res => res.json())
+    .then((data: IServerMessage<ITransactionReceived>) => {
+      setMaxTime(data.time / 1_000_000);
+    })
+    
+  return time;
+}
 
-  //   const messages: IServerMessage[] = [];
-  //   const reader = body.getReader();
-  //   const decoder = new TextDecoder();
-  //   while (true) {
-  //     const { done, value } = await reader.read();
-  //     if (done) {
-  //       break;
-  //     }
-
-  //     const jsonl = decoder.decode(value);
-  //     jsonl.split(/\n/).forEach((line) => {
-  //       if (!line) {
-  //         return;
-  //       }
-
-  //       const message = JSON.parse(line);
-  //       messages.push(message);
-  //     });
-  //   }
-
-  //   return messages;
-  // });
-
-  return [];
-};
-
-export const streamMessages = (
-  setMessages: Dispatch<SetStateAction<Set<IServerMessage>>>,
-  range: number
+export const streamMessages = async (
+  setMessages: Dispatch<SetStateAction<IServerMessage[]>>,
+  timestamp: number
 ) => {
-  const url = new URL("/api/messages", window.location.href);
-  url.searchParams.set("time", range.toString());
+  const url = new URL("/api/messages/batch", window.location.href);
+  url.searchParams.set("time", timestamp.toString());
 
+  const result: Set<IServerMessage> = new Set();
+  let interval: Timer | null = null;
+  let lastTimeStamp: number | null = null;
+  
   oboe(url.toString())
-    .node("!", (res: IServerMessage) => {
-      setMessages((prev) => {
-        const newResult = new Set(prev);
-        newResult.add(res);
-
-        return newResult;
-      });
-
-      return oboe.drop;
+    .node("!", function (msg: IServerMessage) {
+      result.add(msg);
+      
+      // Debounce the state updates because we'll overload React if we don't.
+      if (!interval) {
+        interval = setTimeout(() => {
+          setMessages([...result])
+          if (lastTimeStamp !== null && timestamp !== lastTimeStamp) {
+            this.abort();
+          } else {
+            interval = null;
+            lastTimeStamp = timestamp;
+          }
+        }, 10)
+      } else if (interval && timestamp !== lastTimeStamp) {
+        this.abort();
+      }
     })
 };
 

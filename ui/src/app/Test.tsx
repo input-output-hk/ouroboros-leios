@@ -1,20 +1,19 @@
 "use client";
 
-import { MILLISECOND_RANGE } from "@/components/Graph/Graph";
-import { streamMessages, streamTopography } from "@/components/Graph/queries";
-import { IServerMessage, ITransformedNodeMap } from "@/components/Graph/types";
-import { useEffect, useState } from "react";
+import { useGraphContext } from "@/contexts/GraphContext/context";
 
 export const Test = () => {
-  const [nodes, setNodes] = useState<ITransformedNodeMap>({
-    links: [],
-    nodes: []
-  });
-  const [messages, setMessages] = useState<Set<IServerMessage>>(new Set());
-  useEffect(() => {
-    streamTopography(setNodes)
-    streamMessages(setMessages, MILLISECOND_RANGE);
-  }, [setNodes])
+  const { topography, messages, currentTime, maxTime } = useGraphContext();
 
-  return <>{nodes.nodes.length}, {nodes.links.length}, {messages.size}</>;
+  console.log(messages[messages.length -1]?.time)
+
+  return (
+    <p>
+      Nodes: {topography.nodes.length}<br/>
+      Links: {topography.links.length}<br/>
+      Fetched Messages: {messages.length}<br/>
+      Current Time: {currentTime}<br/>
+      Max Time: {maxTime}
+    </p>
+  );
 }
