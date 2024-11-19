@@ -93,6 +93,42 @@ data VizCommand
   | VizPraosP2P1
   | VizPraosP2P2
 
+vizCommands :: Parser VizCommand
+vizCommands =
+  subparser . mconcat $
+    [ commandGroup "Available visualisations:"
+    , command "tcp-1" . info (pure VizTCP1) $
+        progDesc ""
+    , command "tcp-2" . info (pure VizTCP2) $
+        progDesc ""
+    , command "tcp-3" . info (pure VizTCP3) $
+        progDesc ""
+    , command "relay-1" . info (pure VizRelay1) $
+        progDesc ""
+    , command "relay-2" . info (pure VizRelay2) $
+        progDesc ""
+    , command "p2p-1" . info (pure VizP2P1) $
+        progDesc ""
+    , command "p2p-2" . info (pure VizP2P2) $
+        progDesc ""
+    , command "pcs-1" . info (pure VizPCS1) $
+        progDesc
+          "A simulation of two nodes running Praos chain-sync."
+    , command "pbf-1" . info (pure VizPBF1) $
+        progDesc
+          "A simulation of two nodes running Praos block-fetch."
+    , command "praos-1" . info (pure VizPraos1) $
+        progDesc
+          "A simulation of two nodes running Praos consensus."
+    , command "praos-p2p-1" . info (pure VizPraosP2P1) $
+        progDesc
+          "A simulation of 100 nodes running Praos consensus."
+    , command "praos-p2p-2" . info (pure VizPraosP2P2) $
+        progDesc
+          "A simulation of 100 nodes running Praos consensus, \
+          \comparing a cylindrical world to a flat world."
+    ]
+
 vizCommandToViz :: VizCommand -> Vizualisation
 vizCommandToViz = \case
   VizTCP1 -> ExamplesTCP.example1
@@ -107,23 +143,6 @@ vizCommandToViz = \case
   VizPraos1 -> VizPraos.example1
   VizPraosP2P1 -> VizPraosP2P.example1
   VizPraosP2P2 -> VizPraosP2P.example2
-
-vizCommands :: Parser VizCommand
-vizCommands =
-  subparser . mconcat $
-    [ command "tcp-1" (info (pure VizTCP1) mempty)
-    , command "tcp-2" (info (pure VizTCP2) mempty)
-    , command "tcp-3" (info (pure VizTCP3) mempty)
-    , command "relay-1" (info (pure VizRelay1) mempty)
-    , command "relay-2" (info (pure VizRelay2) mempty)
-    , command "p2p-1" (info (pure VizP2P1) mempty)
-    , command "p2p-2" (info (pure VizP2P2) mempty)
-    , command "pcs-1" (info (pure VizPCS1) mempty)
-    , command "pbf-1" (info (pure VizPBF1) mempty)
-    , command "praos-1" (info (pure VizPraos1) mempty)
-    , command "praos-p2p-1" (info (pure VizPraosP2P1) mempty)
-    , command "praos-p2p-2" (info (pure VizPraosP2P2) mempty)
-    ]
 
 type VizSize = (Int, Int)
 
