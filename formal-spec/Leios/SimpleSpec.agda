@@ -100,7 +100,7 @@ record LeiosState : Type where
   constructLedger = concatMap lookupTxs
 
   needsUpkeep : SlotUpkeep → Set
-  needsUpkeep = _∈ Upkeep
+  needsUpkeep = _∉ Upkeep
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
