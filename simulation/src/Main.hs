@@ -1,15 +1,14 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Main where
 
-import Control.Applicative (Alternative ((<|>)), optional)
 import Data.Maybe (fromMaybe)
-import Data.String (IsString (fromString))
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
-import qualified Options.Applicative as Opts
-import Options.Applicative.Help (line)
+import Options.Applicative
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
@@ -18,136 +17,131 @@ import Viz
 
 main :: IO ()
 main = do
-  CliCmd
-    { cliViz = viz
-    , cliOutputFramesDir
-    , cliOutputSeconds
-    , cliOutputStartTime
-    , cliCpuRendering
-    , cliVizSize
-    } <-
-    Opts.execParser cli
-  case cliOutputFramesDir of
+  VizOptions{..} <- execParser (info (helper <*> vizOptions) mempty)
+  let viz = vizCommandToViz vizCommand
+  case vizOutputFramesDir of
     Nothing ->
-      vizualise config viz
-     where
-      config =
-        defaultGtkVizConfig
-          { gtkVizCpuRendering = cliCpuRendering
-          , gtkVizResolution = cliVizSize
-          }
-    Just outdir ->
-      writeAnimationFrames config viz
-     where
-      config =
-        defaultAnimVizConfig
-          { animVizFrameFiles = \n -> outdir ++ "/frame-" ++ show n ++ ".png"
-          , animVizDuration = fromMaybe 60 cliOutputSeconds
-          , animVizStartTime = fromMaybe 0 cliOutputStartTime
-          , animVizResolution = cliVizSize
-          }
+      let gtkVizConfig =
+            defaultGtkVizConfig
+              { gtkVizCpuRendering = vizCpuRendering
+              , gtkVizResolution = vizSize
+              }
+       in vizualise gtkVizConfig viz
+    Just outputFramesDir ->
+      let animVizConfig =
+            defaultAnimVizConfig
+              { animVizFrameFiles = \n -> outputFramesDir ++ "/frame-" ++ show n ++ ".png"
+              , animVizDuration = fromMaybe 60 vizOutputSeconds
+              , animVizStartTime = fromMaybe 0 vizOutputStartTime
+              , animVizResolution = vizSize
+              }
+       in writeAnimationFrames animVizConfig viz
 
-cli :: Opts.ParserInfo CliCmd
-cli =
-  Opts.info
-    (Opts.helper <*> options)
-    ( Opts.fullDesc
-        <> Opts.header "Vizualisations of Ouroboros-related network simulations"
-        <> Opts.progDescDoc (Just desc)
-    )
- where
-  desc =
-    fromString
-      "Either show a visualisation in a window, or output \
-      \ animation frames to a directory."
-      <> line
-      <> fromString ("VIZNAME is one of: " ++ unwords (map fst vizualisations))
-
-data CliCmd = CliCmd
-  { cliViz :: Vizualisation
-  , cliOutputFramesDir :: Maybe FilePath
-  , cliOutputSeconds :: Maybe Int
-  , cliOutputStartTime :: Maybe Int
-  , cliCpuRendering :: Bool
-  , cliVizSize :: Maybe (Int, Int)
+data VizOptions = VizOptions
+  { vizCommand :: VizCommand
+  , vizOutputFramesDir :: Maybe FilePath
+  , vizOutputSeconds :: Maybe Int
+  , vizOutputStartTime :: Maybe Int
+  , vizCpuRendering :: Bool
+  , vizSize :: Maybe VizSize
   }
 
-vizNamesHelp :: String
-vizNamesHelp = "VIZNAME is one of: " ++ unwords (map fst vizualisations)
-
-options :: Opts.Parser CliCmd
-options =
-  CliCmd
-    <$> Opts.argument
-      (Opts.eitherReader readViz)
-      ( Opts.metavar "VIZNAME"
-          <> Opts.help vizNamesHelp
-      )
+vizOptions :: Parser VizOptions
+vizOptions =
+  VizOptions
+    <$> vizCommands
     <*> optional
-      ( Opts.strOption
-          ( Opts.long "frames-dir"
-              <> Opts.metavar "DIR"
-              <> Opts.help "Output animation frames to directory"
+      ( strOption
+          ( long "frames-dir"
+              <> metavar "DIR"
+              <> help "Output animation frames to directory"
           )
       )
     <*> optional
-      ( Opts.option
-          Opts.auto
-          ( Opts.long "seconds"
-              <> Opts.metavar "SEC"
-              <> Opts.help "Output N seconds of animation"
+      ( option
+          auto
+          ( long "seconds"
+              <> metavar "SEC"
+              <> help "Output N seconds of animation"
           )
       )
     <*> optional
-      ( Opts.option
-          Opts.auto
-          ( Opts.long "skip-seconds"
-              <> Opts.metavar "SEC"
-              <> Opts.help "Skip the first N seconds of animation"
+      ( option
+          auto
+          ( long "skip-seconds"
+              <> metavar "SEC"
+              <> help "Skip the first N seconds of animation"
           )
       )
-    <*> Opts.switch
-      ( Opts.long "cpu-render"
-          <> Opts.help "Use CPU-based client side Cairo rendering"
+    <*> switch
+      ( long "cpu-render"
+          <> help "Use CPU-based client side Cairo rendering"
       )
-    <*> optional sizeOptions
- where
-  sizeOptions :: Opts.Parser (Int, Int)
-  sizeOptions =
-    Opts.flag'
-      (1280, 720)
-      ( Opts.long "720p"
-          <> Opts.help "Use 720p resolution"
+    <*> optional vizSizeOptions
+
+data VizCommand
+  = VizTCP1
+  | VizTCP2
+  | VizTCP3
+  | VizRelay1
+  | VizRelay2
+  | VizP2P1
+  | VizP2P2
+  | VizPCS1
+  | VizPBF1
+  | VizPraos1
+  | VizPraosP2P1
+  | VizPraosP2P2
+
+vizCommandToViz :: VizCommand -> Vizualisation
+vizCommandToViz = \case
+  VizTCP1 -> ExamplesTCP.example1
+  VizTCP2 -> ExamplesTCP.example2
+  VizTCP3 -> ExamplesTCP.example3
+  VizRelay1 -> ExamplesRelay.example1
+  VizRelay2 -> ExamplesRelay.example2
+  VizP2P1 -> ExamplesRelayP2P.example1
+  VizP2P2 -> ExamplesRelayP2P.example2
+  VizPCS1 -> VizChainSync.example1
+  VizPBF1 -> VizBlockFetch.example1
+  VizPraos1 -> VizPraos.example1
+  VizPraosP2P1 -> VizPraosP2P.example1
+  VizPraosP2P2 -> VizPraosP2P.example2
+
+vizCommands :: Parser VizCommand
+vizCommands =
+  subparser . mconcat $
+    [ command "tcp-1" (info (pure VizTCP1) mempty)
+    , command "tcp-2" (info (pure VizTCP2) mempty)
+    , command "tcp-3" (info (pure VizTCP3) mempty)
+    , command "relay-1" (info (pure VizRelay1) mempty)
+    , command "relay-2" (info (pure VizRelay2) mempty)
+    , command "p2p-1" (info (pure VizP2P1) mempty)
+    , command "p2p-2" (info (pure VizP2P2) mempty)
+    , command "pcs-1" (info (pure VizPCS1) mempty)
+    , command "pbf-1" (info (pure VizPBF1) mempty)
+    , command "praos-1" (info (pure VizPraos1) mempty)
+    , command "praos-p2p-1" (info (pure VizPraosP2P1) mempty)
+    , command "praos-p2p-2" (info (pure VizPraosP2P2) mempty)
+    ]
+
+type VizSize = (Int, Int)
+
+vizSizeOptions :: Parser VizSize
+vizSizeOptions =
+  flag'
+    (1280, 720)
+    ( long "720p"
+        <> help "Use 720p resolution"
+    )
+    <|> flag'
+      (1920, 1080)
+      ( long "1080p"
+          <> help "Use 1080p resolution"
       )
-      <|> Opts.flag'
-        (1920, 1080)
-        ( Opts.long "1080p"
-            <> Opts.help "Use 1080p resolution"
-        )
-      <|> Opts.option
-        Opts.auto
-        ( Opts.long "resolution"
-            <> Opts.metavar "(W,H)"
-            <> Opts.help "Use a specific resolution"
-        )
-
-vizualisations :: [(String, Vizualisation)]
-vizualisations =
-  [ ("tcp-1", ExamplesTCP.example1)
-  , ("tcp-2", ExamplesTCP.example2)
-  , ("tcp-3", ExamplesTCP.example3)
-  , ("relay-1", ExamplesRelay.example1)
-  , ("relay-2", ExamplesRelay.example2)
-  , ("p2p-1", ExamplesRelayP2P.example1)
-  , ("p2p-2", ExamplesRelayP2P.example2)
-  , ("pcs-1", VizChainSync.example1)
-  , ("pbf-1", VizBlockFetch.example1)
-  , ("praos-1", VizPraos.example1)
-  , ("praos-p2p-1", VizPraosP2P.example1)
-  , ("praos-p2p-2", VizPraosP2P.example2)
-  ]
-
-readViz :: String -> Either String Vizualisation
-readViz s = case lookup s vizualisations of
-  Just viz -> Right viz
-  Nothing -> Left "unknown vizualisation"
+    <|> option
+      auto
+      ( long "resolution"
+          <> metavar "(W,H)"
+          <> help "Use a specific resolution"
+      )
