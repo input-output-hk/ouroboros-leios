@@ -257,17 +257,17 @@ class
   Node node edge
     | node -> edge
   where
-  allEdgesWithLabel :: node -> Map NodeName edge
+  outgoingEdges :: node -> Map NodeName edge
 
-  allAdjacent :: node -> [NodeName]
-  allAdjacent = M.keys . allEdgesWithLabel
+  adjacentNodes :: node -> [NodeName]
+  adjacentNodes = M.keys . outgoingEdges
 
 instance Node BenchTopologyNode () where
-  allEdgesWithLabel node =
+  outgoingEdges node =
     M.fromList [(producerName, ()) | producerName <- V.toList node.producers]
 
 instance Node SimpleNode Latency where
-  allEdgesWithLabel = (.producers)
+  outgoingEdges = (.producers)
 
 class Node node edge => Topology topology node edge | topology -> node where
   allNodes :: topology -> [node]
@@ -348,7 +348,7 @@ toDotGraphAsTorus topology =
       ]
     | consumer <- allNodes topology
     , let consumerName = consumer.name
-    , producerName <- allAdjacent consumer
+    , producerName <- adjacentNodes consumer
     , let producerRegionColor = regionColorMap M.! (nodeRegionMap M.! producerName)
     ]
   nodeRegionMap =
@@ -395,7 +395,7 @@ toDotGraphByRegion topology =
             , let consumerName = consumer.name
             , let consumerRegionName = consumer.region
             , consumerRegionName == regionName
-            , producerName <- allAdjacent consumer
+            , producerName <- adjacentNodes consumer
             , let producerRegionName = nodeRegionMap M.! producerName
             , producerRegionName == regionName
             , let producerRegionColor = regionColorMap M.! producerRegionName
@@ -408,7 +408,7 @@ toDotGraphByRegion topology =
     | consumer <- allNodes topology
     , let consumerName = consumer.name
     , let consumerRegionName = consumer.region
-    , producerName <- allAdjacent consumer
+    , producerName <- adjacentNodes consumer
     , let producerRegionName = nodeRegionMap M.! producerName
     , let producerRegionColor = regionColorMap M.! producerRegionName
     , consumerRegionName /= producerRegionName
@@ -452,7 +452,7 @@ toGraph topology = G.mkGraph graphNodes graphEdges
     [ (consumerId, producerId, producerLatency)
     | consumer <- allNodes topology
     , let consumerId = unNodeId consumer.nodeId
-    , (producerName, producerLatency) <- M.toList (allEdgesWithLabel consumer)
+    , (producerName, producerLatency) <- M.toList (outgoingEdges consumer)
     , let producerId = unNodeId $ nameToIdMap M.! producerName
     ]
 
