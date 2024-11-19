@@ -150,16 +150,3 @@ executable sample
 
   default-language: Haskell2010
   ghc-options:      -Wall
-
-executable praos
-  if flag(perf)
-    import: performance-opts
-
-  main-is:          src/PraosProtocol/PraosMain.hs
-  build-depends:
-    , base
-    , optparse-applicative
-    , ouroboros-leios-sim
-
-  default-language: Haskell2010
-  ghc-options:      -Wall
