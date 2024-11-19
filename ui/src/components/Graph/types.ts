@@ -3,13 +3,27 @@ export interface INode {
   stake?: number;
 }
 
-export interface IServerNodeMap {
-  nodes: INode[];
-  links: {
-    nodes: number[];
-    id?: number;
-  }[];
+export interface ILink {
+  nodes: number[];
+  id?: number;
 }
+
+export enum EServerType {
+  NODE = "node",
+  LINK = "link"
+}
+
+export type TServerNode = {
+  type: EServerType.NODE;
+  data: INode;
+}
+
+export type TServerLink = {
+  type: EServerType.LINK,
+  data: ILink;
+}
+
+export type TServerNodeMap = TServerNode | TServerLink;
 
 export interface ITransformedNode {
   id: number;

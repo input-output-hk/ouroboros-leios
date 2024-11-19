@@ -23,6 +23,7 @@ import {
   NameType,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
+import { streamTopography } from "./queries";
 import { Slider } from "./Slider";
 import {
   EMessageType,
@@ -37,7 +38,6 @@ import { isWithinRange } from "./utils";
 
 interface IGraphProps {
   messages: IServerMessage[];
-  topography: ITransformedNodeMap;
 }
 
 enum ESpeedOptions {
@@ -45,6 +45,8 @@ enum ESpeedOptions {
   "2/10" = 0.2,
   "3/10" = 0.3,
 }
+
+export const MILLISECOND_RANGE = 500;
 
 const scale = 3;
 let offsetX = 0,
@@ -56,7 +58,6 @@ const CustomTooltip = ({
   label,
 }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
-    console.log(payload);
     return (
       <div className="custom-tooltip">
         <p className="label">{`Message: #${payload[0].payload.message}`}</p>
@@ -68,7 +69,16 @@ const CustomTooltip = ({
   return null;
 };
 
-export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
+export const Graph: FC<IGraphProps> = ({ messages }) => {
+  const [topography, setTopography] = useState<ITransformedNodeMap>({
+    links: [],
+    nodes: []
+  });
+  
+  useEffect(() => {
+    streamTopography(setTopography)
+  }, [])
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationStart = useRef<number>(0);
   const simulationPauseTime = useRef<number>(0);
@@ -288,7 +298,7 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
 
       txGeneratedMessages.forEach(m => {
         const target = m.time / 1_000_000;
-        if (m.message.publisher === node.id && isWithinRange(elapsed, target, 500)) {
+        if (m.message.publisher === node.id && isWithinRange(elapsed, target, MILLISECOND_RANGE)) {
           context.fillStyle = "red";
         }
 
@@ -305,8 +315,6 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
 
     context.restore();
   }, [topography, transactions, play, speed, maxTime, txGeneratedMessages]);
-
-  console.log(generatedTxs)
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
