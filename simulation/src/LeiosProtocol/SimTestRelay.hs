@@ -159,7 +159,7 @@ relayNode
     let relayBufferVar = buffer
     let consumerSST = RelayConsumerSharedState{relayBufferVar, inFlightVar}
     let producerSST = RelayProducerSharedState{relayBufferVar = asReadOnly relayBufferVar}
-    let relayConfig = RelayConfig{maxWindowSize = 10}
+    let relayConfig = RelayConfig{maxWindowSize = 100}
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
