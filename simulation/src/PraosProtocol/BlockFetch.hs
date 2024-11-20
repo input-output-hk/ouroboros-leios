@@ -10,6 +10,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -40,6 +41,7 @@ import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, unless, void, when, (<=<))
 import Control.Tracer (Tracer, traceWith)
 import Data.Bifunctor (second)
+import Data.Kind
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -60,14 +62,14 @@ import PraosProtocol.Common
 import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
 import qualified PraosProtocol.Common.Chain as Chain
 
-data BlockFetchState
+data BlockFetchState (body :: Type)
   = StIdle
   | StBusy
   | StStreaming
   | StDone
   deriving (Show)
 
-data SingBlockFetchState (st :: BlockFetchState) where
+data SingBlockFetchState :: forall body. BlockFetchState body -> Type where
   SingStIdle :: SingBlockFetchState StIdle
   SingStBusy :: SingBlockFetchState StBusy
   SingStStreaming :: SingBlockFetchState StStreaming
@@ -84,28 +86,28 @@ decideSingBlockFetchState SingStDone SingStDone = Just Refl
 decideSingBlockFetchState _ _ = Nothing
 
 decideBlockFetchState ::
-  forall (st :: BlockFetchState) (st' :: BlockFetchState).
+  forall body (st :: BlockFetchState body) (st' :: BlockFetchState body).
   (StateTokenI st, StateTokenI st') =>
   Maybe (st :~: st')
 decideBlockFetchState = decideSingBlockFetchState stateToken stateToken
 
-instance Protocol BlockFetchState where
-  data Message BlockFetchState from to where
+instance Protocol (BlockFetchState body) where
+  data Message (BlockFetchState body) from to where
     MsgRequestRange ::
-      Point Block ->
-      Point Block ->
-      Message BlockFetchState StIdle StBusy
+      Point (Block body) ->
+      Point (Block body) ->
+      Message (BlockFetchState body) StIdle StBusy
     MsgNoBlocks ::
-      Message BlockFetchState StBusy StIdle
+      Message (BlockFetchState body) StBusy StIdle
     MsgStartBatch ::
-      Message BlockFetchState StBusy StStreaming
+      Message (BlockFetchState body) StBusy StStreaming
     MsgBlock ::
-      BlockBody ->
-      Message BlockFetchState StStreaming StStreaming
+      body ->
+      Message (BlockFetchState body) StStreaming StStreaming
     MsgBatchDone ::
-      Message BlockFetchState StStreaming StIdle
+      Message (BlockFetchState body) StStreaming StIdle
     MsgClientDone ::
-      Message BlockFetchState StIdle StDone
+      Message (BlockFetchState body) StIdle StDone
   type StateAgency StIdle = ClientAgency
   type StateAgency StBusy = ServerAgency
   type StateAgency StStreaming = ServerAgency
@@ -117,9 +119,9 @@ instance StateTokenI StBusy where stateToken = SingStBusy
 instance StateTokenI StStreaming where stateToken = SingStStreaming
 instance StateTokenI StDone where stateToken = SingStDone
 
-deriving instance Show (Message BlockFetchState from to)
+deriving instance Show body => Show (Message (BlockFetchState body) from to)
 
-instance MessageSize (Message BlockFetchState st st') where
+instance MessageSize body => MessageSize (Message (BlockFetchState body) st st') where
   messageSizeBytes = \case
     MsgRequestRange pt1 pt2 -> messageSizeBytes pt1 + messageSizeBytes pt2
     MsgNoBlocks -> 1
@@ -128,7 +130,7 @@ instance MessageSize (Message BlockFetchState st st') where
     MsgBatchDone -> 1
     MsgClientDone -> 1
 
-blockFetchMessageLabel :: Message BlockFetchState st st' -> String
+blockFetchMessageLabel :: Message (BlockFetchState body) st st' -> String
 blockFetchMessageLabel = \case
   MsgRequestRange _ _ -> "MsgRequestRange"
   MsgNoBlocks -> "MsgNoBlocks"
@@ -137,29 +139,30 @@ blockFetchMessageLabel = \case
   MsgBatchDone -> "MsgBatchDone"
   MsgClientDone -> "MsgClientDone"
 
-type BlockFetchMessage = ProtocolMessage BlockFetchState
+type BlockFetchMessage body = ProtocolMessage (BlockFetchState body)
 
 --------------------------------
 --- BlockFetch Server
 --------------------------------
 
-newtype BlockFetchProducerState m = BlockFetchProducerState
-  { blocksVar :: ReadOnly (TVar m Blocks)
+newtype BlockFetchProducerState body m = BlockFetchProducerState
+  { blocksVar :: ReadOnly (TVar m (Blocks body))
   }
 
-runBlockFetchProducer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchProducerState m -> m ()
+runBlockFetchProducer :: (IsBody body, MonadSTM m) => Chan m (BlockFetchMessage body) -> BlockFetchProducerState body m -> m ()
 runBlockFetchProducer chan blockFetchProducerState =
   void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchProducer blockFetchProducerState)
 
 resolveRange ::
-  MonadSTM m =>
-  BlockFetchProducerState m ->
-  Point Block ->
-  Point Block ->
-  STM m (Maybe [BlockBody])
+  forall body m.
+  (IsBody body, MonadSTM m) =>
+  BlockFetchProducerState body m ->
+  Point (Block body) ->
+  Point (Block body) ->
+  STM m (Maybe [body])
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
-  let resolveRangeAcc :: [BlockBody] -> Point Block -> Maybe [BlockBody]
+  let resolveRangeAcc :: [body] -> Point (Block body) -> Maybe [body]
       resolveRangeAcc _acc bpoint | pointSlot start > pointSlot bpoint = Nothing
       resolveRangeAcc acc GenesisPoint = assert (start == GenesisPoint) (Just acc)
       resolveRangeAcc acc bpoint@(BlockPoint pslot phash) = do
@@ -172,13 +175,13 @@ resolveRange st start end = do
   return $ resolveRangeAcc [] end
 
 blockFetchProducer ::
-  forall m.
-  MonadSTM m =>
-  BlockFetchProducerState m ->
-  TS.Server BlockFetchState NonPipelined StIdle m ()
+  forall body m.
+  (IsBody body, MonadSTM m) =>
+  BlockFetchProducerState body m ->
+  TS.Server (BlockFetchState body) NonPipelined StIdle m ()
 blockFetchProducer st = idle
  where
-  idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
+  idle :: TS.Server (BlockFetchState body) NonPipelined StIdle m ()
   idle = TS.Await $ \case
     MsgRequestRange start end -> TS.Effect $ atomically $ do
       mblocks <- resolveRange st start end -- Note: we could just look at current chain.
@@ -187,28 +190,28 @@ blockFetchProducer st = idle
         Just blocks -> return $ TS.Yield MsgStartBatch (streaming blocks)
     MsgClientDone -> TS.Done ()
 
-  streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
+  streaming :: [body] -> TS.Server (BlockFetchState body) NonPipelined StStreaming m ()
   streaming [] = TS.Yield MsgBatchDone idle
   streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
 
 -- NOTE: Variant that uses the current chain.
 
--- newtype BlockFetchProducerState m = BlockFetchProducerState
+-- newtype BlockFetchProducerState body m = BlockFetchProducerState
 --   { chainVar :: ReadOnly (TVar m (Chain Block))
 --   }
 
--- runBlockFetchProducer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchProducerState m -> m ()
+-- runBlockFetchProducer :: MonadSTM m => Chan m BlockFetchMessage -> BlockFetchProducerState body m -> m ()
 -- runBlockFetchProducer chan blockFetchProducerState =
 --   void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchProducer blockFetchProducerState)
 
 -- blockFetchProducer ::
 --   forall m.
 --   MonadSTM m =>
---   BlockFetchProducerState m ->
---   TS.Server BlockFetchState NonPipelined StIdle m ()
+--   BlockFetchProducerState body m ->
+--   TS.Server (BlockFetchState body) NonPipelined StIdle m ()
 -- blockFetchProducer st = idle
 --  where
---   idle :: TS.Server BlockFetchState NonPipelined StIdle m ()
+--   idle :: TS.Server (BlockFetchState body) NonPipelined StIdle m ()
 --   idle = TS.Await $ \case
 --     MsgRequestRange start end -> TS.Effect $ atomically $ do
 --       bchain <- readReadOnlyTVar st.chainVar
@@ -217,7 +220,7 @@ blockFetchProducer st = idle
 --         Just blocks -> return $ TS.Yield MsgStartBatch $ streaming $ (blockBody <$> blocks)
 --     MsgClientDone -> TS.Done ()
 
---   streaming :: [BlockBody] -> TS.Server BlockFetchState NonPipelined StStreaming m ()
+--   streaming :: [BlockBody] -> TS.Server (BlockFetchState body) NonPipelined StStreaming m ()
 --   streaming [] = TS.Yield MsgBatchDone idle
 --   streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
 
@@ -230,35 +233,35 @@ newtype BlockRequest
   deriving (Show)
   deriving newtype (Semigroup) -- TODO: we could merge the fragments.
 
-fragmentRange :: AnchoredFragment BlockHeader -> (Point Block, Point Block)
+fragmentRange :: AnchoredFragment BlockHeader -> (Point (Block body), Point (Block body))
 fragmentRange fr = (castPoint $ AnchoredFragment.lastPoint fr, castPoint $ AnchoredFragment.headPoint fr)
 
-blockRequestPoints :: BlockRequest -> [Point Block]
+blockRequestPoints :: BlockRequest -> [Point (Block body)]
 blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AnchoredFragment.toOldestFirst) frs
 
-data BlockFetchConsumerState m = BlockFetchConsumerState
+data BlockFetchConsumerState body m = BlockFetchConsumerState
   { blockRequestVar :: TVar m BlockRequest
-  , addFetchedBlock :: Block -> m ()
-  , removeInFlight :: [Point Block] -> m ()
+  , addFetchedBlock :: Block body -> m ()
+  , removeInFlight :: [Point (Block body)] -> m ()
   }
 
 runBlockFetchConsumer ::
-  (MonadSTM m, MonadDelay m) =>
-  Tracer m PraosNodeEvent ->
-  PraosConfig ->
-  Chan m BlockFetchMessage ->
-  BlockFetchConsumerState m ->
+  (IsBody body, Show body, MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent body) ->
+  PraosConfig body ->
+  Chan m (BlockFetchMessage body) ->
+  BlockFetchConsumerState body m ->
   m ()
 runBlockFetchConsumer tracer cfg chan blockFetchConsumerState =
   void $ runPeerWithDriver (chanDriver decideBlockFetchState chan) (blockFetchConsumer tracer cfg blockFetchConsumerState)
 
 blockFetchConsumer ::
-  forall m.
-  (MonadSTM m, MonadDelay m) =>
-  Tracer m PraosNodeEvent ->
-  PraosConfig ->
-  BlockFetchConsumerState m ->
-  TC.Client BlockFetchState NonPipelined StIdle m ()
+  forall body m.
+  (IsBody body, Show body, MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent body) ->
+  PraosConfig body ->
+  BlockFetchConsumerState body m ->
+  TC.Client (BlockFetchState body) NonPipelined StIdle m ()
 blockFetchConsumer tracer cfg st = idle
  where
   -- does not support preemption of in-flight requests.
@@ -271,13 +274,13 @@ blockFetchConsumer tracer cfg st = idle
         writeTVar st.blockRequestVar (BlockRequest rs')
         return r
 
-  idle :: TC.Client BlockFetchState NonPipelined StIdle m ()
+  idle :: TC.Client (BlockFetchState body) NonPipelined StIdle m ()
   idle = TC.Effect $ atomically $ do
     fr <- blockRequest
     let range@(start, end) = fragmentRange fr
     return $ TC.Yield (MsgRequestRange start end) $ busy range fr
 
-  busy :: (Point Block, Point Block) -> AnchoredFragment BlockHeader -> TC.Client BlockFetchState NonPipelined StBusy m ()
+  busy :: (Point (Block body), Point (Block body)) -> AnchoredFragment BlockHeader -> TC.Client (BlockFetchState body) NonPipelined StBusy m ()
   busy range fr = TC.Await $ \case
     MsgNoBlocks -> TC.Effect $ do
       -- TODO: controller might just ask this peer again.
@@ -285,7 +288,7 @@ blockFetchConsumer tracer cfg st = idle
       return idle
     MsgStartBatch -> streaming range $ AnchoredFragment.toOldestFirst fr
 
-  streaming :: (Point Block, Point Block) -> [BlockHeader] -> TC.Client BlockFetchState NonPipelined StStreaming m ()
+  streaming :: (Point (Block body), Point (Block body)) -> [BlockHeader] -> TC.Client (BlockFetchState body) NonPipelined StStreaming m ()
   streaming range headers = TC.Await $ \msg ->
     case (msg, headers) of
       (MsgBatchDone, []) -> idle
@@ -348,38 +351,38 @@ longestChainSelection candidateChainVars cpsVar getHeader = do
 --    * the block is removed from blocksInFlightVar when it reaches the
 --      "ChainDB" i.e. blockBodiesVar, or the consumer encountered a
 --      problem when fetching it.
-data PeerStatus m = PeerStatus
+data PeerStatus body m = PeerStatus
   { blockRequestVar :: TVar m BlockRequest
-  , blocksInFlightVar :: TVar m (Set (Point Block))
+  , blocksInFlightVar :: TVar m (Set (Point (Block body)))
   , peerChainVar :: ReadOnly (TVar m (Chain BlockHeader))
   }
 
 type PeerId = Int
 
 -- | invariant: blocksVar contains all blocks of cpsVar and targetChainVar
-data BlockFetchControllerState m = BlockFetchControllerState
-  { blocksVar :: TVar m Blocks
-  , targetChainVar :: TVar m (Maybe MissingBlocksChain)
-  , peers :: Map PeerId (PeerStatus m)
+data BlockFetchControllerState body m = BlockFetchControllerState
+  { blocksVar :: TVar m (Blocks body)
+  , targetChainVar :: TVar m (Maybe (MissingBlocksChain body))
+  , peers :: Map PeerId (PeerStatus body m)
   , nextPeerId :: Int
-  , cpsVar :: TVar m (ChainProducerState Block)
+  , cpsVar :: TVar m (ChainProducerState (Block body))
   }
 
 addPeer ::
-  forall m.
+  forall body m.
   MonadSTM m =>
   ReadOnly (TVar m (Chain BlockHeader)) ->
-  BlockFetchControllerState m ->
-  m (BlockFetchControllerState m, PeerId)
+  BlockFetchControllerState body m ->
+  m (BlockFetchControllerState body m, PeerId)
 addPeer peerChainVar st = atomically $ do
   let peerId = st.nextPeerId
   blockRequestVar <- newTVar (BlockRequest [])
   blocksInFlightVar <- newTVar Set.empty
-  let peerStatus = PeerStatus{..} :: PeerStatus m
+  let peerStatus = PeerStatus{..} :: PeerStatus body m
   let peers = Map.insert peerId peerStatus st.peers
   return (st{peers = peers, nextPeerId = peerId + 1}, peerId)
 
-newBlockFetchControllerState :: MonadSTM m => Chain Block -> m (BlockFetchControllerState m)
+newBlockFetchControllerState :: MonadSTM m => Chain (Block body) -> m (BlockFetchControllerState body m)
 newBlockFetchControllerState chain = atomically $ do
   blocksVar <- newTVar (toBlocks chain)
   targetChainVar <- newTVar Nothing
@@ -388,7 +391,7 @@ newBlockFetchControllerState chain = atomically $ do
   cpsVar <- newTVar $ initChainProducerState chain
   return BlockFetchControllerState{..}
 
-blockFetchController :: forall m. MonadSTM m => Tracer m PraosNodeEvent -> BlockFetchControllerState m -> m ()
+blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> BlockFetchControllerState body m -> m ()
 blockFetchController tracer st@BlockFetchControllerState{..} = forever makeRequests
  where
   makeRequests :: m ()
@@ -439,33 +442,33 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
 -- | invariants:
 --    1. prefix starts at Genesis, and the tip of the prefix is the anchor of the suffix.
 --    2. the suffix has one `Left header` element at the start.
-data MissingBlocksChain = MissingBlocksChain
-  { prefix :: AnchoredFragment Block
-  , suffix :: AnchoredFragment BlockOrHeader
+data MissingBlocksChain body = MissingBlocksChain
+  { prefix :: AnchoredFragment (Block body)
+  , suffix :: AnchoredFragment (BlockOrHeader body)
   }
 
-newtype BlockOrHeader = BlockOrHeader {unBlockOrHeader :: Either BlockHeader Block}
+newtype BlockOrHeader body = BlockOrHeader {unBlockOrHeader :: Either BlockHeader (Block body)}
 
-type instance HeaderHash BlockOrHeader = HeaderHash BlockHeader
+type instance HeaderHash (BlockOrHeader body) = HeaderHash BlockHeader
 
-instance StandardHash BlockOrHeader
+instance StandardHash (BlockOrHeader body)
 
-instance HasHeader BlockOrHeader where
+instance IsBody body => HasHeader (BlockOrHeader body) where
   getHeaderFields (BlockOrHeader x) =
     either
       (castHeaderFields . getHeaderFields)
       (castHeaderFields . getHeaderFields)
       x
 
-headPointMChain :: MissingBlocksChain -> Point Block
+headPointMChain :: IsBody body => MissingBlocksChain body -> Point (Block body)
 headPointMChain ch = castPoint $ AnchoredFragment.headPoint ch.suffix
 
-data ChainsUpdate
-  = FullChain (Chain Block)
-  | ImprovedPrefix MissingBlocksChain
-  | SamePrefix MissingBlocksChain
+data ChainsUpdate body
+  = FullChain (Chain (Block body))
+  | ImprovedPrefix (MissingBlocksChain body)
+  | SamePrefix (MissingBlocksChain body)
 
-fillInBlocks :: Blocks -> MissingBlocksChain -> ChainsUpdate
+fillInBlocks :: forall body. IsBody body => Blocks body -> MissingBlocksChain body -> ChainsUpdate body
 fillInBlocks blocks MissingBlocksChain{..} =
   case addToChain prefix (AnchoredFragment.mapAnchoredFragment blkLookup suffix) of
     (prefix', Just suffix')
@@ -477,7 +480,7 @@ fillInBlocks blocks MissingBlocksChain{..} =
         fromMaybe (error "fillInBlocks: prefix not from genesis") $
           Chain.fromAnchoredFragment prefix'
  where
-  blkLookup :: BlockOrHeader -> BlockOrHeader
+  blkLookup :: BlockOrHeader body -> BlockOrHeader body
   blkLookup x@(BlockOrHeader e) = case e of
     Right _ -> x
     Left hdr -> maybe x (BlockOrHeader . Right) . Map.lookup (blockHash hdr) $ blocks
@@ -487,15 +490,17 @@ fillInBlocks blocks MissingBlocksChain{..} =
     BlockOrHeader (Left _) -> (c, Just af)
 
 initMissingBlocksChain ::
-  Blocks ->
-  Chain Block ->
+  forall body.
+  IsBody body =>
+  (Blocks body) ->
+  Chain (Block body) ->
   AnchoredFragment BlockHeader ->
-  ChainsUpdate
+  ChainsUpdate body
 initMissingBlocksChain blocks c fr =
   fillInBlocks blocks $
     MissingBlocksChain prefix (AnchoredFragment.mapAnchoredFragment (BlockOrHeader . Left) fr)
  where
-  pt :: Point Block
+  pt :: Point (Block body)
   pt = castPoint $ AnchoredFragment.anchorPoint fr
   prefix = case AnchoredFragment.splitAfterPoint (Chain.toAnchoredFragment c) pt of
     Just (before, _) -> before
@@ -503,8 +508,8 @@ initMissingBlocksChain blocks c fr =
 
 whenMissing ::
   Monad m =>
-  ChainsUpdate ->
-  (MissingBlocksChain -> m ()) ->
+  ChainsUpdate body ->
+  (MissingBlocksChain body -> m ()) ->
   m ()
 whenMissing (FullChain _) _ = return ()
 whenMissing (ImprovedPrefix m) k = k m
@@ -512,11 +517,11 @@ whenMissing (SamePrefix m) k = k m
 
 -- | Returns whether useful work was done.
 updateChains ::
-  forall m.
-  MonadSTM m =>
-  BlockFetchControllerState m ->
-  ChainsUpdate ->
-  STM m (Bool, Maybe (Chain Block))
+  forall body m.
+  (IsBody body, MonadSTM m) =>
+  BlockFetchControllerState body m ->
+  ChainsUpdate body ->
+  STM m (Bool, Maybe (Chain (Block body)))
 updateChains BlockFetchControllerState{..} e =
   case e of
     FullChain !fullChain -> do
@@ -539,7 +544,7 @@ updateChains BlockFetchControllerState{..} e =
 ---- Methods for blockFetchConsumer and blockFetchProducer
 -----------------------------------------------------------
 
-removeInFlight :: MonadSTM m => BlockFetchControllerState m -> PeerId -> [Point Block] -> STM m ()
+removeInFlight :: MonadSTM m => BlockFetchControllerState body m -> PeerId -> [Point (Block body)] -> STM m ()
 removeInFlight BlockFetchControllerState{..} pId points = do
   let peer = fromMaybe (error "missing peer") $ Map.lookup pId peers
   modifyTVar' peer.blocksInFlightVar (\s -> List.foldl' (flip Set.delete) s points)
@@ -548,7 +553,7 @@ removeInFlight BlockFetchControllerState{..} pId points = do
 --   * removes block from PeerId's in-flight set
 --   * adds block to blocksVar
 --   * @fillInBlocks@ on @selectedChain@, and @updateChains@
-addFetchedBlock :: MonadSTM m => Tracer m PraosNodeEvent -> BlockFetchControllerState m -> PeerId -> Block -> m ()
+addFetchedBlock :: (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> BlockFetchControllerState body m -> PeerId -> Block body -> m ()
 addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
   removeInFlight st pId [blockPoint blk]
   modifyTVar' st.blocksVar (Map.insert (blockHash blk) blk)
@@ -559,13 +564,13 @@ addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
     Just missingChain -> do
       fmap snd $ updateChains st =<< fillInBlocks <$> readTVar st.blocksVar <*> pure missingChain
 
-traceNewTip :: Monad m => Tracer m PraosNodeEvent -> Maybe (Chain Block) -> m ()
+traceNewTip :: Monad m => Tracer m (PraosNodeEvent body) -> Maybe (Chain (Block body)) -> m ()
 traceNewTip tracer x =
   case x of
     Nothing -> return ()
     (Just tip) -> traceWith tracer (PraosNodeEventNewTip tip)
 
-addProducedBlock :: MonadSTM m => BlockFetchControllerState m -> Block -> STM m ()
+addProducedBlock :: (IsBody body, MonadSTM m) => BlockFetchControllerState body m -> Block body -> STM m ()
 addProducedBlock BlockFetchControllerState{..} blk = do
   cps <- readTVar cpsVar
   assert (Chain.validExtension cps.chainState blk) $ do
@@ -577,13 +582,13 @@ addProducedBlock BlockFetchControllerState{..} blk = do
     -- switch to the target chain before that.
     writeTVar targetChainVar Nothing
 
-blockRequestVarForPeerId :: PeerId -> BlockFetchControllerState m -> TVar m BlockRequest
+blockRequestVarForPeerId :: PeerId -> BlockFetchControllerState body m -> TVar m BlockRequest
 blockRequestVarForPeerId peerId blockFetchControllerState =
   case Map.lookup peerId blockFetchControllerState.peers of
     Nothing -> error $ "blockRequestVarForPeerId: no peer with id " <> show peerId
     Just peerStatus -> peerStatus.blockRequestVar
 
-initBlockFetchConsumerStateForPeerId :: MonadSTM m => Tracer m PraosNodeEvent -> PeerId -> BlockFetchControllerState m -> BlockFetchConsumerState m
+initBlockFetchConsumerStateForPeerId :: (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> PeerId -> BlockFetchControllerState body m -> BlockFetchConsumerState body m
 initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState =
   BlockFetchConsumerState
     (blockRequestVarForPeerId peerId blockFetchControllerState)

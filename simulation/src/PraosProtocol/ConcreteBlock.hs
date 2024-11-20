@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -26,6 +27,7 @@ module PraosProtocol.ConcreteBlock (
   BodyHash (..),
   ConcreteHeaderHash (..),
   hashBody,
+  IsBody,
 
   -- * Converting slots to times
   convertSlotToTimeForTestsAssumingNoHardFork,
@@ -64,6 +66,7 @@ import Codec.CBOR.Encoding (encodeBytes, encodeInt, encodeListLen, encodeWord64)
 import Codec.Serialise (Serialise (..))
 import GHC.Generics (Generic)
 
+import Data.Typeable
 import Ouroboros.Network.AnchoredFragment (Anchor (..), AnchoredFragment)
 import Ouroboros.Network.AnchoredFragment qualified as AF
 import Ouroboros.Network.Block
@@ -80,13 +83,13 @@ import Ouroboros.Network.Util.ShowProxy
 
 -- | Our highly-simplified version of a block. It retains the separation
 -- between a block header and body, which is a detail needed for the protocols.
-data Block = Block
+data Block body = Block
   { blockHeader :: BlockHeader
-  , blockBody :: BlockBody
+  , blockBody :: body
   }
   deriving (Show, Eq, Generic)
 
-instance ShowProxy Block
+-- instance ShowProxy (Block body)
 
 newtype BlockBody = BlockBody ByteString
   deriving (Show, Eq, Ord, IsString, Generic)
@@ -146,10 +149,10 @@ newtype BodyHash = BodyHash Int
 -------------------------------------------------------------------------------}
 
 instance StandardHash BlockHeader
-instance StandardHash Block
+instance StandardHash (Block body)
 
 type instance HeaderHash BlockHeader = ConcreteHeaderHash
-type instance HeaderHash Block = ConcreteHeaderHash
+type instance HeaderHash (Block body) = ConcreteHeaderHash
 
 instance HasHeader BlockHeader where
   getHeaderFields hdr =
@@ -166,10 +169,10 @@ instance HasFullHeader BlockHeader where
   blockInvariant b =
     hashHeader b == headerHash b
 
-instance HasHeader Block where
+instance Typeable body => HasHeader (Block body) where
   getHeaderFields = castHeaderFields . getHeaderFields . blockHeader
 
-instance HasFullHeader Block where
+instance (Typeable body, Hashable body) => HasFullHeader (Block body) where
   blockPrevHash = castHash . headerPrevHash . blockHeader
 
   -- \| The block invariant is just that the actual block body hash matches the
@@ -182,37 +185,40 @@ instance HasFullHeader Block where
   Constructing sample chains
 -------------------------------------------------------------------------------}
 
+type IsBody body = (Typeable body, Hashable body)
+
 -- | This takes the blocks in order from /oldest to newest/.
-mkChain :: [(SlotNo, BlockBody)] -> Chain Block
+mkChain :: IsBody body => [(SlotNo, body)] -> Chain (Block body)
 mkChain =
   fixupChain fixupBlock
     . map (uncurry mkPartialBlock)
     . reverse
 
-mkChainSimple :: [BlockBody] -> Chain Block
+mkChainSimple :: IsBody body => [body] -> Chain (Block body)
 mkChainSimple = mkChain . zip [1 ..]
 
 mkAnchoredFragment ::
-  Anchor Block ->
-  [(SlotNo, BlockBody)] ->
-  AnchoredFragment Block
+  IsBody body =>
+  Anchor (Block body) ->
+  [(SlotNo, body)] ->
+  AnchoredFragment (Block body)
 mkAnchoredFragment anchor =
   fixupAnchoredFragmentFrom anchor fixupBlock
     . map (uncurry mkPartialBlock)
     . reverse
 
-mkAnchoredFragmentSimple :: [BlockBody] -> AnchoredFragment Block
+mkAnchoredFragmentSimple :: IsBody body => [body] -> AnchoredFragment (Block body)
 mkAnchoredFragmentSimple =
   mkAnchoredFragment AnchorGenesis . zip [1 ..]
 
-mkPartialBlock :: SlotNo -> BlockBody -> Block
+mkPartialBlock :: Hashable body => SlotNo -> body -> (Block body)
 mkPartialBlock sl body =
   Block
     { blockHeader = mkPartialBlockHeader sl body
     , blockBody = body
     }
 
-mkPartialBlockHeader :: SlotNo -> BlockBody -> BlockHeader
+mkPartialBlockHeader :: Hashable body => SlotNo -> body -> BlockHeader
 mkPartialBlockHeader sl body =
   BlockHeader
     { headerSlot = sl
@@ -233,10 +239,11 @@ mkPartialBlockHeader sl body =
 -- number, the previous hash and the block hash are updated; the slot number and
 -- the signers are kept intact.
 fixupBlock ::
+  Hashable body =>
   HeaderHash block ~ HeaderHash BlockHeader =>
   Anchor block ->
-  Block ->
-  Block
+  (Block body) ->
+  (Block body)
 fixupBlock prev b@Block{blockBody, blockHeader} =
   b
     { blockHeader =
@@ -264,7 +271,7 @@ fixupBlockHeader prev b =
 
 -- Like 'fixupBlock' but it takes the info from a given block.
 --
-fixupBlockAfterBlock :: Block -> Block -> Block
+fixupBlockAfterBlock :: IsBody body => (Block body) -> (Block body) -> (Block body)
 fixupBlockAfterBlock prev = fixupBlock (AF.anchorFromBlock prev)
 
 fixupBlocks ::
@@ -326,7 +333,7 @@ instance Serialise BodyHash where
   encode (BodyHash h) = encodeInt h
   decode = BodyHash <$> decodeInt
 
-instance Serialise Block where
+instance Serialise body => Serialise (Block body) where
   encode Block{blockHeader, blockBody} =
     encodeListLen 2
       <> encode blockHeader

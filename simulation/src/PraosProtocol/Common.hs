@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
@@ -82,29 +83,29 @@ data FullTip
     FullTip BlockHeader
   deriving (Show)
 
-fullTip :: Chain Block -> FullTip
+fullTip :: Chain (Block body) -> FullTip
 fullTip Genesis = FullTipGenesis
 fullTip (_ :> blk) = FullTip (blockHeader blk)
 
-type Blocks = Map (HeaderHash Block) Block
+type Blocks body = Map (HeaderHash (Block body)) (Block body)
 
-toBlocks :: Chain Block -> Blocks
+toBlocks :: Chain (Block body) -> Blocks body
 toBlocks = foldChain (\blocks block -> Map.insert (headerHash . blockHeader $ block) block blocks) Map.empty
 
-headerPoint :: BlockHeader -> Point Block
+headerPoint :: BlockHeader -> Point (Block body)
 headerPoint = castPoint . blockPoint
 
-blockPrevPoint :: (HasFullHeader b, HeaderHash b ~ HeaderHash Block) => Blocks -> b -> Maybe (Point Block)
+blockPrevPoint :: (IsBody body, HasFullHeader b, HeaderHash b ~ HeaderHash (Block body)) => Blocks body -> b -> Maybe (Point (Block body))
 blockPrevPoint blks header = case blockPrevHash header of
   GenesisHash -> pure GenesisPoint
   BlockHash hash -> castPoint . blockPoint <$> Map.lookup hash blks
 
-setFollowerPoint :: FollowerId -> Point Block -> ChainProducerState Block -> ChainProducerState Block
+setFollowerPoint :: forall body. IsBody body => FollowerId -> Point (Block body) -> ChainProducerState (Block body) -> ChainProducerState (Block body)
 setFollowerPoint followerId point st@ChainProducerState{..} =
   assert (pointOnChain point chainState) $
     st{chainFollowers = Map.adjust setFollowerPoint' followerId chainFollowers}
  where
-  setFollowerPoint' :: FollowerState Block -> FollowerState Block
+  setFollowerPoint' :: FollowerState (Block body) -> FollowerState (Block body)
   setFollowerPoint' followerState = followerState{followerPoint = point}
 
 data SlotConfig = SlotConfig {start :: UTCTime, duration :: NominalDiffTime}
@@ -132,20 +133,20 @@ hashToColor hash = (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b /
   r, g, b :: Word8
   ((r, g, b), _) = uniform (mkStdGen hash)
 
-data PraosNodeEvent
-  = PraosNodeEventGenerate Block
-  | PraosNodeEventReceived Block
-  | PraosNodeEventEnterState Block
-  | PraosNodeEventNewTip (Chain Block)
+data PraosNodeEvent body
+  = PraosNodeEventGenerate (Block body)
+  | PraosNodeEventReceived (Block body)
+  | PraosNodeEventEnterState (Block body)
+  | PraosNodeEventNewTip (Chain (Block body))
   deriving (Show)
 
-data PraosConfig = PraosConfig
+data PraosConfig body = PraosConfig
   { slotConfig :: !SlotConfig
-  , blockValidationDelay :: !(Block -> DiffTime)
+  , blockValidationDelay :: !(Block body -> DiffTime)
   , headerValidationDelay :: !(BlockHeader -> DiffTime)
   }
 
-defaultPraosConfig :: MonadTime m => m PraosConfig
+defaultPraosConfig :: MonadTime m => m (PraosConfig body)
 defaultPraosConfig = do
   slotConfig <- slotConfigFromNow
   return

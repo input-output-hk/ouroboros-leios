@@ -47,7 +47,7 @@ examplesRelaySimVizConfig =
     }
  where
   testPtclMessageColor ::
-    BlockFetchMessage ->
+    BlockFetchMessage BlockBody ->
     (Double, Double, Double)
   -- testPtclMessageColor (ProtocolMessage (SomeMessage (MsgBlock blk))) = testNodeMessageColor blk
   testPtclMessageColor _ = (1, 0, 0)
@@ -63,7 +63,7 @@ examplesRelaySimVizConfig =
   -- testNodeMessageText hdr = Just (show $ blockSlot hdr)
 
   testPtclMessageText ::
-    BlockFetchMessage ->
+    BlockFetchMessage BlockBody ->
     Maybe String
   testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
@@ -86,7 +86,7 @@ data BlockFetchVizState
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( BlockFetchMessage
+          [ ( (BlockFetchMessage BlockBody)
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
@@ -264,8 +264,8 @@ recentPrune now (RecentRate pq) =
 
 data BlockFetchVizConfig
   = BlockFetchVizConfig
-  { ptclMessageColor :: BlockFetchMessage -> (Double, Double, Double)
-  , ptclMessageText :: BlockFetchMessage -> Maybe String
+  { ptclMessageColor :: BlockFetchMessage BlockBody -> (Double, Double, Double)
+  , ptclMessageText :: BlockFetchMessage BlockBody -> Maybe String
   }
 
 relaySimVizRender ::
