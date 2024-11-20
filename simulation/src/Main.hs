@@ -148,6 +148,7 @@ vizualisations =
   , ("praos-p2p-2", VizPraosP2P.example2)
   , ("relay-test-1", VizSimTestRelay.example1)
   , ("relay-test-2", VizSimTestRelay.example2)
+  , ("relay-test-3", VizSimTestRelay.example3)
   ]
 
 readViz :: String -> Either String Vizualisation

@@ -40,7 +40,7 @@ import System.Random.Stateful (uniform)
 
 example1 :: Vizualisation
 example1 =
-  slowmoVizualisation 1 $
+  slowmoVizualisation 0.1 $
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
