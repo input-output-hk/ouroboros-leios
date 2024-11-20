@@ -4,7 +4,7 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
+module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
@@ -31,19 +31,20 @@ data LeiosOutput : Type where
   EMPTY    : LeiosOutput
 
 record LeiosState : Type where
-  field V         : VTy
-        SD        : StakeDistr
-        FFDState  : FFD.State
-        Ledger    : List Tx
-        ToPropose : List Tx
-        IBs       : List InputBlock
-        EBs       : List EndorserBlock
-        Vs        : List (List Vote)
-        slot      : ℕ
-        IBHeaders : List IBHeader
-        IBBodies  : List IBBody
-        Upkeep    : ℙ SlotUpkeep
-        BaseState : B.State
+  field V           : VTy
+        SD          : StakeDistr
+        FFDState    : FFD.State
+        Ledger      : List Tx
+        ToPropose   : List Tx
+        IBs         : List InputBlock
+        EBs         : List EndorserBlock
+        Vs          : List (List Vote)
+        slot        : ℕ
+        IBHeaders   : List IBHeader
+        IBBodies    : List IBBody
+        Upkeep      : ℙ SlotUpkeep
+        BaseState   : B.State
+        votingState : VotingState
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -84,6 +85,7 @@ initLeiosState V SD bs = record
   ; IBBodies    = []
   ; Upkeep      = ∅
   ; BaseState   = bs
+  ; votingState = initVotingState
   }
 
 -- some predicates about EBs
