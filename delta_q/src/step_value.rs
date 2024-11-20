@@ -1,8 +1,13 @@
 use crate::{step_function::zip, CDFError, CompactionMode, StepFunctionError, CDF};
 use std::fmt::{self, Write as _};
 
-pub trait StepValue: Clone + Default {
+pub trait StepValue: Clone + fmt::Debug {
     type Error: fmt::Debug;
+
+    /// the zero to use with sum_up
+    fn sum_up_zero() -> Self;
+    /// the zero to use with add_prob
+    fn add_prob_zero() -> Self;
 
     /// Add two values together so that the result means that both values are included
     fn sum_up(&self, other: &Self) -> Self;
@@ -22,6 +27,14 @@ pub trait StepValue: Clone + Default {
 
 impl StepValue for f32 {
     type Error = StepFunctionError;
+
+    fn sum_up_zero() -> Self {
+        0.0
+    }
+
+    fn add_prob_zero() -> Self {
+        0.0
+    }
 
     fn sum_up(&self, other: &Self) -> Self {
         *self + *other
@@ -70,6 +83,14 @@ impl StepValue for f32 {
 
 impl StepValue for CDF {
     type Error = CDFError;
+
+    fn sum_up_zero() -> Self {
+        CDF::top()
+    }
+
+    fn add_prob_zero() -> Self {
+        CDF::bottom()
+    }
 
     fn sum_up(&self, other: &Self) -> Self {
         self.convolve(other)

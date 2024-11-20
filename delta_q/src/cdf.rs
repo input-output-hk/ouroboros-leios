@@ -111,6 +111,10 @@ impl CDF {
         Ok(Self { steps })
     }
 
+    pub fn from_step_at(step: f32) -> Self {
+        Self::new(&[(step, 1.0)]).unwrap()
+    }
+
     /// Create a step function CDF from a vector of (x, y) pairs.
     /// The x values must be greater than 0 and must be strictly monotonically increasing.
     /// The y values must be from (0, 1] and must be strictly monotonically increasing.
@@ -226,7 +230,8 @@ impl CDF {
         // start with the all-zero CDF
         let mut data = Vec::new();
         let mut prev_y = 0.0;
-        let zero = T::default();
+        let zero_prob = T::add_prob_zero();
+        let zero_sum = T::sum_up_zero();
         for (lx, ly) in self.steps.iter() {
             let step = ly - prev_y;
             // take the other CDF, scale it by the step size, shift it by the current x value, and add it into the data
@@ -234,8 +239,8 @@ impl CDF {
             let iter = crate::step_function::zip(
                 data.iter().map(|(x, y)| (*x, y)),
                 other.iter().map(|(x, y)| (x + lx, y.diminish(step))),
-                &zero,
-                zero.clone(),
+                &zero_prob,
+                zero_sum.diminish(step),
             );
             for (x, (ly, ry)) in iter {
                 d.push((x, ly.add_prob(&ry).expect("probability overflow")));

@@ -101,7 +101,7 @@ impl<T: StepValue> StepFunction<T> {
             data: None,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
-            zero: T::default(),
+            zero: T::sum_up_zero(),
         }
     }
 
@@ -110,7 +110,7 @@ impl<T: StepValue> StepFunction<T> {
             .iter()
             .rev()
             .find(|&&(x0, _)| x0 <= x)
-            .map_or(T::default(), |(_, y)| y.clone())
+            .map_or(T::sum_up_zero(), |(_, y)| y.clone())
     }
 
     /// Set the maximum size of the CDF using a mutable reference.
@@ -150,7 +150,7 @@ impl<T: StepValue> StepFunction<T> {
     pub fn iter(&self) -> StepFunctionIterator<T> {
         StepFunctionIterator {
             cdf: self.data().iter(),
-            prev: (0.0, T::default()),
+            prev: (0.0, T::sum_up_zero()),
             first: false,
             last: false,
         }
@@ -159,7 +159,7 @@ impl<T: StepValue> StepFunction<T> {
     pub fn graph_iter(&self) -> StepFunctionIterator<T> {
         StepFunctionIterator {
             cdf: self.data().iter(),
-            prev: (0.0, T::default()),
+            prev: (0.0, T::sum_up_zero()),
             first: true,
             last: false,
         }
@@ -168,7 +168,7 @@ impl<T: StepValue> StepFunction<T> {
     pub fn func_iter(&self) -> StepFunctionIterator<T> {
         StepFunctionIterator {
             cdf: self.data().iter(),
-            prev: (0.0, T::default()),
+            prev: (0.0, T::sum_up_zero()),
             first: true,
             last: true,
         }
@@ -199,7 +199,7 @@ impl<T: StepValue> StepFunction<T> {
                 .map(|d| d.iter().map(|(x, y)| (*x, f(y))).collect()),
             max_size: self.max_size,
             mode: self.mode,
-            zero: U::default(),
+            zero: U::sum_up_zero(),
         }
     }
 
@@ -218,7 +218,7 @@ impl<T: StepValue> StepFunction<T> {
             }),
             max_size: self.max_size,
             mode: self.mode,
-            zero: T::default(),
+            zero: T::sum_up_zero(),
         }
     }
 
@@ -232,7 +232,7 @@ impl<T: StepValue> StepFunction<T> {
             data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
-            zero: T::default(),
+            zero: T::sum_up_zero(),
         }
     }
 
@@ -246,7 +246,7 @@ impl<T: StepValue> StepFunction<T> {
             data: (!data.is_empty()).then_some(data.into()),
             max_size: self.max_size,
             mode: self.mode,
-            zero: T::default(),
+            zero: T::sum_up_zero(),
         })
     }
 
@@ -265,6 +265,14 @@ impl<T: StepValue> From<StepFunction<T>> for StepFunctionSerial<T> {
         Self {
             data: cdf.data()[..].to_owned(),
         }
+    }
+}
+
+impl<T: StepValue, const N: usize> TryFrom<&[(f32, T); N]> for StepFunction<T> {
+    type Error = StepFunctionError;
+
+    fn try_from(points: &[(f32, T); N]) -> Result<Self, Self::Error> {
+        points.as_slice().try_into()
     }
 }
 
@@ -289,7 +297,7 @@ impl<T: StepValue> TryFrom<&[(f32, T)]> for StepFunction<T> {
             data,
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
-            zero: T::default(),
+            zero: T::sum_up_zero(),
         })
     }
 }
@@ -413,14 +421,14 @@ pub struct StepFunctionIterator<'a, T> {
 
 impl<'a, T> Iterator for StepFunctionIterator<'a, T>
 where
-    T: Clone + Default,
+    T: Clone + StepValue,
 {
     type Item = (f32, T);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.first {
             self.first = false;
-            Some((0.0, T::default()))
+            Some((0.0, T::sum_up_zero()))
         } else if let Some(pair) = self.cdf.next() {
             self.prev = pair.clone();
             Some(pair.clone())
@@ -433,7 +441,7 @@ where
     }
 }
 
-impl<'a, T> std::iter::FusedIterator for StepFunctionIterator<'a, T> where T: Clone + Default {}
+impl<'a, T> std::iter::FusedIterator for StepFunctionIterator<'a, T> where T: Clone + StepValue {}
 
 impl PartialOrd for StepFunction {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

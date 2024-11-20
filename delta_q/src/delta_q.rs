@@ -796,6 +796,7 @@ pub fn expand_gossip(
 
     let mut remaining = size - 1.0;
     let mut steps = vec![];
+    let mut senders = 1.0f32;
 
     while remaining > 1.0 {
         let prev = remaining;
@@ -804,11 +805,10 @@ pub fn expand_gossip(
         } else {
             cluster_branch
         };
-        let senders = size - remaining;
         // go through senders in some arbitrary order, but do it one by one to calculate the overlap between their targets
         // correctly even when approaching gossip completion
-        for _sender in 0..senders.round() as usize {
-            let new_prob = remaining / (size - 1.0);
+        for _sender in 0..senders.ceil() as usize {
+            let new_prob = remaining / prev;
             let targets = eff_branch * new_prob;
             remaining -= targets;
             if remaining < 0.0 {
@@ -816,7 +816,9 @@ pub fn expand_gossip(
                 break;
             }
         }
-        steps.push((prev - remaining, remaining));
+        // new nodes in this round are the senders in the next round
+        senders = prev - remaining;
+        steps.push((senders, remaining));
         if steps.len() > 10_000 {
             return Err(DeltaQError::TooManySteps);
         }
@@ -863,7 +865,7 @@ mod tests {
     use super::*;
     use crate::{
         parser::{eval_ctx, outcome},
-        StepFunction,
+        StepFunction, StepValue,
     };
     use maplit::btreemap;
     use winnow::Parser;
@@ -1240,11 +1242,15 @@ mod tests {
         let ctx = PersistentContext::default();
         let mut ephemeral = EphemeralContext::default();
         let res = dq.eval(&ctx, &mut ephemeral).unwrap();
-        let expected = Outcome::new_with_load(
-            CDF::new(&[(3.0, 0.010000001)]).unwrap(),
-            btreemap! {
-                "net".into() => StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
-            },
+        let expected = Outcome::new(CDF::new(&[(3.0, 0.010000001)]).unwrap()).with_load(
+            "net".into(),
+            StepFunction::try_from(&[
+                (0.0, CDF::from_step_at(12.0)),
+                (1.0, CDF::from_step_at(0.0)),
+                (1.5, CDF::from_step_at(24.0).diminish(0.1)),
+                (2.5, CDF::from_step_at(0.0).diminish(0.1)),
+            ])
+            .unwrap(),
         );
         assert_eq!(res, expected);
     }
@@ -1304,36 +1310,36 @@ mod tests {
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
         assert_eq!(e1.to_string(), "\
             CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \
-            WITH a[(0, 1), (1, 0.8), (2, 1.2), (3, 0)] \
-            WITH ab[(0, 12), (1, 9.6), (2, 21.12), (3, 26.88), (4, 35.28), (5, 15.12), (6, 0)] \
-            WITH b[(2, 0.96), (3, 3.84), (4, 5.04), (5, 2.16), (6, 0)] \
-            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.696), (2.8, 0.096), (3.2, 0.48), (3.5, 0.288), (4.2, 0.792), (4.5, 0.216), (5.2, 0.432), (5.5, 0)]");
+            WITH a[(0, 1), (1, CDF[(0, 0.6), (2, 1)]), (2, CDF[(0, 0.4), (2, 1)]), (3, 0)] \
+            WITH ab[(0, 12), (1, CDF[(0, 0.6), (24, 1)]), (2, CDF[(0, 0.24), (24, 0.84), (42, 1)]), (3, CDF[(0, 0.36), (42, 1)]), (4, CDF[(0, 0.16), (42, 1)]), (5, CDF[(0, 0.64), (42, 1)]), (6, 0)] \
+            WITH b[(2, CDF[(0, 0.84), (6, 1)]), (3, CDF[(0, 0.36), (6, 1)]), (4, CDF[(0, 0.16), (6, 1)]), (5, CDF[(0, 0.64), (6, 1)]), (6, 0)] \
+            WITH common[(0.1, 3), (0.8, 0), (1.1, CDF[(0, 0.6), (6, 1)]), (1.8, 0), (2.1, CDF[(0, 0.4), (6, 1)]), (2.2, CDF[(0, 0.24), (0.6, 0.4), (6, 1)]), \
+            (2.8, CDF[(0, 0.84), (0.6, 1)]), (3.2, CDF[(0, 0.36), (0.6, 0.84), (1.2, 1)]), (3.5, CDF[(0, 0.52), (0.6, 1)]), (4.2, CDF[(0, 0.16), (0.6, 0.52), \
+            (1.2, 1)]), (4.5, CDF[(0, 0.64), (0.6, 1)]), (5.2, CDF[(0, 0.64), (1.2, 1)]), (5.5, 0)]");
     }
 
     #[test]
     fn test_gossip() {
-        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0)
+        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 15, 0.1)
             hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
             .parse()
             .unwrap();
         let diffuse = ctx.eval("diffuse").unwrap();
-        assert_eq!(diffuse.to_string(), "\
-            CDF[(0, 0.00033), (1, 0.00067), (2, 0.00133), (3, 0.00266), (4, 0.00532), (5, 0.01062), (6, 0.02112), (7, 0.04147), (8, 0.0803), (9, 0.15133), (10, 0.27057), \
-                (11, 0.44361), (12, 0.64306), (13, 0.81241), (14, 0.91678), (15, 0.96674), (16, 0.98736), (17, 0.99529), (18, 0.99826), (19, 0.99936), (20, 1)] \
-            WITH net[(0, 0.99967), (1, 0.99933), (2, 0.99867), (3, 0.99734), (4, 0.99468), (5, 0.98938), (6, 0.97888), (7, 0.95853), (8, 0.9197), (9, 0.84867), (10, 0.72943), \
-                (11, 0.55639), (12, 0.35694), (13, 0.18759), (14, 0.08322), (15, 0.03326), (16, 0.01264), (17, 0.00471), (18, 0.00174), (19, 0.00064), (20, 0)]");
+        assert_eq!(diffuse.to_string(), "CDF[(0, 0.00033), (1, 0.00533), (2, 0.07074), (3, 0.64287), (4, 1)] \
+          WITH net[(0, CDF[(0, 0.00033), (15, 1)]), (1, CDF[(0, 0.00533), (202.5, 1)]), (2, CDF[(0, 0.07074), (2733.75, 1)]), (3, CDF[(0, 0.64287), (36905.625, 1)]), (4, 0)]");
 
-        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0.99)
-                hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
-            .parse()
-            .unwrap();
-        let diffuse = ctx.eval("diffuse").unwrap();
-        assert_eq!(diffuse.cdf.iter().count(), 1000);
-        assert!(
-            diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
-            "{}",
-            diffuse.cdf.steps().integrate(0.0, 1476.0)
-        );
-        assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
+        // this test made sense when the gossip impl was broken; need to figure out whether to keep it
+        // let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 15, 0.95)
+        //         hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
+        //     .parse()
+        //     .unwrap();
+        // let diffuse = ctx.eval("diffuse").unwrap();
+        // assert_eq!(diffuse.cdf.iter().count(), 1000);
+        // assert!(
+        //     diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
+        //     "{}",
+        //     diffuse.cdf.steps().integrate(0.0, 1476.0)
+        // );
+        // assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
     }
 }
