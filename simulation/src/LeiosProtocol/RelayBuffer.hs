@@ -64,7 +64,10 @@ instance Monoid TicketRange where
   mappend = (<>)
 
 empty :: RelayBuffer key value
-empty = RelayBuffer FingerTree.empty Map.empty minBound
+empty = RelayBuffer FingerTree.empty Map.empty firstUsableTicket
+ where
+  -- so that `takeAfterTicket buffer minBound` gives the whole buffer.
+  firstUsableTicket = incrTicket minBound
 
 null :: RelayBuffer key value -> Bool
 null = FingerTree.null . (.entries)
