@@ -1,5 +1,20 @@
 # Leios logbook
 
+## 2024-11-20
+
+### Model of Cardano throughput
+
+The system-dynamics simulation of Cardano throughput was enhanced and checked.
+
+- Documented all variables.
+- Adjusted slider ranges.
+- Added constraint for valid ranges of variables.
+- Tested scenarios.
+- Checked equations.
+- Fixed extreme scenario were funds flow into reserve.
+- Created [tutorial video](https://drive.google.com/file/d/1YrQLLsgsPt4XHa707c-CfTLkivKRyaa0/view?usp=sharing)
+- Published [version 0.2](https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2) of the model.
+
 ## 2024-11-18
 
 ### Items of interest from Intersect Network WG
