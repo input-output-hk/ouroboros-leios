@@ -501,6 +501,12 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
+  --   Note: `prioritize` is given the map of ids in the `window` but
+  --   not in-flight or fetched yet (the `available` field of the shared state).
+  --
+  --   TODO: For policies like `freshest first` we might need to
+  --   expand of the `window` more aggressively, to make sufficiently
+  --   fresh ids available.
   , submitBlocks :: !([(header, body)] -> UTCTime -> ([(header, body)] -> STM m ()) -> m ())
   -- ^ sends blocks to be validated/added to the buffer. Allowed to be
   -- blocking, but relayConsumer does not assume the blocks made it
