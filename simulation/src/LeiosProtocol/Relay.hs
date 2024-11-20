@@ -295,10 +295,9 @@ instance Protocol (RelayState id header body) where
     -- These blocks are added to the notional FIFO of outstanding
     -- block identifiers for the protocol.
     --
-    -- TODO: review reference to mempool here
-    -- The order in which these block identifiers are returned must be
-    -- the order in which they are submitted to the mempool, to preserve
-    -- dependent blocks.
+    -- The order in which these block identifiers are returned is the
+    -- one `SubmitInOrder :: SubmitPolicy` follows, for protocol
+    -- instances that need to preserve dependencies between blocks.
     MsgRespondHeaders ::
       ResponseList blocking header ->
       Message (RelayState id header body) (StHeaders blocking) StIdle
