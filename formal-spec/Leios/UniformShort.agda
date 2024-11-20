@@ -3,8 +3,10 @@
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
+open import Data.Fin.Patterns
 
-module Leios.UniformShort (⋯ : SpecStructure) (let open SpecStructure ⋯) where
+module Leios.UniformShort (⋯ : SpecStructure 1)
+  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
 
 data SlotUpkeep : Type where
   Base IB-Role EB-Role V-Role : SlotUpkeep
@@ -18,11 +20,10 @@ open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 
-record VotingAbstract : Type₁ where
-  field isVoteCertified : LeiosState → EndorserBlock → Type
-        ⦃ isVoteCertified⁇ ⦄ : ∀ {vs eb} → isVoteCertified vs eb ⁇
+isVoteCertified : LeiosState → EndorserBlock → Type
+isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
 
-module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
+module Protocol where
 
   private variable s s'   : LeiosState
                    ffds'  : FFD.State
