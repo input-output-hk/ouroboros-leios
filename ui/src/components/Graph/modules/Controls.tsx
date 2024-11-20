@@ -6,12 +6,12 @@ import { useHandlers } from "../hooks/useHandlers";
 
 export const Controls: FC = memo(() => {
   const { playing, speed, setSpeed, setCurrentTime } = useGraphContext();
-  const { handleResetSim } = useHandlers();
+  const { handleResetSim, togglePlayPause } = useHandlers();
   return (
     <>
       <button
         className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-        // onClick={togglePlayPause}
+        onClick={togglePlayPause}
       >
         {playing ? "Pause" : "Play"}
       </button>

@@ -1,7 +1,19 @@
-import { FC, useRef } from "react";
+import { useGraphContext } from "@/contexts/GraphContext/context";
+import { FC, useEffect } from "react";
+import { useHandlers } from "../hooks/useHandlers";
 
 export const Canvas: FC = () => {
-  const canvasRef = useRef(null);
+  const { canvasRef, topographyLoaded } = useGraphContext();
+  const { drawCanvas } = useHandlers();
+
+  useEffect(() => {
+    if (!topographyLoaded) {
+      return;
+    }
+
+    drawCanvas();
+  }, [topographyLoaded])
+
   return (
     <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
       <div className="flex items-center justify-center gap-4 mt-4">

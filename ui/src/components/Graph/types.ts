@@ -35,12 +35,12 @@ export interface ITransformedNode {
   };
 };
 
+/** source|target */
+export type TLinkMapId = string;
+
 export interface ITransformedNodeMap {
-  nodes: ITransformedNode[];
-  links: {
-    source: number;
-    target: number;
-  }[];
+  nodes: Map<number, ITransformedNode>;
+  links: Map<string, { source: number; target: number }>;
 }
 
 export enum EMessageType {
