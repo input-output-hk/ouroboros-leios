@@ -52,6 +52,7 @@ library
     PraosProtocol.BlockFetch
     PraosProtocol.BlockGeneration
     PraosProtocol.ChainSync
+    PraosProtocol.ConcreteBlock
     PraosProtocol.Common
     PraosProtocol.Common.AnchoredFragment
     PraosProtocol.Common.Chain
@@ -90,6 +91,7 @@ library
     , cairo
     , cardano-slotting
     , cardano-strict-containers
+    , cborg
     , Chart
     , Chart-cairo
     , colour
@@ -99,6 +101,7 @@ library
     , fingertree
     , gnuplot
     , gtk3
+    , hashable
     , io-classes
     , io-sim
     , kdt

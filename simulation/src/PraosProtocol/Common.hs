@@ -45,10 +45,10 @@ import Control.Exception (assert)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Ouroboros.Network.Block as Block
-import Ouroboros.Network.Mock.ConcreteBlock as ConcreteBlock
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
+import PraosProtocol.ConcreteBlock as ConcreteBlock
 
 import ChanTCP (MessageSize (..))
 import Data.Coerce (coerce)
