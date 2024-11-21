@@ -39,6 +39,15 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                    SD     : StakeDistr
                    pks    : List PubKey
 
+  -- Uniform Short Pipeline:
+  --
+  -- 1. If elected, propose IB
+  -- 2. Wait
+  -- 3. Wait
+  -- 4. If elected, propose EB
+  -- 5. If elected, vote
+  --    If elected, propose RB
+
   data _↝_ : LeiosState → LeiosState → Type where
 
     IB-Role : let open LeiosState s renaming (FFDState to ffds)
@@ -53,9 +62,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
                   LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                  LE = map getEBRef $ filter (isVoteCertified s) $
-                             filter (_∈ᴮ slice L slot 3) EBs
-                  h = mkEB slot id π sk-EB LI LE
+                  h = mkEB slot id π sk-EB LI []
             in
             ∙ needsUpkeep EB-Role
             ∙ canProduceEB slot sk-EB (stake s) π
@@ -64,7 +71,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
 
     V-Role : let open LeiosState s renaming (FFDState to ffds)
-                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 2) EBs
+                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                  votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ needsUpkeep V-Role
