@@ -2,5 +2,6 @@
 
 module Everything where
 
-open import Leios.Simple
+open import Leios.Simplified
+open import Leios.UniformShort
 open import Leios.Network
