@@ -45,6 +45,7 @@ library
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.Short
+    LeiosProtocol.Short.Generate
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP

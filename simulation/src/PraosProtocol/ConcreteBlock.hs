@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -239,6 +240,7 @@ mkPartialBlockHeader sl body =
 -- number, the previous hash and the block hash are updated; the slot number and
 -- the signers are kept intact.
 fixupBlock ::
+  forall body block.
   Hashable body =>
   HeaderHash block ~ HeaderHash BlockHeader =>
   Anchor block ->

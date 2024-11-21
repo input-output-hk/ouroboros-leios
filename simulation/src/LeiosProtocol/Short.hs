@@ -4,16 +4,19 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short where
 
 import Control.Exception (assert)
+import Control.Monad (guard)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import LeiosProtocol.Common
 import ModelTCP
+import Ouroboros.Network.AnchoredFragment (Anchor)
 import Prelude hiding (id)
 
 data SizesConfig = SizesConfig
@@ -35,9 +38,12 @@ data LeiosConfig = LeiosConfig
   , sliceLength :: Int
   -- ^ measured in slots, also stage length in Short leios.
   , inputBlockFrequencyPerSlot :: Double
-  -- ^ expected InputBlock frequency per slot.
+  -- ^ expected InputBlock generation rate per slot.
   , endorseBlockFrequencyPerStage :: Double
-  -- ^ expected EndorseBlock frequency per stage, at most one per node in each (pipeline, stage).
+  -- ^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
+  , activeVotingStageLength :: Int
+  -- ^ prefix of the voting stage where new votes are generated, <= sliceLength.
+  , votingFrequencyPerStage :: Double
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   -- TODO: validation times and max sizes parameters.
@@ -113,6 +119,9 @@ data Stage = Propose | Deliver1 | Deliver2 | Endorse | Vote
 inRange :: SlotNo -> (SlotNo, SlotNo) -> Bool
 inRange s (a, b) = a <= s && s <= b
 
+rangePrefix :: Int -> (SlotNo, SlotNo) -> (SlotNo, SlotNo)
+rangePrefix l (start, _) = (start, toEnum $ fromEnum start + l - 1)
+
 -- | Returns inclusive range of slots.
 stageRange ::
   LeiosConfig ->
@@ -140,6 +149,9 @@ stageRange'_prop l slot =
 
 stageEnd :: LeiosConfig -> Stage -> SlotNo -> Stage -> SlotNo
 stageEnd l s0 slot s = snd $ stageRange l s0 slot s
+
+stageStart :: LeiosConfig -> Stage -> SlotNo -> Stage -> SlotNo
+stageStart l s0 slot s = fst $ stageRange l s0 slot s
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -173,7 +185,7 @@ mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg id slot producer inputBlocks =
   -- Endorse blocks are produced at the beginning of the stage.
-  assert (fst (stageRange cfg Endorse slot Endorse) == slot) $
+  assert (stageStart cfg Endorse slot Endorse == slot) $
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
@@ -190,8 +202,9 @@ mkCertificate cfg vs = assert (Set.size vs <= cfg.votesForCertificate) $ Certifi
 -- Buffers views, divided to avoid reading in unneeded buffers.
 
 data NewRankingBlockData = NewRankingBlockData
-  { freshestCertificate :: (EndorseBlockId, Certificate)
+  { freshestCertifiedEB :: (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
+  , headAnchor :: Anchor RankingBlock
   }
 
 data NewInputBlockData = NewInputBlockData
@@ -223,7 +236,7 @@ inputBlocksToEndorse cfg current buffer =
   buffer.validInputBlocks
     InputBlocksQuery
       { generatedBetween = stageRange cfg Endorse current Propose
-      , receivedBy = snd $ stageRange cfg Endorse current Deliver2
+      , receivedBy = stageEnd cfg Endorse current Deliver2
       }
 
 shouldVoteOnEB ::
@@ -277,3 +290,36 @@ endorseBlocksToVoteFor cfg slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
    in map (.id) . filter cond $
         ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
+
+-----------------------------------------------------------------
+---- Expected generation rates in each slot.
+-----------------------------------------------------------------
+
+newtype NetworkRate = NetworkRate Double
+newtype NodeRate = NodeRate Double
+newtype StakeFraction = StakeFraction Double
+
+-- | Note: each SubSlot rate is `<= 1` by construction.
+inputBlockRate :: LeiosConfig -> SlotNo -> [(SubSlotNo, NetworkRate)]
+inputBlockRate LeiosConfig{inputBlockFrequencyPerSlot} _slot
+  | inputBlockFrequencyPerSlot <= 1 = [(0, NetworkRate inputBlockFrequencyPerSlot)]
+  | otherwise =
+      let q = ceiling inputBlockFrequencyPerSlot
+          fq = NetworkRate $ inputBlockFrequencyPerSlot / fromIntegral q
+       in map (,fq) [0 .. toEnum (q - 1)]
+
+-- | Note: if the NodeRate ends up `>= 1`, you still only produce one block.
+endorseBlockRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
+endorseBlockRate cfg slot = do
+  guard $ stageStart cfg Endorse slot Endorse == slot
+  return $ NetworkRate cfg.endorseBlockFrequencyPerStage
+
+-- | TODO: a little unclear what to do if the NodeRate is `>= 1`.
+votingRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
+votingRate cfg slot = do
+  guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength (stageRange cfg Vote slot Vote)
+  return $ NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
+
+-- mostly here to showcase the types.
+nodeRate :: StakeFraction -> NetworkRate -> NodeRate
+nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)
