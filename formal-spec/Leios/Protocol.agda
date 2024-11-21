@@ -8,7 +8,7 @@ import Data.List.Relation.Unary.Any as A
 
 open import Leios.SpecStructure
 
-module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) where
+module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
@@ -33,9 +33,6 @@ data LeiosInput : Type where
 data LeiosOutput : Type where
   FTCH-LDG : List Tx → LeiosOutput
   EMPTY    : LeiosOutput
-
-data SlotUpkeep : Type where
-  Base IB-Role EB-Role V1-Role V2-Role : SlotUpkeep
 
 record LeiosState : Type where
   field V         : VTy

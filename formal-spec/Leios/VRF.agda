@@ -31,8 +31,5 @@ record LeiosVRF : Type₁ where
   canProduceEBPub : ℕ → ℕ → PubKey → VrfPf → ℕ → Type
   canProduceEBPub slot val k pf stake = verify k (genEBInput slot) val pf × val < stake
 
-  canProduceV1 : ℕ → PrivKey → ℕ → Type
-  canProduceV1 slot k stake = proj₁ (eval k (genVInput slot)) < stake
-
-  canProduceV2 : ℕ → PrivKey → ℕ → Type
-  canProduceV2 slot k stake = proj₁ (eval k (genVInput slot)) < stake
+  canProduceV : ℕ → PrivKey → ℕ → Type
+  canProduceV slot k stake = proj₁ (eval k (genVInput slot)) < stake

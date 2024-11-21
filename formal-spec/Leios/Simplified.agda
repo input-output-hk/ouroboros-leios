@@ -8,7 +8,14 @@ import Data.List as L
 
 module Leios.Simplified (⋯ : SpecStructure) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
-open import Leios.Protocol (⋯) public
+data SlotUpkeep : Type where
+  Base IB-Role EB-Role V1-Role V2-Role : SlotUpkeep
+
+allUpkeep : ℙ SlotUpkeep
+allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
+
+open import Leios.Protocol (⋯) SlotUpkeep public
+
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
@@ -30,9 +37,6 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
                 × fromList ebRefs ⊆ candidateEBs
     where candidateEBs : ℙ Hash
           candidateEBs = mapˢ getEBRef $ filterˢ (_∈ᴮ slice L slot (μ + 3)) (fromList EBs)
-
-allUpkeep : ℙ SlotUpkeep
-allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
 
 module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
@@ -78,7 +82,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                   votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ needsUpkeep V1-Role
-            ∙ canProduceV1 slot sk-V (stake s)
+            ∙ canProduceV slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } V1-Role
@@ -88,7 +92,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                   votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ needsUpkeep V2-Role
-            ∙ canProduceV2 slot sk-V (stake s)
+            ∙ canProduceV slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } V2-Role
@@ -109,13 +113,13 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     No-V1-Role : let open LeiosState s in
             ∙ needsUpkeep V1-Role
-            ∙ ¬ canProduceV1 slot sk-V (stake s)
+            ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
             s ↝ addUpkeep s V1-Role
 
     No-V2-Role : let open LeiosState s in
             ∙ needsUpkeep V2-Role
-            ∙ ¬ canProduceV2 slot sk-V (stake s)
+            ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
             s ↝ addUpkeep s V2-Role
 

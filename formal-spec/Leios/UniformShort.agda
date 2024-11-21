@@ -8,7 +8,14 @@ import Data.List as L
 
 module Leios.UniformShort (⋯ : SpecStructure) (let open SpecStructure ⋯) where
 
-open import Leios.Protocol (⋯) public
+data SlotUpkeep : Type where
+  Base IB-Role EB-Role V-Role : SlotUpkeep
+
+allUpkeep : ℙ SlotUpkeep
+allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V-Role ∷ [])
+
+open import Leios.Protocol (⋯) SlotUpkeep public
+
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
@@ -16,9 +23,6 @@ open GenFFD
 record VotingAbstract : Type₁ where
   field isVoteCertified : LeiosState → EndorserBlock → Type
         ⦃ isVoteCertified⁇ ⦄ : ∀ {vs eb} → isVoteCertified vs eb ⁇
-
-allUpkeep : ℙ SlotUpkeep
-allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ [])
 
 module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
@@ -59,15 +63,15 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
 
-    V1-Role : let open LeiosState s renaming (FFDState to ffds)
-                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 2) EBs
-                  votes = map (vote sk-V ∘ hash) EBs'
+    V-Role : let open LeiosState s renaming (FFDState to ffds)
+                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 2) EBs
+                 votes = map (vote sk-V ∘ hash) EBs'
             in
-            ∙ needsUpkeep V1-Role
-            ∙ canProduceV1 slot sk-V (stake s)
+            ∙ needsUpkeep V-Role
+            ∙ canProduceV slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
-            s ↝ addUpkeep record s { FFDState = ffds' } V1-Role
+            s ↝ addUpkeep record s { FFDState = ffds' } V-Role
 
     No-IB-Role : let open LeiosState s in
             ∙ needsUpkeep IB-Role
@@ -81,11 +85,11 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ─────────────────────────────────────────────
             s ↝ addUpkeep s EB-Role
 
-    No-V1-Role : let open LeiosState s in
-            ∙ needsUpkeep V1-Role
-            ∙ ¬ canProduceV1 slot sk-V (stake s)
+    No-V-Role : let open LeiosState s in
+            ∙ needsUpkeep V-Role
+            ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
-            s ↝ addUpkeep s V1-Role
+            s ↝ addUpkeep s V-Role
 
   data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 
