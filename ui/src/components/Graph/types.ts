@@ -5,7 +5,6 @@ export interface INode {
 
 export interface ILink {
   nodes: number[];
-  id?: number;
 }
 
 export enum EServerType {

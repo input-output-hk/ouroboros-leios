@@ -1,6 +1,6 @@
 import { useGraphContext } from "@/contexts/GraphContext/context";
 import { ESpeedOptions } from "@/contexts/GraphContext/types";
-import { startTransition, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { MILLISECOND_RANGE } from "../Graph";
 import { EMessageType, IServerMessage, ITransactionGenerated } from "../types";
 import { isWithinRange } from "../utils";
@@ -25,6 +25,7 @@ export const useHandlers = () => {
     simulationPauseTime,
     simulationStartTime,
     transactions,
+    setTransactions,
     topography,
   } = useGraphContext();
 
@@ -136,23 +137,29 @@ export const useHandlers = () => {
           return; // Skip if the animation is done or hasn't started
         }
 
+        // Cleanup if transaction has passed.
         if (transactionElapsedTime > duration) {
           setSentTxs((prev) => {
-            prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
-            return prev;
+            const newResult = new Set(prev);
+            newResult.add(`${id}-${source}-${target}#${sentTime + duration}`);
+            return newResult;
           });
 
-          return;
+          setTransactions(prev => {
+            const newResult = new Map(prev);
+            newResult.delete(id);
+            return newResult;
+          })
         }
 
         // Calculate the interpolation factor
-        const t = transactionElapsedTime / duration;
+        const t = Math.min(transactionElapsedTime / duration, 1);
         const x = startX + t * (endX - startX);
         const y = startY + t * (endY - startY);
 
         // Draw the moving circle
         context.beginPath();
-        context.arc(x, y, 2, 0, 2 * Math.PI);
+        context.arc(x, y, 1, 0, 2 * Math.PI);
         context.fillStyle = "red";
         context.fill();
       });
@@ -191,22 +198,20 @@ export const useHandlers = () => {
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
-    startTransition(() => {
-      const now = performance.now();
-      if (!playing) {
-        simulationStartTime.current = now - simulationPauseTime.current;
-        simulationPauseTime.current = now;
-        intervalId.current = setInterval(drawCanvas, 1000 / 120); // 120 FPS
-      } else {
-        simulationPauseTime.current = now - simulationStartTime.current;
-        if (intervalId.current) {
-          clearInterval(intervalId.current);
-          intervalId.current = null;
-        }
+    const now = performance.now();
+    if (!playing) {
+      simulationStartTime.current = now - simulationPauseTime.current;
+      simulationPauseTime.current = now;
+      intervalId.current = setInterval(drawCanvas, 1000 / 120); // 120 FPS
+    } else {
+      simulationPauseTime.current = now - simulationStartTime.current;
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+        intervalId.current = null;
       }
+    }
 
-      setPlaying((playing) => !playing);
-    });
+    setPlaying((playing) => !playing);
   }, [drawCanvas]);
 
   const handleResetSim = useCallback(() => {

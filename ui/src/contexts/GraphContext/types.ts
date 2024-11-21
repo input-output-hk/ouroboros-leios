@@ -2,8 +2,8 @@ import { IServerMessage, ITransactionMessage, ITransformedNodeMap } from "@/comp
 import { Dispatch, MutableRefObject, RefObject, SetStateAction } from "react";
 
 export enum ESpeedOptions {
-  "1/10" = 0.1,
-  "2/10" = 0.2,
+  "1/10" = 0.01,
+  "2/10" = 0.02,
   "3/10" = 0.03,
 }
 

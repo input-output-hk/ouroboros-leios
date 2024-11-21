@@ -3,7 +3,7 @@ import { closeSync, openSync, readSync, statSync } from "fs";
 import { NextResponse } from "next/server";
 import { messagesPath } from "../../utils";
 
-async function getLastLine(filePath: string, bufferSize = 1024): Promise<string> {
+async function getLastTransactionReceived(filePath: string, bufferSize = 1024): Promise<string> {
   return new Promise((resolve, reject) => {
     const fileSize = statSync(filePath).size;
     if (fileSize === 0) {
@@ -14,9 +14,9 @@ async function getLastLine(filePath: string, bufferSize = 1024): Promise<string>
     let buffer = Buffer.alloc(bufferSize);
     let position = fileSize;
     let lastLine = "";
-    let foundNewLine = false;
+    let foundLastTransactionReceived = false;
 
-    while (position > 0 && !foundNewLine) {
+    while (position > 0 && !foundLastTransactionReceived) {
       // Calculate how many bytes to read
       const bytesToRead = Math.min(bufferSize, position);
       position -= bytesToRead;
@@ -27,7 +27,6 @@ async function getLastLine(filePath: string, bufferSize = 1024): Promise<string>
 
       // Search for the last newline character
       const lines = chunk.split(/\n/).reverse();
-      let newLineIndex;
       for (const line of lines) {
         if (!line) {
           continue;
@@ -36,7 +35,8 @@ async function getLastLine(filePath: string, bufferSize = 1024): Promise<string>
         try {
           const message: IServerMessage = JSON.parse(line);
           if (message.message.type === EMessageType.TransactionReceived) {
-            newLineIndex = chunk.indexOf(line) + line.length;
+            lastLine = line;
+            foundLastTransactionReceived = true;
             break;
           }
         } catch (e) {
@@ -44,18 +44,12 @@ async function getLastLine(filePath: string, bufferSize = 1024): Promise<string>
         }
       }
 
-      if (newLineIndex && newLineIndex !== -1) {
-        lastLine = chunk.slice(newLineIndex + 1) + lastLine;
-        foundNewLine = true;
-      } else {
-        // If no newline found, prepend the whole chunk
-        lastLine = chunk + lastLine;
-      }
+      position -= bytesToRead;
     }
 
     closeSync(fileDescriptor);
 
-    if (!foundNewLine && lastLine.length === 0) {
+    if (!foundLastTransactionReceived && lastLine.length === 0) {
       return reject(new Error("Could not find any complete line in the file"));
     }
 
@@ -69,7 +63,8 @@ async function getLastLine(filePath: string, bufferSize = 1024): Promise<string>
 
 export async function GET() {
   try {
-    const line = await getLastLine(messagesPath);
+    const line = await getLastTransactionReceived(messagesPath);
+    console.log(line)
     const data: IServerMessage = JSON.parse(line);
     return NextResponse.json(data);
   } catch(e) {

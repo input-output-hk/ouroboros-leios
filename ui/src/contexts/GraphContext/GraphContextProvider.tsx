@@ -51,35 +51,33 @@ export const GraphContextProvider: FC<PropsWithChildren> = ({ children }) => {
   }, [topography, speed, sentTxs, generatedMessages, messages, maxTime, playing, transactions, currentTime])
 
   const topographyHandler = useSetTopographyHandler(state);
-  const messagesHandler = useStreamMessagesHandler(state)
   const simulationTimeHandler = useSetSimulationTimeHandler(state);
+  const messagesHandler = useStreamMessagesHandler(state)
   
   useEffect(() => {
     topographyHandler();
     simulationTimeHandler();
-    messagesHandler();
+    messagesHandler(0);
   }, [])
 
   const lastRequestTimeRef = useRef<number>(0);
 
   // Update to update on currentTime change
   useEffect(() => {
-    if (currentTime === 0) {
-      messagesHandler();
-      return;
-    }
-
     if (!playing) {
       return;
     }
 
-    if (currentTime - lastRequestTimeRef.current < 100) {
+    // Define the minimum interval between requests
+    const MIN_INTERVAL = 100; // milliseconds
+
+    if (currentTime - lastRequestTimeRef.current < MIN_INTERVAL) {
       return;
     }
 
-    messagesHandler();
+    messagesHandler(currentTime);
     lastRequestTimeRef.current = currentTime;
-  }, [currentTime])
+  }, [currentTime, playing, messagesHandler]);
 
   return (
     <GraphContext.Provider value={state}>

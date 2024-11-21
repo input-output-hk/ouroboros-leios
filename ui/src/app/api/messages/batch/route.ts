@@ -1,8 +1,9 @@
 import { createReadStream, statSync } from "fs";
+import msgpack from "msgpack-lite";
 import { NextResponse } from "next/server";
 import readline from 'readline';
 
-import { EMessageType, IServerMessage } from "@/components/Graph/types";
+import { IServerMessage } from "@/components/Graph/types";
 import { messagesPath } from "../../utils";
 
 const MESSAGE_BUFFER_IN_MS = 200;
@@ -103,8 +104,8 @@ export async function GET(req: Request) {
             const underUpperLimit = message.time / 1_000_000 < currentTime + MESSAGE_BUFFER_IN_MS;
   
             // Check if the message falls within the time range
-            if (aboveLowerLimit && underUpperLimit && [EMessageType.TransactionGenerated, EMessageType.TransactionReceived, EMessageType.TransactionSent].includes(message.message.type)) {
-              controller.enqueue(new TextEncoder().encode(JSON.stringify(message) + "\n"));
+            if (aboveLowerLimit && underUpperLimit) {
+              controller.enqueue(msgpack.encode(message))
             }
 
             // Free up resources if we're already pass the buffer window.
