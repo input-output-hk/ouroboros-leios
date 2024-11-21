@@ -1,0 +1,203 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoFieldSelectors #-}
+
+module LeiosProtocol.Common (
+  module PraosProtocol.Common,
+  module Block,
+  module TimeCompat,
+  RankingBlockHeader,
+  RankingBlockBody (..),
+  RankingBlock,
+  RankingBlockId,
+  InputBlockId (..),
+  InputBlockHeader (..),
+  InputBlockBody (..),
+  InputBlock (..),
+  inputBlockInvariant,
+  EndorseBlockId (..),
+  EndorseBlock (..),
+  VoteId (..),
+  Vote (..),
+  slice,
+)
+where
+
+import ChanTCP
+import Data.Hashable
+import GHC.Generics
+import Ouroboros.Network.Block as Block
+import PraosProtocol.Common (
+  MessageSize (..),
+  ReadOnly,
+  SlotConfig (..),
+  TakeOnly,
+  asReadOnly,
+  asTakeOnly,
+  kilobytes,
+  readReadOnlyTVar,
+  readReadOnlyTVarIO,
+  slotConfigFromNow,
+  slotTime,
+  takeTakeOnlyTMVar,
+  tryTakeTakeOnlyTMVar,
+ )
+import qualified PraosProtocol.Common as Praos
+import SimTypes
+import TimeCompat
+
+{-
+  Note [size of blocks/messages]: we add a `size` field to most
+  entities to more easily allow size to be a runtime parameter.
+
+  Note [id fields]: we use uniquely generated `id` fields to identify
+  blocks instead of hashes (except for RankingBlock). They are also
+  used to verify the header belongs with the body, and anywhere a
+  reference to a block is needed. Represented as pairs `(NodeId,Int)`
+  to allow independent block generation from each node, but should be
+  considered opaque otherwise.
+
+  Note [subSlot, producer, endorseBlocksEarlierStage, endorseBlocksEarlierPipeline]:
+  these fields are needed to counter equivocation (subSlot, producer)
+  or other versions of Leios, we could remove them for now if they get
+  in the way, although it seems eventually we want to simulate all the
+  variants.
+
+-}
+
+type RankingBlockHeader = Praos.BlockHeader
+data RankingBlockBody = RankingBlockBody
+  { endorseBlocks :: ![(EndorseBlockId, Certificate)]
+  -- ^ TODO: verify whether it should contain the whole EB or only the Id.
+  --   Asked about it in a comment to (Uniform) Short-Pipeline Leios doc.
+  --   Mostly matters for size calculations.
+  , size :: !Bytes
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (Hashable)
+
+type RankingBlock = Praos.Block RankingBlockBody
+
+type RankingBlockId = HeaderHash RankingBlock
+
+data InputBlockId = InputBlockId
+  { node :: !NodeId
+  , num :: !Int
+  }
+  deriving stock (Eq, Ord, Show)
+
+newtype SubSlotNo = SubSlotNo SlotNo
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Enum, Bounded)
+
+data InputBlockHeader = InputBlockHeader
+  { id :: !InputBlockId
+  , slot :: !SlotNo
+  , subSlot :: !SubSlotNo
+  -- ^ for generation frequencies higher than 1 per slot.
+  , producer :: !NodeId
+  , rankingBlock :: !RankingBlockId
+  -- ^ points to ledger state for validation.
+  , size :: !Bytes
+  }
+  deriving stock (Eq, Show)
+
+data InputBlockBody = InputBlockBody
+  { id :: !InputBlockId
+  , size :: !Bytes
+  }
+  deriving stock (Eq, Show)
+
+data InputBlock = InputBlock
+  { header :: !InputBlockHeader
+  , body :: !InputBlockBody
+  }
+  deriving stock (Eq, Show)
+
+inputBlockInvariant :: InputBlock -> Bool
+inputBlockInvariant ib = ib.header.id == ib.body.id
+
+data EndorseBlockId = EndorseBlockId
+  { node :: !NodeId
+  , num :: !Int
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (Hashable)
+
+data EndorseBlock = EndorseBlock
+  { id :: !EndorseBlockId
+  , slot :: !SlotNo
+  , subSlot :: !SubSlotNo
+  -- ^ for generation frequencies higher than 1 per slot.
+  , producer :: !NodeId
+  , inputBlocks :: ![InputBlockId]
+  , endorseBlocksEarlierStage :: ![EndorseBlockId]
+  -- ^ not used in "Short" leios.
+  , endorseBlocksEarlierPipeline :: ![EndorseBlockId]
+  -- ^ only used in "Full" leios.
+  , size :: !Bytes
+  }
+  deriving stock (Eq, Show)
+
+data VoteId = VoteId
+  { node :: !NodeId
+  , num :: !Int
+  }
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (Hashable)
+
+data Vote = Vote
+  { id :: !VoteId
+  , slot :: !SlotNo
+  , producer :: !NodeId
+  , endorseBlock :: !EndorseBlockId
+  , size :: !Bytes
+  }
+  deriving stock (Eq, Show)
+
+data Certificate = Certificate
+  { votes :: [VoteId]
+  , size :: Bytes
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (Hashable)
+
+-------------------------------------------
+---- Common defs
+-------------------------------------------
+
+slice :: Int -> SlotNo -> Int -> (SlotNo, SlotNo)
+slice l s x = (toEnum s', toEnum $ s' + l)
+ where
+  -- taken from formal spec
+  s' = (fromEnum s `div` l - x) * l
+
+-------------------------------------------
+---- MessageSize instances
+-------------------------------------------
+
+instance MessageSize RankingBlockBody where
+  messageSizeBytes b = b.size
+
+instance MessageSize InputBlockHeader where
+  messageSizeBytes b = b.size
+
+instance MessageSize InputBlockBody where
+  messageSizeBytes b = b.size
+
+instance MessageSize InputBlock where
+  messageSizeBytes b = messageSizeBytes b.header + messageSizeBytes b.body
+
+instance MessageSize EndorseBlock where
+  messageSizeBytes b = b.size
+
+instance MessageSize Vote where
+  messageSizeBytes b = b.size

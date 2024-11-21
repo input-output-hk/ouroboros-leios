@@ -41,6 +41,7 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
+    LeiosProtocol.Common
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.SimTestRelay
