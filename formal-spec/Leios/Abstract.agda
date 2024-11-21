@@ -14,5 +14,5 @@ record LeiosAbstract : Type₁ where
         vote : PrivKey → Hash → Vote
         sign : PrivKey → Hash → Sig
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
-        L Λ μ : ℕ
+        L : ℕ
         ⦃ NonZero-L ⦄ : NonZero L
