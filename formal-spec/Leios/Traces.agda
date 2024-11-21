@@ -3,20 +3,18 @@
 open import Leios.Prelude
 open import Leios.SpecStructure
 
-module Leios.Traces (⋯ : SpecStructure) (let open SpecStructure ⋯) where
+import Leios.Protocol
 
-open import Leios.Protocol (⋯)
+module Leios.Traces (⋯ : SpecStructure) {u : Type} (let open Leios.Protocol ⋯ u)
+  (_-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type)
+  where
 
-module _ (_↝_ : LeiosState → LeiosState → Type) (allUpkeep : ℙ SlotUpkeep) where
+_⇉_ : LeiosState → LeiosState → Type
+s₁ ⇉ s₂ = Σ[ (i , o) ∈ LeiosInput × LeiosOutput ] (just s₁ -⟦ i / o ⟧⇀ s₂)
 
-  open Rules _↝_ allUpkeep
+_⇉[_]_ : LeiosState → ℕ → LeiosState → Type
+s₁ ⇉[ zero ] s₂ = s₁ ≡ s₂
+s₁ ⇉[ suc m ] sₙ = Σ[ s₂ ∈ LeiosState ] (s₁ ⇉ s₂ × s₂ ⇉[ m ] sₙ)
 
-  _⇉_ : LeiosState → LeiosState → Type
-  s₁ ⇉ s₂ = Σ[ (i , o) ∈ LeiosInput × LeiosOutput ] (just s₁ -⟦ i / o ⟧⇀ s₂)
-
-  _⇉[_]_ : LeiosState → ℕ → LeiosState → Type
-  s₁ ⇉[ zero ] s₂ = s₁ ≡ s₂
-  s₁ ⇉[ suc m ] sₙ = Σ[ s₂ ∈ LeiosState ] (s₁ ⇉ s₂ × s₂ ⇉[ m ] sₙ)
-
-  _⇉⋆_ : LeiosState → LeiosState → Type
-  s₁ ⇉⋆ sₙ = Σ[ n ∈  ℕ ] (s₁ ⇉[ n ] sₙ)
+_⇉⋆_ : LeiosState → LeiosState → Type
+s₁ ⇉⋆ sₙ = Σ[ n ∈  ℕ ] (s₁ ⇉[ n ] sₙ)

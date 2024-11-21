@@ -8,7 +8,6 @@ open import Leios.VRF
 import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
-import Leios.Voting
 
 module Leios.SpecStructure where
 
@@ -44,8 +43,3 @@ record SpecStructure : Type₁ where
   module B   = BaseAbstract.Functionality BF
   module K   = KeyRegistrationAbstract.Functionality KF
   module FFD = FFDAbstract.Functionality FFD'
-
-  open Leios.Voting a public
-
-  field va : VotingAbstract
-  open VotingAbstract va public
