@@ -68,8 +68,10 @@ instance MessageSize BlockBody where
 instance MessageSize BlockHeader where
   messageSizeBytes _ = kilobytes 1
 
--- TODO: Refactor to provide sizes for basic types.
+instance MessageSize SlotNo where
+  messageSizeBytes _ = 8
 
+-- TODO: Refactor to provide sizes for basic types.
 instance MessageSize (Tip block) where
   messageSizeBytes _ = {- slot no -} 8 + {- hash -} 32 + {- block no -} 8
 

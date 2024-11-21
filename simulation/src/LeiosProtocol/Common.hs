@@ -26,17 +26,24 @@ module LeiosProtocol.Common (
   EndorseBlockId (..),
   EndorseBlock (..),
   VoteId (..),
-  Vote (..),
+  VoteMsg (..),
+  Certificate (..),
   slice,
+  rankingBlockBodyInvariant,
+  NodeId,
+  SubSlotNo (..),
 )
 where
 
 import ChanTCP
 import Data.Hashable
+import Data.Set (Set)
+import Data.Word (Word8)
 import GHC.Generics
 import Ouroboros.Network.Block as Block
 import PraosProtocol.Common (
   MessageSize (..),
+  PraosConfig (..),
   ReadOnly,
   SlotConfig (..),
   TakeOnly,
@@ -76,13 +83,16 @@ import TimeCompat
 type RankingBlockHeader = Praos.BlockHeader
 data RankingBlockBody = RankingBlockBody
   { endorseBlocks :: ![(EndorseBlockId, Certificate)]
-  -- ^ TODO: verify whether it should contain the whole EB or only the Id.
-  --   Asked about it in a comment to (Uniform) Short-Pipeline Leios doc.
-  --   Mostly matters for size calculations.
+  , payload :: !Bytes
+  -- ^ ranking blocks can also contain transactions directly, which we
+  -- do not model directly, but contribute to size.
   , size :: !Bytes
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (Hashable)
+
+rankingBlockBodyInvariant :: RankingBlockBody -> Bool
+rankingBlockBodyInvariant rbb = rbb.payload <= rbb.size
 
 type RankingBlock = Praos.Block RankingBlockBody
 
@@ -94,9 +104,12 @@ data InputBlockId = InputBlockId
   }
   deriving stock (Eq, Ord, Show)
 
-newtype SubSlotNo = SubSlotNo SlotNo
+newtype SubSlotNo = SubSlotNo Word8
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Bounded)
+
+instance MessageSize SubSlotNo where
+  messageSizeBytes _ = 1
 
 data InputBlockHeader = InputBlockHeader
   { id :: !InputBlockId
@@ -110,9 +123,13 @@ data InputBlockHeader = InputBlockHeader
   }
   deriving stock (Eq, Show)
 
+-- TODO: at time of writing IB are described to contain an advice field
+-- Quote: `advice: advice describing which transaction scripts validated (phase 2 validation)`
+-- Not represented or taken in consideration here.
 data InputBlockBody = InputBlockBody
   { id :: !InputBlockId
   , size :: !Bytes
+  -- ^ transactions not modeled, only their total size.
   }
   deriving stock (Eq, Show)
 
@@ -135,8 +152,6 @@ data EndorseBlockId = EndorseBlockId
 data EndorseBlock = EndorseBlock
   { id :: !EndorseBlockId
   , slot :: !SlotNo
-  , subSlot :: !SubSlotNo
-  -- ^ for generation frequencies higher than 1 per slot.
   , producer :: !NodeId
   , inputBlocks :: ![InputBlockId]
   , endorseBlocksEarlierStage :: ![EndorseBlockId]
@@ -154,7 +169,7 @@ data VoteId = VoteId
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (Hashable)
 
-data Vote = Vote
+data VoteMsg = VoteMsg
   { id :: !VoteId
   , slot :: !SlotNo
   , producer :: !NodeId
@@ -164,8 +179,7 @@ data Vote = Vote
   deriving stock (Eq, Show)
 
 data Certificate = Certificate
-  { votes :: [VoteId]
-  , size :: Bytes
+  { votes :: Set VoteId
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)
@@ -175,7 +189,7 @@ data Certificate = Certificate
 -------------------------------------------
 
 slice :: Int -> SlotNo -> Int -> (SlotNo, SlotNo)
-slice l s x = (toEnum s', toEnum $ s' + l)
+slice l s x = (toEnum s', toEnum $ s' + l - 1)
  where
   -- taken from formal spec
   s' = (fromEnum s `div` l - x) * l
@@ -199,5 +213,5 @@ instance MessageSize InputBlock where
 instance MessageSize EndorseBlock where
   messageSizeBytes b = b.size
 
-instance MessageSize Vote where
+instance MessageSize VoteMsg where
   messageSizeBytes b = b.size
