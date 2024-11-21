@@ -1,5 +1,6 @@
 "use client";
 import {
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -8,121 +9,183 @@ import {
   type FC,
 } from "react";
 
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  TooltipProps,
+  XAxis,
+  YAxis
+} from "recharts";
+import {
+  NameType,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 import { Slider } from "./Slider";
-import { EMessageType, IServerMessage, ITransformedNodeMap } from "./types";
+import {
+  EMessageType,
+  IServerMessage,
+  ITransactionGenerated,
+  ITransactionMessage,
+  ITransactionReceived,
+  ITransactionSent,
+  ITransformedNodeMap,
+} from "./types";
+import { isWithinRange } from "./utils";
 
 interface IGraphProps {
   messages: IServerMessage[];
   topography: ITransformedNodeMap;
 }
 
-const width = 1024;
-const height = 600;
-const zoomSensitivity = 0.1;
-let scale = 1,
-  isDragging = false,
-  startX: number,
-  startY: number,
-  offsetX = 0,
+enum ESpeedOptions {
+  "1/10" = 0.1,
+  "2/10" = 0.2,
+  "3/10" = 0.3,
+}
+
+const scale = 3;
+let offsetX = 0,
   offsetY = 0;
+
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: TooltipProps<ValueType, NameType>) => {
+  if (active && payload && payload.length) {
+    console.log(payload);
+    return (
+      <div className="custom-tooltip">
+        <p className="label">{`Message: #${payload[0].payload.message}`}</p>
+        <p className="intro">{`Time Sent: ${payload[0].payload.time}ms`}</p>
+      </div>
+    );
+  }
+
+  return null;
+};
 
 export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [play, setPlay] = useState(false);
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const simulationStart = useRef<number>(0);
+  const simulationPauseTime = useRef<number>(0);
+  const intervalId = useRef<Timer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const transactions = useMemo(() => {
-    const transactionsById: Map<number, IServerMessage[]> = new Map();
+  const [play, setPlay] = useState(false);
+  const [speed, setSpeed] = useState<ESpeedOptions>(ESpeedOptions["3/10"]);
+  const [sentTxs, setSentTxs] = useState<Set<string>>(new Set());
+  const [generatedTxs, setGeneratedTxs] = useState<Set<number>>(new Set());
+  const maxTime = useMemo(
+    () => Math.floor(messages[messages.length - 1].time / 1000000),
+    [messages],
+  );
 
-    for (const input of messages) {
-      if (
-        EMessageType.TransactionGenerated === input.message?.type ||
-        EMessageType.TransactionReceived === input.message?.type ||
-        EMessageType.TransactionSent === input.message?.type
-      ) {
-        if (transactionsById.has(input.message.id)) {
-          transactionsById.get(input.message.id)?.push(input);
-        } else {
-          transactionsById.set(input.message.id, [input]);
+  const data = useMemo(
+    () =>
+      [...sentTxs.values()].map((v, index) => ({
+        message: index + 1,
+        time: Number(v.split("#")[1]),
+      })),
+    [sentTxs.size],
+  );
+
+  const txGeneratedMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionGenerated,
+  ) as IServerMessage<ITransactionGenerated>[], [messages]);
+
+  const txSentMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionSent,
+  ) as IServerMessage<ITransactionSent>[], [messages]);
+
+  const txReceivedMessages = useMemo(() => messages.filter(
+    ({ message }) => message.type === EMessageType.TransactionReceived,
+  ) as IServerMessage<ITransactionReceived>[], [messages]);
+
+  const transactions = useMemo(() => {
+    const transactionsById: Map<number, ITransactionMessage[]> = new Map();
+
+    for (const generatedMsg of txGeneratedMessages) {
+      const transactionList: ITransactionMessage[] = [];
+
+      for (const sentMsg of txSentMessages) {
+        if (sentMsg.message.id === generatedMsg.message.id) {
+          const receivedMsg = txReceivedMessages.find(
+            (r) =>
+              r.message.id === generatedMsg.message.id &&
+              r.message.sender === sentMsg.message.sender &&
+              r.message.recipient === sentMsg.message.recipient,
+          );
+
+          if (!receivedMsg) {
+            console.log(
+              "Could not find matching transaction for " + sentMsg.message.id,
+            );
+            continue;
+          }
+
+          // Convert time from nanoseconds to miliseconds.
+          transactionList.push({
+            id: generatedMsg.message.id,
+            duration:
+              Math.floor(receivedMsg.time / 1000000) -
+              Math.floor(sentMsg.time / 1000000),
+            source: sentMsg.message.sender,
+            target: sentMsg.message.recipient,
+            sentTime: Math.floor(sentMsg.time / 1000000),
+            generated: Math.floor(generatedMsg.time / 1000000),
+          });
         }
       }
+
+      transactionsById.set(generatedMsg.message.id, transactionList);
     }
 
     return transactionsById;
-  }, [messages]);
+  }, [messages, txGeneratedMessages, txSentMessages]);
 
-  console.log(transactions)
+  const maxTransactions = useMemo(
+    () =>
+      [...transactions.values()].reduce(
+        (t, v) => (t += v.length),
+        transactions.size,
+      ),
+    [transactions.size],
+  );
 
   // Function to draw the scene
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
-    if (!context) {
+    if (!context || !canvas) {
       return;
     }
 
-    // Clear the canvas
-    context.clearRect(0, 0, width, height);
-    context.save();
+    // Current time in simulation
+    const now = performance.now();
+    const elapsed =
+      simulationStart.current !== 0
+        ? (now - simulationStart.current) * speed
+        : 0;
+    setCurrentTime(elapsed);
 
-    // Apply translation
-    context.translate(offsetX, offsetY);
-    context.scale(scale, scale);
-
-    // Draw the particle
-    // particles.forEach(p => {
-    //   context.beginPath();
-    //   context.arc(p.x, p.y, 2, 0 , 2 * Math.PI);
-    //   context.fillStyle = "red";
-    //   context.fill();
-    // })
-
-    // Draw the links
-    topography.links.forEach((n) => {
-      const nodeStart = topography.nodes.find(({ id }) => id === n.source);
-      const nodeEnd = topography.nodes.find(({ id }) => id === n.target);
-      if (!nodeStart || !nodeEnd) {
-        return;
-      }
-
-      context.beginPath();
-      context.moveTo(nodeStart.fx, nodeStart.fy);
-      context.lineTo(nodeEnd.fx, nodeEnd.fy);
-      context.strokeStyle = "#ddd";
-      context.lineWidth = 1;
-      context.stroke();
-    });
-
-    // Draw the nodes
-    topography.nodes.forEach((n) => {
-      context.beginPath();
-      context.arc(n.fx, n.fy, 6, 0, 2 * Math.PI);
-      context.fillStyle = n.data.stake ? "green" : "blue";
-      context.fill();
-    });
-
-    context.restore();
-  }, [currentTime]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (
-      !canvas ||
-      !messages.length ||
-      !topography.nodes.length ||
-      !topography.links.length
-    ) {
-      return;
-    }
-
-    const context = canvas.getContext("2d");
-    if (!context) {
+    if (elapsed >= maxTime) {
+      intervalId.current && clearInterval(intervalId.current);
+      setPlay(false);
       return;
     }
 
     // Set canvas dimensions
+    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
     canvas.width = width;
     canvas.height = height;
+
+    // Clear the canvas
+    context.clearRect(0, 0, width, height);
+    context.save();
 
     // Calculate the bounds
     const coordinates: { xValues: number[]; yValues: number[] } = {
@@ -146,108 +209,156 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
     const canvasCenterY = height / 2;
 
     // Calculate the offset to center the path
-    offsetX = canvasCenterX - (minX + pathWidth / 2);
-    offsetY = canvasCenterY - (minY + pathHeight / 2);
+    offsetX = canvasCenterX - (minX + pathWidth / 2) * scale;
+    offsetY = canvasCenterY - (minY + pathHeight / 2) * scale;
 
-    canvas.addEventListener("mousedown", (event) => {
-      // Start dragging
-      isDragging = true;
+    // Apply translation and scaling
+    context.translate(offsetX, offsetY);
+    context.scale(scale, scale);
 
-      // Get the initial mouse position
-      const rect = canvas.getBoundingClientRect();
-      startX = event.clientX - rect.left;
-      startY = event.clientY - rect.top;
-    });
-
-    canvas.addEventListener("mousemove", (event) => {
-      if (isDragging) {
-        // Calculate how far the mouse has moved
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-
-        // Update the translation offsets
-        offsetX += (mouseX - startX) / scale;
-        offsetY += (mouseY - startY) / scale;
-
-        // Update the starting position for the next move event
-        startX = mouseX;
-        startY = mouseY;
-
-        // Redraw the canvas
-        draw();
+    // Draw the links
+    topography.links.forEach((link) => {
+      const nodeStart = topography.nodes.find(({ id }) => id === link.source);
+      const nodeEnd = topography.nodes.find(({ id }) => id === link.target);
+      if (!nodeStart || !nodeEnd) {
+        return;
       }
+
+      context.beginPath();
+      context.moveTo(nodeStart.fx, nodeStart.fy);
+      context.lineTo(nodeEnd.fx, nodeEnd.fy);
+      context.strokeStyle = "#ddd";
+      context.lineWidth = 1;
+      context.stroke();
     });
 
-    canvas.addEventListener("mouseup", () => {
-      // Stop dragging
-      isDragging = false;
+    // Draw the transactions
+    transactions.forEach((txList) => {
+      txList.forEach((transaction) => {
+        const { duration, source, target, sentTime, id } = transaction;
+        const sourceNode = topography.nodes.find((n) => n.id === source);
+        const targetNode = topography.nodes.find((n) => n.id === target);
+
+        if (!sourceNode || !targetNode) {
+          console.log(
+            "Could not find source and target nodes for this transaction.",
+          );
+          return;
+        }
+
+        const startX = sourceNode.fx;
+        const startY = sourceNode.fy;
+        const endX = targetNode.fx;
+        const endY = targetNode.fy;
+        const transactionElapsedTime = elapsed - sentTime;
+
+        if (transactionElapsedTime < 0) {
+          return; // Skip if the animation is done or hasn't started
+        }
+
+        if (transactionElapsedTime > duration) {
+          setSentTxs((prev) => {
+            prev.add(`${id}-${source}-${target}#${sentTime + duration}`);
+            return prev;
+          });
+
+          return;
+        }
+
+        // Calculate the interpolation factor
+        const t = transactionElapsedTime / duration;
+        const x = startX + t * (endX - startX);
+        const y = startY + t * (endY - startY);
+
+        // Draw the moving circle
+        context.beginPath();
+        context.arc(x, y, 2, 0, 2 * Math.PI);
+        context.fillStyle = "red";
+        context.fill();
+      });
     });
 
-    canvas.addEventListener("mouseout", () => {
-      // Stop dragging if the mouse leaves the canvas
-      isDragging = false;
+    // Draw the nodes
+    topography.nodes.forEach((node) => {
+      context.beginPath();
+      context.arc(node.fx, node.fy, 3, 0, 2 * Math.PI);
+      context.fillStyle = node.data.stake ? "green" : "blue";
+      context.stroke();
+      context.strokeStyle = "black";
+
+      txGeneratedMessages.forEach(m => {
+        const target = m.time / 1_000_000;
+        if (m.message.publisher === node.id && isWithinRange(elapsed, target, 500)) {
+          context.fillStyle = "red";
+        }
+
+        if (m.message.publisher === node.id && elapsed > target) {
+          setGeneratedTxs(prev => {
+            prev.add(m.time);
+            return prev;
+          });
+        }
+      })
+
+      context.fill();
     });
 
-    canvas.addEventListener("wheel", (event) => {
-      // Prevent the default scrolling behavior
-      event.preventDefault();
+    context.restore();
+  }, [topography, transactions, play, speed, maxTime, txGeneratedMessages]);
 
-      // Calculate the new scale factor
-      const zoom = event.deltaY > 0 ? 1 - zoomSensitivity : 1 + zoomSensitivity;
-      scale *= zoom;
+  console.log(generatedTxs)
 
-      // Redraw the canvas with the new scale
-      draw();
+  // Function to toggle play/pause
+  const togglePlayPause = useCallback(() => {
+    startTransition(() => {
+      const now = performance.now();
+      if (!play) {
+        simulationStart.current = now - simulationPauseTime.current;
+        simulationPauseTime.current = now;
+        intervalId.current = setInterval(draw, 1000 / 120); // 120 FPS
+      } else {
+        simulationPauseTime.current = now - simulationStart.current;
+        if (intervalId.current) {
+          clearInterval(intervalId.current);
+          intervalId.current = null;
+        }
+      }
+
+      setPlay((playing) => {
+        return !playing;
+      });
     });
+  }, [draw]);
 
-    // Function to animate the particle
-    let slotIndex = 0;
-    // const animateParticles = () => {
-    //   const slotStartTime = messages[slotIndex].start_time / 100000;
-    //   const slotEndTime =
-    //     slotIndex === messages.length - 1
-    //       ? messages[slotIndex].events[messages[slotIndex].events.length - 1]
-    //           .time / 100000
-    //       : messages[slotIndex + 1].start_time / 100000;
-    //   const duration = slotEndTime - slotStartTime; // duration of the animation in milliseconds
-    //   const startTime = Date.now();
+  // Function to reset the simulation
+  const resetSimulation = () => {
+    setPlay(false);
+    setCurrentTime(0);
+    setSpeed(ESpeedOptions["1/10"]);
+    setSentTxs(new Set());
+    simulationStart.current = 0;
+    simulationPauseTime.current = 0;
 
-    //   function animate() {
-    //     const elapsed = Date.now() - startTime;
-    //     const t = Math.min(elapsed / duration, 1); // Normalize time to [0, 1]
+    if (intervalId.current) {
+      clearInterval(intervalId.current);
+      intervalId.current = null;
+    }
 
-    //     // Interpolate the particle's position
-    //     // for (const message of messages) {
-    //     /**
-    //      * particles.forEach((p, index) => {
-    //      *  const link = refLinks[index];
-    //      *
-    //      * })
-    //      */
-    //     // }
-    //     // particles.forEach(p => {
-    //     //   p.x = nodes[0].x + (nodes[1].x - nodes[0].x) * t;
-    //     //   p.y = nodes[0].y + (nodes[1].y - nodes[0].y) * t;
-    //     // })
+    draw();
+  };
 
-    //     // Draw the scene
-    //     draw();
+  // Clear the interval on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalId.current) {
+        clearInterval(intervalId.current);
+      }
+    };
+  }, []);
 
-    //     if (t < 1) {
-    //       requestAnimationFrame(animate); // Continue the animation
-    //       slotIndex++;
-    //     }
-    //   }
-
-    //   animate();
-    // };
-
-    // animateParticles();
-
-    // Start the animation
-    // animateParticles();
-  }, [topography, messages]); // Empty dependency array to run once when the component mounts
+  useEffect(() => {
+    draw();
+  }, []);
 
   if (!topography.links.length || !topography.nodes.length) {
     return <p>Loading...</p>;
@@ -256,15 +367,99 @@ export const Graph: FC<IGraphProps> = ({ messages, topography }) => {
   return (
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-        <Slider value={currentMessageIndex} setValue={setCurrentMessageIndex} />
+        <Slider
+          value={currentTime}
+          max={maxTime}
+          setValue={(v) => {
+            setCurrentTime(Number(v));
+          }}
+        />
         <button
           className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-          onClick={() => setPlay((prev) => !prev)}
+          onClick={togglePlayPause}
         >
-          {play ? "Stop" : "Start"}
+          {play ? "Pause" : "Play"}
         </button>
+        <button
+          disabled={play}
+          className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
+          onClick={resetSimulation}
+        >
+          Reset
+        </button>
+        <div className="flex items-center justify-center gap-2">
+          <label htmlFor="speed">Speed:</label>
+          <select
+            id="speed"
+            disabled={play}
+            defaultValue={speed}
+            onChange={(e) => {
+              resetSimulation();
+              setSpeed(Number(e.target.value) as ESpeedOptions);
+            }}
+          >
+            {Object.keys(ESpeedOptions)
+              .filter((key) => isNaN(Number(key)))
+              .map((name) => {
+                return (
+                  <option
+                    key={name}
+                    value={ESpeedOptions[name as keyof typeof ESpeedOptions]}
+                  >
+                    {name}
+                  </option>
+                );
+              })}
+          </select>
+        </div>
       </div>
-      <canvas ref={canvasRef} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
+          <div className="flex items-center justify-center gap-4 mt-4">
+            <div>
+              <h4>Transactions Generated: {generatedTxs.size}</h4>
+            </div>
+            <div>
+              <h4>Transactions Sent: {sentTxs.size}</h4>
+            </div>
+          </div>
+          <canvas ref={canvasRef} />
+        </div>
+        <div className="flex flex-col w-1/3 items-center justify-between gap-4">
+          <div className="w-full h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  tick={false}
+                  label="Transactions Sent"
+                  domain={[0, maxTransactions]}
+                  allowDataOverflow
+                  type="number"
+                  dataKey="message"
+                />
+                <YAxis
+                  tick={false}
+                  label="Time"
+                  domain={[0, maxTime]}
+                  dataKey="time"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="time"
+                  stroke="#8884d8"
+                  fill="#8884d8"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Tooltip content={(props) => <CustomTooltip {...props} />} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="w-full"></div>
+          <div className="w-full"></div>
+        </div>
+      </div>
     </div>
   );
 };

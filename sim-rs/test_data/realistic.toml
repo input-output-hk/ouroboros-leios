@@ -1,4 +1,6 @@
 block_generation_probability = 0.05
+deliver_stage_count = 2
+eb_generation_probability = 5.0
 ib_generation_probability = 5.0
 ib_shards = 16
 max_block_size = 90112

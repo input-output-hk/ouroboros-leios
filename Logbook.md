@@ -1,5 +1,143 @@
 # Leios logbook
 
+## 2024-11-21
+
+Market data that compares Cardano `mainnet` to other prominent blockchain's throughput was added to the [Transaction Throughput CPS](https://github.com/cardano-scaling/CIPs/pull/5).
+
+## 2024-11-20
+
+### Model of Cardano throughput
+
+The system-dynamics simulation of Cardano throughput was enhanced and checked.
+
+- Documented all variables.
+- Adjusted slider ranges.
+- Added constraint for valid ranges of variables.
+- Tested scenarios.
+- Checked equations.
+- Fixed extreme scenario were funds flow into reserve.
+- Created [tutorial video](https://drive.google.com/file/d/1YrQLLsgsPt4XHa707c-CfTLkivKRyaa0/view?usp=sharing)
+- Published [version 0.2](https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2) of the model.
+
+## 2024-11-18
+
+### Items of interest from Intersect Network WG
+
+- Many SPOs have a hot backup of their block producer running.
+- Relays actually have more than 200 downstream p2p connections.
+    - For example, the IOG ones have ~500 downstream peers.
+
+## 2024-11-15
+
+### Analysis of Leios challenges, part 1
+
+See [Challenges for Leios, Part 1](analysis/challenges-1.md) for analysis of the following:
+- Cost of block storage for nodes.
+- Fees and rewards received for each block.
+- Break-even costs for the perpetual storage of blocks
+- Importance of the Cardano Reserves to SPO profitability
+
+Findings:
+1. Fees currently average 173.01 lovelace per byte of block.
+    1. Under best-case conditions, that fee will cover a cost of 115 ADA per GB of storage across 500 stakepools.
+    2. Under more realistic conditions, that fee will only cover a cost of 8 ADA per GB of storage across 2500 stakepools.
+2. Stake pools receive on average 20.91% of rewards.
+3. The cost of perpetual storage of blocks at VMs ranges $7/GB to $30/GB, strongly depending upon the assumption of how rapidly storage costs decrease in the future.
+4. The Cardano Reserves currently supply 99% of the rewards that stake pools and delegators receive.
+5. Break even-costs for the price of Ada needed to cover perpetual storage of blocks range from a best case of $0.06/ADA to a worst case of $3.68/ADA.
+
+### Haskell simulation
+
+- Implemented new parametrized relay protocol that we plan to specialize
+  for diffusion of IB, EB, and votes.
+- Adapted original relay simulation to use the new protocol, adding
+  relay-test-1 and relay-test-2 visualizations, meant as a first test.
+- Changes currently on branch `haskell-leios-sim`[1] as some more debugging
+  still needed: the consumer peer is pipelined and we seem to have
+  problems with messages being read in the wrong context.
+
+[1]: 0284b75727dd6770a4a4f0455e5dc0be9d89412e
+
+### Techno-economic analysis of SPO nodes
+
+The *Refined Estimate* tab of the [Leios High-Level Resources Estimates spreadsheet](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) computes node costs for SPOs under Praos and Leios.
+
+- Each SPO has one block producer and two relays.
+- CPU, IOPS, disk, and network costs are estimated.
+- Results are provided from 1 to 10,000 TPS.
+- Leios parameters can be varied.
+- IBs, EBs, votes, certificates, and RBs are accounted for.
+
+The main findings confirm the insights from the earlier [system-dynamics simulation](#system-dynamics-simulation-of-throughput-techno-economics).
+
+1. Long-term storage of IBs, EBs, and RBs will dominate operating costs.
+2. We need to investigate options such as archiving, sharding, and pruning the transaction history.
+3. It is critical that hardware costs continue to drop: even a 15% reduction per year is not sufficient.
+4. Current fees are insufficient to sustain Leios.
+
+### Example schedule for short-pipeline Leios
+
+The following table illustrate when proposing, endorsing, voting, and forging can take place in short-pipeline Leios.
+
+![Example schedule for short-pipeline leios](analysis/short-pipeline-leios-example-schedule.png)
+
+### Formal specification
+
+The Agda formal specification for the Simplified Leios Protocol has been updated:
+- The formal specification has been completed:
+  - there are no more holes or postulates
+  - the relation corresponding to the Simplified Leios Protocol (Figure 2, in the paper) is implemented
+  - functionalities are mostly kept abstract for now
+
+### Core-parameter model
+
+A first draft of a model of the core system parameters:
+
+
+- Features
+  - Traffic spike tolerance coming either from the protocol or network level.
+  - EB/voting overhead.
+  - The relation of IB rate to IB size and available bandwidth.
+- Input parameters
+  - EB rate
+  - Bandwidth
+  - IB size
+- Graphics
+  - IB rate v.s. available bandwidth
+
+What the model shows is that even with conservative bandwidth numbers, if IBs are of similar size as current Praos blocks, the IB rate is going to be a lot more than 1 per second.
+
+Artifacts:
+
+- Online simulator: [Short Leios parameters model v0.1](https://insightmaker.com/insight/70N5xaPTULaxhMaYcS0JZ8)
+
+Next steps:
+
+- Revisit numbers in the model related to EBs/voting.
+
+
+
+## 2024-11-14
+
+### Rust simulation
+
+Updated sim to generate input blocks, even when they don't include any transactions. 
+
+Added endorser block generation to the sim, with relevant parameters in the config.
+
+Added animation to the visualization. It now shows transmission of TXs across the network, along with a graph displaying their running total. Eventually, viewers will be able to choose what data to visualize live, and notable messages (such as empty IBs) will be displayed specially to make them stand out.
+
+## 2024-11-12
+
+### Team session
+
+- ran manual simulation of short Leios from local node perspective ([meeting recording](https://input-output-rnd.slack.com/files/U02L6J0TP36/F080MPLCMJQ/12_07_58_mst_-_recording))
+- Next meeting
+  - Continue manual simulation of short Leios from distributed perspective
+- Action items:
+  - List of pending open questions for R&D (link will come)
+  - List of tunable parts to optimize cost and resource use for further exploration (link will come)
+
 ## 2024-11-10
 
 - added first somewhat complete-ish list of [simulation model parameters](./docs/simulation-model-parameters.md)
@@ -57,6 +195,10 @@ Next steps:
 - actual `cardano-node` implementation uses hash of vrf proof to
   defend against adversarial behavior, but the simulation does not include those.
 - also added an `headerValidationDelay` parameter (using 5ms atm).
+
+### Rust simulation
+
+Created a set of test data to match ΔQ, in an effort to make the output of simulations comparable.
 
 ## 2024-11-07
 

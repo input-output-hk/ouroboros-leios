@@ -21,6 +21,10 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 data Point = Point !Double !Double
   deriving (Show, Generic)
 
+-- | Path in simulation world
+newtype Path = Path [Point]
+  deriving (Show, Generic)
+
 instance ToJSON Point where
   toEncoding = genericToEncoding defaultOptions
 
