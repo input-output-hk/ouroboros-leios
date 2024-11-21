@@ -8,7 +8,7 @@ import Data.List as L
 
 module Leios.Simplified (⋯ : SpecStructure) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
-open import Leios.Protocol (⋯)
+open import Leios.Protocol (⋯) public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
@@ -34,7 +34,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
 
-module _ (va : VotingAbstract) (let open VotingAbstract va) where
+module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
   private variable s s'   : LeiosState
                    ffds'  : FFD.State
