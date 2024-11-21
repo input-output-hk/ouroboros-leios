@@ -7,9 +7,7 @@ module Leios.Traces (⋯ : SpecStructure) (let open SpecStructure ⋯) where
 
 open import Leios.Protocol (⋯)
 
-module _ (_↝_ : LeiosState → LeiosState → Type) (allUpkeep : ℙ SlotUpkeep) where
-
-  open Rules _↝_ allUpkeep
+module Relation (_-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type) where
 
   _⇉_ : LeiosState → LeiosState → Type
   s₁ ⇉ s₂ = Σ[ (i , o) ∈ LeiosInput × LeiosOutput ] (just s₁ -⟦ i / o ⟧⇀ s₂)
