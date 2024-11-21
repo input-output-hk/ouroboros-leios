@@ -1,5 +1,9 @@
 # Leios logbook
 
+## 2024-11-21
+
+Market data that compares Cardano `mainnet` to other prominent blockchain's throughput was added to the [Transaction Throughput CPS](https://github.com/cardano-scaling/CIPs/pull/5).
+
 ## 2024-11-20
 
 ### Model of Cardano throughput
