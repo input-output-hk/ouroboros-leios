@@ -71,5 +71,5 @@ data _↝_ : LeiosState → LeiosState → Type where
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ [])
 
-module Short = Rules _↝_ allUpkeep
-open Short public
+module UniformShortRules = Rules _↝_ allUpkeep
+open UniformShortRules public

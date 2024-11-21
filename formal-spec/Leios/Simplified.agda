@@ -100,5 +100,5 @@ data _↝_ : LeiosState → LeiosState → Type where
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
 
-module Simplified = Rules _↝_ allUpkeep
-open Simplified public
+module SimplifiedRules = Rules _↝_ allUpkeep
+open SimplifiedRules public
