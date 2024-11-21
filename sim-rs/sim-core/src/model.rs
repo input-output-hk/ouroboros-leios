@@ -97,3 +97,17 @@ impl EndorserBlock {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+pub struct Vote {
+    pub slot: u64,
+    pub producer: NodeId,
+    pub eb: EndorserBlockId,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum NoVoteReason {
+    InvalidSlot,
+    ExtraIB,
+    MissingIB,
+}

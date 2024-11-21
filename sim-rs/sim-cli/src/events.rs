@@ -58,7 +58,7 @@ impl EventMonitor {
             .map(|p| p.id)
             .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * config.deliver_stage_count;
+        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
         Self {
             node_ids,
             pool_ids,
@@ -237,6 +237,10 @@ impl EventMonitor {
                 }
                 Event::EndorserBlockSent { .. } => {}
                 Event::EndorserBlockReceived { .. } => {}
+                Event::Vote { .. } => {}
+                Event::NoVote { .. } => {}
+                Event::VoteSent { .. } => {}
+                Event::VoteReceived { .. } => {}
             }
         }
 

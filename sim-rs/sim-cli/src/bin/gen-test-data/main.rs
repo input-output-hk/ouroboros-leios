@@ -28,6 +28,8 @@ fn main() -> Result<()> {
         Strategy::Simplified(args) => simplified(&args)?,
     };
 
+    let vote_probability = (nodes.len() as f64) / 6.0;
+
     let raw_config = RawConfig {
         seed: None,
         timescale: None,
@@ -38,6 +40,7 @@ fn main() -> Result<()> {
         block_generation_probability: 0.05,
         ib_generation_probability: 5.0,
         eb_generation_probability: 5.0,
+        vote_probability,
         ib_shards: 8,
         max_block_size: 90112,
         stage_length: 2,
