@@ -7,6 +7,11 @@ module Leios.Voting (a : LeiosAbstract) (open LeiosAbstract a) where
 
 open import Leios.Blocks a using (EndorserBlock)
 
-record VotingAbstract (b : Type) : Type₁ where
-  field isVote1Certified : b → EndorserBlock → Type
-        isVote2Certified : b → EndorserBlock → Type
+record VotingAbstract : Type₁ where
+  field VotingState : Type
+        initVotingState : VotingState
+        isVote1Certified : VotingState → EndorserBlock → Type
+        isVote2Certified : VotingState → EndorserBlock → Type
+
+        ⦃ isVote1Certified⁇ ⦄ : ∀ {vs eb} → isVote1Certified vs eb ⁇
+        ⦃ isVote2Certified⁇ ⦄ : ∀ {vs eb} → isVote2Certified vs eb ⁇
