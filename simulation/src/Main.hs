@@ -96,7 +96,7 @@ data VizCommand
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
-  
+
 vizCommands :: Parser VizCommand
 vizCommands =
   subparser . mconcat $
