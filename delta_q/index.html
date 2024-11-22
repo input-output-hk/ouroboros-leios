@@ -69,8 +69,16 @@
               maxY *= 1.2;
             }
 
+            const pad = 'loads' + canvas;
+            const elem = document.getElementById(pad);
+            
             const shapes = [];
+            const annotations = [];
             bins.push(Math.max(max, bins.at(-1) * 1.2));
+
+            const pxPerUnitX = elem.clientWidth / (bins.at(-1) - bins.at(0)) / 1.2;
+            const pxPerUnitY = elem.clientHeight / (maxY - 0) / 1.5;
+
             for (let i = 1; i < bins.length; i++) {
               const v = values[i - 1];
               v.push([maxY, v.at(-1)[1]]);
@@ -84,14 +92,23 @@
                   fillcolor: `rgba(0, 0, 255, ${1 - v[j-1][1]})`,
                   line: { color: 'transparent' },
                 });
+                annotations.push({
+                  x: (bins[i - 1] + bins[i]) / 2,
+                  y: (v[j][0] + v[j-1][0]) / 2,
+                  width: pxPerUnitX * (bins[i] - bins[i - 1]),
+                  height: pxPerUnitY * (v[j][0] - v[j-1][0]),
+                  showarrow: false,
+                  text: '',
+                  hovertext: v[j - 1][1].toFixed(3),
+                });
               }
             }
 
-            const pad = 'loads' + canvas;
             Plotly.newPlot(pad, [maxGraph], {
               font: { size: 24 },
               margin: { pad: 20 },
               shapes,
+              annotations,
             });
             canvas++;
           }
