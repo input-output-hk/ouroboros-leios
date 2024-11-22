@@ -68,7 +68,8 @@ struct NodeLeiosState {
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
-    votes_by_eb: BTreeMap<EndorserBlockId, BTreeSet<Vote>>,
+    voter_slots_seen: BTreeMap<NodeId, BTreeSet<u64>>,
+    votes_by_eb: BTreeMap<EndorserBlockId, Vec<Vote>>,
 }
 
 enum InputBlockState {
@@ -292,36 +293,36 @@ impl Node {
     }
 
     fn vote_for_endorser_blocks(&mut self, slot: u64) -> Result<()> {
-        for next_p in vrf_probabilities(self.sim_config.vote_probability) {
-            if self.run_vrf(next_p).is_some() {
-                let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
-                    return Ok(());
-                };
-                let Some(ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
-                    return Ok(());
-                };
-                let mut votes = vec![];
-                for eb_id in ebs {
-                    let eb = self.leios.ebs.get(&eb_id).unwrap();
-                    match self.should_vote_for(slot, eb) {
-                        Ok(()) => {
-                            let vote = Vote {
-                                slot,
-                                producer: self.id,
-                                eb: eb_id,
-                            };
-                            votes.push(vote);
-                        }
-                        Err(reason) => {
-                            self.tracker.track_no_vote(slot, self.id, eb_id, reason);
-                        }
+        let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
+            return Ok(());
+        };
+        let Some(ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
+            return Ok(());
+        };
+        let mut votes = vec![];
+        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
+            .filter_map(|f| self.run_vrf(f))
+            .count();
+        for _ in 0..vrf_wins {
+            for eb_id in &ebs {
+                let eb = self.leios.ebs.get(eb_id).unwrap();
+                match self.should_vote_for(slot, eb) {
+                    Ok(()) => {
+                        let vote = Vote {
+                            slot,
+                            producer: self.id,
+                            eb: *eb_id,
+                        };
+                        votes.push(vote);
+                    }
+                    Err(reason) => {
+                        self.tracker.track_no_vote(slot, self.id, *eb_id, reason);
                     }
                 }
-                if !votes.is_empty() {
-                    self.send_votes(votes)?;
-                }
-                return Ok(());
             }
+        }
+        if !votes.is_empty() {
+            self.send_votes(votes)?;
         }
         Ok(())
     }
@@ -605,11 +606,23 @@ impl Node {
 
     fn receive_votes(&mut self, from: NodeId, votes: Arc<Vec<Vote>>) -> Result<()> {
         self.tracker.track_votes_received(&votes, from, self.id);
+        let producer = votes[0].producer;
+        let slot = votes[0].slot;
+        if !self
+            .leios
+            .voter_slots_seen
+            .entry(producer)
+            .or_default()
+            .insert(slot)
+        {
+            return Ok(());
+        }
         for vote in votes.iter() {
-            let eb_votes = self.leios.votes_by_eb.entry(vote.eb).or_default();
-            if !eb_votes.insert(vote.clone()) {
-                return Ok(());
-            }
+            self.leios
+                .votes_by_eb
+                .entry(vote.eb)
+                .or_default()
+                .push(vote.clone());
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
@@ -743,8 +756,13 @@ impl Node {
                 .votes_by_eb
                 .entry(vote.eb)
                 .or_default()
-                .insert(vote.clone());
+                .push(vote.clone());
         }
+        self.leios
+            .voter_slots_seen
+            .entry(self.id)
+            .or_default()
+            .insert(votes[0].slot);
         let votes = Arc::new(votes);
         for peer in &self.peers {
             self.tracker.track_votes_sent(&votes, self.id, *peer);
