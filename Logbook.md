@@ -2,6 +2,19 @@
 
 ## 2024-11-22
 
+### Haskell simulation
+
+- Relay protocol works as expected when reading messages from a single
+  thread, sufficient workaround atm but would be good to investigate
+  in future.
+- Fixed inaccuracy in praos simulation where it was possible for a
+  block to validate without having validated the previous one.  The
+  fix also allows for validation to happen via a dedicated queue.
+- Defined "business logic" of (Uniform) Short Leios, referencing the
+  most recent draft.
+- Used relay protocols to define a node for Leios, extending the one
+  we had for Praos. Validation delays still missing atm.
+
 ### Formal specification
 
 - More generic design to support Leios variants
