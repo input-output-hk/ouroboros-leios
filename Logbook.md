@@ -4,6 +4,20 @@
 
 Market data that compares Cardano `mainnet` to other prominent blockchain's throughput was added to the [Transaction Throughput CPS](https://github.com/cardano-scaling/CIPs/pull/5).
 
+### Rust simulation
+
+Visualization: We're able to animate a network of 3000 nodes with 100x mainnet transaction volume, running at about 1/10th speed. Using server-side events to cope with scale looks fast enough, but we haven't wired it up yet.
+
+Simulation: Implemented generation and distribution of votes. Because of the sheer number of votes needed by the protocol, voting involves sending an order of magnitude more messages than anything else, regardless of the transaction volume running through the system. We now need to run the sim at 1/32 of realtime for accurate results.
+
+When simulating 1000x current mainnet transaction volume for 30 seconds:
+112750061 TX message(s) were sent. 112619569 of them were received (99.884%).
+140953 IB message(s) were sent. 140953 of them were received (100.000%).
+917595 EB message(s) were sent. 917595 of them were received (100.000%).
+355863732 Vote message(s) were sent. 355863732 of them were received (100.000%).
+
+We also need a more accurate stake distribution. The current model just assumes it's uniformly distributed, but only a minority of nodes get a vote (~500 of the ~2500 mainnet stake pools) and we (presumably?) need a majority of stake attached to that vote.
+
 ## 2024-11-20
 
 ### Model of Cardano throughput
@@ -19,13 +33,27 @@ The system-dynamics simulation of Cardano throughput was enhanced and checked.
 - Created [tutorial video](https://drive.google.com/file/d/1YrQLLsgsPt4XHa707c-CfTLkivKRyaa0/view?usp=sharing)
 - Published [version 0.2](https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2) of the model.
 
+## 2024-11-19
+
+### Rust simulation
+
+Visualization: More work on streaming, and direct canvas rendering for best performance. There's still too much data to send to the UI at once, and we want to be able to filter "live" for better UX.
+
 ## 2024-11-18
+
+### Rust simulation
+
+Visualization: Working on streaming events from a server to the UI for better performance. 
 
 ### Items of interest from Intersect Network WG
 
 - Many SPOs have a hot backup of their block producer running.
 - Relays actually have more than 200 downstream p2p connections.
     - For example, the IOG ones have ~500 downstream peers.
+
+### Rust simulation
+
+Started work on visualizing simulation against a full-sized network. Unsurprisingly, there is too much data to render straightforwardly we will probably prioritize "zooming in" on a small part of the sim and visualizing that.
 
 ## 2024-11-15
 
