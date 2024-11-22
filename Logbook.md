@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2024-11-22
+
+### Formal specification
+
+- More generic design to support Leios variants
+- Added the specification for Uniform Short Leios
+- A new data type that allows building execution paths
+- Initial work to make the relational specification executable
+
 ## 2024-11-21
 
 Market data that compares Cardano `mainnet` to other prominent blockchain's throughput was added to the [Transaction Throughput CPS](https://github.com/cardano-scaling/CIPs/pull/5).
