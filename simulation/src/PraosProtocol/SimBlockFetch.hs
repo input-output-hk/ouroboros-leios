@@ -9,6 +9,7 @@ import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
+  mapConcurrently_,
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
@@ -83,12 +84,14 @@ traceRelayLink1 tcpprops =
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
-    concurrently_
-      ( blockFetchController nullTracer st
-      )
-      ( runBlockFetchConsumer nullTracer praosConfig chan $
-          initBlockFetchConsumerStateForPeerId nullTracer peerId st
-      )
+    (ts, submitFetchedBlock) <- setupValidatorThreads praosConfig st 1
+    concurrently_ (mapConcurrently_ id ts) $
+      concurrently_
+        ( blockFetchController nullTracer st
+        )
+        ( runBlockFetchConsumer nullTracer praosConfig chan $
+            initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
+        )
   -- Block-Fetch Producer
   nodeB chan = do
     st <- BlockFetchProducerState . asReadOnly <$> newTVarIO (toBlocks bchain)

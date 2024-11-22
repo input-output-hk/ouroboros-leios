@@ -17,7 +17,6 @@ import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Ouroboros.Network.Mock.Chain (headHash)
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
@@ -70,13 +69,14 @@ runPeer ::
   (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
+  (Block body -> m () -> m ()) ->
   PraosNodeState body m ->
   PeerId ->
   Praos body (Chan m) ->
   [Concurrently m ()]
-runPeer tracer cfg st peerId chan = do
+runPeer tracer cfg f st peerId chan = do
   let chainConsumerState = st.chainSyncConsumerStates Map.! peerId
-  let blockFetchConsumerState = initBlockFetchConsumerStateForPeerId tracer peerId st.blockFetchControllerState
+  let blockFetchConsumerState = initBlockFetchConsumerStateForPeerId tracer peerId st.blockFetchControllerState f
   [ Concurrently $ runChainConsumer cfg (protocolChainSync chan) chainConsumerState
     , Concurrently $ runBlockFetchConsumer tracer cfg (protocolBlockFetch chan) blockFetchConsumerState
     ]
@@ -113,12 +113,12 @@ repeatM gen = go []
     | otherwise = gen st >>= \(st', x) -> go (x : acc) (n - 1) st'
 
 runPraosNode ::
-  (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
-  Tracer m (PraosNodeEvent body) ->
-  PraosConfig body ->
-  Chain (Block body) ->
-  [Praos body (Chan m)] ->
-  [Praos body (Chan m)] ->
+  (MonadAsync m, MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent BlockBody) ->
+  PraosConfig BlockBody ->
+  Chain (Block BlockBody) ->
+  [Praos BlockBody (Chan m)] ->
+  [Praos BlockBody (Chan m)] ->
   m ()
 runPraosNode tracer cfg chain followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
@@ -129,19 +129,32 @@ runPraosNode tracer cfg chain followers peers = do
   concurrentlyMany xs = mapM_ wait =<< mapM async xs
 
 setupPraosThreads ::
+  (MonadAsync m, MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent BlockBody) ->
+  PraosConfig BlockBody ->
+  PraosNodeState BlockBody m ->
+  [Praos BlockBody (Chan m)] ->
+  [Praos BlockBody (Chan m)] ->
+  m [Concurrently m ()]
+setupPraosThreads tracer cfg st0 followers peers = do
+  (ts, f) <- BlockFetch.setupValidatorThreads cfg st0.blockFetchControllerState 1 -- TODO: parameter
+  (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg f st0 followers peers
+
+setupPraosThreads' ::
   (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
+  (Block body -> m () -> m ()) ->
   PraosNodeState body m ->
   [Praos body (Chan m)] ->
   [Praos body (Chan m)] ->
   m [Concurrently m ()]
-setupPraosThreads tracer cfg st0 followers peers = do
+setupPraosThreads' tracer cfg submitFetchedBlock st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM addPeer (length peers) st1
   let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
-  let peerThreads = zipWith (runPeer tracer cfg st2) peerIds peers
+  let peerThreads = zipWith (runPeer tracer cfg submitFetchedBlock st2) peerIds peers
   return (controllerThread : concat followerThreads <> concat peerThreads)
 
 data PraosNodeConfig = PraosNodeConfig

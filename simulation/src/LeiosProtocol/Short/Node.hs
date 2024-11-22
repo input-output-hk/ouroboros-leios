@@ -81,7 +81,7 @@ type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId Endor
 type RelayVoteState = RelayConsumerSharedState VoteId VoteId VoteMsg
 
 data ValidationRequest m
-  = ValidateRB RankingBlock (STM m ())
+  = ValidateRB RankingBlock (m ())
   | ValidateIBS [(InputBlockHeader, InputBlockBody)] ([(InputBlockHeader, InputBlockBody)] -> STM m ())
   | ValidateEBS [EndorseBlock] ([EndorseBlock] -> STM m ())
   | ValidateVotes [VoteMsg] ([VoteMsg] -> STM m ())
@@ -140,13 +140,13 @@ leiosNode ::
   m ([m ()])
 leiosNode tracer cfg followers peers = do
   praosState <- PraosNode.newPraosNodeState cfg.baseChain
-  -- TODO: refactor block validation, so we can hook it to `validationQueue`.
+  validationQueue <- newTBQueueIO cfg.processingQueueBound
+  let submitRB rb completion = atomically $ writeTBQueue validationQueue $! ValidateRB rb completion
   praosThreads <-
     join $
-      PraosNode.setupPraosThreads (contramap PraosNodeEvent tracer) cfg.leios.praos praosState
+      PraosNode.setupPraosThreads' (contramap PraosNodeEvent tracer) cfg.leios.praos submitRB praosState
         <$> (mapM (newMuxChan . protocolPraos) followers)
         <*> (mapM (newMuxChan . protocolPraos) peers)
-  validationQueue <- newTBQueueIO cfg.processingQueueBound
   ibDeliveryTimesVar <- newTVarIO Map.empty
   let relayIBConfig =
         RelayConsumerConfig
@@ -238,7 +238,7 @@ leiosNode tracer cfg followers peers = do
       ValidateRB _rb completion -> do
         -- NOTE: in actual impl. have to wait for previous RB, but
         -- not for its ledger state unless rb.payload > 0.
-        atomically $ completion
+        completion
       ValidateIBS ibs completion -> atomically $ do
         -- NOTE: in actual impl. have to wait for ledger state of referenced RBs.
         completion ibs

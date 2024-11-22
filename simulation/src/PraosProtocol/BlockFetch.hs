@@ -32,13 +32,16 @@ import Control.Concurrent.Class.MonadSTM (
     atomically,
     modifyTVar',
     newTVar,
+    newTVarIO,
     readTVar,
+    readTVarIO,
     retry,
     writeTVar
   ),
  )
+import Control.Concurrent.Class.MonadSTM.TBQueue
 import Control.Exception (assert)
-import Control.Monad (forM, forever, guard, unless, void, when, (<=<))
+import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
 import Control.Tracer (Tracer, traceWith)
 import Data.Bifunctor (second)
 import Data.Kind
@@ -58,6 +61,7 @@ import Network.TypedProtocol (
 import Network.TypedProtocol.Driver (runPeerWithDriver)
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
+import Numeric.Natural
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
 import qualified PraosProtocol.Common.Chain as Chain
@@ -242,6 +246,9 @@ blockRequestPoints (BlockRequest frs) = concatMap (map headerPoint . AnchoredFra
 data BlockFetchConsumerState body m = BlockFetchConsumerState
   { blockRequestVar :: TVar m BlockRequest
   , addFetchedBlock :: Block body -> m ()
+  , submitFetchedBlock :: Block body -> m () -> m ()
+  -- ^ a little redundant to have both add and submit, but makes event tracing clearer.
+  --   we could pass the peerId instead of `addFetchedBlock` though.
   , removeInFlight :: [Point (Block body)] -> m ()
   }
 
@@ -262,7 +269,7 @@ blockFetchConsumer ::
   PraosConfig body ->
   BlockFetchConsumerState body m ->
   TC.Client (BlockFetchState body) NonPipelined StIdle m ()
-blockFetchConsumer tracer cfg st = idle
+blockFetchConsumer tracer _cfg st = idle
  where
   -- does not support preemption of in-flight requests.
   blockRequest :: STM m (AnchoredFragment BlockHeader)
@@ -295,13 +302,11 @@ blockFetchConsumer tracer cfg st = idle
       (MsgBlock body, header : headers') -> TC.Effect $ do
         let block = Block header body
         traceWith tracer $ PraosNodeEventReceived block
-        threadDelaySI (cfg.blockValidationDelay block)
-        if blockInvariant block
-          then do
-            st.addFetchedBlock block
-            traceWith tracer (PraosNodeEventEnterState block)
-            return (streaming range headers')
-          else error $ "blockFetchConsumer: invalid block\n" ++ show block -- TODO
+        st.submitFetchedBlock block $ do
+          st.addFetchedBlock block
+          traceWith tracer (PraosNodeEventEnterState block)
+
+        return $ streaming range headers'
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
       (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
 
@@ -588,9 +593,41 @@ blockRequestVarForPeerId peerId blockFetchControllerState =
     Nothing -> error $ "blockRequestVarForPeerId: no peer with id " <> show peerId
     Just peerStatus -> peerStatus.blockRequestVar
 
-initBlockFetchConsumerStateForPeerId :: (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> PeerId -> BlockFetchControllerState body m -> BlockFetchConsumerState body m
-initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState =
+initBlockFetchConsumerStateForPeerId :: (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> PeerId -> BlockFetchControllerState body m -> (Block body -> m () -> m ()) -> BlockFetchConsumerState body m
+initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState submitFetchedBlock =
   BlockFetchConsumerState
     (blockRequestVarForPeerId peerId blockFetchControllerState)
     (addFetchedBlock tracer blockFetchControllerState peerId)
+    submitFetchedBlock
     (atomically . removeInFlight blockFetchControllerState peerId)
+
+setupValidatorThreads ::
+  (MonadSTM m, MonadDelay m) =>
+  PraosConfig BlockBody ->
+  BlockFetchControllerState BlockBody m ->
+  -- | bound on queue length.
+  Natural ->
+  m ([m ()], Block BlockBody -> m () -> m ())
+setupValidatorThreads cfg st n = do
+  queue <- newTBQueueIO n
+  waitingVar <- newTVarIO Map.empty
+  let validate (block, completion) = threadDelaySI (cfg.blockValidationDelay block) >> completion
+  let fetch = forever $ do
+        req@(block, _) <- atomically $ readTBQueue queue
+        assert (blockInvariant block) $ do
+          case blockPrevHash block of
+            GenesisHash -> validate req
+            BlockHash prev -> do
+              havePrev <- Map.member prev <$> readTVarIO st.blocksVar
+              -- Note: for pure praos this also means we have the ledger state.
+              if havePrev
+                then validate req
+                else atomically $ modifyTVar' waitingVar (Map.insertWith (++) prev [req])
+      add block completion = atomically $ writeTBQueue queue (block, completion)
+      processWaiting = forever $ join $ atomically $ do
+        blocks <- readTVar st.blocksVar
+        waiting <- readTVar waitingVar
+        let toValidate = Map.intersection waiting blocks
+        when (Map.null toValidate) retry
+        return $ mapM_ validate $ concat $ Map.elems $ toValidate
+  return ([fetch, processWaiting], add)
