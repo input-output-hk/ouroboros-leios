@@ -806,7 +806,9 @@ pub fn expand_gossip(
             cluster_branch
         };
         // go through senders in some arbitrary order, but do it one by one to calculate the overlap between their targets
-        // correctly even when approaching gossip completion
+        // correctly even when approaching gossip completion; this model assumes that the targets are naturally picked
+        // from the remaining set of nodes, which is of course incorrect--however, the resulting distribution somehow
+        // matches other studies of the Cardano network
         for _sender in 0..senders.ceil() as usize {
             let new_prob = remaining / prev;
             let targets = eff_branch * new_prob;

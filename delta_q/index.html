@@ -5,15 +5,8 @@
     <link data-trunk rel="rust" data-bin="worker" data-type="worker" data-weak-refs />
   </head>
   <body>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <script type="module">
-      import * as core from 'https://root.cern/js/7.7.4/modules/core.mjs';
-      window.core = core;
-      core.settings.HandleKeys = false;
-      import * as draw from 'https://root.cern/js/7.7.4/modules/draw.mjs';
-      window.draw = draw;
-      import { cleanup } from 'https://root.cern/js/7.7.4/modules/base/ObjectPainter.mjs';
-      window.cleanup = cleanup;
-
       window.addEventListener('rootjs', (event) => {
         const { data } = event;
         if (data === null || typeof data !== 'object') {
@@ -25,19 +18,28 @@
         } else {
           const { bins, values, max, name, loads } = data;
 
-          const hist = core.createHistogram('TH1F', bins.length);
-          window.hist = hist;
-          hist.fXaxis.fXbins = bins;
-          for (const idx in values) {
-            hist.setBinContent(parseInt(idx) + 1, values[idx]);
-          }
-          hist.fXaxis.fXmin = 0;
-          hist.fXaxis.fXmax = max;
-          hist.fTitle = name;
-          hist.fXaxis.fTitle = 'time';
-          hist.fYaxis.fTitle = 'cumulative distribution';
-          cleanup('output');
-          draw.draw('output', hist, 'nostat minimum:0 maximum:1.1');
+          const timeliness = {
+            x: bins,
+            y: values.map(y => y.at(-1)[0]),
+            mode: 'lines',
+            line: {shape: 'hv'},
+          };
+          timeliness.x.push(max);
+          timeliness.y.push(timeliness.y.at(-1));
+          Plotly.newPlot('output', [timeliness], {
+            font: { size: 24 },
+            margin: { pad: 20 },
+            shapes: [
+              {
+                type: 'line',
+                x0: 0,
+                x1: max,
+                y0: 1,
+                y1: 1,
+                line: { color: 'black', dash: 'dash' },
+              }
+            ]
+          });
 
           const load_container = document.getElementById('loads');
           while (load_container.firstChild) {
@@ -52,23 +54,45 @@
 
           let canvas = 0;
           for (const { bins, values, name } of loads || []) {
-            const load_hist = core.createHistogram('TH1F', bins.length);
-            load_hist.fXaxis.fXbins = bins;
-            for (const idx in values) {
-              load_hist.setBinContent(parseInt(idx) + 1, values[idx]);
+            const maxGraph = {
+              x: bins,
+              y: values.map(y => y.at(-1)[0]),
+              mode: 'lines',
+              opacity: 0.3,
+              line: { shape: 'hv', color: 'black', width: 1 },
+            };
+
+            let maxY = Math.max(...maxGraph.y);
+            if (maxY === 0) {
+              maxY = 1;
+            } else {
+              maxY *= 1.2;
             }
-            load_hist.fXaxis.fXmin = 0;
-            load_hist.fXaxis.fXmax = max;
-            // ROOT scales the labels as a fraction of the canvas height → counter that effect
-            load_hist.fXaxis.fLabelSize *= loads.length;
-            load_hist.fXaxis.fLabelOffset *= loads.length;
-            load_hist.fYaxis.fLabelSize *= loads.length;
-            load_hist.fYaxis.fLabelOffset *= loads.length;
-            load_hist.fTitle = name;
+
+            const shapes = [];
+            bins.push(Math.max(max, bins.at(-1) * 1.2));
+            for (let i = 1; i < bins.length; i++) {
+              const v = values[i - 1];
+              v.push([maxY, v.at(-1)[1]]);
+              for (let j = 1; j < v.length; j++) {
+                shapes.push({
+                  type: 'rect',
+                  x0: bins[i - 1],
+                  x1: bins[i],
+                  y0: v[j - 1][0],
+                  y1: v[j][0],
+                  fillcolor: `rgba(0, 0, 255, ${1 - v[j-1][1]})`,
+                  line: { color: 'transparent' },
+                });
+              }
+            }
+
             const pad = 'loads' + canvas;
-            window[pad] = load_hist;
-            cleanup(pad);
-            draw.draw(pad, load_hist, 'nostat');
+            Plotly.newPlot(pad, [maxGraph], {
+              font: { size: 24 },
+              margin: { pad: 20 },
+              shapes,
+            });
             canvas++;
           }
         }

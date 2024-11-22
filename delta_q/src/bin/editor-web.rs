@@ -7,7 +7,7 @@ macro_rules! cloned {
 
 use delta_q::{
     CalcCdf, DeltaQComponent, DeltaQContext, DeltaQExpr, EphemeralContext, EvalCtxAction,
-    PersistentContext, StepFunction,
+    PersistentContext, StepFunction, CDF,
 };
 use gloo_utils::window;
 use js_sys::Reflect;
@@ -93,7 +93,7 @@ fn app_main() -> HtmlResult {
                         return;
                     }
                 };
-                let data = mk_graph_obj(name, cdf.cdf.steps());
+                let data = mk_graph_obj(name, &cdf.cdf.steps().map(|x| CDF::from_step_at(*x)));
                 Reflect::set(&data, &"loads".into(), &cdf.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
                 let init = MessageEventInit::new();
                 init.set_data(&data);
@@ -229,7 +229,7 @@ fn app_main() -> HtmlResult {
     })
 }
 
-fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
+fn mk_graph_obj(name: &str, steps: &StepFunction<CDF>) -> js_sys::Object {
     let data = js_sys::Object::new();
     Reflect::set(
         &data,
@@ -245,7 +245,16 @@ fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
         &"values".into(),
         &steps
             .graph_iter()
-            .map(|x| JsValue::from(x.1))
+            .map(|x| {
+                x.1.graph_iter()
+                    .map(|(x, y)| {
+                        [x, y]
+                            .iter()
+                            .map(|z| JsValue::from(*z))
+                            .collect::<js_sys::Array>()
+                    })
+                    .collect::<js_sys::Array>()
+            })
             .collect::<js_sys::Array>(),
     )
     .unwrap();
