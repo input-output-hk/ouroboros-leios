@@ -263,10 +263,10 @@ impl EventMonitor {
                     *eb_stake.entry(eb).or_default() += stake as f64;
                 }
                 Event::NoVote { .. } => {}
-                Event::VoteSent { .. } => {
+                Event::VotesSent { .. } => {
                     vote_messages.sent += 1;
                 }
-                Event::VoteReceived { .. } => {
+                Event::VotesReceived { .. } => {
                     vote_messages.received += 1;
                 }
             }

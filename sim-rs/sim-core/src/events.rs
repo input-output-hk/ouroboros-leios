@@ -93,15 +93,15 @@ pub enum Event {
         eb: EndorserBlockId,
         reason: NoVoteReason,
     },
-    VoteSent {
-        #[serde(flatten)]
-        vote: Vote,
+    VotesSent {
+        slot: u64,
+        producer: NodeId,
         sender: NodeId,
         recipient: NodeId,
     },
-    VoteReceived {
-        #[serde(flatten)]
-        vote: Vote,
+    VotesReceived {
+        slot: u64,
+        producer: NodeId,
         sender: NodeId,
         recipient: NodeId,
     },
@@ -240,17 +240,25 @@ impl EventTracker {
         });
     }
 
-    pub fn track_vote_sent(&self, vote: &Vote, sender: NodeId, recipient: NodeId) {
-        self.send(Event::VoteSent {
-            vote: vote.clone(),
+    pub fn track_votes_sent(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
+        let Some(Vote { slot, producer, .. }) = votes.first() else {
+            return;
+        };
+        self.send(Event::VotesSent {
+            slot: *slot,
+            producer: *producer,
             sender,
             recipient,
         });
     }
 
-    pub fn track_vote_received(&self, vote: &Vote, sender: NodeId, recipient: NodeId) {
-        self.send(Event::VoteReceived {
-            vote: vote.clone(),
+    pub fn track_votes_received(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
+        let Some(Vote { slot, producer, .. }) = votes.first() else {
+            return;
+        };
+        self.send(Event::VotesReceived {
+            slot: *slot,
+            producer: *producer,
             sender,
             recipient,
         });

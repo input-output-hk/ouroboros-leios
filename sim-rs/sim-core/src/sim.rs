@@ -224,7 +224,7 @@ enum SimulationMessage {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
     // Get out the vote
-    Vote(Vote),
+    Votes(Arc<Vec<Vote>>),
 }
 
 impl HasBytesSize for SimulationMessage {
@@ -250,7 +250,7 @@ impl HasBytesSize for SimulationMessage {
             Self::RequestEB(_) => 8,
             Self::EB(_) => 32,
 
-            Self::Vote(_) => 8,
+            Self::Votes(v) => 8 * v.len() as u64,
         }
     }
 }

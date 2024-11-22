@@ -209,8 +209,8 @@ impl Node {
                         }
 
                         // Voting
-                        SimulationMessage::Vote(vote) => {
-                            self.receive_vote(from, vote)?;
+                        SimulationMessage::Votes(votes) => {
+                            self.receive_votes(from, votes)?;
                         }
                     }
                 }
@@ -300,16 +300,25 @@ impl Node {
                 let Some(ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
                     return Ok(());
                 };
+                let mut votes = vec![];
                 for eb_id in ebs {
                     let eb = self.leios.ebs.get(&eb_id).unwrap();
                     match self.should_vote_for(slot, eb) {
                         Ok(()) => {
-                            self.vote_for(slot, eb_id)?;
+                            let vote = Vote {
+                                slot,
+                                producer: self.id,
+                                eb: eb_id,
+                            };
+                            votes.push(vote);
                         }
                         Err(reason) => {
                             self.tracker.track_no_vote(slot, self.id, eb_id, reason);
                         }
                     }
+                }
+                if !votes.is_empty() {
+                    self.send_votes(votes)?;
                 }
                 return Ok(());
             }
@@ -594,19 +603,21 @@ impl Node {
         Ok(())
     }
 
-    fn receive_vote(&mut self, from: NodeId, vote: Vote) -> Result<()> {
-        self.tracker.track_vote_received(&vote, from, self.id);
-        let votes = self.leios.votes_by_eb.entry(vote.eb).or_default();
-        if !votes.insert(vote.clone()) {
-            return Ok(());
+    fn receive_votes(&mut self, from: NodeId, votes: Arc<Vec<Vote>>) -> Result<()> {
+        self.tracker.track_votes_received(&votes, from, self.id);
+        for vote in votes.iter() {
+            let eb_votes = self.leios.votes_by_eb.entry(vote.eb).or_default();
+            if !eb_votes.insert(vote.clone()) {
+                return Ok(());
+            }
         }
-        // We haven't seen this vote before, so propagate it to our neighbors
+        // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
             if *peer == from {
                 continue;
             }
-            self.tracker.track_vote_sent(&vote, self.id, *peer);
-            self.send_to(*peer, SimulationMessage::Vote(vote.clone()))?;
+            self.tracker.track_votes_sent(&votes, self.id, *peer);
+            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
         }
         Ok(())
     }
@@ -725,21 +736,19 @@ impl Node {
         Ok(())
     }
 
-    fn vote_for(&mut self, slot: u64, eb_id: EndorserBlockId) -> Result<()> {
-        let vote = Vote {
-            producer: self.id,
-            slot,
-            eb: eb_id,
-        };
-        self.tracker.track_vote(&vote);
-        self.leios
-            .votes_by_eb
-            .entry(eb_id)
-            .or_default()
-            .insert(vote.clone());
+    fn send_votes(&mut self, votes: Vec<Vote>) -> Result<()> {
+        for vote in &votes {
+            self.tracker.track_vote(vote);
+            self.leios
+                .votes_by_eb
+                .entry(vote.eb)
+                .or_default()
+                .insert(vote.clone());
+        }
+        let votes = Arc::new(votes);
         for peer in &self.peers {
-            self.tracker.track_vote_sent(&vote, self.id, *peer);
-            self.send_to(*peer, SimulationMessage::Vote(vote.clone()))?;
+            self.tracker.track_votes_sent(&votes, self.id, *peer);
+            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
         }
         Ok(())
     }
