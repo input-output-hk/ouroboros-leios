@@ -32,6 +32,11 @@ common performance-opts
     -fspecialise-aggressively
 
 library
+  default-extensions:
+    DisambiguateRecordFields
+    OverloadedRecordDot
+    ScopedTypeVariables
+
   exposed-modules:
     Chan
     ChanDriver
@@ -41,6 +46,14 @@ library
     ExamplesRelay
     ExamplesRelayP2P
     ExamplesTCP
+    LeiosProtocol.Common
+    LeiosProtocol.Relay
+    LeiosProtocol.RelayBuffer
+    LeiosProtocol.Short
+    LeiosProtocol.Short.Generate
+    LeiosProtocol.Short.Node
+    LeiosProtocol.SimTestRelay
+    LeiosProtocol.VizSimTestRelay
     ModelTCP
     P2P
     PlotTCP
@@ -50,6 +63,7 @@ library
     PraosProtocol.Common
     PraosProtocol.Common.AnchoredFragment
     PraosProtocol.Common.Chain
+    PraosProtocol.ConcreteBlock
     PraosProtocol.ExamplesPraosP2P
     PraosProtocol.PraosNode
     PraosProtocol.SimBlockFetch
@@ -84,39 +98,46 @@ library
     , bytestring
     , cairo
     , cardano-slotting
+    , cardano-strict-containers
+    , cborg
     , Chart
     , Chart-cairo
     , colour
     , containers
     , contra-tracer
+    , deepseq
     , fgl
     , filepath
     , fingertree
     , gnuplot
     , graphviz
     , gtk3
+    , hashable
     , io-classes
     , io-sim
     , kdt
     , mtl
+    , nothunks
     , ouroboros-network-api
     , ouroboros-network-mock
     , pango
     , pqueue
+    , quiet
     , random
     , serialise
     , si-timers
-    , sqlite-simple           >=0.4
+    , singletons
+    , sqlite-simple              >=0.4
     , temporary
     , text
     , time
-    , typed-protocols         >=0.3
+    , typed-protocols            >=0.3
     , vector
     , zlib
 
-  hs-source-dirs:   src
-  default-language: Haskell2010
-  ghc-options:      -Wall
+  hs-source-dirs:     src
+  default-language:   Haskell2010
+  ghc-options:        -Wall
 
   if flag(perf)
     import: performance-opts

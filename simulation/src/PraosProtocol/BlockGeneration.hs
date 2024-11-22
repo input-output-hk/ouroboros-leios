@@ -21,7 +21,7 @@ import System.Random (StdGen, uniformR)
 
 -- | Returns a block that can extend the chain.
 --   PRECONDITION: the SlotNo is ahead of the chain tip.
-mkBlock :: Chain Block -> SlotNo -> BlockBody -> Block
+mkBlock :: IsBody body => Chain (Block body) -> SlotNo -> body -> (Block body)
 mkBlock c sl body = fixupBlock (Chain.headAnchor c) (mkPartialBlock sl body)
 
 type SlotGap = Word64
@@ -70,12 +70,12 @@ mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
   return $ Just go
 
 blockGenerator ::
-  (MonadSTM m, MonadDelay m, MonadTime m) =>
-  Tracer m PraosNodeEvent ->
-  PraosConfig ->
-  TVar m (ChainProducerState Block) ->
-  (Block -> STM m ()) ->
-  Maybe (m (SlotNo, BlockBody)) ->
+  (IsBody body, MonadSTM m, MonadDelay m, MonadTime m) =>
+  Tracer m (PraosNodeEvent body) ->
+  PraosConfig body ->
+  TVar m (ChainProducerState (Block body)) ->
+  (Block body -> STM m ()) ->
+  Maybe (m (SlotNo, body)) ->
   m ()
 blockGenerator _tracer _praosConfig _cpsVar _addBlockSt Nothing = return ()
 blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever $ go

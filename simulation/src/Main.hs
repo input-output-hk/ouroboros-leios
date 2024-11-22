@@ -8,6 +8,7 @@ import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import Options.Applicative
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
@@ -92,6 +93,9 @@ data VizCommand
   | VizPraos1
   | VizPraosP2P1
   | VizPraosP2P2
+  | VizRelayTest1
+  | VizRelayTest2
+  | VizRelayTest3
 
 vizCommands :: Parser VizCommand
 vizCommands =
@@ -127,6 +131,12 @@ vizCommands =
         progDesc
           "A simulation of 100 nodes running Praos consensus, \
           \comparing a cylindrical world to a flat world."
+    , command "relay-test-1" . info (pure VizRelayTest1) $
+        progDesc ""
+    , command "relay-test-2" . info (pure VizRelayTest2) $
+        progDesc ""
+    , command "relay-test-3" . info (pure VizRelayTest3) $
+        progDesc ""
     ]
 
 vizCommandToViz :: VizCommand -> Vizualisation
@@ -143,6 +153,9 @@ vizCommandToViz = \case
   VizPraos1 -> VizPraos.example1
   VizPraosP2P1 -> VizPraosP2P.example1
   VizPraosP2P2 -> VizPraosP2P.example2
+  VizRelayTest1 -> VizSimTestRelay.example1
+  VizRelayTest2 -> VizSimTestRelay.example2
+  VizRelayTest3 -> VizSimTestRelay.example3
 
 type VizSize = (Int, Int)
 

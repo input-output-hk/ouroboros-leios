@@ -64,14 +64,14 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   chainSyncMessageText (ProtocolMessage (SomeMessage msg)) = Just $ chainSyncMessageLabel msg
 
   blockFetchMessageColor ::
-    BlockFetchMessage ->
+    BlockFetchMessage BlockBody ->
     (Double, Double, Double)
   blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgBlock blk -> blockBodyColor blk
     _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
-    BlockFetchMessage ->
+    BlockFetchMessage BlockBody ->
     Maybe String
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
@@ -94,7 +94,7 @@ data PraosSimVizState
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( PraosMessage
+          [ ( PraosMessage BlockBody
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
@@ -135,7 +135,7 @@ data LinkPoints
       {-# UNPACK #-} !Point
   deriving (Show)
 
-type ChainsMap = IntMap (Chain Block)
+type ChainsMap = IntMap (Chain (Block BlockBody))
 
 accumChains :: Time -> PraosEvent -> ChainsMap -> ChainsMap
 accumChains _ (PraosEventNode (LabelNode nid (PraosNodeEventNewTip ch))) = IMap.insert (coerce nid) ch
@@ -146,7 +146,7 @@ type DiffusionLatencyMap = Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Ti
 accumDiffusionLatency :: Time -> PraosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
 accumDiffusionLatency now (PraosEventNode e) = accumDiffusionLatency' now e
 accumDiffusionLatency _ _ = id
-accumDiffusionLatency' :: Time -> LabelNode PraosNodeEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency' :: Time -> LabelNode (PraosNodeEvent BlockBody) -> DiffusionLatencyMap -> DiffusionLatencyMap
 accumDiffusionLatency' now (LabelNode nid (PraosNodeEventGenerate blk)) vs =
   assert (not (blockHash blk `Map.member` vs)) $
     Map.insert
@@ -362,8 +362,8 @@ data PraosVizConfig
   = PraosVizConfig
   { chainSyncMessageColor :: ChainSyncMessage -> (Double, Double, Double)
   , chainSyncMessageText :: ChainSyncMessage -> Maybe String
-  , blockFetchMessageColor :: BlockFetchMessage -> (Double, Double, Double)
-  , blockFetchMessageText :: BlockFetchMessage -> Maybe String
+  , blockFetchMessageColor :: BlockFetchMessage BlockBody -> (Double, Double, Double)
+  , blockFetchMessageText :: BlockFetchMessage BlockBody -> Maybe String
   }
 
 praosSimVizRender ::

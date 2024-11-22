@@ -153,7 +153,7 @@ newtype ChainConsumerState m = ChainConsumerState
 
 runChainConsumer ::
   (MonadSTM m, MonadDelay m) =>
-  PraosConfig ->
+  PraosConfig body ->
   Chan m ChainSyncMessage ->
   ChainConsumerState m ->
   m ()
@@ -163,9 +163,9 @@ runChainConsumer cfg chan st =
 type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
 chainConsumer ::
-  forall m.
+  forall m body.
   (MonadSTM m, MonadDelay m) =>
-  PraosConfig ->
+  PraosConfig body ->
   ChainConsumerState m ->
   ChainConsumer 'StIdle m ()
 chainConsumer cfg (ChainConsumerState hchainVar) = idle True
@@ -219,17 +219,17 @@ chainConsumer cfg (ChainConsumerState hchainVar) = idle True
 ---- ChainSync Producer
 --------------------------------
 
-runChainProducer :: MonadSTM m => Chan m ChainSyncMessage -> FollowerId -> TVar m (ChainProducerState Block) -> m ()
+runChainProducer :: (IsBody body, MonadSTM m) => Chan m ChainSyncMessage -> FollowerId -> TVar m (ChainProducerState (Block body)) -> m ()
 runChainProducer chan followerId stVar =
   void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer followerId stVar)
 
 type ChainProducer st m a = TS.Server ChainSyncState 'NonPipelined st m a
 
 chainProducer ::
-  forall m.
-  MonadSTM m =>
+  forall m body.
+  (MonadSTM m, IsBody body) =>
   FollowerId ->
-  TVar m (ChainProducerState Block) ->
+  TVar m (ChainProducerState (Block body)) ->
   ChainProducer StIdle m ()
 chainProducer followerId stVar = idle
  where

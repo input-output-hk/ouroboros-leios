@@ -18,7 +18,7 @@ import qualified Graphics.Rendering.Chart.Easy as Chart
 import Data.Bifunctor (second)
 import ModelTCP (TcpMsgForecast (..), segmentSize)
 import P2P
-import PraosProtocol.Common (BlockHeader, FullTip (FullTip), Time (..))
+import PraosProtocol.Common (BlockBody, BlockHeader, FullTip (FullTip), Time (..))
 import PraosProtocol.PraosNode
 import PraosProtocol.VizSimPraos (
   LinkPoints (..),
@@ -41,7 +41,7 @@ import VizUtils
 data PraosP2PSimVizConfig
   = PraosP2PSimVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  , ptclMessageColor :: PraosMessage -> Maybe (Double, Double, Double)
+  , ptclMessageColor :: PraosMessage BlockBody -> Maybe (Double, Double, Double)
   }
 
 praosP2PSimVizRender ::

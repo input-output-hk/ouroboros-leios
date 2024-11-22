@@ -40,9 +40,9 @@ data PraosEvent
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
-    PraosEventNode (LabelNode PraosNodeEvent)
+    PraosEventNode (LabelNode (PraosNodeEvent BlockBody))
   | -- | An event on a tcp link between two nodes
-    PraosEventTcp (LabelLink (TcpEvent PraosMessage))
+    PraosEventTcp (LabelLink (TcpEvent (PraosMessage BlockBody)))
   deriving (Show)
 
 exampleTrace1 :: PraosTrace
@@ -83,13 +83,13 @@ traceRelayLink1 tcpprops =
   tracer :: Tracer (IOSim s) PraosEvent
   tracer = simTracer
 
-  nodeTracer :: NodeId -> Tracer (IOSim s) PraosNodeEvent
+  nodeTracer :: NodeId -> Tracer (IOSim s) (PraosNodeEvent BlockBody)
   nodeTracer n =
     contramap (PraosEventNode . LabelNode n) tracer
 
   praosTracer ::
     NodeId ->
     NodeId ->
-    Tracer (IOSim s) (LabelTcpDir (TcpEvent PraosMessage))
+    Tracer (IOSim s) (LabelTcpDir (TcpEvent (PraosMessage BlockBody)))
   praosTracer nfrom nto =
     contramap (PraosEventTcp . labelDirToLabelLink nfrom nto) tracer
