@@ -20,6 +20,7 @@ import Data.Traversable (forM)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
 import PraosProtocol.Common (fixupBlock, mkPartialBlock)
+import System.Random
 
 data BuffersView m = BuffersView
   { newRBData :: STM m NewRankingBlockData
@@ -30,7 +31,7 @@ data BuffersView m = BuffersView
 
 data Role :: Type -> Type where
   Base :: Role RankingBlock
-  Propose :: [SubSlotNo] -> Role [InputBlock]
+  Propose :: SubSlotNo -> Role InputBlock
   Endorse :: Role EndorseBlock
   Vote :: Role [VoteMsg]
 
@@ -39,6 +40,23 @@ data SomeRole :: Type where
 
 data SomeAction :: Type where
   SomeAction :: Role a -> a -> SomeAction
+
+mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, NodeRate)]) -> m (SlotNo -> m [SomeRole])
+mkScheduler rng0 rates = do
+  let sampleRate (role, NodeRate lambda) = do
+        (sample, rng') <- gets $ uniformR (0, 1)
+        put $! rng'
+        -- TODO: check poisson dist. math.
+        let prob = lambda * exp (-lambda)
+        pure [role | sample <= prob]
+
+  rngVar <- newTVarIO rng0
+  let sched slot = atomically $ do
+        rng <- readTVar rngVar
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRate $ (rates slot)
+        writeTVar rngVar rng1
+        return $ acts
+  return sched
 
 waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> m SlotNo
 waitNextSlot cfg = do
@@ -75,15 +93,14 @@ blockGenerator BlockGeneratorConfig{..} = go 0
   execute' :: SlotNo -> Role a -> StateT Int m a
   execute' slot Base = do
     rbData <- lift $ atomically $ buffers.newRBData
-    let body = uncurry (mkRankingBlockBody leios) rbData.freshestCertifiedEB rbData.txsPayload
+    let body = mkRankingBlockBody leios rbData.freshestCertifiedEB rbData.txsPayload
     -- TODO: maybe submit should do the fixupBlock.
     return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
-  execute' slot (Propose subs) = do
-    forM subs $ \sub -> do
-      i <- nextBlkId InputBlockId
-      ibData <- lift $ atomically $ buffers.newIBData
-      let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
-      return $! mkInputBlock leios header ibData.txsPayload
+  execute' slot (Propose sub) = do
+    i <- nextBlkId InputBlockId
+    ibData <- lift $ atomically $ buffers.newIBData
+    let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
+    return $! mkInputBlock leios header ibData.txsPayload
   execute' slot Endorse = do
     i <- nextBlkId EndorseBlockId
     ibs <- lift $ atomically $ buffers.ibs

@@ -2,7 +2,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module PraosProtocol.PraosNode where
+module PraosProtocol.PraosNode (
+  module PraosProtocol.PraosNode,
+  PraosNodeEvent (..),
+)
+where
 
 import ChanMux
 import Control.Concurrent.Class.MonadSTM
@@ -13,6 +17,7 @@ import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Ouroboros.Network.Mock.Chain (headHash)
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
@@ -44,6 +49,11 @@ data PraosNodeState body m = PraosNodeState
   { blockFetchControllerState :: BlockFetchControllerState body m
   , chainSyncConsumerStates :: Map PeerId (ChainConsumerState m)
   }
+
+preferredChain :: MonadSTM m => PraosNodeState body m -> STM m (Chain (Block body))
+preferredChain st = do
+  cps <- readTVar st.blockFetchControllerState.cpsVar
+  return $ chainState cps
 
 -- Peer requires ChainSyncConsumer and BlockFetchConsumer
 addPeer ::
@@ -141,6 +151,9 @@ data PraosNodeConfig = PraosNodeConfig
   , blockMarker :: ByteString
   -- ^ bytes to include in block bodies.
   }
+
+newPraosNodeState :: MonadSTM m => Chain (Block body) -> m (PraosNodeState body m)
+newPraosNodeState chain = PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
 
 praosNode ::
   (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>

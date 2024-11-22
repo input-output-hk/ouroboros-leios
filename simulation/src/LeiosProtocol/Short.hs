@@ -157,11 +157,11 @@ stageStart l s0 slot s = fst $ stageRange l s0 slot s
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
 
-mkRankingBlockBody :: LeiosConfig -> EndorseBlockId -> Certificate -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg eb cert payload =
+mkRankingBlockBody :: LeiosConfig -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
+mkRankingBlockBody cfg ebs payload =
   fixSize cfg $
     RankingBlockBody
-      { endorseBlocks = [(eb, cert)]
+      { endorseBlocks = maybe [] (: []) ebs
       , payload
       , size = 0
       }
@@ -172,7 +172,7 @@ mkInputBlockHeader ::
   SlotNo ->
   SubSlotNo ->
   NodeId ->
-  RankingBlockId ->
+  ChainHash RankingBlock ->
   InputBlockHeader
 mkInputBlockHeader cfg id slot subSlot producer rankingBlock =
   fixSize cfg $ InputBlockHeader{size = 0, ..}
@@ -202,13 +202,13 @@ mkCertificate cfg vs = assert (Set.size vs <= cfg.votesForCertificate) $ Certifi
 -- Buffers views, divided to avoid reading in unneeded buffers.
 
 data NewRankingBlockData = NewRankingBlockData
-  { freshestCertifiedEB :: (EndorseBlockId, Certificate)
+  { freshestCertifiedEB :: Maybe (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
   , headAnchor :: Anchor RankingBlock
   }
 
 data NewInputBlockData = NewInputBlockData
-  { referenceRankingBlock :: RankingBlockId
+  { referenceRankingBlock :: ChainHash RankingBlock
   , txsPayload :: Bytes
   }
 

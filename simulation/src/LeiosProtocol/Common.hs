@@ -42,6 +42,7 @@ import Data.Word (Word8)
 import GHC.Generics
 import Ouroboros.Network.Block as Block
 import PraosProtocol.Common (
+  ChainHash (..),
   MessageSize (..),
   PraosConfig (..),
   ReadOnly,
@@ -83,6 +84,7 @@ import TimeCompat
 type RankingBlockHeader = Praos.BlockHeader
 data RankingBlockBody = RankingBlockBody
   { endorseBlocks :: ![(EndorseBlockId, Certificate)]
+  -- ^ at most one in short leios.
   , payload :: !Bytes
   -- ^ ranking blocks can also contain transactions directly, which we
   -- do not model directly, but contribute to size.
@@ -108,16 +110,13 @@ newtype SubSlotNo = SubSlotNo Word8
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Bounded)
 
-instance MessageSize SubSlotNo where
-  messageSizeBytes _ = 1
-
 data InputBlockHeader = InputBlockHeader
   { id :: !InputBlockId
   , slot :: !SlotNo
   , subSlot :: !SubSlotNo
   -- ^ for generation frequencies higher than 1 per slot.
   , producer :: !NodeId
-  , rankingBlock :: !RankingBlockId
+  , rankingBlock :: !(ChainHash RankingBlock)
   -- ^ points to ledger state for validation.
   , size :: !Bytes
   }
@@ -198,8 +197,14 @@ slice l s x = (toEnum s', toEnum $ s' + l - 1)
 ---- MessageSize instances
 -------------------------------------------
 
+instance MessageSize SubSlotNo where
+  messageSizeBytes _ = 1
+
 instance MessageSize RankingBlockBody where
   messageSizeBytes b = b.size
+
+instance MessageSize InputBlockId where
+  messageSizeBytes _ = 32 {- hash -}
 
 instance MessageSize InputBlockHeader where
   messageSizeBytes b = b.size
@@ -210,8 +215,14 @@ instance MessageSize InputBlockBody where
 instance MessageSize InputBlock where
   messageSizeBytes b = messageSizeBytes b.header + messageSizeBytes b.body
 
+instance MessageSize EndorseBlockId where
+  messageSizeBytes _ = 32 {- hash -}
+
 instance MessageSize EndorseBlock where
   messageSizeBytes b = b.size
+
+instance MessageSize VoteId where
+  messageSizeBytes _ = 32 {- hash -}
 
 instance MessageSize VoteMsg where
   messageSizeBytes b = b.size

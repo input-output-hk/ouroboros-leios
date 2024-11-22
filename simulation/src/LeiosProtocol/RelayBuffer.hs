@@ -109,6 +109,9 @@ ticketSearchMeasure n ml mr = mMaxTicket ml >= n && mMinTicket mr > n
 toList :: Ord key => RelayBuffer key value -> [EntryWithTicket key value]
 toList rb = Foldable.toList rb.entries
 
+values :: Ord key => RelayBuffer key value -> [value]
+values = map value . toList
+
 keySet :: Ord key => RelayBuffer key value -> Set key
 keySet rb = Map.keysSet rb.index
 
