@@ -83,8 +83,8 @@ fn app_main() -> HtmlResult {
         (selected.clone(), epoch.clone()),
         cloned!(agent_status, ctx; move |deps| async move {
             if let Some(name) = deps.0.as_deref() {
-                let cdf = match agent.run((name.to_string(), (*ctx).clone())).await {
-                    Ok(cdf) => cdf,
+                let outcome = match agent.run((name.to_string(), (*ctx).clone())).await {
+                    Ok(outcome) => outcome,
                     Err(e) => {
                         let init = MessageEventInit::new();
                         init.set_data(&wasm_bindgen::JsValue::null());
@@ -93,8 +93,15 @@ fn app_main() -> HtmlResult {
                         return;
                     }
                 };
-                let data = mk_graph_obj(name, &cdf.cdf.steps().map(|x| CDF::from_step_at(*x)));
-                Reflect::set(&data, &"loads".into(), &cdf.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                let data = mk_graph_obj(name, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
+                Reflect::set(&data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                if let Some(constraint) = ctx.constraint(name) {
+                    if let Ok(outcome) = agent.run((constraint.to_string(), (*ctx).clone())).await {
+                        let constraint_data = mk_graph_obj(constraint, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
+                        Reflect::set(&constraint_data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                        Reflect::set(&data, &"constraint".into(), &constraint_data).unwrap();
+                    }
+                }
                 let init = MessageEventInit::new();
                 init.set_data(&data);
                 let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).unwrap());

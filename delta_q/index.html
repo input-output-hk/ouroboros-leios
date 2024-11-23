@@ -16,7 +16,8 @@
             load_container.removeChild(load_container.firstChild);
           }
         } else {
-          const { bins, values, max, name, loads } = data;
+          window.data = data;
+          const { bins, values, max, name, loads, constraint } = data;
 
           const timeliness = {
             x: bins,
@@ -26,15 +27,31 @@
           };
           timeliness.x.push(max);
           timeliness.y.push(timeliness.y.at(-1));
-          Plotly.newPlot('output', [timeliness], {
+          const plots = [timeliness];
+
+          if (constraint) {
+            const { bins, values } = constraint;
+            const plot = {
+              x: bins,
+              y: values.map(y => y.at(-1)[0]),
+              mode: 'lines',
+              line: {shape: 'hv', color: 'red'},
+            };
+            plot.x.push(Math.max(max, bins.at(-1) * 1.2));
+            plot.y.push(plot.y.at(-1));
+            plots.push(plot);
+          }
+
+          Plotly.newPlot('output', plots, {
             font: { size: 24 },
             margin: { pad: 20 },
+            showlegend: false,
             shapes: [
               {
                 type: 'line',
                 x0: 0,
-                x1: max,
                 y0: 1,
+                x1: max,
                 y1: 1,
                 line: { color: 'black', dash: 'dash' },
               }
@@ -69,10 +86,23 @@
               maxY *= 1.2;
             }
 
+            const limit = constraint?.loads?.find(l => l.name === name)?.values?.at(-1)?.at(-1)?.[0] ?? Infinity;
+
             const pad = 'loads' + canvas;
             const elem = document.getElementById(pad);
             
             const shapes = [];
+            if (limit !== Infinity) {
+              shapes.push({
+                type: 'line',
+                x0: 0,
+                y0: limit,
+                x1: max,
+                y1: limit,
+                line: { color: 'red', dash: 'dash' },
+              });
+            }
+
             const annotations = [];
             bins.push(Math.max(max, bins.at(-1) * 1.2));
 
@@ -81,15 +111,17 @@
 
             for (let i = 1; i < bins.length; i++) {
               const v = values[i - 1];
+              const last = v.length;
               v.push([maxY, v.at(-1)[1]]);
               for (let j = 1; j < v.length; j++) {
+                const color = j < last && v[j][0] > limit ? '255,0,0' : '0,0,255';
                 shapes.push({
                   type: 'rect',
                   x0: bins[i - 1],
                   x1: bins[i],
                   y0: v[j - 1][0],
                   y1: v[j][0],
-                  fillcolor: `rgba(0, 0, 255, ${1 - v[j-1][1]})`,
+                  fillcolor: `rgba(${color}, ${1 - v[j-1][1]})`,
                   line: { color: 'transparent' },
                 });
                 annotations.push({
@@ -107,6 +139,7 @@
             Plotly.newPlot(pad, [maxGraph], {
               font: { size: 24 },
               margin: { pad: 20 },
+              title: { text: name },
               shapes,
               annotations,
             });
