@@ -1,41 +1,30 @@
 import { useGraphContext } from "@/contexts/GraphContext/context";
 import { ESpeedOptions } from "@/contexts/GraphContext/types";
-import { useCallback, useMemo } from "react";
-import { MILLISECOND_RANGE } from "../Graph";
-import { EMessageType, IServerMessage, ITransactionGenerated } from "../types";
+import { useCallback } from "react";
 import { isWithinRange } from "../utils";
+import { useStreamMessagesHandler } from "./queries";
 
-const scale = 3;
+const scale = 4;
 let offsetX = 0,
   offsetY = 0;
 
 export const useHandlers = () => {
   const {
-    canvasRef,
-    intervalId,
-    maxTime,
-    messages,
-    playing,
-    speed,
-    setSentTxs,
-    setCurrentTime,
-    setGeneratedMessages,
-    setPlaying,
-    setSpeed,
-    simulationPauseTime,
-    simulationStartTime,
-    transactions,
-    setTransactions,
-    topography,
+    state: {
+      canvasRef,
+      currentTime,
+      intervalId,
+      maxTime,
+      playing,
+      speed,
+      simulationPauseTime,
+      simulationStartTime,
+      topography,
+    },
+    dispatch
   } = useGraphContext();
 
-  const txGeneratedMessages = useMemo(
-    () =>
-      (messages?.filter(
-        ({ message }) => message.type === EMessageType.TransactionGenerated,
-      ) as IServerMessage<ITransactionGenerated>[]) || [],
-    [messages],
-  );
+  const { startStream, stopStream, transactionsRef, txReceivedMessagesRef, txGeneratedRef, txSentMessagesRef } = useStreamMessagesHandler();
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -50,11 +39,11 @@ export const useHandlers = () => {
       simulationStartTime.current !== 0
         ? (now - simulationStartTime.current) * speed
         : 0;
-    setCurrentTime(elapsed);
+    dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
 
     if (elapsed >= maxTime) {
       intervalId.current && clearInterval(intervalId.current);
-      setPlaying(false);
+      dispatch({ type: "SET_PLAYING", payload: false });
       return;
     }
 
@@ -109,12 +98,12 @@ export const useHandlers = () => {
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
       context.strokeStyle = "#ddd";
-      context.lineWidth = 0.5;
+      context.lineWidth = 0.2;
       context.stroke();
     });
 
     // Draw the transactions
-    transactions.forEach((txList) => {
+    transactionsRef.current.forEach((txList) => {
       txList.forEach((transaction) => {
         const { duration, source, target, sentTime, id } = transaction;
         const sourceNode = topography.nodes.get(source);
@@ -133,35 +122,29 @@ export const useHandlers = () => {
         const endY = targetNode.fy;
         const transactionElapsedTime = elapsed - sentTime;
 
+        // Skip if the animation hasn't started.
         if (transactionElapsedTime < 0) {
-          return; // Skip if the animation is done or hasn't started
+          return;
         }
-
-        // Cleanup if transaction has passed.
-        if (transactionElapsedTime > duration) {
-          setSentTxs((prev) => {
-            const newResult = new Set(prev);
-            newResult.add(`${id}-${source}-${target}#${sentTime + duration}`);
-            return newResult;
-          });
-
-          setTransactions(prev => {
-            const newResult = new Map(prev);
-            newResult.delete(id);
-            return newResult;
-          })
+        // Cleanup if transaction is 50ms old.
+        else if (transactionElapsedTime > sentTime + duration + 100) {
+          transactionsRef.current.delete(id);
+          txSentMessagesRef.current.delete(sentTime);
+          txReceivedMessagesRef.current.delete(sentTime + duration);
         }
-
-        // Calculate the interpolation factor
-        const t = Math.min(transactionElapsedTime / duration, 1);
-        const x = startX + t * (endX - startX);
-        const y = startY + t * (endY - startY);
-
-        // Draw the moving circle
-        context.beginPath();
-        context.arc(x, y, 1, 0, 2 * Math.PI);
-        context.fillStyle = "red";
-        context.fill();
+        // Draw the transaction event.
+        else {
+          // Calculate the interpolation factor
+          const t = Math.min(transactionElapsedTime / duration, 1);
+          const x = startX + t * (endX - startX);
+          const y = startY + t * (endY - startY);
+  
+          // Draw the moving circle
+          context.beginPath();
+          context.arc(x, y, 0.5, 0, 2 * Math.PI);
+          context.fillStyle = "red";
+          context.fill();
+        }
       });
     });
 
@@ -173,20 +156,17 @@ export const useHandlers = () => {
       context.stroke();
       context.strokeStyle = "black";
 
-      txGeneratedMessages.forEach((m) => {
+      txGeneratedRef.current.forEach((m) => {
         const target = m.time / 1_000_000;
         if (
           m.message.publisher === node.id &&
-          isWithinRange(elapsed, target, MILLISECOND_RANGE)
+          isWithinRange(elapsed, target, 50)
         ) {
           context.fillStyle = "red";
         }
 
         if (m.message.publisher === node.id && elapsed > target) {
-          setGeneratedMessages((prev) => {
-            prev.add(m.time);
-            return prev;
-          });
+          txGeneratedRef.current.set(m.time, m);
         }
       });
 
@@ -194,16 +174,18 @@ export const useHandlers = () => {
     });
 
     context.restore();
-  }, [topography, transactions, playing, speed, maxTime, txGeneratedMessages]);
+  }, [playing, speed]);
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
     const now = performance.now();
     if (!playing) {
+      startStream(currentTime, speed);
       simulationStartTime.current = now - simulationPauseTime.current;
       simulationPauseTime.current = now;
-      intervalId.current = setInterval(drawCanvas, 1000 / 120); // 120 FPS
+      intervalId.current = setInterval(drawCanvas, 1000 / 60); // 60 FPS
     } else {
+      stopStream();
       simulationPauseTime.current = now - simulationStartTime.current;
       if (intervalId.current) {
         clearInterval(intervalId.current);
@@ -211,16 +193,24 @@ export const useHandlers = () => {
       }
     }
 
-    setPlaying((playing) => !playing);
-  }, [drawCanvas]);
+    dispatch({ type: "TOGGLE_PLAYING" })
+  }, [drawCanvas, currentTime, speed]);
 
   const handleResetSim = useCallback(() => {
-    setCurrentTime(0);
-    setPlaying(false);
-    setSentTxs(new Set());
-    setSpeed(ESpeedOptions["3/10"]);
+    dispatch({ type: "BATCH_UPDATE", payload: {
+      currentTime: 0,
+      playing: false,
+      sentTxs: new Set(),
+      speed: ESpeedOptions["3/10"],
+      generatedMessages: new Set()
+    } });
+    
     simulationStartTime.current = 0;
     simulationPauseTime.current = 0;
+    transactionsRef.current = new Map();
+    txReceivedMessagesRef.current = new Map();
+    txGeneratedRef.current = new Map();
+    txSentMessagesRef.current = new Map();
 
     if (intervalId.current) {
       clearInterval(intervalId.current);

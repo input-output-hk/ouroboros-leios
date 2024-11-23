@@ -5,7 +5,7 @@ import { ESpeedOptions } from "@/contexts/GraphContext/types";
 import { useHandlers } from "../hooks/useHandlers";
 
 export const Controls: FC = memo(() => {
-  const { playing, speed, setSpeed, setCurrentTime } = useGraphContext();
+  const { state: { playing, speed }, dispatch } = useGraphContext();
   const { handleResetSim, togglePlayPause } = useHandlers();
   return (
     <>
@@ -23,7 +23,7 @@ export const Controls: FC = memo(() => {
         Reset
       </button>
       <button onClick={(() => {
-        setCurrentTime(1000)
+        dispatch({ type: "SET_CURRENT_TIME", payload: 1000 })
       })}>
         Jump to Time
       </button>
@@ -35,7 +35,7 @@ export const Controls: FC = memo(() => {
           value={speed}
           onChange={(e) => {
             handleResetSim();
-            setSpeed(Number(e.target.value) as ESpeedOptions);
+            dispatch({ type: "SET_SPEED", payload: Number(e.target.value) })
           }}
         >
           {Object.keys(ESpeedOptions)

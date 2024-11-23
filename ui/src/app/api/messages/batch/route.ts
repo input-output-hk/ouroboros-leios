@@ -1,12 +1,9 @@
 import { createReadStream, statSync } from "fs";
-import msgpack from "msgpack-lite";
 import { NextResponse } from "next/server";
-import readline from 'readline';
+import readline from "readline";
 
 import { IServerMessage } from "@/components/Graph/types";
 import { messagesPath } from "../../utils";
-
-const MESSAGE_BUFFER_IN_MS = 200;
 
 async function findStartPosition(filePath: string, targetTimestamp: number) {
   const fileSize = statSync(filePath).size;
@@ -29,17 +26,20 @@ async function findStartPosition(filePath: string, targetTimestamp: number) {
   return bestPosition;
 }
 
-function getTimestampAtPosition(filePath: string, position: number): Promise<number> {
+function getTimestampAtPosition(
+  filePath: string,
+  position: number,
+): Promise<number> {
   return new Promise((resolve, reject) => {
     const stream = createReadStream(filePath, { start: position });
     let foundNewLine = false;
     let adjustedPosition = position;
 
     // Read a few bytes to find the newline character
-    stream.on('data', (chunk) => {
+    stream.on("data", (chunk) => {
       const decoded = chunk.toString("utf8");
       for (let i = 0; i < decoded.length; i++) {
-        if (decoded[i] === '\n') {
+        if (decoded[i] === "\n") {
           foundNewLine = true;
           adjustedPosition += i + 1; // Move to the start of the next line
           break;
@@ -49,151 +49,141 @@ function getTimestampAtPosition(filePath: string, position: number): Promise<num
       stream.close(); // Stop reading once the newline is found
     });
 
-    stream.on('close', () => {
+    stream.on("close", () => {
       if (foundNewLine) {
         // Now use readline to get the timestamp from the new line
-        const lineStream = createReadStream(filePath, { start: adjustedPosition });
+        const lineStream = createReadStream(filePath, {
+          start: adjustedPosition,
+        });
         const rl = readline.createInterface({
           input: lineStream,
           crlfDelay: Infinity,
         });
 
-        rl.on('line', (line) => {
+        rl.on("line", (line) => {
           const message: IServerMessage = JSON.parse(line);
           const timestamp = message.time / 1_000_000;
           rl.close();
           resolve(timestamp);
         });
 
-        rl.on('error', (err) => {
+        rl.on("error", (err) => {
           reject(err);
         });
       } else {
-        reject(new Error("Could not find a newline character in the provided range"));
+        reject(
+          new Error("Could not find a newline character in the provided range"),
+        );
       }
     });
 
-    stream.on('error', (err) => {
+    stream.on("error", (err) => {
       reject(err);
     });
   });
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request, res: Response) {
   try {
     const url = new URL(req.url);
-    const currentTime = parseInt(url.searchParams.get("time") || "", 10);
+    const startTime = parseInt(url.searchParams.get("startTime") || "");
+    const speed = parseInt(url.searchParams.get("speed") || "");
 
-    if (isNaN(currentTime)) {
-      return new NextResponse("Invalid currentTime parameter", { status: 400 });
+    if (isNaN(startTime)) {
+      return new NextResponse(null, { status: 400, statusText: "Invalid currentTime parameter" });
     }
 
-    const startPosition = await findStartPosition(messagesPath, currentTime);
-    const fileStream = createReadStream(messagesPath, { encoding: "utf8", start: startPosition });
+    if (isNaN(speed)) {
+      return new NextResponse(null, { status: 400, statusText: "Invalid speed parameter" });
+    }
+
+    const startPosition = await findStartPosition(messagesPath, startTime);    
+    const fileStream = createReadStream(messagesPath, {
+      encoding: "utf8",
+      start: startPosition,
+    });
     const rl = readline.createInterface({
       input: fileStream,
-      crlfDelay: Infinity
-    })
-    
-    const stream = new ReadableStream({
-      start(controller) {
-        rl.on("line", (line) => {
-          try {
-            const message: IServerMessage = JSON.parse(line);
-            const aboveLowerLimit = message.time / 1_000_000 >= currentTime;
-            const underUpperLimit = message.time / 1_000_000 < currentTime + MESSAGE_BUFFER_IN_MS;
-  
-            // Check if the message falls within the time range
-            if (aboveLowerLimit && underUpperLimit) {
-              controller.enqueue(msgpack.encode(message))
-            }
-
-            // Free up resources if we're already pass the buffer window.
-            if (message.time / 1_000_000 >= currentTime + MESSAGE_BUFFER_IN_MS) {
-              rl.close();
-              fileStream.destroy();
-            }
-          } catch (error) {
-            // Handle JSON parse errors or other issues
-            controller.error(error);
-          }
-        });
-  
-        rl.on("close", () => {
-          controller.close();
-        });
-  
-        rl.on("error", (error) => {
-          controller.error(error);
-        });
-      }
+      crlfDelay: Infinity,
     });
 
-    // const stream = new ReadableStream(
-    //   {
-    //     start(controller) {
-    //       start = performance.now();
-    //       fileStream.on("data", (chunk) => {
-    //         buffer += chunk;
-    //         let lines = buffer.split("\n");
-    //         buffer = lines.pop() || ""; // Keep the last incomplete line
-  
-    //         for (const line of lines) {
-    //           if (!line.trim()) continue;
-  
-    //           try {
-    //             const message: IServerMessage = JSON.parse(line);
-    //             const aboveLowerLimit = message.time / 1_000_000 >= currentTime - halfRange;
-    //             const underUpperLimit = message.time / 1_000_000 < currentTime + halfRange;
-  
-    //             // Check if the message falls within the time range
-    //             if (aboveLowerLimit && underUpperLimit && !sent) {
-    //               // Stream the message if it matches the time range
-    //               controller.enqueue(new TextEncoder().encode(JSON.stringify(message) + "\n"));
-    //               sent = true;
-    //             }
-    //           } catch (error) {
-    //             console.error("Error parsing JSON line:", error);
-    //             controller.error(new Error("Error parsing JSON line"));
-    //             fileStream.destroy();
-    //             break;
-    //           }
-    //         }
-    //       });
+    let initialEventTime: number | null = null;
+    let interval: Timer | undefined;
+    const startTimeOnServer = Date.now();
+    const eventBuffer: { line: string; timeToSend: number }[] = [];
+    let rlClosed = false;
 
-    //       fileStream.on("end", () => {
-    //         end = performance.now();
-    //         console.log(end - start);
-    //         if (buffer.trim()) {
-    //           try {
-    //             const message = JSON.parse(buffer); // Parse the last incomplete line
-    //             controller.enqueue(
-    //               new TextEncoder().encode(JSON.stringify(message) + "\n"),
-    //             );
-    //           } catch (error) {
-    //             console.error("Error parsing final JSON line:", error);
-    //             controller.error(new Error("Error parsing final JSON line"));
-    //           }
-    //         }
-    //         controller.close();
-    //       });
+    const stream = new ReadableStream({
+      cancel() {
+        clearInterval(interval);
+        rl.close();
+      },
 
-    //       fileStream.on("error", (error) => {
-    //         console.error("File stream error:", error);
-    //         controller.error(new Error("File stream error"));
-    //       });
-    //     },
-    //   },
-    //   {
-    //     highWaterMark: 100_000,
-    //   },
-    // );
+      start(controller) {
+        const processEventBuffer = () => {
+          const now = Date.now();
 
-    // Return a streaming response
+          while (eventBuffer.length > 0) {
+            const { line, timeToSend } = eventBuffer[0];
+            if (timeToSend <= now) {
+              // Send the event to the client
+              controller.enqueue(`data: ${line}\n\n`);
+              eventBuffer.shift();
+            } else {
+              // Next event isn't ready yet
+              break;
+            }
+          }
+
+          // Close the stream if all events have been sent and the file has been fully read
+          if (eventBuffer.length === 0 && rlClosed) {
+            clearInterval(interval);
+            controller.close();
+          }
+        };
+
+        interval = setInterval(processEventBuffer, 50);
+
+        const processLine = (line: string) => {
+          try {
+            const message: IServerMessage = JSON.parse(line);
+            const eventTime = message.time; // Timestamp in nanoseconds
+
+            if (initialEventTime === null) {
+              initialEventTime = eventTime;
+            }
+
+            const deltaTime = eventTime - initialEventTime; // Difference in nanoseconds
+            const adjustedDelay = (deltaTime / 1_000_000) * speed; // Convert to ms and apply multiplier
+
+            const timeToSend = startTimeOnServer + adjustedDelay;
+
+            eventBuffer.push({ line, timeToSend });
+          } catch (error) {
+            controller.error(error);
+          }
+        };
+
+        rl.on("line", (line) => {
+          processLine(line);
+        });
+
+        rl.on("close", () => {
+          console.log('rl closed')
+        });
+
+        rl.on("error", (error) => {
+          controller.error(error);
+          console.log('rl error')
+        });
+      },
+    });
+
     return new NextResponse(stream, {
       headers: {
-        "Content-Type": "application/jsonl",
-        "Transfer-Encoding": "chunked",
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
     });
   } catch (e) {

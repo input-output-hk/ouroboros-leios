@@ -1,87 +1,71 @@
-import { FC, PropsWithChildren, useEffect, useMemo, useRef, useState } from "react";
+"use client";
+import { FC, PropsWithChildren, useMemo, useReducer, useRef } from "react";
 
-import { useSetSimulationTimeHandler, useSetTopographyHandler, useStreamMessagesHandler } from "@/components/Graph/hooks/queries";
-import { IServerMessage, ITransactionMessage, ITransformedNodeMap } from "@/components/Graph/types";
+import { IGraphWrapperProps } from "@/components/Graph/GraphWapper";
+import { ITransformedNodeMap } from "@/components/Graph/types";
 import { defaultState, GraphContext } from "./context";
-import { IGraphContextState } from "./types";
+import { reducer } from "./reducer";
 
-export const GraphContextProvider: FC<PropsWithChildren> = ({ children }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current)
-  const [currentTime, setCurrentTime] = useState(defaultState.currentTime);
-  const [generatedMessages, setGeneratedMessages] = useState<Set<number>>(defaultState.generatedMessages);
-  const intervalId = useRef<Timer | null>(defaultState.intervalId.current);
-  const [maxTime, setMaxTime] = useState(defaultState.maxTime);
-  const [messages, setMessages] = useState<IServerMessage[]>(defaultState.messages);
-  const [playing, setPlaying] = useState(defaultState.playing);
-  const [sentTxs, setSentTxs] = useState<Set<string>>(defaultState.sentTxs);
-  const simulationPauseTime = useRef<number>(defaultState.simulationPauseTime.current);
-  const simulationStartTime = useRef<number>(defaultState.simulationStartTime.current);
-  const [speed, setSpeed] = useState(defaultState.speed);
-  const [topography, setTopography] = useState<ITransformedNodeMap>(defaultState.topography);
-  const [topographyLoaded, setTopographyLoaded] = useState<boolean>(defaultState.topographyLoaded);
-  const [transactions, setTransactions] = useState<Map<number, ITransactionMessage[]>>(defaultState.transactions);
+export const GraphContextProvider: FC<
+  PropsWithChildren<IGraphWrapperProps>
+> = ({ children, topography, maxTime }) => {
+  const defaultSyncedState = useMemo(() => {
+    const transformedTopography: ITransformedNodeMap = {
+      nodes: new Map(
+        topography.nodes.map((n, i) => [
+          i,
+          {
+            data: n,
+            fx: n.location[0],
+            fy: n.location[1],
+            id: i,
+          },
+        ]),
+      ),
+      links: new Map(
+        topography.links.map((l) => [
+          `${l.nodes[0]}|${l.nodes[1]}`,
+          {
+            source: l.nodes[0],
+            target: l.nodes[1],
+          },
+        ]),
+      ),
+    };
 
-  const state: IGraphContextState = useMemo(() => {
     return {
-      canvasRef,
-      currentTime,
-      generatedMessages,
-      intervalId,
+      ...defaultState,
       maxTime,
-      messages,
-      playing,
-      sentTxs,
-      simulationPauseTime,
-      simulationStartTime,
-      speed,
-      topography,
-      topographyLoaded,
-      transactions,
-      setCurrentTime,
-      setGeneratedMessages,
-      setPlaying,
-      setSentTxs,
-      setSpeed,
-      setMaxTime,
-      setMessages,
-      setTopography,
-      setTopographyLoaded,
-      setTransactions
-    }
-  }, [topography, speed, sentTxs, generatedMessages, messages, maxTime, playing, transactions, currentTime])
-
-  const topographyHandler = useSetTopographyHandler(state);
-  const simulationTimeHandler = useSetSimulationTimeHandler(state);
-  const messagesHandler = useStreamMessagesHandler(state)
-  
-  useEffect(() => {
-    topographyHandler();
-    simulationTimeHandler();
-    messagesHandler(0);
+      topography: transformedTopography,
+      topographyLoaded: true,
+    };
   }, [])
 
-  const lastRequestTimeRef = useRef<number>(0);
+  const [state, dispatch] = useReducer(reducer, defaultSyncedState);
 
-  // Update to update on currentTime change
-  useEffect(() => {
-    if (!playing) {
-      return;
-    }
+  const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current);
+  const intervalId = useRef<Timer | null>(defaultState.intervalId.current);
+  const simulationPauseTime = useRef<number>(
+    defaultState.simulationPauseTime.current,
+  );
+  const simulationStartTime = useRef<number>(
+    defaultState.simulationStartTime.current,
+  );
 
-    // Define the minimum interval between requests
-    const MIN_INTERVAL = 100; // milliseconds
-
-    if (currentTime - lastRequestTimeRef.current < MIN_INTERVAL) {
-      return;
-    }
-
-    messagesHandler(currentTime);
-    lastRequestTimeRef.current = currentTime;
-  }, [currentTime, playing, messagesHandler]);
+  const resolvedState = useMemo(
+    () => ({
+      ...state,
+      canvasRef,
+      intervalId,
+      simulationPauseTime,
+      simulationStartTime,
+    }),
+    [state],
+  );
 
   return (
-    <GraphContext.Provider value={state}>
+    <GraphContext.Provider value={{ state: resolvedState, dispatch }}>
       {children}
     </GraphContext.Provider>
-  )
-}
+  );
+};

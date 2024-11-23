@@ -1,5 +1,6 @@
-import { createContext, useContext } from "react";
-import { ESpeedOptions, IGraphContextState } from "./types";
+"use client";
+import { Context, createContext, useContext } from "react";
+import { ESpeedOptions, IGraphContext, IGraphContextState } from "./types";
 
 export const defaultState: IGraphContextState = {
   canvasRef: { current: null },
@@ -7,7 +8,7 @@ export const defaultState: IGraphContextState = {
   generatedMessages: new Set(),
   intervalId: { current: null },
   maxTime: 0,
-  messages: [],
+  messages: new Map(),
   playing: false,
   simulationPauseTime: { current: 0 },
   simulationStartTime: { current: 0 },
@@ -16,17 +17,10 @@ export const defaultState: IGraphContextState = {
   topography: { links: new Map(), nodes: new Map() },
   topographyLoaded: false,
   transactions: new Map(),
-  setCurrentTime: () => {},
-  setGeneratedMessages: () => {},
-  setMaxTime: () => {},
-  setMessages: () => {},
-  setPlaying: () => {},
-  setSentTxs: () => {},
-  setSpeed: () => {},
-  setTopography: () => {},
-  setTopographyLoaded: () => {},
-  setTransactions: () => {}
 }
 
-export const GraphContext = createContext(defaultState);
+export const GraphContext: Context<IGraphContext> = createContext({
+  state: defaultState,
+  dispatch: (_val) => {}
+});
 export const useGraphContext = () => useContext(GraphContext);

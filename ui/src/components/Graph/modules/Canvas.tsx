@@ -1,9 +1,11 @@
+"use client";
+
 import { useGraphContext } from "@/contexts/GraphContext/context";
 import { FC, useEffect } from "react";
 import { useHandlers } from "../hooks/useHandlers";
 
 export const Canvas: FC = () => {
-  const { canvasRef, topographyLoaded } = useGraphContext();
+  const { state: { topographyLoaded, canvasRef } } = useGraphContext();
   const { drawCanvas } = useHandlers();
 
   useEffect(() => {

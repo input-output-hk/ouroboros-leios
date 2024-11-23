@@ -4,7 +4,7 @@ import { type FC } from "react";
 /** Built with AI !! */
 export const Slider: FC = () => {
     const min = 0;
-    const { currentTime, setCurrentTime, maxTime } = useGraphContext();
+    const { state: { currentTime, maxTime } } = useGraphContext();
 
     // const handleClick: MouseEventHandler<HTMLDivElement> = (e) => {
     //     // Get the slider's bounding rectangle

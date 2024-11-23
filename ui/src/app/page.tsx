@@ -1,16 +1,17 @@
-import { Graph } from "@/components/Graph/Graph";
+import { GraphWrapper } from "@/components/Graph/GraphWapper";
 import Image from "next/image";
+import { getSetSimulationMaxTime, getSimulationTopography } from "./queries";
 
 export default async function Home() {
-  // const [messages, topography] = await Promise.all([
-  //   getMessages(),
-  //   getTopography()
-  // ])
+  const [maxTime, topography] = await Promise.all([
+    getSetSimulationMaxTime(),
+    getSimulationTopography(),
+  ]);
 
   return (
     <div>
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Graph />
+        <GraphWrapper maxTime={maxTime} topography={topography}/>
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         <a

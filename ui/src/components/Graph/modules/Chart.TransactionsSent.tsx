@@ -1,3 +1,5 @@
+"use client";
+
 import { FC, useMemo } from "react";
 import {
   Area,
@@ -31,7 +33,7 @@ const CustomTooltip = ({
 };
 
 export const ChartTransactionsSent: FC = () => {
-  const { maxTime, sentTxs } = useGraphContext();
+  const { state: { maxTime, sentTxs } } = useGraphContext();
 
   const data = useMemo(
     () =>

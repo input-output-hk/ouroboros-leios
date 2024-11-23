@@ -7,6 +7,11 @@ export interface ILink {
   nodes: number[];
 }
 
+export interface IServerNodeMap {
+  links: ILink[];
+  nodes: INode[];
+}
+
 export enum EServerType {
   NODE = "node",
   LINK = "link"
