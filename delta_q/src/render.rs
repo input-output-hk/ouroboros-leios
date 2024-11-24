@@ -55,12 +55,13 @@ pub fn delta_q_component(props: &Props) -> Html {
             html!(<Branch top={first.clone()} bottom={second.clone()} kind={BranchKind::ForSome} {on_change} />)
         }
         DeltaQExpr::Gossip {
-            hop,
+            send,
+            receive,
             size,
             branching,
             cluster_coeff,
         } => {
-            html! { <Gossip hop={hop.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
+            html! { <Gossip send={send.clone()} receive={receive.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
         }
     }
 }
@@ -537,7 +538,8 @@ impl Reducible for PersistentContext {
 
 #[derive(Properties, Clone, PartialEq)]
 pub struct GossipProps {
-    pub hop: Arc<DeltaQExpr>,
+    pub send: Arc<DeltaQExpr>,
+    pub receive: Arc<DeltaQExpr>,
     pub size: f32,
     pub branching: f32,
     pub cluster_coeff: f32,
@@ -547,7 +549,8 @@ pub struct GossipProps {
 #[function_component(Gossip)]
 pub fn gossip(props: &GossipProps) -> Html {
     let GossipProps {
-        hop,
+        send,
+        receive,
         size,
         branching,
         cluster_coeff,
@@ -559,11 +562,11 @@ pub fn gossip(props: &GossipProps) -> Html {
 
     html! {
         <div class={classes!("frame")} onclick={toggle_popup}>
-            { format!("gossip({}, {}, {}, {})", hop, size, branching, cluster_coeff) }
+            { format!("gossip({send}, {receive}, {size}, {branching}, {cluster_coeff})") }
             if *popup {
                 <div class={classes!("popup")}>
                     {
-                        match expand_gossip(&hop, *size, *branching, *cluster_coeff) {
+                        match expand_gossip(&send, &receive, *size, *branching, *cluster_coeff) {
                             Ok(delta_q) => html! { <DeltaQComponent delta_q={delta_q.arc()} on_change={|_| {}} /> },
                             Err(e) => html! { <div>{e.to_string()}</div> },
                         }

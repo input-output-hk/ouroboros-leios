@@ -13,10 +13,8 @@ pub trait StepValue: Clone + fmt::Debug {
     fn sum_up(&self, other: &Self) -> Self;
     /// Add two values together probabilistically
     fn add_prob(&self, other: &Self) -> Result<Self, Self::Error>;
-    /// Scale the value itself by a factor
-    fn scale(&self, factor: f32) -> Self;
-    /// Diminish the probability density by a factor
-    fn diminish(&self, factor: f32) -> Self;
+    /// Scale the probability density by a factor
+    fn scale_prob(&self, factor: f32) -> Self;
     /// Combine two values by choosing one with a given probability
     fn choice(&self, my_fraction: f32, other: &Self) -> Result<Self, Self::Error>;
     fn compact(this: &mut Vec<(f32, Self)>, mode: CompactionMode, max_size: usize);
@@ -51,11 +49,7 @@ impl StepValue for f32 {
         }
     }
 
-    fn scale(&self, factor: f32) -> Self {
-        *self * factor
-    }
-
-    fn diminish(&self, factor: f32) -> Self {
+    fn scale_prob(&self, factor: f32) -> Self {
         *self * factor
     }
 
@@ -102,11 +96,7 @@ impl StepValue for CDF {
             .collect()
     }
 
-    fn scale(&self, factor: f32) -> Self {
-        self.iter().map(|(x, y)| (x * factor, y)).collect()
-    }
-
-    fn diminish(&self, factor: f32) -> Self {
+    fn scale_prob(&self, factor: f32) -> Self {
         self.iter().map(|(x, y)| (x, y * factor)).collect()
     }
 

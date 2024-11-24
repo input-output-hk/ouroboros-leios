@@ -165,3 +165,4 @@ The load factor annotations would not be necessary if it were possible to use pr
 Which syntax to use is a matter of taste (or later bike shedding), since the achieved result is the same.
 
 So, with this understanding the meaning of `O₁ ->-×K O₂` is that `O₂` can only be done after `O₁` has finished, but the probability that `O₂` must be performed on a given node is `K`.
+The load of the resulting outcome is thus computed by applying a choice operator _but only to the CUDFs_, with the original load receiving weight `K` and “load zero” receiving weight `1 - K`.

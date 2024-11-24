@@ -203,25 +203,6 @@ impl<T: StepValue> StepFunction<T> {
         }
     }
 
-    pub fn scale(&self, factor: f32) -> Self {
-        if factor == 0.0 {
-            return Self::zero()
-                .with_max_size(self.max_size)
-                .with_mode(self.mode);
-        }
-        Self {
-            data: self.data.as_ref().map(|d| {
-                d.iter()
-                    .map(|(x, y)| (*x, y.scale(factor)))
-                    .collect::<Vec<_>>()
-                    .into()
-            }),
-            max_size: self.max_size,
-            mode: self.mode,
-            zero: T::sum_up_zero(),
-        }
-    }
-
     pub fn sum_up(&self, other: &Self) -> Self {
         let mut data = Vec::new();
         for (x, (l, r)) in self.zip(other) {

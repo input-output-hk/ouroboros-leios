@@ -238,9 +238,9 @@ impl CDF {
             let mut d = Vec::new();
             let iter = crate::step_function::zip(
                 data.iter().map(|(x, y)| (*x, y)),
-                other.iter().map(|(x, y)| (x + lx, y.diminish(step))),
+                other.iter().map(|(x, y)| (x + lx, y.scale_prob(step))),
                 &zero_prob,
-                zero_sum.diminish(step),
+                zero_sum.scale_prob(step),
             );
             for (x, (ly, ry)) in iter {
                 d.push((x, ly.add_prob(&ry).expect("probability overflow")));

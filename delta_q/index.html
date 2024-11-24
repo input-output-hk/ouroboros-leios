@@ -10,14 +10,19 @@
       window.addEventListener('rootjs', (event) => {
         const { data } = event;
         if (data === null || typeof data !== 'object') {
-          cleanup('output');
+          Plotly.purge('output');
           const load_container = document.getElementById('loads');
           while (load_container.firstChild) {
             load_container.removeChild(load_container.firstChild);
           }
         } else {
           window.data = data;
-          const { bins, values, max, name, loads, constraint } = data;
+          const { bins, values, name, loads, constraint } = data;
+
+          let max = bins.at(-1) * 1.2;
+          if (max === 0) {
+            max = 1;
+          }
 
           const timeliness = {
             x: bins,
@@ -66,7 +71,7 @@
             const id = 'loads' + idx;
             const pad = load_container.appendChild(document.createElement('div'));
             pad.id = id;
-            pad.setAttribute('style', `width: 100%; height: ${100 / loads.length}%;`);
+            pad.setAttribute('style', `width: 100%; height: ${loads.length > 1 ? 80 : 100}%;`);
           }
 
           let canvas = 0;
@@ -131,7 +136,7 @@
                   height: pxPerUnitY * (v[j][0] - v[j-1][0]),
                   showarrow: false,
                   text: '',
-                  hovertext: v[j - 1][1].toFixed(3),
+                  hovertext: `level: ${v[j - 1][1].toFixed(3)}<br>value: ${v[j][0]}<br>prob: ${(v[j][1]-v[j-1][1]).toFixed(3)}`,
                 });
               }
             }

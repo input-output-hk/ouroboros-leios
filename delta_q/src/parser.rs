@@ -198,19 +198,22 @@ fn for_some(input: &mut &str) -> PResult<DeltaQExpr> {
 fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         "gossip(",
-        cut_err(seq!(delta_q, _: comma, num, _: comma, num, _: comma, num))
+        cut_err(seq!(delta_q, _: comma, delta_q, _: comma, num, _: comma, num, _: comma, num))
             .context(StrContext::Label("gossip specification"))
             .context(StrContext::Expected(StrContextValue::Description(
                 "hop, size, branching, cluster coefficient",
             ))),
         closing_paren,
     )
-    .map(|(dq, size, branching, cluster_coeff)| DeltaQExpr::Gossip {
-        hop: Arc::new(dq),
-        size,
-        branching,
-        cluster_coeff,
-    })
+    .map(
+        |(dq1, dq2, size, branching, cluster_coeff)| DeltaQExpr::Gossip {
+            send: Arc::new(dq1),
+            receive: Arc::new(dq2),
+            size,
+            branching,
+            cluster_coeff,
+        },
+    )
     .parse_next(input)
 }
 

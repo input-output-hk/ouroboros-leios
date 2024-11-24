@@ -85,11 +85,14 @@ impl Outcome {
             .try_collect()
     }
 
-    pub fn mult(&self, lf: f32, ctx: &PersistentContext) -> Self {
-        Self {
-            cdf: self.cdf_cloned(ctx),
-            load: self.map_load(ctx, |l| l.scale(lf)),
+    pub fn apply_load_factor(&self, lf: f32, ctx: &PersistentContext) -> Result<Self, CDFError> {
+        if lf < 0.0 || lf > 1.0 {
+            return Err(CDFError::InvalidFraction(lf));
         }
+        Ok(Self {
+            cdf: self.cdf_cloned(ctx),
+            load: self.map_load(ctx, |l| l.choice(lf, &StepFunction::zero()).unwrap()),
+        })
     }
 
     pub fn seq(&self, other: &Self, ctx: &PersistentContext) -> Self {
