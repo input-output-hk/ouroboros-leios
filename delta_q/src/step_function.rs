@@ -64,6 +64,8 @@ impl StepFunction {
             }
         }
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
             return Err(StepFunctionError::NonMonotonicData);
         }
         let data = if points.is_empty() {
@@ -267,6 +269,8 @@ impl<T: StepValue> TryFrom<&[(f32, T)]> for StepFunction<T> {
             }
         }
         if !points.windows(2).all(|w| w[0].0 < w[1].0) {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
             return Err(StepFunctionError::NonMonotonicData);
         }
         let data = if points.is_empty() {

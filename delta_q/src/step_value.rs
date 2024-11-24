@@ -1,4 +1,6 @@
-use crate::{step_function::zip, CDFError, CompactionMode, StepFunctionError, CDF};
+use crate::{
+    compaction::compact_cdf, step_function::zip, CDFError, CompactionMode, StepFunctionError, CDF,
+};
 use std::fmt::{self, Write as _};
 
 pub trait StepValue: Clone + fmt::Debug {
@@ -112,8 +114,8 @@ impl StepValue for CDF {
             .collect())
     }
 
-    fn compact(_this: &mut Vec<(f32, Self)>, _mode: CompactionMode, _max_size: usize) {
-        // no plan yet
+    fn compact(this: &mut Vec<(f32, Self)>, mode: CompactionMode, max_size: usize) {
+        compact_cdf(this, mode, max_size);
     }
 
     fn similar(&self, other: &Self) -> bool {

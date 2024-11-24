@@ -119,14 +119,14 @@
               const last = v.length;
               v.push([maxY, v.at(-1)[1]]);
               for (let j = 1; j < v.length; j++) {
-                const color = j < last && v[j][0] > limit ? '255,0,0' : '0,0,255';
+                const color = j < last && v[j][0] > limit ? '155,0,0' : '0,0,255';
                 shapes.push({
                   type: 'rect',
                   x0: bins[i - 1],
                   x1: bins[i],
                   y0: v[j - 1][0],
                   y1: v[j][0],
-                  fillcolor: `rgba(${color}, ${1 - v[j-1][1]})`,
+                  fillcolor: `rgba(${color}, ${Math.sqrt(1 - v[j-1][1])})`,
                   line: { color: 'transparent' },
                 });
                 annotations.push({

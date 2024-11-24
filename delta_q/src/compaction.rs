@@ -1,5 +1,6 @@
+use crate::{StepValue, CDF};
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BinaryHeap};
+use std::{cmp::Ordering, collections::BinaryHeap, mem};
 
 #[derive(Debug, PartialEq, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum CompactionMode {
@@ -140,4 +141,55 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
 
     // skipping every other occurrence of the same bin may end up draining the heap, so check whether we need to run a second pass
     compact(data, mode, max_size);
+}
+
+pub(crate) fn compact_cdf(data: &mut Vec<(f32, CDF)>, _mode: CompactionMode, _max_size: usize) {
+    if data.len() < 10 {
+        return;
+    }
+    let max_dx = data[data.len() - 1].0 / 300.0;
+
+    let mut pos = 0;
+    let mut current = None;
+    for idx in 0..data.len() {
+        let (x, cdf) = mem::take(&mut data[idx]);
+        let next_x = data.get(idx + 1).map(|x| x.0).unwrap_or(f32::INFINITY);
+        if x.similar(&next_x) {
+            continue;
+        }
+
+        if let Some((curr_x, curr_cdf, count)) = current.take() {
+            if next_x - curr_x > max_dx {
+                // emit previously summarised CDF
+                data[pos] = (curr_x, quantise(curr_cdf));
+                pos += 1;
+                current = Some((x, cdf, 1.0f32));
+            } else {
+                // summarise into current CDF
+                let merged = curr_cdf
+                    .choice(count / (count + 1.0), &cdf)
+                    .expect("fractions should be valid");
+                current = Some((curr_x, merged, count + 1.0));
+            }
+        } else {
+            current = Some((x, cdf, 1.0f32));
+        }
+    }
+    if let Some((x, cdf, _)) = current.take() {
+        data[pos] = (x, quantise(cdf));
+        pos += 1;
+    }
+    data.truncate(pos);
+}
+
+fn quantise(cdf: CDF) -> CDF {
+    let mut prev = 0.0;
+    cdf.iter()
+        .map(|(x, y)| (x, (y * 1000.0).round() / 1000.0))
+        .filter(|(_, y)| {
+            let keep = *y != prev;
+            prev = *y;
+            keep
+        })
+        .collect()
 }

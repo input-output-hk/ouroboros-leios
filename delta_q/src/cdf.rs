@@ -106,6 +106,8 @@ impl CDF {
             .tuple_windows::<(_, _)>()
             .all(|(a, b)| a.1 < b.1)
         {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::error_2(&"non-monotonic".into(), &format!("{}", steps).into());
             return Err(CDFError::NonMonotonicData);
         }
         Ok(Self { steps })
