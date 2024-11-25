@@ -5,12 +5,13 @@
 module SimTypes where
 
 import Data.Aeson.Types (FromJSON, FromJSONKey, ToJSON (..), ToJSONKey, defaultOptions, genericToEncoding)
+import Data.Hashable
 import Data.Ix (Ix)
 import GHC.Generics (Generic)
 
 newtype NodeId = NodeId Int
   deriving (Eq, Ord, Ix, Show)
-  deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey)
+  deriving newtype (ToJSON, FromJSON, ToJSONKey, FromJSONKey, Hashable)
 
 data LabelNode e = LabelNode NodeId e deriving (Show)
 
@@ -18,6 +19,10 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 
 -- | Position in simulation world coordinates
 data Point = Point !Double !Double
+  deriving (Show, Generic)
+
+-- | Path in simulation world
+newtype Path = Path [Point]
   deriving (Show, Generic)
 
 instance ToJSON Point where

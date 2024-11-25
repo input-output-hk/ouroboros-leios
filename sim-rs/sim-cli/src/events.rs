@@ -35,7 +35,6 @@ pub enum OutputFormat {
 
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
-    pool_ids: Vec<NodeId>,
     stage_length: u64,
     maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
@@ -51,17 +50,10 @@ impl EventMonitor {
         output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
-        let pool_ids = config
-            .nodes
-            .iter()
-            .filter(|p| p.stake > 0)
-            .map(|p| p.id)
-            .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * config.deliver_stage_count;
+        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
         Self {
             node_ids,
-            pool_ids,
             stage_length,
             maximum_ib_age,
             events_source,
@@ -85,6 +77,7 @@ impl EventMonitor {
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
+        let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
         let mut total_slots = 0u64;
@@ -94,6 +87,11 @@ impl EventMonitor {
         let mut empty_ibs = 0u64;
         let mut expired_ibs = 0u64;
         let mut generated_ebs = 0u64;
+        let mut total_votes = 0u64;
+        let mut tx_messages = MessageStats::default();
+        let mut ib_messages = MessageStats::default();
+        let mut eb_messages = MessageStats::default();
+        let mut vote_messages = MessageStats::default();
 
         // Pretty print options for bytes
         let pbo = Some(PrettyBytesOptions {
@@ -157,8 +155,12 @@ impl EventMonitor {
                     );
                     pending_txs.insert(id);
                 }
-                Event::TransactionSent { .. } => {}
-                Event::TransactionReceived { .. } => {}
+                Event::TransactionSent { .. } => {
+                    tx_messages.sent += 1;
+                }
+                Event::TransactionReceived { .. } => {
+                    tx_messages.received += 1;
+                }
                 Event::PraosBlockGenerated {
                     slot,
                     producer,
@@ -217,8 +219,11 @@ impl EventMonitor {
                         pretty_bytes(ib_bytes, pbo.clone()),
                     )
                 }
-                Event::InputBlockSent { .. } => {}
+                Event::InputBlockSent { .. } => {
+                    ib_messages.sent += 1;
+                }
                 Event::InputBlockReceived { recipient, .. } => {
+                    ib_messages.received += 1;
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
                 Event::EndorserBlockGenerated { id, input_blocks } => {
@@ -235,8 +240,23 @@ impl EventMonitor {
                         id.slot,
                     )
                 }
-                Event::EndorserBlockSent { .. } => {}
-                Event::EndorserBlockReceived { .. } => {}
+                Event::EndorserBlockSent { .. } => {
+                    eb_messages.sent += 1;
+                }
+                Event::EndorserBlockReceived { .. } => {
+                    eb_messages.received += 1;
+                }
+                Event::Vote { eb, .. } => {
+                    total_votes += 1;
+                    *eb_votes.entry(eb).or_default() += 1.0;
+                }
+                Event::NoVote { .. } => {}
+                Event::VotesSent { .. } => {
+                    vote_messages.sent += 1;
+                }
+                Event::VotesReceived { .. } => {
+                    vote_messages.received += 1;
+                }
             }
         }
 
@@ -263,11 +283,11 @@ impl EventMonitor {
                 ),
             );
 
-            for id in self.pool_ids {
-                if let Some(published) = blocks_published.get(&id) {
+            for id in &self.node_ids {
+                if let Some(published) = blocks_published.get(id) {
                     info!("Pool {id} published {published} naive praos block(s)");
                 }
-                if let Some(rejected) = blocks_rejected.get(&id) {
+                if let Some(rejected) = blocks_rejected.get(id) {
                     info!("Pool {id} failed to publish {rejected} naive praos block(s) due to slot battles.");
                 }
             }
@@ -294,6 +314,8 @@ impl EventMonitor {
                     .iter()
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
+            let votes_per_eb = compute_stats(eb_votes.into_values());
+
             info!(
                 "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
                 generated_ibs as f64 / total_slots as f64
@@ -350,7 +372,18 @@ impl EventMonitor {
                 "{} out of {} IBs expired before they reached an EB.",
                 expired_ibs, generated_ibs,
             );
+            info!("{} total votes were generated.", total_votes);
+            info!("Each EB received an average of {:.3} vote(s) (stddev {:3})..",
+                votes_per_eb.mean, votes_per_eb.std_dev);
         });
+
+        info_span!("network").in_scope(|| {
+            tx_messages.display("TX");
+            ib_messages.display("IB");
+            eb_messages.display("EB");
+            vote_messages.display("Vote");
+        });
+
         Ok(())
     }
 }
@@ -359,6 +392,21 @@ struct Transaction {
     bytes: u64,
     generated: Timestamp,
     included_in_ib: Option<Timestamp>,
+}
+
+#[derive(Default)]
+struct MessageStats {
+    sent: u64,
+    received: u64,
+}
+impl MessageStats {
+    fn display(&self, name: &str) {
+        let percent_received = self.received as f64 / self.sent as f64 * 100.0;
+        info!(
+            "{} {} message(s) were sent. {} of them were received ({:.3}%).",
+            self.sent, name, self.received, percent_received
+        );
+    }
 }
 
 struct Stats {

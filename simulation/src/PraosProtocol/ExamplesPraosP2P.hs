@@ -330,7 +330,7 @@ config =
     }
  where
   testPtclMessageColor ::
-    PraosMessage ->
+    PraosMessage BlockBody ->
     Maybe (Double, Double, Double)
   testPtclMessageColor msg =
     case msg of

@@ -62,3 +62,7 @@ uniform_ib_generation = true
 
 # EB parameters
 eb_generation_probability = 5.0
+
+# Vote parameters
+vote_probability = 500
+one_vote_per_vrf = true

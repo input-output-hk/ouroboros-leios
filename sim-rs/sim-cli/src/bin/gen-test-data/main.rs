@@ -28,6 +28,8 @@ fn main() -> Result<()> {
         Strategy::Simplified(args) => simplified(&args)?,
     };
 
+    let vote_probability = 500.0;
+
     let raw_config = RawConfig {
         seed: None,
         timescale: None,
@@ -38,12 +40,14 @@ fn main() -> Result<()> {
         block_generation_probability: 0.05,
         ib_generation_probability: 5.0,
         eb_generation_probability: 5.0,
+        vote_probability,
         ib_shards: 8,
         max_block_size: 90112,
         stage_length: 2,
         deliver_stage_count: 2,
         uniform_ib_generation: true,
         max_ib_requests_per_peer: 1,
+        one_vote_per_vrf: true,
         max_ib_size: 327680,
         max_tx_size: 16384,
         transaction_frequency_ms: DistributionConfig::Exp {

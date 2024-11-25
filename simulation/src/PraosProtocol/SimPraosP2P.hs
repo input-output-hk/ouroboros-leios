@@ -53,7 +53,7 @@ tracePraosP2P
           sequence
             [ do
               (inChan, outChan) <-
-                newConnectionBundleTCP @Praos
+                newConnectionBundleTCP @(Praos BlockBody)
                   (linkTracer na nb)
                   (tcpprops (realToFrac latency))
               return ((na, nb), (inChan, outChan))
@@ -92,7 +92,7 @@ tracePraosP2P
     tracer :: Tracer (IOSim s) PraosEvent
     tracer = simTracer
 
-    nodeTracer :: NodeId -> Tracer (IOSim s) PraosNodeEvent
+    nodeTracer :: NodeId -> Tracer (IOSim s) (PraosNodeEvent BlockBody)
     nodeTracer n =
       contramap (PraosEventNode . LabelNode n) tracer
 
@@ -101,6 +101,6 @@ tracePraosP2P
       NodeId ->
       Tracer
         (IOSim s)
-        (LabelTcpDir (TcpEvent PraosMessage))
+        (LabelTcpDir (TcpEvent (PraosMessage BlockBody)))
     linkTracer nfrom nto =
       contramap (PraosEventTcp . labelDirToLabelLink nfrom nto) tracer

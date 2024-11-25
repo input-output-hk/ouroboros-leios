@@ -9,6 +9,8 @@ uniform_ib_generation = true
 max_ib_size = 327680
 max_ib_requests_per_peer = 1
 ib_shards = 8
+vote_probability = 500
+one_vote_per_vrf = true
 
 [[nodes]]
 location = [

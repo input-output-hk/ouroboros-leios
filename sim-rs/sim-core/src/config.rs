@@ -59,6 +59,7 @@ pub struct RawConfig {
     pub block_generation_probability: f64,
     pub ib_generation_probability: f64,
     pub eb_generation_probability: f64,
+    pub vote_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub stage_length: u64,
@@ -67,6 +68,7 @@ pub struct RawConfig {
     pub max_ib_size: u64,
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
+    pub one_vote_per_vrf: bool,
     pub transaction_frequency_ms: DistributionConfig,
     pub transaction_size_bytes: DistributionConfig,
 }
@@ -117,6 +119,7 @@ impl From<RawConfig> for SimConfiguration {
             block_generation_probability: value.block_generation_probability,
             ib_generation_probability: value.ib_generation_probability,
             eb_generation_probability: value.eb_generation_probability,
+            vote_probability: value.vote_probability,
             max_block_size: value.max_block_size,
             max_tx_size: value.max_tx_size,
             stage_length: value.stage_length,
@@ -125,6 +128,7 @@ impl From<RawConfig> for SimConfiguration {
             max_ib_size: value.max_ib_size,
             max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             ib_shards: value.ib_shards,
+            one_vote_per_vrf: value.one_vote_per_vrf,
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
@@ -142,6 +146,7 @@ pub struct SimConfiguration {
     pub block_generation_probability: f64,
     pub ib_generation_probability: f64,
     pub eb_generation_probability: f64,
+    pub vote_probability: f64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub stage_length: u64,
@@ -150,6 +155,7 @@ pub struct SimConfiguration {
     pub max_ib_size: u64,
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
+    pub one_vote_per_vrf: bool,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }

@@ -73,4 +73,4 @@ chanDriver cmp ch =
     case smsg of
       SomeMessage @_ @st' msg -> case cmp @st @st' of
         Just Refl -> pure (SomeMessage msg, ())
-        Nothing -> error "TODO"
+        Nothing -> error "recvMessage: read message state does not match expected state"

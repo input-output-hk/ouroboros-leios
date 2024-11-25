@@ -20,6 +20,7 @@ module ModelTCP (
 import Control.Exception (assert)
 import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime)
 import Data.Foldable as Foldable (Foldable (sum))
+import Data.Hashable
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
@@ -52,7 +53,7 @@ data TcpConnProps = TcpConnProps
   deriving (Show)
 
 newtype Bytes = Bytes {fromBytes :: Int}
-  deriving (Eq, Ord, Enum, Num, Real, Integral, Show)
+  deriving (Eq, Ord, Enum, Num, Real, Integral, Show, Hashable)
 
 data TcpState = TcpState
   { tcpCongestionWindow :: !Bytes

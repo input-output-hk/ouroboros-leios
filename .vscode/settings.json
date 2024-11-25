@@ -3,5 +3,6 @@
     "source.fixAll.eslint": "always",
     "source.organizeImports": "explicit",
   },
-  "editor.formatOnSave": true, // Disable default formatter if ESLint is handling formatting
+  "editor.formatOnSave": true,
+  "haskell.formattingProvider": "fourmolu", // Disable default formatter if ESLint is handling formatting
 }

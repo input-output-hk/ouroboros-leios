@@ -7,7 +7,7 @@ use crate::{
     config::NodeId,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        Transaction, TransactionId,
+        NoVoteReason, Transaction, TransactionId, Vote,
     },
 };
 
@@ -79,6 +79,29 @@ pub enum Event {
     EndorserBlockReceived {
         #[serde(flatten)]
         id: EndorserBlockId,
+        sender: NodeId,
+        recipient: NodeId,
+    },
+    Vote {
+        slot: u64,
+        producer: NodeId,
+        eb: EndorserBlockId,
+    },
+    NoVote {
+        slot: u64,
+        producer: NodeId,
+        eb: EndorserBlockId,
+        reason: NoVoteReason,
+    },
+    VotesSent {
+        slot: u64,
+        producer: NodeId,
+        sender: NodeId,
+        recipient: NodeId,
+    },
+    VotesReceived {
+        slot: u64,
+        producer: NodeId,
         sender: NodeId,
         recipient: NodeId,
     },
@@ -189,6 +212,53 @@ impl EventTracker {
     pub fn track_eb_received(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::EndorserBlockReceived {
             id,
+            sender,
+            recipient,
+        });
+    }
+
+    pub fn track_vote(&self, vote: &Vote) {
+        self.send(Event::Vote {
+            slot: vote.slot,
+            producer: vote.producer,
+            eb: vote.eb,
+        });
+    }
+
+    pub fn track_no_vote(
+        &self,
+        slot: u64,
+        producer: NodeId,
+        eb: EndorserBlockId,
+        reason: NoVoteReason,
+    ) {
+        self.send(Event::NoVote {
+            slot,
+            producer,
+            eb,
+            reason,
+        });
+    }
+
+    pub fn track_votes_sent(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
+        let Some(Vote { slot, producer, .. }) = votes.first() else {
+            return;
+        };
+        self.send(Event::VotesSent {
+            slot: *slot,
+            producer: *producer,
+            sender,
+            recipient,
+        });
+    }
+
+    pub fn track_votes_received(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
+        let Some(Vote { slot, producer, .. }) = votes.first() else {
+            return;
+        };
+        self.send(Event::VotesReceived {
+            slot: *slot,
+            producer: *producer,
             sender,
             recipient,
         });

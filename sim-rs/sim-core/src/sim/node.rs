@@ -20,7 +20,7 @@ use crate::{
     events::EventTracker,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        Transaction, TransactionId,
+        NoVoteReason, Transaction, TransactionId, Vote,
     },
     network::{NetworkSink, NetworkSource},
 };
@@ -67,6 +67,9 @@ struct NodeLeiosState {
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
+    ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
+    voter_slots_seen: BTreeMap<NodeId, BTreeSet<u64>>,
+    votes_by_eb: BTreeMap<EndorserBlockId, Vec<Vote>>,
 }
 
 enum InputBlockState {
@@ -205,6 +208,11 @@ impl Node {
                         SimulationMessage::EB(eb) => {
                             self.receive_eb(from, eb)?;
                         }
+
+                        // Voting
+                        SimulationMessage::Votes(votes) => {
+                            self.receive_votes(from, votes)?;
+                        }
                     }
                 }
             };
@@ -218,10 +226,15 @@ impl Node {
 
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
+
+            // Vote for any EBs which satisfy all requirements.
+            self.vote_for_endorser_blocks(slot)?;
+
+            // Generate any EBs we're allowed to in this slot.
+            self.generate_endorser_blocks(slot)?;
+
             // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
-            // Generate any EBs we're allowed to in this slot
-            self.generate_endorser_blocks(slot)?;
         }
 
         // Generate any IBs scheduled for this slot.
@@ -233,10 +246,8 @@ impl Node {
     }
 
     fn schedule_input_block_generation(&mut self, slot: u64) {
-        let mut probability = self.sim_config.ib_generation_probability;
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
-        while probability > 0.0 {
-            let next_p = f64::min(probability, 1.0);
+        for next_p in vrf_probabilities(self.sim_config.ib_generation_probability) {
             if let Some(vrf) = self.run_vrf(next_p) {
                 let vrf_slot = if self.sim_config.uniform_ib_generation {
                     // IBs are generated at the start of any slot within this stage
@@ -247,7 +258,6 @@ impl Node {
                 };
                 slot_vrfs.entry(vrf_slot).or_default().push(vrf);
             }
-            probability -= 1.0;
         }
         for (slot, vrfs) in slot_vrfs {
             let headers = vrfs
@@ -266,9 +276,7 @@ impl Node {
     }
 
     fn generate_endorser_blocks(&mut self, slot: u64) -> Result<()> {
-        let mut probability = self.sim_config.eb_generation_probability;
-        while probability > 0.0 {
-            let next_p = f64::min(probability, 1.0);
+        for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
                 let mut eb = EndorserBlock {
                     slot,
@@ -280,8 +288,54 @@ impl Node {
                 // A node should only generate at most 1 EB per slot
                 return Ok(());
             }
-            probability -= 1.0;
         }
+        Ok(())
+    }
+
+    fn vote_for_endorser_blocks(&mut self, slot: u64) -> Result<()> {
+        let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
+            return Ok(());
+        };
+        let Some(mut ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
+            return Ok(());
+        };
+        let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
+            .filter_map(|f| self.run_vrf(f))
+            .count();
+        if vrf_wins == 0 {
+            return Ok(());
+        }
+        ebs.retain(|eb_id| {
+            let eb = self.leios.ebs.get(eb_id).unwrap();
+            match self.should_vote_for(slot, eb) {
+                Ok(()) => true,
+                Err(reason) => {
+                    self.tracker.track_no_vote(slot, self.id, *eb_id, reason);
+                    false
+                }
+            }
+        });
+        if ebs.is_empty() {
+            return Ok(());
+        }
+        let votes_allowed = if self.sim_config.one_vote_per_vrf {
+            // For every VRF lottery you won, you can vote for one EB
+            vrf_wins
+        } else {
+            // For every VRF lottery you won, you can vote for every EB
+            vrf_wins * ebs.len()
+        };
+        let votes = ebs
+            .iter()
+            .cycle()
+            .map(|eb_id| Vote {
+                slot,
+                producer: self.id,
+                eb: *eb_id,
+            })
+            .take(votes_allowed)
+            .collect();
+        self.send_votes(votes)?;
         Ok(())
     }
 
@@ -551,12 +605,44 @@ impl Node {
         if self.leios.ebs.insert(id, eb).is_some() {
             return Ok(());
         }
+        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
         // We haven't seen this EB before, so propagate it to our neighbors
         for peer in &self.peers {
             if *peer == from {
                 continue;
             }
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
+        }
+        Ok(())
+    }
+
+    fn receive_votes(&mut self, from: NodeId, votes: Arc<Vec<Vote>>) -> Result<()> {
+        self.tracker.track_votes_received(&votes, from, self.id);
+        let producer = votes[0].producer;
+        let slot = votes[0].slot;
+        if !self
+            .leios
+            .voter_slots_seen
+            .entry(producer)
+            .or_default()
+            .insert(slot)
+        {
+            return Ok(());
+        }
+        for vote in votes.iter() {
+            self.leios
+                .votes_by_eb
+                .entry(vote.eb)
+                .or_default()
+                .push(vote.clone());
+        }
+        // We haven't seen these votes before, so propagate them to our neighbors
+        for peer in &self.peers {
+            if *peer == from {
+                continue;
+            }
+            self.tracker.track_votes_sent(&votes, self.id, *peer);
+            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
         }
         Ok(())
     }
@@ -608,7 +694,7 @@ impl Node {
         let config = &self.sim_config;
         let Some(earliest_slot) = eb
             .slot
-            .checked_sub(config.deliver_stage_count * config.stage_length)
+            .checked_sub(config.stage_length * (config.deliver_stage_count + 1))
         else {
             return;
         };
@@ -626,8 +712,73 @@ impl Node {
 
         let id = eb.id();
         self.leios.ebs.insert(id, eb.clone());
+        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
         for peer in &self.peers {
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
+        }
+        Ok(())
+    }
+
+    fn should_vote_for(&self, slot: u64, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
+        let stage_length = self.sim_config.stage_length;
+        let deliver_stage_count = self.sim_config.deliver_stage_count;
+
+        let Some(ib_slot_start) = slot.checked_sub(stage_length * (deliver_stage_count + 2)) else {
+            // The IBs for this EB were "generated" before the sim began.
+            // It's valid iff there are no IBs.
+            return if eb.ibs.is_empty() {
+                Ok(())
+            } else {
+                Err(NoVoteReason::ExtraIB)
+            };
+        };
+        let ib_slot_end = ib_slot_start + stage_length;
+        let ib_slot_range = ib_slot_start..ib_slot_end;
+
+        let mut ib_set = HashSet::new();
+        for ib in &eb.ibs {
+            if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
+                return Err(NoVoteReason::MissingIB);
+            }
+            if !ib_slot_range.contains(&ib.slot) {
+                return Err(NoVoteReason::InvalidSlot);
+            }
+            ib_set.insert(*ib);
+        }
+        for ib_slot in ib_slot_range {
+            for ib in self
+                .leios
+                .ibs_by_slot
+                .get(&ib_slot)
+                .iter()
+                .flat_map(|f| f.iter())
+            {
+                if !ib_set.contains(ib) {
+                    return Err(NoVoteReason::ExtraIB);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn send_votes(&mut self, votes: Vec<Vote>) -> Result<()> {
+        for vote in &votes {
+            self.tracker.track_vote(vote);
+            self.leios
+                .votes_by_eb
+                .entry(vote.eb)
+                .or_default()
+                .push(vote.clone());
+        }
+        self.leios
+            .voter_slots_seen
+            .entry(self.id)
+            .or_default()
+            .insert(votes[0].slot);
+        let votes = Arc::new(votes);
+        for peer in &self.peers {
+            self.tracker.track_votes_sent(&votes, self.id, *peer);
+            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
         }
         Ok(())
     }
@@ -658,4 +809,9 @@ impl Node {
 fn compute_target_vrf_stake(stake: u64, total_stake: u64, success_rate: f64) -> u64 {
     let ratio = stake as f64 / total_stake as f64;
     (total_stake as f64 * ratio * success_rate) as u64
+}
+
+fn vrf_probabilities(probability: f64) -> impl Iterator<Item = f64> {
+    let final_success_rate = Some(probability.fract()).filter(|f| *f > 0.0);
+    std::iter::repeat_n(1.0, probability.trunc() as usize).chain(final_success_rate)
 }

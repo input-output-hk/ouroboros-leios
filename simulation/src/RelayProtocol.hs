@@ -13,6 +13,12 @@ module RelayProtocol (
   nullBlockQueue,
   snocBlockQueue,
   unconsBlockQueue,
+  blockQueueBlocks,
+  Ticket,
+  BlockWithTicket (..),
+  zeroTicket,
+  takeAfterTicket,
+  lookupByTicket,
   BlockRelayMessage (..),
   relayServer,
   BlockRelayConfig (..),
@@ -91,7 +97,11 @@ instance Monoid BlockQueueMeasure where
   mappend = (<>)
 
 emptyBlockQueue :: BlockQueue blk blkid
-emptyBlockQueue = BlockQueue FingerTree.empty Map.empty (Ticket 0)
+emptyBlockQueue = BlockQueue FingerTree.empty Map.empty tic
+ where
+  -- Ticket 0 is reserved for `zeroTicket` so takeAfterTicket blkq
+  -- zeroTicket always returns all elements.
+  tic = Ticket 1
 
 nullBlockQueue :: BlockQueue blk blkid -> Bool
 nullBlockQueue (BlockQueue ps _ _) = FingerTree.null ps
@@ -133,6 +143,24 @@ lookupByTicket (BlockQueue ps _ _) n =
     ps of
     FingerTree.Position _ (BlockWithTicket blk _ n') _ | n' == n -> Just blk
     _ -> Nothing
+
+zeroTicket :: Ticket
+zeroTicket = Ticket 0
+
+takeAfterTicket :: BlockQueue blk blkid -> Ticket -> [BlockWithTicket blk blkid]
+takeAfterTicket (BlockQueue blkq _ _) n =
+  case FingerTree.search
+    ( \ml mr ->
+        mMaxTicket ml >= n
+          && mMinTicket mr > n
+    )
+    blkq of
+    FingerTree.Position _ blk@(BlockWithTicket _ _ n') r
+      | n' == n -> Foldable.toList r
+      | otherwise -> blk : Foldable.toList r
+    FingerTree.OnLeft -> Foldable.toList blkq
+    FingerTree.OnRight -> []
+    FingerTree.Nowhere -> error "impossible"
 
 fingerprintBlockQueue :: BlockQueue blk blkid -> Ticket
 fingerprintBlockQueue (BlockQueue _ _ counter) = counter

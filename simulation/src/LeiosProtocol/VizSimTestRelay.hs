@@ -1,22 +1,20 @@
-{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
-module PraosProtocol.VizSimBlockFetch where
+module LeiosProtocol.VizSimTestRelay where
 
-import ChanDriver
+import Control.Exception (assert)
+import Control.Monad.Class.MonadTime.SI (Time, addTime)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
+
 import ModelTCP
-import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.BlockFetch
-import PraosProtocol.Common hiding (Point)
-import PraosProtocol.SimBlockFetch
 import SimTypes
 import Viz
 import VizSim
@@ -26,6 +24,19 @@ import VizSimTCP (
   renderMessagesInFlight,
  )
 import VizUtils
+
+import ChanDriver (ProtocolMessage (..))
+import Data.Word (Word8)
+import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
+import LeiosProtocol.SimTestRelay
+import Network.TypedProtocol (SomeMessage (..))
+import SimTCPLinks
+import System.Random (mkStdGen)
+import System.Random.Stateful (uniform)
+
+------------------------------------------------------------------------------
+-- Examples
+--
 
 example1 :: Vizualisation
 example1 =
@@ -37,69 +48,103 @@ example1 =
  where
   model = relaySimVizModel trace
    where
-    trace = exampleTrace1
+    trace =
+      traceRelayLink1
+        (mkTcpConnProps 0.3 (kilobytes 1000))
+        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
-examplesRelaySimVizConfig :: BlockFetchVizConfig
+example2 :: Vizualisation
+example2 =
+  slowmoVizualisation 0.1 $
+    Viz model $
+      LayoutReqSize 1000 650 $
+        Layout $
+          relaySimVizRender examplesRelaySimVizConfig
+ where
+  model = relaySimVizModel trace
+   where
+    trace =
+      traceRelayLink4
+        (mkTcpConnProps 0.3 (kilobytes 1000))
+        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+
+example3 :: Vizualisation
+example3 =
+  slowmoVizualisation 0.1 $
+    Viz model $
+      LayoutReqSize 1000 650 $
+        Layout $
+          relaySimVizRender examplesRelaySimVizConfig
+ where
+  model = relaySimVizModel trace
+   where
+    trace =
+      traceRelayLink4Asymmetric
+        (mkTcpConnProps 0.2 (kilobytes 1000))
+        (mkTcpConnProps 0.3 (kilobytes 1000))
+        (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
+
+examplesRelaySimVizConfig :: RelaySimVizConfig
 examplesRelaySimVizConfig =
-  BlockFetchVizConfig
-    { ptclMessageColor = testPtclMessageColor
+  RelaySimVizConfig
+    { nodeMessageColor = testNodeMessageColor
+    , ptclMessageColor = testPtclMessageColor
+    , nodeMessageText = testNodeMessageText
     , ptclMessageText = testPtclMessageText
     }
  where
   testPtclMessageColor ::
-    BlockFetchMessage BlockBody ->
+    TestBlockRelayMessage ->
     (Double, Double, Double)
-  -- testPtclMessageColor (ProtocolMessage (SomeMessage (MsgBlock blk))) = testNodeMessageColor blk
-  testPtclMessageColor _ = (1, 0, 0)
+  testPtclMessageColor (ProtocolMessage (SomeMessage msg)) =
+    case msg of
+      MsgRespondBodies ((_, blk) : _) -> testNodeMessageColor blk
+      _ -> (1, 0, 0)
 
-  -- testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  -- testNodeMessageColor hdr =
-  --   (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
-  --  where
-  --   r, g, b :: Word8
-  --   ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
+  testNodeMessageColor :: TestBlock -> (Double, Double, Double)
+  testNodeMessageColor (TestBlock (TestBlockId blkid) _ _) =
+    (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
+   where
+    r, g, b :: Word8
+    ((r, g, b), _) = uniform (mkStdGen blkid)
 
-  -- testNodeMessageText :: BlockHeader -> Maybe String
-  -- testNodeMessageText hdr = Just (show $ blockSlot hdr)
+  testNodeMessageText :: TestBlock -> Maybe String
+  testNodeMessageText (TestBlock (TestBlockId blkid) _ _) = Just (show blkid)
 
-  testPtclMessageText ::
-    BlockFetchMessage BlockBody ->
-    Maybe String
-  testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
+  testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ relayMessageLabel msg
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
 
 -- | The vizualisation data model for the relay simulation
-type BlockFetchVizModel =
+type RelaySimVizModel =
   SimVizModel
-    BlockFetchEvent
-    BlockFetchVizState
+    RelaySimEvent
+    RelaySimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data BlockFetchVizState
-  = BlockFetchVizState
+data RelaySimVizState = RelaySimVizState
   { vizWorldShape :: !WorldShape
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( (BlockFetchMessage BlockBody)
+          [ ( TestBlockRelayMessage
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
           ]
        )
-  , vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
-  , vizMsgsAtNodeBuffer :: !(Map NodeId [BlockHeader])
+  , vizMsgsAtNodeQueue :: !(Map NodeId [TestBlock])
+  , vizMsgsAtNodeBuffer :: !(Map NodeId [TestBlock])
   , vizMsgsAtNodeRecentQueue :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeRecentBuffer :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeTotalQueue :: !(Map NodeId Int)
   , vizMsgsAtNodeTotalBuffer :: !(Map NodeId Int)
   , vizNumMsgsGenerated :: !Int
-  , vizMsgsDiffusionLatency :: !(Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time]))
+  , vizMsgsDiffusionLatency :: !(Map TestBlockId (TestBlock, NodeId, Time, [Time]))
   }
 
 -- | The end points where the each link, including the case where the link
@@ -124,8 +169,8 @@ data LinkPoints
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
 relaySimVizModel ::
-  BlockFetchTrace ->
-  VizModel BlockFetchVizModel
+  RelaySimTrace ->
+  VizModel RelaySimVizModel
 relaySimVizModel =
   simVizModel
     accumEventVizState
@@ -133,7 +178,7 @@ relaySimVizModel =
     initVizState
  where
   initVizState =
-    BlockFetchVizState
+    RelaySimVizState
       { vizWorldShape = WorldShape (0, 0) False
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
@@ -150,10 +195,10 @@ relaySimVizModel =
 
   accumEventVizState ::
     Time ->
-    BlockFetchEvent ->
-    BlockFetchVizState ->
-    BlockFetchVizState
-  accumEventVizState _now (BlockFetchEventSetup shape nodes links) vs =
+    RelaySimEvent ->
+    RelaySimVizState ->
+    RelaySimVizState
+  accumEventVizState _now (RelaySimEventSetup shape nodes links) vs =
     vs
       { vizWorldShape = shape
       , vizNodePos = nodes
@@ -169,7 +214,7 @@ relaySimVizModel =
       }
   accumEventVizState
     _now
-    ( BlockFetchEventTcp
+    ( RelaySimEventTcp
         ( LabelLink
             nfrom
             nto
@@ -185,11 +230,79 @@ relaySimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
+  accumEventVizState now (RelaySimEventNode (LabelNode nid (RelayNodeEventEnterQueue msg))) vs =
+    vs
+      { vizMsgsAtNodeQueue =
+          Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentQueue =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentQueue vs)
+      , vizMsgsAtNodeTotalQueue =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalQueue vs)
+      }
+  accumEventVizState now (RelaySimEventNode (LabelNode nid (RelayNodeEventEnterBuffer msg))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeQueue =
+          Map.adjust
+            (filter (\msg' -> testBlockId msg' /= testBlockId msg))
+            nid
+            (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizMsgsDiffusionLatency =
+          Map.adjust
+            ( \(blk, nid', created, arrivals) ->
+                (blk, nid', created, now : arrivals)
+            )
+            (testBlockId msg)
+            (vizMsgsDiffusionLatency vs)
+      }
+  accumEventVizState _now (RelaySimEventNode (LabelNode nid (RelayNodeEventRemove msg))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.adjust
+            (filter (\msg' -> testBlockId msg' /= testBlockId msg))
+            nid
+            (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeQueue =
+          Map.adjust
+            (filter (\msg' -> testBlockId msg' /= testBlockId msg))
+            nid
+            (vizMsgsAtNodeQueue vs)
+      }
+  accumEventVizState now (RelaySimEventNode (LabelNode nid (RelayNodeEventGenerate msg))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
+      , vizMsgsDiffusionLatency =
+          assert (not (testBlockId msg `Map.member` vizMsgsDiffusionLatency vs)) $
+            Map.insert
+              (testBlockId msg)
+              (msg, nid, now, [now])
+              (vizMsgsDiffusionLatency vs)
+      }
 
   pruneVisState ::
     Time ->
-    BlockFetchVizState ->
-    BlockFetchVizState
+    RelaySimVizState ->
+    RelaySimVizState
   pruneVisState now vs =
     vs
       { vizMsgsInTransit =
@@ -262,15 +375,16 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data BlockFetchVizConfig
-  = BlockFetchVizConfig
-  { ptclMessageColor :: BlockFetchMessage BlockBody -> (Double, Double, Double)
-  , ptclMessageText :: BlockFetchMessage BlockBody -> Maybe String
+data RelaySimVizConfig = RelaySimVizConfig
+  { nodeMessageColor :: TestBlock -> (Double, Double, Double)
+  , ptclMessageColor :: TestBlockRelayMessage -> (Double, Double, Double)
+  , nodeMessageText :: TestBlock -> Maybe String
+  , ptclMessageText :: TestBlockRelayMessage -> Maybe String
   }
 
 relaySimVizRender ::
-  BlockFetchVizConfig ->
-  VizRender BlockFetchVizModel
+  RelaySimVizConfig ->
+  VizRender RelaySimVizModel
 relaySimVizRender vizConfig =
   VizRender
     { renderReqSize = (500, 500)
@@ -279,28 +393,33 @@ relaySimVizRender vizConfig =
     }
 
 relaySimVizRenderModel ::
-  BlockFetchVizConfig ->
+  RelaySimVizConfig ->
   Time ->
-  SimVizModel event BlockFetchVizState ->
+  SimVizModel event RelaySimVizState ->
   (Double, Double) ->
   Cairo.Render ()
 relaySimVizRenderModel
-  BlockFetchVizConfig
-    { ptclMessageColor
+  RelaySimVizConfig
+    { nodeMessageColor
+    , ptclMessageColor
+    , nodeMessageText
     , ptclMessageText
     }
   now
   ( SimVizModel
       _events
-      BlockFetchVizState
+      RelaySimVizState
         { vizWorldShape = WorldShape{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizMsgsInTransit
+        , vizMsgsAtNodeQueue
+        , vizMsgsAtNodeBuffer
         }
     )
   screenSize = do
     renderLinks
+    renderMessagesAtNodes
     renderNodes
    where
     renderNodes = do
@@ -315,6 +434,58 @@ relaySimVizRenderModel
           Cairo.stroke
         | (_node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
+        ]
+      Cairo.restore
+
+    renderMessagesAtNodes = do
+      Cairo.save
+      sequence_
+        [ do
+          Cairo.setSourceRGB r g b
+          Cairo.arc (x - 10) y' 10 0 (2 * pi)
+          Cairo.fillPreserve
+          Cairo.setSourceRGB 0 0 0
+          Cairo.setLineWidth 1
+          Cairo.stroke
+          case nodeMessageText msg of
+            Nothing -> return ()
+            Just txt -> do
+              Cairo.moveTo (x - 32) (y' + 5)
+              Cairo.showText txt
+              Cairo.newPath
+        | (node, msgs) <- Map.toList vizMsgsAtNodeQueue
+        , (n, msg) <- zip [1 ..] msgs
+        , let (Point x y) =
+                simPointToPixel
+                  worldDimensions
+                  screenSize
+                  (vizNodePos Map.! node)
+              y' = y + 16 + 20 * n
+              (r, g, b) = nodeMessageColor msg
+        ]
+      sequence_
+        [ do
+          Cairo.setSourceRGB r g b
+          Cairo.arc (x + 10) y' 10 0 (2 * pi)
+          Cairo.fillPreserve
+          Cairo.setSourceRGB 0 0 0
+          Cairo.setLineWidth 1
+          Cairo.stroke
+          case nodeMessageText msg of
+            Nothing -> return ()
+            Just txt -> do
+              Cairo.moveTo (x + 22) (y' + 5)
+              Cairo.showText txt
+              Cairo.newPath
+        | (node, msgs) <- Map.toList vizMsgsAtNodeBuffer
+        , (n, msg) <- zip [1 ..] msgs
+        , let (Point x y) =
+                simPointToPixel
+                  worldDimensions
+                  screenSize
+                  (vizNodePos Map.! node)
+              y' = y + 16 + 20 * n
+              (r, g, b) = nodeMessageColor msg
         ]
       Cairo.restore
 

@@ -9,6 +9,7 @@ import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
+  mapConcurrently_,
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
@@ -38,7 +39,7 @@ data BlockFetchEvent
   | -- | An event at a node
     BlockFetchEventNode (LabelNode BlockFetchNodeEvent)
   | -- | An event on a tcp link between two nodes
-    BlockFetchEventTcp (LabelLink (TcpEvent (ProtocolMessage BlockFetchState)))
+    BlockFetchEventTcp (LabelLink (TcpEvent (ProtocolMessage (BlockFetchState BlockBody))))
   deriving (Show)
 
 data BlockFetchNodeEvent = BlockFetchNodeEvent
@@ -79,16 +80,18 @@ traceRelayLink1 tcpprops =
   bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
 
   -- Block-Fetch Controller & Consumer
-  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig -> Chan m (ProtocolMessage BlockFetchState) -> m ()
+  nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
-    concurrently_
-      ( blockFetchController nullTracer st
-      )
-      ( runBlockFetchConsumer nullTracer praosConfig chan $
-          initBlockFetchConsumerStateForPeerId nullTracer peerId st
-      )
+    (ts, submitFetchedBlock) <- setupValidatorThreads praosConfig st 1
+    concurrently_ (mapConcurrently_ id ts) $
+      concurrently_
+        ( blockFetchController nullTracer st
+        )
+        ( runBlockFetchConsumer nullTracer praosConfig chan $
+            initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
+        )
   -- Block-Fetch Producer
   nodeB chan = do
     st <- BlockFetchProducerState . asReadOnly <$> newTVarIO (toBlocks bchain)
@@ -107,6 +110,6 @@ traceRelayLink1 tcpprops =
     NodeId ->
     Tracer
       (IOSim s)
-      (LabelTcpDir (TcpEvent (ProtocolMessage BlockFetchState)))
+      (LabelTcpDir (TcpEvent (ProtocolMessage (BlockFetchState BlockBody))))
   linkTracer nfrom nto =
     contramap (BlockFetchEventTcp . labelDirToLabelLink nfrom nto) tracer
