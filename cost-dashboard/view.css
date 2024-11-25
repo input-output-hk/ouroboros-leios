@@ -59,6 +59,10 @@ th {
   text-align: center;
 }
 
+th span {
+  font-weight: normal;
+}
+
 td {
   font-family: monospace;
   text-align: right;
