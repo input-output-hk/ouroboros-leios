@@ -96,13 +96,13 @@ fn app_main() -> HtmlResult {
                 };
                 web_sys::console::log_1(&JsValue::from_str(&format!("evaluated {name}")));
                 let data = mk_graph_obj(name, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
-                Reflect::set(&data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                Reflect::set(&data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, &steps.simplify())).collect::<js_sys::Array>()).unwrap();
                 if let Some(constraint) = ctx.constraint(name) {
                     web_sys::console::log_1(&JsValue::from_str(&format!("evaluating constraint {constraint}")));
                     if let Ok(outcome) = agent.run((constraint.to_string(), (*ctx).clone())).await {
                         web_sys::console::log_1(&JsValue::from_str(&format!("evaluated constraint {constraint}")));
                         let constraint_data = mk_graph_obj(constraint, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
-                        Reflect::set(&constraint_data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                        Reflect::set(&constraint_data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, &steps.simplify())).collect::<js_sys::Array>()).unwrap();
                         Reflect::set(&data, &"constraint".into(), &constraint_data).unwrap();
                     }
                 }

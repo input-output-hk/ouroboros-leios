@@ -143,7 +143,35 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
     compact(data, mode, max_size);
 }
 
-pub(crate) fn compact_cdf(data: &mut Vec<(f32, CDF)>, _mode: CompactionMode, _max_size: usize) {
+pub(crate) fn compact_cdf(data: &mut Vec<(f32, CDF)>, mode: CompactionMode, max_size: usize) {
+    if data.len() < 10 {
+        return;
+    }
+
+    let mut pos = 0;
+    for idx in 0..data.len() {
+        let (x, mut cdf) = mem::take(&mut data[idx]);
+        let next_x = data.get(idx + 1).map(|x| x.0).unwrap_or(f32::INFINITY);
+        if x.similar(&next_x) {
+            continue;
+        }
+        if cdf.steps().data().len() > max_size {
+            let mut steps = cdf.steps().data().to_vec();
+            compact(&mut steps, mode, max_size);
+            if steps.len() < cdf.steps().data().len() {
+                cdf = CDF::new(&steps)
+                    .expect("step function error")
+                    .with_max_size(max_size)
+                    .with_mode(mode);
+            }
+        }
+        data[pos] = (x, cdf);
+        pos += 1;
+    }
+    data.truncate(pos);
+}
+
+pub(crate) fn simplify_cdf(data: &mut Vec<(f32, CDF)>) {
     if data.len() < 10 {
         return;
     }

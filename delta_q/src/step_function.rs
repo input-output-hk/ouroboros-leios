@@ -1,4 +1,4 @@
-use crate::{CompactionMode, StepValue};
+use crate::{compaction::simplify_cdf, CompactionMode, StepValue, CDF};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -94,6 +94,19 @@ impl StepFunction {
                 }
             })
             .sum()
+    }
+}
+
+impl StepFunction<CDF> {
+    pub fn simplify(&self) -> Self {
+        let mut data = self.data().to_vec();
+        simplify_cdf(&mut data);
+        Self {
+            data: (!data.is_empty()).then_some(data.into()),
+            max_size: self.max_size,
+            mode: self.mode,
+            zero: CDF::sum_up_zero(),
+        }
     }
 }
 
