@@ -19,7 +19,7 @@ export const Canvas: FC = () => {
           <h4>Transactions Generated: {generatedMessages.size}</h4>
         </div>
         <div>
-          <h4>Transactions Sent: {sentTxs.size}</h4>
+          <h4>Propogations: {sentTxs.size}</h4>
         </div>
       </div>
       <canvas ref={canvasRef} />

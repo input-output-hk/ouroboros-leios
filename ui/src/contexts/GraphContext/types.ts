@@ -6,9 +6,9 @@ import {
 import { Dispatch, MutableRefObject, RefObject } from "react";
 
 export enum ESpeedOptions {
-  "1/10" = 0.01,
-  "2/10" = 0.02,
-  "3/10" = 0.03,
+  "1/100" = 0.01,
+  "1/200" = 0.02,
+  "1/300" = 0.03,
 }
 
 export interface IGraphContextState {

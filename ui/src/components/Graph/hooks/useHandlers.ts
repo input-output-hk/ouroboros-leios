@@ -112,7 +112,6 @@ export const useHandlers = () => {
     transactionsRef.current.forEach((txList, id) => {
       const lastMessage = txList[txList.length -1];
       if (elapsed > lastMessage.sentTime + lastMessage.duration) {
-        dispatch({ type: "ADD_GENERATED_MESSAGE", payload: elapsed })
         transactionsRef.current.delete(id);
         txList.forEach(tx => {
           txSentMessagesRef.current.delete(tx.sentTime);
@@ -182,7 +181,7 @@ export const useHandlers = () => {
         }
 
         if (m.message.publisher === node.id && elapsed > target) {
-          txGeneratedRef.current.set(m.time, m);
+          dispatch({ type: "ADD_GENERATED_MESSAGE", payload: m.time / 1_000_000 })
         }
       });
 
@@ -217,7 +216,7 @@ export const useHandlers = () => {
       currentTime: 0,
       playing: false,
       sentTxs: new Set(),
-      speed: ESpeedOptions["3/10"],
+      speed: ESpeedOptions["1/300"],
       generatedMessages: new Set()
     } });
     

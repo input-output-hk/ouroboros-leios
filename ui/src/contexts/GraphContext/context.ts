@@ -13,7 +13,7 @@ export const defaultState: IGraphContextState = {
   simulationPauseTime: { current: 0 },
   simulationStartTime: { current: 0 },
   sentTxs: new Set(),
-  speed: ESpeedOptions["3/10"],
+  speed: ESpeedOptions["1/300"],
   topography: { links: new Map(), nodes: new Map() },
   topographyLoaded: false,
   transactions: new Map(),

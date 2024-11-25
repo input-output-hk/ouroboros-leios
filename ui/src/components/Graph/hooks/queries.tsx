@@ -1,6 +1,5 @@
 import { useCallback, useRef } from "react";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
 import {
   EMessageType,
   IServerMessage,
@@ -11,7 +10,6 @@ import {
 } from "../types";
 
 export const useStreamMessagesHandler = () => {
-  const { dispatch } = useGraphContext();
   const eventSource = useRef<EventSource>();
 
   // Mutable refs to store messages and transactions without causing re-renders

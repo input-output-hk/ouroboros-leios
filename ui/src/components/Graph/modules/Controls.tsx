@@ -22,11 +22,6 @@ export const Controls: FC = memo(() => {
       >
         Reset
       </button>
-      <button onClick={(() => {
-        dispatch({ type: "SET_CURRENT_TIME", payload: 1000 })
-      })}>
-        Jump to Time
-      </button>
       <div className="flex items-center justify-center gap-2">
         <label htmlFor="speed">Speed:</label>
         <select
