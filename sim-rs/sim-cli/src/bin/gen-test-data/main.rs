@@ -28,7 +28,7 @@ fn main() -> Result<()> {
         Strategy::Simplified(args) => simplified(&args)?,
     };
 
-    let vote_probability = (nodes.len() as f64) / 6.0;
+    let vote_probability = 500.0;
 
     let raw_config = RawConfig {
         seed: None,
@@ -47,6 +47,7 @@ fn main() -> Result<()> {
         deliver_stage_count: 2,
         uniform_ib_generation: true,
         max_ib_requests_per_peer: 1,
+        one_vote_per_vrf: true,
         max_ib_size: 327680,
         max_tx_size: 16384,
         transaction_frequency_ms: DistributionConfig::Exp {

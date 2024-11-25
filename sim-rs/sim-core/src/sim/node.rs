@@ -296,34 +296,46 @@ impl Node {
         let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
             return Ok(());
         };
-        let Some(ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
+        let Some(mut ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
             return Ok(());
         };
-        let mut votes = vec![];
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
-        for _ in 0..vrf_wins {
-            for eb_id in &ebs {
-                let eb = self.leios.ebs.get(eb_id).unwrap();
-                match self.should_vote_for(slot, eb) {
-                    Ok(()) => {
-                        let vote = Vote {
-                            slot,
-                            producer: self.id,
-                            eb: *eb_id,
-                        };
-                        votes.push(vote);
-                    }
-                    Err(reason) => {
-                        self.tracker.track_no_vote(slot, self.id, *eb_id, reason);
-                    }
+        if vrf_wins == 0 {
+            return Ok(());
+        }
+        ebs.retain(|eb_id| {
+            let eb = self.leios.ebs.get(eb_id).unwrap();
+            match self.should_vote_for(slot, eb) {
+                Ok(()) => true,
+                Err(reason) => {
+                    self.tracker.track_no_vote(slot, self.id, *eb_id, reason);
+                    false
                 }
             }
+        });
+        if ebs.is_empty() {
+            return Ok(());
         }
-        if !votes.is_empty() {
-            self.send_votes(votes)?;
-        }
+        let votes_allowed = if self.sim_config.one_vote_per_vrf {
+            // For every VRF lottery you won, you can vote for one EB
+            vrf_wins
+        } else {
+            // For every VRF lottery you won, you can vote for every EB
+            vrf_wins * ebs.len()
+        };
+        let votes = ebs
+            .iter()
+            .cycle()
+            .map(|eb_id| Vote {
+                slot,
+                producer: self.id,
+                eb: *eb_id,
+            })
+            .take(votes_allowed)
+            .collect();
+        self.send_votes(votes)?;
         Ok(())
     }
 
