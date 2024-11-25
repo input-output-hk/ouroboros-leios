@@ -15,46 +15,14 @@ export const reducer = (
       return { ...state, generatedMessages: newSet };
     }
 
+    case "SET_GENERATED_MESSSAGES": {
+      return { ...state, generatedMessages: action.payload };
+    }
+
     case "REMOVE_GENERATED_MESSAGE": {
       const newSet = new Set(state.generatedMessages);
       newSet.delete(action.payload);
       return { ...state, generatedMessages: newSet };
-    }
-
-    case "SET_MAX_TIME":
-      return { ...state, maxTime: action.payload };
-
-    case "ADD_MESSAGE": {
-      const newMessages = new Map(state.messages);
-      newMessages.set(action.payload.time, action.payload);
-      return { ...state, messages: newMessages };
-    }
-
-    case "ADD_MESSAGES": {
-      const newPrev = new Map(state.messages);
-      newPrev.forEach(v => {
-        if (state.currentTime > v.time / 1_000_000) {
-          newPrev.delete(v.time);
-        }
-      })
-
-      const newMessages = new Map([...newPrev, ...action.payload]);
-      return { ...state, messages: newMessages };
-    }
-
-    case "REMOVE_MESSAGE": {
-      const newMessages = new Map(state.messages);
-      newMessages.delete(action.payload);
-      return { ...state, messages: newMessages };
-    }
-
-    case "REMOVE_MESSAGES": {
-      debugger;
-      const newMessages = new Map(state.messages);
-      action.payload.forEach((time) => {
-        newMessages.delete(time);
-      });
-      return { ...state, messages: newMessages };
     }
 
     case "SET_PLAYING": {
@@ -71,30 +39,18 @@ export const reducer = (
       return { ...state, sentTxs: newSet };
     }
 
+    case "SET_SENT_TXS": {
+      return { ...state, sentTxs: action.payload };
+    }
+
     case "REMOVE_SENT_TX": {
       const newSet = new Set(state.sentTxs);
       newSet.delete(action.payload);
       return { ...state, sentTxs: newSet };
     }
 
-    case "SET_SPEED":
+    case "SET_SPEED": {
       return { ...state, speed: action.payload };
-
-    case "SET_TOPOGRAPHY":
-      return { ...state, topography: action.payload };
-
-    case "SET_TOPOGRAPHY_LOADED":
-      return { ...state, topographyLoaded: action.payload };
-
-    case "SET_TRANSACTIONS": {
-      return { ...state, transactions: action.payload };
-    }
-
-    case "REMOVE_TRANSACTION": {
-      debugger;
-      const newTxs = new Map(state.transactions);
-      newTxs.delete(action.payload);
-      return { ...state, transactions: newTxs };
     }
 
     case "BATCH_UPDATE": {

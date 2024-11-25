@@ -39,7 +39,13 @@ export const useHandlers = () => {
       simulationStartTime.current !== 0
         ? (now - simulationStartTime.current) * speed
         : 0;
-    dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
+
+    if (elapsed >= maxTime) {
+      togglePlayPause();
+      return;
+    } else {
+      dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
+    }
 
     if (elapsed >= maxTime) {
       intervalId.current && clearInterval(intervalId.current);
@@ -103,9 +109,19 @@ export const useHandlers = () => {
     });
 
     // Draw the transactions
-    transactionsRef.current.forEach((txList) => {
+    transactionsRef.current.forEach((txList, id) => {
+      const lastMessage = txList[txList.length -1];
+      if (elapsed > lastMessage.sentTime + lastMessage.duration) {
+        dispatch({ type: "ADD_GENERATED_MESSAGE", payload: elapsed })
+        transactionsRef.current.delete(id);
+        txList.forEach(tx => {
+          txSentMessagesRef.current.delete(tx.sentTime);
+          txReceivedMessagesRef.current.delete(tx.sentTime + tx.duration);
+        })
+      }
+
       txList.forEach((transaction) => {
-        const { duration, source, target, sentTime, id } = transaction;
+        const { duration, source, target, sentTime } = transaction;
         const sourceNode = topography.nodes.get(source);
         const targetNode = topography.nodes.get(target);
 
@@ -126,12 +142,12 @@ export const useHandlers = () => {
         if (transactionElapsedTime < 0) {
           return;
         }
-        // Cleanup if transaction is 50ms old.
-        else if (transactionElapsedTime > sentTime + duration + 100) {
-          transactionsRef.current.delete(id);
-          txSentMessagesRef.current.delete(sentTime);
-          txReceivedMessagesRef.current.delete(sentTime + duration);
+
+        // If we're past the animation, log it to our sent transaction store.
+        else if (elapsed > sentTime + duration) {
+          dispatch({ type: "ADD_SENT_TX", payload: sentTime })
         }
+
         // Draw the transaction event.
         else {
           // Calculate the interpolation factor
@@ -174,7 +190,7 @@ export const useHandlers = () => {
     });
 
     context.restore();
-  }, [playing, speed]);
+  }, [playing, speed, maxTime]);
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {

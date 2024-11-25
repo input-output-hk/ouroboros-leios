@@ -11,11 +11,10 @@ import {
 } from "../types";
 
 export const useStreamMessagesHandler = () => {
-  const { state: { messages }, dispatch } = useGraphContext();
+  const { dispatch } = useGraphContext();
   const eventSource = useRef<EventSource>();
 
   // Mutable refs to store messages and transactions without causing re-renders
-  const totalEventCount = useRef<number>(0);
   const transactionsByIdRef = useRef<Map<number, ITransactionMessage[]>>(new Map());
   const txGeneratedMessagesById = useRef<Map<number, IServerMessage<ITransactionGenerated>>>(new Map());
   const txSentMessagesById = useRef<Map<number, IServerMessage<ITransactionSent>[]>>(new Map());
@@ -30,7 +29,6 @@ export const useStreamMessagesHandler = () => {
       eventSource.current = new EventSource(url);
       eventSource.current.onmessage = function (message) {
         const json: IServerMessage = JSON.parse(message.data);
-        totalEventCount.current++;
         processMessage(json);
       };
     },

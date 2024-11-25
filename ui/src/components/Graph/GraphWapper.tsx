@@ -1,6 +1,5 @@
 "use client";
 
-import { Test } from "@/app/Test";
 import { GraphContextProvider } from "@/contexts/GraphContext/GraphContextProvider";
 import { FC } from "react";
 import { Canvas } from "./modules/Canvas";
@@ -19,7 +18,6 @@ export const GraphWrapper: FC<IGraphWrapperProps> = ({
   topography,
 }) => (
   <GraphContextProvider maxTime={maxTime} topography={topography}>
-    <Test />
     <div className="container mx-auto">
       <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
         <Slider />

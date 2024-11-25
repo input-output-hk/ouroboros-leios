@@ -1,7 +1,7 @@
 import {
   IServerMessage,
   ITransactionMessage,
-  ITransformedNodeMap,
+  ITransformedNodeMap
 } from "@/components/Graph/types";
 import { Dispatch, MutableRefObject, RefObject } from "react";
 
@@ -19,7 +19,7 @@ export interface IGraphContextState {
   maxTime: number;
   messages: Map<number, IServerMessage>;
   playing: boolean;
-  sentTxs: Set<string>;
+  sentTxs: Set<number>;
   simulationStartTime: MutableRefObject<number>;
   simulationPauseTime: MutableRefObject<number>;
   speed: ESpeedOptions;
@@ -31,27 +31,14 @@ export interface IGraphContextState {
 export type TGraphContextActions =
   | { type: "SET_CURRENT_TIME"; payload: number }
   | { type: "ADD_GENERATED_MESSAGE"; payload: number }
+  | { type: "SET_GENERATED_MESSSAGES", payload: Set<number> }
   | { type: "REMOVE_GENERATED_MESSAGE"; payload: number }
-  | { type: "SET_MAX_TIME"; payload: number }
-  | { type: "ADD_MESSAGE"; payload: IServerMessage }
-  | { type: "ADD_MESSAGES"; payload: Map<number, IServerMessage> }
-  | { type: "REMOVE_MESSAGE"; payload: number }
-  | { type: "REMOVE_MESSAGES"; payload: number[] }
+  | { type: "ADD_SENT_TX"; payload: number }
+  | { type: "SET_SENT_TXS"; payload: Set<number> }
+  | { type: "REMOVE_SENT_TX"; payload: number }
   | { type: "SET_PLAYING"; payload: boolean }
   | { type: "TOGGLE_PLAYING" }
-  | { type: "ADD_SENT_TX"; payload: string }
-  | { type: "REMOVE_SENT_TX"; payload: string }
   | { type: "SET_SPEED"; payload: ESpeedOptions }
-  | { type: "SET_TOPOGRAPHY"; payload: ITransformedNodeMap }
-  | { type: "SET_TOPOGRAPHY_LOADED"; payload: boolean }
-  | {
-      type: "SET_TRANSACTIONS";
-      payload: Map<number, ITransactionMessage[]>;
-    }
-  | {
-    type: "REMOVE_TRANSACTION";
-    payload: number;
-  }
   | {
     type: "BATCH_UPDATE";
     payload: Partial<IGraphContextState>;

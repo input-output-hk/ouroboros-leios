@@ -17,8 +17,7 @@ import { useGraphContext } from "@/contexts/GraphContext/context";
 
 const CustomTooltip = ({
   active,
-  payload,
-  label,
+  payload
 }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
     return (
@@ -39,9 +38,9 @@ export const ChartTransactionsSent: FC = () => {
     () =>
       [...sentTxs.values()].map((v, index) => ({
         message: index + 1,
-        time: Number(v.split("#")[1]),
+        time: v,
       })),
-    [sentTxs.size],
+    [sentTxs],
   );
 
   return (
