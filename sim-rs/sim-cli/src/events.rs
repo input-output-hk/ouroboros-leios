@@ -35,8 +35,6 @@ pub enum OutputFormat {
 
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
-    pool_stake: BTreeMap<NodeId, u64>,
-    total_stake: u64,
     stage_length: u64,
     maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
@@ -52,19 +50,10 @@ impl EventMonitor {
         output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
-        let pool_stake: BTreeMap<_, _> = config
-            .nodes
-            .iter()
-            .filter(|p| p.stake > 0)
-            .map(|p| (p.id, p.stake))
-            .collect();
-        let total_stake = pool_stake.values().cloned().sum();
         let stage_length = config.stage_length;
         let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
         Self {
             node_ids,
-            pool_stake,
-            total_stake,
             stage_length,
             maximum_ib_age,
             events_source,
@@ -89,7 +78,6 @@ impl EventMonitor {
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
-        let mut eb_stake: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
         let mut total_slots = 0u64;
@@ -99,6 +87,7 @@ impl EventMonitor {
         let mut empty_ibs = 0u64;
         let mut expired_ibs = 0u64;
         let mut generated_ebs = 0u64;
+        let mut total_votes = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
@@ -257,10 +246,9 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::Vote { producer, eb, .. } => {
+                Event::Vote { eb, .. } => {
+                    total_votes += 1;
                     *eb_votes.entry(eb).or_default() += 1.0;
-                    let stake = self.pool_stake.get(&producer).cloned().unwrap();
-                    *eb_stake.entry(eb).or_default() += stake as f64;
                 }
                 Event::NoVote { .. } => {}
                 Event::VotesSent { .. } => {
@@ -327,7 +315,6 @@ impl EventMonitor {
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
             let votes_per_eb = compute_stats(eb_votes.into_values());
-            let stake_per_eb = compute_stats(eb_stake.into_values().map(|v| v / (self.total_stake as f64)));
 
             info!(
                 "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -385,8 +372,9 @@ impl EventMonitor {
                 "{} out of {} IBs expired before they reached an EB.",
                 expired_ibs, generated_ibs,
             );
-            info!("Each EB received an average of {} vote(s) (stddev {:3}), representing {:3}% of stake (stddev {:.3}%).",
-                votes_per_eb.mean, votes_per_eb.std_dev, stake_per_eb.mean * 100.0, stake_per_eb.std_dev * 100.0);
+            info!("{} total votes were generated.", total_votes);
+            info!("Each EB received an average of {:.3} vote(s) (stddev {:3})..",
+                votes_per_eb.mean, votes_per_eb.std_dev);
         });
 
         info_span!("network").in_scope(|| {
