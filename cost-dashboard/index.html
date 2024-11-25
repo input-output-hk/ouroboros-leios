@@ -10,10 +10,10 @@
     <div id="uiHeader">
       <div>
         <h1>Ouroborous Leios cost estimator</h1>
-        <h2>v0.1</h2>
+        <h2>v0.2<!--, <small><a href="">video tutorial</a></small>--></h2>
       </div>
       <p><em>Explore the costs and benefits of Ouroborous Leios</em></p>
-      <p>WARNING: This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision.</p>
+      <p>WARNING: This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
     </div>
     <div id="uiDisplays">
       <table>
@@ -24,7 +24,7 @@
         </thead>
         <tbody>
           <tr>
-            <th rowspan="8">Leios protocol</th>
+            <th rowspan="7">Leios protocol</th>
             <th colspan="2">Variant</th>
             <td colspan="2">
               <input id="uiVariant" type="text" list="uiVariants" value="Short Leios" disabled="true"/>
@@ -47,18 +47,13 @@
             <td>slot/phase</td>
           </tr>
           <tr>
-            <th colspan="2">Pipeline length</th>
-            <td><input id="uiPipeline" type="number" disabled="true"/></td>
-            <td>slot/pipeline</td>
-          </tr>
-          <tr>
             <th colspan="2">IB rate</th>
-            <td><input id="uiIbRate" type="number" min="0" max="1" value="0.05" step="0.01"/></td>
+            <td><input id="uiIbRate" type="number" min="0" max="1" value="0.25" step="0.01"/></td>
             <td>IB/slot</td>
           </tr>
           <tr>
             <th colspan="2">EB rate</th>
-            <td><input id="uiEbRate" type="number" min="0" max="10" value="2" step="1"/></td>
+            <td><input id="uiEbRate" type="number" min="0" max="10" value="1" step="1" disabled="true"/></td>
             <td>EB/pipeline</td>
           </tr>
           <tr>
@@ -68,7 +63,7 @@
           </tr>
           <tr>
             <th colspan="2">Certificate rate</th>
-            <td><input id="uiCertRate" type="number" min="0" max="10" value="1" step="1"/></td>
+            <td><input id="uiCertRate" type="number" min="0" max="10" value="1" step="1" disabled="true"/></td>
             <td>cert/pipeline</td>
           </tr>
           <tr>
@@ -99,9 +94,14 @@
             <td>vCPU*ms/IB</td>
           </tr>
           <tr>
-            <th rowspan="4">EB</th>
+            <th rowspan="5">EB</th>
+            <th>IB reference</th>
+            <td><input id="uiIbRef" type="number" min="0" max="20" value="1.2" step="0.1"/></td>
+            <td>kB/IB</td>
+          </tr>
+          <tr>
             <th>Size</th>
-            <td><input id="uiEbSize" type="number" min="0" max="20" value="1.2" step="0.1"/></td>
+            <td><input id="uiEbSize" type="number" disabled="true"/></td>
             <td>kB/EB</td>
           </tr>
           <tr>
@@ -283,7 +283,7 @@
             <td>vCPU*ms/tx</td>
           </tr>
           <tr>
-            <th>Fee fee per byte</th>
+            <th>Fee per byte</th>
             <td><input id="uiTxFee" type="number" min="0" max="20" value="0.17401" step="0.01"/></td>
             <td>ADA/kB</td>
           </tr>
@@ -320,7 +320,7 @@
           <tr>
             <th>IOPS</th>
             <td id="uiTotalIops">?</td>
-            <td>IO/s</td>
+            <td>IO/s/month</td>
           </tr>
           <tr>
             <th>Network egress</th>
@@ -330,7 +330,7 @@
           <tr>
             <th>Network interface</th>
             <td id="uiNic">?</td>
-            <td>Gb/s</td>
+            <td>Gb/s/month</td>
           </tr>
           <tr>
             <th rowspan="5">Costs</th>
@@ -359,17 +359,27 @@
             <td>USD/month</td>
           </tr>
           <tr>
-            <th colspan="2">Retained fees</th>
+            <th rowspan="5">Metrics</th>
+            <th rowspan="2">Cost per transaction</th>
+            <td id="uiCostTxUsd">?</td>
+            <td>USD/tx</td>
+          </tr>
+          <tr>
+            <td id="uiCostTxAda">?</td>
+            <td>ADA/tx</td>
+          </tr>
+          <tr>
+            <th>Retained fees</th>
             <td id="uiFees">?</td>
             <td>USD/month</td>
           </tr>
           <tr>
-            <th colspan="2">Retained fees − cost</th>
+            <th>Retained fees − cost</th>
             <td id="uiProfit">?</td>
             <td>USD/month</td>
           </tr>
           <tr>
-            <th colspan="2">Retained fees ÷ cost</th>
+            <th>Retained fees ÷ cost</th>
             <td id="uiReturn">?</td>
             <td>%</td>
           </tr>

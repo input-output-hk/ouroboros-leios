@@ -6,18 +6,14 @@ import * as d3  from "d3"
 
 
 const millisecond = 0.001                 //  s/ms
-const bit = 1 / 8                         //  b/B
-const kilobyte = 1000                     //  B/kB
-const gigabyte = 1000 * 1000 * 1000       //  B/GB
+const bit = 1 / 8                         //  B/b
+const kilobyte = 1024                     //  B/kB
+const gigabyte = 1024 * 1024 * 1024       //  B/GB
 const month = 365.24 / 12 * 24 * 60 * 60  //  s/month
 
 
 function getFloat(ui) {
   return parseFloat(ui.value)
-}
-
-function roundTwo(x) {
-  return Math.round(100 * x) / 100
 }
 
 function sumResources(resources) {
@@ -31,7 +27,7 @@ function sumResources(resources) {
 }
 
 
-function calculateResources(rate /*  item/s  */, elSize, elIo, elBuild, elVerify, persistent) {
+function calculateResources(rate /*  item/slot  */, elSize, elIo, elBuild, elVerify, persistent) {
 
   const slot = getFloat(uiSlotRate)          //  slot/s
   const size = getFloat(elSize)              //  kB/item
@@ -44,8 +40,8 @@ function calculateResources(rate /*  item/s  */, elSize, elIo, elBuild, elVerify
     throughput   : bps                                           //  B/s
   , disk         : persistent ? bps : 0                          //  B/s
   , producerVcpu : Math.max(build, verify) * rate * millisecond  //  vCPU
-  , relayVcpu    : verify * rate * millisecond                   //  vCPU
-  , io           : io * rate                                     //  IO/s
+  , relayVcpu    : verify * rate * slot * millisecond            //  vCPU
+  , io           : io * rate * slot                              //  IO/s
   }
 
 }
@@ -57,28 +53,29 @@ function ibResources() {
 
 function ebResources() {
   const ebRate = getFloat(uiEbRate)      //  EB/pipline
-  const pipeline = getFloat(uiPipeline)  //  slot/pipeline
+  const pipeline = getFloat(uiPhase)     //  slot/pipeline
   const rate = ebRate / pipeline         //  EB/slot
   return calculateResources(rate, uiEbSize, uiEbIo, uiEbBuild, uiEbVerify, true)
 }
 
 function voteResources() {
   const voteRate = getFloat(uiVoteRate)  //  vote/pipline
-  const pipeline = getFloat(uiPipeline)  //  slot/pipeline
+  const pipeline = getFloat(uiPhase)     //  slot/pipeline
   const rate = voteRate / pipeline       //  vote/slot
   return calculateResources(rate, uiVoteSize, uiVoteIo, uiVoteBuild, uiVoteVerify, false)
 }
 
 function certResources() {
   const certRate = getFloat(uiCertRate)  //  cert/pipline
-  const pipeline = getFloat(uiPipeline)  //  slot/pipeline
+  const pipeline = getFloat(uiPhase)     //  slot/pipeline
   const rate = certRate / pipeline       //  cert/slot
   return calculateResources(rate, uiCertSize, uiCertIo, uiCertBuild, uiCertVerify, false)
 }
 
 function rbResources() {
   const rate = getFloat(uiRbRate)  //  RB/slot
-  return calculateResources(rate, uiCertSize, uiCertIo, uiCertBuild, uiCertVerify, true)
+  const uiRbIo = uiCertIo
+  return calculateResources(rate, uiCertSize, uiRbIo, uiRbBuild, uiRbVerify, true)
 }
 
 function txResources() {
@@ -102,25 +99,29 @@ function txResources() {
 
 export async function calculate() {
 
-  const slot = getFloat(uiSlotRate)  //  slot/s
-  const phases = getFloat(uiPhases)  //  phase/pipeline
-  const phase = getFloat(uiPhase)    //  slot/phase
+  // The variable names and units are awkard here: Because of Leios
+  // parallelism, the number of slots per pipeline equals the number
+  // of phases per pipeline.
 
-  const pipeline = phases * phase    //  slot/pipeline
-  uiPipeline.value = pipeline
+  const slot = getFloat(uiSlotRate)   //  slot/s
+  const phases = getFloat(uiPhases)   //  phase/pipeline
+  const pipeline = getFloat(uiPhase)  //  slot/pipeline
 
-  const ibRate = getFloat(uiIbRate)        //  IB/slot
-  const certRate = getFloat(uiCertRate)    //  cert/pipeline
-  const rbRate = getFloat(uiRbRate)        //  RB/slot
+  const ibRate = getFloat(uiIbRate)      //  IB/slot
+  const ebRate = getFloat(uiEbRate)      //  EB/pipeline
+  const certRate = getFloat(uiCertRate)  //  cert/pipeline
+  const rbRate = getFloat(uiRbRate)      //  RB/slot
 
   const praosTxRate = getFloat(uiPraosTx)  //  tx/s
   const leiosTxRate = getFloat(uiLeiosTx)  //  tx/s
 
-  const txSize = getFloat(uiTxSize)        //  kB/tx
-  const certSize = getFloat(uiCertSize)    //  kB/cert
+  const txSize = getFloat(uiTxSize)      //  kB/tx
+  const ibRefSize = getFloat(uiIbRef)    //  kB/IBref
+  const certSize = getFloat(uiCertSize)  //  kB/cert
 
-  uiRbSize.value = (praosTxRate * txSize / rbRate + certRate * certSize) / slot  //  kB/RB
-  uiIbSize.value = leiosTxRate * txSize / ibRate / slot                          //  kB/IB
+  uiRbSize.value = ((praosTxRate * txSize / slot + certRate * certSize / pipeline) / rbRate).toFixed(2)       //  kB/RB
+  uiIbSize.value = (leiosTxRate == 0 && ibRate == 0 ? 0 : leiosTxRate * txSize / ibRate / slot).toFixed(2)    //  kB/IB
+  uiEbSize.value = (leiosTxRate == 0 && ibRate == 0 ? 0 : ibRate * pipeline / ebRate * ibRefSize).toFixed(2)  //  kB/EB
 
   const resources = sumResources([
     ibResources()
@@ -139,43 +140,50 @@ export async function calculate() {
   const vcpu = producers * Math.max(2, Math.ceil(spike * resources.producerVcpu))
              + relays    * Math.max(2, Math.ceil(spike * resources.relayVcpu   ))
   uiTotalVcpu.innerText = vcpu
-  const costVcpu = roundTwo(vcpu * getFloat(uiVcpu))
-  uiCostVcpu.innerText = costVcpu
+  const costVcpu = vcpu * getFloat(uiVcpu)
+  uiCostVcpu.innerText = costVcpu.toFixed(2)
 
-  const discount = (1 - getFloat(uiDiscount) / 100) / 12                                            //  1/month
+  const discount = getFloat(uiDiscount) / 100 / 12                                                  //  1/month
   const perpetual = (1 + discount) / discount                                                       //  1
   const compression = 1 - getFloat(uiCompression) / 100                                             //  1
   const storage = nodes * compression * (getFloat(uiRbLedger) + resources.disk / gigabyte * month)  //  GB/month
-  uiTotalStorage.innerText = roundTwo(storage)
-  const costStorage = roundTwo(storage * perpetual * getFloat(uiStorage)) 
-  uiCostStorage.innerText = costStorage
+  uiTotalStorage.innerText = storage.toFixed(2)
+  const costStorage = storage * perpetual * getFloat(uiStorage)
+  uiCostStorage.innerText = costStorage.toFixed(2)
 
   const throughput = resources.throughput                     //  B/s
   const downstream = getFloat(uiDownsteam) * throughput       //  B/s
   const upstream = getFloat(uiUpstream) * throughput          //  B/S
   const network = (downstream + upstream) / gigabyte * month  //  GB/month
-  uiTotalEgress.innerText = roundTwo(network)
-  const costEgress = roundTwo(network * getFloat(uiEgress))
-  uiCostEgress.innerText = costEgress
+  uiTotalEgress.innerText = network.toFixed(2)
+  const costEgress = network * getFloat(uiEgress)
+  uiCostEgress.innerText = costEgress.toFixed(2)
 
   uiNic.innerText = Math.max(1, Math.round(Math.pow(10, Math.ceil(Math.log(spike * Math.max(upstream, downstream) / gigabyte / bit) / Math.log(10)))))  // Gb/s
 
-  const io = nodes * resources.io  // IO/s
-  uiTotalIops.innerText = roundTwo(io)
-  const costIops = roundTwo(io * getFloat(uiIops))
-  uiCostIops.innerText = costIops
+  const io = spike * nodes * resources.io  // IO/s
+  uiTotalIops.innerText = io.toFixed(2)
+  const costIops = io * getFloat(uiIops)
+  uiCostIops.innerText = costIops.toFixed(2)
 
   const cost = costVcpu + costStorage + costIops + costEgress
-  uiCost.innerText = cost
+  uiCost.innerText = cost.toFixed(2)
 
-  const txRate = praosTxRate + leiosTxRate                                           //  tx/s
-  const txFee = getFloat(uiTxFee)                                                    //  ADA/tx
-  const price = getFloat(uiAda)                                                      //  USD/ADA
-  const totalFees = txRate * txFee * price * month                                   //  USD/month
-  const retained = getFloat(uiStake) / 100 * getFloat(uiRetained) / 100 * totalFees  //  USD/month
-  uiFees.innerText = roundTwo(retained)
-  uiProfit.innerText = roundTwo(retained - cost)
-  uiReturn.innerText = roundTwo(100 * retained / cost)
+  const txRate = praosTxRate + leiosTxRate                               //  tx/s
+  const txFee = getFloat(uiTxFee) * getFloat(uiTxSize)                   //  ADA/tx
+  const price = getFloat(uiAda)                                          //  USD/ADA
+  const totalFees = txRate * txFee * price * month                       //  USD/month
+  const fraction = getFloat(uiStake) / 100 * getFloat(uiRetained) / 100  //  %/100
+  const retained = fraction * totalFees                                  //  USD/month
+
+  uiFees.innerText = retained.toFixed(2)
+  uiProfit.innerText = (retained - cost).toFixed(2)
+  uiReturn.innerText = (100 * retained / cost).toFixed(2)
+
+  const txCostUSD = cost / fraction / txRate / month  //  USD/tx
+  const txCostADA = txCostUSD / price                 //  ADA/tx
+  uiCostTxUsd.innerText = txCostUSD.toFixed(2)
+  uiCostTxAda.innerText = txCostADA.toFixed(2)
   
 }
 
@@ -193,23 +201,21 @@ export async function initialize() {
   , uiEbBuild
   , uiEbIo
   , uiEbRate
-  , uiEbSize
+//, uiEbSize
   , uiEbVerify
   , uiEgress
   , uiIbBuild
   , uiIbIo
   , uiIbRate
+  , uiIbRef
 //, uiIbSize
   , uiIbVerify
   , uiIops
   , uiLeiosTx
-  , uiNic
   , uiPhase
 //, uiPhases
-//, uiPipeline
   , uiPraosTx
   , uiProducers
-  , uiProfit
   , uiRbBuild
   , uiRbLedger
   , uiRbRate
@@ -217,7 +223,6 @@ export async function initialize() {
   , uiRbVerify
   , uiRelays
   , uiRetained
-  , uiReturn
   , uiSlotRate
   , uiSpike
   , uiStake
@@ -227,7 +232,6 @@ export async function initialize() {
   , uiTxVerify
   , uiUpstream
 //, uiVariant
-  , uiVariants
   , uiVcpu
   , uiVoteBuild
   , uiVoteIo
