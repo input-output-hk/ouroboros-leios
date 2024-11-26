@@ -10,7 +10,7 @@
     <div id="uiHeader">
       <div>
         <h1>Ouroborous Leios cost estimator</h1>
-        <h2>v0.2<!--, <small><a href="">video tutorial</a></small>--></h2>
+        <h2>v0.2, <small><a href="https://drive.google.com/file/d/1pH1GYRInevlKcrkpFRJYIvRqFtcv3yFd/view?usp=sharing">video tutorial</a></small></h2>
       </div>
       <p><em>Explore the costs and benefits of Ouroborous Leios</em></p>
       <p>WARNING: This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
@@ -188,7 +188,7 @@
             <td>tx/s</td>
           </tr>
           <tr>
-            <th rowspan="3">RB</th>
+            <th rowspan="3">RB <span title="A Praos block, also called a Ranking Block in Leios.">ⓘ</span></th>
             <th>Size <span title="Size of each Ranking Block.">ⓘ</span></th>
             <td><input id="uiRbSize" type="number" disabled="true"/></td>
             <td>kB/RB</td>
@@ -289,7 +289,7 @@
           </tr>
           <tr>
             <th colspan="2">Storage compression <span title="Percentage by which each node's disk storage space is reduced by using data compression or a compressed file system.">ⓘ</span></th>
-            <td><input id="uiCompression" type="number" min="0" max="100" value="75" step="0.1"/></td>
+            <td><input id="uiCompression" type="number" min="0" max="100" value="60" step="0.1"/></td>
             <td>%</td>
           </tr>
           <tr>
@@ -333,8 +333,8 @@
             <td>Gb/s/month</td>
           </tr>
           <tr>
-            <th rowspan="5">Costs <span title="The stake pool's monthly cost of CPU.">ⓘ</span></th>
-            <th>Compute</th>
+            <th rowspan="5">Costs</th>
+            <th>Compute <span title="The stake pool's monthly cost of CPU.">ⓘ</span></th>
             <td id="uiCostVcpu">?</td>
             <td>USD/month</td>
           </tr>

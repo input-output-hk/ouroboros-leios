@@ -7,4 +7,6 @@ npm install
 
 npx webpack
 
-cp index.html view.css controller.js ../site/static/dashboard/
+mkdir -p tmp
+cp index.html view.css controller.js tmp/
+ipfs add --pin=false --recursive=true tmp
