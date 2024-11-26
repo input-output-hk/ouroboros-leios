@@ -35,6 +35,7 @@ pub enum OutputFormat {
 
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
+    pool_ids: Vec<NodeId>,
     stage_length: u64,
     maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
@@ -50,10 +51,16 @@ impl EventMonitor {
         output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
+        let pool_ids = config
+            .nodes
+            .iter()
+            .filter_map(|p| if p.stake > 0 { Some(p.id) } else { None })
+            .collect();
         let stage_length = config.stage_length;
         let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
         Self {
             node_ids,
+            pool_ids,
             stage_length,
             maximum_ib_age,
             events_source,
@@ -78,6 +85,8 @@ impl EventMonitor {
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
         let mut votes_per_bundle: BTreeMap<(u64, NodeId), f64> = BTreeMap::new();
+        let mut votes_per_pool: BTreeMap<NodeId, f64> =
+            self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
@@ -251,6 +260,7 @@ impl EventMonitor {
                     total_votes += 1;
                     *votes_per_bundle.entry((slot, producer)).or_default() += 1.0;
                     *eb_votes.entry(eb).or_default() += 1.0;
+                    *votes_per_pool.entry(producer).or_default() += 1.0;
                 }
                 Event::NoVote { .. } => {}
                 Event::VotesSent { .. } => {
@@ -302,6 +312,7 @@ impl EventMonitor {
                 .collect();
             let empty_ebs = generated_ebs - ibs_in_eb.len() as u64;
             let ibs_which_reached_eb = ebs_containing_ib.len();
+            let bundle_count = votes_per_bundle.len();
             let txs_per_ib = compute_stats(txs_in_ib.into_values());
             let bytes_per_ib = compute_stats(bytes_in_ib.into_values());
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
@@ -316,7 +327,9 @@ impl EventMonitor {
                     .iter()
                     .map(|id| seen_ibs.get(id).copied().unwrap_or_default()),
             );
+            let votes_per_pool = compute_stats(votes_per_pool.into_values());
             let votes_per_eb = compute_stats(eb_votes.into_values());
+            let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
 
             info!(
                 "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -375,10 +388,10 @@ impl EventMonitor {
                 expired_ibs, generated_ibs,
             );
             info!("{} total votes were generated.", total_votes);
+            info!("Each stake pool produced an average of {:.3} vote(s) (stddev {:.3}).",
+                votes_per_pool.mean, votes_per_pool.std_dev);
             info!("Each EB received an average of {:.3} vote(s) (stddev {:.3}).",
                 votes_per_eb.mean, votes_per_eb.std_dev);
-            let bundle_count = votes_per_bundle.len();
-            let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
         });
