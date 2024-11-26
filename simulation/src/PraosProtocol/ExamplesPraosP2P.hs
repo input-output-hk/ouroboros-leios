@@ -40,8 +40,8 @@ import SimTypes
 import System.Random (StdGen, mkStdGen)
 import Viz
 
-example1 :: Vizualisation
-example1 =
+example1 :: Int -> DiffTime -> Maybe P2PTopography -> Vizualisation
+example1 seed blockInterval maybeP2PTopography =
   Viz model $
     LayoutAbove
       [ layoutLabelTime
@@ -72,20 +72,21 @@ example1 =
           ]
       ]
  where
-  model = praosSimVizModel $ example1Trace rng0 5 p2pTopography
-  p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng0
-  p2pTopographyCharacteristics =
-    P2PTopographyCharacteristics
-      { p2pWorldShape =
-          WorldShape
-            { worldDimensions = (0.600, 0.300)
-            , worldIsCylinder = True
-            }
-      , p2pNumNodes = 100
-      , p2pNodeLinksClose = 5
-      , p2pNodeLinksRandom = 5
-      }
-  rng0 = mkStdGen 4 -- TODO make a param.
+  rng = mkStdGen seed
+  p2pTopography =
+    flip fromMaybe maybeP2PTopography $
+      flip genArbitraryP2PTopography rng $
+        P2PTopographyCharacteristics
+          { p2pWorldShape =
+              WorldShape
+                { worldDimensions = (0.600, 0.300)
+                , worldIsCylinder = True
+                }
+          , p2pNumNodes = 100
+          , p2pNodeLinksClose = 5
+          , p2pNodeLinksRandom = 5
+          }
+  model = praosSimVizModel (example1Trace rng blockInterval p2pTopography)
 
 data DiffusionEntry = DiffusionEntry
   { hash :: Int

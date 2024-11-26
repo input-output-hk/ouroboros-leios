@@ -9,12 +9,14 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Topology where
 
 import Codec.Compression.GZip as GZip (decompress)
+import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (assert)
 import Control.Monad (forM_, void, (<=<))
 import Data.Aeson (encode)
@@ -29,7 +31,9 @@ import qualified Data.GraphViz as GV
 import qualified Data.GraphViz.Attributes as GVA
 import qualified Data.GraphViz.Attributes.Complete as GVAC
 import qualified Data.GraphViz.Commands as GVC
+import qualified Data.GraphViz.Commands.IO as GVCIO
 import qualified Data.GraphViz.Types as GVT (PrintDot)
+import Data.GraphViz.Types.Generalised (FromGeneralisedDot (fromGeneralised))
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Map (Map)
@@ -47,8 +51,8 @@ import qualified Database.SQLite.Simple as SQLlite
 import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import GHC.Records (HasField)
-import P2P (Latency)
-import SimTypes (Path (..), Point (..))
+import P2P (Latency, P2PTopography (..))
+import SimTypes (NodeId (..), Path (..), Point (..), WorldDimensions, WorldShape (..))
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose)
 import System.IO.Temp (withTempFile)
@@ -66,10 +70,6 @@ newtype NodeName = NodeName {unNodeName :: Text}
   deriving newtype (GVT.PrintDot)
   deriving newtype (SQLite.ToField)
   deriving newtype (PrintfArg)
-
-newtype NodeId = NodeId {unNodeId :: Int}
-  deriving (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
 
 newtype OrgName = OrgName {unOrgName :: Text}
   deriving (Show, Eq, Ord)
@@ -451,20 +451,23 @@ toGraph topology = G.mkGraph graphNodes graphEdges
   graphEdges =
     [ (consumerId, producerId, producerLatency)
     | consumer <- allNodes topology
-    , let consumerId = unNodeId consumer.nodeId
+    , let consumerId = coerce consumer.nodeId
     , (producerName, producerLatency) <- M.toList (outgoingEdges consumer)
-    , let producerId = unNodeId $ nameToIdMap M.! producerName
+    , let producerId = coerce $ nameToIdMap M.! producerName
     ]
 
 toGraphWithPositionInformation ::
   forall topology node edge.
   Topology topology node edge =>
+  WorldDimensions ->
   topology ->
-  Gr (node, Point) (edge, Path)
-toGraphWithPositionInformation =
-  G.nemap unsafeUnpackAttributeNode unsafeUnpackAttributeEdge
-    . GV.dotizeGraph params
-    . toGraph
+  IO (Gr (node, Point) (edge, Path))
+toGraphWithPositionInformation (w, h) topology = do
+  let gr0 = toGraph topology
+  let gr1 = GV.dotizeGraph params gr0
+  let gr2 = G.nemap unsafeUnpackAttributeNode unsafeUnpackAttributeEdge gr1
+  let gr3 = rescale gr2
+  pure gr3
  where
   params =
     GV.defaultParams
@@ -473,12 +476,29 @@ toGraphWithPositionInformation =
       , clusterID = regionNameToGraphID
       }
 
+  rescale :: Gr (node, Point) (edge, Path) -> Gr (node, Point) (edge, Path)
+  rescale gr = G.nmap (second rescalePoint) gr
+   where
+    rescalePoint p = Point (rescaleX p._1) (rescaleY p._2)
+     where
+      ps0 = fmap (snd . snd) (G.labNodes gr)
+      rescaleX x = xPad + (x - x0l) / w0 * (w - 2 * xPad)
+       where
+        xPad = 0.05 * w
+        (x0l, x0u) = (minimum &&& maximum) (fmap _1 ps0)
+        w0 = x0u - x0l
+      rescaleY y = yPad + (y - y0l) / h0 * (h - 2 * yPad)
+       where
+        yPad = 0.05 * h
+        (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
+        h0 = y0u - y0l
+
   unsafeUnpackAttributeNode :: GV.AttributeNode a -> (a, Point)
   unsafeUnpackAttributeNode ([GVAC.Pos (GVAC.PointPos point)], x) = (x, unsafeToPoint point)
   unsafeUnpackAttributeNode _ = error "post-condition of dotizeGraph violated"
 
   unsafeToPoint :: GVAC.Point -> Point
-  unsafeToPoint (GVAC.Point x y Nothing False) = Point x y
+  unsafeToPoint (GVAC.Point x y _z False) = Point x y
   unsafeToPoint _ = error "post-condition of dotizeGraph violated"
 
   unsafeUnpackAttributeEdge :: GV.AttributeEdge a -> (a, Path)
@@ -498,3 +518,31 @@ toGraphWithPositionInformation =
 
   clusterByRegion :: G.LNode node -> GV.NodeCluster RegionName (G.LNode node)
   clusterByRegion lnode@(_, node) = GV.C node.region (GV.N lnode)
+
+toP2PTopography ::
+  WorldDimensions ->
+  SimpleTopology ->
+  IO P2PTopography
+toP2PTopography worldDimensions topology = do
+  graphWithInfo <- toGraphWithPositionInformation worldDimensions topology
+  let nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes graphWithInfo]
+  let edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges graphWithInfo]
+  let p2pNodes =
+        M.fromList
+          [ (node.nodeId, point)
+          | (node, point) <- M.elems nodeInfoMap
+          ]
+  let p2pLinks =
+        M.fromList
+          [ ((node1.nodeId, node2.nodeId), latency)
+          | ((n1, n2), (latency, _path)) <- M.assocs edgeInfoMap
+          , let (node1, _point1) = nodeInfoMap M.! n1
+          , let (node2, _point2) = nodeInfoMap M.! n2
+          ]
+  let p2pWorldShape = WorldShape{worldIsCylinder = True, ..}
+  pure P2PTopography{..}
+
+readP2PTopography :: WorldDimensions -> FilePath -> IO P2PTopography
+readP2PTopography worldDimensions simpleTopologyFile = do
+  simpleTopology <- readSimpleTopology simpleTopologyFile
+  toP2PTopography worldDimensions simpleTopology

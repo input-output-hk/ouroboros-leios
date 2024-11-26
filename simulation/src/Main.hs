@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
@@ -14,29 +15,86 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
+import TimeCompat (DiffTime)
+import Topology (readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
 
 main :: IO ()
-main = do
-  VizOptions{..} <- execParser (info (helper <*> vizOptions) mempty)
-  let viz = vizCommandToViz vizCommand
-  case vizOutputFramesDir of
-    Nothing ->
-      let gtkVizConfig =
-            defaultGtkVizConfig
-              { gtkVizCpuRendering = vizCpuRendering
-              , gtkVizResolution = vizSize
-              }
-       in vizualise gtkVizConfig viz
-    Just outputFramesDir ->
-      let animVizConfig =
-            defaultAnimVizConfig
-              { animVizFrameFiles = \n -> outputFramesDir ++ "/frame-" ++ show n ++ ".png"
-              , animVizDuration = fromMaybe 60 vizOutputSeconds
-              , animVizStartTime = fromMaybe 0 vizOutputStartTime
-              , animVizResolution = vizSize
-              }
-       in writeAnimationFrames animVizConfig viz
+main =
+  execParser (info (helper <*> options) mempty) >>= \case
+    CliCommand CliOptions{..} ->
+      case cliCommand of
+        CliConvertBenchTopology{..} -> do
+          simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency inputBenchTopology inputBenchLatencies
+          writeSimpleTopology outputSimpleTopology simpleTopology
+    VizCommand opt@VizOptions{..} -> do
+      viz <- vizOptionsToViz opt
+      case vizOutputFramesDir of
+        Nothing ->
+          let gtkVizConfig =
+                defaultGtkVizConfig
+                  { gtkVizCpuRendering = vizCpuRendering
+                  , gtkVizResolution = vizSize
+                  }
+           in vizualise gtkVizConfig viz
+        Just outputFramesDir ->
+          let animVizConfig =
+                defaultAnimVizConfig
+                  { animVizFrameFiles = \n -> outputFramesDir ++ "/frame-" ++ show n ++ ".png"
+                  , animVizDuration = fromMaybe 60 vizOutputSeconds
+                  , animVizStartTime = fromMaybe 0 vizOutputStartTime
+                  , animVizResolution = vizSize
+                  }
+           in writeAnimationFrames animVizConfig viz
+
+data Options
+  = VizCommand VizOptions
+  | CliCommand CliOptions
+
+options :: Parser Options
+options = VizCommand <$> vizOptions <|> CliCommand <$> cliOptions
+
+newtype CliOptions = CliOptions
+  { cliCommand :: CliCommand
+  }
+
+data CliCommand
+  = CliConvertBenchTopology {inputBenchTopology :: FilePath, inputBenchLatencies :: FilePath, outputSimpleTopology :: FilePath}
+
+cliOptions :: Parser CliOptions
+cliOptions =
+  CliOptions
+    <$> cliCommands
+
+cliCommands :: Parser CliCommand
+cliCommands =
+  subparser . mconcat $
+    [ commandGroup "Available utility commands:"
+    , command "convert-bench-topology" . info cliConvertBenchTopology $
+        progDesc "Convert the benchmark topology files to a simple topology file."
+    ]
+
+cliConvertBenchTopology :: Parser CliCommand
+cliConvertBenchTopology =
+  CliConvertBenchTopology
+    <$> strOption
+      ( long "input-bench-topology"
+          <> short 't'
+          <> metavar "FILE"
+          <> help "The input topology file."
+      )
+    <*> strOption
+      ( long "input-bench-latencies"
+          <> short 'l'
+          <> metavar "FILE"
+          <> help "The input latencies database."
+      )
+    <*> strOption
+      ( long "output-simple-topology"
+          <> short 'o'
+          <> metavar "FILE"
+          <> help "The output topology file."
+      )
 
 data VizOptions = VizOptions
   { vizCommand :: VizCommand
@@ -91,11 +149,37 @@ data VizCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1
+  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, maybeTopologyFile :: Maybe FilePath}
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
+
+parserPraosP2P1 :: Parser VizCommand
+parserPraosP2P1 =
+  VizPraosP2P1
+    <$> option
+      auto
+      ( long "seed"
+          <> metavar "NUMBER"
+          <> help "The seed for the random number generator."
+          <> value 0
+      )
+    <*> option
+      (fmap (fromIntegral @Int) auto)
+      ( long "block-interval"
+          <> metavar "NUMBER"
+          <> help "The interval at which blocks are generated."
+          <> value 5
+      )
+    <*> optional
+      ( option
+          str
+          ( long "topology"
+              <> metavar "FILE"
+              <> help "The file describing the network topology."
+          )
+      )
 
 vizCommands :: Parser VizCommand
 vizCommands =
@@ -124,7 +208,7 @@ vizCommands =
     , command "praos-1" . info (pure VizPraos1) $
         progDesc
           "A simulation of two nodes running Praos consensus."
-    , command "praos-p2p-1" . info (pure VizPraosP2P1) $
+    , command "praos-p2p-1" . info parserPraosP2P1 $
         progDesc
           "A simulation of 100 nodes running Praos consensus."
     , command "praos-p2p-2" . info (pure VizPraosP2P2) $
@@ -139,23 +223,26 @@ vizCommands =
         progDesc ""
     ]
 
-vizCommandToViz :: VizCommand -> Vizualisation
-vizCommandToViz = \case
-  VizTCP1 -> ExamplesTCP.example1
-  VizTCP2 -> ExamplesTCP.example2
-  VizTCP3 -> ExamplesTCP.example3
-  VizRelay1 -> ExamplesRelay.example1
-  VizRelay2 -> ExamplesRelay.example2
-  VizP2P1 -> ExamplesRelayP2P.example1
-  VizP2P2 -> ExamplesRelayP2P.example2
-  VizPCS1 -> VizChainSync.example1
-  VizPBF1 -> VizBlockFetch.example1
-  VizPraos1 -> VizPraos.example1
-  VizPraosP2P1 -> VizPraosP2P.example1
-  VizPraosP2P2 -> VizPraosP2P.example2
-  VizRelayTest1 -> VizSimTestRelay.example1
-  VizRelayTest2 -> VizSimTestRelay.example2
-  VizRelayTest3 -> VizSimTestRelay.example3
+vizOptionsToViz :: VizOptions -> IO Vizualisation
+vizOptionsToViz VizOptions{..} = case vizCommand of
+  VizTCP1 -> pure ExamplesTCP.example1
+  VizTCP2 -> pure ExamplesTCP.example2
+  VizTCP3 -> pure ExamplesTCP.example3
+  VizRelay1 -> pure ExamplesRelay.example1
+  VizRelay2 -> pure ExamplesRelay.example2
+  VizP2P1 -> pure ExamplesRelayP2P.example1
+  VizP2P2 -> pure ExamplesRelayP2P.example2
+  VizPCS1 -> pure VizChainSync.example1
+  VizPBF1 -> pure VizBlockFetch.example1
+  VizPraos1 -> pure VizPraos.example1
+  VizPraosP2P1{..} -> do
+    let worldDimensions = (1200, 1000)
+    maybeP2PTopography <- traverse (readP2PTopography worldDimensions) maybeTopologyFile
+    pure $ VizPraosP2P.example1 seed blockInterval maybeP2PTopography
+  VizPraosP2P2 -> pure VizPraosP2P.example2
+  VizRelayTest1 -> pure VizSimTestRelay.example1
+  VizRelayTest2 -> pure VizSimTestRelay.example2
+  VizRelayTest3 -> pure VizSimTestRelay.example3
 
 type VizSize = (Int, Int)
 

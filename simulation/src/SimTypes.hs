@@ -18,7 +18,7 @@ data LabelNode e = LabelNode NodeId e deriving (Show)
 data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 
 -- | Position in simulation world coordinates
-data Point = Point !Double !Double
+data Point = Point {_1 :: !Double, _2 :: !Double}
   deriving (Show, Generic)
 
 -- | Path in simulation world
@@ -30,8 +30,10 @@ instance ToJSON Point where
 
 instance FromJSON Point
 
+type WorldDimensions = (Double, Double)
+
 data WorldShape = WorldShape
-  { worldDimensions :: !(Double, Double)
+  { worldDimensions :: !WorldDimensions
   -- ^ The dimensions of the world in simulation world coordinates
   -- (Circumference, pole-to-pole)
   , worldIsCylinder :: !Bool
