@@ -7,7 +7,7 @@ use crate::{
     config::NodeId,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        NoVoteReason, Transaction, TransactionId, Vote,
+        NoVoteReason, Transaction, TransactionId, VoteBundle,
     },
 };
 
@@ -217,12 +217,8 @@ impl EventTracker {
         });
     }
 
-    pub fn track_vote(&self, vote: &Vote) {
-        self.send(Event::Vote {
-            slot: vote.slot,
-            producer: vote.producer,
-            eb: vote.eb,
-        });
+    pub fn track_vote(&self, slot: u64, producer: NodeId, eb: EndorserBlockId) {
+        self.send(Event::Vote { slot, producer, eb });
     }
 
     pub fn track_no_vote(
@@ -240,25 +236,19 @@ impl EventTracker {
         });
     }
 
-    pub fn track_votes_sent(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
-        let Some(Vote { slot, producer, .. }) = votes.first() else {
-            return;
-        };
+    pub fn track_votes_sent(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesSent {
-            slot: *slot,
-            producer: *producer,
+            slot: votes.slot,
+            producer: votes.producer,
             sender,
             recipient,
         });
     }
 
-    pub fn track_votes_received(&self, votes: &[Vote], sender: NodeId, recipient: NodeId) {
-        let Some(Vote { slot, producer, .. }) = votes.first() else {
-            return;
-        };
+    pub fn track_votes_received(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesReceived {
-            slot: *slot,
-            producer: *producer,
+            slot: votes.slot,
+            producer: votes.producer,
             sender,
             recipient,
         });

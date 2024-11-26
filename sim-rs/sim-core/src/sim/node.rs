@@ -20,7 +20,7 @@ use crate::{
     events::EventTracker,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        NoVoteReason, Transaction, TransactionId, Vote,
+        NoVoteReason, Transaction, TransactionId, VoteBundle,
     },
     network::{NetworkSink, NetworkSource},
 };
@@ -68,8 +68,8 @@ struct NodeLeiosState {
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
-    voter_slots_seen: BTreeMap<NodeId, BTreeSet<u64>>,
-    votes_by_eb: BTreeMap<EndorserBlockId, Vec<Vote>>,
+    votes_by_eb: BTreeMap<EndorserBlockId, u64>,
+    votes: BTreeMap<(u64, NodeId), Arc<VoteBundle>>,
 }
 
 enum InputBlockState {
@@ -210,6 +210,12 @@ impl Node {
                         }
 
                         // Voting
+                        SimulationMessage::AnnounceVotes(slot, producer) => {
+                            self.receive_announce_votes(from, slot, producer)?;
+                        }
+                        SimulationMessage::RequestVotes(slot, producer) => {
+                            self.receive_request_votes(from, slot, producer)?;
+                        }
                         SimulationMessage::Votes(votes) => {
                             self.receive_votes(from, votes)?;
                         }
@@ -325,17 +331,14 @@ impl Node {
             // For every VRF lottery you won, you can vote for every EB
             vrf_wins * ebs.len()
         };
-        let votes = ebs
-            .iter()
-            .cycle()
-            .map(|eb_id| Vote {
-                slot,
-                producer: self.id,
-                eb: *eb_id,
-            })
-            .take(votes_allowed)
-            .collect();
-        self.send_votes(votes)?;
+        let votes = VoteBundle {
+            slot,
+            producer: self.id,
+            ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
+        };
+        if !votes.ebs.is_empty() {
+            self.send_votes(votes)?;
+        }
         Ok(())
     }
 
@@ -616,33 +619,42 @@ impl Node {
         Ok(())
     }
 
-    fn receive_votes(&mut self, from: NodeId, votes: Arc<Vec<Vote>>) -> Result<()> {
+    fn receive_announce_votes(&mut self, from: NodeId, slot: u64, producer: NodeId) -> Result<()> {
+        if !self.leios.votes.contains_key(&(slot, producer)) {
+            self.send_to(from, SimulationMessage::RequestVotes(slot, producer))?;
+        }
+        Ok(())
+    }
+
+    fn receive_request_votes(&mut self, from: NodeId, slot: u64, producer: NodeId) -> Result<()> {
+        if let Some(votes) = self.leios.votes.get(&(slot, producer)) {
+            self.tracker.track_votes_sent(votes, self.id, from);
+            self.send_to(from, SimulationMessage::Votes(votes.clone()))?;
+        }
+        Ok(())
+    }
+
+    fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) -> Result<()> {
+        let slot = votes.slot;
+        let producer = votes.producer;
         self.tracker.track_votes_received(&votes, from, self.id);
-        let producer = votes[0].producer;
-        let slot = votes[0].slot;
-        if !self
+        if self
             .leios
-            .voter_slots_seen
-            .entry(producer)
-            .or_default()
-            .insert(slot)
+            .votes
+            .insert((votes.slot, votes.producer), votes.clone())
+            .is_some()
         {
             return Ok(());
         }
-        for vote in votes.iter() {
-            self.leios
-                .votes_by_eb
-                .entry(vote.eb)
-                .or_default()
-                .push(vote.clone());
+        for eb in votes.ebs.iter() {
+            *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
             if *peer == from {
                 continue;
             }
-            self.tracker.track_votes_sent(&votes, self.id, *peer);
-            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
+            self.send_to(*peer, SimulationMessage::AnnounceVotes(slot, producer))?;
         }
         Ok(())
     }
@@ -761,24 +773,20 @@ impl Node {
         Ok(())
     }
 
-    fn send_votes(&mut self, votes: Vec<Vote>) -> Result<()> {
-        for vote in &votes {
-            self.tracker.track_vote(vote);
-            self.leios
-                .votes_by_eb
-                .entry(vote.eb)
-                .or_default()
-                .push(vote.clone());
+    fn send_votes(&mut self, votes: VoteBundle) -> Result<()> {
+        for eb in &votes.ebs {
+            self.tracker.track_vote(votes.slot, votes.producer, *eb);
+            *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
         }
-        self.leios
-            .voter_slots_seen
-            .entry(self.id)
-            .or_default()
-            .insert(votes[0].slot);
         let votes = Arc::new(votes);
+        self.leios
+            .votes
+            .insert((votes.slot, votes.producer), votes.clone());
         for peer in &self.peers {
-            self.tracker.track_votes_sent(&votes, self.id, *peer);
-            self.send_to(*peer, SimulationMessage::Votes(votes.clone()))?;
+            self.send_to(
+                *peer,
+                SimulationMessage::AnnounceVotes(votes.slot, votes.producer),
+            )?;
         }
         Ok(())
     }
