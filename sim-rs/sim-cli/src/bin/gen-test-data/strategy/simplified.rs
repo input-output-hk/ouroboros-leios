@@ -66,7 +66,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
         let pool_id = nodes.len();
         nodes.push(RawNodeConfig {
             location: pool_loc,
-            stake: stake.get(pool_count).cloned(),
+            stake: stake.get(i).cloned(),
         });
         let relay_id = nodes.len();
         nodes.push(RawNodeConfig {
