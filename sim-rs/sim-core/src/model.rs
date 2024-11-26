@@ -99,10 +99,10 @@ impl EndorserBlock {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct Vote {
+pub struct VoteBundle {
     pub slot: u64,
     pub producer: NodeId,
-    pub eb: EndorserBlockId,
+    pub ebs: Vec<EndorserBlockId>, // contains duplicates
 }
 
 #[derive(Debug, Clone, Serialize)]

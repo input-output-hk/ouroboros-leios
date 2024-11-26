@@ -21,7 +21,7 @@ use crate::{
     events::EventTracker,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        Transaction, TransactionId, Vote,
+        Transaction, TransactionId, VoteBundle,
     },
     network::Network,
 };
@@ -224,7 +224,9 @@ enum SimulationMessage {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
     // Get out the vote
-    Votes(Arc<Vec<Vote>>),
+    AnnounceVotes(u64, NodeId),
+    RequestVotes(u64, NodeId),
+    Votes(Arc<VoteBundle>),
 }
 
 impl HasBytesSize for SimulationMessage {
@@ -250,7 +252,9 @@ impl HasBytesSize for SimulationMessage {
             Self::RequestEB(_) => 8,
             Self::EB(_) => 32,
 
-            Self::Votes(v) => 8 * v.len() as u64,
+            Self::AnnounceVotes(_, _) => 8,
+            Self::RequestVotes(_, _) => 8,
+            Self::Votes(v) => 8 * v.ebs.len() as u64,
         }
     }
 }

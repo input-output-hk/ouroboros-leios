@@ -77,6 +77,7 @@ impl EventMonitor {
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
+        let mut votes_per_bundle: BTreeMap<(u64, NodeId), f64> = BTreeMap::new();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
@@ -246,8 +247,9 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::Vote { eb, .. } => {
+                Event::Vote { eb, producer, slot } => {
                     total_votes += 1;
+                    *votes_per_bundle.entry((slot, producer)).or_default() += 1.0;
                     *eb_votes.entry(eb).or_default() += 1.0;
                 }
                 Event::NoVote { .. } => {}
@@ -373,8 +375,12 @@ impl EventMonitor {
                 expired_ibs, generated_ibs,
             );
             info!("{} total votes were generated.", total_votes);
-            info!("Each EB received an average of {:.3} vote(s) (stddev {:3})..",
+            info!("Each EB received an average of {:.3} vote(s) (stddev {:.3}).",
                 votes_per_eb.mean, votes_per_eb.std_dev);
+            let bundle_count = votes_per_bundle.len();
+            let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
+            info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
+                votes_per_bundle.mean, votes_per_bundle.std_dev);
         });
 
         info_span!("network").in_scope(|| {
