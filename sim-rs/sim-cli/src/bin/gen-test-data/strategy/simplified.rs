@@ -5,7 +5,7 @@ use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 use sim_core::config::{RawLinkConfig, RawNodeConfig};
 
-use super::utils::LinkTracker;
+use super::utils::{distribute_stake, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -59,13 +59,14 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
         Cluster::new(-30.0, 120.0),
         Cluster::new(-40.0, 60.0),
     ];
+    let stake = distribute_stake(pool_count)?;
     for i in 0..pool_count {
         let cluster = i % 5;
         let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
         let pool_id = nodes.len();
         nodes.push(RawNodeConfig {
             location: pool_loc,
-            stake: Some(rng.gen_range(100..100000)),
+            stake: stake.get(pool_count).cloned(),
         });
         let relay_id = nodes.len();
         nodes.push(RawNodeConfig {
