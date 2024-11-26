@@ -29,6 +29,22 @@ A spreadsheet model of Leios stake pool economics was converted to an interactiv
 
 ![Screenshot of Leios cost model](images/leios-cost-model.png)
 
+### Rust simulation
+
+Filtered out even more redundant vote messages, and added more details about voting to the output.
+
+Adopted more realistic stake distribution (the old data was using a normal distribution and not accounting for whales).
+
+Improved UX and reliability of the visualization. Animation is smoother, and the TX volume graph is more intutive.
+
+## 2024-11-25
+
+### Rust simulation
+
+Stopped sending as many redundant vote messages, traffic is far more reasonable.
+
+
+
 ## 2024-11-22
 
 ### Haskell simulation
@@ -43,6 +59,12 @@ A spreadsheet model of Leios stake pool economics was converted to an interactiv
   most recent draft.
 - Used relay protocols to define a node for Leios, extending the one
   we had for Praos. Validation delays still missing atm.
+
+### Rust simulation
+
+Bundle all votes a node produces for one round in a single message, to vastly reduce network traffic. Still too high.
+
+The visualization is streaming events from the server more efficiently, so it can display more data.
 
 ### Formal specification
 
