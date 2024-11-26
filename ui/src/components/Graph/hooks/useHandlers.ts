@@ -16,7 +16,10 @@ export const useHandlers = () => {
       intervalId,
       maxTime,
       playing,
-      sentTxs,
+      transactionsByIdRef,
+      txGeneratedMessagesById,
+      txReceivedMessagesById,
+      txSentMessagesById,
       speed,
       simulationPauseTime,
       simulationStartTime,
@@ -28,10 +31,6 @@ export const useHandlers = () => {
   const {
     startStream,
     stopStream,
-    transactionsRef,
-    txReceivedMessagesRef,
-    txGeneratedRef,
-    txSentMessagesRef,
   } = useStreamMessagesHandler();
 
   const drawCanvas = useCallback(() => {
@@ -117,16 +116,7 @@ export const useHandlers = () => {
     });
 
     // Draw the transactions
-    transactionsRef.current.forEach((txList, id) => {
-      const lastMessage = txList[txList.length - 1];
-      if (elapsed > lastMessage.sentTime + lastMessage.duration) {
-        transactionsRef.current.delete(id);
-        txList.forEach((tx) => {
-          txSentMessagesRef.current.delete(tx.sentTime);
-          txReceivedMessagesRef.current.delete(tx.sentTime + tx.duration);
-        });
-      }
-
+    transactionsByIdRef.current.forEach((txList) => {
       txList.forEach((transaction) => {
         const { duration, source, target, sentTime } = transaction;
         const sourceNode = topography.nodes.get(source);
@@ -145,29 +135,26 @@ export const useHandlers = () => {
         const endY = targetNode.fy;
         const transactionElapsedTime = elapsed - sentTime;
 
-        // Skip if the animation hasn't started.
+        // Calculate the interpolation factor
+        const t = Math.min(transactionElapsedTime / duration, 1);
+        const x = startX + t * (endX - startX);
+        const y = startY + t * (endY - startY);
+
+        // Animation hasn't started.
         if (transactionElapsedTime < 0) {
           return;
         }
 
-        // If we're past the animation, log it to our sent transaction store.
-        else if (elapsed > sentTime + duration) {
-          dispatch({ type: "ADD_SENT_TX", payload: sentTime });
+        // Animation done.
+        if (x === endX && y === endY) {
+          return;
         }
 
-        // Draw the transaction event.
-        else {
-          // Calculate the interpolation factor
-          const t = Math.min(transactionElapsedTime / duration, 1);
-          const x = startX + t * (endX - startX);
-          const y = startY + t * (endY - startY);
-
-          // Draw the moving circle
-          context.beginPath();
-          context.arc(x, y, 0.5, 0, 2 * Math.PI);
-          context.fillStyle = "red";
-          context.fill();
-        }
+        // Draw the moving circle
+        context.beginPath();
+        context.arc(x, y, 1, 0, 2 * Math.PI);
+        context.fillStyle = "red";
+        context.fill();
       });
     });
 
@@ -179,20 +166,13 @@ export const useHandlers = () => {
       context.stroke();
       context.strokeStyle = "black";
 
-      txGeneratedRef.current.forEach((m) => {
+      txGeneratedMessagesById.current.forEach((m) => {
         const target = m.time / 1_000_000;
         if (
           m.message.publisher === node.id &&
           isWithinRange(elapsed, target, 50)
         ) {
           context.fillStyle = "red";
-        }
-
-        if (m.message.publisher === node.id && elapsed > target) {
-          dispatch({
-            type: "ADD_GENERATED_MESSAGE",
-            payload: m.time / 1_000_000,
-          });
         }
       });
 
@@ -204,7 +184,7 @@ export const useHandlers = () => {
     if (intervalId.current !== null) {
       intervalId.current = requestAnimationFrame(drawCanvas);
     }
-  }, [playing, speed, maxTime]);
+  }, [playing, speed, maxTime, topography.nodes, topography.links]);
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -240,10 +220,10 @@ export const useHandlers = () => {
 
     simulationStartTime.current = 0;
     simulationPauseTime.current = 0;
-    transactionsRef.current = new Map();
-    txReceivedMessagesRef.current = new Map();
-    txGeneratedRef.current = new Map();
-    txSentMessagesRef.current = new Map();
+    transactionsByIdRef.current = new Map();
+    txReceivedMessagesById.current = new Map();
+    txGeneratedMessagesById.current = new Map();
+    txSentMessagesById.current = new Map();
 
     if (intervalId.current) {
       clearInterval(intervalId.current);

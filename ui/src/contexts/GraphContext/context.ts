@@ -4,6 +4,10 @@ import { ESpeedOptions, IGraphContext, IGraphContextState } from "./types";
 
 export const defaultState: IGraphContextState = {
   canvasRef: { current: null },
+  transactionsByIdRef: { current: new Map() },
+  txGeneratedMessagesById: { current: new Map() },
+  txReceivedMessagesById: { current: new Map() },
+  txSentMessagesById: { current: new Map() },
   currentTime: 0,
   generatedMessages: [],
   intervalId: { current: null },

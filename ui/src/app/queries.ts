@@ -2,7 +2,7 @@ import {
   EMessageType,
   ILink,
   INode,
-  IServerMessage
+  IServerMessage,
 } from "@/components/Graph/types";
 import { parse } from "@iarna/toml";
 import { closeSync, createReadStream, openSync, readSync, statSync } from "fs";
@@ -78,7 +78,7 @@ export const getSetSimulationMaxTime = async (): Promise<number> => {
 export const getSimulationTopography = async () => {
   const filePath = path.resolve(
     __dirname,
-    "../../../../../sim-rs/test_data/simplified.toml",
+    "../../../../../sim-rs/test_data/medium.toml",
   );
   const fileStream = createReadStream(filePath, {
     encoding: "utf8",
@@ -89,11 +89,22 @@ export const getSimulationTopography = async () => {
     nodes: INode[];
   };
 
+  const sanitizeBigints = (_: string, v: any) =>
+    typeof v === "bigint" ? `${v}n` : v;
+  const restoreBigints = (_: string, v: any) =>
+    typeof v === "string" && /^\d+n$/.test(v) ? BigInt(v.replace("n", "")) : v;
+
   // Must sanitize the objects to exclude symbols from the TOML parser.
-  const sanitized = JSON.parse(JSON.stringify({
-    links: result.links,
-    nodes: result.nodes
-  }));
+  const sanitized = JSON.parse(
+    JSON.stringify(
+      {
+        links: result.links,
+        nodes: result.nodes,
+      },
+      sanitizeBigints,
+    ),
+    restoreBigints,
+  );
 
   return sanitized;
 };

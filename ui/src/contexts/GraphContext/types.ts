@@ -1,6 +1,9 @@
 import {
   IServerMessage,
+  ITransactionGenerated,
   ITransactionMessage,
+  ITransactionReceived,
+  ITransactionSent,
   ITransformedNodeMap
 } from "@/components/Graph/types";
 import { Dispatch, MutableRefObject, RefObject } from "react";
@@ -13,6 +16,10 @@ export enum ESpeedOptions {
 
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement>;
+  transactionsByIdRef: MutableRefObject<Map<number, ITransactionMessage[]>>;
+  txGeneratedMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionGenerated>>>;
+  txSentMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionSent>[]>>;
+  txReceivedMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionReceived>[]>>;
   currentTime: number;
   generatedMessages: number[];
   intervalId: MutableRefObject<number | null>;
