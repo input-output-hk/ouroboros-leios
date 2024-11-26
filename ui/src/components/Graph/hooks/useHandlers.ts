@@ -189,6 +189,8 @@ export const useHandlers = () => {
     });
 
     context.restore();
+
+    requestAnimationFrame(drawCanvas);
   }, [playing, speed, maxTime]);
 
   // Function to toggle play/pause
@@ -198,18 +200,20 @@ export const useHandlers = () => {
       startStream(currentTime, speed);
       simulationStartTime.current = now - simulationPauseTime.current;
       simulationPauseTime.current = now;
-      intervalId.current = setInterval(drawCanvas, 1000 / 60); // 60 FPS
+      intervalId.current = requestAnimationFrame(drawCanvas);
+      // intervalId.current = setInterval(drawCanvas, 1000 / 60); // 60 FPS
     } else {
       stopStream();
       simulationPauseTime.current = now - simulationStartTime.current;
       if (intervalId.current) {
+        cancelAnimationFrame(intervalId.current)
         clearInterval(intervalId.current);
         intervalId.current = null;
       }
     }
 
     dispatch({ type: "TOGGLE_PLAYING" })
-  }, [drawCanvas, currentTime, speed]);
+  }, [drawCanvas, currentTime, speed, playing]);
 
   const handleResetSim = useCallback(() => {
     dispatch({ type: "BATCH_UPDATE", payload: {
