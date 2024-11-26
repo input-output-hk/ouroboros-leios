@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{btree_map, hash_map, BTreeMap, BTreeSet, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -69,7 +69,7 @@ struct NodeLeiosState {
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
     votes_by_eb: BTreeMap<EndorserBlockId, u64>,
-    votes: BTreeMap<(u64, NodeId), Arc<VoteBundle>>,
+    votes: BTreeMap<(u64, NodeId), VoteBundleState>,
 }
 
 enum InputBlockState {
@@ -85,6 +85,11 @@ impl InputBlockState {
             Self::Received(ib) => &ib.header,
         }
     }
+}
+
+enum VoteBundleState {
+    Requested,
+    Received(Arc<VoteBundle>),
 }
 
 #[derive(Default)]
@@ -406,7 +411,7 @@ impl Node {
     }
 
     fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
-        if let Entry::Vacant(e) = self.txs.entry(id) {
+        if let hash_map::Entry::Vacant(e) = self.txs.entry(id) {
             e.insert(TransactionView::Pending);
             self.send_to(from, SimulationMessage::RequestTx(id))?;
         }
@@ -620,14 +625,15 @@ impl Node {
     }
 
     fn receive_announce_votes(&mut self, from: NodeId, slot: u64, producer: NodeId) -> Result<()> {
-        if !self.leios.votes.contains_key(&(slot, producer)) {
+        if let btree_map::Entry::Vacant(e) = self.leios.votes.entry((slot, producer)) {
+            e.insert(VoteBundleState::Requested);
             self.send_to(from, SimulationMessage::RequestVotes(slot, producer))?;
         }
         Ok(())
     }
 
     fn receive_request_votes(&mut self, from: NodeId, slot: u64, producer: NodeId) -> Result<()> {
-        if let Some(votes) = self.leios.votes.get(&(slot, producer)) {
+        if let Some(VoteBundleState::Received(votes)) = self.leios.votes.get(&(slot, producer)) {
             self.tracker.track_votes_sent(votes, self.id, from);
             self.send_to(from, SimulationMessage::Votes(votes.clone()))?;
         }
@@ -641,8 +647,11 @@ impl Node {
         if self
             .leios
             .votes
-            .insert((votes.slot, votes.producer), votes.clone())
-            .is_some()
+            .insert(
+                (votes.slot, votes.producer),
+                VoteBundleState::Received(votes.clone()),
+            )
+            .is_some_and(|v| matches!(v, VoteBundleState::Received(_)))
         {
             return Ok(());
         }
@@ -779,9 +788,10 @@ impl Node {
             *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
         }
         let votes = Arc::new(votes);
-        self.leios
-            .votes
-            .insert((votes.slot, votes.producer), votes.clone());
+        self.leios.votes.insert(
+            (votes.slot, votes.producer),
+            VoteBundleState::Received(votes.clone()),
+        );
         for peer in &self.peers {
             self.send_to(
                 *peer,

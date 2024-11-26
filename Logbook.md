@@ -2,6 +2,11 @@
 
 ## 2024-11-26
 
+### Curve fit to empirically observed distribution of stake pools.  
+
+The cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. To use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
+
+![Curve fit to stakepool distribution at epoch 500](images/stake-fit.png)
 ### Online calculator for Leios economics
 
 A spreadsheet model of Leios stake pool economics was converted to an interactive web application.

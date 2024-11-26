@@ -5,7 +5,7 @@ use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use sim_core::config::{RawLinkConfig, RawNodeConfig};
 
-use crate::strategy::utils::LinkTracker;
+use crate::strategy::utils::{distribute_stake, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
@@ -25,6 +25,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
         bail!("At least one node must not be a stake pool");
     }
 
+    let stake = distribute_stake(args.stake_pool_count)?;
     let mut rng = thread_rng();
 
     let mut nodes = vec![];
@@ -32,11 +33,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
 
     println!("generating nodes...");
     for id in 0..args.node_count {
-        let stake = if id < args.stake_pool_count {
-            Some(rng.gen_range(100..100000))
-        } else {
-            None
-        };
+        let stake = stake.get(id).cloned();
         nodes.push(RawNodeConfig {
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
             stake,
