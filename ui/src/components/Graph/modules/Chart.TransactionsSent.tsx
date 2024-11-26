@@ -2,22 +2,25 @@
 
 import { FC, useMemo } from "react";
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   TooltipProps,
   XAxis,
   YAxis,
 } from "recharts";
-import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import {
+  NameType,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 
 import { useGraphContext } from "@/contexts/GraphContext/context";
 
 const CustomTooltip = ({
   active,
-  payload
+  payload,
 }: TooltipProps<ValueType, NameType>) => {
   if (active && payload && payload.length) {
     return (
@@ -32,39 +35,50 @@ const CustomTooltip = ({
 };
 
 export const ChartTransactionsSent: FC = () => {
-  const { state: { maxTime, sentTxs } } = useGraphContext();
+  const {
+    state: { maxTime, sentTxs },
+  } = useGraphContext();
 
-  const data = useMemo(
-    () =>
-      [...sentTxs.values()].map((v, index) => ({
-        message: index + 1,
-        time: v,
-      })),
-    [sentTxs],
-  );
+  const data = useMemo(() => {
+    return sentTxs.sort((a, b) => a - b).map((v, index) => ({
+      message: index + 1,
+      time: v,
+    }));
+  }, [sentTxs]);
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray={2} />
+        <YAxis
           tick={false}
-          label="Transactions Sent"
+          label={{
+            value: "Tx Propagations",
+            angle: -90,
+          }}
+          domain={[0, Math.max(sentTxs.length, 1000)]}
           allowDataOverflow
           type="number"
           dataKey="message"
         />
-        <YAxis tick={false} label="Time" domain={[0, maxTime]} dataKey="time" />
-        <Area
-          type="monotone"
+        <XAxis
+          tickFormatter={(v) => `${v.toFixed(0)}ms`}
+          label="Time"
+          type="number"
+          tickCount={2}
+          allowDataOverflow
+          domain={[0, maxTime]}
           dataKey="time"
+        />
+        <Line
+          type="natural"
+          dataKey="message"
           stroke="#8884d8"
-          fill="#8884d8"
           strokeWidth={2}
           dot={false}
         />
         <Tooltip content={(props) => <CustomTooltip {...props} />} />
-      </AreaChart>
+      </LineChart>
     </ResponsiveContainer>
   );
 };

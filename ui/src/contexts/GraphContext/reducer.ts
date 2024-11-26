@@ -10,9 +10,8 @@ export const reducer = (
       return { ...state, currentTime: action.payload };
 
     case "ADD_GENERATED_MESSAGE": {
-      const newSet = new Set(state.generatedMessages);
-      newSet.add(action.payload);
-      return { ...state, generatedMessages: newSet };
+      const uniqueSet = new Set([...state.generatedMessages, action.payload]);
+      return { ...state, generatedMessages: [...uniqueSet] };
     }
 
     case "SET_GENERATED_MESSSAGES": {
@@ -20,9 +19,7 @@ export const reducer = (
     }
 
     case "REMOVE_GENERATED_MESSAGE": {
-      const newSet = new Set(state.generatedMessages);
-      newSet.delete(action.payload);
-      return { ...state, generatedMessages: newSet };
+      return { ...state, generatedMessages: state.generatedMessages.filter(v => v !== action.payload) };
     }
 
     case "SET_PLAYING": {
@@ -34,9 +31,8 @@ export const reducer = (
     }
 
     case "ADD_SENT_TX": {
-      const newSet = new Set(state.sentTxs);
-      newSet.add(action.payload);
-      return { ...state, sentTxs: newSet };
+      const uniqueSet = new Set([...state.sentTxs, action.payload]);
+      return { ...state, sentTxs: [...uniqueSet] };
     }
 
     case "SET_SENT_TXS": {
@@ -44,9 +40,7 @@ export const reducer = (
     }
 
     case "REMOVE_SENT_TX": {
-      const newSet = new Set(state.sentTxs);
-      newSet.delete(action.payload);
-      return { ...state, sentTxs: newSet };
+      return { ...state, sentTxs: state.sentTxs.filter(v => v !== action.payload) };
     }
 
     case "SET_SPEED": {

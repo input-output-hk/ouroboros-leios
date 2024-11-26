@@ -16,15 +16,23 @@ export const useHandlers = () => {
       intervalId,
       maxTime,
       playing,
+      sentTxs,
       speed,
       simulationPauseTime,
       simulationStartTime,
       topography,
     },
-    dispatch
+    dispatch,
   } = useGraphContext();
 
-  const { startStream, stopStream, transactionsRef, txReceivedMessagesRef, txGeneratedRef, txSentMessagesRef } = useStreamMessagesHandler();
+  const {
+    startStream,
+    stopStream,
+    transactionsRef,
+    txReceivedMessagesRef,
+    txGeneratedRef,
+    txSentMessagesRef,
+  } = useStreamMessagesHandler();
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -110,13 +118,13 @@ export const useHandlers = () => {
 
     // Draw the transactions
     transactionsRef.current.forEach((txList, id) => {
-      const lastMessage = txList[txList.length -1];
+      const lastMessage = txList[txList.length - 1];
       if (elapsed > lastMessage.sentTime + lastMessage.duration) {
         transactionsRef.current.delete(id);
-        txList.forEach(tx => {
+        txList.forEach((tx) => {
           txSentMessagesRef.current.delete(tx.sentTime);
           txReceivedMessagesRef.current.delete(tx.sentTime + tx.duration);
-        })
+        });
       }
 
       txList.forEach((transaction) => {
@@ -144,7 +152,7 @@ export const useHandlers = () => {
 
         // If we're past the animation, log it to our sent transaction store.
         else if (elapsed > sentTime + duration) {
-          dispatch({ type: "ADD_SENT_TX", payload: sentTime })
+          dispatch({ type: "ADD_SENT_TX", payload: sentTime });
         }
 
         // Draw the transaction event.
@@ -153,7 +161,7 @@ export const useHandlers = () => {
           const t = Math.min(transactionElapsedTime / duration, 1);
           const x = startX + t * (endX - startX);
           const y = startY + t * (endY - startY);
-  
+
           // Draw the moving circle
           context.beginPath();
           context.arc(x, y, 0.5, 0, 2 * Math.PI);
@@ -181,7 +189,10 @@ export const useHandlers = () => {
         }
 
         if (m.message.publisher === node.id && elapsed > target) {
-          dispatch({ type: "ADD_GENERATED_MESSAGE", payload: m.time / 1_000_000 })
+          dispatch({
+            type: "ADD_GENERATED_MESSAGE",
+            payload: m.time / 1_000_000,
+          });
         }
       });
 
@@ -190,7 +201,9 @@ export const useHandlers = () => {
 
     context.restore();
 
-    requestAnimationFrame(drawCanvas);
+    if (intervalId.current !== null) {
+      intervalId.current = requestAnimationFrame(drawCanvas);
+    }
   }, [playing, speed, maxTime]);
 
   // Function to toggle play/pause
@@ -201,29 +214,30 @@ export const useHandlers = () => {
       simulationStartTime.current = now - simulationPauseTime.current;
       simulationPauseTime.current = now;
       intervalId.current = requestAnimationFrame(drawCanvas);
-      // intervalId.current = setInterval(drawCanvas, 1000 / 60); // 60 FPS
     } else {
       stopStream();
       simulationPauseTime.current = now - simulationStartTime.current;
-      if (intervalId.current) {
-        cancelAnimationFrame(intervalId.current)
-        clearInterval(intervalId.current);
+      if (intervalId.current !== null) {
+        cancelAnimationFrame(intervalId.current);
         intervalId.current = null;
       }
     }
 
-    dispatch({ type: "TOGGLE_PLAYING" })
+    dispatch({ type: "TOGGLE_PLAYING" });
   }, [drawCanvas, currentTime, speed, playing]);
 
   const handleResetSim = useCallback(() => {
-    dispatch({ type: "BATCH_UPDATE", payload: {
-      currentTime: 0,
-      playing: false,
-      sentTxs: new Set(),
-      speed: ESpeedOptions["1/300"],
-      generatedMessages: new Set()
-    } });
-    
+    dispatch({
+      type: "BATCH_UPDATE",
+      payload: {
+        currentTime: 0,
+        playing: false,
+        sentTxs: [],
+        speed: ESpeedOptions["3% Speed"],
+        generatedMessages: [],
+      },
+    });
+
     simulationStartTime.current = 0;
     simulationPauseTime.current = 0;
     transactionsRef.current = new Map();

@@ -6,20 +6,20 @@ import {
 import { Dispatch, MutableRefObject, RefObject } from "react";
 
 export enum ESpeedOptions {
-  "1/100" = 0.01,
-  "1/200" = 0.02,
-  "1/300" = 0.03,
+  "1% Speed" = 0.01,
+  "3% Speed" = 0.03,
+  "10% Speed" = 0.1,
 }
 
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement>;
   currentTime: number;
-  generatedMessages: Set<number>;
-  intervalId: MutableRefObject<Timer | null>;
+  generatedMessages: number[];
+  intervalId: MutableRefObject<number | null>;
   maxTime: number;
   messages: Map<number, IServerMessage>;
   playing: boolean;
-  sentTxs: Set<number>;
+  sentTxs: number[];
   simulationStartTime: MutableRefObject<number>;
   simulationPauseTime: MutableRefObject<number>;
   speed: ESpeedOptions;
@@ -31,10 +31,10 @@ export interface IGraphContextState {
 export type TGraphContextActions =
   | { type: "SET_CURRENT_TIME"; payload: number }
   | { type: "ADD_GENERATED_MESSAGE"; payload: number }
-  | { type: "SET_GENERATED_MESSSAGES", payload: Set<number> }
+  | { type: "SET_GENERATED_MESSSAGES", payload: number[] }
   | { type: "REMOVE_GENERATED_MESSAGE"; payload: number }
   | { type: "ADD_SENT_TX"; payload: number }
-  | { type: "SET_SENT_TXS"; payload: Set<number> }
+  | { type: "SET_SENT_TXS"; payload: number[] }
   | { type: "REMOVE_SENT_TX"; payload: number }
   | { type: "SET_PLAYING"; payload: boolean }
   | { type: "TOGGLE_PLAYING" }
