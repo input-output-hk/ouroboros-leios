@@ -1,5 +1,29 @@
 # Leios logbook
 
+## 2024-11-26
+
+### Online calculator for Leios economics
+
+A spreadsheet model of Leios stake pool economics was converted to an interactive web application.
+
+- It is a basic model of network, disk, and CPU required for RBs, IBs, EBs, votes, and certificates.
+    - Limited to Short Leios.
+    - Includes an approximation of cloud-computing costs.
+    - SPOs can configure the number of block-producing and relay nodes.
+    - Users can vary Leios parameters and the TPS for Leios and Praos.
+    - It computes costs, fees, return on expenses, and break-even transaction costs.
+- The code is pure client-side and does not require a server.
+- [Video tutorial](https://drive.google.com/file/d/1pH1GYRInevlKcrkpFRJYIvRqFtcv3yFd/view?usp=sharing)
+- Deployed at [ipns://k51qzi5uqu5dju7ov2vadg0pl5htj1zu5w95obm6bczepe88ru4y4ej082w3mg](https://ipfs.functionally.io/ipfs/QmSkegrQbosnSrvTCHJWR6jhoFNrJH2Jhfoh1cuxrhpwqt).
+- Future work
+    - Populate inputs with more realist values.
+        - Simulation results for network behavior.
+        - Cryptography benchmarking.
+    - Meet with IO SRE team to refine model of cloud-computing costs.
+    - Meet with SPOs to refine model of SPO operations.
+
+![Screenshot of Leios cost model](images/leios-cost-model.png)
+
 ## 2024-11-22
 
 ### Haskell simulation
@@ -54,6 +78,8 @@ The system-dynamics simulation of Cardano throughput was enhanced and checked.
 - Fixed extreme scenario were funds flow into reserve.
 - Created [tutorial video](https://drive.google.com/file/d/1YrQLLsgsPt4XHa707c-CfTLkivKRyaa0/view?usp=sharing)
 - Published [version 0.2](https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2) of the model.
+
+![Screenshot of Cardano throughput model](images/cardano-throughput-model.png)
 
 ## 2024-11-19
 
