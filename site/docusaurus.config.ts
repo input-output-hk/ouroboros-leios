@@ -78,6 +78,16 @@ const config: Config = {
                 },
                 { to: '/news', label: 'Latest News', position: 'right' },
                 {
+                    href: 'https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2',
+                    label: 'Throughput Simulation',
+                    position: 'right',
+                },
+                {
+                    to: 'pathname:///cost-estimator/',
+                    label: 'Cost Estimator',
+                    position: 'right',
+                },
+                {
                     href: 'https://github.com/input-output-hk/ouroboros-leios',
                     label: 'GitHub',
                     position: 'right',
