@@ -1,5 +1,10 @@
 # Leios logbook
 
+## 2024-11-27
+
+### November Public Monthly Meeting
+[Recording](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing)
+
 ## 2024-11-26
 
 ### Curve fit to empirically observed distribution of stake pools.  
