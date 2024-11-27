@@ -31,9 +31,7 @@ import qualified Data.GraphViz as GV
 import qualified Data.GraphViz.Attributes as GVA
 import qualified Data.GraphViz.Attributes.Complete as GVAC
 import qualified Data.GraphViz.Commands as GVC
-import qualified Data.GraphViz.Commands.IO as GVCIO
 import qualified Data.GraphViz.Types as GVT (PrintDot)
-import Data.GraphViz.Types.Generalised (FromGeneralisedDot (fromGeneralised))
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Map (Map)
