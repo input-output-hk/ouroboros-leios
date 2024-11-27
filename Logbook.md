@@ -2,7 +2,19 @@
 
 ## 2024-11-27
 
+### Deployed throughput simulator and cost estimator
+
+The [Leios website](https://leios.cardano-scaling.org/) now links to the two new interactive tools:
+
+- [Cardano throughput simulator](https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2)
+- [Leios cost estimator](https://leios.cardano-scaling.org/cost-estimator/)
+
+### Meeting with cryptographers about voting and certificates
+
+We now have order-of-magnitude estimates for the size and computation required for Mithril (BLS), ALBA, and Musen certificates for Leios. In a week or two we will start using those in the Leios models and simulations. However, quite a bit more research, evaluation, benchmarking, and design needs to be done before settling on the details of Leios voting and certificates.
+
 ### November Public Monthly Meeting
+
 [Recording](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing)
 
 ## 2024-11-26
@@ -12,6 +24,7 @@
 The cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. To use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
 
 ![Curve fit to stakepool distribution at epoch 500](images/stake-fit.png)
+
 ### Online calculator for Leios economics
 
 A spreadsheet model of Leios stake pool economics was converted to an interactive web application.
