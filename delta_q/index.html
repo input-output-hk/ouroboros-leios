@@ -82,13 +82,20 @@
           }
 
           let canvas = 0;
-          for (const { bins, values, name } of loads || []) {
+          for (const { bins, values, name, expected } of loads || []) {
             const maxGraph = {
               x: bins,
               y: values.map(y => y.at(-1)[0]),
               mode: 'lines',
               opacity: 0.3,
               line: { shape: 'hv', color: 'black', width: 1 },
+            };
+
+            const expectedGraph = {
+              x: bins,
+              y: expected,
+              mode: 'lines',
+              line: { shape: 'hv', color: 'orange', width: 1 },
             };
 
             let maxY = Math.max(...maxGraph.y);
@@ -148,10 +155,11 @@
               }
             }
 
-            Plotly.newPlot(pad, [maxGraph], {
+            Plotly.newPlot(pad, [maxGraph, expectedGraph], {
               font: { size: 24 },
               margin: { pad: 20 },
               title: { text: name },
+              showlegend: false,
               shapes,
               annotations,
             });

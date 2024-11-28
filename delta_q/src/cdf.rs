@@ -163,6 +163,13 @@ impl CDF {
         &self.steps
     }
 
+    pub fn expected(&self) -> f32 {
+        self.iter()
+            .tuple_windows()
+            .map(|(x, y)| y.0 * (y.1 - x.1))
+            .sum::<f32>()
+    }
+
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for
     /// the first CDF.
     pub fn choice(&self, my_fraction: f32, other: &CDF) -> Result<CDF, CDFError> {

@@ -279,6 +279,15 @@ fn mk_graph_obj(name: &str, steps: &StepFunction<CDF>) -> js_sys::Object {
             .collect::<js_sys::Array>(),
     )
     .unwrap();
+    Reflect::set(
+        &data,
+        &"expected".into(),
+        &steps
+            .iter()
+            .map(|(_x, cdf)| JsValue::from(cdf.expected()))
+            .collect::<js_sys::Array>(),
+    )
+    .unwrap();
     Reflect::set(&data, &"name".into(), &name.into()).unwrap();
     data
 }
