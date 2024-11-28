@@ -885,35 +885,29 @@ pub fn expand_gossip(
             &format!("senders: {senders}, remaining: {remaining}, idx: {idx}").into(),
         );
         if remaining > 1.0 {
-            let send_factor = if idx == 1 {
-                remaining / (senders * cluster_branch)
-            } else {
-                1.0
-            } * senders
-                / (senders + remaining);
             ret = Arc::new(DeltaQExpr::Seq(
                 Arc::new(DeltaQExpr::Seq(
                     Arc::new(DeltaQExpr::Outcome(Outcome::top())),
                     LoadUpdate::new(senders / (senders + remaining)),
-                    Arc::new(receive.clone()),
+                    Arc::new(DeltaQExpr::Seq(
+                        Arc::new(receive.clone()),
+                        if idx == 1 {
+                            LoadUpdate::new(remaining / (senders * cluster_branch))
+                        } else {
+                            LoadUpdate::default()
+                        },
+                        Arc::new(send.clone()),
+                    )),
                 )),
                 LoadUpdate {
                     factor: 1.0,
                     disjoint_names: disjoint_names.clone(),
                 },
-                Arc::new(DeltaQExpr::Seq(
-                    Arc::new(DeltaQExpr::Seq(
-                        Arc::new(DeltaQExpr::Outcome(Outcome::top())),
-                        LoadUpdate::new(send_factor),
-                        Arc::new(send.clone()),
-                    )),
-                    LoadUpdate::default(),
-                    Arc::new(DeltaQExpr::Choice(
-                        Arc::new(DeltaQExpr::Outcome(Outcome::top())),
-                        senders,
-                        ret,
-                        remaining,
-                    )),
+                Arc::new(DeltaQExpr::Choice(
+                    Arc::new(DeltaQExpr::Outcome(Outcome::top())),
+                    senders,
+                    ret,
+                    remaining,
                 )),
             ));
         } else {
@@ -927,7 +921,10 @@ pub fn expand_gossip(
             LoadUpdate::new(1.0 / size),
             Arc::new(send.clone()),
         )),
-        LoadUpdate::default(),
+        LoadUpdate {
+            factor: 1.0,
+            disjoint_names: disjoint_names.clone(),
+        },
         Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, 1.0, ret, size - 1.0)),
     )
     .into())

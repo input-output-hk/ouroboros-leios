@@ -165,8 +165,10 @@ pub(crate) fn compact_cdf(data: &mut Vec<(f32, CDF)>, mode: CompactionMode, max_
                     .with_mode(mode);
             }
         }
-        data[pos] = (x, cdf);
-        pos += 1;
+        if pos == 0 || !cdf.similar(&data[pos - 1].1) {
+            data[pos] = (x, cdf);
+            pos += 1;
+        }
     }
     data.truncate(pos);
 }
