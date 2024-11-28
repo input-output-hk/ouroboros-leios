@@ -2,7 +2,7 @@ use crate::{
     delta_q::{expand_gossip, DeltaQ, LoadUpdate, Name},
     DeltaQExpr, Outcome, PersistentContext,
 };
-use std::{rc::Rc, sync::Arc};
+use std::{collections::BTreeSet, rc::Rc, sync::Arc};
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
@@ -43,7 +43,7 @@ pub fn delta_q_component(props: &Props) -> Html {
             html! { <CdfComponent outcome={outcome.clone()} {on_change} /> }
         }
         DeltaQExpr::Seq(first, load, second) => {
-            html!(<Seq first={first.clone()} load={*load} second={second.clone()} {on_change} />)
+            html!(<Seq first={first.clone()} load={load.clone()} second={second.clone()} {on_change} />)
         }
         DeltaQExpr::Choice(first, first_weight, second, second_weight) => {
             html!(<Branch top={first.clone()} bottom={second.clone()} {on_change} kind={BranchKind::Choice(*first_weight, *second_weight)} />)
@@ -60,8 +60,9 @@ pub fn delta_q_component(props: &Props) -> Html {
             size,
             branching,
             cluster_coeff,
+            disjoint_names,
         } => {
-            html! { <Gossip send={send.clone()} receive={receive.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} {on_change} /> }
+            html! { <Gossip send={send.clone()} receive={receive.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} disjoint_names={disjoint_names.clone()} {on_change} /> }
         }
     }
 }
@@ -232,27 +233,27 @@ pub fn seq(props: &SeqProps) -> Html {
     let on_change = props.on_change.clone();
     let first = props.first.clone();
     let second = props.second.clone();
-    let load = props.load;
+    let load = props.load.clone();
     let ctx = use_context::<DeltaQContext>().unwrap();
 
-    let on_first_change = Callback::from(cloned!(second, on_change, ctx;
+    let on_first_change = Callback::from(cloned!(second, on_change, ctx, load;
         move |(name, delta_q)| {
             // if the name matches our context, edit the DeltaQ; otherwise just bubble up
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(DeltaQExpr::Seq(delta_q, load, second.clone()).into())));
+                on_change.emit((name, Some(DeltaQExpr::Seq(delta_q, load.clone(), second.clone()).into())));
             }
         }
     ));
 
-    let on_second_change = Callback::from(cloned!(first, on_change, ctx;
+    let on_second_change = Callback::from(cloned!(first, on_change, ctx, load;
         move |(name, delta_q)| {
             // if the name matches our context, edit the DeltaQ; otherwise just bubble up
             if name != ctx.name {
                 on_change.emit((name, delta_q));
             } else if let Some(delta_q) = delta_q {
-                on_change.emit((name, Some(DeltaQExpr::Seq(first.clone(), load, delta_q).into())));
+                on_change.emit((name, Some(DeltaQExpr::Seq(first.clone(), load.clone(), delta_q).into())));
             }
         }
     ));
@@ -262,11 +263,11 @@ pub fn seq(props: &SeqProps) -> Html {
     let oninput = Callback::from(cloned!(name; move |e: InputEvent| {
         name.set(e.target_unchecked_into::<HtmlInputElement>().value());
     }));
-    let onsubmit = Callback::from(cloned!(name, on_change, ctx, first, second;
+    let onsubmit = Callback::from(cloned!(name, on_change, ctx, first, second, load;
         move |e: SubmitEvent| {
             e.prevent_default();
             on_change.emit((ctx.name.clone(), Some(DeltaQ::name(&name).arc())));
-            on_change.emit(((*name).clone(), Some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into())));
+            on_change.emit(((*name).clone(), Some(DeltaQExpr::Seq(first.clone(), load.clone(), second.clone()).into())));
         }
     ));
 
@@ -279,16 +280,16 @@ pub fn seq(props: &SeqProps) -> Html {
                     <div class={classes!("popup")}>
                     <button onclick={cloned!(popup;
                         move |_| popup.set(false))}> { "abort" } </button>
-                    <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc()))))}> { "make choice" } </button>
-                    <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forAll" } </button>
-                    <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forSome" } </button>
-                    <button onclick={cloned!(on_change, first, second, popup, ctx;
-                        move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(second.clone(), load, first.clone()).into()))) })}>{ "switch" }</button>
-                    <button onclick={cloned!(on_change, first, second, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(first.clone(), load, second.clone()).into()))))}>{ "append" }</button>
+                    <button onclick={cloned!(on_change, first, second, ctx, load;
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQExpr::Seq(first.clone(), load.clone(), second.clone()).into(), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc()))))}> { "make choice" } </button>
+                    <button onclick={cloned!(on_change, first, second, ctx, load;
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_all(DeltaQExpr::Seq(first.clone(), load.clone(), second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forAll" } </button>
+                    <button onclick={cloned!(on_change, first, second, ctx, load;
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::for_some(DeltaQExpr::Seq(first.clone(), load.clone(), second.clone()).into(), DeltaQExpr::BlackBox.into()).arc()))))}> { "make forSome" } </button>
+                    <button onclick={cloned!(on_change, first, second, popup, ctx, load;
+                        move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(second.clone(), load.clone(), first.clone()).into()))) })}>{ "switch" }</button>
+                    <button onclick={cloned!(on_change, first, second, ctx, load;
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQExpr::Seq(first.clone(), load.clone(), second.clone()).into()))))}>{ "append" }</button>
                     <button onclick={cloned!(popup, on_change, first, ctx;
                         move |_| { popup.set(false); on_change.emit((ctx.name.clone(), Some(first.clone()))) })}>{ "keep left" }</button>
                     <button onclick={cloned!(popup, on_change, second, ctx;
@@ -543,6 +544,7 @@ pub struct GossipProps {
     pub size: f32,
     pub branching: f32,
     pub cluster_coeff: f32,
+    pub disjoint_names: BTreeSet<Name>,
     pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
 }
 
@@ -554,6 +556,7 @@ pub fn gossip(props: &GossipProps) -> Html {
         size,
         branching,
         cluster_coeff,
+        disjoint_names,
         on_change: _,
     } = props;
 
@@ -566,7 +569,14 @@ pub fn gossip(props: &GossipProps) -> Html {
             if *popup {
                 <div class={classes!("popup")}>
                     {
-                        match expand_gossip(&send, &receive, *size, *branching, *cluster_coeff) {
+                        match expand_gossip(
+                            &send,
+                            &receive,
+                            *size,
+                            *branching,
+                            *cluster_coeff,
+                            disjoint_names,
+                        ) {
                             Ok(delta_q) => html! { <DeltaQComponent delta_q={delta_q.arc()} on_change={|_| {}} /> },
                             Err(e) => html! { <div>{e.to_string()}</div> },
                         }

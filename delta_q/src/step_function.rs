@@ -232,6 +232,20 @@ impl<T: StepValue> StepFunction<T> {
         }
     }
 
+    pub fn sum_prob(&self, other: &Self) -> Result<Self, T::Error> {
+        let mut data = Vec::new();
+        for (x, (l, r)) in self.zip(other) {
+            data.push((x, l.add_prob(&r, true)?));
+        }
+        T::compact(&mut data, self.mode, self.max_size);
+        Ok(Self {
+            data: (!data.is_empty()).then_some(data.into()),
+            max_size: self.max_size,
+            mode: self.mode,
+            zero: T::sum_up_zero(),
+        })
+    }
+
     pub fn choice(&self, my_fraction: f32, other: &Self) -> Result<Self, T::Error> {
         let mut data = Vec::new();
         for (x, (l, r)) in self.zip(other) {

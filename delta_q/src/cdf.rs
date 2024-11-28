@@ -245,7 +245,7 @@ impl CDF {
                 zero_sum.scale_prob(step),
             );
             for (x, (ly, ry)) in iter {
-                d.push((x, ly.add_prob(&ry).expect("probability overflow")));
+                d.push((x, ly.add_prob(&ry, false).expect("probability overflow")));
             }
             data = d;
             prev_y = ly;

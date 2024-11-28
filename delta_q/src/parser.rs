@@ -2,7 +2,7 @@ use crate::{
     delta_q::{LoadUpdate, Name},
     DeltaQ, DeltaQExpr, Outcome, PersistentContext, StepFunction, CDF,
 };
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use winnow::{
     combinator::{
         alt, cut_err, delimited, fail, opt, preceded, repeat, separated, separated_pair, seq,
@@ -99,7 +99,7 @@ fn atom(input: &mut &str) -> PResult<DeltaQExpr> {
             for_all,
             for_some,
             gossip,
-            name,
+            name_expr,
             delimited('(', delta_q, closing_paren),
             fail.context(StrContext::Label("atom"))
                 .context(StrContext::Expected(StrContextValue::Description(
@@ -127,7 +127,11 @@ fn name_bare<'a>(input: &mut &'a str) -> PResult<&'a str> {
     take_while(1.., |c: char| c.is_alphanumeric() || c == '_').parse_next(input)
 }
 
-fn name(input: &mut &str) -> PResult<DeltaQExpr> {
+fn name(input: &mut &str) -> PResult<Name> {
+    name_bare.map(Name::from).parse_next(input)
+}
+
+fn name_expr(input: &mut &str) -> PResult<DeltaQExpr> {
     (name_bare, opt(preceded('^', int)))
         .parse_next(input)
         .map(|(name, rec)| DeltaQExpr::Name(name.into(), rec))
@@ -195,10 +199,21 @@ fn for_some(input: &mut &str) -> PResult<DeltaQExpr> {
     .parse_next(input)
 }
 
+fn name_list(input: &mut &str) -> PResult<BTreeSet<Name>> {
+    delimited(
+        '[',
+        separated(0.., preceded(ws, name), (ws, ',')),
+        (ws, ']'),
+    )
+    .parse_next(input)
+}
+
 fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
     delimited(
         "gossip(",
-        cut_err(seq!(delta_q, _: comma, delta_q, _: comma, num, _: comma, num, _: comma, num))
+        cut_err(seq!(
+            delta_q, _: comma, delta_q, _: comma, num, _: comma, num, _: comma, num, _: comma, name_list
+        ))
             .context(StrContext::Label("gossip specification"))
             .context(StrContext::Expected(StrContextValue::Description(
                 "hop, size, branching, cluster coefficient",
@@ -206,12 +221,13 @@ fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
         closing_paren,
     )
     .map(
-        |(dq1, dq2, size, branching, cluster_coeff)| DeltaQExpr::Gossip {
+        |(dq1, dq2, size, branching, cluster_coeff, disjoint_names)| DeltaQExpr::Gossip {
             send: Arc::new(dq1),
             receive: Arc::new(dq2),
             size,
             branching,
             cluster_coeff,
+            disjoint_names,
         },
     )
     .parse_next(input)

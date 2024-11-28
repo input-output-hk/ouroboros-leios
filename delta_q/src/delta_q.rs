@@ -2,7 +2,7 @@ use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MA
 use smallstr::SmallString;
 use std::{
     cell::{Cell, OnceCell, RefCell},
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     str::FromStr,
     sync::{Arc, OnceLock},
@@ -138,14 +138,18 @@ impl Display for PersistentContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoadUpdate {
     pub factor: f32,
+    pub disjoint_names: BTreeSet<Name>,
 }
 
 impl LoadUpdate {
     pub fn new(factor: f32) -> Self {
-        Self { factor }
+        Self {
+            factor,
+            disjoint_names: BTreeSet::default(),
+        }
     }
 }
 
@@ -160,7 +164,10 @@ impl Display for LoadUpdate {
 
 impl Default for LoadUpdate {
     fn default() -> Self {
-        Self { factor: 1.0 }
+        Self {
+            factor: 1.0,
+            disjoint_names: BTreeSet::default(),
+        }
     }
 }
 
@@ -215,6 +222,7 @@ pub enum DeltaQExpr {
         size: f32,
         branching: f32,
         cluster_coeff: f32,
+        disjoint_names: BTreeSet<Name>,
     },
 }
 
@@ -492,12 +500,20 @@ impl DeltaQ {
                 size,
                 branching,
                 cluster_coeff,
+                disjoint_names,
             } => {
                 write!(f, "gossip(")?;
                 DeltaQ::display(send, f, true)?;
                 write!(f, ", ")?;
                 DeltaQ::display(receive, f, true)?;
-                write!(f, ", {}, {}, {})", size, branching, cluster_coeff)
+                write!(f, ", {}, {}, {}, [", size, branching, cluster_coeff)?;
+                for (idx, name) in disjoint_names.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", name)?;
+                }
+                write!(f, "])")
             }
         }
     }
@@ -517,7 +533,7 @@ impl DeltaQ {
             AssembleChoice(&'a Arc<DeltaQExpr>, f32, f32),
             AssembleForAll(&'a Arc<DeltaQExpr>),
             AssembleForSome(&'a Arc<DeltaQExpr>),
-            ExpandGossip(f32, f32, f32),
+            ExpandGossip(f32, f32, f32, BTreeSet<Name>),
         }
 
         let mut op_stack = Vec::new();
@@ -532,7 +548,7 @@ impl DeltaQ {
                         res_stack.push(delta_q.clone());
                     }
                     DeltaQExpr::Seq(first, load, second) => {
-                        op_stack.push(Op::AssembleSeq(delta_q, *load));
+                        op_stack.push(Op::AssembleSeq(delta_q, load.clone()));
                         op_stack.push(Op::Expand(second));
                         op_stack.push(Op::Expand(first));
                     }
@@ -557,8 +573,14 @@ impl DeltaQ {
                         size,
                         branching,
                         cluster_coeff,
+                        disjoint_names,
                     } => {
-                        op_stack.push(Op::ExpandGossip(*size, *branching, *cluster_coeff));
+                        op_stack.push(Op::ExpandGossip(
+                            *size,
+                            *branching,
+                            *cluster_coeff,
+                            disjoint_names.clone(),
+                        ));
                         op_stack.push(Op::Expand(receive));
                         op_stack.push(Op::Expand(send));
                     }
@@ -603,10 +625,17 @@ impl DeltaQ {
                         res_stack.push(Arc::new(expanded));
                     }
                 }
-                Op::ExpandGossip(size, branching, cluster_coeff) => {
+                Op::ExpandGossip(size, branching, cluster_coeff, disjoint_names) => {
                     let receive = res_stack.pop().unwrap();
                     let send = res_stack.pop().unwrap();
-                    let expanded = expand_gossip(&send, &receive, size, branching, cluster_coeff)?;
+                    let expanded = expand_gossip(
+                        &send,
+                        &receive,
+                        size,
+                        branching,
+                        cluster_coeff,
+                        &disjoint_names,
+                    )?;
                     res_stack.push(expanded.expr);
                 }
             }
@@ -633,7 +662,10 @@ impl DeltaQ {
             /// Evaluate a DeltaQ with the given load factor and push the result on the result stack
             Eval(&'a DeltaQExpr),
             /// construct a sequence from the top two results on the result stack
-            Seq { load_factor: f32 },
+            Seq {
+                load_factor: f32,
+                disjoint_names: BTreeSet<Name>,
+            },
             /// construct a choice from the top two results on the result stack
             Choice(f32, f32),
             /// construct a forall from the top two results on the result stack
@@ -726,6 +758,7 @@ impl DeltaQ {
                         DeltaQExpr::Seq(first, load, second) => {
                             op_stack.push(Op::Seq {
                                 load_factor: load.factor,
+                                disjoint_names: load.disjoint_names.clone(),
                             });
                             // evaluate second after first
                             op_stack.push(Op::Eval(second));
@@ -749,13 +782,16 @@ impl DeltaQ {
                         DeltaQExpr::Gossip { .. } => panic!("gossip not expanded"),
                     }
                 }
-                Op::Seq { load_factor } => {
+                Op::Seq {
+                    load_factor,
+                    disjoint_names,
+                } => {
                     let second = res_stack
                         .pop()
                         .unwrap()
                         .apply_load_factor(load_factor, ctx)?;
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.seq(&second, ctx));
+                    res_stack.push(first.seq(&second, ctx, disjoint_names));
                 }
                 Op::Choice(w1, w2) => {
                     let second = res_stack.pop().unwrap();
@@ -803,6 +839,7 @@ pub fn expand_gossip(
     size: f32,
     branching: f32,
     cluster_coeff: f32,
+    disjoint_names: &BTreeSet<Name>,
 ) -> Result<DeltaQ, DeltaQError> {
     if size <= 1.0 {
         return Ok(DeltaQ::top());
@@ -855,7 +892,10 @@ pub fn expand_gossip(
                     Arc::new(DeltaQExpr::Seq(
                         Arc::new(receive.clone()),
                         if idx == 1 {
-                            LoadUpdate::new(remaining / (senders * cluster_branch))
+                            LoadUpdate {
+                                factor: remaining / (senders * cluster_branch),
+                                disjoint_names: disjoint_names.clone(),
+                            }
                         } else {
                             LoadUpdate::default()
                         },

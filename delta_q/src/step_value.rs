@@ -14,7 +14,7 @@ pub trait StepValue: Clone + fmt::Debug {
     /// Add two values together so that the result means that both values are included
     fn sum_up(&self, other: &Self) -> Self;
     /// Add two values together probabilistically
-    fn add_prob(&self, other: &Self) -> Result<Self, Self::Error>;
+    fn add_prob(&self, other: &Self, do_offset: bool) -> Result<Self, Self::Error>;
     /// Scale the probability density by a factor
     fn scale_prob(&self, factor: f32) -> Self;
     /// Combine two values by choosing one with a given probability
@@ -40,11 +40,13 @@ impl StepValue for f32 {
         *self + *other
     }
 
-    fn add_prob(&self, other: &Self) -> Result<Self, Self::Error> {
-        let ret = *self + *other;
+    fn add_prob(&self, other: &Self, do_offset: bool) -> Result<Self, Self::Error> {
+        let ret = *self + *other + if do_offset { -1.0 } else { 0.0 };
         if ret.similar(&1.0) {
             Ok(1.0)
         } else if ret > 1.0 {
+            Err(StepFunctionError::ProbabilityOverflow(ret))
+        } else if ret < 0.0 {
             Err(StepFunctionError::ProbabilityOverflow(ret))
         } else {
             Ok(ret)
@@ -92,9 +94,9 @@ impl StepValue for CDF {
         self.convolve(other)
     }
 
-    fn add_prob(&self, other: &Self) -> Result<Self, Self::Error> {
+    fn add_prob(&self, other: &Self, do_offset: bool) -> Result<Self, Self::Error> {
         zip(self.iter(), other.iter(), 0.0, 0.0)
-            .map(|(x, (y, z))| Ok((x, y.add_prob(&z)?)))
+            .map(|(x, (y, z))| Ok((x, y.add_prob(&z, do_offset)?)))
             .collect()
     }
 
