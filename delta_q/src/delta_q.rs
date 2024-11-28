@@ -1402,13 +1402,13 @@ mod tests {
 
     #[test]
     fn test_gossip() {
-        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 15, 0.1)
+        let ctx: PersistentContext = "diffuse := gossip(hop, CDF[(0, 1)], 3000, 15, 0.1, [])
             hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
             .parse()
             .unwrap();
         let diffuse = ctx.eval("diffuse").unwrap();
-        assert_eq!(diffuse.to_string(), "CDF[(0, 0.00033), (1, 0.00533), (2, 0.07074), (3, 0.64287), (4, 1)] \
-          WITH net[(0, CDF[(0, 0.00033), (15, 1)]), (1, CDF[(0, 0.00533), (202.5, 1)]), (2, CDF[(0, 0.07074), (2733.75, 1)]), (3, CDF[(0, 0.64287), (36905.625, 1)]), (4, 0)]");
+        assert_eq!(diffuse.to_string(), "CDF[(1, 0.00033), (2, 0.00533), (3, 0.07074), (4, 1)] \
+            WITH net[(0, CDF[(0, 0.99967), (1, 1)]), (1, CDF[(0, 0.995), (1, 1)]), (2, CDF[(0, 0.9346), (1, 1)]), (3, CDF[(0, 0.97355), (1, 1)]), (4, 0)]");
 
         // this test made sense when the gossip impl was broken; need to figure out whether to keep it
         // let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 15, 0.95)
