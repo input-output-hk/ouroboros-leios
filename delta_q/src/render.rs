@@ -274,7 +274,7 @@ pub fn seq(props: &SeqProps) -> Html {
     html! {
         <div class={classes!("row", "center", "frame")}>
             <DeltaQComponent delta_q={first.clone()} on_change={on_first_change} />
-            <div class={classes!("seqSymbol", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
+            <div class={classes!("seqSymbol", "anchor", (!load.disjoint_names.is_empty()).then_some("disjoint"))} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
                 { format!("{}", load) }
                 if *popup {
                     <div class={classes!("popup")}>
