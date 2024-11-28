@@ -125,7 +125,10 @@ fn ws<'a>(input: &mut &'a str) -> PResult<&'a str> {
 }
 
 fn rest_of_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    (take_while(0.., |c: char| c != '\n'), opt('\n'))
+    (
+        take_while(0.., |c: char| c.is_whitespace() && c != '\n'),
+        opt('\n'),
+    )
         .take()
         .parse_next(input)
 }
@@ -227,7 +230,7 @@ fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
         ))
             .context(StrContext::Label("gossip specification"))
             .context(StrContext::Expected(StrContextValue::Description(
-                "hop, size, branching, cluster coefficient",
+                "send, receive, size, branching, cluster coefficient, disjoint names",
             ))),
         closing_paren,
     )
@@ -252,10 +255,12 @@ fn comma(input: &mut &str) -> PResult<()> {
 }
 
 fn num(input: &mut &str) -> PResult<f32> {
-    take_while(1.., |c: char| c.is_digit(10) || c == '.')
-        .try_map(|num_str: &str| num_str.parse::<f32>())
-        .context(StrContext::Label("number"))
-        .parse_next(input)
+    cut_err(
+        take_while(1.., |c: char| c.is_digit(10) || c == '.')
+            .try_map(|num_str: &str| num_str.parse::<f32>()),
+    )
+    .context(StrContext::Label("number"))
+    .parse_next(input)
 }
 
 fn int(input: &mut &str) -> PResult<usize> {

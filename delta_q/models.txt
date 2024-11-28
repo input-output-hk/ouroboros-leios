@@ -148,4 +148,42 @@ validate := CDF[(0.1, 1)] WITH cpu[(0, 1), (0.1, 0)]
 8 -- more realistic Leios model
 =============================================
 
+parallel := all(pipeline | all(slices^1 ->- pipeline | all(slices^2 ->- pipeline | all(slices^3 ->- pipeline | all(slices^4 ->- pipeline | all(slices^5 ->- pipeline | all(slices^6 ->- pipeline | slices^7 ->- pipeline)))))))
+pipeline := pipelineIB ->- endorse
 
+endorse := all(CDF[(0, 1)] ->- endorse1 | CDF[(0.1, 1)] ->- endorse1)
+endorse1 := all(diffuseEB | slice) ->- diffuseVote
+
+pipelineIB := all(pipeline0 | all(pipeline1 | all(pipeline2 | all(pipeline3 | all(pipeline4 | all(pipeline5 | all(pipeline6 | all(pipeline7 | all(pipeline8 | pipeline9)))))))))
+pipeline0 := all(CDF[(0,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline1 := all(CDF[(1,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline2 := all(CDF[(2,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline3 := all(CDF[(3,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline4 := all(CDF[(4,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline5 := all(CDF[(5,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline6 := all(CDF[(6,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline7 := all(CDF[(7,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline8 := all(CDF[(8,1)] ->- diffuseIB | slice ->- slice) ->- slice
+pipeline9 := all(CDF[(9,1)] ->- diffuseIB | slice ->- slice) ->- slice
+
+slice := CDF[(10, 1)]
+slices := slice ->- slices
+
+-- diffusion is modelled assuming that propagation is along relays, followed by transmission to block producer
+diffuseIB := gossip(getIB, validateIB, 1000, 15, 0.08, [cpu, net]) ->- getIB ->- validateIB
+diffuseEB := gossip(getEB, validateEB, 1000, 15, 0.08, [cpu, net]) ->- getEB ->- validateEB
+diffuseVote := gossip(getVote, validateVote, 1000, 15, 0.08, [cpu, net]) ->- getVote ->- validateVote
+
+-- validation requires the attention of one CPU core for some duration
+validateIB := CDF[(0.1, 1)] WITH cpu[(0, 1), (0.1, 0)]
+validateEB := CDF[(0.1, 1)] WITH cpu[(0, 1), (0.1, 0)]
+validateVote := CDF[(0.1, 1)] WITH cpu[(0, 1), (0.1, 0)]
+
+getIB := sendS ->- sendS ->- sendS ->- sendXL
+getEB := sendS ->- sendS ->- sendS ->- sendL
+getVote := sendS ->- sendS ->- sendS ->- sendL
+
+-- these outcomes model sending at a node with a max rate of 1Mbps
+sendS := CDF[(0.00012, 1)] WITH net[(0, 1), (0.00012, 0)] ->- CDF[(0.006, 0.333), (0.035, 0.666), (0.135, 1)]
+sendL := CDF[(0.005, 1)] WITH net[(0, 1), (0.005, 0)] ->- CDF[(0.012, 0.333), (0.07, 0.666), (0.265, 1)]
+sendXL := CDF[(0.08, 1)] WITH net[(0, 1), (0.08, 0)] ->- CDF[(0.04, 0.333), (0.2, 0.666), (0.8, 1)]
