@@ -259,6 +259,6 @@ mod tests {
         "
         .parse()
         .unwrap();
-        let res = ctx.eval("IB").unwrap();
+        let _res = ctx.eval("IB").unwrap();
     }
 }

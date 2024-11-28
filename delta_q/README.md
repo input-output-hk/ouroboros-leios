@@ -59,10 +59,12 @@ modelling an empirically determined distribution of the diffusion process using 
 
 Very similar expressions can be generated using the `gossip()` operator, where
 
-    gossip(hopIB, 2500, 15, 0.07)
+    gossip(hopIB, validate, 2500, 15, 0.07, [cpu])
 
 means that information starts out at a single node and is at each step spread to 15 neighbors until all 2500 nodes have been reached.
+The second parameter describes the action taking at the receiving node of each step, in this case `validate` is assumed to be the outcome that describes the (CPU-bound) activity of validating the IB.
 The fourth parameter is the average local cluster coefficient of the network, which describes which fraction of a node’s neighbors are directly connected to each other — which will lead to duplicate information transfers that are then assumed to not actually perform the `hopIB` outcome via deduplication.
+The last parameter lists the names of resources that are to be treated as independent across nodes — in the example each node has its own CPUs, so usage on two different nodes is not added in terms of intensity but in terms of probability (since the main variable during gossip is “which node am I?”).
 
 Adding this operator makes it easier to play with different network sizes or suggested peering schemes.
 
@@ -86,6 +88,15 @@ cargo install --locked trunk
 # it has been reported that the following might be necessary as well
 cargo install --locked wasm-bindgen-cli
 ```
+
+Then you start serving the app using
+
+```sh
+trunk serve --release
+```
+
+When starting out, the evaluation context of the app is empty (it is stored in `localStorage` within your browser).
+You may want to copy the latest example from `models.txt`, taking the whole set of expressions and pasting it into the popup that appears when you click the `edit` button.
 
 ## Known Shortcomings
 

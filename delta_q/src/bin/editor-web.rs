@@ -6,8 +6,8 @@ macro_rules! cloned {
 }
 
 use delta_q::{
-    CalcCdf, DeltaQComponent, DeltaQContext, DeltaQExpr, EphemeralContext, EvalCtxAction,
-    PersistentContext, StepFunction, CDF,
+    CalcCdf, DeltaQComponent, DeltaQContext, DeltaQExpr, EvalCtxAction, PersistentContext,
+    StepFunction, CDF,
 };
 use gloo_utils::window;
 use js_sys::Reflect;
@@ -147,18 +147,19 @@ fn app_main() -> HtmlResult {
     }));
 
     let mut sel_found = false;
-    let mut cache = EphemeralContext::default();
+    // let mut cache = EphemeralContext::default();
     let list_items = ctx
         .iter()
         .map(|(k, v)| {
             let name = k.clone();
             let constraint = ctx.constraint(&name);
             let check = (|| {
-                let c = ctx.get(&constraint?)?;
-                let c = c.eval(&ctx, &mut cache).ok()?;
-                let n = ctx.get(&name)?;
-                let n = n.eval(&ctx, &mut cache).ok()?;
-                Some(n.cdf >= c.cdf)
+                return None;
+                // let c = ctx.get(&constraint?)?;
+                // let c = c.eval(&ctx, &mut cache).ok()?;
+                // let n = ctx.get(&name)?;
+                // let n = n.eval(&ctx, &mut cache).ok()?;
+                // Some(n.cdf >= c.cdf)
             })();
             let check = match check {
                 Some(true) => "slack",

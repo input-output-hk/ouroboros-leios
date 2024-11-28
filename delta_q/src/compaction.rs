@@ -175,7 +175,7 @@ pub(crate) fn simplify_cdf(data: &mut Vec<(f32, CDF)>) {
     if data.len() < 10 {
         return;
     }
-    let max_dx = data[data.len() - 1].0 / 300.0;
+    let max_dx = data[data.len() - 1].0 / 200.0;
 
     let mut pos = 0;
     let mut current = None;
