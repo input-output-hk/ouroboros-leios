@@ -150,11 +150,19 @@ fn app_main() -> HtmlResult {
     // let mut cache = EphemeralContext::default();
     let list_items = ctx
         .iter()
-        .map(|(k, v)| {
+        .map(|k| {
+            let Some(v) = ctx.get(k) else {
+                return html! {
+                    <li class={classes!("row")}>
+                        <pre>{ k.as_str() }</pre>
+                    </li>
+                };
+            };
             let name = k.clone();
             let constraint = ctx.constraint(&name);
             let check = (|| {
                 return None;
+                // constraint checking is too slow to not be cached, which is currently not worth it for me
                 // let c = ctx.get(&constraint?)?;
                 // let c = c.eval(&ctx, &mut cache).ok()?;
                 // let n = ctx.get(&name)?;

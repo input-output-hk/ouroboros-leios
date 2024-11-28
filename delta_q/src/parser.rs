@@ -16,22 +16,27 @@ use winnow::{
 pub fn eval_ctx(input: &str) -> Result<PersistentContext, String> {
     repeat(
         0..,
-        delimited(
+        (
             ws,
             separated_pair(
                 (name_bare, opt((ws, ">=", ws, name_bare).map(|x| x.3))),
                 (ws, ":=", ws),
                 delta_q,
             ),
-            ws,
         ),
     )
     .parse(input)
     .map_err(|e| format!("{e}"))
 }
 
-impl<'a> Accumulate<((&'a str, Option<&'a str>), DeltaQExpr)> for PersistentContext {
-    fn accumulate(&mut self, ((name, constraint), dq): ((&'a str, Option<&'a str>), DeltaQExpr)) {
+impl<'a> Accumulate<(&'a str, ((&'a str, Option<&'a str>), DeltaQExpr))> for PersistentContext {
+    fn accumulate(
+        &mut self,
+        (comment, ((name, constraint), dq)): (&'a str, ((&'a str, Option<&'a str>), DeltaQExpr)),
+    ) {
+        if !comment.is_empty() {
+            self.put_comment(comment);
+        }
         self.put(name.to_owned(), DeltaQ::from(dq));
         if let Some(constraint) = constraint {
             self.set_constraint(name, Some(constraint.into()));
@@ -106,16 +111,22 @@ fn atom(input: &mut &str) -> PResult<DeltaQExpr> {
                     "'BB', name, CDF, 'all(', 'some(', 'gossip(', or parentheses",
                 ))),
         )),
-        ws,
+        rest_of_line,
     )
     .parse_next(input)
 }
 
-fn ws(input: &mut &str) -> PResult<()> {
+fn ws<'a>(input: &mut &'a str) -> PResult<&'a str> {
     let white = take_while(0.., |c: char| c.is_whitespace()).void();
     let comment = ("--", take_while(0.., |c: char| c != '\n'), opt('\n')).void();
     separated::<_, _, (), _, _, _, _>(0.., white, comment)
-        .void()
+        .take()
+        .parse_next(input)
+}
+
+fn rest_of_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    (take_while(0.., |c: char| c != '\n'), opt('\n'))
+        .take()
         .parse_next(input)
 }
 

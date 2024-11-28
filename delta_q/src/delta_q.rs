@@ -45,6 +45,7 @@ pub type Name = SmallString<[u8; 16]>;
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PersistentContext {
     pub ctx: BTreeMap<Name, (DeltaQ, Option<Name>)>,
+    pub order: Vec<Name>,
     pub max_size: usize,
     pub mode: CompactionMode,
 }
@@ -61,6 +62,7 @@ impl Default for PersistentContext {
     fn default() -> Self {
         Self {
             ctx: Default::default(),
+            order: Vec::new(),
             max_size: DEFAULT_MAX_SIZE,
             mode: Default::default(),
         }
@@ -70,7 +72,14 @@ impl Default for PersistentContext {
 impl PersistentContext {
     pub fn put(&mut self, name: String, delta_q: DeltaQ) {
         let name = Name::from(name);
-        self.ctx.insert(name, (delta_q, None));
+        let existed = self.ctx.insert(name.clone(), (delta_q, None)).is_some();
+        if !existed {
+            self.order.push(name);
+        }
+    }
+
+    pub fn put_comment(&mut self, comment: &str) {
+        self.order.push(Name::from(comment));
     }
 
     pub fn remove(&mut self, name: &str) -> Option<DeltaQ> {
@@ -85,8 +94,8 @@ impl PersistentContext {
         DeltaQ::name(name).eval(self, &mut EphemeralContext::default())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Name, &DeltaQ)> {
-        self.ctx.iter().map(|(k, (v, _))| (k, v))
+    pub fn iter(&self) -> impl Iterator<Item = &Name> {
+        self.order.iter()
     }
 
     pub fn constraint(&self, name: &str) -> Option<&Name> {
@@ -106,6 +115,7 @@ impl PersistentContext {
     }
 }
 
+#[cfg(test)]
 impl From<BTreeMap<String, DeltaQ>> for PersistentContext {
     fn from(value: BTreeMap<String, DeltaQ>) -> Self {
         Self {
@@ -113,12 +123,14 @@ impl From<BTreeMap<String, DeltaQ>> for PersistentContext {
                 .into_iter()
                 .map(|(k, v)| (Name::from(k), (v, None)))
                 .collect(),
+            order: Vec::new(),
             max_size: DEFAULT_MAX_SIZE,
             mode: CompactionMode::default(),
         }
     }
 }
 
+#[cfg(test)]
 impl Into<BTreeMap<Name, DeltaQ>> for PersistentContext {
     fn into(self) -> BTreeMap<Name, DeltaQ> {
         self.ctx.into_iter().map(|(k, (v, _))| (k, v)).collect()
@@ -127,7 +139,11 @@ impl Into<BTreeMap<Name, DeltaQ>> for PersistentContext {
 
 impl Display for PersistentContext {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (k, (v, c)) in self.ctx.iter() {
+        for k in self.iter() {
+            let Some((v, c)) = self.ctx.get(k) else {
+                write!(f, "{}", k)?;
+                continue;
+            };
             if let Some(c) = c {
                 writeln!(f, "{} >= {} := {}", k, c, v)?;
             } else {
