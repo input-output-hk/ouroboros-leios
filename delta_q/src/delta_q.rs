@@ -1,4 +1,5 @@
 use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MAX_SIZE};
+use itertools::Itertools;
 use smallstr::SmallString;
 use std::{
     cell::{Cell, OnceCell, RefCell},
@@ -171,6 +172,9 @@ impl LoadUpdate {
 
 impl Display for LoadUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if !self.disjoint_names.is_empty() {
+            write!(f, "{}", self.disjoint_names.iter().join(", "))?;
+        }
         if self.factor != 1.0 {
             write!(f, "×{}", self.factor)?;
         }

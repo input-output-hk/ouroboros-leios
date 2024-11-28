@@ -60,7 +60,7 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
         loop {
             let snap = input.checkpoint();
             let Ok(op) = alt((
-                op_seq.map(|mult| Op::Seq { mult }),
+                op_seq.map(|(names, mult)| Op::Seq { names, mult }),
                 (num, "<>", num).map(|(l, _, r)| Op::Choice(l, r)),
             ))
             .parse_next(input) else {
@@ -75,9 +75,14 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
 
             let rhs = rec(input, rbp)?;
             lhs = match op {
-                Op::Seq { mult } => {
-                    DeltaQExpr::Seq(Arc::new(lhs), LoadUpdate::new(mult), Arc::new(rhs))
-                }
+                Op::Seq { names, mult } => DeltaQExpr::Seq(
+                    Arc::new(lhs),
+                    LoadUpdate {
+                        factor: mult,
+                        disjoint_names: names,
+                    },
+                    Arc::new(rhs),
+                ),
                 Op::Choice(l, r) => DeltaQExpr::Choice(Arc::new(lhs), l, Arc::new(rhs), r),
             };
         }
@@ -86,12 +91,13 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
     rec(input, 0)
 }
 
-fn op_seq(input: &mut &str) -> PResult<f32> {
+fn op_seq(input: &mut &str) -> PResult<(BTreeSet<Name>, f32)> {
     (
         "->-",
+        opt(name_list).map(|x| x.unwrap_or_default()),
         opt(preceded(alt(('*', '×', '⋅')), num)).map(|x| x.unwrap_or(1.0)),
     )
-        .map(|x| x.1)
+        .map(|x| (x.1, x.2))
         .parse_next(input)
 }
 
@@ -216,8 +222,9 @@ fn for_some(input: &mut &str) -> PResult<DeltaQExpr> {
 fn name_list(input: &mut &str) -> PResult<BTreeSet<Name>> {
     delimited(
         '[',
-        separated(0.., preceded(ws, name), (ws, ',')),
-        (ws, ']'),
+        cut_err(separated(0.., preceded(ws, name), (ws, ',')))
+            .context(StrContext::Label("name list")),
+        cut_err((ws, ']')).context(StrContext::Label("closing bracket")),
     )
     .parse_next(input)
 }
@@ -279,9 +286,9 @@ fn closing_paren(input: &mut &str) -> PResult<()> {
         .parse_next(input)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Op {
-    Seq { mult: f32 },
+    Seq { names: BTreeSet<Name>, mult: f32 },
     Choice(f32, f32),
 }
 
