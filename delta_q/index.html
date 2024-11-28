@@ -1,43 +1,74 @@
 <html>
   <head>
     <link data-trunk rel="css" href="styles.css" />
-    <link data-trunk rel="rust" data-bin="editor-web" data-type="main" data-weak-refs />
-    <link data-trunk rel="rust" data-bin="worker" data-type="worker" data-weak-refs />
+    <link data-trunk rel="rust" data-bin="editor-web" data-type="main" data-weak-refs data-wasm-opt="0" data-keep-debug />
+    <link data-trunk rel="rust" data-bin="worker" data-type="worker" data-weak-refs data-wasm-opt="0" data-keep-debug />
   </head>
   <body>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
     <script type="module">
-      import * as core from 'https://root.cern/js/7.7.4/modules/core.mjs';
-      window.core = core;
-      core.settings.HandleKeys = false;
-      import * as draw from 'https://root.cern/js/7.7.4/modules/draw.mjs';
-      window.draw = draw;
-      import { cleanup } from 'https://root.cern/js/7.7.4/modules/base/ObjectPainter.mjs';
-      window.cleanup = cleanup;
+      function num(x) {
+        if (x <= 0) return x.toFixed(3);
+        const digits = Math.floor(Math.log10(x)) + 1;
+        const decimals = Math.max(0, 4 - digits);
+        return x.toFixed(decimals);
+      }
 
       window.addEventListener('rootjs', (event) => {
         const { data } = event;
         if (data === null || typeof data !== 'object') {
-          cleanup('output');
+          Plotly.purge('output');
           const load_container = document.getElementById('loads');
           while (load_container.firstChild) {
             load_container.removeChild(load_container.firstChild);
           }
         } else {
-          const { bins, values, max, name, loads } = data;
+          window.data = data;
+          const { bins, values, name, loads, constraint } = data;
 
-          const hist = core.createHistogram('TH1F', bins.length);
-          window.hist = hist;
-          hist.fXaxis.fXbins = bins;
-          for (const idx in values) {
-            hist.setBinContent(parseInt(idx) + 1, values[idx]);
+          let max = bins.at(-1) * 1.2;
+          if (max === 0) {
+            max = 1;
           }
-          hist.fXaxis.fXmin = 0;
-          hist.fXaxis.fXmax = max;
-          hist.fTitle = name;
-          hist.fXaxis.fTitle = 'time';
-          hist.fYaxis.fTitle = 'cumulative distribution';
-          cleanup('output');
-          draw.draw('output', hist, 'nostat minimum:0 maximum:1.1');
+
+          const timeliness = {
+            x: bins,
+            y: values.map(y => y.at(-1)[0]),
+            mode: 'lines',
+            line: {shape: 'hv'},
+          };
+          timeliness.x.push(max);
+          timeliness.y.push(timeliness.y.at(-1));
+          const plots = [timeliness];
+
+          if (constraint) {
+            const { bins, values } = constraint;
+            const plot = {
+              x: bins,
+              y: values.map(y => y.at(-1)[0]),
+              mode: 'lines',
+              line: {shape: 'hv', color: 'red'},
+            };
+            plot.x.push(Math.max(max, bins.at(-1) * 1.2));
+            plot.y.push(plot.y.at(-1));
+            plots.push(plot);
+          }
+
+          Plotly.newPlot('output', plots, {
+            font: { size: 24 },
+            margin: { pad: 20 },
+            showlegend: false,
+            shapes: [
+              {
+                type: 'line',
+                x0: 0,
+                y0: 1,
+                x1: max,
+                y1: 1,
+                line: { color: 'black', dash: 'dash' },
+              }
+            ]
+          });
 
           const load_container = document.getElementById('loads');
           while (load_container.firstChild) {
@@ -47,28 +78,83 @@
             const id = 'loads' + idx;
             const pad = load_container.appendChild(document.createElement('div'));
             pad.id = id;
-            pad.setAttribute('style', `width: 100%; height: ${100 / loads.length}%;`);
+            pad.setAttribute('style', `width: 100%; height: ${loads.length > 1 ? 80 : 100}%;`);
           }
 
           let canvas = 0;
           for (const { bins, values, name } of loads || []) {
-            const load_hist = core.createHistogram('TH1F', bins.length);
-            load_hist.fXaxis.fXbins = bins;
-            for (const idx in values) {
-              load_hist.setBinContent(parseInt(idx) + 1, values[idx]);
+            const maxGraph = {
+              x: bins,
+              y: values.map(y => y.at(-1)[0]),
+              mode: 'lines',
+              opacity: 0.3,
+              line: { shape: 'hv', color: 'black', width: 1 },
+            };
+
+            let maxY = Math.max(...maxGraph.y);
+            if (maxY === 0) {
+              maxY = 1;
+            } else {
+              maxY *= 1.2;
             }
-            load_hist.fXaxis.fXmin = 0;
-            load_hist.fXaxis.fXmax = max;
-            // ROOT scales the labels as a fraction of the canvas height → counter that effect
-            load_hist.fXaxis.fLabelSize *= loads.length;
-            load_hist.fXaxis.fLabelOffset *= loads.length;
-            load_hist.fYaxis.fLabelSize *= loads.length;
-            load_hist.fYaxis.fLabelOffset *= loads.length;
-            load_hist.fTitle = name;
+
+            const limit = constraint?.loads?.find(l => l.name === name)?.values?.at(-1)?.at(-1)?.[0] ?? Infinity;
+
             const pad = 'loads' + canvas;
-            window[pad] = load_hist;
-            cleanup(pad);
-            draw.draw(pad, load_hist, 'nostat');
+            const elem = document.getElementById(pad);
+            
+            const shapes = [];
+            if (limit !== Infinity) {
+              shapes.push({
+                type: 'line',
+                x0: 0,
+                y0: limit,
+                x1: max,
+                y1: limit,
+                line: { color: 'red', dash: 'dash' },
+              });
+            }
+
+            const annotations = [];
+            bins.push(Math.max(max, bins.at(-1) * 1.2));
+
+            const pxPerUnitX = elem.clientWidth / (bins.at(-1) - bins.at(0)) / 1.2;
+            const pxPerUnitY = elem.clientHeight / (maxY - 0) / 1.5;
+
+            for (let i = 1; i < bins.length; i++) {
+              const v = values[i - 1];
+              const last = v.length;
+              v.push([maxY, v.at(-1)[1]]);
+              for (let j = 1; j < v.length; j++) {
+                const color = j < last && v[j][0] > limit ? '155,0,0' : '0,0,255';
+                shapes.push({
+                  type: 'rect',
+                  x0: bins[i - 1],
+                  x1: bins[i],
+                  y0: v[j - 1][0],
+                  y1: v[j][0],
+                  fillcolor: `rgba(${color}, ${Math.sqrt(1 - v[j-1][1])})`,
+                  line: { color: 'transparent' },
+                });
+                annotations.push({
+                  x: (bins[i - 1] + bins[i]) / 2,
+                  y: (v[j][0] + v[j-1][0]) / 2,
+                  width: pxPerUnitX * (bins[i] - bins[i - 1]),
+                  height: pxPerUnitY * (v[j][0] - v[j-1][0]),
+                  showarrow: false,
+                  text: '',
+                  hovertext: `level: ${v[j - 1][1].toFixed(3)}<br>value: ${num(v[j][0])}<br>prob: ${(v[j][1]-v[j-1][1]).toFixed(3)}`,
+                });
+              }
+            }
+
+            Plotly.newPlot(pad, [maxGraph], {
+              font: { size: 24 },
+              margin: { pad: 20 },
+              title: { text: name },
+              shapes,
+              annotations,
+            });
             canvas++;
           }
         }

@@ -2,7 +2,7 @@ use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MA
 use smallstr::SmallString;
 use std::{
     cell::{Cell, OnceCell, RefCell},
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     str::FromStr,
     sync::{Arc, OnceLock},
@@ -138,14 +138,18 @@ impl Display for PersistentContext {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LoadUpdate {
     pub factor: f32,
+    pub disjoint_names: BTreeSet<Name>,
 }
 
 impl LoadUpdate {
     pub fn new(factor: f32) -> Self {
-        Self { factor }
+        Self {
+            factor,
+            disjoint_names: BTreeSet::default(),
+        }
     }
 }
 
@@ -160,7 +164,10 @@ impl Display for LoadUpdate {
 
 impl Default for LoadUpdate {
     fn default() -> Self {
-        Self { factor: 1.0 }
+        Self {
+            factor: 1.0,
+            disjoint_names: BTreeSet::default(),
+        }
     }
 }
 
@@ -209,10 +216,13 @@ pub enum DeltaQExpr {
     ),
     Gossip {
         #[serde(with = "delta_q_serde")]
-        hop: Arc<DeltaQExpr>,
+        send: Arc<DeltaQExpr>,
+        #[serde(with = "delta_q_serde")]
+        receive: Arc<DeltaQExpr>,
         size: f32,
         branching: f32,
         cluster_coeff: f32,
+        disjoint_names: BTreeSet<Name>,
     },
 }
 
@@ -322,7 +332,10 @@ impl Drop for DeltaQExpr {
                 save(depth, l);
                 save(depth, r);
             }
-            DeltaQExpr::Gossip { hop, .. } => save(depth, hop),
+            DeltaQExpr::Gossip { send, receive, .. } => {
+                save(depth, send);
+                save(depth, receive);
+            }
         };
         // switch off special handling for this particular DeltaQExpr
         DROP.set(true);
@@ -482,14 +495,25 @@ impl DeltaQ {
                 write!(f, ")")
             }
             DeltaQExpr::Gossip {
-                hop,
+                send,
+                receive,
                 size,
                 branching,
                 cluster_coeff,
+                disjoint_names,
             } => {
                 write!(f, "gossip(")?;
-                DeltaQ::display(hop, f, true)?;
-                write!(f, ", {}, {}, {})", size, branching, cluster_coeff)
+                DeltaQ::display(send, f, true)?;
+                write!(f, ", ")?;
+                DeltaQ::display(receive, f, true)?;
+                write!(f, ", {}, {}, {}, [", size, branching, cluster_coeff)?;
+                for (idx, name) in disjoint_names.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", name)?;
+                }
+                write!(f, "])")
             }
         }
     }
@@ -509,7 +533,7 @@ impl DeltaQ {
             AssembleChoice(&'a Arc<DeltaQExpr>, f32, f32),
             AssembleForAll(&'a Arc<DeltaQExpr>),
             AssembleForSome(&'a Arc<DeltaQExpr>),
-            ExpandGossip(f32, f32, f32),
+            ExpandGossip(f32, f32, f32, BTreeSet<Name>),
         }
 
         let mut op_stack = Vec::new();
@@ -524,7 +548,7 @@ impl DeltaQ {
                         res_stack.push(delta_q.clone());
                     }
                     DeltaQExpr::Seq(first, load, second) => {
-                        op_stack.push(Op::AssembleSeq(delta_q, *load));
+                        op_stack.push(Op::AssembleSeq(delta_q, load.clone()));
                         op_stack.push(Op::Expand(second));
                         op_stack.push(Op::Expand(first));
                     }
@@ -544,13 +568,21 @@ impl DeltaQ {
                         op_stack.push(Op::Expand(first));
                     }
                     DeltaQExpr::Gossip {
-                        hop,
+                        send,
+                        receive,
                         size,
                         branching,
                         cluster_coeff,
+                        disjoint_names,
                     } => {
-                        op_stack.push(Op::ExpandGossip(*size, *branching, *cluster_coeff));
-                        op_stack.push(Op::Expand(hop));
+                        op_stack.push(Op::ExpandGossip(
+                            *size,
+                            *branching,
+                            *cluster_coeff,
+                            disjoint_names.clone(),
+                        ));
+                        op_stack.push(Op::Expand(receive));
+                        op_stack.push(Op::Expand(send));
                     }
                 },
                 Op::AssembleSeq(delta_q, load) => {
@@ -593,9 +625,17 @@ impl DeltaQ {
                         res_stack.push(Arc::new(expanded));
                     }
                 }
-                Op::ExpandGossip(size, branching, cluster_coeff) => {
-                    let hop = res_stack.pop().unwrap();
-                    let expanded = expand_gossip(&hop, size, branching, cluster_coeff)?;
+                Op::ExpandGossip(size, branching, cluster_coeff, disjoint_names) => {
+                    let receive = res_stack.pop().unwrap();
+                    let send = res_stack.pop().unwrap();
+                    let expanded = expand_gossip(
+                        &send,
+                        &receive,
+                        size,
+                        branching,
+                        cluster_coeff,
+                        &disjoint_names,
+                    )?;
                     res_stack.push(expanded.expr);
                 }
             }
@@ -622,7 +662,10 @@ impl DeltaQ {
             /// Evaluate a DeltaQ with the given load factor and push the result on the result stack
             Eval(&'a DeltaQExpr),
             /// construct a sequence from the top two results on the result stack
-            Seq { load_factor: f32 },
+            Seq {
+                load_factor: f32,
+                disjoint_names: BTreeSet<Name>,
+            },
             /// construct a choice from the top two results on the result stack
             Choice(f32, f32),
             /// construct a forall from the top two results on the result stack
@@ -715,6 +758,7 @@ impl DeltaQ {
                         DeltaQExpr::Seq(first, load, second) => {
                             op_stack.push(Op::Seq {
                                 load_factor: load.factor,
+                                disjoint_names: load.disjoint_names.clone(),
                             });
                             // evaluate second after first
                             op_stack.push(Op::Eval(second));
@@ -738,10 +782,16 @@ impl DeltaQ {
                         DeltaQExpr::Gossip { .. } => panic!("gossip not expanded"),
                     }
                 }
-                Op::Seq { load_factor } => {
-                    let second = res_stack.pop().unwrap().mult(load_factor, ctx);
+                Op::Seq {
+                    load_factor,
+                    disjoint_names,
+                } => {
+                    let second = res_stack
+                        .pop()
+                        .unwrap()
+                        .apply_load_factor(load_factor, ctx)?;
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.seq(&second, ctx)?);
+                    res_stack.push(first.seq(&second, ctx, disjoint_names));
                 }
                 Op::Choice(w1, w2) => {
                     let second = res_stack.pop().unwrap();
@@ -751,12 +801,12 @@ impl DeltaQ {
                 Op::ForAll => {
                     let second = res_stack.pop().unwrap();
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.for_all(&second, ctx)?);
+                    res_stack.push(first.for_all(&second, ctx));
                 }
                 Op::ForSome => {
                     let second = res_stack.pop().unwrap();
                     let first = res_stack.pop().unwrap();
-                    res_stack.push(first.for_some(&second, ctx)?);
+                    res_stack.push(first.for_some(&second, ctx));
                 }
                 Op::EndRec(n) => {
                     ephemeral.rec.remove(n).unwrap();
@@ -784,10 +834,12 @@ impl DeltaQ {
 
 // assume that gossiping to a node that already has been reached is free
 pub fn expand_gossip(
-    hop: &DeltaQExpr,
+    send: &DeltaQExpr,
+    receive: &DeltaQExpr,
     size: f32,
     branching: f32,
     cluster_coeff: f32,
+    disjoint_names: &BTreeSet<Name>,
 ) -> Result<DeltaQ, DeltaQError> {
     if size <= 1.0 {
         return Ok(DeltaQ::top());
@@ -796,6 +848,7 @@ pub fn expand_gossip(
 
     let mut remaining = size - 1.0;
     let mut steps = vec![];
+    let mut senders = 1.0f32;
 
     while remaining > 1.0 {
         let prev = remaining;
@@ -804,11 +857,12 @@ pub fn expand_gossip(
         } else {
             cluster_branch
         };
-        let senders = size - remaining;
         // go through senders in some arbitrary order, but do it one by one to calculate the overlap between their targets
-        // correctly even when approaching gossip completion
-        for _sender in 0..senders.round() as usize {
-            let new_prob = remaining / (size - 1.0);
+        // correctly even when approaching gossip completion; this model assumes that the targets are naturally picked
+        // from the remaining set of nodes, which is of course incorrect--however, the resulting distribution somehow
+        // matches other studies of the Cardano network
+        for _sender in 0..senders.ceil() as usize {
+            let new_prob = remaining / prev;
             let targets = eff_branch * new_prob;
             remaining -= targets;
             if remaining < 0.0 {
@@ -816,28 +870,58 @@ pub fn expand_gossip(
                 break;
             }
         }
-        steps.push((prev - remaining, remaining));
+        // new nodes in this round are the senders in the next round
+        senders = prev - remaining;
+        steps.push((senders, remaining));
         if steps.len() > 10_000 {
             return Err(DeltaQError::TooManySteps);
         }
     }
 
     let mut ret = Arc::new(DeltaQExpr::BlackBox);
-    for (step, remaining) in steps.into_iter().rev() {
+    for (idx, (senders, remaining)) in steps.into_iter().rev().enumerate() {
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!("senders: {senders}, remaining: {remaining}, idx: {idx}").into(),
+        );
         if remaining > 1.0 {
             ret = Arc::new(DeltaQExpr::Seq(
-                Arc::new(hop.clone()),
-                LoadUpdate::new(cluster_branch),
-                Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, step, ret, remaining)),
+                Arc::new(DeltaQExpr::Seq(
+                    Arc::new(DeltaQExpr::Outcome(Outcome::top())),
+                    LoadUpdate::new(senders / (senders + remaining)),
+                    Arc::new(DeltaQExpr::Seq(
+                        Arc::new(receive.clone()),
+                        if idx == 1 {
+                            LoadUpdate {
+                                factor: remaining / (senders * cluster_branch),
+                                disjoint_names: disjoint_names.clone(),
+                            }
+                        } else {
+                            LoadUpdate::default()
+                        },
+                        Arc::new(send.clone()),
+                    )),
+                )),
+                LoadUpdate::default(),
+                Arc::new(DeltaQExpr::Choice(
+                    Arc::new(DeltaQExpr::Outcome(Outcome::top())),
+                    senders,
+                    ret,
+                    remaining,
+                )),
             ));
         } else {
-            ret = Arc::new(hop.clone());
+            ret = Arc::new(receive.clone());
         }
     }
 
     Ok(DeltaQExpr::Seq(
-        DeltaQ::top().expr,
-        LoadUpdate::new(branching),
+        Arc::new(DeltaQExpr::Seq(
+            Arc::new(DeltaQExpr::Outcome(Outcome::top())),
+            LoadUpdate::new(1.0 / size),
+            Arc::new(send.clone()),
+        )),
+        LoadUpdate::default(),
         Arc::new(DeltaQExpr::Choice(DeltaQ::top().expr, 1.0, ret, size - 1.0)),
     )
     .into())
@@ -877,7 +961,7 @@ mod tests {
 
     #[test]
     fn test_display_cdf() {
-        let cdf = CDF::new(&[0.0, 0.2, 0.9], 1.0).unwrap();
+        let cdf = CDF::new(&[(1.0, 0.2), (2.0, 0.9)]).unwrap();
         let dq = DeltaQ::cdf(cdf.clone());
         assert_eq!(dq.to_string(), "CDF[(1, 0.2), (2, 0.9)]");
         assert_eq!(dq, "CDF[(1, 0.2), (2, 0.9)]".parse().unwrap());
@@ -977,7 +1061,7 @@ mod tests {
     fn test_scenario_from_paper_64k() {
         let ctx = btreemap! {
             "single".to_owned() =>
-                DeltaQ::cdf(CDF::from_steps(
+                DeltaQ::cdf(CDF::new(
                     &[(0.024, 1.0 / 3.0), (0.143, 2.0 / 3.0), (0.531, 1.0)],
                 )
                 .unwrap()),
@@ -1046,7 +1130,7 @@ mod tests {
                     ),
                     1.0,
                 ),
-            "base".to_owned() => DeltaQ::cdf(CDF::new(&[0.0, 0.5, 1.0], 1.0).unwrap()),
+            "base".to_owned() => DeltaQ::cdf(CDF::new(&[(1.0, 0.5), (2.0,1.0)]).unwrap()),
         };
         let result = DeltaQ::name("recursive")
             .eval(&ctx.into(), &mut EphemeralContext::default())
@@ -1072,9 +1156,11 @@ mod tests {
 
     #[test]
     fn parse_outcome() {
-        let expected = Outcome::new(CDF::from_steps(&[(1.0, 0.1), (2.0, 0.3)]).unwrap()).with_load(
-            "metric".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
+        let expected = Outcome::new_with_load(
+            CDF::new(&[(1.0, 0.1), (2.0, 0.3)]).unwrap(),
+            btreemap! {
+                "metric".into() => StepFunction::new(&[(0.0, 12.0), (1.5, 0.0)]).unwrap(),
+            },
         );
         assert_eq!(
             DeltaQExpr::Outcome(expected),
@@ -1145,7 +1231,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             res.cdf,
-            CDF::from_steps(&[
+            CDF::new(&[
                 (0.2, 0.046360295),
                 (0.3, 0.20068718),
                 (0.4, 0.30865377),
@@ -1223,22 +1309,30 @@ mod tests {
 
     #[test]
     fn test_load_update() {
-        let outcome = Outcome::new(CDF::from_steps(&[(1.5, 0.1)]).unwrap()).with_load(
-            "net".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
+        let outcome = Outcome::new_with_load(
+            CDF::new(&[(1.5, 0.1)]).unwrap(),
+            btreemap! {
+                "net".into() => StepFunction::new(&[(0.0, 12.0), (1.0, 0.0)]).unwrap(),
+            },
         );
         let dq = DeltaQ::from(DeltaQExpr::Seq(
             Arc::new(DeltaQExpr::Outcome(outcome.clone())),
-            LoadUpdate::new(2.0),
+            LoadUpdate::new(0.5),
             Arc::new(DeltaQExpr::Outcome(outcome)),
         ));
-        assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×2 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
+        assert_eq!(dq.to_string(), "CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)] ->-×0.5 CDF[(1.5, 0.1)] WITH net[(0, 12), (1, 0)]");
         let ctx = PersistentContext::default();
         let mut ephemeral = EphemeralContext::default();
         let res = dq.eval(&ctx, &mut ephemeral).unwrap();
-        let expected = Outcome::new(CDF::from_steps(&[(3.0, 0.010000001)]).unwrap()).with_load(
+        let expected = Outcome::new(CDF::new(&[(3.0, 0.010000001)]).unwrap()).with_load(
             "net".into(),
-            StepFunction::new(&[(0.0, 12.0), (1.0, 0.0), (1.5, 2.4), (2.5, 0.0)]).unwrap(),
+            StepFunction::try_from(&[
+                (0.0, CDF::from_step_at(12.0)),
+                (1.0, CDF::from_step_at(0.0)),
+                (1.5, CDF::new(&[(0.0, 0.05), (12.0, 0.1)]).unwrap()),
+                (2.5, CDF::new(&[(0.0, 0.1)]).unwrap()),
+            ])
+            .unwrap(),
         );
         assert_eq!(res, expected);
     }
@@ -1266,8 +1360,8 @@ mod tests {
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             c := CDF[(3, 0.6), (4, 1)] WITH common[(2.4, 100), (2.5, 0)] WITH c[(0,1), (3,0)]
 
-            e1 := a ->-×3 b 1<>2 a ->-×3 c
-            e2 := a ->-×3 (b 1<>2 c)
+            e1 := a ->-×0.3 b 1<>2 a ->-×0.3 c
+            e2 := a ->-×0.3 (b 1<>2 c)
             ").unwrap();
         let e1 = DeltaQ::name("e1")
             .eval(&ctx, &mut EphemeralContext::default())
@@ -1284,10 +1378,10 @@ mod tests {
             a := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
             b := CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             
-            e1 := a ->-×2 a ->-×3 b
+            e1 := a ->-×0.8 a ->-×0.7 b
             e2 := CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
-                ->-×2 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
-                ->-×3 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
+                ->-×0.8 CDF[(1, 0.4), (2, 1)] WITH common[(0.1, 3), (0.8, 0)] WITH a[(0,1), (1,0)] WITH ab[(0, 12), (1,0)]
+                ->-×0.7 CDF[(2, 0.5), (3, 1)] WITH common[(0.2, 0.1), (1.2, 0.2), (1.5, 0)] WITH b[(0,1), (2,0)] WITH ab[(0, 7), (2,0)]
             ").unwrap();
         let e1 = DeltaQ::name("e1")
             .eval(&ctx, &mut EphemeralContext::default())
@@ -1298,36 +1392,36 @@ mod tests {
         assert!(e1.similar(&e2), "{e1}\ndoes not match\n{e2}");
         assert_eq!(e1.to_string(), "\
             CDF[(4, 0.08), (5, 0.4), (6, 0.82), (7, 1)] \
-            WITH a[(0, 1), (1, 0.8), (2, 1.2), (3, 0)] \
-            WITH ab[(0, 12), (1, 9.6), (2, 21.12), (3, 26.88), (4, 35.28), (5, 15.12), (6, 0)] \
-            WITH b[(2, 0.96), (3, 3.84), (4, 5.04), (5, 2.16), (6, 0)] \
-            WITH common[(0.1, 3), (0.8, 0), (1.1, 2.4), (1.8, 0), (2.1, 3.6), (2.2, 3.696), (2.8, 0.096), (3.2, 0.48), (3.5, 0.288), (4.2, 0.792), (4.5, 0.216), (5.2, 0.432), (5.5, 0)]");
+            WITH a[(0, 1), (1, CDF[(0, 0.68), (1, 1)]), (2, CDF[(0, 0.52), (1, 1)]), (3, 0)] \
+            WITH ab[(0, 12), (1, CDF[(0, 0.68), (12, 1)]), (2, CDF[(0, 0.4304), (7, 0.52), (12, 1)]), (3, CDF[(0, 0.6416), (7, 1)]), (4, CDF[(0, 0.5296), (7, 1)]), (5, CDF[(0, 0.7984), (7, 1)]), (6, 0)] \
+            WITH b[(2, CDF[(0, 0.9104), (1, 1)]), (3, CDF[(0, 0.6416), (1, 1)]), (4, CDF[(0, 0.5296), (1, 1)]), (5, CDF[(0, 0.7984), (1, 1)]), (6, 0)] \
+            WITH common[(0.1, 3), (0.8, 0), (1.1, CDF[(0, 0.68), (3, 1)]), (1.8, 0), (2.1, CDF[(0, 0.52), (3, 1)]), (2.2, CDF[(0, 0.4304), (0.1, 0.52), (3, 1)]), \
+            (2.8, CDF[(0, 0.9104), (0.1, 1)]), (3.2, CDF[(0, 0.6416), (0.1, 0.9104), (0.2, 1)]), (3.5, CDF[(0, 0.7312), (0.1, 1)]), \
+            (4.2, CDF[(0, 0.5296), (0.1, 0.7312), (0.2, 1)]), (4.5, CDF[(0, 0.7984), (0.1, 1)]), (5.2, CDF[(0, 0.7984), (0.2, 1)]), (5.5, 0)]");
     }
 
     #[test]
     fn test_gossip() {
-        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0)
+        let ctx: PersistentContext = "diffuse := gossip(hop, CDF[(0, 1)], 3000, 15, 0.1, [])
             hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
             .parse()
             .unwrap();
         let diffuse = ctx.eval("diffuse").unwrap();
-        assert_eq!(diffuse.to_string(), "\
-            CDF[(0, 0.00033), (1, 0.00067), (2, 0.00133), (3, 0.00266), (4, 0.00532), (5, 0.01062), (6, 0.02112), (7, 0.04147), (8, 0.0803), (9, 0.15133), (10, 0.27057), \
-                (11, 0.44361), (12, 0.64306), (13, 0.81241), (14, 0.91678), (15, 0.96674), (16, 0.98736), (17, 0.99529), (18, 0.99826), (19, 0.99936), (20, 1)] \
-            WITH net[(0, 0.99967), (1, 0.99933), (2, 0.99867), (3, 0.99734), (4, 0.99468), (5, 0.98938), (6, 0.97888), (7, 0.95853), (8, 0.9197), (9, 0.84867), (10, 0.72943), \
-                (11, 0.55639), (12, 0.35694), (13, 0.18759), (14, 0.08322), (15, 0.03326), (16, 0.01264), (17, 0.00471), (18, 0.00174), (19, 0.00064), (20, 0)]");
+        assert_eq!(diffuse.to_string(), "CDF[(1, 0.00033), (2, 0.00533), (3, 0.07074), (4, 1)] \
+            WITH net[(0, CDF[(0, 0.99967), (1, 1)]), (1, CDF[(0, 0.995), (1, 1)]), (2, CDF[(0, 0.9346), (1, 1)]), (3, CDF[(0, 0.97355), (1, 1)]), (4, 0)]");
 
-        let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 1, 0.99)
-                hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
-            .parse()
-            .unwrap();
-        let diffuse = ctx.eval("diffuse").unwrap();
-        assert_eq!(diffuse.cdf.iter().count(), 1000);
-        assert!(
-            diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
-            "{}",
-            diffuse.cdf.steps().integrate(0.0, 1476.0)
-        );
-        assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
+        // this test made sense when the gossip impl was broken; need to figure out whether to keep it
+        // let ctx: PersistentContext = "diffuse := gossip(hop, 3000, 15, 0.95)
+        //         hop := CDF[(1, 1)] WITH net[(0, 1), (1, 0)]"
+        //     .parse()
+        //     .unwrap();
+        // let diffuse = ctx.eval("diffuse").unwrap();
+        // assert_eq!(diffuse.cdf.iter().count(), 1000);
+        // assert!(
+        //     diffuse.cdf.steps().integrate(0.0, 1476.0) > 737.0,
+        //     "{}",
+        //     diffuse.cdf.steps().integrate(0.0, 1476.0)
+        // );
+        // assert!(diffuse.cdf.steps().at(1200.0) > 0.95);
     }
 }

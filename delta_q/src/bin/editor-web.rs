@@ -7,7 +7,7 @@ macro_rules! cloned {
 
 use delta_q::{
     CalcCdf, DeltaQComponent, DeltaQContext, DeltaQExpr, EphemeralContext, EvalCtxAction,
-    PersistentContext, StepFunction,
+    PersistentContext, StepFunction, CDF,
 };
 use gloo_utils::window;
 use js_sys::Reflect;
@@ -83,8 +83,9 @@ fn app_main() -> HtmlResult {
         (selected.clone(), epoch.clone()),
         cloned!(agent_status, ctx; move |deps| async move {
             if let Some(name) = deps.0.as_deref() {
-                let cdf = match agent.run((name.to_string(), (*ctx).clone())).await {
-                    Ok(cdf) => cdf,
+                web_sys::console::log_1(&JsValue::from_str(&format!("evaluating {name}")));
+                let outcome = match agent.run((name.to_string(), (*ctx).clone())).await {
+                    Ok(outcome) => outcome,
                     Err(e) => {
                         let init = MessageEventInit::new();
                         init.set_data(&wasm_bindgen::JsValue::null());
@@ -93,10 +94,21 @@ fn app_main() -> HtmlResult {
                         return;
                     }
                 };
-                let data = mk_graph_obj(name, cdf.cdf.steps());
-                Reflect::set(&data, &"loads".into(), &cdf.load.iter().map(|(metric, steps)| mk_graph_obj(metric, steps)).collect::<js_sys::Array>()).unwrap();
+                web_sys::console::log_1(&JsValue::from_str(&format!("evaluated {name}")));
+                let data = mk_graph_obj(name, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
+                Reflect::set(&data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, &steps.simplify())).collect::<js_sys::Array>()).unwrap();
+                if let Some(constraint) = ctx.constraint(name) {
+                    web_sys::console::log_1(&JsValue::from_str(&format!("evaluating constraint {constraint}")));
+                    if let Ok(outcome) = agent.run((constraint.to_string(), (*ctx).clone())).await {
+                        web_sys::console::log_1(&JsValue::from_str(&format!("evaluated constraint {constraint}")));
+                        let constraint_data = mk_graph_obj(constraint, &outcome.cdf.steps().map(|x| CDF::from_step_at(*x)));
+                        Reflect::set(&constraint_data, &"loads".into(), &outcome.load.iter().map(|(metric, steps)| mk_graph_obj(metric, &steps.simplify())).collect::<js_sys::Array>()).unwrap();
+                        Reflect::set(&data, &"constraint".into(), &constraint_data).unwrap();
+                    }
+                }
                 let init = MessageEventInit::new();
                 init.set_data(&data);
+                web_sys::console::log_1(&JsValue::from_str(&format!("dispatching {name}")));
                 let _ = window().dispatch_event(&*MessageEvent::new_with_event_init_dict("rootjs", &init).unwrap());
                 agent_status.set("OK".to_owned());
             }
@@ -229,7 +241,7 @@ fn app_main() -> HtmlResult {
     })
 }
 
-fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
+fn mk_graph_obj(name: &str, steps: &StepFunction<CDF>) -> js_sys::Object {
     let data = js_sys::Object::new();
     Reflect::set(
         &data,
@@ -245,11 +257,19 @@ fn mk_graph_obj(name: &str, steps: &StepFunction) -> js_sys::Object {
         &"values".into(),
         &steps
             .graph_iter()
-            .map(|x| JsValue::from(x.1))
+            .map(|x| {
+                x.1.graph_iter()
+                    .map(|(x, y)| {
+                        [x, y]
+                            .iter()
+                            .map(|z| JsValue::from(*z))
+                            .collect::<js_sys::Array>()
+                    })
+                    .collect::<js_sys::Array>()
+            })
             .collect::<js_sys::Array>(),
     )
     .unwrap();
-    Reflect::set(&data, &"max".into(), &(steps.max_x() * 1.2).max(0.1).into()).unwrap();
     Reflect::set(&data, &"name".into(), &name.into()).unwrap();
     data
 }
@@ -371,7 +391,7 @@ fn app() -> Html {
             <h1>{ "DeltaQ Editor" }</h1>
             <div style="display: flex; flex-direction: row; height: 40%;">
                 <div id="output" style="width: 50%; height: 100%; border: 1px solid black;" />
-                <div id="loads" style="width: 50%; height: 100%; border: 1px solid black;" />
+                <div id="loads" style="width: 50%; height: 100%; border: 1px solid black; overflow-y: scroll;" />
             </div>
             <Suspense fallback={waiting}>
                 <OneshotProvider<CalcCdf> path="worker.js">

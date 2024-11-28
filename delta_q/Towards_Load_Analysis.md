@@ -94,3 +94,75 @@ When the expression containing this outcome (potentially multiple times) has bee
 Since we designed it with a queue depth of ten, exceeding ten parallel usages constitutes a resource constraint violation — we can then compare how often this occurs with the probability we assigned to the corresponding failure.
 If the real system doesn’t actually fail in this case but just gets slower, we would respond to a violation by increasing the assumed queue depth until no violation occurs anymore.
 It is at this point that ΔQ tells us _via the timeliness constraints_ whether the system is feasible under realistic load constraints.
+
+## How to model gossip in this probabilistic setting
+
+Gossip starts at some point in the network graph, where new information has just been created.
+The process can be described as proceeding in steps, although you need to keep in mind that these steps are not strictly serialised, causality only orders things on a local scale.
+At each step, a node that already has the information sends messages towards `B` other nodes, presumed to be its peers.
+Each of these may either already know the information (the probability of which approaches 1 at the end of the gossiping), or request the data from the sender, leading to the transfer of the data and eventually the continuation with the next gossip step.
+
+This implies that all nodes will at the conclusion of the gossip have received the data exactly once, but not all nodes will have sent the data–the sending part happens `B` times in correlated fashion at the same location while the reception happens uncorrelated at a different location.
+But in the end, all nodes are the same in a peer-to-peer network, so in a given gossip process a given node may appear at any one step and it may or may not have sent the data.
+
+This leads me to the conclusion that sending and receiving need to be tracked separately; receiving will also use other resources like CPU cycles to validate the received data.
+In the following we assume that the message to notify peers of the availability of new information is essentially free — its latency can be incorporated in the following outcome and its resource usage can be neglected.
+This implies that information propagates only forward through the network graph, not towards regions that already have the information.
+The key observations for one gossip step are the following:
+
+0. data are available at the source
+1. data have been sent at the source
+2. data have reached the destination
+3. data have been properly received at the destination
+
+The outcome `O₁` takes us from step 0 to 1 and contains a network delay (one RTT) and the activity of sending the data bytes over the network interface `B` times — this will incur some measurable queueing delay for large messages (especially on slow local links) and use resources accordingly.
+Thereafter, outcome `O₂` describes the network delay due to the technical distance between source and destination (lower-bounded by what speed of light permits, but often much larger than that); network usage may be tracked but is typically irrelevant for the Cardano use case because the overall bandwidth used is tiny compared to today’s network speeds.
+Finally, outcome `O₃` expresses all that is needed from taking the data bytes out of the TCP socket receive buffer at the destination and perform any action (typically using CPU and memory) that is required to make the information properly available for the next gossip step; note how bounded resources may also lead to queueing delays within this outcome.
+
+Let’s try this out on a small network of nine nodes with `B = 3`.
+The initial state is that the first node already has the information, so the process is already 1⁄9 complete.
+
+    gossip_1 := ⊤ 1<>8 step_1
+    step_1   := O₁ ->- O₂ ->- O₃ ->- gossip_2
+
+Computing this yields with 8⁄9 probability the effort of a node performing the initial sending activities of the gossip, and three nodes performing reception.
+Since we want to compute the resource usage of a stochastically chosen node, we need to scale the probability densities of `O₁` by 1⁄8, meaning that with a probability of 1⁄9 any node may perform the tripled effort of sending at this point.
+For `O₃` the situation is different, here we need to express that three out of all nine nodes perform the receiving activities, so we need to scale the probability densities by 3⁄8.
+
+    gossip_2 := ⊤ 3<>5 step_2
+    step_2   := O₁ ->- O₂ ->- O₃ ->- gossip_3
+
+In the second step we’re already done in three of the remaining eight cases.
+`step_2` is performed by three nodes in parallel while the probability mass has been reduced to 5⁄9 by the choices so far.
+Due to our assumptions of neglecting the cost of informing target nodes of the availability of new information, we need to carefully consider how often the sending outcome `O₁` will occur.
+Three senders would normally send the data nine times in total, but there are only five outstanding nodes to reach.
+Therefore we take the maximum of three parallel activities and give it a probability of 5⁄9 (the correct way would assign probabilities to zero, one, two, and three and split the probability mass accordingly using the choice operator; we'll have to see whether the added complexity is really required).
+Consequently, `O₃` is performed five times at different locations, thus its probability densities are already correctly scaled.
+
+    gossip_3 := ⊤
+
+And with that we’re done.
+
+> This example shows that the load factor introduced in the beginning should not be used to multiply the amount of load, it should be used to scale the resource usage probability densities.
+> We’ll use it like that in the following.
+
+Another way to structure the ΔQ expression above focuses on choice as expressing the probability of “which node am I?”
+This leads to the rough structure
+
+    gossip := O₁
+      1<>8 <delay> ->- O₂ ->- O₃ ->- (O₁ 5<>4 ⊤)
+      4<>5 <delay> ->- O₂ ->- O₃
+
+Here, the `<delay>` expresses that we need to wait for the (gradual) completion of the outcome on the other side of the branch — this choice is performed “second branch after first” in a sense, since the nodes in the lower branch will get the information from the nodes in the upper branch.
+This is of course not a proper ΔQ expression yet, we need to write it down in a different fashion, focusing on timeliness now, but taking the probabilities from the thought experiment above.
+
+    gossip := (⊤ ->-×1÷9 O₁) ->-
+      (⊤ 1<>8 ⊤ ->-×3÷8 O₂ ->- O₃ ->-×5÷9 O₁ ->-
+        (⊤ 4<>5 O₁ ->- O₂))
+
+(The use of `÷` is only used for notation of rational numbers.)
+The load factor annotations would not be necessary if it were possible to use probabilistic choice to split only the weights for resource usage while keeping the timeliness CDF unchanged.
+Which syntax to use is a matter of taste (or later bike shedding), since the achieved result is the same.
+
+So, with this understanding the meaning of `O₁ ->-×K O₂` is that `O₂` can only be done after `O₁` has finished, but the probability that `O₂` must be performed on a given node is `K`.
+The load of the resulting outcome is thus computed by applying a choice operator _but only to the CUDFs_, with the original load receiving weight `K` and “load zero” receiving weight `1 - K`.
