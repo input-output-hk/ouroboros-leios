@@ -396,11 +396,11 @@ impl Node {
         // Do not remove TXs in these blocks from the leios mempool.
         // Wait until we learn more about how praos and leios interact.
         for peer in &self.peers {
-            if !self
+            if self
                 .praos
                 .peer_heads
                 .get(peer)
-                .is_some_and(|&s| s >= block.slot)
+                .is_none_or(|&s| s < block.slot)
             {
                 self.send_to(*peer, SimulationMessage::RollForward(block.slot))?;
                 self.praos.peer_heads.insert(*peer, block.slot);
