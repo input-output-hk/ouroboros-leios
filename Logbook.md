@@ -1,5 +1,36 @@
 # Leios logbook
 
+## 2024-12-03
+
+### Agda version of Leios cost model
+
+The JavaScript cost model for Leios has been migrated to Agda in order to enforce consistency of units. The Agda module [CostModel](cost-dashboard/CostModel.agda) uses dependent types to impose dimensional analysis on arithmetic operations. Two minor units-of-measure errors in the JavaScript were identified and fixed during this process of translation.
+
+Compare the Agda result for base scenario to the [interactive JavaScript cost model](https://leios.cardano-scaling.org/cost-estimator/) by executing the following:
+
+```console
+$ agda --compile Main.agda && ./Main
+
+Resources
+  Compute: 6.0 vCPU/month
+  Disk: 521.9347105407714 GB/month
+  IOPS: 1657.5 IO/s/month
+  Network egress: 27468.026039657594 GB/month
+  Network interface: 0.39415836334228516 Gb/s/month
+Costs
+  Compute: 120.0 USD/month
+  Disk (amortized): 5073.205386456298 USD/month
+  IOPS: 82.875 USD/month
+  Network egress: 2746.8026039657593 USD/month
+  Total: 8022.8829904220565 USD/month
+Metrics
+  Cost per transaction: 0.14438981959329794 USD/tx
+  Cost per transaction: 0.1925197594577306 ADA/tx
+  Retained fees: 14067.958706189473 USD/month
+  Retained fees − cost: 6045.075715767416 USD/month
+  Retained fees ÷ cost: 175.347923221418 %
+```
+
 ## 2024-11-28
 
 ### ΔQSD Update

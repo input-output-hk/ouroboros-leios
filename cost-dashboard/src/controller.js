@@ -37,11 +37,11 @@ function calculateResources(rate /*  item/slot  */, elSize, elIo, elBuild, elVer
   const bps = size * rate * slot * kilobyte  //  B/s
 
   return {
-    throughput   : bps                                           //  B/s
-  , disk         : persistent ? bps : 0                          //  B/s
-  , producerVcpu : Math.max(build, verify) * rate * millisecond  //  vCPU
-  , relayVcpu    : verify * rate * slot * millisecond            //  vCPU
-  , io           : io * rate * slot                              //  IO/s
+    throughput   : bps                                                  //  B/s
+  , disk         : persistent ? bps : 0                                 //  B/s
+  , producerVcpu : Math.max(build, verify) * rate * slot * millisecond  //  vCPU
+  , relayVcpu    : verify * rate * slot * millisecond                   //  vCPU
+  , io           : io * rate * slot                                     //  IO/s
   }
 
 }
@@ -75,7 +75,7 @@ function certResources() {
 function rbResources() {
   const rate = getFloat(uiRbRate)  //  RB/slot
   const uiRbIo = uiCertIo
-  return calculateResources(rate, uiCertSize, uiRbIo, uiRbBuild, uiRbVerify, true)
+  return calculateResources(rate, uiRbSize, uiRbIo, uiRbBuild, uiRbVerify, true)
 }
 
 function txResources() {
