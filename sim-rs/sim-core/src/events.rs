@@ -82,10 +82,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
-    Vote {
+    VotesGenerated {
         slot: u64,
         producer: NodeId,
-        eb: EndorserBlockId,
+        ebs: Vec<EndorserBlockId>,
     },
     NoVote {
         slot: u64,
@@ -217,8 +217,12 @@ impl EventTracker {
         });
     }
 
-    pub fn track_vote(&self, slot: u64, producer: NodeId, eb: EndorserBlockId) {
-        self.send(Event::Vote { slot, producer, eb });
+    pub fn track_votes_generated(&self, votes: &VoteBundle) {
+        self.send(Event::VotesGenerated {
+            slot: votes.slot,
+            producer: votes.producer,
+            ebs: votes.ebs.clone(),
+        });
     }
 
     pub fn track_no_vote(

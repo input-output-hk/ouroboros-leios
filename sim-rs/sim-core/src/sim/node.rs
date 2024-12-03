@@ -783,8 +783,8 @@ impl Node {
     }
 
     fn send_votes(&mut self, votes: VoteBundle) -> Result<()> {
+        self.tracker.track_votes_generated(&votes);
         for eb in &votes.ebs {
-            self.tracker.track_vote(votes.slot, votes.producer, *eb);
             *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
         }
         let votes = Arc::new(votes);

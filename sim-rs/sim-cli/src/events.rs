@@ -256,11 +256,17 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::Vote { eb, producer, slot } => {
-                    total_votes += 1;
-                    *votes_per_bundle.entry((slot, producer)).or_default() += 1.0;
-                    *eb_votes.entry(eb).or_default() += 1.0;
-                    *votes_per_pool.entry(producer).or_default() += 1.0;
+                Event::VotesGenerated {
+                    slot,
+                    producer,
+                    ebs,
+                } => {
+                    for eb in ebs {
+                        total_votes += 1;
+                        *votes_per_bundle.entry((slot, producer)).or_default() += 1.0;
+                        *eb_votes.entry(eb).or_default() += 1.0;
+                        *votes_per_pool.entry(producer).or_default() += 1.0;
+                    }
                 }
                 Event::NoVote { .. } => {}
                 Event::VotesSent { .. } => {
