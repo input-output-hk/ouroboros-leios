@@ -1,6 +1,7 @@
 
 'use strict'
 
+import * as gen from "./gen"
 
 import * as d3  from "d3"
 
@@ -37,11 +38,11 @@ function calculateResources(rate /*  item/slot  */, elSize, elIo, elBuild, elVer
   const bps = size * rate * slot * kilobyte  //  B/s
 
   return {
-    throughput   : bps                                           //  B/s
-  , disk         : persistent ? bps : 0                          //  B/s
-  , producerVcpu : Math.max(build, verify) * rate * millisecond  //  vCPU
-  , relayVcpu    : verify * rate * slot * millisecond            //  vCPU
-  , io           : io * rate * slot                              //  IO/s
+    throughput   : bps                                                  //  B/s
+  , disk         : persistent ? bps : 0                                 //  B/s
+  , producerVcpu : Math.max(build, verify) * rate * slot * millisecond  //  vCPU
+  , relayVcpu    : verify * rate * slot * millisecond                   //  vCPU
+  , io           : io * rate * slot                                     //  IO/s
   }
 
 }
@@ -241,4 +242,6 @@ export async function initialize() {
   ].forEach(el => el.addEventListener("input", calculate))
 
   calculate()
+
+  console.log(gen.Test.x)
 }
