@@ -1,7 +1,6 @@
 
 'use strict'
 
-import * as gen from "./gen"
 
 import * as d3  from "d3"
 
@@ -242,6 +241,4 @@ export async function initialize() {
   ].forEach(el => el.addEventListener("input", calculate))
 
   calculate()
-
-  console.log(gen.Test.x)
 }
