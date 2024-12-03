@@ -76,7 +76,7 @@ function certResources() {
 function rbResources() {
   const rate = getFloat(uiRbRate)  //  RB/slot
   const uiRbIo = uiCertIo
-  return calculateResources(rate, uiCertSize, uiRbIo, uiRbBuild, uiRbVerify, true)
+  return calculateResources(rate, uiRbSize, uiRbIo, uiRbBuild, uiRbVerify, true)
 }
 
 function txResources() {
