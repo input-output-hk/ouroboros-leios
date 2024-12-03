@@ -11,7 +11,7 @@ use std::{
 pub enum StepFunctionError {
     InvalidFormat(&'static str, usize),
     InvalidDataRange(&'static str, f32),
-    NonMonotonicData,
+    NonMonotonicData(f32, f32),
     InvalidFraction(f32),
     ProbabilityOverflow(f32),
 }
@@ -21,7 +21,7 @@ impl fmt::Display for StepFunctionError {
         match self {
             Self::InvalidFormat(s, pos) => write!(f, "invalid format: {} at position {}", s, pos),
             Self::InvalidDataRange(axis, y) => write!(f, "invalid data range: {axis}={y}"),
-            Self::NonMonotonicData => write!(f, "non-monotonic data"),
+            Self::NonMonotonicData(x, y) => write!(f, "non-monotonic data: {x} -> {y}"),
             Self::InvalidFraction(y) => {
                 write!(f, "invalid fraction: {y} (must be between 0 and 1)")
             }
@@ -63,10 +63,12 @@ impl StepFunction {
                 return Err(StepFunctionError::InvalidDataRange("y", y));
             }
         }
-        if !points.windows(2).all(|w| w[0].0 < w[1].0) {
-            #[cfg(target_arch = "wasm32")]
-            web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
-            return Err(StepFunctionError::NonMonotonicData);
+        for (l, r) in points.iter().tuple_windows() {
+            if r.0 <= l.0 {
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
+                return Err(StepFunctionError::NonMonotonicData(l.0, r.0));
+            }
         }
         let data = if points.is_empty() {
             None
@@ -295,10 +297,12 @@ impl<T: StepValue> TryFrom<&[(f32, T)]> for StepFunction<T> {
                 return Err(StepFunctionError::InvalidDataRange("x", *x));
             }
         }
-        if !points.windows(2).all(|w| w[0].0 < w[1].0) {
-            #[cfg(target_arch = "wasm32")]
-            web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
-            return Err(StepFunctionError::NonMonotonicData);
+        for (l, r) in points.iter().tuple_windows() {
+            if r.0 <= l.0 {
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::error_2(&"non-monotonic".into(), &format!("{:?}", points).into());
+                return Err(StepFunctionError::NonMonotonicData(l.0, r.0));
+            }
         }
         let data = if points.is_empty() {
             None
@@ -398,7 +402,7 @@ impl FromStr for StepFunction {
                 return Err(StepFunctionError::InvalidDataRange("x", x));
             }
             if x <= x_prev {
-                return Err(StepFunctionError::NonMonotonicData);
+                return Err(StepFunctionError::NonMonotonicData(x_prev, x));
             }
             x_prev = x;
             let y = y.trim();

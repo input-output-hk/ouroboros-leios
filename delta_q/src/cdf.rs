@@ -5,7 +5,7 @@ use std::{fmt, str::FromStr, sync::OnceLock};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CDFError {
     InvalidDataRange(&'static str, f32),
-    NonMonotonicData,
+    NonMonotonicData(f32, f32),
     InvalidFraction(f32),
     InvalidFormat(&'static str, usize),
     ProbabilityOverflow(f32),
@@ -20,9 +20,9 @@ impl fmt::Display for CDFError {
                     "Data vector must contain values between 0 and 1, found {s}={y}"
                 )
             }
-            CDFError::NonMonotonicData => write!(
+            CDFError::NonMonotonicData(x, y) => write!(
                 f,
-                "Data vector must contain monotonically increasing values"
+                "Data vector must contain monotonically increasing values: {x} -> {y}"
             ),
             CDFError::InvalidFraction(y) => write!(f, "Fraction must be between 0 and 1: {y}"),
             CDFError::InvalidFormat(s, pos) => write!(f, "Invalid format: {s} at {pos}"),
@@ -38,7 +38,7 @@ impl From<StepFunctionError> for CDFError {
         match err {
             StepFunctionError::InvalidFormat(s, p) => CDFError::InvalidFormat(s, p),
             StepFunctionError::InvalidDataRange(s, y) => CDFError::InvalidDataRange(s, y),
-            StepFunctionError::NonMonotonicData => CDFError::NonMonotonicData,
+            StepFunctionError::NonMonotonicData(x, y) => CDFError::NonMonotonicData(x, y),
             StepFunctionError::InvalidFraction(y) => CDFError::InvalidFraction(y),
             StepFunctionError::ProbabilityOverflow(y) => CDFError::ProbabilityOverflow(y),
         }
@@ -101,14 +101,12 @@ impl CDF {
                 return Err(CDFError::InvalidDataRange("y", y));
             }
         }
-        if !steps
-            .iter()
-            .tuple_windows::<(_, _)>()
-            .all(|(a, b)| a.1 < b.1)
-        {
-            #[cfg(target_arch = "wasm32")]
-            web_sys::console::error_2(&"non-monotonic".into(), &format!("{}", steps).into());
-            return Err(CDFError::NonMonotonicData);
+        for (l, r) in steps.iter().tuple_windows() {
+            if r.1 <= l.1 {
+                #[cfg(target_arch = "wasm32")]
+                web_sys::console::error_2(&"non-monotonic".into(), &format!("{}", steps).into());
+                return Err(CDFError::NonMonotonicData(l.0, r.1));
+            }
         }
         Ok(Self { steps })
     }
@@ -285,7 +283,7 @@ mod tests {
         assert_eq!(cdf, Err(CDFError::InvalidDataRange("y", 1.1)));
 
         let cdf = CDF::new(&[(0.25, 0.25), (0.5, 0.5), (0.75, 0.75), (1.0, 0.5)]);
-        assert_eq!(cdf, Err(CDFError::NonMonotonicData));
+        assert_eq!(cdf, Err(CDFError::NonMonotonicData(0.75, 0.5)));
     }
 
     #[test]
@@ -417,10 +415,10 @@ mod tests {
 
         let invalid_cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.5, 0.25), (0.75, 0.75), (1, 1)";
         let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
-        assert_eq!(cdf, Err(CDFError::NonMonotonicData));
+        assert_eq!(cdf, Err(CDFError::NonMonotonicData(0.25, 0.25)));
 
         let invalid_cdf_str = "CDF[(0, 0.1), (0.25, 0.25), (0.25, 0.5), (0.75, 0.75), (1, 1)";
         let cdf: Result<CDF, CDFError> = invalid_cdf_str.parse();
-        assert_eq!(cdf, Err(CDFError::NonMonotonicData));
+        assert_eq!(cdf, Err(CDFError::NonMonotonicData(0.25, 0.25)));
     }
 }
