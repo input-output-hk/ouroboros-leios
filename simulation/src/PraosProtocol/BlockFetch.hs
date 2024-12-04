@@ -42,8 +42,9 @@ import Control.Concurrent.Class.MonadSTM (
 import Control.Concurrent.Class.MonadSTM.TBQueue
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
-import Control.Tracer (Tracer, traceWith)
+import Control.Tracer (Contravariant (contramap), Tracer, traceWith)
 import Data.Bifunctor (second)
+import Data.Foldable (forM_)
 import Data.Kind
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -603,7 +604,7 @@ initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState sub
 
 setupValidatorThreads ::
   (MonadSTM m, MonadDelay m) =>
-  Tracer m (PraosNodeEvent body) ->
+  Tracer m (PraosNodeEvent BlockBody) ->
   PraosConfig BlockBody ->
   BlockFetchControllerState BlockBody m ->
   -- | bound on queue length.
@@ -611,28 +612,54 @@ setupValidatorThreads ::
   m ([m ()], Block BlockBody -> m () -> m ())
 setupValidatorThreads tracer cfg st n = do
   queue <- newTBQueueIO n
-  waitingVar <- newTVarIO Map.empty
-  let validate (block, completion) = do
-        let !delay = cfg.blockValidationDelay block
-        traceWith tracer (PraosNodeEventCPU (CPUTask delay))
+  (waitingVar, processWaiting) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
+  let doTask (delay, m) = do
+        traceWith tracer . PraosNodeEventCPU . CPUTask $ delay
         threadDelaySI delay
-        completion
-  let fetch = forever $ do
-        req@(block, _) <- atomically $ readTBQueue queue
+        m
+
+  -- if we have the previous block, we process the task sequentially to provide back pressure on the queue.
+  let waitForPrev block task = case blockPrevHash block of
+        GenesisHash -> doTask task
+        BlockHash prev -> do
+          havePrev <- Map.member prev <$> readTVarIO st.blocksVar
+          -- Note: for pure praos this also means we have the ledger state.
+          if havePrev
+            then doTask task
+            else atomically $ modifyTVar' waitingVar (Map.insertWith (++) prev [task])
+      fetch = forever $ do
+        (block, completion) <- atomically $ readTBQueue queue
         assert (blockInvariant block) $ do
-          case blockPrevHash block of
-            GenesisHash -> validate req
-            BlockHash prev -> do
-              havePrev <- Map.member prev <$> readTVarIO st.blocksVar
-              -- Note: for pure praos this also means we have the ledger state.
-              if havePrev
-                then validate req
-                else atomically $ modifyTVar' waitingVar (Map.insertWith (++) prev [req])
+          waitForPrev block $
+            let !delay = cfg.blockValidationDelay block
+             in (delay, completion)
       add block completion = atomically $ writeTBQueue queue (block, completion)
-      processWaiting = forever $ join $ atomically $ do
-        blocks <- readTVar st.blocksVar
-        waiting <- readTVar waitingVar
-        let toValidate = Map.intersection waiting blocks
-        when (Map.null toValidate) retry
-        return $ mapM_ validate $ concat $ Map.elems $ toValidate
   return ([fetch, processWaiting], add)
+
+setupProcessWaitingThread ::
+  forall body m b.
+  (MonadSTM m, MonadDelay m, IsBody body) =>
+  Tracer m CPUTask ->
+  -- | how many waiting to process in parallel
+  Maybe Int ->
+  TVar m (Blocks body) ->
+  m (TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]), m ())
+setupProcessWaitingThread tracer npar blocksVar = do
+  waitingVar <- newTVarIO Map.empty
+  return $ (waitingVar, processWaiting waitingVar)
+ where
+  parallelDelay xs = do
+    let !d = maximum $ map fst xs
+    forM_ xs $ traceWith tracer . CPUTask . fst
+    threadDelaySI d
+    mapM_ snd xs
+  processWaiting waitingVar = forever $ join $ atomically $ do
+    waiting <- readTVar waitingVar
+    when (Map.null waiting) retry
+    blocks <- readTVar blocksVar
+    let toValidate = Map.intersection waiting blocks
+    when (Map.null toValidate) retry
+    writeTVar waitingVar $! waiting Map.\\ toValidate
+    let chunks Nothing xs = [xs]
+        chunks (Just m) xs = map (take m) . takeWhile (not . null) . iterate (drop m) $ xs
+    return $ mapM_ parallelDelay $ chunks npar $ concat $ Map.elems $ toValidate

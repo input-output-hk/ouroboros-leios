@@ -1,4 +1,6 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
@@ -8,7 +10,6 @@
 module LeiosProtocol.Short.Node where
 
 import ChanMux
-import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad (forever, guard, join, when)
@@ -33,7 +34,7 @@ import qualified LeiosProtocol.Short.Generate as Generate
 import ModelTCP
 import Numeric.Natural (Natural)
 import Ouroboros.Network.Mock.Chain (headHash)
-import PraosProtocol.BlockFetch (addProducedBlock)
+import PraosProtocol.BlockFetch
 import PraosProtocol.Common
 import PraosProtocol.Common.Chain (headAnchor)
 import qualified PraosProtocol.PraosNode as PraosNode
@@ -94,6 +95,10 @@ data LeiosNodeState m = LeiosNodeState
   , relayVoteState :: RelayVoteState m
   , ibDeliveryTimesVar :: TVar m (Map InputBlockId UTCTime)
   , validationQueue :: TBQueue m (ValidationRequest m)
+  , waitingForRBVar :: TVar m (Map ConcreteHeaderHash [(DiffTime, m ())])
+  -- ^ waiting for RB block itself to be validated.
+  , waitingForLedgerStateVar :: TVar m (Map ConcreteHeaderHash [(DiffTime, m ())])
+  -- ^ waiting for ledger state of RB block to be validated.
   }
 
 data LeiosNodeConfig = LeiosNodeConfig
@@ -152,8 +157,6 @@ leiosNode tracer cfg followers peers = do
         <$> (mapM (newMuxChan . protocolPraos) followers)
         <*> (mapM (newMuxChan . protocolPraos) peers)
   ibDeliveryTimesVar <- newTVarIO Map.empty
-  -- TODO: add logging of parallel tasks
-  let threadDelayParallel = maximum >>> \d -> when (d >= 0) $ threadDelaySI d
   let relayIBConfig =
         RelayConsumerConfig
           { relay = RelayConfig{maxWindowSize = 100}
@@ -207,10 +210,18 @@ leiosNode tracer cfg followers peers = do
   (relayIBState, ibThreads) <- setupRelay relayIBConfig (map protocolIB followers) (map protocolIB peers)
   (relayEBState, ebThreads) <- setupRelay relayEBConfig (map protocolEB followers) (map protocolEB peers)
   (relayVoteState, voteThreads) <- setupRelay relayVoteConfig (map protocolVote followers) (map protocolVote peers)
+
+  (waitingForRBVar, processWaitingForRB) <-
+    setupProcessWaitingThread @RankingBlockBody
+      (contramap LeiosNodeEventCPU tracer)
+      Nothing -- unbounded parallelism
+      praosState.blockFetchControllerState.blocksVar
+
+  (waitingForLedgerStateVar, processWaitingForLedgerState) <- (,) <$> newTVarIO Map.empty <*> error "TBD" -- TODO
   let leiosState = LeiosNodeState{..}
   let genThreads = [generate leiosState]
   let processingThreads = [processing leiosState]
-  let pruningThreads = [] -- TODO: need EB/IBs to be around long enough to validate RBs
+  let pruningThreads = [] -- TODO: need EB/IBs to be around long enough to validate further IBs.
   return $
     concat
       [ genThreads
@@ -220,8 +231,13 @@ leiosNode tracer cfg followers peers = do
       , ebThreads
       , voteThreads
       , coerce praosThreads
+      , [processWaitingForRB, processWaitingForLedgerState]
       ]
  where
+  threadDelayParallel ds = do
+    forM_ ds (traceWith tracer . LeiosNodeEventCPU . CPUTask)
+    let d = maximum ds
+    when (d >= 0) $ threadDelaySI d
   generate :: LeiosNodeState m -> m ()
   generate st = do
     schedule <- mkSchedule cfg
@@ -231,7 +247,6 @@ leiosNode tracer cfg followers peers = do
       submitOne :: SomeAction -> m ()
       submitOne x = atomically $ case x of
         SomeAction Generate.Base rb ->
-          -- TODO: certificate construction delay?
           addProducedBlock st.praosState.blockFetchControllerState rb
         SomeAction (Generate.Propose _) ib ->
           modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
@@ -242,24 +257,52 @@ leiosNode tracer cfg followers peers = do
     let LeiosNodeConfig{..} = cfg
     blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
 
-  -- TODO: validation delays and tracing events.
-  -- TODO: LeiosNodeEventCPU to keep track of cpu use.
+  -- TODO: tracing events
   processing :: LeiosNodeState m -> m ()
   processing leiosState = forever $ do
+    -- NOTE: IOSim deschedules the thread after an `atomically`, we
+    -- might get more parallelism by reading the whole buffer at once.
     req <- atomically $ readTBQueue leiosState.validationQueue
     case req of
-      ValidateRB _rb completion -> do
-        -- NOTE: in actual impl. have to wait for previous RB, but
-        -- not for its ledger state unless rb.payload > 0.
-        completion
-      ValidateIBS ibs completion -> atomically $ do
-        -- NOTE: in actual impl. have to wait for ledger state of referenced RBs.
-        completion ibs
+      ValidateRB rb completion -> do
+        let !delay = cfg.leios.praos.blockValidationDelay rb
+        case blockPrevHash rb of
+          GenesisHash -> do
+            traceWith tracer . LeiosNodeEventCPU . CPUTask $ delay
+            threadDelaySI delay
+            completion
+          BlockHash prev -> atomically $ do
+            let var =
+                  if rb.blockBody.payload > 0
+                    then leiosState.waitingForLedgerStateVar
+                    else leiosState.waitingForRBVar
+            modifyTVar' var $ Map.insertWith (++) prev [(delay, completion)]
+      ValidateIBS ibs completion -> do
+        -- IBs with an RB reference have to wait for ledger state of that RB.
+        let valIB x =
+              let
+                !delay = cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
+               in
+                (delay, atomically (completion [x]))
+        let waitingLedgerState =
+              Map.fromListWith
+                (++)
+                [ (rbHash, [valIB ib])
+                | ib <- ibs
+                , BlockHash rbHash <- [(fst ib).rankingBlock]
+                ]
+
+        atomically $ modifyTVar' leiosState.waitingForLedgerStateVar (`Map.union` waitingLedgerState)
+
+        let (delays, ms) = unzip [valIB ib | ib@(h, _) <- ibs, GenesisHash <- [h.rankingBlock]]
+        threadDelayParallel delays
+        sequence_ ms
       ValidateEBS ebs completion -> do
-        -- TODO: only delay for crypto checks, contents used for voting.
+        -- NOTE: block references are only inspected during voting.
+        threadDelayParallel $ map cfg.leios.delays.endorseBlockValidation ebs
         atomically $ completion ebs
       ValidateVotes vs completion -> do
-        -- TODO: only delay for crypto checks
+        threadDelayParallel $ map cfg.leios.delays.voteMsgValidation vs
         atomically $ completion vs
 
 mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> BuffersView m
@@ -271,6 +314,7 @@ mkBuffersView cfg st = BuffersView{..}
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
     let votesForEB = Map.fromListWith Set.union [(v.endorseBlock, Set.singleton v.id) | v <- bufferVotes]
+    -- TODO: certificate construction delay?
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
           guard (cfg.leios.votesForCertificate <= Set.size votes)

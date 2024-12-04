@@ -512,8 +512,9 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   -- ^ sends blocks to be validated/added to the buffer. Allowed to be
   -- blocking, but relayConsumer does not assume the blocks made it
   -- into the relayBuffer. Also takes a delivery time (relevant for
-  -- e.g. IB endorsement) and a callback that expects the subset of
-  -- validated blocks.
+  -- e.g. IB endorsement) and a callback that expects a subset of
+  -- validated blocks. Callback might be called more than once, with
+  -- different subsets.
   , submitPolicy :: !SubmitPolicy
   , maxHeadersToRequest :: !Word16
   , maxBodiesToRequest :: !Word16
@@ -816,6 +817,10 @@ relayConsumerPipelined config sst =
       unless (idsReceived `Set.isSubsetOf` idsRequested) $
         throw BodiesNotRequested
 
+      let notReceived = idsRequested `Set.difference` idsReceived
+      unless (Set.null notReceived) $ do
+        atomically $ modifyTVar' sst.inFlightVar (`Set.difference` notReceived)
+
       -- We can match up all the txids we requested, with those we
       -- received.
       let idsRequestedWithBodiesReceived :: Map id (Maybe (header, body))
@@ -887,8 +892,8 @@ relayConsumerPipelined config sst =
           -- all blocks validated.
           modifyTVar' sst.relayBufferVar $
             flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
-          -- TODO?: the ids we did not receive could be taken out earlier.
-          modifyTVar' sst.inFlightVar (`Set.difference` idsRequested)
+          -- TODO: won't remove from inFlight blocks not validated.
+          modifyTVar' sst.inFlightVar (`Set.difference` Set.fromList (map (config.headerId . fst) validated))
 
       return $
         idle
