@@ -1,5 +1,21 @@
 # Leios logbook
 
+## 2024-12-04
+
+### Outline for first technical report
+
+The [draft first technical report for Leios](docs/technical-report-1.md) contains the following sections as placeholders:
+
+- Executive summary
+- Introduction
+- Specification for Short Leios
+- Delta QSD network performance model
+- Rust simulation
+- Haskell prototype
+- Voting and certificates
+- Cost analysis for Leios nodes
+- Findings and conclusions
+
 ## 2024-12-03
 
 ### Agda version of Leios cost model
