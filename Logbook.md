@@ -347,7 +347,7 @@ A first draft system-dynamics simulation models the techno-economics of changes 
   - Diagnostic consistency checks for the simulation
 - Calibrated against Epoch 500-519
 
-This techno-economic simulation highlights is the tension between the following variables:
+This techno-economic simulation highlights the tension between the following variables:
 
 - A linear growth in throughput would cause a quadratic growth in ledger size.
 - Storage cost per gigabyte typically decays exponentially over time, but with a small rate (maybe 10%/year).
