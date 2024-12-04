@@ -40,7 +40,7 @@ import SimTypes
 import System.Random (StdGen, mkStdGen)
 import Viz
 
-example1 :: Int -> DiffTime -> Maybe P2PTopography -> Vizualisation
+example1 :: Int -> DiffTime -> Maybe P2PTopography -> Visualization
 example1 seed blockInterval maybeP2PTopography =
   Viz model $
     LayoutAbove
@@ -225,9 +225,9 @@ example1Trace rng0 blockInterval p2pTopography =
  where
   p2pNumNodes = Map.size $ p2pNodes p2pTopography
 
-example2 :: Vizualisation
+example2 :: Visualization
 example2 =
-  --  slowmoVizualisation 0.2 $
+  --  slowmoVisualization 0.2 $
   Viz (pairVizModel model1 model2) $
     LayoutAbove
       [ layoutLabel 18 "Flat vs cylindrical world topology"

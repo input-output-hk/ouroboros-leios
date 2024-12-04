@@ -16,9 +16,9 @@ import Viz
 import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P
 
-example1 :: Vizualisation
+example1 :: Visualization
 example1 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz model $
       LayoutAbove
         [ layoutLabelTime
@@ -86,9 +86,9 @@ example1 =
       , p2pNodeLinksRandom = 5
       }
 
-example2 :: Vizualisation
+example2 :: Visualization
 example2 =
-  slowmoVizualisation 0.2 $
+  slowmoVisualization 0.2 $
     Viz (pairVizModel model1 model2) $
       LayoutAbove
         [ layoutLabel 18 "Flat vs cylindrical world topology"

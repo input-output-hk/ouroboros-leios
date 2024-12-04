@@ -9,9 +9,9 @@ import SimTCPLinks (kilobytes, mkTcpConnProps)
 import Viz
 import VizSimRelay
 
-example1 :: Vizualisation
+example1 :: Visualization
 example1 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
@@ -24,9 +24,9 @@ example1 =
         (mkTcpConnProps 0.3 (kilobytes 1000))
         (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
-example2 :: Vizualisation
+example2 :: Visualization
 example2 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz model $
       LayoutReqSize 1000 650 $
         Layout $
@@ -39,9 +39,9 @@ example2 =
         (mkTcpConnProps 0.3 (kilobytes 1000))
         (UniformGenerationPattern (kilobytes 100) 0.2 5.0)
 
-example3 :: Vizualisation
+example3 :: Visualization
 example3 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz model $
       LayoutReqSize 1000 650 $
         Layout $

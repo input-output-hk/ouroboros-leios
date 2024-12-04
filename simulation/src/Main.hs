@@ -204,7 +204,7 @@ parserPraosP2P1 =
           )
       )
 
-vizOptionsToViz :: VizCommand -> IO Vizualisation
+vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizTCP1 -> pure ExamplesTCP.example1
   VizTCP2 -> pure ExamplesTCP.example2
