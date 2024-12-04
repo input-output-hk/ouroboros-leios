@@ -31,6 +31,17 @@ data SizesConfig = SizesConfig
   -- ^ certificate size might depend on number of votes.
   }
 
+-- Note: ranking block validation delays are in the PraosConfig, covers certificate validation.
+data LeiosDelays = LeiosDelays
+  { inputBlockHeaderValidation :: InputBlockHeader -> DiffTime
+  -- ^ vrf and signature
+  , inputBlockValidation :: InputBlock -> DiffTime
+  -- ^ hash matching and payload validation (incl. tx scripts)
+  , endorseBlockValidation :: EndorseBlock -> DiffTime
+  , voteMsgValidation :: VoteMsg -> DiffTime
+  , certificateCreation :: Certificate -> DiffTime
+  }
+
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
 --       Would need to rework def. of Stage to accomodate different pipeline shapes.
 data LeiosConfig = LeiosConfig
@@ -46,7 +57,8 @@ data LeiosConfig = LeiosConfig
   , votingFrequencyPerStage :: Double
   , votesForCertificate :: Int
   , sizes :: SizesConfig
-  -- TODO: validation times and max sizes parameters.
+  , delays :: LeiosDelays
+  -- TODO?: max size parameters.
   }
 
 class FixSize a where
