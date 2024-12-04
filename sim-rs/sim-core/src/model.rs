@@ -5,11 +5,19 @@ use serde::{ser::SerializeStruct, Serialize};
 
 macro_rules! id_wrapper {
     ($outer:ident, $inner:ty) => {
-        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $outer($inner);
         impl Display for $outer {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.0.fmt(f)
+            }
+        }
+        impl Serialize for $outer {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&self.0.to_string())
             }
         }
         impl $outer {
