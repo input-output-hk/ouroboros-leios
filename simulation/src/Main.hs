@@ -290,7 +290,7 @@ parserSimCommand =
     [ commandGroup "Available simulations:"
     , command "praos-diffusion-10" . info parserSimPraosDiffusion10 $
         progDesc ""
-    , command "praos-diffusion-10" . info parserSimPraosDiffusion20 $
+    , command "praos-diffusion-20" . info parserSimPraosDiffusion20 $
         progDesc ""
     ]
 
@@ -320,14 +320,14 @@ parserSimPraosDiffusion20 =
       ( long "num-close-links"
           <> metavar "NUMBER"
           <> help "The number of close-distance links."
-          <> value 5
+          <> value 10
       )
     <*> option
       auto
       ( long "num-random-links"
           <> metavar "NUMBER"
           <> help "The number of random links."
-          <> value 5
+          <> value 10
       )
 
 --------------------------------------------------------------------------------
