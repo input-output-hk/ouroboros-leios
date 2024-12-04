@@ -20,8 +20,8 @@ import Topology (readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatenc
 import Viz
 
 main :: IO ()
-main =
-  execParser (info (helper <*> options) mempty) >>= \case
+main = do
+  customExecParser parserPrefs options >>= \case
     CliCommand CliOptions{..} ->
       case cliCommand of
         CliConvertBenchTopology{..} -> do
@@ -47,12 +47,22 @@ main =
                   }
            in writeAnimationFrames animVizConfig viz
 
+parserPrefs :: ParserPrefs
+parserPrefs =
+  prefs . mconcat $
+    [ showHelpOnEmpty
+    , helpShowGlobals
+    ]
+
+options :: ParserInfo Options
+options = info (parserOptions <**> helper) mempty
+
 data Options
   = VizCommand VizOptions
   | CliCommand CliOptions
 
-options :: Parser Options
-options = VizCommand <$> vizOptions <|> CliCommand <$> cliOptions
+parserOptions :: Parser Options
+parserOptions = VizCommand <$> parserVizOptions <|> CliCommand <$> parserCliOptions
 
 newtype CliOptions = CliOptions
   { cliCommand :: CliCommand
@@ -61,21 +71,21 @@ newtype CliOptions = CliOptions
 data CliCommand
   = CliConvertBenchTopology {inputBenchTopology :: FilePath, inputBenchLatencies :: FilePath, outputSimpleTopology :: FilePath}
 
-cliOptions :: Parser CliOptions
-cliOptions =
+parserCliOptions :: Parser CliOptions
+parserCliOptions =
   CliOptions
-    <$> cliCommands
+    <$> parserCliCommand
 
-cliCommands :: Parser CliCommand
-cliCommands =
+parserCliCommand :: Parser CliCommand
+parserCliCommand =
   subparser . mconcat $
     [ commandGroup "Available utility commands:"
-    , command "convert-bench-topology" . info cliConvertBenchTopology $
+    , command "convert-bench-topology" . info (parserCliConvertBenchTopology <**> helper) $
         progDesc "Convert the benchmark topology files to a simple topology file."
     ]
 
-cliConvertBenchTopology :: Parser CliCommand
-cliConvertBenchTopology =
+parserCliConvertBenchTopology :: Parser CliCommand
+parserCliConvertBenchTopology =
   CliConvertBenchTopology
     <$> strOption
       ( long "input-bench-topology"
@@ -105,10 +115,10 @@ data VizOptions = VizOptions
   , vizSize :: Maybe VizSize
   }
 
-vizOptions :: Parser VizOptions
-vizOptions =
+parserVizOptions :: Parser VizOptions
+parserVizOptions =
   VizOptions
-    <$> vizCommands
+    <$> parserVizCommand
     <*> optional
       ( strOption
           ( long "frames-dir"
@@ -155,34 +165,8 @@ data VizCommand
   | VizRelayTest2
   | VizRelayTest3
 
-parserPraosP2P1 :: Parser VizCommand
-parserPraosP2P1 =
-  VizPraosP2P1
-    <$> option
-      auto
-      ( long "seed"
-          <> metavar "NUMBER"
-          <> help "The seed for the random number generator."
-          <> value 0
-      )
-    <*> option
-      (fmap (fromIntegral @Int) auto)
-      ( long "block-interval"
-          <> metavar "NUMBER"
-          <> help "The interval at which blocks are generated."
-          <> value 5
-      )
-    <*> optional
-      ( option
-          str
-          ( long "topology"
-              <> metavar "FILE"
-              <> help "The file describing the network topology."
-          )
-      )
-
-vizCommands :: Parser VizCommand
-vizCommands =
+parserVizCommand :: Parser VizCommand
+parserVizCommand =
   subparser . mconcat $
     [ commandGroup "Available visualisations:"
     , command "tcp-1" . info (pure VizTCP1) $
@@ -208,7 +192,7 @@ vizCommands =
     , command "praos-1" . info (pure VizPraos1) $
         progDesc
           "A simulation of two nodes running Praos consensus."
-    , command "praos-p2p-1" . info parserPraosP2P1 $
+    , command "praos-p2p-1" . info (parserPraosP2P1 <**> helper) $
         progDesc
           "A simulation of 100 nodes running Praos consensus."
     , command "praos-p2p-2" . info (pure VizPraosP2P2) $
@@ -222,6 +206,32 @@ vizCommands =
     , command "relay-test-3" . info (pure VizRelayTest3) $
         progDesc ""
     ]
+
+parserPraosP2P1 :: Parser VizCommand
+parserPraosP2P1 =
+  VizPraosP2P1
+    <$> option
+      auto
+      ( long "seed"
+          <> metavar "NUMBER"
+          <> help "The seed for the random number generator."
+          <> value 0
+      )
+    <*> option
+      (fmap (fromIntegral @Int) auto)
+      ( long "block-interval"
+          <> metavar "NUMBER"
+          <> help "The interval at which blocks are generated."
+          <> value 5
+      )
+    <*> optional
+      ( option
+          str
+          ( long "topology"
+              <> metavar "FILE"
+              <> help "The file describing the network topology."
+          )
+      )
 
 vizOptionsToViz :: VizOptions -> IO Vizualisation
 vizOptionsToViz VizOptions{..} = case vizCommand of
