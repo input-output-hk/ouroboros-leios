@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
     events::Event,
-    model::{EndorserBlockId, InputBlockId, TransactionId},
+    model::{EndorserBlockId, InputBlockId, TransactionId, VoteBundleId},
 };
 use tokio::{
     fs::{self, File},
@@ -84,7 +84,7 @@ impl EventMonitor {
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
-        let mut votes_per_bundle: BTreeMap<(u64, NodeId), f64> = BTreeMap::new();
+        let mut votes_per_bundle: BTreeMap<VoteBundleId, f64> = BTreeMap::new();
         let mut votes_per_pool: BTreeMap<NodeId, f64> =
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
@@ -208,24 +208,24 @@ impl EventMonitor {
                     if transactions.is_empty() {
                         empty_ibs += 1;
                     }
-                    pending_ibs.insert(header.id());
+                    pending_ibs.insert(header.id);
                     let mut ib_bytes = 0;
                     for tx_id in &transactions {
-                        *txs_in_ib.entry(header.id()).or_default() += 1.;
+                        *txs_in_ib.entry(header.id).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
                         ib_bytes += tx.bytes;
-                        *bytes_in_ib.entry(header.id()).or_default() += tx.bytes as f64;
+                        *bytes_in_ib.entry(header.id).or_default() += tx.bytes as f64;
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
                         }
                     }
-                    *seen_ibs.entry(header.producer).or_default() += 1.;
+                    *seen_ibs.entry(header.id.producer).or_default() += 1.;
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {} ({}).",
-                        header.producer,
+                        header.id.producer,
                         transactions.len(),
-                        header.slot,
+                        header.id.slot,
                         pretty_bytes(ib_bytes, pbo.clone()),
                     )
                 }
@@ -256,16 +256,12 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::VotesGenerated {
-                    slot,
-                    producer,
-                    ebs,
-                } => {
+                Event::VotesGenerated { id, ebs } => {
                     for eb in ebs {
                         total_votes += 1;
-                        *votes_per_bundle.entry((slot, producer)).or_default() += 1.0;
+                        *votes_per_bundle.entry(id).or_default() += 1.0;
                         *eb_votes.entry(eb).or_default() += 1.0;
-                        *votes_per_pool.entry(producer).or_default() += 1.0;
+                        *votes_per_pool.entry(id.producer).or_default() += 1.0;
                     }
                 }
                 Event::NoVote { .. } => {}
