@@ -23,7 +23,7 @@
 
 ### Example schedule
 
-![Example schedule for short-pipeline leios](analysis/short-pipeline-leios-example-schedule.png)
+![Example schedule for short-pipeline leios](../analysis/short-pipeline-leios-example-schedule.png)
 
 
 ## Formal Specification for Short Leios
@@ -213,11 +213,11 @@ Historically, Praos blocks have been highly compressible. For example, compressi
 
 For recent epochs, the fee paid in blocks per byte of block storage has a mean of 173.01 lovelace/byte.
 
-![Fee paid per byte of block](fee-per-byte.svg)
+![Fee paid per byte of block](../analysis/fee-per-byte.svg)
 
 In the long term (when the Cardano Reserves have been exhausted) the upper bound (if all Ada were staked and block producers never miss blocks) for the fraction of the fee paid to pools and stakers as rewards is 80%. Currently 20.91% of that reward goes to pool operators and the remainder goes to delegators.
 
-![Fraction of rewards going to pools](leader-reward.svg)
+![Fraction of rewards going to pools](../analysis/leader-reward.svg)
 
 
 ### Importance of the Cardano Reserves
@@ -226,11 +226,11 @@ The analysis above considers transaction fees as the source of rewards, which wi
 
 |                                                                          |                                                                          |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| ![Absolute disbursement of Reserves](reserves-disbursement-absolute.svg) | ![Relative disbursement of Reserves](reserves-disbursement-relative.svg) |
+| ![Absolute disbursement of Reserves](../analysis/reserves-disbursement-absolute.svg) | ![Relative disbursement of Reserves](../analysis/reserves-disbursement-relative.svg) |
 
 In fact, approximately 99% of the rewards paid to stake pools come from the Reserves, with only about 1% coming from transaction fees.
 
-![Rewards from fees](reserves-reward-fraction.svg)
+![Rewards from fees](../analysis/reserves-reward-fraction.svg)
 
 
 ### Insights for Leios techno-economics
