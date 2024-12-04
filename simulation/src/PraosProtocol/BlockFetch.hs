@@ -603,15 +603,20 @@ initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState sub
 
 setupValidatorThreads ::
   (MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent body) ->
   PraosConfig BlockBody ->
   BlockFetchControllerState BlockBody m ->
   -- | bound on queue length.
   Natural ->
   m ([m ()], Block BlockBody -> m () -> m ())
-setupValidatorThreads cfg st n = do
+setupValidatorThreads tracer cfg st n = do
   queue <- newTBQueueIO n
   waitingVar <- newTVarIO Map.empty
-  let validate (block, completion) = threadDelaySI (cfg.blockValidationDelay block) >> completion
+  let validate (block, completion) = do
+        let !delay = cfg.blockValidationDelay block
+        traceWith tracer (PraosNodeEventCPU (CPUTask delay))
+        threadDelaySI delay
+        completion
   let fetch = forever $ do
         req@(block, _) <- atomically $ readTBQueue queue
         assert (blockInvariant block) $ do

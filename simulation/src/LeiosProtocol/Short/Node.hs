@@ -8,9 +8,10 @@
 module LeiosProtocol.Short.Node where
 
 import ChanMux
+import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM
-import Control.Monad (forever, guard, join)
+import Control.Monad (forever, guard, join, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Tracer
@@ -110,8 +111,11 @@ data LeiosNodeConfig = LeiosNodeConfig
   , processingQueueBound :: Natural
   }
 
-data LeiosNodeEvent = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
-  -- TODO: other events
+-- TODO: other events
+data LeiosNodeEvent
+  = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
+  | -- | Note: PraosNode.PraosNodeEvent has its own CPU event.
+    LeiosNodeEventCPU CPUTask
   deriving (Show)
 
 setupRelay ::
@@ -148,10 +152,14 @@ leiosNode tracer cfg followers peers = do
         <$> (mapM (newMuxChan . protocolPraos) followers)
         <*> (mapM (newMuxChan . protocolPraos) peers)
   ibDeliveryTimesVar <- newTVarIO Map.empty
+  -- TODO: add logging of parallel tasks
+  let threadDelayParallel = maximum >>> \d -> when (d >= 0) $ threadDelaySI d
   let relayIBConfig =
         RelayConsumerConfig
           { relay = RelayConfig{maxWindowSize = 100}
           , headerId = (.id)
+          , headerValidationDelay = cfg.leios.delays.inputBlockHeaderValidation
+          , threadDelayParallel
           , -- TODO: add prioritization policy to LeiosConfig
             prioritize = sortOn (Down . (.slot)) . Map.elems
           , submitPolicy = SubmitAll
@@ -168,6 +176,8 @@ leiosNode tracer cfg followers peers = do
         RelayConsumerConfig
           { relay = RelayConfig{maxWindowSize = 100}
           , headerId = id
+          , headerValidationDelay = const 0
+          , threadDelayParallel
           , -- TODO: add prioritization policy to LeiosConfig?
             prioritize = sort . Map.elems
           , submitPolicy = SubmitAll
@@ -182,6 +192,8 @@ leiosNode tracer cfg followers peers = do
         RelayConsumerConfig
           { relay = RelayConfig{maxWindowSize = 100}
           , headerId = id
+          , headerValidationDelay = const 0
+          , threadDelayParallel
           , -- TODO: add prioritization policy to LeiosConfig?
             prioritize = sort . Map.elems
           , submitPolicy = SubmitAll
@@ -231,6 +243,7 @@ leiosNode tracer cfg followers peers = do
     blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
 
   -- TODO: validation delays and tracing events.
+  -- TODO: LeiosNodeEventCPU to keep track of cpu use.
   processing :: LeiosNodeState m -> m ()
   processing leiosState = forever $ do
     req <- atomically $ readTBQueue leiosState.validationQueue

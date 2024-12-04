@@ -37,6 +37,7 @@ module PraosProtocol.Common (
   kilobytes,
   module TimeCompat,
   defaultPraosConfig,
+  CPUTask (..),
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
@@ -55,6 +56,7 @@ import ChanTCP (MessageSize (..))
 import Data.Coerce (coerce)
 import Data.Word (Word8)
 import SimTCPLinks (kilobytes)
+import SimTypes (CPUTask (..))
 import System.Random (mkStdGen, uniform)
 import TimeCompat
 
@@ -140,6 +142,7 @@ data PraosNodeEvent body
   | PraosNodeEventReceived (Block body)
   | PraosNodeEventEnterState (Block body)
   | PraosNodeEventNewTip (Chain (Block body))
+  | PraosNodeEventCPU CPUTask
   deriving (Show)
 
 data PraosConfig body = PraosConfig
