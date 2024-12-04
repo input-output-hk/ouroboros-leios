@@ -21,7 +21,7 @@ import Viz
 
 main :: IO ()
 main = do
-  customExecParser parserPrefs options >>= \case
+  customExecParser parserPrefs parserInfoOptions >>= \case
     CliCommand CliOptions{..} ->
       case cliCommand of
         CliConvertBenchTopology{..} -> do
@@ -54,8 +54,8 @@ parserPrefs =
     , helpShowGlobals
     ]
 
-options :: ParserInfo Options
-options = info (parserOptions <**> helper) mempty
+parserInfoOptions :: ParserInfo Options
+parserInfoOptions = info (parserOptions <**> helper) mempty
 
 data Options
   = VizCommand VizOptions
