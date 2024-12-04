@@ -41,6 +41,15 @@
 ## Voting and certificates
 
 
+
+### Quorum size
+
+
+
+### Certificate scheme
+
+
+
 ## Cost analyses
 
 The deployment of Ouroboros Leios on Cardano nodes has economic implications both for the ecosystem as a whole and for individual stake pool operations (SPOs). Revenues may increase from the fees collected for the higher volume of transactions on the network, but costs may increase due to the additional computing associated with running a Leios implementation. The overall economic impact of Leios depends upon the relative magnitude of these revenues and costs as they evolve over time. Furthermore, relatively minor variants of the Leios protocol or its implementation may, in principle, have outsize implications for economic feasibility. Models and simulations that link the technical and economic aspects of Leios can provide guidance for settling the details of the Leios specification and how it will be implemented on the Cardano node.
@@ -254,6 +263,30 @@ In fact, approximately 99% of the rewards paid to stake pools come from the Rese
     4. The network traffic to downstream nodes is limited to a economically sustainable level.
     5. Ada price continues at current values.
 9. Reaching 100 transactions per second by 2030 will likely alleviate the depletion of the Reserves.
+
+
+## Approximate models of Cardano mainnet characteristics
+
+We have developed several "curve fits" to Cardano mainnet statistics for quantities of interest in Leios simulations. These serve as compact and convenient inputs to some of the Leios simulation studies. Of course, they do no preclude using historical transaction data directly in Leios simulations and using future hypothetical or extreme distributions for Leios simulation studies.
+
+### Transaction sizes and frequencies
+
+Using post-Byron `mainnet` data from `cardano-db-sync`, we tally the transaction sizes and number of transactions per block. As a rough approximation, we can model the size distribution by a log-normal distribution with log-mean of `6.833` and log-standard-deviation of `1.127` and the transactions per block as an exponential distribution with mean `16.97`. The plots below compare the empirical distributions to these approximations.
+
+| Transaction Size                                     | Transactions per Block                                    |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| ![Transaction size distribution](../images/tx-size.svg) | ![Transaction-per-block distribution](../images/tx-freq.svg) |
+
+The transaction-size distribution has a longer tail and more clumpiness than the log-normal approximation, but the transaction-per-block distribution is consistent with an exponential distribution. Note, however, that there is a correlation between size and number per block, so we'd really need to model the joint distribution. For the time being, these two approximation should be adequate.
+
+See [this Jupyter notebook](../analysis/tx.ipynb) for details of the analysis.
+
+
+### Stake distribution
+
+The stake distribution has an important influence on the number of unique SPOs involved in each round of Leios voting. It turns out that the cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. This curve can be adapted to the actual number of stake pools being modeled: for example, in order to use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
+
+![Curve fit to stakepool distribution at epoch 500](../images/stake-fit.png)
 
 
 ## Findings and conclusions
