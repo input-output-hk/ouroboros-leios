@@ -646,14 +646,25 @@ setupProcessWaitingThread ::
   m (TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]), m ())
 setupProcessWaitingThread tracer npar blocksVar = do
   waitingVar <- newTVarIO Map.empty
-  return $ (waitingVar, processWaiting waitingVar)
+  return $ (waitingVar, processWaiting tracer npar blocksVar waitingVar)
+
+processWaiting ::
+  forall m a b.
+  (MonadSTM m, MonadDelay m) =>
+  Tracer m CPUTask ->
+  -- | how many waiting to process in parallel
+  Maybe Int ->
+  TVar m (Map ConcreteHeaderHash a) ->
+  TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]) ->
+  m ()
+processWaiting tracer npar blocksVar waitingVar = go
  where
   parallelDelay xs = do
     let !d = maximum $ map fst xs
     forM_ xs $ traceWith tracer . CPUTask . fst
     threadDelaySI d
     mapM_ snd xs
-  processWaiting waitingVar = forever $ join $ atomically $ do
+  go = forever $ join $ atomically $ do
     waiting <- readTVar waitingVar
     when (Map.null waiting) retry
     blocks <- readTVar blocksVar
