@@ -1,5 +1,7 @@
 {-# OPTIONS --safe #-}
 
+open import Data.These
+
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.VRF
@@ -20,13 +22,13 @@ record BaseAbstract : Type₁ where
 
   data Input : Type₁ where
     INIT   : (EndorserBlock × Cert → Type) → Input
-    SUBMIT : EndorserBlock ⊎ List Tx → Input -- maybe we have both
+    SUBMIT : These EndorserBlock (List Tx) → Input
     FTCH-LDG : Input
 
   data Output : Type where
     STAKE : StakeDistr → Output
     EMPTY : Output
-    BASE-LDG : List EndorserBlock → Output
+    BASE-LDG : List (These EndorserBlock (List Tx)) → Output
 
   record Functionality : Type₁ where
     field State : Type

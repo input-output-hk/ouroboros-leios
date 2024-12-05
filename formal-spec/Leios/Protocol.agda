@@ -1,8 +1,9 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id)
+open import Leios.Prelude
 open import Leios.FFD
 
+import Data.These as T
 import Data.List as L
 import Data.List.Relation.Unary.Any as A
 
@@ -64,8 +65,8 @@ record LeiosState : Type where
           open IBBody
           open InputBlock
 
-  constructLedger : List EndorserBlock → List Tx
-  constructLedger = concatMap lookupTxs
+  constructLedger : List (T.These EndorserBlock (List Tx)) → List Tx
+  constructLedger = L.concat ∘ L.map (T.fold lookupTxs id λ eb txs → lookupTxs eb ++ txs)
 
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
@@ -99,7 +100,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
 
 stake : LeiosState → ℕ
-stake record { SD = SD } = case lookupᵐ? SD id of λ where
+stake record { SD = SD } = case lookupᵐ? SD poolId of λ where
   (just s) → s
   nothing  → 0
 
