@@ -66,7 +66,7 @@ record LeiosState : Type where
           open InputBlock
 
   constructLedger : List (T.These EndorserBlock (List Tx)) → List Tx
-  constructLedger = L.concat ∘ L.map (T.fold lookupTxs id λ eb txs → lookupTxs eb ++ txs)
+  constructLedger = L.concat ∘ L.map (T.mergeThese L._++_ ∘ T.map₁ lookupTxs)
 
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
