@@ -104,6 +104,7 @@ data LatencyPerStake = LatencyPerStake
 
 data DiffusionData = DiffusionData
   { topography :: P2PTopographyCharacteristics
+  , topography_details :: P2PTopography
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
   , stable_chain_hashes :: [Int]
@@ -118,7 +119,7 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     , latencies = bin $ diffusionLatencyPerStakeFraction nnodes (Time created) (map Time arrivals)
     }
  where
-  bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
+  bins = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
   bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) $ bins
 
 data DiffusionLatencyState = DiffusionLatencyState
@@ -127,8 +128,8 @@ data DiffusionLatencyState = DiffusionLatencyState
   , cpuTasks :: !(Map.Map NodeId [(DiffTime, CPUTask)])
   }
 
-diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
-diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState accum render
+diffusionSampleModel :: P2PTopographyCharacteristics -> P2PTopography -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
+diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp = SampleModel initState accum render
  where
   initState = DiffusionLatencyState IMap.empty Map.empty Map.empty
   accum t e DiffusionLatencyState{..} =
@@ -158,6 +159,7 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState acc
     let diffusionData =
           DiffusionData
             { topography = p2pTopographyCharacteristics
+            , topography_details = p2pTopography
             , entries
             , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
             , stable_chain_hashes
@@ -189,7 +191,7 @@ example1000Diffusion ::
   FilePath ->
   IO ()
 example1000Diffusion clinks rlinks stop fp =
-  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics fp) stop $
+  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
     example1Trace rng 20 p2pTopography
  where
   rng = mkStdGen 42
