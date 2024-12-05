@@ -612,7 +612,7 @@ setupValidatorThreads ::
   m ([m ()], Block BlockBody -> m () -> m ())
 setupValidatorThreads tracer cfg st n = do
   queue <- newTBQueueIO n
-  (waitingVar, processWaiting) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
+  (waitingVar, processWaitingThread) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
   let doTask (delay, m) = do
         traceWith tracer . PraosNodeEventCPU . CPUTask $ delay
         threadDelaySI delay
@@ -634,7 +634,7 @@ setupValidatorThreads tracer cfg st n = do
             let !delay = cfg.blockValidationDelay block
              in (delay, completion)
       add block completion = atomically $ writeTBQueue queue (block, completion)
-  return ([fetch, processWaiting], add)
+  return ([fetch, processWaitingThread], add)
 
 setupProcessWaitingThread ::
   forall m a b.
