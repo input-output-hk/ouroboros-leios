@@ -637,12 +637,12 @@ setupValidatorThreads tracer cfg st n = do
   return ([fetch, processWaiting], add)
 
 setupProcessWaitingThread ::
-  forall body m b.
-  (MonadSTM m, MonadDelay m, IsBody body) =>
+  forall m a b.
+  (MonadSTM m, MonadDelay m) =>
   Tracer m CPUTask ->
   -- | how many waiting to process in parallel
   Maybe Int ->
-  TVar m (Blocks body) ->
+  TVar m (Map ConcreteHeaderHash a) ->
   m (TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]), m ())
 setupProcessWaitingThread tracer npar blocksVar = do
   waitingVar <- newTVarIO Map.empty

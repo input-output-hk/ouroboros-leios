@@ -88,6 +88,8 @@ data ValidationRequest m
   | ValidateEBS [EndorseBlock] ([EndorseBlock] -> STM m ())
   | ValidateVotes [VoteMsg] ([VoteMsg] -> STM m ())
 
+data LedgerState = LedgerState
+
 data LeiosNodeState m = LeiosNodeState
   { praosState :: PraosNode.PraosNodeState RankingBlockBody m
   , relayIBState :: RelayIBState m
@@ -95,10 +97,11 @@ data LeiosNodeState m = LeiosNodeState
   , relayVoteState :: RelayVoteState m
   , ibDeliveryTimesVar :: TVar m (Map InputBlockId UTCTime)
   , validationQueue :: TBQueue m (ValidationRequest m)
-  , waitingForRBVar :: TVar m (Map ConcreteHeaderHash [(DiffTime, m ())])
+  , waitingForRBVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
   -- ^ waiting for RB block itself to be validated.
-  , waitingForLedgerStateVar :: TVar m (Map ConcreteHeaderHash [(DiffTime, m ())])
+  , waitingForLedgerStateVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
   -- ^ waiting for ledger state of RB block to be validated.
+  , ledgerStateVar :: TVar m (Map (HeaderHash RankingBlock) LedgerState)
   }
 
 data LeiosNodeConfig = LeiosNodeConfig
@@ -212,16 +215,22 @@ leiosNode tracer cfg followers peers = do
   (relayVoteState, voteThreads) <- setupRelay relayVoteConfig (map protocolVote followers) (map protocolVote peers)
 
   (waitingForRBVar, processWaitingForRB) <-
-    setupProcessWaitingThread @RankingBlockBody
+    setupProcessWaitingThread
       (contramap LeiosNodeEventCPU tracer)
       Nothing -- unbounded parallelism
       praosState.blockFetchControllerState.blocksVar
 
-  (waitingForLedgerStateVar, processWaitingForLedgerState) <- (,) <$> newTVarIO Map.empty <*> error "TBD" -- TODO
+  ledgerStateVar <- newTVarIO Map.empty
+  (waitingForLedgerStateVar, processWaitingForLedgerState) <-
+    setupProcessWaitingThread
+      (contramap LeiosNodeEventCPU tracer)
+      Nothing -- unbounded parallelism
+      ledgerStateVar
   let leiosState = LeiosNodeState{..}
   let genThreads = [generate leiosState]
   let processingThreads = [processing leiosState]
-  let pruningThreads = [] -- TODO: need EB/IBs to be around long enough to validate further IBs.
+  let pruningThreads = [] -- TODO: need EB/IBs to be around long enough to compute ledger state if they end in RB.
+  let computeLedgerStateThreads = error "TODO"
   return $
     concat
       [ genThreads
@@ -232,6 +241,7 @@ leiosNode tracer cfg followers peers = do
       , voteThreads
       , coerce praosThreads
       , [processWaitingForRB, processWaitingForLedgerState]
+      , computeLedgerStateThreads
       ]
  where
   threadDelayParallel ds = do
