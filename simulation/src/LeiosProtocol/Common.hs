@@ -36,6 +36,8 @@ module LeiosProtocol.Common (
 where
 
 import ChanTCP
+import Control.Exception (assert)
+import Control.Monad (guard)
 import Data.Hashable
 import Data.Set (Set)
 import Data.Word (Word8)
@@ -187,11 +189,15 @@ data Certificate = Certificate
 ---- Common defs
 -------------------------------------------
 
-slice :: Int -> SlotNo -> Int -> (SlotNo, SlotNo)
-slice l s x = (toEnum s', toEnum $ s' + l - 1)
+slice :: Int -> SlotNo -> Int -> Maybe (SlotNo, SlotNo)
+slice l s x = do
+  guard (s' >= 0)
+  return (a, b)
  where
   -- taken from formal spec
   s' = (fromEnum s `div` l - x) * l
+  a = assert (s' >= 0) $ toEnum s'
+  b = assert (s' + l - 1 >= 0) $ toEnum $ s' + l - 1
 
 -------------------------------------------
 ---- MessageSize instances

@@ -12,6 +12,7 @@ module LeiosProtocol.Short where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import LeiosProtocol.Common
@@ -143,27 +144,27 @@ stageRange ::
   SlotNo ->
   -- | stage to compute the range for
   Stage ->
-  (SlotNo, SlotNo)
+  Maybe (SlotNo, SlotNo)
 stageRange cfg = stageRange' cfg.sliceLength
 
-stageRange' :: Int -> Stage -> SlotNo -> Stage -> (SlotNo, SlotNo)
+stageRange' :: Int -> Stage -> SlotNo -> Stage -> Maybe (SlotNo, SlotNo)
 stageRange' l s0 slot s = slice l slot (fromEnum s0 - fromEnum s)
 
 stageRange'_prop :: Int -> SlotNo -> Bool
 stageRange'_prop l slot =
-  and [slot `inRange` stageRange' l stage slot stage | stage <- stages]
-    && and [contiguous $ map (stageRange' l stage slot) stages | stage <- stages]
+  and [fromMaybe False $ (slot `inRange`) <$> stageRange' l stage slot stage | stage <- stages]
+    && and [contiguous $ mapMaybe (stageRange' l stage slot) stages | stage <- stages]
  where
   stages = [minBound .. maxBound]
   rightSize (a, b) = length [a .. b] == l
   contiguous (x : y : xs) = rightSize x && succ (snd x) == fst y && contiguous (y : xs)
   contiguous _ = True
 
-stageEnd :: LeiosConfig -> Stage -> SlotNo -> Stage -> SlotNo
-stageEnd l s0 slot s = snd $ stageRange l s0 slot s
+stageEnd :: LeiosConfig -> Stage -> SlotNo -> Stage -> Maybe SlotNo
+stageEnd l s0 slot s = snd <$> stageRange l s0 slot s
 
-stageStart :: LeiosConfig -> Stage -> SlotNo -> Stage -> SlotNo
-stageStart l s0 slot s = fst $ stageRange l s0 slot s
+stageStart :: LeiosConfig -> Stage -> SlotNo -> Stage -> Maybe SlotNo
+stageStart l s0 slot s = fst <$> stageRange l s0 slot s
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -197,7 +198,7 @@ mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg id slot producer inputBlocks =
   -- Endorse blocks are produced at the beginning of the stage.
-  assert (stageStart cfg Endorse slot Endorse == slot) $
+  assert (stageStart cfg Endorse slot Endorse == Just slot) $
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
@@ -244,12 +245,15 @@ inputBlocksToEndorse ::
   SlotNo ->
   InputBlocksSnapshot ->
   [InputBlockId]
-inputBlocksToEndorse cfg current buffer =
-  buffer.validInputBlocks
-    InputBlocksQuery
-      { generatedBetween = stageRange cfg Endorse current Propose
-      , receivedBy = stageEnd cfg Endorse current Deliver2
-      }
+inputBlocksToEndorse cfg current buffer = fromMaybe [] $ do
+  generatedBetween <- stageRange cfg Endorse current Propose
+  receivedBy <- stageEnd cfg Endorse current Deliver2
+  pure $
+    buffer.validInputBlocks
+      InputBlocksQuery
+        { generatedBetween
+        , receivedBy
+        }
 
 shouldVoteOnEB ::
   LeiosConfig ->
@@ -258,21 +262,22 @@ shouldVoteOnEB ::
   InputBlocksSnapshot ->
   EndorseBlock ->
   Bool
+shouldVoteOnEB cfg slot _buffers | Nothing <- stageRange cfg Vote slot Propose = const False
 shouldVoteOnEB cfg slot buffers = cond
  where
-  generatedBetween = stageRange cfg Vote slot Propose
+  generatedBetween = fromMaybe (error "impossible") $ stageRange cfg Vote slot Propose
   receivedByEndorse =
     buffers.validInputBlocks
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = stageEnd cfg Vote slot Endorse
+        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg Vote slot Endorse
         }
   receivedByDeliver1 = buffers.validInputBlocks q
    where
     q =
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = stageEnd cfg Vote slot Deliver1
+        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg Vote slot Deliver1
         }
   -- TODO: use sets in EndorseBlock?
   subset xs ys = all (`elem` ys) xs
@@ -283,7 +288,7 @@ shouldVoteOnEB cfg slot buffers = cond
     assumptions =
       null eb.endorseBlocksEarlierStage
         && null eb.endorseBlocksEarlierPipeline
-        && eb.slot `inRange` stageRange cfg Vote slot Endorse
+        && eb.slot `inRange` (fromMaybe (error "impossible") $ stageRange cfg Vote slot Endorse)
     -- A. all referenced IBs have been received by the end of the Endorse stage,
     -- C. all referenced IBs validate (wrt. script execution), and,
     -- D. only IBs from this pipeline’s Propose stage are referenced (and not from other pipelines).
@@ -301,7 +306,7 @@ endorseBlocksToVoteFor ::
 endorseBlocksToVoteFor cfg slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
    in map (.id) . filter cond $
-        ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
+        maybe [] ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.
@@ -323,13 +328,15 @@ inputBlockRate LeiosConfig{inputBlockFrequencyPerSlot} _slot
 -- | Note: if the NodeRate ends up `>= 1`, you still only produce one block.
 endorseBlockRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
 endorseBlockRate cfg slot = do
-  guard $ stageStart cfg Endorse slot Endorse == slot
+  startEndorse <- stageStart cfg Endorse slot Endorse
+  guard $ startEndorse == slot
   return $ NetworkRate cfg.endorseBlockFrequencyPerStage
 
 -- | TODO: a little unclear what to do if the NodeRate is `>= 1`.
 votingRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
 votingRate cfg slot = do
-  guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength (stageRange cfg Vote slot Vote)
+  range <- stageRange cfg Vote slot Vote
+  guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
   return $ NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
 
 -- mostly here to showcase the types.

@@ -122,7 +122,7 @@ slotConfigFromNow = do
   start <- getCurrentTime
   return $ SlotConfig{start, duration = 1}
 
-blockBodyColor :: BlockBody -> (Double, Double, Double)
+blockBodyColor :: IsBody body => body -> (Double, Double, Double)
 blockBodyColor = hashToColor . coerce . hashBody
 
 blockHeaderColor :: BlockHeader -> (Double, Double, Double)

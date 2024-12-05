@@ -61,9 +61,11 @@ mkScheduler rng0 rates = do
 waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> m SlotNo
 waitNextSlot cfg = do
   now <- getCurrentTime
+  let nextSlotTime = (ceiling $ now `diffUTCTime` cfg.praos.slotConfig.start)
   let slot =
         assert (cfg.praos.slotConfig.duration == 1) $
-          toEnum (ceiling $ now `diffUTCTime` cfg.praos.slotConfig.start)
+          assert (nextSlotTime >= 0) $
+            toEnum nextSlotTime
   let tgt = slotTime cfg.praos.slotConfig slot
   threadDelayNDT (tgt `diffUTCTime` now)
   return slot

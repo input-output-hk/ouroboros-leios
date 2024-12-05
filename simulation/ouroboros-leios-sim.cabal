@@ -52,6 +52,8 @@ library
     LeiosProtocol.Short
     LeiosProtocol.Short.Generate
     LeiosProtocol.Short.Node
+    LeiosProtocol.Short.Sim
+    LeiosProtocol.Short.VizSim
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP

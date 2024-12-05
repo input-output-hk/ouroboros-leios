@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import Options.Applicative
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
@@ -135,6 +136,7 @@ data VizSubCommand
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
+  | VizShortLeios1
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -176,6 +178,9 @@ parserVizSubCommand =
         progDesc ""
     , command "relay-test-3" . info (pure VizRelayTest3) $
         progDesc ""
+    , command "sleios-1" . info (pure VizShortLeios1) $
+        progDesc
+          "A simulation of two nodes running Short Leios."
     ]
 
 parserPraosP2P1 :: Parser VizSubCommand
@@ -224,6 +229,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizRelayTest1 -> pure VizSimTestRelay.example1
   VizRelayTest2 -> pure VizSimTestRelay.example2
   VizRelayTest3 -> pure VizSimTestRelay.example3
+  VizShortLeios1 -> pure VizShortLeios.example1
 
 type VizSize = (Int, Int)
 
@@ -268,7 +274,7 @@ parserSimOptions =
   SimOptions
     <$> parserSimCommand
     <*> option
-      (Time <$> auto)
+      (Time . fromIntegral @Int <$> auto)
       ( long "output-seconds"
           <> metavar "SECONDS"
           <> help "Output N seconds of simulation."

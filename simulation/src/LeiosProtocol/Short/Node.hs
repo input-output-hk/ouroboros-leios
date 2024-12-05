@@ -54,6 +54,7 @@ data LeiosMessage
   | RelayVote {fromRelayVote :: RelayVoteMessage}
   | -- | `BearerMsg` here is a bit ugly, but allows us to not have to split up PraosMessage in the Leios bundle.
     PraosMsg {fromPraosMsg :: PraosMessage}
+  deriving (Show)
 
 data Leios f = Leios
   { protocolIB :: f RelayIBMessage
