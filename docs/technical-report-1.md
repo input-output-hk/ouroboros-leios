@@ -45,38 +45,60 @@
 
 ### Structure of votes
 
-We have used an identical structure for single `Vote`s, for both algorithms. We define this structure as a CDDL grammar, inspired by the [block header](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/conway.cddl#L27) definition from cardano-ledger:
+Conceptually, a Leios vote contains the following information:
 
-```cddl
-vote =
-  [ voter_id         : hash32
-  , voting_round     : round_no
-  , block_hash       : hash32
-  , voting_proof     : vrf_cert
-  , voting_weight    : voting_weight
-  , kes_period       : kes_period
-  , kes_vkey         : kes_vkey
-  , kes_signature    : kes_signature
-  ]
-```
+- The hash of the EB being voted for
+- The identity of the voter
+- The number of votes cast
+- A proof that the votes cast are valid
 
-This definition relies on the following primitive types (drawn from Ledger definitions in [crypto.cddl](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/crypto.cddl#L1))
+When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized.
 
-```cddl
-round_no = uint .size 8
-voting_weight = uint .size 8
-vrf_cert = [bytes, bytes .size 80]
-hash32 = bytes .size 32
-kes_vkey = bytes .size 32
-kes_signature = bytes .size 448
-kes_period = uint .size 8
-```
+It has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
 
-As already mentioned, `Vote` mimicks the block header's structure which allows Cardano nodes to reuse their existing VRF and KES keys. Some additional notes:
+1. A vote should be small.
+    1. Smaller than a TCP MTU so it fits in a single packet
+    2. As small as possible if the size of a certificate scales with the size and number of votes
+2. Key distribution should be simple and secure.
+    1. Key rotation and revocation may be necessary
+    2. Ideally, existing Cardano keys could be used for Leios voting, but without compromising security
 
-* Total vote size is **710 bytes** with the above definition,
-* Unless explicitly mentioned, `hash` function exclusively uses 32-bytes Blake2b-256 hashes,
-* The `voter_id` is it's pool identifier, ie. the hash of the node's cold key.
+
+> [!TODO]
+> Below is the VRF+KES approach studied in Peras, which seems larger than it need be.
+> - [ ] Remove redundant fields
+> - [ ] Compare to fields needed for BLS and Musen
+> 
+> We have used an identical structure for single `Vote`s, for both algorithms. We define this structure as a CDDL grammar, inspired by the [block header](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/conway.cddl#L27) definition from cardano-ledger:
+> 
+> ```cddl
+> vote =
+>   [ voter_id         : hash32
+>   , voting_round     : round_no
+>   , block_hash       : hash32
+>   , voting_proof     : vrf_cert
+>   , voting_weight    : voting_weight
+>   , kes_period       : kes_period
+>   , kes_vkey         : kes_vkey
+>   , kes_signature    : kes_signature
+>   ]
+> ```
+> 
+> This definition relies on the following primitive types (drawn from Ledger definitions in [crypto.cddl](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/crypto.cddl#L1))
+> 
+> ```cddl
+> round_no = uint .size 8
+> voting_weight = uint .size 8
+> vrf_cert = [bytes, bytes .size 80]
+> hash32 = bytes .size 32
+> kes_vkey = bytes .size 32
+> kes_signature = bytes .size 448
+> kes_period = uint .size 8
+> ```
+> 
+> * Total vote size is **710 bytes** with the above definition,
+> * Unless explicitly mentioned, `hash` function exclusively uses 32-bytes Blake2b-256 hashes,
+> * The `voter_id` is it's pool identifier, ie. the hash of the node's cold key. 
 
 
 ### Number of unique SPOs voting
@@ -106,7 +128,7 @@ The plots below show the number of unique voters as a function of mainnet epoch 
 | ![Unique voters for 500 votes](../analysis/committee_statistics-500.svg) | ![Unique voters for 750 votes](../analysis/committee_statistics-750.svg) | ![Unique voters for 1000 votes](../analysis/committee_statistics-1000.svg) |
 
 
-### Quorum size
+### Committee size and quorum requirement
 
 The combinatorics associated with obtaining a quorum of voters from a mixture of honest and dishonest parties set fundamental limits on the safe size for voting quorums in Leios. (However, the specific choice of certificate scheme my imposing additional limits and security considerations.) We are concerned about both the probability that a quorum of honest votes is reached and the probability that dishonest voters form their own quorum. For Leios, the situation where there are multiple quora of mixed honest and dishonest parties is not equivalent to having a dishonest quorum, though it may cause inefficiencies when EBs with duplicate or clashing transactions are later included in RBs. The table below shows situations that may be encountered.
 
@@ -172,7 +194,7 @@ Given the above analysis, we consider a 60% quorum for a committee of 500 votes 
 |                   50 % |                           7.83e-4 |                        0.001 |
 
 > [!WARNING]
-> We need to compute the Praos attack probabilities at the above adversarial stakes, so we can compare them to the Leios probability of an adversarial quorum. I'm certain that the Leios probabilities are lower than the Praos ones if $\tau = 0.60$, but the not so sure about the situation with $\tau = 0.55$.
+> We need to compute the Praos attack probabilities at the above adversarial stakes, so we can compare them to the Leios probability of an adversarial quorum. I'm certain that the Leios probabilities are lower than the Praos ones if $\tau = 0.60$, but I'm not so certain about the situation if $\tau = 0.55$.
 
 
 ### ALBA voting
