@@ -257,31 +257,40 @@ Combining the possible voting outcomes with the certificate ones yields a comple
 
 #### ALBA certificate
 
-The Jupyter notebook [../analysis/stake_distribution.ipynb](analysis/stake_distribution.ipynb) (view [here](https://nbviewer.org/github/input-output-hk/ouroboros-leios/blob/stake-analysis/analysis/stake_distribution.ipynb)) analyzes the implications of the Cardano mainnet stake distribution upon the number of unique votes and votes for a Leios voting round.
+> [!WARNING]
+> This section needs thorough review, and it does not distinguish ALBA variants.
+> 
+> - [ ] Check the typesetting of the equations.
 
-Leios needs to ensure the impossibility of an adversarial quorum, but it can accept adversarial activity causing quorum failures, since the latter just lowers throughput slightly. Hence we require a 60% quorum and 92% availability of honest votes, and set the committee size to 500 votes. An ALBA security parameter of 80 may provide adequate security. This translates to the following ALBA parameters and security for Leios.
+ALBA certificates are parameterized by three parameters ($n_f$, $n_p$, and $\ell_\text{sec}$). Let $\left| S_p \right|$ be the number of honest votes the certifier has access to. The *completeness* property of ALBA ensures that one is not able to create a proof with probability $p = 2^{-\ell_\text{sec}}$  provided $\left| S_p \right| \geq n_p$. If $\left| S_p \right| < n_p$, then the probability of optimistically failing to create a proof is
 
-- $n_f = 0.60$
-- $n_p = 0.92$
-- $l_\text{sec} = 80$
-- $n_\text{votes} = 500$
-- $2^{-l_\text{sec}} = 8.27 \cdot 10^{-25}$
-- $u_\text{ALBA} = 148$
-- probability of adversarial quorum
-  - 35% adversarial stake: $p = 1.71 \cdot 10^{-21}$
-  - 40% adversarial stake: $p = 7.69 \cdot 10^{-13}$
-  - 45% adversarial stake: $p = 2.87 \cdot 10^{-7}$
-- probability of honest quorum
-  - 35% adversarial stake: $p = 0.917$
+$$
+p = 2 \cdot \log 12 \cdot \lceil \ell_\text{sec} \rceil \cdot \left( \frac{\left| S_p \right|}{n_p} \right)^u
+$$
 
-The plot below shows the number of votes that would have to be included in an ALBA certificate for Leios, given those parameters. If votes are 700 bytes each, then we have the following:
+where the number of votes included in the proof is
 
-- Incoming to node which creates a certificate: 500 votes of 700 bytes = 350 kB.
-- Contents of ALBA certificate: 140 votes of 700 bytes = 98 kB.
+$$
+u = \left\lceil \frac{ \ell_\text{sec} + \log_2 \ell_\text{sec} + 5 - \log_2 (\log_2 e) } { \log_2(\frac{n_p}{n_f}) } \right\rceil
+$$
 
-The alternative is to use BLS certificates, which have higher CPU load but smaller size.
+The plots below show how it is more probable to build a certificate with more votes or lower $n_p$ and how higher $n_p$ requires fewer items (votes) be included in the certificate. We need a low enough $n_p$ so that a certifier can easily build a certificate of honest votes and a low enough $n_p$ so that the resulting certificate will fit in a Praos block.
 
-![Number of unique votes in ALBA certificate for Leios](../analysis/unique-votes-leios.png)
+|                                                                        |                                                             |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| ![Probability of creating an ALBA proof](../analysis/alba-success.svg) | ![Number of items in ALBA proof](../analysis/alba-size.svg) |
+
+For the sake of argument, assume that we want the votes included in the certificate to occupy no more than 75 kB. The table below indicates that votes no larger than 400 bytes would provide a reasonable requirement for the number of honest votes needed for certification. Note that our analysis of quorum size resulted in a constraint of 60% of the votes being honest. ALBA, however, raised that constraint the to values in the table because ALBA needs more than 60% of the votes to build a compact certificate.
+
+| Vote size | Votes fitting into 75 kB | Minimum allowable $n_p$ | Fraction of honest votes needed, $n_p/n$ |
+| --------: | -----------------------: | ----------------------: | ---------------------------------------: |
+|     200 B |                      375 |                     355 |                                   71.0 % |
+|     250 B |                      300 |                     371 |                                   74.2 % |
+|     300 B |                      250 |                     386 |                                   77.2 % |
+|     350 B |                      214 |                     403 |                                   80.6 % |
+|     400 B |                      187 |                     421 |                                   84.2 % |
+|     450 B |                      166 |                     439 |                                   87.8 % |
+|     500 B |                      150 |                     457 |                                   91.4 % |
 
 
 #### Musen certificate
