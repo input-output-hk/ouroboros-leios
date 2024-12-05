@@ -29,11 +29,12 @@ macro_rules! id_wrapper {
     };
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Block {
     pub slot: u64,
     pub producer: NodeId,
     pub vrf: u64,
+    pub endorsement: Option<Endorsement>,
     pub transactions: Vec<Arc<Transaction>>,
 }
 
@@ -170,4 +171,10 @@ pub enum NoVoteReason {
     InvalidSlot,
     ExtraIB,
     MissingIB,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Endorsement {
+    pub eb: EndorserBlockId,
+    pub votes: Vec<NodeId>,
 }
