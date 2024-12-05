@@ -309,9 +309,10 @@ impl Node {
         let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
             return Ok(());
         };
-        let Some(mut ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
+        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
             return Ok(());
         };
+        let mut ebs = ebs.clone();
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
@@ -377,16 +378,14 @@ impl Node {
         if let Some(endorsement) = &endorsement {
             // If we are, get all referenced TXs out of the mempool
             let Some(eb) = self.leios.ebs.get(&endorsement.eb) else {
-                bail!("Missing endorsement block")
+                bail!("Missing endorsement block {}", endorsement.eb);
             };
             for ib_id in &eb.ibs {
                 let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
-                    bail!("Missing input block")
+                    bail!("Missing input block {}", ib_id);
                 };
                 for tx in &ib.transactions {
-                    if self.praos.mempool.remove(&tx.id).is_none() {
-                        bail!("Missing TX")
-                    }
+                    self.praos.mempool.remove(&tx.id);
                 }
             }
         }
@@ -417,12 +416,25 @@ impl Node {
     }
 
     fn choose_endorsed_block(&mut self) -> Option<Endorsement> {
+        // an EB is eligible for endorsement if it has this many votes
         let vote_threshold = self.sim_config.vote_threshold;
+        // and if it is not in a pipeline already represented in the chain
+        // (NB: all EBs produced in a pipeline are produced during the same slot)
+        let forbidden_slots: HashSet<u64> = self
+            .praos
+            .blocks
+            .values()
+            .flat_map(|b| b.endorsement.iter())
+            .map(|e| e.eb.slot)
+            .collect();
+
         let (&block, _) = self
             .leios
             .votes_by_eb
             .iter()
-            .filter(|(_, votes)| votes.len() as u64 >= vote_threshold)
+            .filter(|(eb, votes)| {
+                votes.len() as u64 >= vote_threshold && !forbidden_slots.contains(&eb.slot)
+            })
             .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), votes.len()))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
@@ -517,20 +529,20 @@ impl Node {
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
-        if self
-            .praos
-            .blocks
-            .insert(block.slot, block.clone())
-            .is_none()
-        {
-            // Do not remove TXs in these blocks from the leios mempool.
-            // Wait until we learn more about how praos and leios interact.
-            let head = self.praos.peer_heads.entry(from).or_default();
-            if *head < block.slot {
-                *head = block.slot
+        if let Some(old_block) = self.praos.blocks.get(&block.slot) {
+            // SLOT BATTLE!!! lower VRF wins
+            if old_block.vrf <= block.vrf {
+                // We like our block better than this new one.
+                return Ok(());
             }
-            self.publish_block(block)?;
         }
+        self.praos.blocks.insert(block.slot, block.clone());
+
+        let head = self.praos.peer_heads.entry(from).or_default();
+        if *head < block.slot {
+            *head = block.slot
+        }
+        self.publish_block(block)?;
         Ok(())
     }
 

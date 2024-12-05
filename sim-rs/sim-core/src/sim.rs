@@ -127,10 +127,8 @@ impl Simulation {
             biased;
             _ = token.cancelled() => {}
             _ = handle_events => {}
-            results = set.join_all() => {
-                for res in results {
-                    res?;
-                }
+            result = set.join_next() => {
+                result.unwrap()??;
             }
         };
 

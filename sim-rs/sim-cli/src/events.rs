@@ -189,6 +189,7 @@ impl EventMonitor {
                         producer,
                         all_txs.len()
                     );
+                    praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
                         let mut block_leios_txs: Vec<_> = eb_ibs
@@ -221,7 +222,6 @@ impl EventMonitor {
                     }
                     for published_tx in all_txs {
                         let tx = txs.get(&published_tx).unwrap();
-                        praos_txs += 1;
                         published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
@@ -426,8 +426,9 @@ impl EventMonitor {
                 votes_per_eb.mean, votes_per_eb.std_dev);
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
-            info!("{} L1 blocks had a Leios endorsement.", leios_blocks_with_endorsements);
-
+            info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
+            info!("{} tx(s) were referenced by a Leios endorsement.", leios_txs);
+            info!("{} tx(s) were included directly in a Praos block.", praos_txs);
         });
 
         info_span!("network").in_scope(|| {
