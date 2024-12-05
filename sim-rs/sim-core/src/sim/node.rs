@@ -389,7 +389,6 @@ impl Node {
                     }
                 }
             }
-            // eb.ibs
         }
 
         // Fill a block with as many pending transactions as can fit
@@ -423,11 +422,26 @@ impl Node {
             .leios
             .votes_by_eb
             .iter()
-            .find(|(_, votes)| votes.len() as u64 >= vote_threshold)?;
+            .filter(|(_, votes)| votes.len() as u64 >= vote_threshold)
+            .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), votes.len()))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
 
         Some(Endorsement { eb: block, votes })
+    }
+
+    fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
+        let eb = self.leios.ebs.get(eb_id)?;
+        let mut tx_set = HashSet::new();
+        for ib_id in &eb.ibs {
+            let InputBlockState::Received(ib) = self.leios.ibs.get(ib_id)? else {
+                return None;
+            };
+            for tx in &ib.transactions {
+                tx_set.insert(tx.id);
+            }
+        }
+        Some(tx_set.len())
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
