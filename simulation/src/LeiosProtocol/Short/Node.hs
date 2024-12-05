@@ -24,6 +24,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord
+import Data.Set (Set)
 import qualified Data.Set as Set
 import LeiosProtocol.Common
 import LeiosProtocol.Relay
@@ -102,6 +103,7 @@ data LeiosNodeState m = LeiosNodeState
   , waitingForLedgerStateVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
   -- ^ waiting for ledger state of RB block to be validated.
   , ledgerStateVar :: TVar m (Map (HeaderHash RankingBlock) LedgerState)
+  , ibsNeededForEBVar :: TVar m (Map EndorseBlockId (Set InputBlockId))
   }
 
 data LeiosNodeConfig = LeiosNodeConfig
@@ -160,6 +162,7 @@ leiosNode tracer cfg followers peers = do
         <$> (mapM (newMuxChan . protocolPraos) followers)
         <*> (mapM (newMuxChan . protocolPraos) peers)
   ibDeliveryTimesVar <- newTVarIO Map.empty
+  ibsNeededForEBVar <- newTVarIO Map.empty
   let relayIBConfig =
         RelayConsumerConfig
           { relay = RelayConfig{maxWindowSize = 100}
@@ -191,8 +194,8 @@ leiosNode tracer cfg followers peers = do
           , maxBodiesToRequest = 1 -- should we chunk bodies here?
           , submitBlocks = \xs _ completion -> atomically $ do
               writeTBQueue validationQueue $!
-                ValidateEBS (map snd xs) $
-                  completion . map (\eb -> (eb.id, eb))
+                ValidateEBS (map snd xs) $ \ebs -> do
+                  completion . map (\eb -> (eb.id, eb)) $ ebs
           }
   let relayVoteConfig =
         RelayConsumerConfig
@@ -230,7 +233,7 @@ leiosNode tracer cfg followers peers = do
   let genThreads = [generate leiosState]
   let processingThreads = [processing leiosState]
   let pruningThreads = [] -- TODO: need EB/IBs to be around long enough to compute ledger state if they end in RB.
-  let computeLedgerStateThreads = error "TODO"
+  let computeLedgerStateThreads = [computeLedgerState leiosState]
   return $
     concat
       [ genThreads
@@ -248,6 +251,26 @@ leiosNode tracer cfg followers peers = do
     forM_ ds (traceWith tracer . LeiosNodeEventCPU . CPUTask)
     let d = maximum ds
     when (d >= 0) $ threadDelaySI d
+  computeLedgerState :: LeiosNodeState m -> m ()
+  computeLedgerState st = forever $ do
+    _readyLedgerState <- atomically $ do
+      blocks <- readTVar st.praosState.blockFetchControllerState.blocksVar
+      when (Map.null blocks) retry
+      ledgerMissing <- Map.elems . (blocks Map.\\) <$> readTVar st.ledgerStateVar
+      when (null ledgerMissing) retry
+      ibsNeededForEB <- readTVar st.ibsNeededForEBVar
+      let readyLedgerState =
+            [ (blockHash rb, LedgerState)
+            | rb <- ledgerMissing
+            , flip all rb.blockBody.endorseBlocks $ \(ebId, _) ->
+                Map.lookup ebId ibsNeededForEB == Just Set.empty
+            ]
+      when (null readyLedgerState) retry
+      modifyTVar' st.ledgerStateVar (`Map.union` Map.fromList readyLedgerState)
+      return readyLedgerState
+    -- TODO? trace readyLedgerState
+    return ()
+
   generate :: LeiosNodeState m -> m ()
   generate st = do
     schedule <- mkSchedule cfg
@@ -271,7 +294,9 @@ leiosNode tracer cfg followers peers = do
   processing :: LeiosNodeState m -> m ()
   processing leiosState = forever $ do
     -- NOTE: IOSim deschedules the thread after an `atomically`, we
-    -- might get more parallelism by reading the whole buffer at once.
+    -- might get more parallelism by reading the whole buffer at once,
+    -- collect all resulting delays and do a single
+    -- `threadDelayParallel` call.
     req <- atomically $ readTBQueue leiosState.validationQueue
     case req of
       ValidateRB rb completion -> do
@@ -284,7 +309,7 @@ leiosNode tracer cfg followers peers = do
           BlockHash prev -> atomically $ do
             let var =
                   if rb.blockBody.payload > 0
-                    then leiosState.waitingForLedgerStateVar
+                    then leiosState.waitingForLedgerStateVar -- TODO: assumes payload can be validated without content of EB, check with spec.
                     else leiosState.waitingForRBVar
             modifyTVar' var $ Map.insertWith (++) prev [(delay, completion)]
       ValidateIBS ibs completion -> do
@@ -292,8 +317,12 @@ leiosNode tracer cfg followers peers = do
         let valIB x =
               let
                 !delay = cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
+                task = atomically $ do
+                  completion [x]
+                  -- TODO: likely needs optimization
+                  modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete (fst x).id))
                in
-                (delay, atomically (completion [x]))
+                (delay, task)
         let waitingLedgerState =
               Map.fromListWith
                 (++)
@@ -310,7 +339,11 @@ leiosNode tracer cfg followers peers = do
       ValidateEBS ebs completion -> do
         -- NOTE: block references are only inspected during voting.
         threadDelayParallel $ map cfg.leios.delays.endorseBlockValidation ebs
-        atomically $ completion ebs
+        atomically $ do
+          completion ebs
+          ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
+          let ibsNeeded = Map.fromList $ map (\eb -> (eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)) ebs
+          modifyTVar' leiosState.ibsNeededForEBVar $ (`Map.union` ibsNeeded)
       ValidateVotes vs completion -> do
         threadDelayParallel $ map cfg.leios.delays.voteMsgValidation vs
         atomically $ completion vs
