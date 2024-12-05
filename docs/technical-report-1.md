@@ -40,7 +40,22 @@
 
 ## Voting and certificates
 
+Leios voting involves numerous decisions about cryptographic matters and protocol parameters.
 
+- What type of keys will be used to sign a vote?
+- What form will a proof of the right to vote take?
+- How large will the vote committee be?
+- Will committee members with a large amount of stake be allowed multiple votes?
+- What quorum of votes will be required to certify an EB?
+- What type of certificate will attest to a quorum of votes?
+
+These decisions affect security, efficiency, and cost.
+
+- All of the choices affect security.
+- The cryptographic details affect the size of votes and certificates and the CPU and network resources needed for them.
+- The size of the committee and quorum directly affect CPU and network resources.
+
+The next subsections contain preliminary analyses of concerns and potential decisions affecting voting and certificates. For clarity, we have tried to keep different aspects separate.
 
 
 ### Structure of votes
@@ -51,8 +66,25 @@ Conceptually, a Leios vote contains the following information:
 - The identity of the voter
 - The number of votes cast
 - A proof that the votes cast are valid
+- A signature
 
-When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized.
+When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized. Not counting the hash of the EB, we would expect a vote to comprise at least 146 bytes. However, use of KES signature could add nearly 500 bytes more.
+
+- *Voter identity:* 32 bytes
+- *Number of votes cast:* 2 bytes
+- *Proof of right to vote:* 80 bytes
+- *Signature:* 32 bytes
+
+> [!DANGER]
+> Is this reasoning correct?
+> 
+> - Voter identity is 32 bytes because that is the size of a pool ID.
+> - We really only need 1 byte to count the votes cast, but two is safer.
+> - I'm not sure where the 80 byte estimate for a VRF proof came from.
+> - A Blake2b-256 signature is 32 bytes.
+> - This assumes that public keys would have been transmitted previously.
+> - This also assumes that duplicative information such as the EB hash and pipeline ID would be global to the collection of votes.
+
 
 It has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
 
@@ -197,7 +229,33 @@ Given the above analysis, we consider a 60% quorum for a committee of 500 votes 
 > We need to compute the Praos attack probabilities at the above adversarial stakes, so we can compare them to the Leios probability of an adversarial quorum. I'm certain that the Leios probabilities are lower than the Praos ones if $\tau = 0.60$, but I'm not so certain about the situation if $\tau = 0.55$.
 
 
-### ALBA voting
+### Certificate scheme
+
+Certificates that attest to a quorum of votes have failure modes beyond the failure modes for obtaining a quorum of votes. Cryptographic parameters must be set so that a certificate is only created if a quorum is present and it should be highly probably that a certificate can be created if a quorum is present.
+
+| Quorum of votes? | Certificate created? | Description           | Implications                                          |
+| ---------------- | -------------------- | --------------------- | ----------------------------------------------------- |
+| Yes              | Yes                  | Proper certificate    | Input blocks endorsed.                                |
+| Yes              | No                   | Certification failure | Input blocks not endorsed when they should have been. |
+| No               | No                   | No quorum             | Input blocks not endorsed.                            |
+| No               | Yes                  | Erroneous certificate | Input blocks endorsed when they should not have been. |
+
+Combining the possible voting outcomes with the certificate ones yields a complex landscape. There is some interaction between voting and certification because some certificate scheme may have small probabilities of building a valid certificate without a quorum. We will evaluate several schemes in terms of these probabilities and the size of the certificate they produce. In addition to security, Leios requires that the certificate fit inside a Praos block, currently 90,112 bytes.
+
+| Content of certificate | Quorum on honest votes? | Certificate created? | Description                                          | Endorsement |
+| ---------------------- | ----------------------- | -------------------- | ---------------------------------------------------- | ----------- |
+| Honest votes           | Yes                     | Yes                  | Proper honest certificate                            | Honest      |
+| Honest votes           | No                      | Yes                  | Erroneous honest certificate                         | Incorrect   |
+| Honest votes           | Yes                     | No                   | Failure to make honest certificate                   | Failure     |
+| Honest votes           | No                      | No                   | No honest quorum                                     | None        |
+| Adversarial votes      | Yes                     | Yes                  | Adversarial certificate when honest one was possible | Attacked    |
+| Adversarial votes      | No                      | Yes                  | Adversarial certificate                              | Attacked    |
+
+
+#### BLS certificate
+
+
+#### ALBA certificate
 
 The Jupyter notebook [../analysis/stake_distribution.ipynb](analysis/stake_distribution.ipynb) (view [here](https://nbviewer.org/github/input-output-hk/ouroboros-leios/blob/stake-analysis/analysis/stake_distribution.ipynb)) analyzes the implications of the Cardano mainnet stake distribution upon the number of unique votes and votes for a Leios voting round.
 
@@ -226,27 +284,8 @@ The alternative is to use BLS certificates, which have higher CPU load but small
 ![Number of unique votes in ALBA certificate for Leios](../analysis/unique-votes-leios.png)
 
 
+#### Musen certificate
 
-### Certificate scheme
-
-
-| Quorum of votes? | Certificate created? | Description           | Implications                                          |
-| ---------------- | -------------------- | --------------------- | ----------------------------------------------------- |
-| Yes              | Yes                  | Proper certificate    | Input blocks endorsed.                                |
-| Yes              | No                   | Certification failure | Input blocks not endorsed when they should have been. |
-| No               | No                   | No quorum             | Input blocks not endorsed.                            |
-| No               | Yes                  | Erroneous certificate | Input blocks endorsed when they should not have been. |
-
-
-
-| Content of certificate | Quorum on honest votes? | Certificate created? | Description                                          | Endorsement |
-| ---------------------- | ----------------------- | -------------------- | ---------------------------------------------------- | ----------- |
-| Honest votes           | Yes                     | Yes                  | Proper honest certificate                            | Honest      |
-| Honest votes           | No                      | Yes                  | Erroneous honest certificate                         | Incorrect   |
-| Honest votes           | Yes                     | No                   | Failure to make honest certificate                   | Failure     |
-| Honest votes           | No                      | No                   | No honest quorum                                     | None        |
-| Adversarial votes      | Yes                     | Yes                  | Adversarial certificate when honest one was possible | Attacked    |
-| Adversarial votes      | No                      | Yes                  | Adversarial certificate                              | Attacked    |
 
 
 ## Cost analyses
