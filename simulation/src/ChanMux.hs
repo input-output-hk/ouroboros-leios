@@ -35,6 +35,7 @@ import Control.Tracer
 
 import Chan
 import ChanTCP
+import qualified Control.Category as Cat
 import TimeCompat
 
 class MuxBundle bundle where
@@ -61,6 +62,10 @@ data ToFromMuxMsg mm a
   { toMuxMsg :: a -> mm
   , fromMuxMsg :: mm -> a
   }
+
+instance Cat.Category ToFromMuxMsg where
+  id = ToFromMuxMsg id id
+  (.) (ToFromMuxMsg f f') (ToFromMuxMsg g g') = ToFromMuxMsg (g . f) (f' . g')
 
 dynToFromMuxMsg :: Typeable a => ToFromMuxMsg Dynamic a
 dynToFromMuxMsg = ToFromMuxMsg toDyn (fromJust . fromDynamic)

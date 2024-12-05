@@ -10,10 +10,11 @@
 module LeiosProtocol.Short.Node where
 
 import ChanMux
+import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM
 import Control.Exception (assert)
-import Control.Monad (forever, guard, join, when)
+import Control.Monad (forever, guard, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Tracer
@@ -52,14 +53,13 @@ data LeiosMessage
   | RelayEB {fromRelayEB :: RelayEBMessage}
   | RelayVote {fromRelayVote :: RelayVoteMessage}
   | -- | `BearerMsg` here is a bit ugly, but allows us to not have to split up PraosMessage in the Leios bundle.
-    PraosMsg {fromPraosMsg :: BearerMsg PraosMessage}
+    PraosMsg {fromPraosMsg :: PraosMessage}
 
 data Leios f = Leios
   { protocolIB :: f RelayIBMessage
   , protocolEB :: f RelayEBMessage
   , protocolVote :: f RelayVoteMessage
-  , protocolPraos :: f (BearerMsg PraosMessage)
-  -- ^ use newChanMux on (Chan m PraosMessage) to get PraosNode.Praos bundle.
+  , protocolPraos :: PraosNode.Praos RankingBlockBody f
   }
 
 instance MessageSize LeiosMessage where
@@ -76,9 +76,13 @@ instance MuxBundle Leios where
       { protocolIB = ToFromMuxMsg RelayIB fromRelayIB
       , protocolEB = ToFromMuxMsg RelayEB fromRelayEB
       , protocolVote = ToFromMuxMsg RelayVote fromRelayVote
-      , protocolPraos = ToFromMuxMsg PraosMsg fromPraosMsg
+      , protocolPraos = case toFromMuxMsgBundle @(PraosNode.Praos RankingBlockBody) of
+          PraosNode.Praos a b -> PraosNode.Praos (p >>> a) (p >>> b)
       }
-  traverseMuxBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> f d
+   where
+    p = ToFromMuxMsg PraosMsg fromPraosMsg
+
+  traverseMuxBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseMuxBundle f d
 
 type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
 type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId EndorseBlock
@@ -151,11 +155,10 @@ setupRelay cfg consumerSST followers peers = do
   return $ consumers ++ producers
 
 type SubmitBlocks m header body =
-  ( [(header, body)] ->
-    UTCTime ->
-    ([(header, body)] -> STM m ()) ->
-    m ()
-  )
+  [(header, body)] ->
+  UTCTime ->
+  ([(header, body)] -> STM m ()) ->
+  m ()
 
 relayIBConfig ::
   (MonadAsync m, MonadSTM m, MonadDelay m, MonadTime m) =>
@@ -267,10 +270,13 @@ leiosNode tracer cfg followers peers = do
             completion . map (\eb -> (eb.id, eb)) $ ebs
 
   praosThreads <-
-    join $
-      PraosNode.setupPraosThreads' (contramap PraosNodeEvent tracer) cfg.leios.praos submitRB praosState
-        <$> (mapM (newMuxChan . protocolPraos) followers)
-        <*> (mapM (newMuxChan . protocolPraos) peers)
+    PraosNode.setupPraosThreads'
+      (contramap PraosNodeEvent tracer)
+      cfg.leios.praos
+      submitRB
+      praosState
+      (map protocolPraos followers)
+      (map protocolPraos peers)
 
   ibThreads <-
     setupRelay
