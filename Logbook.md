@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-12-05
+
+### Rust simulation
+
+We have a running model of RB production, which means we're simulating Leios end to end! Transaction throughput seems lower than expected, only ~57% of transactions reach the base chain over the course of 300 slots. This is likely a bug with the sim and needs more investigation.
+
+Shifting focus on the visualization, from an extremely-slowed-down view of network traffic to views of the individual blocks themselves. We learned this morning that stage length would likely be 20 slots (we had assumed much lower), so we want to prioritize views with less data so that we can run them in real or sped-up time.
+
 ## 2024-12-04
 
 ### Outline for first technical report
@@ -15,6 +23,10 @@ The [draft first technical report for Leios](docs/technical-report-1.md) contain
 - Voting and certificates
 - Cost analysis for Leios nodes
 - Findings and conclusions
+
+### Rust simulation
+
+Fixed the issue caught by ΔQ; it was an issue with the topology of the test data. Alas, the model still doesn't match any reasonable formula in ΔQ.
 
 ## 2024-12-03
 
@@ -46,6 +58,12 @@ Metrics
   Retained fees − cost: 6045.075715767416 USD/month
   Retained fees ÷ cost: 175.347923221418 %
 ```
+
+### Rust simulation
+
+Simplified the representation of events, so that votes don't take up as much file size. Began work on modeling RB production.
+
+Roland measured the rust sim's transaction propagation time against a ΔQ model, and the rust sim propagated more quickly than physically possible. Unforutnately, this is a bug.
 
 ## 2024-11-28
 
