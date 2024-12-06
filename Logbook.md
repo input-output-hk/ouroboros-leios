@@ -15,6 +15,30 @@ Next steps:
   voting) and check for problems in simulation.
 - Run larger simulations and extract measures of interest.
 
+### ALBA analyses and benchmarking
+
+Analysis and benchmarking of ALBA certificates for Leios has proceeded and is providing valuable results.
+
+- Parameters $\lambda$, $n_f$, and $n_p$ were varied.
+- Estimates of certificate size, time to build the certificate, and time to verify the certificate were measured.
+- Benchmarking is made with respect to the hash function used (Blake2s, SHA256, Keccak256, etc.)
+- SNARKifying the resulting certificate is being assessed.
+
+Similar results for Mithril certificates will be ready next week. Analysis of Musen will follow that.
+
+This all is a work and progress and values may change significantly in the future, especially as we understand the SNARKification better and investigate Musen. We'll also need a more elaborate catalog of these numbers, since there are many parameters and scenarios. In particular, if we use SNARKs, the proving times will be much higher but the certificates will be very small. We also haven't settled on VRF/KES votes vs empheral keys. Anyway, below are some recommended values for our December simulations:
+
+- Sortition: 50 ms
+- Votes
+    - Number: 500
+    - Size: 500 B
+    - Construction: 0.65 ms
+    - Verification: 0.15 ms
+- ALBA certificate
+    - Size: 75 kB
+    - Construction (aggregation plus proof): 200 ms
+    - Verification: 0.15 ms
+
 ### Draft of several sections of the first tech report
 
 We now have a full draft of several sections of the technical report.
