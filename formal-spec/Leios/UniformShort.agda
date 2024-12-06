@@ -36,7 +36,6 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                    eb     : EndorserBlock
                    ebs    : List (T.These EndorserBlock (List Tx))
                    txs    : List Tx
-                   rbRef  : RBRef
                    V      : VTy
                    SD     : StakeDistr
                    pks    : List PubKey
@@ -54,7 +53,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     IB-Role : let open LeiosState s renaming (FFDState to ffds)
                   b = ibBody (record { txs = ToPropose })
-                  h = ibHeader (mkIBHeader slot poolId π sk-IB ToPropose rbRef)
+                  h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
             in
             ∙ needsUpkeep IB-Role
             ∙ canProduceIB slot sk-IB (stake s) π
@@ -64,7 +63,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
                   LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                  h = mkEB slot poolId π sk-EB LI []
+                  h = mkEB slot id π sk-EB LI []
             in
             ∙ needsUpkeep EB-Role
             ∙ canProduceEB slot sk-EB (stake s) π

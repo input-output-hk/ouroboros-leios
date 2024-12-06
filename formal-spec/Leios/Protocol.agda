@@ -1,6 +1,6 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude
+open import Leios.Prelude hiding (id)
 open import Leios.FFD
 
 import Data.These as T
@@ -100,7 +100,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
 
 stake : LeiosState → ℕ
-stake record { SD = SD } = case lookupᵐ? SD poolId of λ where
+stake record { SD = SD } = case lookupᵐ? SD id of λ where
   (just s) → s
   nothing  → 0
 

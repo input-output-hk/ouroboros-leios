@@ -24,7 +24,6 @@ OSig : Bool → Type
 OSig true  = Sig
 OSig false = ⊤
 
-RBRef = Hash
 IBRef = Hash
 EBRef = Hash
 
@@ -37,7 +36,6 @@ record IBHeaderOSig (b : Bool) : Type where
         producerID : PoolID
         lotteryPf  : VrfPf
         bodyHash   : Hash
-        rbRef      : RBRef
         signature  : OSig b
 
 IBHeader    = IBHeaderOSig true
@@ -62,15 +60,14 @@ instance
   IsBlock-InputBlock : IsBlock InputBlock
   IsBlock-InputBlock = record { InputBlock }
 
-mkIBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → RBRef → IBHeader
-mkIBHeader slot id π pKey txs rbRef = record { signature = sign pKey (hash h) ; IBHeaderOSig h }
+mkIBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → IBHeader
+mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHeaderOSig h }
   where
     h : IBHeaderOSig false
     h = record { slotNumber = slot
                ; producerID = id
                ; lotteryPf  = π
                ; bodyHash   = hash txs
-               ; rbRef      = rbRef
                ; signature  = _
                }
 

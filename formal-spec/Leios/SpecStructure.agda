@@ -20,7 +20,7 @@ record SpecStructure : Type₁ where
   field ⦃ IsBlock-Vote ⦄ : IsBlock (List Vote)
         ⦃ Hashable-IBHeaderOSig ⦄ : ∀ {b} → Hashable (IBHeaderOSig b) Hash
         ⦃ Hashable-PreEndorserBlock ⦄ : Hashable PreEndorserBlock Hash
-        poolId : PoolID
+        id : PoolID
         FFD' : FFDAbstract.Functionality ffdAbstract
         vrf' : LeiosVRF a
 
