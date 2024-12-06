@@ -41,7 +41,7 @@ import VizUtils
 
 example1 :: Visualization
 example1 =
-  slowmoVisualization 1 $
+  slowmoVisualization 0.5 $
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
@@ -417,6 +417,7 @@ leiosSimVizRenderModel
       LeiosSimVizState
         { vizWorldShape = WorldShape{worldDimensions}
         , vizNodePos
+        , vizNodeTip
         , vizNodeLinks
         , vizMsgsInTransit
         }
@@ -431,12 +432,15 @@ leiosSimVizRenderModel
       sequence_
         [ do
           Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB 0.7 0.7 0.7
+          Cairo.setSourceRGB r b g
           Cairo.fillPreserve
           Cairo.setSourceRGB 0 0 0
           Cairo.stroke
-        | (_node, pos) <- Map.toList vizNodePos
+        | (node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
+        , let (r, b, g) = case Map.lookup node vizNodeTip of
+                Just (FullTip hdr) -> blockHeaderColorAsBody hdr
+                _ -> (0.7, 0.7, 0.7)
         ]
       Cairo.restore
 

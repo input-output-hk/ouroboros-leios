@@ -80,17 +80,17 @@ traceRelayLink1 tcpprops =
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
-              , sliceLength = 7
+              , sliceLength = 5 -- matching the interval between RBs
               , -- \^ measured in slots, also stage length in Short leios.
                 inputBlockFrequencyPerSlot = 5
               , -- \^ expected InputBlock generation rate per slot.
-                endorseBlockFrequencyPerStage = 3
+                endorseBlockFrequencyPerStage = 4
               , -- \^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
                 activeVotingStageLength = 1
-              , -- \^ prefix of the voting stage where new votes are generated, <= sliceLength.
-                votingFrequencyPerStage = 20
-              , votesForCertificate = 10
-              , sizes =
+              , votingFrequencyPerStage = 4
+              , votesForCertificate = 1 -- just two nodes available to vote!
+              , sizes -- TODO: realistic sizes
+                =
                   SizesConfig
                     { producerId = 4
                     , vrfProof = 32
@@ -107,14 +107,14 @@ traceRelayLink1 tcpprops =
                     , -- \^ hash matching and payload validation (incl. tx scripts)
                       endorseBlockValidation = const 0.005
                     , voteMsgValidation = const 0.005
-                    , certificateCreation = const 0.050
+                    , certificateCreation = const 0.050 -- TODO: is this used?
                     }
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig
               { leios = leiosConfig
-              , rankingBlockFrequencyPerSlot = 0.2
-              , stake = StakeFraction 0.5
+              , rankingBlockFrequencyPerSlot = 1 / fromIntegral leiosConfig.sliceLength -- every 5 seconds
+              , stake = StakeFraction 0.5 -- just two nodes!
               , rng = mkStdGen i
               , -- \^ for block generation
                 baseChain = Genesis
