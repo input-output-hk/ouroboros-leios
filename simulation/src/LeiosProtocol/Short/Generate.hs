@@ -58,14 +58,20 @@ mkScheduler rng0 rates = do
         return $ acts
   return sched
 
-waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> m SlotNo
-waitNextSlot cfg = do
+-- | @waitNextSlot cfg targetSlot@ waits until the beginning of
+-- @targetSlot@ if that's now or in the future, otherwise the closest slot.
+waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> SlotNo -> m SlotNo
+waitNextSlot cfg targetSlot = do
   now <- getCurrentTime
-  let nextSlotTime = (ceiling $ now `diffUTCTime` cfg.praos.slotConfig.start)
-  let slot =
-        assert (cfg.praos.slotConfig.duration == 1) $
-          assert (nextSlotTime >= 0) $
-            toEnum nextSlotTime
+  let targetSlotTime = slotTime cfg.praos.slotConfig targetSlot
+  let slot
+        | now <= targetSlotTime = targetSlot
+        | otherwise = assert (nextSlotIndex >= 0) $ toEnum nextSlotIndex
+       where
+        nextSlotIndex =
+          assert (cfg.praos.slotConfig.duration == 1) $
+            ceiling $
+              now `diffUTCTime` cfg.praos.slotConfig.start
   let tgt = slotTime cfg.praos.slotConfig slot
   threadDelayNDT (tgt `diffUTCTime` now)
   return slot
@@ -83,14 +89,14 @@ blockGenerator ::
   (MonadSTM m, MonadDelay m, MonadTime m) =>
   BlockGeneratorConfig m ->
   m ()
-blockGenerator BlockGeneratorConfig{..} = go 0
+blockGenerator BlockGeneratorConfig{..} = go (0, 0)
  where
-  go !blkId = do
-    slot <- waitNextSlot leios
+  go (!blkId, !tgtSlot) = do
+    slot <- waitNextSlot leios tgtSlot
     roles <- schedule slot
     (actions, blkId') <- runStateT (mapM (execute slot) roles) blkId
     submit actions
-    go blkId'
+    go (blkId', slot + 1)
   execute slot (SomeRole r) = SomeAction r <$> execute' slot r
   execute' :: SlotNo -> Role a -> StateT Int m a
   execute' slot Base = do

@@ -90,10 +90,10 @@ type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId Endor
 type RelayVoteState = RelayConsumerSharedState VoteId VoteId VoteMsg
 
 data ValidationRequest m
-  = ValidateRB RankingBlock (m ())
-  | ValidateIBS [(InputBlockHeader, InputBlockBody)] UTCTime ([(InputBlockHeader, InputBlockBody)] -> STM m ())
-  | ValidateEBS [EndorseBlock] ([EndorseBlock] -> STM m ())
-  | ValidateVotes [VoteMsg] ([VoteMsg] -> STM m ())
+  = ValidateRB !RankingBlock !(m ())
+  | ValidateIBS ![(InputBlockHeader, InputBlockBody)] !UTCTime !([(InputBlockHeader, InputBlockBody)] -> STM m ())
+  | ValidateEBS ![EndorseBlock] !([EndorseBlock] -> STM m ())
+  | ValidateVotes ![VoteMsg] !([VoteMsg] -> STM m ())
 
 data LedgerState = LedgerState
 
@@ -221,7 +221,8 @@ relayVoteConfig tracer _cfg submitBlocks =
     , submitBlocks
     }
 
-threadDelayParallel :: (Foldable t, MonadDelay m) => Tracer m LeiosNodeEvent -> t DiffTime -> m ()
+threadDelayParallel :: MonadDelay m => Tracer m LeiosNodeEvent -> [DiffTime] -> m ()
+threadDelayParallel tracer [] = return ()
 threadDelayParallel tracer ds = do
   forM_ ds (traceWith tracer . LeiosNodeEventCPU . CPUTask)
   let d = maximum ds
