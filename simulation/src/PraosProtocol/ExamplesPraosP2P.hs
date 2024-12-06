@@ -107,6 +107,7 @@ data DiffusionData = DiffusionData
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
   , stable_chain_hashes :: [Int]
+  , cpuTasks :: Map.Map NodeId [(DiffTime, CPUTask)]
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -123,16 +124,18 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
 data DiffusionLatencyState = DiffusionLatencyState
   { chains :: !ChainsMap
   , diffusions :: !DiffusionLatencyMap
+  , cpuTasks :: !(Map.Map NodeId [(DiffTime, CPUTask)])
   }
 
 diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
 diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState accum render
  where
-  initState = DiffusionLatencyState IMap.empty Map.empty
+  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty
   accum t e DiffusionLatencyState{..} =
     DiffusionLatencyState
       { chains = accumChains t e chains
       , diffusions = accumDiffusionLatency t e diffusions
+      , cpuTasks = accumCPUTasks t e cpuTasks
       }
   nnodes = p2pNumNodes p2pTopographyCharacteristics
   render DiffusionLatencyState{..} = do
@@ -158,6 +161,7 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState acc
             , entries
             , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
             , stable_chain_hashes
+            , cpuTasks
             }
 
     encodeFile fp diffusionData
@@ -168,6 +172,10 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState acc
     putStrLn $ "Number of blocks that reached 98% stake: " ++ show (length $ fst arrived98)
     putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ snd arrived98)
     putStrLn $ "Blocks in longest common prefix that did not reach 98% stake: " ++ show missing
+
+accumCPUTasks :: Time -> PraosEvent -> Map.Map NodeId [(DiffTime, CPUTask)] -> Map.Map NodeId [(DiffTime, CPUTask)]
+accumCPUTasks (Time t) (PraosEventNode (LabelNode nId (PraosNodeEventCPU task))) = Map.insertWith (++) nId [(t, task)]
+accumCPUTasks _ _ = id
 
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
