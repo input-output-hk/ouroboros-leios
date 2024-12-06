@@ -12,9 +12,6 @@ module LeiosProtocol.Short.Sim where
 
 import ChanMux
 import ChanTCP
-import Control.Monad.Class.MonadAsync (
-  MonadAsync (async, wait),
- )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -27,6 +24,9 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 -- import PraosProtocol.Common hiding (Point)
+
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -49,6 +49,9 @@ data LeiosEvent
   | -- | An event on a tcp link between two nodes
     LeiosEventTcp (LabelLink (TcpEvent LeiosMessage))
   deriving (Show)
+
+messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
+messages trace = [(t, LabelLink x y msg) | (t, LeiosEventTcp (LabelLink x y (TcpSendMsg msg _ _))) <- trace]
 
 exampleTrace1 :: LeiosTrace
 exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
@@ -129,8 +132,8 @@ traceRelayLink1 tcpprops =
         (++)
           <$> (leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA])
           <*> (leiosNode (nodeTracer nodeB) (leiosNodeConfig nodeB) [pB] [cB])
-      mapM_ wait =<< mapM async threads
-      return ()
+      mapM_ forkIO threads
+      forever $ threadDelaySI 1000
  where
   (nodeA, nodeB) = (NodeId 0, NodeId 1)
 
