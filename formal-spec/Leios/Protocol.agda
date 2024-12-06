@@ -65,7 +65,7 @@ record LeiosState : Type where
           open IBBody
           open InputBlock
 
-  constructLedger : List (T.These EndorserBlock (List Tx)) → List Tx
+  constructLedger : List RankingBlock → List Tx
   constructLedger = L.concat ∘ L.map (T.mergeThese L._++_ ∘ T.map₁ lookupTxs)
 
   needsUpkeep : SlotUpkeep → Set

@@ -14,6 +14,8 @@ open import Leios.Blocks a using (EndorserBlock)
 StakeDistr : Type
 StakeDistr = PoolID ⇀ ℕ
 
+RankingBlock = These EndorserBlock (List Tx)
+
 record BaseAbstract : Type₁ where
   field Cert : Type
         VTy : Type
@@ -22,13 +24,13 @@ record BaseAbstract : Type₁ where
 
   data Input : Type₁ where
     INIT   : (EndorserBlock × Cert → Type) → Input
-    SUBMIT : These EndorserBlock (List Tx) → Input
+    SUBMIT : RankingBlock → Input
     FTCH-LDG : Input
 
   data Output : Type where
     STAKE : StakeDistr → Output
     EMPTY : Output
-    BASE-LDG : List (These EndorserBlock (List Tx)) → Output
+    BASE-LDG : List RankingBlock → Output
 
   record Functionality : Type₁ where
     field State : Type
