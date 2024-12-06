@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module PraosProtocol.VizSimPraos where
 
@@ -284,6 +283,7 @@ praosSimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
+  accumEventVizState _ (PraosEventNode (LabelNode _ (PraosNodeEventCPU _))) vs = vs
 
   pruneVisState ::
     Time ->

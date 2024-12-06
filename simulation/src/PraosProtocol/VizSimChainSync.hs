@@ -1,7 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module PraosProtocol.VizSimChainSync where
 
@@ -191,6 +190,7 @@ relaySimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
+  accumEventVizState _ (ChainSyncEventNode _) vs = vs
   -- accumEventVizState now (ChainSyncEventNode (LabelNode nid (RelayNodeEventEnterQueue msg))) vs =
   --   vs
   --     { vizMsgsAtNodeQueue =

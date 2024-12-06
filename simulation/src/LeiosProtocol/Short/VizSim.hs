@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module LeiosProtocol.Short.VizSim where
 
@@ -286,6 +285,13 @@ praosSimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
+  accumEventVizState _now (LeiosEventNode (LabelNode _nodeId (LeiosNodeEventCPU _task))) vs = vs
+  accumEventVizState
+    _now
+    ( LeiosEventNode
+        (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
+      )
+    vs = vs
 
   pruneVisState ::
     Time ->
