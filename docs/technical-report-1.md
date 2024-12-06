@@ -225,8 +225,12 @@ Given the above analysis, we consider a 60% quorum for a committee of 500 votes 
 |                   45 % |                           3.01e-6 |                        0.066 |
 |                   50 % |                           7.83e-4 |                        0.001 |
 
-> [!WARNING]
+> [!TODO]
 > We need to compute the Praos attack probabilities at the above adversarial stakes, so we can compare them to the Leios probability of an adversarial quorum. I'm certain that the Leios probabilities are lower than the Praos ones if $\tau = 0.60$, but I'm not so certain about the situation if $\tau = 0.55$.
+
+> [!DANGER]
+> 
+> The above analysis might not hold when the clumpiness of the stake distribution is accounted for. For example, do the probabilities change if a couple of large stakepools are selected in the lottery?
 
 
 ### Certificate scheme
@@ -291,6 +295,15 @@ For the sake of argument, assume that we want the votes included in the certific
 |     400 B |                      187 |                     421 |                                   84.2 % |
 |     450 B |                      166 |                     439 |                                   87.8 % |
 |     500 B |                      150 |                     457 |                                   91.4 % |
+
+
+> [!TODO]
+> 
+> Include results from Raphael's analyses and benchmarking:
+> 
+> - [ ] Certificate size for unoptimized and optimized ALBA format.
+> - [ ] How proving times vary with the underlying hash algorithm (Blake2s, SHA256, Keccak256, Poseidon, etc.).
+> - [ ] Snarkification
 
 
 #### Musen certificate
@@ -403,6 +416,10 @@ The main findings confirm the insights from the system-dynamics siulation
 - Downstream connectivity of nodes imposes substantial network-egress costs on SPOs.
 - It is critical that hardware costs continue to drop at a 15% reduction per year.
 - The present fee structure for Cardano transaction is sufficient for Leios to be viable if there are more than 50 transactions per second.
+
+> [!DANGER]
+> 
+> We need to account for the fact that many SPOs use cloud services that include a large amount of bandwidth for VMs: the cost model should only bill for the bandwidth used beyond that monthly allocation.
 
 
 ### Cost of storage
