@@ -222,7 +222,7 @@ relayVoteConfig tracer _cfg submitBlocks =
     }
 
 threadDelayParallel :: MonadDelay m => Tracer m LeiosNodeEvent -> [DiffTime] -> m ()
-threadDelayParallel tracer [] = return ()
+threadDelayParallel _tracer [] = return ()
 threadDelayParallel tracer ds = do
   forM_ ds (traceWith tracer . LeiosNodeEventCPU . CPUTask)
   let d = maximum ds
