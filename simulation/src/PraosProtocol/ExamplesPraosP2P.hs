@@ -32,7 +32,7 @@ import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import PraosProtocol.SimPraosP2P
-import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig (..), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
+import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig' (blockFetchMessageColor), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)

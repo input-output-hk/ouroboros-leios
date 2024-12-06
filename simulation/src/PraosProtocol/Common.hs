@@ -38,6 +38,7 @@ module PraosProtocol.Common (
   module TimeCompat,
   defaultPraosConfig,
   CPUTask (..),
+  hashToColor,
 ) where
 
 import Control.Concurrent.Class.MonadSTM (

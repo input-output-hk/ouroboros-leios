@@ -47,7 +47,7 @@ example1 =
    where
     trace = exampleTrace1
 
-examplesPraosSimVizConfig :: PraosVizConfig
+examplesPraosSimVizConfig :: forall body. IsBody body => PraosVizConfig' body
 examplesPraosSimVizConfig = PraosVizConfig{..}
  where
   chainSyncMessageColor ::
@@ -63,14 +63,14 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
   chainSyncMessageText (ProtocolMessage (SomeMessage msg)) = Just $ chainSyncMessageLabel msg
 
   blockFetchMessageColor ::
-    BlockFetchMessage BlockBody ->
+    BlockFetchMessage body ->
     (Double, Double, Double)
   blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgBlock blk -> blockBodyColor blk
     _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
-    BlockFetchMessage BlockBody ->
+    BlockFetchMessage body ->
     Maybe String
   blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
@@ -357,13 +357,13 @@ recentPrune now (RecentRate pq) =
 ------------------------------------------------------------------------------
 -- The vizualisation rendering
 --
-
-data PraosVizConfig
+type PraosVizConfig = PraosVizConfig' BlockBody
+data PraosVizConfig' body
   = PraosVizConfig
   { chainSyncMessageColor :: ChainSyncMessage -> (Double, Double, Double)
   , chainSyncMessageText :: ChainSyncMessage -> Maybe String
-  , blockFetchMessageColor :: BlockFetchMessage BlockBody -> (Double, Double, Double)
-  , blockFetchMessageText :: BlockFetchMessage BlockBody -> Maybe String
+  , blockFetchMessageColor :: BlockFetchMessage body -> (Double, Double, Double)
+  , blockFetchMessageText :: BlockFetchMessage body -> Maybe String
   }
 
 praosSimVizRender ::

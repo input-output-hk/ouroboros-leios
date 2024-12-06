@@ -3,12 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module LeiosProtocol.Short.VizSim where
 
 import ChanDriver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
+import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
 import Data.Map (Map)
@@ -18,15 +20,15 @@ import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
-import LeiosProtocol.Short.Node (LeiosMessage (..), LeiosNodeEvent (..))
+import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
+import LeiosProtocol.Short.Node (LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.BlockFetch (BlockFetchMessage, Message (MsgBlock), blockFetchMessageLabel)
-import PraosProtocol.ChainSync (ChainSyncMessage, Message (..), chainSyncMessageLabel)
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
+import qualified PraosProtocol.VizSimPraos as VizSimPraos
 import SimTypes
 import Viz
 import VizSim
@@ -39,49 +41,46 @@ import VizUtils
 
 example1 :: Visualization
 example1 =
-  slowmoVisualization 0.1 $
+  slowmoVisualization 1 $
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
-          praosSimVizRender examplesPraosSimVizConfig
+          leiosSimVizRender examplesLeiosSimVizConfig
  where
   model = praosSimVizModel trace
    where
     trace = exampleTrace1
 
-examplesPraosSimVizConfig :: PraosVizConfig
-examplesPraosSimVizConfig = PraosVizConfig{..}
+examplesLeiosSimVizConfig :: LeiosVizConfig
+examplesLeiosSimVizConfig = LeiosVizConfig{..}
  where
-  chainSyncMessageColor ::
-    ChainSyncMessage ->
-    (Double, Double, Double)
-  chainSyncMessageColor (ProtocolMessage (SomeMessage (MsgRollForward_StCanAwait blk _))) = blockHeaderColor blk
-  chainSyncMessageColor (ProtocolMessage (SomeMessage (MsgRollForward_StMustReply blk _))) = blockHeaderColor blk
-  chainSyncMessageColor _ = (1, 0, 0)
-
-  chainSyncMessageText ::
-    ChainSyncMessage ->
-    Maybe String
-  chainSyncMessageText (ProtocolMessage (SomeMessage msg)) = Just $ chainSyncMessageLabel msg
-
-  blockFetchMessageColor ::
-    BlockFetchMessage RankingBlockBody ->
-    (Double, Double, Double)
-  blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
-    MsgBlock blk -> blockBodyColor blk
+  VizSimPraos.PraosVizConfig{..} = VizSimPraos.examplesPraosSimVizConfig
+  praosMessageColor = either chainSyncMessageColor blockFetchMessageColor . coerce
+  praosMessageText = either chainSyncMessageText blockFetchMessageText . coerce
+  relayIBMessageColor :: RelayIBMessage -> (Double, Double, Double)
+  relayIBMessageColor = relayMessageColor $ \(InputBlockId x y) -> (x, y)
+  relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
+  relayEBMessageColor = relayMessageColor $ \(EndorseBlockId x y) -> (x, y)
+  relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
+  relayVoteMessageColor = relayMessageColor $ \(VoteId x y) -> (x, y)
+  relayIBMessageText :: RelayIBMessage -> Maybe String
+  relayIBMessageText = relayMessageText "IB:"
+  relayEBMessageText :: RelayEBMessage -> Maybe String
+  relayEBMessageText = relayMessageText "EB:"
+  relayVoteMessageText :: RelayVoteMessage -> Maybe String
+  relayVoteMessageText = relayMessageText "Vote:"
+  relayMessageText prefix (ProtocolMessage (SomeMessage msg)) = Just $ prefix ++ relayMessageLabel msg
+  relayMessageColor :: (id -> (NodeId, Int)) -> RelayMessage id header body -> (Double, Double, Double)
+  relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
+    MsgRespondBodies bodies -> hashToColor . hash $ map (f . fst) bodies
     _otherwise -> (1, 0, 0)
-
-  blockFetchMessageText ::
-    BlockFetchMessage RankingBlockBody ->
-    Maybe String
-  blockFetchMessageText (ProtocolMessage (SomeMessage msg)) = Just $ blockFetchMessageLabel msg
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
 
 -- | The vizualisation data model for the relay simulation
-type PraosSimVizModel =
+type LeiosSimVizModel =
   SimVizModel
     LeiosEvent
     LeiosSimVizState
@@ -167,7 +166,7 @@ accumDiffusionLatency' _ _ vs = vs
 -- trace.
 praosSimVizModel ::
   LeiosTrace ->
-  VizModel PraosSimVizModel
+  VizModel LeiosSimVizModel
 praosSimVizModel =
   simVizModel
     accumEventVizState
@@ -366,37 +365,52 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data PraosVizConfig
-  = PraosVizConfig
-  { chainSyncMessageColor :: ChainSyncMessage -> (Double, Double, Double)
-  , chainSyncMessageText :: ChainSyncMessage -> Maybe String
-  , blockFetchMessageColor :: BlockFetchMessage RankingBlockBody -> (Double, Double, Double)
-  , blockFetchMessageText :: BlockFetchMessage RankingBlockBody -> Maybe String
+data LeiosVizConfig
+  = LeiosVizConfig
+  { praosMessageColor :: PraosMessage RankingBlockBody -> (Double, Double, Double)
+  , praosMessageText :: PraosMessage RankingBlockBody -> Maybe String
+  , relayIBMessageColor :: RelayIBMessage -> (Double, Double, Double)
+  , relayIBMessageText :: RelayIBMessage -> Maybe String
+  , relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
+  , relayEBMessageText :: RelayEBMessage -> Maybe String
+  , relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
+  , relayVoteMessageText :: RelayVoteMessage -> Maybe String
   }
 
-praosSimVizRender ::
-  PraosVizConfig ->
-  VizRender PraosSimVizModel
-praosSimVizRender vizConfig =
+leiosMessageColor :: LeiosVizConfig -> LeiosMessage -> (Double, Double, Double)
+leiosMessageColor LeiosVizConfig{..} msg =
+  case msg of
+    RelayIB x -> relayIBMessageColor x
+    RelayEB x -> relayEBMessageColor x
+    RelayVote x -> relayVoteMessageColor x
+    PraosMsg x -> praosMessageColor x
+
+leiosMessageText :: LeiosVizConfig -> LeiosMessage -> Maybe String
+leiosMessageText LeiosVizConfig{..} msg =
+  case msg of
+    RelayIB x -> relayIBMessageText x
+    RelayEB x -> relayEBMessageText x
+    RelayVote x -> relayVoteMessageText x
+    PraosMsg x -> praosMessageText x
+
+leiosSimVizRender ::
+  LeiosVizConfig ->
+  VizRender LeiosSimVizModel
+leiosSimVizRender vizConfig =
   VizRender
     { renderReqSize = (500, 500)
     , renderChanged = \_t _fn _m -> True
-    , renderModel = \t _fn m sz -> praosSimVizRenderModel vizConfig t m sz
+    , renderModel = \t _fn m sz -> leiosSimVizRenderModel vizConfig t m sz
     }
 
-praosSimVizRenderModel ::
-  PraosVizConfig ->
+leiosSimVizRenderModel ::
+  LeiosVizConfig ->
   Time ->
   SimVizModel event LeiosSimVizState ->
   (Double, Double) ->
   Cairo.Render ()
-praosSimVizRenderModel
-  PraosVizConfig
-    { chainSyncMessageColor
-    , chainSyncMessageText
-    , blockFetchMessageColor
-    , blockFetchMessageText
-    }
+leiosSimVizRenderModel
+  cfg
   now
   ( SimVizModel
       _events
@@ -440,9 +454,7 @@ praosSimVizRenderModel
           Cairo.newPath
           -- draw all the messages within the clipping region of the link
           renderMessagesInFlight
-            ( TcpSimVizConfig $ \msg -> case msg of
-                PraosMsg x -> either chainSyncMessageColor blockFetchMessageColor . coerce $ x
-                _ -> (0, 0, 0) -- TODO
+            ( TcpSimVizConfig $ leiosMessageColor cfg
             )
             now
             fromPos
@@ -515,7 +527,7 @@ praosSimVizRenderModel
       labelsOffset = scaleV (-50) $ unitV $ normalV $ vector fromPos toPos
       msgLabels =
         [ (msgLabel, msgforecast)
-        | (PraosMsg msg, msgforecast, _) <- msgs -- TODO: other msgs
+        | (msg, msgforecast, _) <- msgs
         , now <= msgRecvTrailingEdge msgforecast
-        , Just msgLabel <- [either chainSyncMessageText blockFetchMessageText $ coerce msg]
+        , Just msgLabel <- [leiosMessageText cfg msg]
         ]
