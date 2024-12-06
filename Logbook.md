@@ -1,5 +1,34 @@
 # Leios logbook
 
+## 2024-12-06
+
+### Draft of several sections of the first tech report
+
+We now have a full draft of several sections of the technical report.
+
+- Cost analysis
+    - Simulation of transaction volume on Cardano
+    - Estimation of costs for a Leios SPO
+    - Cost of storage
+        - Break-even cost for perpetual storage of blocks
+        - Compressed storage of Praos blocks
+- Rewards received
+    - Importance of Cardano Reserves
+- Insights for Leios techno-economics
+- Approximate models of Cardano mainnet characteristics
+    - Transaction sizes and frequencies
+    - Stake distribution
+
+Work is in progress on voting and certificates in https://github.com/input-output-hk/ouroboros-leios/pull/94. The following subsections have been fully drafted:
+
+- Voting and certificates
+- Structure of votes
+- Number of unique SPOs voting
+- Committee size and quorum requirement
+- Certificate scheme
+
+The ALBA, BLS, and Musen sections are still being researched and written.
+
 ## 2024-12-05
 
 ### Rust simulation
