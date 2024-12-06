@@ -87,6 +87,12 @@ ibHeaderValid? _ = yes record {}
 ibBodyValid? : (b : IBBody) → Dec (ibBodyValid b)
 ibBodyValid? _ = yes record {}
 
+ibValid : InputBlock → Type
+ibValid record { header = h ; body = b } = ibHeaderValid h × ibBodyValid b
+
+ibValid? : (ib : InputBlock) → Dec (ibValid ib)
+ibValid? record { header = h ; body = b } = ibHeaderValid? h ×-dec ibBodyValid? b
+
 --------------------------------------------------------------------------------
 -- Endorser Blocks
 --------------------------------------------------------------------------------
@@ -139,69 +145,11 @@ ebValid? _ = yes record {}
 -- Votes
 --------------------------------------------------------------------------------
 
--- TODO: move here from AbstractLeios
-
 -- TODO
 record vsValid (vs : List Vote) : Type where
 
 vsValid? : (vs : List Vote) → Dec (vsValid vs)
 vsValid? _ = yes record {}
-
---------------------------------------------------------------------------------
--- Ranking Blocks
---------------------------------------------------------------------------------
-
-record Endorsement : Type where
-  field ebRef     : Hash
-        votes     : ℙ (PoolID × VrfPf)
-        signature : AggSig
-
-record RBHeaderOSig (b : Bool) : Type where
-  field slotNumber  : ℕ
-        producerID  : PoolID
-        lotteryPf   : VrfPf -- TODO: not in spec
-        endorsement : Endorsement
-        bodyHash    : Hash
-        prevHash    : Hash
-        signature   : OSig b
-
-RBHeader    = RBHeaderOSig true
-PreRBHeader = RBHeaderOSig false
-
-record RBBody : Type where
-  field txs : List Tx
-
-record RankingBlock : Type where
-  field header : RBHeader
-        body   : RBBody
-
-  open RBHeaderOSig header public
-
-instance
-  IsBlock-RBHeaderOSig : ∀ {b} → IsBlock (RBHeaderOSig b)
-  IsBlock-RBHeaderOSig = record { RBHeaderOSig }
-
-  Hashable-RBBody : Hashable RBBody Hash
-  Hashable-RBBody .hash b = hash (b .RBBody.txs)
-
-  IsBlock-RankingBlock : IsBlock RankingBlock
-  IsBlock-RankingBlock = record { RankingBlock }
-
-mkRBHeader : ⦃ Hashable PreRBHeader Hash ⦄ → ℕ → PoolID → VrfPf → Endorsement → PrivKey → List Tx → Hash → RBHeader
-mkRBHeader slot id π e pKey txs prevHash = record { signature = sign pKey (hash h) ; RBHeaderOSig h }
-  where
-    h : RBHeaderOSig false
-    h = record { slotNumber  = slot
-               ; producerID  = id
-               ; lotteryPf   = π
-               ; endorsement = e
-               ; bodyHash    = hash txs
-               ; prevHash    = prevHash
-               ; signature   = _
-               }
-
-getRBRef : ⦃ Hashable RBHeader Hash ⦄ → RankingBlock → RBRef
-getRBRef = hash ∘ RankingBlock.header
 
 --------------------------------------------------------------------------------
 -- FFD for Leios Blocks
