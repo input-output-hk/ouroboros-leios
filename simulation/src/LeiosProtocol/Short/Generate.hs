@@ -101,7 +101,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
   execute' :: SlotNo -> Role a -> StateT Int m a
   execute' slot Base = do
     rbData <- lift $ atomically $ buffers.newRBData
-    let body = mkRankingBlockBody leios rbData.freshestCertifiedEB rbData.txsPayload
+    let body = mkRankingBlockBody leios nodeId rbData.freshestCertifiedEB rbData.txsPayload
     -- TODO: maybe submit should do the fixupBlock.
     return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
   execute' slot (Propose sub) = do

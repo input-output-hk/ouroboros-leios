@@ -170,12 +170,13 @@ stageStart l s0 slot s = fst <$> stageRange l s0 slot s
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
 
-mkRankingBlockBody :: LeiosConfig -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg ebs payload =
+mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
+mkRankingBlockBody cfg nodeId ebs payload =
   fixSize cfg $
     RankingBlockBody
       { endorseBlocks = maybe [] (: []) ebs
       , payload
+      , nodeId
       , size = 0
       }
 
@@ -192,7 +193,7 @@ mkInputBlockHeader cfg id slot subSlot producer rankingBlock =
 
 mkInputBlock :: LeiosConfig -> InputBlockHeader -> Bytes -> InputBlock
 mkInputBlock _cfg header bodySize =
-  InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize}}
+  InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
@@ -206,7 +207,7 @@ mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> EndorseBlockId -> Vote
 mkVoteMsg cfg id slot producer endorseBlock = fixSize cfg $ VoteMsg{size = 0, ..}
 
 mkCertificate :: LeiosConfig -> Set VoteId -> Certificate
-mkCertificate cfg vs = assert (Set.size vs <= cfg.votesForCertificate) $ Certificate vs
+mkCertificate cfg vs = assert (Set.size vs >= cfg.votesForCertificate) $ Certificate vs
 
 ---------------------------------------------------------------------------------------
 ---- Selecting data to build blocks

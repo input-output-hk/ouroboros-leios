@@ -446,20 +446,21 @@ generator ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-generator _tracer cfg st = do
+generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
   -- TODO: tracing events
   let
     submitOne :: SomeAction -> m ()
-    submitOne x = atomically $ case x of
-      SomeAction Generate.Base rb ->
-        addProducedBlock st.praosState.blockFetchControllerState rb
-      SomeAction (Generate.Propose _) ib ->
-        modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
-      SomeAction Generate.Endorse eb ->
-        modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
-      SomeAction Generate.Vote vs -> forM_ vs $ \v ->
+    submitOne x = case x of
+      SomeAction Generate.Base rb -> do
+        atomically $ addProducedBlock st.praosState.blockFetchControllerState rb
+        traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
+      SomeAction (Generate.Propose _) ib -> do
+        atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+      SomeAction Generate.Endorse eb -> do
+        atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
+      SomeAction Generate.Vote vs -> atomically $ forM_ vs $ \v ->
         modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
   let LeiosNodeConfig{..} = cfg
   blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}

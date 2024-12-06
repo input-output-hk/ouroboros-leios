@@ -90,6 +90,8 @@ data RankingBlockBody = RankingBlockBody
   , payload :: !Bytes
   -- ^ ranking blocks can also contain transactions directly, which we
   -- do not model directly, but contribute to size.
+  , nodeId :: !NodeId
+  -- ^ convenience to keep track of origin, does not contribute to size.
   , size :: !Bytes
   }
   deriving stock (Eq, Show, Generic)
@@ -106,7 +108,8 @@ data InputBlockId = InputBlockId
   { node :: !NodeId
   , num :: !Int
   }
-  deriving stock (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (Hashable)
 
 newtype SubSlotNo = SubSlotNo Word8
   deriving stock (Show)
@@ -131,6 +134,8 @@ data InputBlockBody = InputBlockBody
   { id :: !InputBlockId
   , size :: !Bytes
   -- ^ transactions not modeled, only their total size.
+  , slot :: !SlotNo
+  -- ^ duplicated here for convenience of vizualization, does not contribute to size.
   }
   deriving stock (Eq, Show)
 

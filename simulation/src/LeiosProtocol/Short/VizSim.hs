@@ -47,7 +47,7 @@ example1 =
         Layout $
           leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = praosSimVizModel trace
+  model = leiosSimVizModel trace
    where
     trace = exampleTrace1
 
@@ -164,10 +164,10 @@ accumDiffusionLatency' _ _ vs = vs
 
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
-praosSimVizModel ::
+leiosSimVizModel ::
   LeiosTrace ->
   VizModel LeiosSimVizModel
-praosSimVizModel =
+leiosSimVizModel =
   simVizModel
     accumEventVizState
     pruneVisState
