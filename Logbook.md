@@ -2,6 +2,19 @@
 
 ## 2024-12-06
 
+### Haskell simulation
+
+First Leios visualisations implemented (on `andrea/leios-p2p` branch atm):
+- short-leios-1: 2 nodes, showing every mini-protocol message.
+- short-leios-p2p-1: 100 nodes, showing transfers of RB,IB,EB,Votes and some statistics.
+
+Next steps:
+- Improve readability of short-leios-p2p-1 to differentiate pipelines
+  and kinds of blocks.
+- Verify parameters are set to sensible values (in particular wrt
+  voting) and check for problems in simulation.
+- Run larger simulations and extract measures of interest.
+
 ### Draft of several sections of the first tech report
 
 We now have a full draft of several sections of the technical report.
