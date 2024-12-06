@@ -178,7 +178,7 @@ parserVizSubCommand =
         progDesc ""
     , command "relay-test-3" . info (pure VizRelayTest3) $
         progDesc ""
-    , command "sleios-1" . info (pure VizShortLeios1) $
+    , command "short-leios-1" . info (pure VizShortLeios1) $
         progDesc
           "A simulation of two nodes running Short Leios."
     ]
