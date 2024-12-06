@@ -75,7 +75,8 @@ When collecting votes for the same EB, the hash of the EB would only have to be 
 - *Proof of right to vote:* 80 bytes
 - *Signature:* 32 bytes
 
-> [!DANGER]
+> [!CAUTION]
+> 
 > Is this reasoning correct?
 > 
 > - Voter identity is 32 bytes because that is the size of a pool ID.
@@ -96,8 +97,10 @@ It has not been decided what types of keys and signatures will be used for Leios
     2. Ideally, existing Cardano keys could be used for Leios voting, but without compromising security
 
 
-> [!TODO]
+> [!IMPORTANT]
+> 
 > Below is the VRF+KES approach studied in Peras, which seems larger than it need be.
+> 
 > - [ ] Remove redundant fields
 > - [ ] Compare to fields needed for BLS and Musen
 > 
@@ -164,7 +167,8 @@ The plots below show the number of unique voters as a function of mainnet epoch 
 
 The combinatorics associated with obtaining a quorum of voters from a mixture of honest and dishonest parties set fundamental limits on the safe size for voting quorums in Leios. (However, the specific choice of certificate scheme my imposing additional limits and security considerations.) We are concerned about both the probability that a quorum of honest votes is reached and the probability that dishonest voters form their own quorum. For Leios, the situation where there are multiple quora of mixed honest and dishonest parties is not equivalent to having a dishonest quorum, though it may cause inefficiencies when EBs with duplicate or clashing transactions are later included in RBs. The table below shows situations that may be encountered.
 
-> [!DANGER]
+> [!CAUTION]
+> 
 > Is it the second-to-last sentence in the previous paragraph really true?
 
 | Quorum of honest votes? | Quorum of adversial votes? | Description        | Implications                                                             |
@@ -197,7 +201,8 @@ The plots below show how the probability of obtaining or not obtaining an honest
 
 ![Approximate probability of honest quorum](../analysis/honest-quorum.svg)
 
-> [!DANGER]
+> [!CAUTION]
+> 
 > Should we do the exact computation for the above plots and table or is the normal approximation okay? The CDF computations might be slow, and we'd also have to make an assumption about the number of lovelace staked.
 
 Conversely, using the same method we can estimate the probability of adversarial parties creating their own quorum.
@@ -225,10 +230,11 @@ Given the above analysis, we consider a 60% quorum for a committee of 500 votes 
 |                   45 % |                           3.01e-6 |                        0.066 |
 |                   50 % |                           7.83e-4 |                        0.001 |
 
-> [!TODO]
+> [!IMPORTANT]
+> 
 > We need to compute the Praos attack probabilities at the above adversarial stakes, so we can compare them to the Leios probability of an adversarial quorum. I'm certain that the Leios probabilities are lower than the Praos ones if $\tau = 0.60$, but I'm not so certain about the situation if $\tau = 0.55$.
 
-> [!DANGER]
+> [!CAUTION]
 > 
 > The above analysis might not hold when the clumpiness of the stake distribution is accounted for. For example, do the probabilities change if a couple of large stakepools are selected in the lottery?
 
@@ -262,6 +268,7 @@ Combining the possible voting outcomes with the certificate ones yields a comple
 #### ALBA certificate
 
 > [!WARNING]
+> 
 > This section needs thorough review, and it does not distinguish ALBA variants.
 > 
 > - [ ] Check the typesetting of the equations.
@@ -297,7 +304,7 @@ For the sake of argument, assume that we want the votes included in the certific
 |     500 B |                      150 |                     457 |                                   91.4 % |
 
 
-> [!TODO]
+> [!IMPORTANT]
 > 
 > Include results from Raphael's analyses and benchmarking:
 > 
@@ -417,7 +424,7 @@ The main findings confirm the insights from the system-dynamics siulation
 - It is critical that hardware costs continue to drop at a 15% reduction per year.
 - The present fee structure for Cardano transaction is sufficient for Leios to be viable if there are more than 50 transactions per second.
 
-> [!DANGER]
+> [!CAUTION]
 > 
 > We need to account for the fact that many SPOs use cloud services that include a large amount of bandwidth for VMs: the cost model should only bill for the bandwidth used beyond that monthly allocation.
 
