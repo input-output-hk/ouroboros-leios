@@ -31,6 +31,14 @@ The ALBA, BLS, and Musen sections are still being researched and written.
 
 ## 2024-12-05
 
+### Meeting the CF about mainnet data
+
+We met with Karl Knutsson of the Cardano Foundation to discuss the availability of data on `mainnet` topology and performance. We will continue collaboration and data exchange. The three data sources of most interest are the following:
+
+1. Peer connectivity, including the clustering coefficient.
+2. Block propagation and adoption.
+3. Test transactions.
+
 ### Rust simulation
 
 We have a running model of RB production, which means we're simulating Leios end to end! Transaction throughput seems lower than expected, only ~57% of transactions reach the base chain over the course of 300 slots. This is likely a bug with the sim and needs more investigation.
