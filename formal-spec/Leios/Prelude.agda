@@ -11,10 +11,12 @@ open import Class.HasOrder public
 open import Class.Hashable public
 open import Prelude.InferenceRules public
 
+open import Data.These using (this; that) public
+
 import Data.List as L
 
 fromTo : ℕ → ℕ → List ℕ
-fromTo m n = L.map (_+ m) (upTo (n ∸ m))
+fromTo m n = map (_+ m) (upTo (n ∸ m))
 
 slice : (L : ℕ) → ⦃ NonZero L ⦄ → ℕ → ℕ → ℙ ℕ
 slice L s x = fromList (fromTo s' (s' + (L ∸ 1)))

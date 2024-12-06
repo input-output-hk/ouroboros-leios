@@ -4,7 +4,6 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-open import Data.These using (this; that)
 import Data.List as L
 
 module Leios.UniformShort (⋯ : SpecStructure) (let open SpecStructure ⋯) where
