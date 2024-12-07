@@ -6,7 +6,7 @@ jq --unbuffered -rc 'select(.message.type=="TransactionGenerated") | (.message.i
     echo $id $t
     CDF=`(
       echo $t
-      jq -c 'select(.message|.type=="TransactionReceived" and .id=='$id') | {time,id:.message.id}' < "$1"
+      jq -c $id' as $id|select(.message|{type,id}|. == {type: "TransactionReceived", id: $id|tostring}) | {time,id:.message.id}' < "$1"
     ) | jq -srf convert.jq`
     if [ -z "$RET" ]; then
       RET="$CDF"
