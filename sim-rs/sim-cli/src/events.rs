@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::Result;
 use average::Variance;
+use itertools::Itertools as _;
 use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
@@ -88,16 +89,20 @@ impl EventMonitor {
         let mut votes_per_pool: BTreeMap<NodeId, f64> =
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
+        let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
+        let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp(Duration::from_secs(0));
         let mut total_slots = 0u64;
-        let mut published_txs = 0u64;
+        let mut praos_txs = 0u64;
         let mut published_bytes = 0u64;
         let mut generated_ibs = 0u64;
         let mut empty_ibs = 0u64;
         let mut expired_ibs = 0u64;
         let mut generated_ebs = 0u64;
         let mut total_votes = 0u64;
+        let mut leios_blocks_with_endorsements = 0u64;
+        let mut leios_txs = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
@@ -175,9 +180,33 @@ impl EventMonitor {
                     slot,
                     producer,
                     vrf,
+                    endorsement,
                     transactions,
                 } => {
-                    info!("Pool {} produced a praos block in slot {slot}.", producer);
+                    let mut all_txs = transactions;
+                    info!(
+                        "Pool {} produced a praos block in slot {slot} with {} tx(s).",
+                        producer,
+                        all_txs.len()
+                    );
+                    praos_txs += all_txs.len() as u64;
+                    if let Some(endorsement) = endorsement {
+                        leios_blocks_with_endorsements += 1;
+                        let mut block_leios_txs: Vec<_> = eb_ibs
+                            .get(&endorsement.eb)
+                            .unwrap()
+                            .iter()
+                            .flat_map(|ib| ib_txs.get(ib).unwrap())
+                            .copied()
+                            .dedup()
+                            .collect();
+                        info!(
+                            "This block had an additional {} leios tx(s).",
+                            block_leios_txs.len()
+                        );
+                        leios_txs += block_leios_txs.len() as u64;
+                        all_txs.append(&mut block_leios_txs);
+                    }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
                         if *old_vrf > vrf {
                             *blocks_published.entry(producer).or_default() += 1;
@@ -191,9 +220,8 @@ impl EventMonitor {
                         *blocks_published.entry(producer).or_default() += 1;
                         blocks.insert(slot, (producer, vrf));
                     }
-                    for published_tx in transactions {
+                    for published_tx in all_txs {
                         let tx = txs.get(&published_tx).unwrap();
-                        published_txs += 1;
                         published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
@@ -209,6 +237,7 @@ impl EventMonitor {
                         empty_ibs += 1;
                     }
                     pending_ibs.insert(header.id);
+                    ib_txs.insert(header.id, transactions.clone());
                     let mut ib_bytes = 0;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(header.id).or_default() += 1.;
@@ -238,6 +267,7 @@ impl EventMonitor {
                 }
                 Event::EndorserBlockGenerated { id, input_blocks } => {
                     generated_ebs += 1;
+                    eb_ibs.insert(id, input_blocks.clone());
                     for ib_id in &input_blocks {
                         *ibs_in_eb.entry(id).or_default() += 1.0;
                         *ebs_containing_ib.entry(*ib_id).or_default() += 1.0;
@@ -283,7 +313,7 @@ impl EventMonitor {
                 "{} slot(s) had no naive praos blocks.",
                 total_slots - blocks.len() as u64
             );
-            info!("{published_txs} transaction(s) ({}) finalized in a naive praos block.", pretty_bytes(published_bytes, pbo.clone()));
+            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + leios_txs, pretty_bytes(published_bytes, pbo.clone()));
             info!(
                 "{} transaction(s) ({}) did not reach a naive praos block.",
                 pending_txs.len(),
@@ -396,6 +426,9 @@ impl EventMonitor {
                 votes_per_eb.mean, votes_per_eb.std_dev);
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
+            info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
+            info!("{} tx(s) were referenced by a Leios endorsement.", leios_txs);
+            info!("{} tx(s) were included directly in a Praos block.", praos_txs);
         });
 
         info_span!("network").in_scope(|| {

@@ -2,6 +2,7 @@ block_generation_probability = 0.05
 ib_generation_probability = 5.0
 eb_generation_probability = 5.0
 vote_probability = 500.0
+vote_threshold = 150
 max_block_size = 90112
 max_tx_size = 16384
 stage_length = 2

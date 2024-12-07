@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
@@ -19,8 +19,8 @@ use crate::{
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
-        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
+        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     network::{NetworkSink, NetworkSource},
 };
@@ -68,7 +68,7 @@ struct NodeLeiosState {
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
-    votes_by_eb: BTreeMap<EndorserBlockId, u64>,
+    votes_by_eb: BTreeMap<EndorserBlockId, Vec<NodeId>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
 }
 
@@ -309,9 +309,10 @@ impl Node {
         let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
             return Ok(());
         };
-        let Some(mut ebs) = self.leios.ebs_by_slot.remove(&eb_slot) else {
+        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
             return Ok(());
         };
+        let mut ebs = ebs.clone();
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
@@ -372,6 +373,23 @@ impl Node {
             return Ok(());
         };
 
+        // Let's see if we are minting an RB
+        let endorsement = self.choose_endorsed_block();
+        if let Some(endorsement) = &endorsement {
+            // If we are, get all referenced TXs out of the mempool
+            let Some(eb) = self.leios.ebs.get(&endorsement.eb) else {
+                bail!("Missing endorsement block {}", endorsement.eb);
+            };
+            for ib_id in &eb.ibs {
+                let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                    bail!("Missing input block {}", ib_id);
+                };
+                for tx in &ib.transactions {
+                    self.praos.mempool.remove(&tx.id);
+                }
+            }
+        }
+
         // Fill a block with as many pending transactions as can fit
         let mut size = 0;
         let mut transactions = vec![];
@@ -388,12 +406,54 @@ impl Node {
             slot,
             producer: self.id,
             vrf,
+            endorsement,
             transactions,
         };
         self.tracker.track_praos_block_generated(&block);
         self.publish_block(Arc::new(block))?;
 
         Ok(())
+    }
+
+    fn choose_endorsed_block(&mut self) -> Option<Endorsement> {
+        // an EB is eligible for endorsement if it has this many votes
+        let vote_threshold = self.sim_config.vote_threshold;
+        // and if it is not in a pipeline already represented in the chain
+        // (NB: all EBs produced in a pipeline are produced during the same slot)
+        let forbidden_slots: HashSet<u64> = self
+            .praos
+            .blocks
+            .values()
+            .flat_map(|b| b.endorsement.iter())
+            .map(|e| e.eb.slot)
+            .collect();
+
+        let (&block, _) = self
+            .leios
+            .votes_by_eb
+            .iter()
+            .filter(|(eb, votes)| {
+                votes.len() as u64 >= vote_threshold && !forbidden_slots.contains(&eb.slot)
+            })
+            .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), votes.len()))?;
+
+        let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
+
+        Some(Endorsement { eb: block, votes })
+    }
+
+    fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
+        let eb = self.leios.ebs.get(eb_id)?;
+        let mut tx_set = HashSet::new();
+        for ib_id in &eb.ibs {
+            let InputBlockState::Received(ib) = self.leios.ibs.get(ib_id)? else {
+                return None;
+            };
+            for tx in &ib.transactions {
+                tx_set.insert(tx.id);
+            }
+        }
+        Some(tx_set.len())
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
@@ -469,20 +529,20 @@ impl Node {
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
-        if self
-            .praos
-            .blocks
-            .insert(block.slot, block.clone())
-            .is_none()
-        {
-            // Do not remove TXs in these blocks from the leios mempool.
-            // Wait until we learn more about how praos and leios interact.
-            let head = self.praos.peer_heads.entry(from).or_default();
-            if *head < block.slot {
-                *head = block.slot
+        if let Some(old_block) = self.praos.blocks.get(&block.slot) {
+            // SLOT BATTLE!!! lower VRF wins
+            if old_block.vrf <= block.vrf {
+                // We like our block better than this new one.
+                return Ok(());
             }
-            self.publish_block(block)?;
         }
+        self.praos.blocks.insert(block.slot, block.clone());
+
+        let head = self.praos.peer_heads.entry(from).or_default();
+        if *head < block.slot {
+            *head = block.slot
+        }
+        self.publish_block(block)?;
         Ok(())
     }
 
@@ -656,7 +716,11 @@ impl Node {
             return Ok(());
         }
         for eb in votes.ebs.iter() {
-            *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
+            self.leios
+                .votes_by_eb
+                .entry(*eb)
+                .or_default()
+                .push(votes.id.producer);
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
@@ -785,7 +849,11 @@ impl Node {
     fn send_votes(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
         for eb in &votes.ebs {
-            *self.leios.votes_by_eb.entry(*eb).or_default() += 1;
+            self.leios
+                .votes_by_eb
+                .entry(*eb)
+                .or_default()
+                .push(votes.id.producer);
         }
         let votes = Arc::new(votes);
         self.leios

@@ -6,8 +6,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::NodeId,
     model::{
-        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
+        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
 };
 
@@ -36,6 +36,7 @@ pub enum Event {
         slot: u64,
         producer: NodeId,
         vrf: u64,
+        endorsement: Option<Endorsement>,
         transactions: Vec<TransactionId>,
     },
     PraosBlockSent {
@@ -124,6 +125,7 @@ impl EventTracker {
             slot: block.slot,
             producer: block.producer,
             vrf: block.vrf,
+            endorsement: block.endorsement.clone(),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }

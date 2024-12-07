@@ -29,6 +29,7 @@ fn main() -> Result<()> {
     };
 
     let vote_probability = 500.0;
+    let vote_threshold = 150;
 
     let raw_config = RawConfig {
         seed: None,
@@ -41,6 +42,7 @@ fn main() -> Result<()> {
         ib_generation_probability: 5.0,
         eb_generation_probability: 5.0,
         vote_probability,
+        vote_threshold,
         ib_shards: 8,
         max_block_size: 90112,
         stage_length: 2,

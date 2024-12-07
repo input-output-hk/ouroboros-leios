@@ -5,11 +5,19 @@ use serde::{ser::SerializeStruct, Serialize};
 
 macro_rules! id_wrapper {
     ($outer:ident, $inner:ty) => {
-        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $outer($inner);
         impl Display for $outer {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.0.fmt(f)
+            }
+        }
+        impl Serialize for $outer {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&self.0.to_string())
             }
         }
         impl $outer {
@@ -21,11 +29,12 @@ macro_rules! id_wrapper {
     };
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Block {
     pub slot: u64,
     pub producer: NodeId,
     pub vrf: u64,
+    pub endorsement: Option<Endorsement>,
     pub transactions: Vec<Arc<Transaction>>,
 }
 
@@ -162,4 +171,10 @@ pub enum NoVoteReason {
     InvalidSlot,
     ExtraIB,
     MissingIB,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Endorsement {
+    pub eb: EndorserBlockId,
+    pub votes: Vec<NodeId>,
 }

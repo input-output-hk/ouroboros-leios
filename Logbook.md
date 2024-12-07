@@ -1,5 +1,87 @@
 # Leios logbook
 
+## 2024-12-06
+
+### Haskell simulation
+
+First Leios visualisations implemented (on `andrea/leios-p2p` branch atm):
+- short-leios-1: 2 nodes, showing every mini-protocol message.
+- short-leios-p2p-1: 100 nodes, showing transfers of RB,IB,EB,Votes and some statistics.
+
+Next steps:
+- Improve readability of short-leios-p2p-1 to differentiate pipelines
+  and kinds of blocks.
+- Verify parameters are set to sensible values (in particular wrt
+  voting) and check for problems in simulation.
+- Run larger simulations and extract measures of interest.
+
+### ALBA analyses and benchmarking
+
+Analysis and benchmarking of ALBA certificates for Leios has proceeded and is providing valuable results.
+
+- Parameters $\lambda$, $n_f$, and $n_p$ were varied.
+- Estimates of certificate size, time to build the certificate, and time to verify the certificate were measured.
+- Benchmarking is made with respect to the hash function used (Blake2s, SHA256, Keccak256, etc.)
+- SNARKifying the resulting certificate is being assessed.
+
+Similar results for Mithril certificates will be ready next week. Analysis of Musen will follow that.
+
+This all is a work and progress and values may change significantly in the future, especially as we understand the SNARKification better and investigate Musen. We'll also need a more elaborate catalog of these numbers, since there are many parameters and scenarios. In particular, if we use SNARKs, the proving times will be much higher but the certificates will be very small. We also haven't settled on VRF/KES votes vs empheral keys. Anyway, below are some recommended values for our December simulations:
+
+- Sortition: 50 ms
+- Votes
+    - Number: 500
+    - Size: 500 B
+    - Construction: 0.65 ms
+    - Verification: 0.15 ms
+- ALBA certificate
+    - Size: 75 kB
+    - Construction (aggregation plus proof): 200 ms
+    - Verification: 0.15 ms
+
+### Draft of several sections of the first tech report
+
+We now have a full draft of several sections of the technical report.
+
+- Cost analysis
+    - Simulation of transaction volume on Cardano
+    - Estimation of costs for a Leios SPO
+    - Cost of storage
+        - Break-even cost for perpetual storage of blocks
+        - Compressed storage of Praos blocks
+- Rewards received
+    - Importance of Cardano Reserves
+- Insights for Leios techno-economics
+- Approximate models of Cardano mainnet characteristics
+    - Transaction sizes and frequencies
+    - Stake distribution
+
+Work is in progress on voting and certificates in https://github.com/input-output-hk/ouroboros-leios/pull/94. The following subsections have been fully drafted:
+
+- Voting and certificates
+- Structure of votes
+- Number of unique SPOs voting
+- Committee size and quorum requirement
+- Certificate scheme
+
+The ALBA, BLS, and Musen sections are still being researched and written.
+
+## 2024-12-05
+
+### Meeting the CF about mainnet data
+
+We met with Karl Knutsson of the Cardano Foundation to discuss the availability of data on `mainnet` topology and performance. We will continue collaboration and data exchange. The three data sources of most interest are the following:
+
+1. Peer connectivity, including the clustering coefficient.
+2. Block propagation and adoption.
+3. Test transactions.
+
+### Rust simulation
+
+We have a running model of RB production, which means we're simulating Leios end to end! Transaction throughput seems lower than expected, only ~57% of transactions reach the base chain over the course of 300 slots. This is likely a bug with the sim and needs more investigation.
+
+Shifting focus on the visualization, from an extremely-slowed-down view of network traffic to views of the individual blocks themselves. We learned this morning that stage length would likely be 20 slots (we had assumed much lower), so we want to prioritize views with less data so that we can run them in real or sped-up time.
+
 ## 2024-12-04
 
 ### Outline for first technical report
@@ -15,6 +97,10 @@ The [draft first technical report for Leios](docs/technical-report-1.md) contain
 - Voting and certificates
 - Cost analysis for Leios nodes
 - Findings and conclusions
+
+### Rust simulation
+
+Fixed the issue caught by ΔQ; it was an issue with the topology of the test data. Alas, the model still doesn't match any reasonable formula in ΔQ.
 
 ## 2024-12-03
 
@@ -46,6 +132,12 @@ Metrics
   Retained fees − cost: 6045.075715767416 USD/month
   Retained fees ÷ cost: 175.347923221418 %
 ```
+
+### Rust simulation
+
+Simplified the representation of events, so that votes don't take up as much file size. Began work on modeling RB production.
+
+Roland measured the rust sim's transaction propagation time against a ΔQ model, and the rust sim propagated more quickly than physically possible. Unforutnately, this is a bug.
 
 ## 2024-11-28
 
@@ -347,7 +439,7 @@ A first draft system-dynamics simulation models the techno-economics of changes 
   - Diagnostic consistency checks for the simulation
 - Calibrated against Epoch 500-519
 
-This techno-economic simulation highlights is the tension between the following variables:
+This techno-economic simulation highlights the tension between the following variables:
 
 - A linear growth in throughput would cause a quadratic growth in ledger size.
 - Storage cost per gigabyte typically decays exponentially over time, but with a small rate (maybe 10%/year).

@@ -65,4 +65,5 @@ eb_generation_probability = 5.0
 
 # Vote parameters
 vote_probability = 500
+vote_threshold = 150
 one_vote_per_vrf = true
