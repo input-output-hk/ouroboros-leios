@@ -395,7 +395,7 @@ fn edit_expression(props: &EditExpressionProps) -> HtmlResult {
                 <pre>{ &*result }</pre>
             </div>
         } else {
-            <span class={classes!("dq_show")} onclick={cloned!(editing; move |_| editing.set(true))}>{ value.to_string() }</span>
+            <span class={classes!("dq_show")} onclick={cloned!(editing; move |_| editing.set(true))}>{ format!("{:#}", *value) }</span>
         }
     })
 }

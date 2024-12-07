@@ -470,7 +470,11 @@ impl DeltaQ {
                 }
             }
             DeltaQExpr::Outcome(outcome) => {
-                write!(f, "{}", outcome)
+                if f.alternate() {
+                    write!(f, "{:#}", outcome)
+                } else {
+                    write!(f, "{}", outcome)
+                }
             }
             DeltaQExpr::Seq(first, load, second) => {
                 if parens {

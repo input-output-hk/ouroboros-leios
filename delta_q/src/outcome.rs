@@ -160,9 +160,16 @@ impl Outcome {
 }
 impl Display for Outcome {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.cdf)?;
-        for (metric, load) in self.load.iter() {
-            write!(f, " WITH {metric}{load}")?;
+        if f.alternate() {
+            write!(f, "{:#}", self.cdf)?;
+            for (metric, load) in self.load.iter() {
+                write!(f, " WITH {metric}{load:#}")?;
+            }
+        } else {
+            write!(f, "{}", self.cdf)?;
+            for (metric, load) in self.load.iter() {
+                write!(f, " WITH {metric}{load}")?;
+            }
         }
         Ok(())
     }

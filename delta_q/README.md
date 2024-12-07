@@ -101,3 +101,11 @@ You may want to copy the latest example from `models.txt`, taking the whole set 
 ## Known Shortcomings
 
 - functional but ugly
+
+## misc
+
+### converting from latencies.json of the Haskell simulation
+
+```sh
+jq -r '[.[]|.[1]]|sort|length as $l|[foreach .[] as $i (0;.+1;if .%100==0 or .==$l then "("+($i|tostring)+", "+(./$l|tostring)+")" else null end)|select(.)]|join(",")' latencies.json
+```
