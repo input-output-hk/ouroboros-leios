@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -20,6 +21,7 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Control.Exception (assert)
 import Control.Monad (void)
+import Control.Tracer
 import Data.Maybe (fromMaybe)
 import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
@@ -153,22 +155,24 @@ newtype ChainConsumerState m = ChainConsumerState
 
 runChainConsumer ::
   (MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   Chan m ChainSyncMessage ->
   ChainConsumerState m ->
   m ()
-runChainConsumer cfg chan st =
-  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer cfg st)
+runChainConsumer tracer cfg chan st =
+  void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainConsumer tracer cfg st)
 
 type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
 chainConsumer ::
   forall m body.
   (MonadSTM m, MonadDelay m) =>
+  Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   ChainConsumerState m ->
   ChainConsumer 'StIdle m ()
-chainConsumer cfg (ChainConsumerState hchainVar) = idle True
+chainConsumer tracer cfg (ChainConsumerState hchainVar) = idle True
  where
   -- NOTE: The specification says to do an initial intersection with
   --       exponentially spaced points, and perform binary search to
@@ -202,7 +206,9 @@ chainConsumer cfg (ChainConsumerState hchainVar) = idle True
   rollForward :: BlockHeader -> ChainConsumer 'StIdle m ()
   rollForward header =
     TC.Effect $ do
-      threadDelaySI (cfg.headerValidationDelay header)
+      let !delay = cfg.headerValidationDelay header
+      traceWith tracer $ PraosNodeEventCPU (CPUTask delay)
+      threadDelaySI delay
       atomically $ do
         modifyTVar' hchainVar $ Chain.addBlock header
         return $ idle False
@@ -219,7 +225,12 @@ chainConsumer cfg (ChainConsumerState hchainVar) = idle True
 ---- ChainSync Producer
 --------------------------------
 
-runChainProducer :: (IsBody body, MonadSTM m) => Chan m ChainSyncMessage -> FollowerId -> TVar m (ChainProducerState (Block body)) -> m ()
+runChainProducer ::
+  (IsBody body, MonadSTM m) =>
+  Chan m ChainSyncMessage ->
+  FollowerId ->
+  TVar m (ChainProducerState (Block body)) ->
+  m ()
 runChainProducer chan followerId stVar =
   void $ runPeerWithDriver (chanDriver decideChainSyncState chan) (chainProducer followerId stVar)
 

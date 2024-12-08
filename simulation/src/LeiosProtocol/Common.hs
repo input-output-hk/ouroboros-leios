@@ -36,6 +36,8 @@ module LeiosProtocol.Common (
 where
 
 import ChanTCP
+import Control.Exception (assert)
+import Control.Monad (guard)
 import Data.Hashable
 import Data.Set (Set)
 import Data.Word (Word8)
@@ -88,6 +90,8 @@ data RankingBlockBody = RankingBlockBody
   , payload :: !Bytes
   -- ^ ranking blocks can also contain transactions directly, which we
   -- do not model directly, but contribute to size.
+  , nodeId :: !NodeId
+  -- ^ convenience to keep track of origin, does not contribute to size.
   , size :: !Bytes
   }
   deriving stock (Eq, Show, Generic)
@@ -104,7 +108,8 @@ data InputBlockId = InputBlockId
   { node :: !NodeId
   , num :: !Int
   }
-  deriving stock (Eq, Ord, Show)
+  deriving stock (Eq, Ord, Show, Generic)
+  deriving anyclass (Hashable)
 
 newtype SubSlotNo = SubSlotNo Word8
   deriving stock (Show)
@@ -129,6 +134,8 @@ data InputBlockBody = InputBlockBody
   { id :: !InputBlockId
   , size :: !Bytes
   -- ^ transactions not modeled, only their total size.
+  , slot :: !SlotNo
+  -- ^ duplicated here for convenience of vizualization, does not contribute to size.
   }
   deriving stock (Eq, Show)
 
@@ -187,11 +194,15 @@ data Certificate = Certificate
 ---- Common defs
 -------------------------------------------
 
-slice :: Int -> SlotNo -> Int -> (SlotNo, SlotNo)
-slice l s x = (toEnum s', toEnum $ s' + l - 1)
+slice :: Int -> SlotNo -> Int -> Maybe (SlotNo, SlotNo)
+slice l s x = do
+  guard (s' >= 0)
+  return (a, b)
  where
   -- taken from formal spec
   s' = (fromEnum s `div` l - x) * l
+  a = assert (s' >= 0) $ toEnum s'
+  b = assert (s' + l - 1 >= 0) $ toEnum $ s' + l - 1
 
 -------------------------------------------
 ---- MessageSize instances

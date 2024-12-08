@@ -1,7 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module PraosProtocol.VizSimBlockFetch where
 
@@ -185,6 +184,7 @@ relaySimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
+  accumEventVizState _ (BlockFetchEventNode _) vs = vs
 
   pruneVisState ::
     Time ->

@@ -37,6 +37,8 @@ module PraosProtocol.Common (
   kilobytes,
   module TimeCompat,
   defaultPraosConfig,
+  CPUTask (..),
+  hashToColor,
 ) where
 
 import Control.Concurrent.Class.MonadSTM (
@@ -55,6 +57,7 @@ import ChanTCP (MessageSize (..))
 import Data.Coerce (coerce)
 import Data.Word (Word8)
 import SimTCPLinks (kilobytes)
+import SimTypes (CPUTask (..))
 import System.Random (mkStdGen, uniform)
 import TimeCompat
 
@@ -120,7 +123,7 @@ slotConfigFromNow = do
   start <- getCurrentTime
   return $ SlotConfig{start, duration = 1}
 
-blockBodyColor :: BlockBody -> (Double, Double, Double)
+blockBodyColor :: IsBody body => body -> (Double, Double, Double)
 blockBodyColor = hashToColor . coerce . hashBody
 
 blockHeaderColor :: BlockHeader -> (Double, Double, Double)
@@ -140,6 +143,7 @@ data PraosNodeEvent body
   | PraosNodeEventReceived (Block body)
   | PraosNodeEventEnterState (Block body)
   | PraosNodeEventNewTip (Chain (Block body))
+  | PraosNodeEventCPU CPUTask
   deriving (Show)
 
 data PraosConfig body = PraosConfig
