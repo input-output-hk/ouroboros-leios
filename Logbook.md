@@ -1,14 +1,36 @@
 # Leios logbook
 
+## 2024-12-09
+
+### Nix development environment
+
+We previously had a `nix develop` environment for the Haskell simulation, but this was removed as the Haskell package evolved. Instead of re-nixifying this repository, I created a separate [ouroboros-leios.env](https://github.com/functionally/ouroboros-leios.env) repository where one can open a `nix develop` with the correct Haskell compiler and dependencies.
+
 ## 2024-12-06
+
+### ΔQ
+
+- created a ΔQ model (`comparison_rs.txt`) of transaction diffusion in the Rust simulation:
+  - propagation among the five clusters followed by propagation within the 40 nodes of each cluster
+  - only fixed message delays of 12ms, 69ms, 268ms, independent of message size
+  - general structure of completion matches the timings, but the completion rate is overall quite different
+  - spreading to neighbor clusters (3×68ms) followed by another such hop should hit all clusters, but that also doesn’t happen in the simulation, it waits until 3×268ms before it can break through 74% completion
+  - **conclusion:** I don’t really understand what the simulation is doing, even though the Rust code looks obvious enough, and obviously correct on the node level; will dive into the machine room later
+- created a ΔQ model (`comparison_hs.txt`) of Praos block diffusion in the Haskell simulation:
+  - hs simulates TCP window collapse, which adds a very latency-dependent additional delay to block transfer times — I wasn’t able to adequately model that, plausible ΔQ expressions lead to too slow completion
+  - when TCP window collapse is hacked out (thanks Andrea!) I get close matching of the result with a ΔQ expression, however, that expression does not match the stated simulation behaviour
+  - in particular: it matches only when assuming that blocks are _not validated_ during relaying, only afterwards before adoption
+  - one suspicious detail: according to my (hopefully not buggy!) measurement, the network topology for the hs simulation has a clustering coefficient of exactly zero — I was unable to find a single triangle
 
 ### Haskell simulation
 
 First Leios visualisations implemented (on `andrea/leios-p2p` branch atm):
+
 - short-leios-1: 2 nodes, showing every mini-protocol message.
 - short-leios-p2p-1: 100 nodes, showing transfers of RB,IB,EB,Votes and some statistics.
 
 Next steps:
+
 - Improve readability of short-leios-p2p-1 to differentiate pipelines
   and kinds of blocks.
 - Verify parameters are set to sensible values (in particular wrt
@@ -30,33 +52,33 @@ This all is a work and progress and values may change significantly in the futur
 
 - Sortition: 50 ms
 - Votes
-    - Number: 500
-    - Size: 500 B
-    - Construction: 0.65 ms
-    - Verification: 0.15 ms
+  - Number: 500
+  - Size: 500 B
+  - Construction: 0.65 ms
+  - Verification: 0.15 ms
 - ALBA certificate
-    - Size: 75 kB
-    - Construction (aggregation plus proof): 200 ms
-    - Verification: 0.15 ms
+  - Size: 75 kB
+  - Construction (aggregation plus proof): 200 ms
+  - Verification: 0.15 ms
 
 ### Draft of several sections of the first tech report
 
 We now have a full draft of several sections of the technical report.
 
 - Cost analysis
-    - Simulation of transaction volume on Cardano
-    - Estimation of costs for a Leios SPO
-    - Cost of storage
-        - Break-even cost for perpetual storage of blocks
-        - Compressed storage of Praos blocks
+  - Simulation of transaction volume on Cardano
+  - Estimation of costs for a Leios SPO
+  - Cost of storage
+    - Break-even cost for perpetual storage of blocks
+    - Compressed storage of Praos blocks
 - Rewards received
-    - Importance of Cardano Reserves
+  - Importance of Cardano Reserves
 - Insights for Leios techno-economics
 - Approximate models of Cardano mainnet characteristics
-    - Transaction sizes and frequencies
-    - Stake distribution
+  - Transaction sizes and frequencies
+  - Stake distribution
 
-Work is in progress on voting and certificates in https://github.com/input-output-hk/ouroboros-leios/pull/94. The following subsections have been fully drafted:
+Work is in progress on voting and certificates in <https://github.com/input-output-hk/ouroboros-leios/pull/94>. The following subsections have been fully drafted:
 
 - Voting and certificates
 - Structure of votes
@@ -334,7 +356,7 @@ Findings:
 
 ### Techno-economic analysis of SPO nodes
 
-The *Refined Estimate* tab of the [Leios High-Level Resources Estimates spreadsheet](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) computes node costs for SPOs under Praos and Leios.
+The _Refined Estimate_ tab of the [Leios High-Level Resources Estimates spreadsheet](analysis/Leios%20resource%20estimates%20-%20ROUGH%20ESTIMATE.ods) computes node costs for SPOs under Praos and Leios.
 
 - Each SPO has one block producer and two relays.
 - CPU, IOPS, disk, and network costs are estimated.
@@ -721,7 +743,7 @@ Agenda:
   - IB of shard i should not have tx consuming token of shard j
   - fees of IB i are paid with token shard i
   - ensure IB from different shards will never consume token from other shards
-  - *important* : fees are always paid, even if tx is not included in the ledger
+  - _important_ : fees are always paid, even if tx is not included in the ledger
   - Q: what about multiple tokens per UTxO?
   - grinding with people trying to overload one shard?
   - \# shards w.r.t IB rate => decrease probability of concurrent IBs for the same shard
@@ -781,11 +803,11 @@ The diagram above illustrates a techno-economic business case for Leios adoption
 
 We could consider the following goals for January 2025.
 
-- *Technical goal for PI8:* Estimate a reasonably tight upper bound on the cost of operating a Leios node, as a function of transaction throughput, and estimate the maximum practical throughput.
+- _Technical goal for PI8:_ Estimate a reasonably tight upper bound on the cost of operating a Leios node, as a function of transaction throughput, and estimate the maximum practical throughput.
   - Target level: SRL2
-- *Business goal for PI8:* Identify (a) the acceptable limit of transaction cost for Cardano stakeholders, (b) the maximum throughput required by stakeholders, and (c) the throughput-cost relationship for other major blockchains.
+- _Business goal for PI8:_ Identify (a) the acceptable limit of transaction cost for Cardano stakeholders, (b) the maximum throughput required by stakeholders, and (c) the throughput-cost relationship for other major blockchains.
   - Target level: IRL3
-- *Termination criteria for Leios:* Transaction costs are unacceptably high for Leios or the practical maximum throughput fails to meet stakeholder expectations. In this case the Leios protocol may need reconceptualization and redesign, or it may need to be abandoned.
+- _Termination criteria for Leios:_ Transaction costs are unacceptably high for Leios or the practical maximum throughput fails to meet stakeholder expectations. In this case the Leios protocol may need reconceptualization and redesign, or it may need to be abandoned.
 
 ### Haskell Simulation
 
@@ -973,7 +995,7 @@ Main question is what to test (first)? And how to test? Network diffusion seems 
 - The node can fetch new headers and blocks
 - The node can diffuse new headers and blocks
 - It must node propagate equivocated blocks more than once
-  - But it must propagate them at least once to ensure a *proof-of-equivocation* is available to all honest nodes in the network
+  - But it must propagate them at least once to ensure a _proof-of-equivocation_ is available to all honest nodes in the network
 
 How does coverage comes into play here?
 
@@ -1008,7 +1030,7 @@ Discussing some possible short-term objectives:
   - start with Adversarial scenarios, answering the question on where to define the behaviour: in the spec or in the tester?
   - simulatios/prototypes will need to have some ways to interact w/ tester => interfaces can be refined later
 - Define a taxonomy of "adversarialness"
-  - strong adversary that's *misbehaving*
+  - strong adversary that's _misbehaving_
   - adversarial "natural" conditions, eg. outages/split brains
   - transaction level adversary
   - we need to qualify those different scenarios
@@ -1079,16 +1101,16 @@ We can run the conformance tests in the ledger spec :tada:
 #### What approach for Leios?
 
 - We don't have an executable Agda spec for Leios, only a relational one (with holes).
-- We need to make the spec executable, but we know from experience with Peras that maintaining *both* a relational spec and an executable spec is costly
+- We need to make the spec executable, but we know from experience with Peras that maintaining _both_ a relational spec and an executable spec is costly
   - to guarantee at least soundness we need to prove the executable spec implements correctly the relational one which is non trivial
 - Also, a larger question is how do we handle adversarial behaviour in the spec?
   - it's expected the specification uses dependent types to express the preconditions for a transition, so that only valid transitions can be expressed at the level of the specification
-  - but we want the *implementaiton* to also rule out those transitions and therefore we want to explicitly test failed preconditions
+  - but we want the _implementaiton_ to also rule out those transitions and therefore we want to explicitly test failed preconditions
 - then the question is: how does the (executable) specification handles failed preconditions? does it crash? can we know in some ways it failed?
   - we need to figure how this is done in the ledger spec
 - In the case of Peras, we started out modelling an `Adversary` or dishonest node in the spec but this proved cumbersome and we needed to relax or remove that constraint to make progress
 
-  - however, it seems we really want the executable spec to be *total* in the sense that any sequence of transitions, valid or invalid, has a definite result
+  - however, it seems we really want the executable spec to be _total_ in the sense that any sequence of transitions, valid or invalid, has a definite result
 
 - we have summarized short term plan [here](https://github.com/input-output-hk/ouroboros-leios/issues/42)
 - we also need to define a "longer" term plan, eg. 2 months horizon
@@ -1260,7 +1282,7 @@ ND starts raising a few concerns he has about leios that should be answered:
 - How does it work at saturation?
 
 A key issue is potential attack vector that comes from de-duplicating txs: how is it handled by Leios forwarding infra? In general, how does Leios deals with adversarial behaviour?
-We acknowledge this needs to be answered, and there's work on mempool management that needs to happen, but that's not the core topic we want to work on *now*
+We acknowledge this needs to be answered, and there's work on mempool management that needs to happen, but that's not the core topic we want to work on _now_
 
 Another important question to answer is "What resources are needed?" as this has a deep impact on centralisation:
 
@@ -1633,7 +1655,7 @@ Here are a few comments by @bwbush about the `leios-sim` package:
 
 Added some documentation to the Leios simulator:
 
-- Added *tooltips* to document the various parameters available
+- Added _tooltips_ to document the various parameters available
 - Added readonly fields computing various aggregates from the simulation's data: Throughput, latency to inclusion in EB, dropped IB rate
 - Added a [comment](https://github.com/input-output-hk/ouroboros-leios/issues/7#issuecomment-2236521300) on the simulator issue as I got perplexed with the throughput computation's result: I might be doing something wrong and not computing what I think I am computing as the results are inconsistent. I think this comes from the fact we are simulation 2 nodes so the throughput aggregates the 2 nodes' and should be assigned individually to each one, perhaps more as a distribution?
 
@@ -1656,12 +1678,12 @@ Managed to configure the ECS cluster, service, and task to run the image, but it
 
 need to configure a secret containing a PAT for pulling the manifest: <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_repositoryCredentials>
 
-I gave up trying to run on AWS, every solution I found is an insanely intricate maze of stupidly complicated solution which I don't care about as I only need to deploy a *single* image without any data dependency attached.
+I gave up trying to run on AWS, every solution I found is an insanely intricate maze of stupidly complicated solution which I don't care about as I only need to deploy a _single_ image without any data dependency attached.
 
 I managed to get Gcloud run deployment working, mostly copy pasting what I did peras and fiddling with it.
 
 - I reused same service account than Peras which is a mistake -> should create a new service account with limited rights
-- Needeed to add service account as an *owner* of the domain in the google console (a manual task) in order to allow subdomain mapping
+- Needeed to add service account as an _owner_ of the domain in the google console (a manual task) in order to allow subdomain mapping
 - Changed the server code to support defining its port from `PORT` environment variable which is provided by the deployment configuration
 
 Allowing anyone to access the server proved annoying too: The folowing configuration works
@@ -1790,7 +1812,7 @@ The recording is available on GDrive: <https://drive.google.com/file/d/1r04nrjMt
 
 Discussing with researchers on some early simulations that are being worked on for Leios.
 
-- Constraint: Setup threshold on *egress* bandwidth, then simulate diffusion of a block to downstream peers
+- Constraint: Setup threshold on _egress_ bandwidth, then simulate diffusion of a block to downstream peers
   - upstream sends notificatoin (Eg. header)
   - downstream asks for block body if it does not have it
   - then it "validates" (simulated time) and advertises to neighbours
@@ -1804,7 +1826,7 @@ Discussing with researchers on some early simulations that are being worked on f
   - δ = 8 (4 inbound, 4 outbound)
   - b/w limit = 1Mb/s
   - block size ~ 1kB
-- when sending 10 blocks/s we observe more variation, a bit more contention as the *freshest first* policy starts to kick in
+- when sending 10 blocks/s we observe more variation, a bit more contention as the _freshest first_ policy starts to kick in
 - at 1block/ms there's a much wider variation in time it takes to reach nodes
   - the first blocks take the longest as the queues are filling up with fresher blocks
   - latest blocks go faster, almost as fast as when rate is much slower, but this is also an artifact of the simulation (eg. time horizon means there's no block coming after which decreases contention)
@@ -1854,7 +1876,7 @@ Spyros will work this week on network simulation for Leios
   - need to queue local actions according to bandwidth availability
   - main input parameter is IB generation rate
   - output = delivery ratio of IBs
-  - if IB rate > threshold -> most blocks won't make it because of *freshest first* policy
+  - if IB rate > threshold -> most blocks won't make it because of _freshest first_ policy
 
 Next steps:
 
@@ -1961,10 +1983,10 @@ Here is some draft we drew:
 
 Couple explanations:
 
-- Upper part is about *equivocation*, eg. an adversary producing different IBs at the same slot.
-  - a node will observe the equivocation (on the far right) by being offered 2 *equivocated* headers from different peers
-  - This node will be able to produce a *proof of equivocation* that's useful when voting for IBs (and EBs?)
-- Lower part is about *freshest first* download policy: Two nodes producing valid IBs at different slots.
+- Upper part is about _equivocation_, eg. an adversary producing different IBs at the same slot.
+  - a node will observe the equivocation (on the far right) by being offered 2 _equivocated_ headers from different peers
+  - This node will be able to produce a _proof of equivocation_ that's useful when voting for IBs (and EBs?)
+- Lower part is about _freshest first_ download policy: Two nodes producing valid IBs at different slots.
   - given the choice of headers (and bodies) consumer node will choose to download the freshest body first, eg. B in this case
   - headers are downloaded in any order as we can't know whether or not they are "freshest" before reading them
   - It seems that's only relevant if there are more blocks offered than available bandwidth :thinking:

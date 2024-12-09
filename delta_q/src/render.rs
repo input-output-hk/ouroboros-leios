@@ -196,7 +196,7 @@ pub fn cdf_component(props: &CdfProps) -> Html {
 
     html! {
         <div class={classes!("cdf", "anchor")} onclick={cloned!(popup; move |_| if !*popup { popup.set(true) })}>
-            { format!("{}", props.outcome) }
+            { format!("{:#}", props.outcome) }
             if *popup {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup; move |_| popup.set(false))}>{ "abort" }</button>
