@@ -124,16 +124,16 @@ impl Clock {
     }
 
     pub async fn wait_until(&self, timestamp: Timestamp) {
-        let now = self.now();
-        if timestamp <= now {
-            debug!("not sleeping because {timestamp:?} <= {now:?}");
-            return;
-        }
-
         let (tx, mut rx) = oneshot::channel();
 
         {
             let mut this = self.inner.lock().unwrap();
+            let now = this.time;
+            if timestamp.0 <= now {
+                debug!("not sleeping because {timestamp:?} <= {now:?}");
+                return;
+            }
+    
             this.calls.insert(timestamp, tx);
             if this.calls.len() == this.num_tasks {
                 this.time = this
