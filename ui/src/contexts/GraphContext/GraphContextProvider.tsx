@@ -2,24 +2,18 @@
 import {
   FC,
   PropsWithChildren,
-  useCallback,
-  useEffect,
   useMemo,
   useReducer,
-  useRef,
+  useRef
 } from "react";
 
 import { IGraphWrapperProps } from "@/components/Graph/GraphWapper";
 import {
-  IServerMessage,
-  ITransactionGenerated,
-  ITransactionMessage,
-  ITransactionReceived,
-  ITransactionSent,
-  ITransformedNodeMap,
+  ITransformedNodeMap
 } from "@/components/Graph/types";
 import { defaultState, GraphContext } from "./context";
 import { reducer } from "./reducer";
+import { ISimulationAggregatedDataState } from "./types";
 
 export const GraphContextProvider: FC<
   PropsWithChildren<IGraphWrapperProps>
@@ -59,7 +53,8 @@ export const GraphContextProvider: FC<
   const [state, dispatch] = useReducer(reducer, defaultSyncedState);
 
   const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current);
-  const intervalId = useRef<number | null>(defaultState.intervalId.current);
+  const intervalId = useRef<Timer | undefined>(defaultState.intervalId.current);
+  const aggregatedData = useRef<ISimulationAggregatedDataState>(defaultState.aggregatedData.current);
   const simulationPauseTime = useRef<number>(
     defaultState.simulationPauseTime.current,
   );
@@ -67,85 +62,17 @@ export const GraphContextProvider: FC<
     defaultState.simulationStartTime.current,
   );
 
-  // Mutable refs to store messages and transactions without causing re-renders
-  const transactionsByIdRef = useRef<Map<number, ITransactionMessage[]>>(
-    new Map(),
-  );
-  const txGeneratedMessagesById = useRef<
-    Map<number, IServerMessage<ITransactionGenerated>>
-  >(new Map());
-  const txSentMessagesById = useRef<
-    Map<number, IServerMessage<ITransactionSent>[]>
-  >(new Map());
-  const txReceivedMessagesById = useRef<
-    Map<number, IServerMessage<ITransactionReceived>[]>
-  >(new Map());
-
   const resolvedState = useMemo(
     () => ({
       ...state,
       canvasRef,
-      transactionsByIdRef,
-      txGeneratedMessagesById,
-      txSentMessagesById,
-      txReceivedMessagesById,
+      aggregatedData,
       intervalId,
       simulationPauseTime,
       simulationStartTime,
     }),
     [state],
   );
-
-  const aggregateSimluationData = useCallback(() => {
-    const now = performance.now();
-    const elapsed =
-      simulationStartTime.current !== 0
-        ? (now - simulationStartTime.current) * state.speed
-        : 0;
-
-    // Aggregate total propagated transactions at current time.
-    const sentTxs: number[] = [];
-    for (const txList of transactionsByIdRef.current.values()) {
-      for (const { duration, sentTime } of txList) {
-        if (elapsed > sentTime + duration) {
-          sentTxs.push(sentTime);
-        }
-      }
-    }
-
-    // Aggregate generated transactions.
-    const generatedMessages: number[] = [];
-    defaultSyncedState.topography.nodes.forEach((node) => {
-      txGeneratedMessagesById.current.forEach((m) => {
-        const target = m.time / 1_000_000;
-
-        if (m.message.publisher === node.id && elapsed > target) {
-          generatedMessages.push(m.time / 1_000_000);
-        }
-      });
-    });
-
-    dispatch({
-      type: "BATCH_UPDATE",
-      payload: {
-        sentTxs,
-        generatedMessages,
-      },
-    });
-  }, [state.speed, defaultSyncedState.topography.nodes]);
-
-  useEffect(() => {
-    let interval: Timer | undefined = undefined;
-    if (state.playing) {
-      interval = setInterval(aggregateSimluationData, 10000 * state.speed);
-    } else if (interval !== undefined) {
-      clearInterval(interval);
-    }
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [state.playing, state.speed]);
 
   return (
     <GraphContext.Provider value={{ state: resolvedState, dispatch }}>

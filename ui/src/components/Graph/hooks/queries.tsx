@@ -1,108 +1,123 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 import { useGraphContext } from "@/contexts/GraphContext/context";
-import {
-  EMessageType,
-  IServerMessage,
-  ITransactionGenerated,
-  ITransactionMessage,
-  ITransactionReceived,
-  ITransactionSent
-} from "../types";
+import { EMessageType, IServerMessage } from "../types";
+import { incrementNodeAggregationData } from "../utils";
 
 export const useStreamMessagesHandler = () => {
-  const { state: { transactionsByIdRef, txGeneratedMessagesById, txReceivedMessagesById, txSentMessagesById }} = useGraphContext();
+  const {
+    state: { aggregatedData, simulationStartTime, speed },
+  } = useGraphContext();
   const eventSource = useRef<EventSource>();
+  const renderInterval = useRef<Timer | undefined>();
+  const pendingPropagations = useRef<string[]>([]);
+  const pendingMsgs = useRef<Map<number, IServerMessage[]>>(new Map());
 
   const startStream = useCallback(
     (startTime: number, range: number) => {
-      const url = new URL('/api/messages/batch', window.location.href);
-      url.searchParams.set('startTime', startTime.toString());
-      url.searchParams.set('speed', range.toString());
+      const url = new URL("/api/messages/batch", window.location.href);
+      url.searchParams.set("startTime", startTime.toString());
+      url.searchParams.set("speed", range.toString());
 
       eventSource.current = new EventSource(url);
       eventSource.current.onmessage = function (message) {
         const json: IServerMessage = JSON.parse(message.data);
-        processMessage(json);
+        const elapsed =
+          simulationStartTime.current !== 0
+            ? (performance.now() - simulationStartTime.current) * speed
+            : 0;
+
+        if (json.time / 1_000_000 < elapsed) {
+          processMessage(json);
+        } else {
+          const otherEvents =
+            pendingMsgs.current.get(json.time / 1_000_000) || [];
+          pendingMsgs.current.set(json.time / 1_000_000, [
+            ...otherEvents,
+            json,
+          ]);
+        }
       };
+
+      renderInterval.current = setInterval(processMessagesIntervalFunc, 10);
     },
-    [],
+    [speed],
   );
 
   const stopStream = useCallback(() => {
     eventSource.current?.close();
-  }, [])
+    clearInterval(renderInterval.current);
+  }, []);
+
+  const processMessagesIntervalFunc = useCallback(() => {
+    const elapsed =
+      simulationStartTime.current !== 0
+        ? (performance.now() - simulationStartTime.current) * speed
+        : 0;
+
+    for (const [time, data] of pendingMsgs.current) {
+      if (time > elapsed) {
+        break;
+      }
+
+      data.forEach(processMessage);
+      pendingMsgs.current.delete(time);
+    }
+  }, [speed]);
 
   // Function to process each message and update transactions
   const processMessage = useCallback((json: IServerMessage) => {
     const { message } = json;
 
     if (message.type === EMessageType.TransactionGenerated) {
-      txGeneratedMessagesById.current.set(message.id, json as IServerMessage<ITransactionGenerated>);
+      aggregatedData.current.total.txGenerated++;
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.publisher.toString(),
+        "txGenerated",
+      );
     } else if (message.type === EMessageType.TransactionSent) {
-      let sentMessages = txSentMessagesById.current.get(message.id) || [];
-      sentMessages.push(json as IServerMessage<ITransactionSent>);
-      txSentMessagesById.current.set(message.id, sentMessages);
-
-      // Generation will always come first.
-      const generatedMsg = txGeneratedMessagesById.current.get(message.id) as IServerMessage<ITransactionGenerated>;
-      const receivedMessages = txReceivedMessagesById.current.get(message.id) || [];
-
-      for (const receivedMsg of receivedMessages) {
-        if (
-          receivedMsg.message.sender === message.sender &&
-          receivedMsg.message.recipient === message.recipient
-        ) {
-          const transaction: ITransactionMessage = {
-            id: message.id,
-            duration:
-              Math.floor(receivedMsg.time / 1_000_000) -
-              Math.floor(json.time / 1_000_000),
-            source: message.sender,
-            target: message.recipient,
-            sentTime: Math.floor(json.time / 1_000_000),
-            generated: Math.floor(generatedMsg?.time || 0 / 1_000_000),
-          };
-
-          let transactionList = transactionsByIdRef.current.get(message.id) || [];
-          transactionList.push(transaction);
-          transactionsByIdRef.current.set(message.id, transactionList);
-        }
-      }
+      aggregatedData.current.total.txSent++;
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.sender.toString(),
+        "txSent",
+      );
+      pendingPropagations.current.push(
+        `${message.sender}-${message.recipient}-${message.id}`,
+      );
     } else if (message.type === EMessageType.TransactionReceived) {
-      let receivedMessages = txReceivedMessagesById.current.get(message.id) || [];
-      receivedMessages.push(json as IServerMessage<ITransactionReceived>);
-      txReceivedMessagesById.current.set(message.id, receivedMessages);
-
-      const generatedMsg = txGeneratedMessagesById.current.get(message.id) as IServerMessage<ITransactionGenerated>;
-      const sentMessages = txSentMessagesById.current.get(message.id) || [];
-
-      for (const sentMsg of sentMessages) {
-        if (
-          sentMsg.message.sender === message.sender &&
-          sentMsg.message.recipient === message.recipient
-        ) {
-          const transaction: ITransactionMessage = {
-            id: message.id,
-            duration:
-              Math.floor(json.time / 1_000_000) -
-              Math.floor(sentMsg.time / 1_000_000),
-            source: message.sender,
-            target: message.recipient,
-            sentTime: Math.floor(sentMsg.time / 1_000_000),
-            generated: Math.floor(generatedMsg?.time || 0 / 1_000_000),
-          };
-
-          let transactionList = transactionsByIdRef.current.get(message.id) || [];
-          transactionList.push(transaction);
-          transactionsByIdRef.current.set(message.id, transactionList);
-        }
+      aggregatedData.current.total.txReceived++;
+      const matchingSentIndex = pendingPropagations.current.indexOf(
+        `${message.sender}-${message.recipient}-${message.id}`,
+      );
+      if (matchingSentIndex !== -1) {
+        aggregatedData.current.total.txPropagations++;
+        incrementNodeAggregationData(
+          aggregatedData.current.nodes,
+          message.recipient.toString(),
+          "txReceived",
+        );
+        incrementNodeAggregationData(
+          aggregatedData.current.nodes,
+          message.sender.toString(),
+          "txPropagations",
+        );
+        incrementNodeAggregationData(
+          aggregatedData.current.nodes,
+          message.recipient.toString(),
+          "txPropagations",
+        );
+        pendingPropagations.current.splice(matchingSentIndex, 1);
       }
     }
   }, []);
 
-  return {
-    startStream,
-    stopStream,
-  };
+  return useMemo(
+    () => ({
+      startStream,
+      stopStream,
+    }),
+    [startStream, stopStream],
+  );
 };

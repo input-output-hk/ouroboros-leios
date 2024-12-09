@@ -1,9 +1,5 @@
 import {
   IServerMessage,
-  ITransactionGenerated,
-  ITransactionMessage,
-  ITransactionReceived,
-  ITransactionSent,
   ITransformedNodeMap
 } from "@/components/Graph/types";
 import { Dispatch, MutableRefObject, RefObject } from "react";
@@ -14,15 +10,35 @@ export enum ESpeedOptions {
   "10% Speed" = 0.1,
 }
 
+export interface ISimulationAggregatedData {
+  txPerSecond: number;
+  txGenerated: number;
+  txSent: number;
+  txReceived: number;
+  txPropagations: number;
+  ibGenerated: number;
+  ibSent: number;
+  ibReceived: number;
+  ebGenerated: number;
+  ebSent: number;
+  ebReceived: number;
+  pbGenerated: number;
+  pbSent: number;
+  pbReceived: number;
+}
+
+export interface ISimulationAggregatedDataState {
+  total: ISimulationAggregatedData;
+  nodes: Map<string, ISimulationAggregatedData>;
+}
+
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement>;
-  transactionsByIdRef: MutableRefObject<Map<number, ITransactionMessage[]>>;
-  txGeneratedMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionGenerated>>>;
-  txSentMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionSent>[]>>;
-  txReceivedMessagesById: MutableRefObject<Map<number, IServerMessage<ITransactionReceived>[]>>;
   currentTime: number;
+  currentNode?: string;
   generatedMessages: number[];
-  intervalId: MutableRefObject<number | null>;
+  intervalId: MutableRefObject<Timer | undefined>;
+  aggregatedData: MutableRefObject<ISimulationAggregatedDataState>;
   maxTime: number;
   messages: Map<number, IServerMessage>;
   playing: boolean;
@@ -32,11 +48,11 @@ export interface IGraphContextState {
   speed: ESpeedOptions;
   topography: ITransformedNodeMap;
   topographyLoaded: boolean;
-  transactions: Map<number, ITransactionMessage[]>;
 }
 
 export type TGraphContextActions =
   | { type: "SET_CURRENT_TIME"; payload: number }
+  | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "ADD_GENERATED_MESSAGE"; payload: number }
   | { type: "SET_GENERATED_MESSSAGES", payload: number[] }
   | { type: "REMOVE_GENERATED_MESSAGE"; payload: number }

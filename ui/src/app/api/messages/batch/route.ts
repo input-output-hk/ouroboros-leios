@@ -109,7 +109,7 @@ export async function GET(req: Request, res: Response) {
 
     let initialEventTime: number | null = null;
     let interval: Timer | undefined;
-    const startTimeOnServer = Date.now();
+    const startTimeOnServer = performance.now();
     const eventBuffer: { line: string; timeToSend: number }[] = [];
     let rlClosed = false;
 
@@ -121,7 +121,7 @@ export async function GET(req: Request, res: Response) {
 
       start(controller) {
         const processEventBuffer = () => {
-          const now = Date.now();
+          const now = performance.now();
 
           while (eventBuffer.length > 0) {
             const { line, timeToSend } = eventBuffer[0];

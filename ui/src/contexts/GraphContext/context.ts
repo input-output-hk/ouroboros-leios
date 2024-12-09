@@ -1,16 +1,33 @@
 "use client";
 import { Context, createContext, useContext } from "react";
-import { ESpeedOptions, IGraphContext, IGraphContextState } from "./types";
+import { ESpeedOptions, IGraphContext, IGraphContextState, ISimulationAggregatedDataState } from "./types";
+
+export const defaultAggregatedData: ISimulationAggregatedDataState = {
+  total: {
+    txPerSecond: 0,
+    txGenerated: 0,
+    txPropagations: 0,
+    txReceived: 0,
+    txSent: 0,
+    ebGenerated: 0,
+    ebReceived: 0,
+    ebSent: 0,
+    ibGenerated: 0,
+    ibReceived: 0,
+    ibSent: 0,
+    pbGenerated: 0,
+    pbReceived: 0,
+    pbSent: 0,
+  },
+  nodes: new Map()
+};
 
 export const defaultState: IGraphContextState = {
   canvasRef: { current: null },
-  transactionsByIdRef: { current: new Map() },
-  txGeneratedMessagesById: { current: new Map() },
-  txReceivedMessagesById: { current: new Map() },
-  txSentMessagesById: { current: new Map() },
+  aggregatedData: { current: defaultAggregatedData },
   currentTime: 0,
   generatedMessages: [],
-  intervalId: { current: null },
+  intervalId: { current: undefined },
   maxTime: 0,
   messages: new Map(),
   playing: false,
@@ -20,7 +37,6 @@ export const defaultState: IGraphContextState = {
   speed: ESpeedOptions["3% Speed"],
   topography: { links: new Map(), nodes: new Map() },
   topographyLoaded: false,
-  transactions: new Map(),
 }
 
 export const GraphContext: Context<IGraphContext> = createContext({
