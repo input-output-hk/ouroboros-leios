@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2024-12-09
+
+### Nix development environment
+
+We previously had a `nix develop` environment for the Haskell simulation, but this was removed as the Haskell package evolved. Instead of re-nixifying this repository, I created a separate [ouroboros-leios.env](https://github.com/functionally/ouroboros-leios.env) repository where one can open a `nix develop` with the correct Haskell compiler and dependencies.
+
 ## 2024-12-06
 
 ### ΔQ
