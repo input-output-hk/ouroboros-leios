@@ -1,6 +1,6 @@
 use std::{
     collections::{btree_map, hash_map, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
-    sync::{atomic::AtomicU64, Arc},
+    sync::Arc,
     time::Duration,
 };
 
@@ -9,7 +9,7 @@ use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::ChaChaRng;
-use tokio::select;
+use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
 
 use crate::{
@@ -24,7 +24,6 @@ use crate::{
 };
 
 use super::SimulationMessage;
-use rand_distr::Distribution;
 
 enum TransactionView {
     Pending,
@@ -43,9 +42,9 @@ pub struct Node {
     pub id: NodeId,
     trace: bool,
     sim_config: Arc<SimConfiguration>,
-    tx_prob: f64,
-    msg_source: NetworkSource<SimulationMessage>,
+    msg_source: Option<NetworkSource<SimulationMessage>>,
     msg_sink: NetworkSink<SimulationMessage>,
+    tx_source: Option<mpsc::UnboundedReceiver<Arc<Transaction>>>,
     events: BinaryHeap<FutureEvent<NodeEvent>>,
     tracker: EventTracker,
     rng: ChaChaRng,
@@ -106,12 +105,14 @@ struct PeerInputBlockRequests {
 }
 
 impl Node {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: &NodeConfiguration,
         sim_config: Arc<SimConfiguration>,
         total_stake: u64,
         msg_source: NetworkSource<SimulationMessage>,
         msg_sink: NetworkSink<SimulationMessage>,
+        tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
         tracker: EventTracker,
         rng: ChaChaRng,
         clock: Clock,
@@ -122,16 +123,13 @@ impl Node {
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
 
-        // TODO: take the 0.85 from the config file
-        let tx_prob = 0.85 / sim_config.nodes.len() as f64;
-
         Self {
             id,
             trace: sim_config.trace_nodes.contains(&id),
             sim_config,
-            tx_prob,
-            msg_source,
+            msg_source: Some(msg_source),
             msg_sink,
+            tx_source: Some(tx_source),
             events,
             tracker,
             rng,
@@ -154,8 +152,9 @@ impl Node {
 
     pub async fn run(mut self) -> Result<()> {
         // TODO: split struct Node into the mechanics (which can then be extracted here) and the high-level logic that handles messages
-        // (then we could remove these `replace` shenanigans)
-        let mut msg_source = std::mem::replace(&mut self.msg_source, NetworkSource::new());
+        // (then we could remove these Option shenanigans)
+        let mut msg_source = self.msg_source.take().unwrap();
+        let mut tx_source = self.tx_source.take().unwrap();
 
         loop {
             select! {
@@ -165,6 +164,13 @@ impl Node {
                         break;
                     };
                     self.events.push(FutureEvent(timestamp, NodeEvent::Message(from, msg)));
+                }
+                maybe_tx = tx_source.recv() => {
+                    let Some(tx) = maybe_tx else {
+                        // sim has stopped runinng
+                        break;
+                    };
+                    self.receive_tx(self.id, tx)?;
                 }
                 event = self.next_event() => {
                     match event {
@@ -249,22 +255,6 @@ impl Node {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
-        static NEXT_TX_ID: AtomicU64 = AtomicU64::new(0);
-
-        if self.rng.gen_bool(self.tx_prob) {
-            let id =
-                TransactionId::new(NEXT_TX_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
-            let shard = self.rng.gen_range(0..self.sim_config.ib_shards);
-            let bytes = self
-                .sim_config
-                .max_tx_size
-                .min(self.sim_config.transaction_size_bytes.sample(&mut self.rng) as u64);
-            let tx = Arc::new(Transaction { id, shard, bytes });
-
-            self.tracker.track_transaction_generated(&tx, self.id);
-            self.receive_tx(self.id, tx)?;
-        }
-
         // The beginning of a new slot is the end of an old slot.
         // Publish any input blocks left over from the last slot
 
@@ -530,7 +520,9 @@ impl Node {
 
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
-        if from != self.id {
+        if from == self.id {
+            self.tracker.track_transaction_generated(&tx, self.id);
+        } else {
             self.tracker
                 .track_transaction_received(tx.id, from, self.id);
         }

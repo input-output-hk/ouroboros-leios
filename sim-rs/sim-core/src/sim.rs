@@ -1,12 +1,14 @@
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use netsim_async::{Bandwidth, EdgePolicy, HasBytesSize, Latency};
 use node::Node;
 use rand::RngCore;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
-use tokio::{select, task::JoinSet};
+use slot::SlotWitness;
+use tokio::{select, sync::mpsc, task::JoinSet};
 use tokio_util::sync::CancellationToken;
+use tx::TransactionProducer;
 
 use crate::{
     clock::Clock,
@@ -20,9 +22,13 @@ use crate::{
 };
 
 mod node;
+mod slot;
+mod tx;
 
 pub struct Simulation {
     network: Network<SimulationMessage>,
+    tx_producer: TransactionProducer,
+    slot_witness: SlotWitness,
     nodes: Vec<Node>,
 }
 
@@ -35,6 +41,7 @@ impl Simulation {
 
         let mut rng = ChaChaRng::seed_from_u64(config.seed);
         let mut nodes = vec![];
+        let mut node_tx_sinks = HashMap::new();
         for link_config in config.links.iter() {
             network.set_edge_policy(
                 link_config.nodes.0,
@@ -50,20 +57,36 @@ impl Simulation {
         for node_config in &config.nodes {
             let id = node_config.id;
             let (msg_sink, msg_source) = network.open(id).context("could not open socket")?;
+            let (tx_sink, tx_source) = mpsc::unbounded_channel();
+            node_tx_sinks.insert(id, tx_sink);
             let node = Node::new(
                 node_config,
                 config.clone(),
                 total_stake,
                 msg_source,
                 msg_sink,
+                tx_source,
                 tracker.clone(),
                 ChaChaRng::seed_from_u64(rng.next_u64()),
                 clock.clone(),
             );
             nodes.push(node);
         }
+        let tx_producer = TransactionProducer::new(
+            ChaChaRng::seed_from_u64(rng.next_u64()),
+            clock.clone(),
+            node_tx_sinks,
+            &config,
+        );
 
-        Ok(Self { network, nodes })
+        let slot_witness = SlotWitness::new(clock, tracker);
+
+        Ok(Self {
+            network,
+            tx_producer,
+            slot_witness,
+            nodes,
+        })
     }
 
     // Run the simulation indefinitely.
@@ -77,6 +100,10 @@ impl Simulation {
         select! {
             biased;
             _ = token.cancelled() => {}
+            _ = self.slot_witness.run() => {}
+            result = self.tx_producer.run() => {
+                result?;
+            }
             result = set.join_next() => {
                 result.unwrap()??;
             }

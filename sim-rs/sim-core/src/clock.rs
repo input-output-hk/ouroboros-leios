@@ -142,11 +142,12 @@ impl Clock {
 
         {
             let mut this = self.inner.lock().unwrap();
-    
+
             this.calls.insert(timestamp, tx);
             if this.calls.len() == this.num_tasks {
                 let time = this.calls.iter().next().map(|(t, _)| t.0).unwrap();
-                self.time.store(duration_to_u64(time), std::sync::atomic::Ordering::Relaxed);
+                self.time
+                    .store(duration_to_u64(time), std::sync::atomic::Ordering::Relaxed);
                 while let Some((&Timestamp(t, _), _w)) = this.calls.iter().next() {
                     debug!("waking one task at {:?}", time);
                     if t != time {
@@ -164,7 +165,7 @@ impl Clock {
 
         // cancellation needs to remove the entry
         struct Guard<'a>(&'a Clock, Timestamp);
-        impl<'a> Guard<'a> {
+        impl Guard<'_> {
             fn defuse(&mut self) {
                 self.1 .1 = 0;
             }
