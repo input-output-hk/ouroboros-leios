@@ -1,25 +1,35 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
-module PraosProtocol.VizSimChainSync where
+module LeiosProtocol.Short.VizSim where
 
 import ChanDriver
-import Data.Coerce
+import Control.Exception (assert)
+import Data.Coerce (coerce)
+import Data.Hashable (hash)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap.Strict as IMap
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
-import Data.Word
 import qualified Graphics.Rendering.Cairo as Cairo
+import LeiosProtocol.Common hiding (Point)
+import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
+import LeiosProtocol.Short.Node (LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.ChainSync
 import PraosProtocol.Common hiding (Point)
-import PraosProtocol.SimChainSync
+import PraosProtocol.PraosNode (PraosMessage (..))
+import qualified PraosProtocol.VizSimPraos as VizSimPraos
 import SimTypes
-import System.Random (mkStdGen, uniform)
 import Viz
 import VizSim
 import VizSimTCP (
@@ -31,80 +41,79 @@ import VizUtils
 
 example1 :: Visualization
 example1 =
-  slowmoVisualization 0.1 $
+  slowmoVisualization 0.5 $
     Viz model $
       LayoutReqSize 500 650 $
         Layout $
-          relaySimVizRender examplesRelaySimVizConfig
+          leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = relaySimVizModel trace
+  model = leiosSimVizModel trace
    where
     trace = exampleTrace1
 
-examplesRelaySimVizConfig :: ChainSyncVizConfig
-examplesRelaySimVizConfig =
-  ChainSyncVizConfig
-    { nodeMessageColor = testNodeMessageColor
-    , ptclMessageColor = testPtclMessageColor
-    , nodeMessageText = testNodeMessageText
-    , ptclMessageText = testPtclMessageText
-    }
+examplesLeiosSimVizConfig :: LeiosVizConfig
+examplesLeiosSimVizConfig = LeiosVizConfig{..}
  where
-  testPtclMessageColor ::
-    ChainSyncMessage ->
-    (Double, Double, Double)
-  testPtclMessageColor (ProtocolMessage (SomeMessage (MsgRollForward_StCanAwait blk _))) = testNodeMessageColor blk
-  testPtclMessageColor (ProtocolMessage (SomeMessage (MsgRollForward_StMustReply blk _))) = testNodeMessageColor blk
-  testPtclMessageColor _ = (1, 0, 0)
-
-  testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  testNodeMessageColor hdr =
-    (fromIntegral r / 256, fromIntegral g / 256, fromIntegral b / 256)
-   where
-    r, g, b :: Word8
-    ((r, g, b), _) = uniform (mkStdGen $ coerce $ blockHash hdr)
-
-  testNodeMessageText :: BlockHeader -> Maybe String
-  testNodeMessageText hdr = Just (show $ blockSlot hdr)
-
-  testPtclMessageText ::
-    ChainSyncMessage ->
-    Maybe String
-  testPtclMessageText (ProtocolMessage (SomeMessage msg)) = Just $ chainSyncMessageLabel msg
+  VizSimPraos.PraosVizConfig{..} = VizSimPraos.examplesPraosSimVizConfig
+  praosMessageColor = either chainSyncMessageColor blockFetchMessageColor . coerce
+  praosMessageText = either chainSyncMessageText blockFetchMessageText . coerce
+  relayIBMessageColor :: RelayIBMessage -> (Double, Double, Double)
+  relayIBMessageColor = relayMessageColor $ \(InputBlockId x y) -> (x, y)
+  relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
+  relayEBMessageColor = relayMessageColor $ \(EndorseBlockId x y) -> (x, y)
+  relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
+  relayVoteMessageColor = relayMessageColor $ \(VoteId x y) -> (x, y)
+  relayIBMessageText :: RelayIBMessage -> Maybe String
+  relayIBMessageText = relayMessageText "IB:"
+  relayEBMessageText :: RelayEBMessage -> Maybe String
+  relayEBMessageText = relayMessageText "EB:"
+  relayVoteMessageText :: RelayVoteMessage -> Maybe String
+  relayVoteMessageText = relayMessageText "Vote:"
+  relayMessageText prefix (ProtocolMessage (SomeMessage msg)) = Just $ prefix ++ relayMessageLabel msg
+  relayMessageColor :: (id -> (NodeId, Int)) -> RelayMessage id header body -> (Double, Double, Double)
+  relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
+    MsgRespondBodies bodies -> hashToColor . hash $ map (f . fst) bodies
+    _otherwise -> (1, 0, 0)
 
 ------------------------------------------------------------------------------
 -- The vizualisation model
 --
 
 -- | The vizualisation data model for the relay simulation
-type ChainSyncVizModel =
+type LeiosSimVizModel =
   SimVizModel
-    ChainSyncEvent
-    ChainSyncVizState
+    LeiosEvent
+    LeiosSimVizState
 
 -- | The vizualisation state within the data model for the relay simulation
-data ChainSyncVizState
-  = ChainSyncVizState
+data LeiosSimVizState
+  = LeiosSimVizState
   { vizWorldShape :: !WorldShape
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( ChainSyncMessage
+          [ ( LeiosMessage
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
           ]
        )
-  , vizMsgsAtNodeQueue :: !(Map NodeId [BlockHeader])
-  , vizMsgsAtNodeBuffer :: !(Map NodeId [BlockHeader])
+  , vizNodeTip :: !(Map NodeId FullTip)
+  , -- the Buffer and Queue names are legacy from VizSimRelay.
+    -- In Praos we consider:
+    --  * Queue = seen by blockFetchConsumer and not yet in Buffer
+    --  * Buffer = added to blocksVar
+    vizMsgsAtNodeQueue :: !(Map NodeId [RankingBlockHeader])
+  , vizMsgsAtNodeBuffer :: !(Map NodeId [RankingBlockHeader])
   , vizMsgsAtNodeRecentQueue :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeRecentBuffer :: !(Map NodeId RecentRate)
   , vizMsgsAtNodeTotalQueue :: !(Map NodeId Int)
   , vizMsgsAtNodeTotalBuffer :: !(Map NodeId Int)
-  , vizNumMsgsGenerated :: !Int
-  , vizMsgsDiffusionLatency :: !(Map (HeaderHash BlockHeader) (BlockHeader, NodeId, Time, [Time]))
+  , -- these are `Block`s generated (globally).
+    vizNumMsgsGenerated :: !Int
+  , vizMsgsDiffusionLatency :: !DiffusionLatencyMap
   }
 
 -- | The end points where the each link, including the case where the link
@@ -126,23 +135,51 @@ data LinkPoints
       {-# UNPACK #-} !Point
   deriving (Show)
 
+type ChainsMap = IntMap (Chain (Block RankingBlockBody))
+
+accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
+accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip ch)))) = IMap.insert (coerce nid) ch
+accumChains _ _ = id
+
+type DiffusionLatencyMap = Map (HeaderHash RankingBlockHeader) (RankingBlockHeader, NodeId, Time, [Time])
+
+accumDiffusionLatency :: Time -> LeiosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency now (LeiosEventNode (LabelNode n (PraosNodeEvent e))) = accumDiffusionLatency' now (LabelNode n e)
+accumDiffusionLatency _ _ = id
+accumDiffusionLatency' :: Time -> LabelNode (PraosNodeEvent RankingBlockBody) -> DiffusionLatencyMap -> DiffusionLatencyMap
+accumDiffusionLatency' now (LabelNode nid (PraosNodeEventGenerate blk)) vs =
+  assert (not (blockHash blk `Map.member` vs)) $
+    Map.insert
+      (blockHash blk)
+      (blockHeader blk, nid, now, [now])
+      vs
+accumDiffusionLatency' now (LabelNode _nid (PraosNodeEventEnterState blk)) vs =
+  Map.adjust
+    ( \(hdr, nid', created, arrivals) ->
+        (hdr, nid', created, now : arrivals)
+    )
+    (blockHash blk)
+    vs
+accumDiffusionLatency' _ _ vs = vs
+
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
-relaySimVizModel ::
-  ChainSyncTrace ->
-  VizModel ChainSyncVizModel
-relaySimVizModel =
+leiosSimVizModel ::
+  LeiosTrace ->
+  VizModel LeiosSimVizModel
+leiosSimVizModel =
   simVizModel
     accumEventVizState
     pruneVisState
     initVizState
  where
   initVizState =
-    ChainSyncVizState
+    LeiosSimVizState
       { vizWorldShape = WorldShape (0, 0) False
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
+      , vizNodeTip = Map.empty
       , vizMsgsAtNodeQueue = Map.empty
       , vizMsgsAtNodeBuffer = Map.empty
       , vizMsgsAtNodeRecentQueue = Map.empty
@@ -155,10 +192,10 @@ relaySimVizModel =
 
   accumEventVizState ::
     Time ->
-    ChainSyncEvent ->
-    ChainSyncVizState ->
-    ChainSyncVizState
-  accumEventVizState _now (ChainSyncEventSetup shape nodes links) vs =
+    LeiosEvent ->
+    LeiosSimVizState ->
+    LeiosSimVizState
+  accumEventVizState _now (LeiosEventSetup shape nodes links) vs =
     vs
       { vizWorldShape = shape
       , vizNodePos = nodes
@@ -172,9 +209,66 @@ relaySimVizModel =
             )
             links
       }
+  accumEventVizState _now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip tip)))) vs =
+    vs{vizNodeTip = Map.insert nid (fullTip tip) (vizNodeTip vs)}
+  accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
+      , vizMsgsDiffusionLatency =
+          assert (not (blockHash blk `Map.member` vizMsgsDiffusionLatency vs)) $
+            Map.insert
+              (blockHash blk)
+              (blockHeader blk, nid, now, [now])
+              (vizMsgsDiffusionLatency vs)
+      }
+  accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventReceived blk)))) vs =
+    vs
+      { vizMsgsAtNodeQueue =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentQueue =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentQueue vs)
+      , vizMsgsAtNodeTotalQueue =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalQueue vs)
+      }
+  accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventEnterState blk)))) vs =
+    vs
+      { vizMsgsAtNodeBuffer =
+          Map.insertWith (flip (++)) nid [blockHeader blk] (vizMsgsAtNodeBuffer vs)
+      , vizMsgsAtNodeQueue =
+          Map.adjust
+            (filter (\blk' -> blockHash blk' /= blockHash blk))
+            nid
+            (vizMsgsAtNodeQueue vs)
+      , vizMsgsAtNodeRecentBuffer =
+          Map.alter
+            (Just . recentAdd now . fromMaybe recentEmpty)
+            nid
+            (vizMsgsAtNodeRecentBuffer vs)
+      , vizMsgsAtNodeTotalBuffer =
+          Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
+      , vizMsgsDiffusionLatency =
+          Map.adjust
+            ( \(hdr, nid', created, arrivals) ->
+                (hdr, nid', created, now : arrivals)
+            )
+            (blockHash blk)
+            (vizMsgsDiffusionLatency vs)
+      }
   accumEventVizState
     _now
-    ( ChainSyncEventTcp
+    ( LeiosEventTcp
         ( LabelLink
             nfrom
             nto
@@ -190,80 +284,18 @@ relaySimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
-  accumEventVizState _ (ChainSyncEventNode _) vs = vs
-  -- accumEventVizState now (ChainSyncEventNode (LabelNode nid (RelayNodeEventEnterQueue msg))) vs =
-  --   vs
-  --     { vizMsgsAtNodeQueue =
-  --         Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeQueue vs)
-  --     , vizMsgsAtNodeRecentQueue =
-  --         Map.alter
-  --           (Just . recentAdd now . fromMaybe recentEmpty)
-  --           nid
-  --           (vizMsgsAtNodeRecentQueue vs)
-  --     , vizMsgsAtNodeTotalQueue =
-  --         Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalQueue vs)
-  --     }
-  -- accumEventVizState now (ChainSyncEventNode (LabelNode nid (RelayNodeEventEnterBuffer msg))) vs =
-  --   vs
-  --     { vizMsgsAtNodeBuffer =
-  --         Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeBuffer vs)
-  --     , vizMsgsAtNodeQueue =
-  --         Map.adjust
-  --           (filter (\msg' -> testBlockId msg' /= testBlockId msg))
-  --           nid
-  --           (vizMsgsAtNodeQueue vs)
-  --     , vizMsgsAtNodeRecentBuffer =
-  --         Map.alter
-  --           (Just . recentAdd now . fromMaybe recentEmpty)
-  --           nid
-  --           (vizMsgsAtNodeRecentBuffer vs)
-  --     , vizMsgsAtNodeTotalBuffer =
-  --         Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
-  --     , vizMsgsDiffusionLatency =
-  --         Map.adjust
-  --           ( \(blk, nid', created, arrivals) ->
-  --               (blk, nid', created, now : arrivals)
-  --           )
-  --           (testBlockId msg)
-  --           (vizMsgsDiffusionLatency vs)
-  --     }
-  -- accumEventVizState _now (ChainSyncEventNode (LabelNode nid (RelayNodeEventRemove msg))) vs =
-  --   vs
-  --     { vizMsgsAtNodeBuffer =
-  --         Map.adjust
-  --           (filter (\msg' -> testBlockId msg' /= testBlockId msg))
-  --           nid
-  --           (vizMsgsAtNodeBuffer vs)
-  --     , vizMsgsAtNodeQueue =
-  --         Map.adjust
-  --           (filter (\msg' -> testBlockId msg' /= testBlockId msg))
-  --           nid
-  --           (vizMsgsAtNodeQueue vs)
-  --     }
-  -- accumEventVizState now (ChainSyncEventNode (LabelNode nid (RelayNodeEventGenerate msg))) vs =
-  --   vs
-  --     { vizMsgsAtNodeBuffer =
-  --         Map.insertWith (flip (++)) nid [msg] (vizMsgsAtNodeBuffer vs)
-  --     , vizMsgsAtNodeRecentBuffer =
-  --         Map.alter
-  --           (Just . recentAdd now . fromMaybe recentEmpty)
-  --           nid
-  --           (vizMsgsAtNodeRecentBuffer vs)
-  --     , vizMsgsAtNodeTotalBuffer =
-  --         Map.insertWith (+) nid 1 (vizMsgsAtNodeTotalBuffer vs)
-  --     , vizNumMsgsGenerated = vizNumMsgsGenerated vs + 1
-  --     , vizMsgsDiffusionLatency =
-  --         assert (not (testBlockId msg `Map.member` vizMsgsDiffusionLatency vs)) $
-  --           Map.insert
-  --             (testBlockId msg)
-  --             (msg, nid, now, [now])
-  --             (vizMsgsDiffusionLatency vs)
-  --    }
+  accumEventVizState _now (LeiosEventNode (LabelNode _nodeId (LeiosNodeEventCPU _task))) vs = vs
+  accumEventVizState
+    _now
+    ( LeiosEventNode
+        (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
+      )
+    vs = vs
 
   pruneVisState ::
     Time ->
-    ChainSyncVizState ->
-    ChainSyncVizState
+    LeiosSimVizState ->
+    LeiosSimVizState
   pruneVisState now vs =
     vs
       { vizMsgsInTransit =
@@ -275,18 +307,15 @@ relaySimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo1) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
-          Map.filter (\(_, _, t, _) -> t >= secondsAgo15) (vizMsgsDiffusionLatency vs)
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       }
    where
-    secondsAgo1 :: Time
-    secondsAgo1 = addTime (-1) now
-
-    secondsAgo15 :: Time
-    secondsAgo15 = addTime (-15) now
+    secondsAgo30 :: Time
+    secondsAgo30 = addTime (-30) now
 
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.
@@ -336,52 +365,65 @@ recentPrune now (RecentRate pq) =
 -- The vizualisation rendering
 --
 
-data ChainSyncVizConfig
-  = ChainSyncVizConfig
-  { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  , ptclMessageColor :: ChainSyncMessage -> (Double, Double, Double)
-  , nodeMessageText :: BlockHeader -> Maybe String
-  , ptclMessageText :: ChainSyncMessage -> Maybe String
+data LeiosVizConfig
+  = LeiosVizConfig
+  { praosMessageColor :: PraosMessage RankingBlockBody -> (Double, Double, Double)
+  , praosMessageText :: PraosMessage RankingBlockBody -> Maybe String
+  , relayIBMessageColor :: RelayIBMessage -> (Double, Double, Double)
+  , relayIBMessageText :: RelayIBMessage -> Maybe String
+  , relayEBMessageColor :: RelayEBMessage -> (Double, Double, Double)
+  , relayEBMessageText :: RelayEBMessage -> Maybe String
+  , relayVoteMessageColor :: RelayVoteMessage -> (Double, Double, Double)
+  , relayVoteMessageText :: RelayVoteMessage -> Maybe String
   }
 
-relaySimVizRender ::
-  ChainSyncVizConfig ->
-  VizRender ChainSyncVizModel
-relaySimVizRender vizConfig =
+leiosMessageColor :: LeiosVizConfig -> LeiosMessage -> (Double, Double, Double)
+leiosMessageColor LeiosVizConfig{..} msg =
+  case msg of
+    RelayIB x -> relayIBMessageColor x
+    RelayEB x -> relayEBMessageColor x
+    RelayVote x -> relayVoteMessageColor x
+    PraosMsg x -> praosMessageColor x
+
+leiosMessageText :: LeiosVizConfig -> LeiosMessage -> Maybe String
+leiosMessageText LeiosVizConfig{..} msg =
+  case msg of
+    RelayIB x -> relayIBMessageText x
+    RelayEB x -> relayEBMessageText x
+    RelayVote x -> relayVoteMessageText x
+    PraosMsg x -> praosMessageText x
+
+leiosSimVizRender ::
+  LeiosVizConfig ->
+  VizRender LeiosSimVizModel
+leiosSimVizRender vizConfig =
   VizRender
     { renderReqSize = (500, 500)
     , renderChanged = \_t _fn _m -> True
-    , renderModel = \t _fn m sz -> relaySimVizRenderModel vizConfig t m sz
+    , renderModel = \t _fn m sz -> leiosSimVizRenderModel vizConfig t m sz
     }
 
-relaySimVizRenderModel ::
-  ChainSyncVizConfig ->
+leiosSimVizRenderModel ::
+  LeiosVizConfig ->
   Time ->
-  SimVizModel event ChainSyncVizState ->
+  SimVizModel event LeiosSimVizState ->
   (Double, Double) ->
   Cairo.Render ()
-relaySimVizRenderModel
-  ChainSyncVizConfig
-    { nodeMessageColor
-    , ptclMessageColor
-    , nodeMessageText
-    , ptclMessageText
-    }
+leiosSimVizRenderModel
+  cfg
   now
   ( SimVizModel
       _events
-      ChainSyncVizState
+      LeiosSimVizState
         { vizWorldShape = WorldShape{worldDimensions}
         , vizNodePos
+        , vizNodeTip
         , vizNodeLinks
         , vizMsgsInTransit
-        , vizMsgsAtNodeQueue
-        , vizMsgsAtNodeBuffer
         }
     )
   screenSize = do
     renderLinks
-    renderMessagesAtNodes
     renderNodes
    where
     renderNodes = do
@@ -390,64 +432,15 @@ relaySimVizRenderModel
       sequence_
         [ do
           Cairo.arc x y 25 0 (pi * 2)
-          Cairo.setSourceRGB 0.7 0.7 0.7
+          Cairo.setSourceRGB r b g
           Cairo.fillPreserve
           Cairo.setSourceRGB 0 0 0
           Cairo.stroke
-        | (_node, pos) <- Map.toList vizNodePos
+        | (node, pos) <- Map.toList vizNodePos
         , let (Point x y) = simPointToPixel worldDimensions screenSize pos
-        ]
-      Cairo.restore
-
-    renderMessagesAtNodes = do
-      Cairo.save
-      sequence_
-        [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x - 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x - 32) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
-        | (node, msgs) <- Map.toList vizMsgsAtNodeQueue
-        , (n, msg) <- zip [1 ..] msgs
-        , let (Point x y) =
-                simPointToPixel
-                  worldDimensions
-                  screenSize
-                  (vizNodePos Map.! node)
-              y' = y + 16 + 20 * n
-              (r, g, b) = nodeMessageColor msg
-        ]
-      sequence_
-        [ do
-          Cairo.setSourceRGB r g b
-          Cairo.arc (x + 10) y' 10 0 (2 * pi)
-          Cairo.fillPreserve
-          Cairo.setSourceRGB 0 0 0
-          Cairo.setLineWidth 1
-          Cairo.stroke
-          case nodeMessageText msg of
-            Nothing -> return ()
-            Just txt -> do
-              Cairo.moveTo (x + 22) (y' + 5)
-              Cairo.showText txt
-              Cairo.newPath
-        | (node, msgs) <- Map.toList vizMsgsAtNodeBuffer
-        , (n, msg) <- zip [1 ..] msgs
-        , let (Point x y) =
-                simPointToPixel
-                  worldDimensions
-                  screenSize
-                  (vizNodePos Map.! node)
-              y' = y + 16 + 20 * n
-              (r, g, b) = nodeMessageColor msg
+        , let (r, b, g) = case Map.lookup node vizNodeTip of
+                Just (FullTip hdr) -> blockHeaderColorAsBody hdr
+                _ -> (0.7, 0.7, 0.7)
         ]
       Cairo.restore
 
@@ -465,7 +458,8 @@ relaySimVizRenderModel
           Cairo.newPath
           -- draw all the messages within the clipping region of the link
           renderMessagesInFlight
-            (TcpSimVizConfig ptclMessageColor)
+            ( TcpSimVizConfig $ leiosMessageColor cfg
+            )
             now
             fromPos
             toPos
@@ -539,5 +533,5 @@ relaySimVizRenderModel
         [ (msgLabel, msgforecast)
         | (msg, msgforecast, _) <- msgs
         , now <= msgRecvTrailingEdge msgforecast
-        , Just msgLabel <- [ptclMessageText msg]
+        , Just msgLabel <- [leiosMessageText cfg msg]
         ]

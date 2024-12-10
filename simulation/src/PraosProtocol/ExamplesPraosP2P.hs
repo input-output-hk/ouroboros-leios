@@ -32,7 +32,7 @@ import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import PraosProtocol.SimPraosP2P
-import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig (..), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
+import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig' (blockFetchMessageColor), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)
@@ -104,9 +104,11 @@ data LatencyPerStake = LatencyPerStake
 
 data DiffusionData = DiffusionData
   { topography :: P2PTopographyCharacteristics
+  , topography_details :: P2PTopography
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
   , stable_chain_hashes :: [Int]
+  , cpuTasks :: Map.Map NodeId [(DiffTime, CPUTask)]
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -117,22 +119,24 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     , latencies = bin $ diffusionLatencyPerStakeFraction nnodes (Time created) (map Time arrivals)
     }
  where
-  bins = [0.5, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
+  bins = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
   bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) $ bins
 
 data DiffusionLatencyState = DiffusionLatencyState
   { chains :: !ChainsMap
   , diffusions :: !DiffusionLatencyMap
+  , cpuTasks :: !(Map.Map NodeId [(DiffTime, CPUTask)])
   }
 
-diffusionSampleModel :: P2PTopographyCharacteristics -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
-diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState accum render
+diffusionSampleModel :: P2PTopographyCharacteristics -> P2PTopography -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
+diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp = SampleModel initState accum render
  where
-  initState = DiffusionLatencyState IMap.empty Map.empty
+  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty
   accum t e DiffusionLatencyState{..} =
     DiffusionLatencyState
       { chains = accumChains t e chains
       , diffusions = accumDiffusionLatency t e diffusions
+      , cpuTasks = accumCPUTasks t e cpuTasks
       }
   nnodes = p2pNumNodes p2pTopographyCharacteristics
   render DiffusionLatencyState{..} = do
@@ -155,9 +159,11 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState acc
     let diffusionData =
           DiffusionData
             { topography = p2pTopographyCharacteristics
+            , topography_details = p2pTopography
             , entries
             , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
             , stable_chain_hashes
+            , cpuTasks
             }
 
     encodeFile fp diffusionData
@@ -168,6 +174,10 @@ diffusionSampleModel p2pTopographyCharacteristics fp = SampleModel initState acc
     putStrLn $ "Number of blocks that reached 98% stake: " ++ show (length $ fst arrived98)
     putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ snd arrived98)
     putStrLn $ "Blocks in longest common prefix that did not reach 98% stake: " ++ show missing
+
+accumCPUTasks :: Time -> PraosEvent -> Map.Map NodeId [(DiffTime, CPUTask)] -> Map.Map NodeId [(DiffTime, CPUTask)]
+accumCPUTasks (Time t) (PraosEventNode (LabelNode nId (PraosNodeEventCPU task))) = Map.insertWith (++) nId [(t, task)]
+accumCPUTasks _ _ = id
 
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
@@ -181,7 +191,7 @@ example1000Diffusion ::
   FilePath ->
   IO ()
 example1000Diffusion clinks rlinks stop fp =
-  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics fp) stop $
+  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
     example1Trace rng 20 p2pTopography
  where
   rng = mkStdGen 42

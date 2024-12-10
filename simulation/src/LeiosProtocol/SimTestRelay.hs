@@ -64,6 +64,7 @@ import SimTypes
 import TimeCompat (threadDelayNDT, threadDelaySI)
 
 import ChanMux
+import Control.Category ((>>>))
 import Control.Exception (assert)
 import Data.Foldable (forM_)
 import Data.List (sortOn)
@@ -163,6 +164,8 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
+            , headerValidationDelay = const 0.1
+            , threadDelayParallel = sum >>> \d -> if d >= 0 then threadDelaySI d else return ()
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll
