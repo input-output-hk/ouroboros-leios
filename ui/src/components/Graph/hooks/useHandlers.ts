@@ -74,21 +74,23 @@ export const useHandlers = () => {
     // Draw the nodes
     topography.nodes.forEach((node) => {
       context.beginPath();
-      context.arc(node.fx, node.fy, 2, 0, 2 * Math.PI);
+      context.arc(node.fx, node.fy, 1, 0, 2 * Math.PI);
       context.fillStyle = node.data.stake ? "green" : "blue";
+      context.stroke();
+      context.lineWidth = 1;
+      
+      const hasData = aggregatedData.current.nodes.has(node.id.toString());
+      if (hasData) {
+        context.strokeStyle = "red";
+      } else {
+        context.strokeStyle = "black";
+      }
 
       if (currentNode === node.id.toString()) {
+        console.log(node.id, hasData, aggregatedData.current.nodes.get(node.id.toString()))
         context.fillStyle = "red";
       }
 
-      context.stroke();
-      context.strokeStyle = "black";
-
-      const hasData = aggregatedData.current.nodes.get(node.id.toString());
-      if (hasData) {
-        context.strokeStyle = "red";
-        context.lineWidth = 1;
-      }
 
       context.fill();
     });

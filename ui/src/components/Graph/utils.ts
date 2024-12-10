@@ -109,6 +109,6 @@ export const incrementNodeAggregationData = (
     txReceived: 0,
     txSent: 0,
     ...matchingNode,
-    [key]: 1,
+    [key]: (matchingNode?.[key] || 0) + 1,
   });
 };

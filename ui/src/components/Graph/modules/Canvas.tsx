@@ -11,10 +11,10 @@ export const Canvas: FC = () => {
     state: { canvasRef, topography, currentNode },
     dispatch,
   } = useGraphContext();
-  const { drawTopography: drawCanvas } = useHandlers();
+  const { drawTopography } = useHandlers();
 
   useEffect(() => {
-    drawCanvas();
+    drawTopography();
     canvasRef.current?.addEventListener("click", (ev) => {
       if (!canvasRef.current) {
         return;
@@ -38,17 +38,15 @@ export const Canvas: FC = () => {
 
       dispatch({ type: "SET_CURRENT_NODE", payload: node });
     });
-  }, []);
 
-  useEffect(drawCanvas, [currentNode])
-
-  useEffect(() => {
-    const redraw = debounce(drawCanvas, 100);
+    const redraw = debounce(drawTopography, 100);
 
     window.addEventListener("resize", redraw)
 
     return () => window.removeEventListener("resize", redraw)
-  }, [])
+  }, []);
+
+  useEffect(drawTopography, [currentNode]);
 
   return (
     <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
