@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-12-10
+
+## Summary of mainnet data available
+
+- [These slides](https://docs.google.com/presentation/d/1Iy2Vu3jZMsHFrvqmiM8urK9EVXbYJW0knb5XQ7w2tZE/edit?usp=sharing) summarize data we have available for topology, block propagation, transaction delays, etc.
+- Will can reformat data we need for our simulations, so we don't end up with inconsistent input data sets.
+- We will use the [beta-distribution fit](docs/technical-report-1.md#stake-distribution) for representing the unevenness of the stake distribution in our simulations.
+
 ## 2024-12-09
 
 ### Nix development environment
