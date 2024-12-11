@@ -1,17 +1,17 @@
 use std::time::Duration;
 
 use crate::{
-    clock::{Clock, Timestamp},
+    clock::{ClockBarrier, Timestamp},
     events::EventTracker,
 };
 
 pub struct SlotWitness {
-    clock: Clock,
+    clock: ClockBarrier,
     tracker: EventTracker,
 }
 
 impl SlotWitness {
-    pub fn new(clock: Clock, tracker: EventTracker) -> Self {
+    pub fn new(clock: ClockBarrier, tracker: EventTracker) -> Self {
         Self { clock, tracker }
     }
 

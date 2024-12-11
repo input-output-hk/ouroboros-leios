@@ -6,7 +6,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
 use crate::{
-    clock::{Clock, Timestamp},
+    clock::{ClockBarrier, Timestamp},
     config::{NodeId, SimConfiguration},
     model::{Transaction, TransactionId},
     probability::FloatDistribution,
@@ -14,7 +14,7 @@ use crate::{
 
 pub struct TransactionProducer {
     rng: ChaChaRng,
-    clock: Clock,
+    clock: ClockBarrier,
     node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
     ib_shards: u64,
     frequency_ms: FloatDistribution,
@@ -24,7 +24,7 @@ pub struct TransactionProducer {
 impl TransactionProducer {
     pub fn new(
         rng: ChaChaRng,
-        clock: Clock,
+        clock: ClockBarrier,
         node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
         config: &SimConfiguration,
     ) -> Self {

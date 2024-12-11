@@ -13,7 +13,7 @@ use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
 
 use crate::{
-    clock::{Clock, FutureEvent, Timestamp},
+    clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
@@ -48,7 +48,7 @@ pub struct Node {
     events: BinaryHeap<FutureEvent<NodeEvent>>,
     tracker: EventTracker,
     rng: ChaChaRng,
-    clock: Clock,
+    clock: ClockBarrier,
     stake: u64,
     total_stake: u64,
     peers: Vec<NodeId>,
@@ -115,7 +115,7 @@ impl Node {
         tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
         tracker: EventTracker,
         rng: ChaChaRng,
-        clock: Clock,
+        clock: ClockBarrier,
     ) -> Self {
         let id = config.id;
         let stake = config.stake;

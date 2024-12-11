@@ -33,7 +33,11 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(config: SimConfiguration, tracker: EventTracker, clock: Clock) -> Result<Self> {
+    pub async fn new(
+        config: SimConfiguration,
+        tracker: EventTracker,
+        clock: Clock,
+    ) -> Result<Self> {
         let config = Arc::new(config);
         let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
@@ -68,18 +72,18 @@ impl Simulation {
                 tx_source,
                 tracker.clone(),
                 ChaChaRng::seed_from_u64(rng.next_u64()),
-                clock.clone(),
+                clock.barrier().await,
             );
             nodes.push(node);
         }
         let tx_producer = TransactionProducer::new(
             ChaChaRng::seed_from_u64(rng.next_u64()),
-            clock.clone(),
+            clock.barrier().await,
             node_tx_sinks,
             &config,
         );
 
-        let slot_witness = SlotWitness::new(clock, tracker);
+        let slot_witness = SlotWitness::new(clock.barrier().await, tracker);
 
         Ok(Self {
             network,
