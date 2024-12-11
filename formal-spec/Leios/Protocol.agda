@@ -2,11 +2,6 @@
 
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
-
-import Data.These as T
-import Data.List as L
-import Data.List.Relation.Unary.Any as A
-
 open import Leios.SpecStructure
 
 module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) where

@@ -1,7 +1,5 @@
 {-# OPTIONS --safe #-}
 
-open import Data.These
-
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.VRF

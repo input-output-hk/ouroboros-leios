@@ -4,8 +4,6 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-import Data.List as L
-
 module Leios.Simplified (⋯ : SpecStructure) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
 data SlotUpkeep : Type where
