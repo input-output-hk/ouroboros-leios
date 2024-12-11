@@ -10,11 +10,11 @@ export const useStreamMessagesHandler = () => {
   } = useGraphContext();
   const eventSource = useRef<EventSource>();
   const renderInterval = useRef<Timer | undefined>();
-  const pendingPropagations = useRef<string[]>([]);
   const pendingMsgs = useRef<Map<number, IServerMessage[]>>(new Map());
 
   const startStream = useCallback(
     (startTime: number, range: number) => {
+      console.log(pendingMsgs.current.size)
       const url = new URL("/api/messages/batch", window.location.href);
       url.searchParams.set("startTime", startTime.toString());
       url.searchParams.set("speed", range.toString());
@@ -24,18 +24,17 @@ export const useStreamMessagesHandler = () => {
         const json: IServerMessage = JSON.parse(message.data);
         const elapsed =
           simulationStartTime.current !== 0
-            ? (performance.now() - simulationStartTime.current) * speed
+            ? (Date.now() - simulationStartTime.current) * speed
             : 0;
 
         if (json.time / 1_000_000 < elapsed) {
           processMessage(json);
         } else {
-          const otherEvents =
-            pendingMsgs.current.get(json.time / 1_000_000) || [];
-          pendingMsgs.current.set(json.time / 1_000_000, [
-            ...otherEvents,
-            json,
-          ]);
+          if (pendingMsgs.current.has(json.time / 1_000_000)) {
+            pendingMsgs.current.get(json.time / 1_000_000)?.push(json);
+          } else {
+            pendingMsgs.current.set(json.time / 1_000_000, [json]);
+          }
         }
       };
 
@@ -52,7 +51,7 @@ export const useStreamMessagesHandler = () => {
   const processMessagesIntervalFunc = useCallback(() => {
     const elapsed =
       simulationStartTime.current !== 0
-        ? (performance.now() - simulationStartTime.current) * speed
+        ? (Date.now() - simulationStartTime.current) * speed
         : 0;
 
     for (const [time, data] of pendingMsgs.current) {
@@ -70,46 +69,41 @@ export const useStreamMessagesHandler = () => {
     const { message } = json;
 
     if (message.type === EMessageType.TransactionGenerated) {
-      aggregatedData.current.total.txGenerated++;
       incrementNodeAggregationData(
         aggregatedData.current.nodes,
         message.publisher.toString(),
         "txGenerated",
       );
     } else if (message.type === EMessageType.TransactionSent) {
-      aggregatedData.current.total.txSent++;
       incrementNodeAggregationData(
         aggregatedData.current.nodes,
         message.sender.toString(),
         "txSent",
       );
-      pendingPropagations.current.push(
-        `${message.sender}-${message.recipient}-${message.id}`,
-      );
     } else if (message.type === EMessageType.TransactionReceived) {
-      aggregatedData.current.total.txReceived++;
-      const matchingSentIndex = pendingPropagations.current.indexOf(
-        `${message.sender}-${message.recipient}-${message.id}`,
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.recipient.toString(),
+        "txReceived",
       );
-      if (matchingSentIndex !== -1) {
-        aggregatedData.current.total.txPropagations++;
-        incrementNodeAggregationData(
-          aggregatedData.current.nodes,
-          message.recipient.toString(),
-          "txReceived",
-        );
-        incrementNodeAggregationData(
-          aggregatedData.current.nodes,
-          message.sender.toString(),
-          "txPropagations",
-        );
-        incrementNodeAggregationData(
-          aggregatedData.current.nodes,
-          message.recipient.toString(),
-          "txPropagations",
-        );
-        pendingPropagations.current.splice(matchingSentIndex, 1);
-      }
+    } else if (message.type === EMessageType.InputBlockGenerated) {
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.producer.toString(),
+        "ibGenerated",
+      );
+    } else if (message.type === EMessageType.InputBlockSent) {
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.sender.toString(),
+        "ibSent",
+      );
+    } else if (message.type === EMessageType.InputBlockReceived) {
+      incrementNodeAggregationData(
+        aggregatedData.current.nodes,
+        message.recipient.toString(),
+        "ibReceived",
+      );
     }
   }, []);
 

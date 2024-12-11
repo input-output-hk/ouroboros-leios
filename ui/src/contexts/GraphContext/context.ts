@@ -3,22 +3,6 @@ import { Context, createContext, useContext } from "react";
 import { ESpeedOptions, IGraphContext, IGraphContextState, ISimulationAggregatedDataState } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
-  total: {
-    txPerSecond: 0,
-    txGenerated: 0,
-    txPropagations: 0,
-    txReceived: 0,
-    txSent: 0,
-    ebGenerated: 0,
-    ebReceived: 0,
-    ebSent: 0,
-    ibGenerated: 0,
-    ibReceived: 0,
-    ibSent: 0,
-    pbGenerated: 0,
-    pbReceived: 0,
-    pbSent: 0,
-  },
   nodes: new Map()
 };
 

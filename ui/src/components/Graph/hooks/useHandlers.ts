@@ -6,7 +6,7 @@ import { ESpeedOptions } from "@/contexts/GraphContext/types";
 import { useCallback } from "react";
 
 import { CANVAS_SCALE, getOffsetCoordinates } from "../utils";
-import { useStreamMessagesHandler } from "./queries";
+import { useStreamMessagesHandler } from "./useStreamMessagesHandler";
 
 export const useHandlers = () => {
   const {
@@ -109,18 +109,18 @@ export const useHandlers = () => {
   const togglePlayPause = useCallback(() => {
     if (!playing) {
       startStream(currentTime, speed);
-      simulationStartTime.current = performance.now() - simulationPauseTime.current;
+      simulationStartTime.current = Date.now() - simulationPauseTime.current;
       intervalId.current = setInterval(() => {
         const elapsed =
           simulationStartTime.current !== 0
-            ? (performance.now() - simulationStartTime.current) * speed
+            ? (Date.now() - simulationStartTime.current) * speed
             : 0;
 
         dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
       }, 1000 / 60);
     } else {
       stopStream();
-      simulationPauseTime.current = performance.now() - simulationStartTime.current;
+      simulationPauseTime.current = Date.now() - simulationStartTime.current;
       clearInterval(intervalId.current);
       intervalId.current = undefined;
     }

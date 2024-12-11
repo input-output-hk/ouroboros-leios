@@ -104,7 +104,6 @@ export const incrementNodeAggregationData = (
     pbReceived: 0,
     pbSent: 0,
     txGenerated: 0,
-    txPerSecond: 0,
     txPropagations: 0,
     txReceived: 0,
     txSent: 0,

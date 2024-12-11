@@ -10,12 +10,21 @@ export enum ESpeedOptions {
   "10% Speed" = 0.1,
 }
 
+export interface ISimulationAggregatedTotalData {
+  txGenerated: number;
+  txPropagations: number;
+  ibGenerated: number;
+  ibPropagations: number;
+  ebGenerated: number;
+  ebPropagations: number;
+  pbGenerated: number;
+  pbPropagations: number;
+}
+
 export interface ISimulationAggregatedData {
-  txPerSecond: number;
   txGenerated: number;
   txSent: number;
   txReceived: number;
-  txPropagations: number;
   ibGenerated: number;
   ibSent: number;
   ibReceived: number;
@@ -28,7 +37,6 @@ export interface ISimulationAggregatedData {
 }
 
 export interface ISimulationAggregatedDataState {
-  total: ISimulationAggregatedData;
   nodes: Map<string, ISimulationAggregatedData>;
 }
 

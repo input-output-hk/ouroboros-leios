@@ -51,10 +51,11 @@ export enum EMessageType {
   TransactionGenerated = "TransactionGenerated",
   TransactionReceived = "TransactionReceived",
   TransactionSent = "TransactionSent",
+  InputBlockGenerated = "InputBlockGenerated",
   InputBlockReceived = "InputBlockReceived",
+  InputBlockSent = "InputBlockSent",
   PraosBlockReceived = "PraosBlockReceived",
   Slot = "Slot",
-  InputBlockGenerated = "InputBlockGenerated",
 }
 
 export interface ITransactionGenerated {
@@ -78,8 +79,20 @@ export interface ITransactionSent {
   recipient: number;
 }
 
+export interface IInputBlockGenerated {
+  type: EMessageType.InputBlockGenerated;
+  id: string;
+  slot: number;
+  producer: number;
+  index: number;
+  vrf: number;
+  timestamp: number;
+  transactions: number[];
+}
+
 export interface IInputBlockReceived {
   type: EMessageType.InputBlockReceived;
+  id: string;
   slot: number;
   producer: number;
   index: number;
@@ -87,9 +100,12 @@ export interface IInputBlockReceived {
   recipient: number;
 }
 
-export interface IPraosBlockReceived {
-  type: EMessageType.PraosBlockReceived;
+export interface IInputBlockSent {
+  type: EMessageType.InputBlockSent;
+  id: string;
   slot: number;
+  producer: number;
+  index: number;
   sender: number;
   recipient: number;
 }
@@ -99,19 +115,17 @@ export interface ISlot {
   number: number;
 }
 
-export interface IInputBlockGenerated {
-  type: EMessageType.InputBlockGenerated;
+export interface IPraosBlockReceived {
+  type: EMessageType.PraosBlockReceived;
   slot: number;
-  producer: number;
-  index: number;
-  vrf: number;
-  timestamp: number;
-  transactions: number[];
+  sender: number;
+  recipient: number;
 }
 
 export type TMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
+  | IInputBlockSent
   | IPraosBlockReceived
   | ISlot
   | ITransactionGenerated
