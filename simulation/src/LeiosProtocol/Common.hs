@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -43,6 +44,7 @@ import Data.Hashable
 import Data.Set (Set)
 import Data.Word (Word8)
 import GHC.Generics
+import GHC.Records
 import GHC.Word (Word64)
 import Ouroboros.Network.Block as Block
 import PraosProtocol.Common (
@@ -149,6 +151,9 @@ data InputBlock = InputBlock
 
 inputBlockInvariant :: InputBlock -> Bool
 inputBlockInvariant ib = ib.header.id == ib.body.id
+
+instance HasField "id" InputBlock InputBlockId where
+  getField = (.id) . (.header)
 
 data EndorseBlockId = EndorseBlockId
   { node :: !NodeId

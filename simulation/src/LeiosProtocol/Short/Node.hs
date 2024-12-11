@@ -134,12 +134,12 @@ data LeiosEventBlock
   | EventVote VoteMsg
   deriving (Show)
 
+data BlockEvent = Generate | Received | EnterState
+  deriving (Show)
 data LeiosNodeEvent
   = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
   | LeiosNodeEventCPU CPUTask
-  | LeiosNodeEventGenerate LeiosEventBlock
-  | LeiosNodeEventReceived LeiosEventBlock
-  | LeiosNodeEventEnterState LeiosEventBlock
+  | LeiosNodeEvent BlockEvent LeiosEventBlock
   deriving (Show)
 
 newRelayState ::
@@ -267,7 +267,7 @@ leiosNode tracer cfg followers peers = do
   leiosState@LeiosNodeState{..} <- newLeiosNodeState cfg
   let
     traceReceived :: [a] -> (a -> LeiosEventBlock) -> m ()
-    traceReceived xs f = mapM_ (traceWith tracer . LeiosNodeEventReceived . f) xs
+    traceReceived xs f = mapM_ (traceWith tracer . LeiosNodeEvent Received . f) xs
 
   -- tracing for RB already covered in blockFetchConsumer.
   let submitRB rb completion = atomically $ writeTBQueue validationQueue $! ValidateRB rb completion
@@ -454,7 +454,7 @@ validationDispatcher tracer cfg leiosState = forever $ do
       traceEnterState vs EventVote
  where
   traceEnterState :: [a] -> (a -> LeiosEventBlock) -> m ()
-  traceEnterState xs f = forM_ xs $ traceWith tracer . LeiosNodeEventEnterState . f
+  traceEnterState xs f = forM_ xs $ traceWith tracer . LeiosNodeEvent EnterState . f
 generator ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -473,13 +473,13 @@ generator tracer cfg st = do
         traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
       SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
         atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
-        traceWith tracer (LeiosNodeEventGenerate (EventIB ib))
+        traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
       SomeAction Generate.Endorse eb -> do
         atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
-        traceWith tracer (LeiosNodeEventGenerate (EventEB eb))
+        traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
       SomeAction Generate.Vote v -> do
         atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
-        traceWith tracer (LeiosNodeEventGenerate (EventVote v))
+        traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
   blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
 

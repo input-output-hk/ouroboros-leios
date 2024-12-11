@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -18,10 +20,11 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
+import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
@@ -114,6 +117,20 @@ data LeiosSimVizState
   , -- these are `Block`s generated (globally).
     vizNumMsgsGenerated :: !Int
   , vizMsgsDiffusionLatency :: !DiffusionLatencyMap
+  , ibMsgs :: !(LeiosSimVizMsgsState InputBlockId InputBlock)
+  , ebMsgs :: !(LeiosSimVizMsgsState EndorseBlockId EndorseBlock)
+  , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
+  }
+
+data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
+  { msgsAtNodeQueue :: !(Map NodeId [msg])
+  , msgsAtNodeBuffer :: !(Map NodeId [msg])
+  , msgsAtNodeRecentQueue :: !(Map NodeId RecentRate)
+  , msgsAtNodeRecentBuffer :: !(Map NodeId RecentRate)
+  , msgsAtNodeTotalQueue :: !(Map NodeId Int)
+  , msgsAtNodeTotalBuffer :: !(Map NodeId Int)
+  , -- these are `Block`s generated (globally).
+    numMsgsGenerated :: !Int
   }
 
 -- | The end points where the each link, including the case where the link
@@ -188,6 +205,9 @@ leiosSimVizModel =
       , vizMsgsAtNodeTotalBuffer = Map.empty
       , vizNumMsgsGenerated = 0
       , vizMsgsDiffusionLatency = Map.empty
+      , ibMsgs = initMsgs
+      , ebMsgs = initMsgs
+      , voteMsgs = initMsgs
       }
 
   accumEventVizState ::
@@ -211,6 +231,11 @@ leiosSimVizModel =
       }
   accumEventVizState _now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip tip)))) vs =
     vs{vizNodeTip = Map.insert nid (fullTip tip) (vizNodeTip vs)}
+  accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) vs =
+    case blk of
+      EventIB x -> vs{ibMsgs = accumLeiosMsgs now nid event x vs.ibMsgs}
+      EventEB x -> vs{ebMsgs = accumLeiosMsgs now nid event x vs.ebMsgs}
+      EventVote x -> vs{voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs}
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
     vs
       { vizMsgsAtNodeBuffer =
@@ -317,6 +342,63 @@ leiosSimVizModel =
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
 
+initMsgs :: LeiosSimVizMsgsState id msg
+initMsgs =
+  LeiosSimVizMsgsState
+    { msgsAtNodeQueue = Map.empty
+    , msgsAtNodeBuffer = Map.empty
+    , msgsAtNodeRecentQueue = Map.empty
+    , msgsAtNodeRecentBuffer = Map.empty
+    , msgsAtNodeTotalQueue = Map.empty
+    , msgsAtNodeTotalBuffer = Map.empty
+    , -- these are `Block`s generated (globally).
+      numMsgsGenerated = 0
+    }
+
+accumLeiosMsgs :: (Eq id, HasField "id" msg id) => Time -> NodeId -> BlockEvent -> msg -> LeiosSimVizMsgsState id msg -> LeiosSimVizMsgsState id msg
+accumLeiosMsgs now nid Generate blk vs =
+  vs
+    { msgsAtNodeBuffer =
+        Map.insertWith (flip (++)) nid [blk] (msgsAtNodeBuffer vs)
+    , msgsAtNodeRecentBuffer =
+        Map.alter
+          (Just . recentAdd now . fromMaybe recentEmpty)
+          nid
+          (msgsAtNodeRecentBuffer vs)
+    , msgsAtNodeTotalBuffer =
+        Map.insertWith (+) nid 1 (msgsAtNodeTotalBuffer vs)
+    , numMsgsGenerated = numMsgsGenerated vs + 1
+    }
+accumLeiosMsgs now nid Received blk vs =
+  vs
+    { msgsAtNodeQueue =
+        Map.insertWith (flip (++)) nid [blk] (msgsAtNodeQueue vs)
+    , msgsAtNodeRecentQueue =
+        Map.alter
+          (Just . recentAdd now . fromMaybe recentEmpty)
+          nid
+          (msgsAtNodeRecentQueue vs)
+    , msgsAtNodeTotalQueue =
+        Map.insertWith (+) nid 1 (msgsAtNodeTotalQueue vs)
+    }
+accumLeiosMsgs now nid EnterState blk vs =
+  vs
+    { msgsAtNodeBuffer =
+        Map.insertWith (flip (++)) nid [blk] (msgsAtNodeBuffer vs)
+    , msgsAtNodeQueue =
+        Map.adjust
+          (filter (\blk' -> blk'.id /= blk.id))
+          nid
+          (msgsAtNodeQueue vs)
+    , msgsAtNodeRecentBuffer =
+        Map.alter
+          (Just . recentAdd now . fromMaybe recentEmpty)
+          nid
+          (msgsAtNodeRecentBuffer vs)
+    , msgsAtNodeTotalBuffer =
+        Map.insertWith (+) nid 1 (msgsAtNodeTotalBuffer vs)
+    }
+
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.
 --
@@ -420,10 +502,12 @@ leiosSimVizRenderModel
         , vizNodeTip
         , vizNodeLinks
         , vizMsgsInTransit
+        , ibMsgs
         }
     )
   screenSize = do
     renderLinks
+    renderMessagesAtNodes ibMsgs
     renderNodes
    where
     renderNodes = do
@@ -535,3 +619,58 @@ leiosSimVizRenderModel
         , now <= msgRecvTrailingEdge msgforecast
         , Just msgLabel <- [leiosMessageText cfg msg]
         ]
+
+    renderMessagesAtNodes LeiosSimVizMsgsState{..} = do
+      Cairo.save
+      sequence_
+        [ do
+          Cairo.setSourceRGB r g b
+          Cairo.arc (x - 10) y' 10 0 (2 * pi)
+          Cairo.fillPreserve
+          Cairo.setSourceRGB 0 0 0
+          Cairo.setLineWidth 1
+          Cairo.stroke
+          case nodeMessageText msg of
+            Nothing -> return ()
+            Just txt -> do
+              Cairo.moveTo (x - 32) (y' + 5)
+              Cairo.showText txt
+              Cairo.newPath
+        | (node, msgs) <- Map.toList msgsAtNodeQueue
+        , (n, msg) <- zip [1 ..] msgs
+        , let (Point x y) =
+                simPointToPixel
+                  worldDimensions
+                  screenSize
+                  (vizNodePos Map.! node)
+              y' = y + 16 + 20 * n
+              (r, g, b) = nodeMessageColor msg
+        ]
+      sequence_
+        [ do
+          Cairo.setSourceRGB r g b
+          Cairo.arc (x + 10) y' 10 0 (2 * pi)
+          Cairo.fillPreserve
+          Cairo.setSourceRGB 0 0 0
+          Cairo.setLineWidth 1
+          Cairo.stroke
+          case nodeMessageText msg of
+            Nothing -> return ()
+            Just txt -> do
+              Cairo.moveTo (x + 22) (y' + 5)
+              Cairo.showText txt
+              Cairo.newPath
+        | (node, msgs) <- Map.toList msgsAtNodeBuffer
+        , (n, msg) <- zip [1 ..] msgs
+        , let (Point x y) =
+                simPointToPixel
+                  worldDimensions
+                  screenSize
+                  (vizNodePos Map.! node)
+              y' = y + 16 + 20 * n
+              (r, g, b) = nodeMessageColor msg
+        ]
+      Cairo.restore
+     where
+      nodeMessageText msg = Just $ show $ (\(InputBlockId (NodeId x) y) -> (x, y)) $ msg.id
+      nodeMessageColor msg = hashToColor $ hash msg.id

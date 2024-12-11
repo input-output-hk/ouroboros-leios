@@ -107,9 +107,9 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     -- TODO: maybe submit should do the fixupBlock.
     return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
   execute' slot Propose wins = do
-    i <- nextBlkId InputBlockId
     ibData <- lift $ atomically $ buffers.newIBData
     forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
+      i <- nextBlkId InputBlockId
       let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
       return $! mkInputBlock leios header ibData.txsPayload
   execute' slot Endorse _wins = do

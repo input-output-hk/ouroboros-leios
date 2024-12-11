@@ -13,7 +13,6 @@ module LeiosProtocol.Short where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
-import Data.Coerce
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
