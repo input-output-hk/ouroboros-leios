@@ -6,6 +6,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module LeiosProtocol.Short.Node where
 
@@ -127,11 +128,18 @@ data LeiosNodeConfig = LeiosNodeConfig
   , processingQueueBound :: Natural
   }
 
--- TODO: other events
+data LeiosEventBlock
+  = EventIB InputBlock
+  | EventEB EndorseBlock
+  | EventVote VoteMsg
+  deriving (Show)
+
 data LeiosNodeEvent
   = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
-  | -- | Note: PraosNode.PraosNodeEvent has its own CPU event.
-    LeiosNodeEventCPU CPUTask
+  | LeiosNodeEventCPU CPUTask
+  | LeiosNodeEventGenerate LeiosEventBlock
+  | LeiosNodeEventReceived LeiosEventBlock
+  | LeiosNodeEventEnterState LeiosEventBlock
   deriving (Show)
 
 newRelayState ::
@@ -257,19 +265,23 @@ leiosNode ::
   m ([m ()])
 leiosNode tracer cfg followers peers = do
   leiosState@LeiosNodeState{..} <- newLeiosNodeState cfg
+  let
+    traceReceived :: [a] -> (a -> LeiosEventBlock) -> m ()
+    traceReceived xs f = mapM_ (traceWith tracer . LeiosNodeEventReceived . f) xs
 
+  -- tracing for RB already covered in blockFetchConsumer.
   let submitRB rb completion = atomically $ writeTBQueue validationQueue $! ValidateRB rb completion
-  let submitIB xs deliveryTime completion = atomically $ do
-        writeTBQueue validationQueue $! ValidateIBS xs deliveryTime $ \ys -> do
-          completion ys
-  let submitVote xs _ completion = atomically $ do
-        writeTBQueue validationQueue $!
-          ValidateVotes (map snd xs) $
-            completion . map (\v -> (v.id, v))
-  let submitEB xs _ completion = atomically $ do
-        writeTBQueue validationQueue $!
-          ValidateEBS (map snd xs) $ \ebs -> do
-            completion . map (\eb -> (eb.id, eb)) $ ebs
+  let submitIB xs deliveryTime completion = do
+        traceReceived xs $ EventIB . uncurry InputBlock
+        atomically $ writeTBQueue validationQueue $! ValidateIBS xs deliveryTime $ completion
+
+  let submitVote (map snd -> xs) _ completion = do
+        traceReceived xs EventVote
+        atomically $ writeTBQueue validationQueue $! ValidateVotes xs $ completion . map (\v -> (v.id, v))
+
+  let submitEB (map snd -> xs) _ completion = do
+        traceReceived xs EventEB
+        atomically $ writeTBQueue validationQueue $! ValidateEBS xs $ completion . map (\eb -> (eb.id, eb))
 
   praosThreads <-
     PraosNode.setupPraosThreads'
@@ -413,7 +425,7 @@ validationDispatcher tracer cfg leiosState = forever $ do
                 -- TODO: likely needs optimization
                 modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete (fst x).id))
              in
-              (delay, task)
+              (delay, task >> traceEnterState [uncurry InputBlock x] EventIB)
       let waitingLedgerState =
             Map.fromListWith
               (++)
@@ -435,10 +447,14 @@ validationDispatcher tracer cfg leiosState = forever $ do
         ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
         let ibsNeeded = Map.fromList $ map (\eb -> (eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)) ebs
         modifyTVar' leiosState.ibsNeededForEBVar $ (`Map.union` ibsNeeded)
+      traceEnterState ebs EventEB
     ValidateVotes vs completion -> do
       threadDelayParallel tracer $ map cfg.leios.delays.voteMsgValidation vs
       atomically $ completion vs
-
+      traceEnterState vs EventVote
+ where
+  traceEnterState :: [a] -> (a -> LeiosEventBlock) -> m ()
+  traceEnterState xs f = forM_ xs $ traceWith tracer . LeiosNodeEventEnterState . f
 generator ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -449,7 +465,6 @@ generator ::
 generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
-  -- TODO: tracing events
   let
     submitOne :: SomeAction -> m ()
     submitOne x = case x of
@@ -458,10 +473,13 @@ generator tracer cfg st = do
         traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
       SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
         atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+        traceWith tracer (LeiosNodeEventGenerate (EventIB ib))
       SomeAction Generate.Endorse eb -> do
         atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
-      SomeAction Generate.Vote v -> atomically $ do
-        modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
+        traceWith tracer (LeiosNodeEventGenerate (EventEB eb))
+      SomeAction Generate.Vote v -> do
+        atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
+        traceWith tracer (LeiosNodeEventGenerate (EventVote v))
   let LeiosNodeConfig{..} = cfg
   blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
 
