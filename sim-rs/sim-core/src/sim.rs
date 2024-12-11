@@ -83,7 +83,7 @@ impl Simulation {
             &config,
         );
 
-        let slot_witness = SlotWitness::new(clock.barrier().await, tracker);
+        let slot_witness = SlotWitness::new(clock.barrier().await, tracker, &config);
 
         Ok(Self {
             network,
