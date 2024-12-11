@@ -164,6 +164,7 @@ impl Node {
                         break;
                     };
                     self.events.push(FutureEvent(timestamp, NodeEvent::Message(from, msg)));
+                    self.clock.finish_task();
                 }
                 maybe_tx = tx_source.recv() => {
                     let Some(tx) = maybe_tx else {
@@ -914,6 +915,7 @@ impl Node {
                 msg.bytes_size()
             );
         }
+        self.clock.start_task();
         self.msg_sink.send_to(to, msg)
     }
 }

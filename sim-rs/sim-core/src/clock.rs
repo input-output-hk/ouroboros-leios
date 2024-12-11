@@ -59,7 +59,7 @@ impl Clock {
     }
 
     pub fn now(&self) -> Timestamp {
-        self.time.load(std::sync::atomic::Ordering::Relaxed)
+        self.time.load(std::sync::atomic::Ordering::Acquire)
     }
 
     pub async fn barrier(&self) -> ClockBarrier {
