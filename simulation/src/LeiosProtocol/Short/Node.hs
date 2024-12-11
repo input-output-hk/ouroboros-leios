@@ -18,7 +18,7 @@ import Control.Monad (forever, guard, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Tracer
-import Data.Bifunctor (Bifunctor (first), second)
+import Data.Bifunctor
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.List (sort, sortOn)
@@ -456,11 +456,11 @@ generator tracer cfg st = do
       SomeAction Generate.Base rb -> do
         atomically $ addProducedBlock st.praosState.blockFetchControllerState rb
         traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
-      SomeAction (Generate.Propose _) ib -> do
+      SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
         atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
       SomeAction Generate.Endorse eb -> do
         atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
-      SomeAction Generate.Vote vs -> atomically $ forM_ vs $ \v ->
+      SomeAction Generate.Vote v -> atomically $ do
         modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
   let LeiosNodeConfig{..} = cfg
   blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
@@ -473,12 +473,13 @@ mkBuffersView cfg st = BuffersView{..}
     bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
-    let votesForEB = Map.fromListWith Set.union [(v.endorseBlock, Set.singleton v.id) | v <- bufferVotes]
+    let votesForEB = Map.fromListWith Map.union [(eb, Map.singleton v.id v.votes) | v <- bufferVotes, eb <- v.endorseBlocks]
     -- TODO: certificate construction delay?
+    let totalVotes = fromIntegral . sum . Map.elems
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
-          guard (cfg.leios.votesForCertificate <= Set.size votes)
-          return (eb.id, mkCertificate cfg.leios votes)
+          guard (cfg.leios.votesForCertificate <= totalVotes votes)
+          return (eb.id, mkCertificate cfg.leios (Map.keysSet votes))
     -- TODO: cache index of EBs ordered by .slot descending?
     let freshestCertifiedEB = listToMaybe . mapMaybe tryCertify . sortOn (Down . (.slot)) $ bufferEB
     return $
@@ -514,13 +515,13 @@ mkBuffersView cfg st = BuffersView{..}
 
     return EndorseBlocksSnapshot{..}
 
-mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [SomeRole])
+mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
 mkSchedule cfg = mkScheduler cfg.rng rates
  where
   rates slot =
-    (map . second) (nodeRate cfg.stake) . concat $
-      [ (map . first) (SomeRole . Generate.Propose) $ inputBlockRate cfg.leios slot
-      , map (SomeRole Generate.Endorse,) . maybe [] (: []) $ endorseBlockRate cfg.leios slot
-      , map (SomeRole Generate.Vote,) . maybe [] (: []) $ votingRate cfg.leios slot
-      , [(SomeRole Generate.Base, NetworkRate cfg.rankingBlockFrequencyPerSlot)]
+    (map . second . map) (nodeRate cfg.stake) $
+      [ (SomeRole Generate.Propose, inputBlockRate cfg.leios slot)
+      , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios slot)
+      , (SomeRole Generate.Vote, votingRate cfg.leios slot)
+      , (SomeRole Generate.Base, [NetworkRate cfg.rankingBlockFrequencyPerSlot])
       ]

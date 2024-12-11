@@ -15,8 +15,8 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
+import Control.Monad (forM)
 import Data.Kind
-import Data.Traversable (forM)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
 import PraosProtocol.Common (fixupBlock, mkPartialBlock)
@@ -31,9 +31,9 @@ data BuffersView m = BuffersView
 
 data Role :: Type -> Type where
   Base :: Role RankingBlock
-  Propose :: SubSlotNo -> Role InputBlock
+  Propose :: Role [InputBlock]
   Endorse :: Role EndorseBlock
-  Vote :: Role [VoteMsg]
+  Vote :: Role VoteMsg
 
 data SomeRole :: Type where
   SomeRole :: Role a -> SomeRole
@@ -41,19 +41,21 @@ data SomeRole :: Type where
 data SomeAction :: Type where
   SomeAction :: Role a -> a -> SomeAction
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, NodeRate)]) -> m (SlotNo -> m [SomeRole])
+mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, [NodeRate])]) -> m (SlotNo -> m [(SomeRole, Word64)])
 mkScheduler rng0 rates = do
-  let sampleRate (role, NodeRate lambda) = do
+  let sampleRate (NodeRate lambda) = do
         (sample, rng') <- gets $ uniformR (0, 1)
         put $! rng'
         -- TODO: check poisson dist. math.
         let prob = lambda * exp (-lambda)
-        pure [role | sample <= prob]
-
+        pure $ sample <= prob
+      sampleRates (role, rs) = do
+        wins <- fromIntegral . length . filter id <$> mapM sampleRate rs
+        return [(role, wins) | wins >= 1]
   rngVar <- newTVarIO rng0
   let sched slot = atomically $ do
         rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRate $ (rates slot)
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ (rates slot)
         writeTVar rngVar rng1
         return $ acts
   return sched
@@ -80,7 +82,7 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   { leios :: LeiosConfig
   , nodeId :: NodeId
   , buffers :: BuffersView m
-  , schedule :: SlotNo -> m [SomeRole]
+  , schedule :: SlotNo -> m [(SomeRole, Word64)]
   , submit :: [SomeAction] -> m ()
   }
 
@@ -97,30 +99,30 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     (actions, blkId') <- runStateT (mapM (execute slot) roles) blkId
     submit actions
     go (blkId', slot + 1)
-  execute slot (SomeRole r) = SomeAction r <$> execute' slot r
-  execute' :: SlotNo -> Role a -> StateT Int m a
-  execute' slot Base = do
+  execute slot (SomeRole r, wins) = assert (wins >= 1) $ SomeAction r <$> execute' slot r wins
+  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m a
+  execute' slot Base _wins = do
     rbData <- lift $ atomically $ buffers.newRBData
     let body = mkRankingBlockBody leios nodeId rbData.freshestCertifiedEB rbData.txsPayload
     -- TODO: maybe submit should do the fixupBlock.
     return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
-  execute' slot (Propose sub) = do
+  execute' slot Propose wins = do
     i <- nextBlkId InputBlockId
     ibData <- lift $ atomically $ buffers.newIBData
-    let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
-    return $! mkInputBlock leios header ibData.txsPayload
-  execute' slot Endorse = do
+    forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
+      let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
+      return $! mkInputBlock leios header ibData.txsPayload
+  execute' slot Endorse _wins = do
     i <- nextBlkId EndorseBlockId
     ibs <- lift $ atomically $ buffers.ibs
     return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
-  execute' slot Vote = do
+  execute' slot Vote votes = do
     votingFor <- lift $ atomically $ do
       ibs <- buffers.ibs
       ebs <- buffers.ebs
       pure $ endorseBlocksToVoteFor leios slot ibs ebs
-    forM votingFor $ \eb -> do
-      i <- nextBlkId VoteId
-      return $! mkVoteMsg leios i slot nodeId eb
+    i <- nextBlkId VoteId
+    return $! mkVoteMsg leios i slot nodeId votes votingFor
   nextBlkId :: (NodeId -> Int -> a) -> StateT Int m a
   nextBlkId f = do
     i <- get

@@ -32,6 +32,7 @@ module LeiosProtocol.Common (
   rankingBlockBodyInvariant,
   NodeId,
   SubSlotNo (..),
+  Word64,
 )
 where
 
@@ -42,6 +43,7 @@ import Data.Hashable
 import Data.Set (Set)
 import Data.Word (Word8)
 import GHC.Generics
+import GHC.Word (Word64)
 import Ouroboros.Network.Block as Block
 import PraosProtocol.Common (
   ChainHash (..),
@@ -179,7 +181,8 @@ data VoteMsg = VoteMsg
   { id :: !VoteId
   , slot :: !SlotNo
   , producer :: !NodeId
-  , endorseBlock :: !EndorseBlockId
+  , votes :: Word64
+  , endorseBlocks :: ![EndorseBlockId]
   , size :: !Bytes
   }
   deriving stock (Eq, Show)

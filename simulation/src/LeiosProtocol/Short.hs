@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
@@ -12,6 +13,7 @@ module LeiosProtocol.Short where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Coerce
 import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -108,7 +110,8 @@ instance FixSize VoteMsg where
       { size =
           cfg.sizes.producerId
             + messageSizeBytes v.slot
-            + cfg.sizes.reference {- EB ref -}
+            + 64 {- votes -}
+            + sum (map (const cfg.sizes.reference {- EB ref -}) endorseBlocks)
             + cfg.sizes.voteCrypto
       , ..
       }
@@ -203,8 +206,8 @@ mkEndorseBlock cfg id slot producer inputBlocks =
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
-mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> EndorseBlockId -> VoteMsg
-mkVoteMsg cfg id slot producer endorseBlock = fixSize cfg $ VoteMsg{size = 0, ..}
+mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
+mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
 
 mkCertificate :: LeiosConfig -> Set VoteId -> Certificate
 mkCertificate cfg vs = assert (Set.size vs >= cfg.votesForCertificate) $ Certificate vs
@@ -317,28 +320,33 @@ newtype NetworkRate = NetworkRate Double
 newtype NodeRate = NodeRate Double
 newtype StakeFraction = StakeFraction Double
 
--- | Note: each SubSlot rate is `<= 1` by construction.
-inputBlockRate :: LeiosConfig -> SlotNo -> [(SubSlotNo, NetworkRate)]
-inputBlockRate LeiosConfig{inputBlockFrequencyPerSlot} _slot
-  | inputBlockFrequencyPerSlot <= 1 = [(0, NetworkRate inputBlockFrequencyPerSlot)]
+splitIntoSubSlots :: NetworkRate -> [NetworkRate]
+splitIntoSubSlots (NetworkRate r)
+  | r <= 1 = [NetworkRate r]
   | otherwise =
-      let q = ceiling inputBlockFrequencyPerSlot
-          fq = NetworkRate $ inputBlockFrequencyPerSlot / fromIntegral q
-       in map (,fq) [0 .. toEnum (q - 1)]
+      let
+        q = ceiling r
+        fq = NetworkRate $ r / fromIntegral q
+       in
+        replicate q fq
 
--- | Note: if the NodeRate ends up `>= 1`, you still only produce one block.
-endorseBlockRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
-endorseBlockRate cfg slot = do
+inputBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
+inputBlockRate LeiosConfig{inputBlockFrequencyPerSlot} _slot =
+  splitIntoSubSlots $ NetworkRate inputBlockFrequencyPerSlot
+
+endorseBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
+endorseBlockRate cfg slot = fromMaybe [] $ do
   startEndorse <- stageStart cfg Endorse slot Endorse
   guard $ startEndorse == slot
-  return $ NetworkRate cfg.endorseBlockFrequencyPerStage
+  return $ splitIntoSubSlots $ NetworkRate cfg.endorseBlockFrequencyPerStage
 
--- | TODO: a little unclear what to do if the NodeRate is `>= 1`.
-votingRate :: LeiosConfig -> SlotNo -> Maybe NetworkRate
-votingRate cfg slot = do
+-- TODO: double check with technical report section on voting when ready.
+votingRate :: LeiosConfig -> SlotNo -> [NetworkRate]
+votingRate cfg slot = fromMaybe [] $ do
   range <- stageRange cfg Vote slot Vote
   guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
-  return $ NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
+  let votingFrequencyPerSlot = cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
+  return $ splitIntoSubSlots $ NetworkRate votingFrequencyPerSlot
 
 -- mostly here to showcase the types.
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
