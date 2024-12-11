@@ -6,8 +6,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::NodeId,
     model::{
-        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        NoVoteReason, Transaction, TransactionId, VoteBundle,
+        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
+        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
 };
 
@@ -36,6 +36,7 @@ pub enum Event {
         slot: u64,
         producer: NodeId,
         vrf: u64,
+        endorsement: Option<Endorsement>,
         transactions: Vec<TransactionId>,
     },
     PraosBlockSent {
@@ -83,8 +84,7 @@ pub enum Event {
         recipient: NodeId,
     },
     VotesGenerated {
-        slot: u64,
-        producer: NodeId,
+        id: VoteBundleId,
         ebs: Vec<EndorserBlockId>,
     },
     NoVote {
@@ -94,14 +94,12 @@ pub enum Event {
         reason: NoVoteReason,
     },
     VotesSent {
-        slot: u64,
-        producer: NodeId,
+        id: VoteBundleId,
         sender: NodeId,
         recipient: NodeId,
     },
     VotesReceived {
-        slot: u64,
-        producer: NodeId,
+        id: VoteBundleId,
         sender: NodeId,
         recipient: NodeId,
     },
@@ -127,6 +125,7 @@ impl EventTracker {
             slot: block.slot,
             producer: block.producer,
             vrf: block.vrf,
+            endorsement: block.endorsement.clone(),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }
@@ -219,8 +218,7 @@ impl EventTracker {
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VotesGenerated {
-            slot: votes.slot,
-            producer: votes.producer,
+            id: votes.id,
             ebs: votes.ebs.clone(),
         });
     }
@@ -242,8 +240,7 @@ impl EventTracker {
 
     pub fn track_votes_sent(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesSent {
-            slot: votes.slot,
-            producer: votes.producer,
+            id: votes.id,
             sender,
             recipient,
         });
@@ -251,8 +248,7 @@ impl EventTracker {
 
     pub fn track_votes_received(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesReceived {
-            slot: votes.slot,
-            producer: votes.producer,
+            id: votes.id,
             sender,
             recipient,
         });

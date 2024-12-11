@@ -151,7 +151,7 @@ impl<T> NetworkSink<T> {
             })
             .is_err()
         {
-            bail!("Connection is closed")
+            bail!("Connection between nodes {} and {} is closed", self.id, to);
         }
         Ok(())
     }

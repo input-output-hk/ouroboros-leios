@@ -40,6 +40,7 @@ source-repository-package
     type: git
     location: https://github.com/Saizan/io-sim.git
     tag: cb3926463e42d5eff98acdbdeadd4a05c7c81f90
+    --sha256: 64IWzs36fLSvf1Jb5z1ajeBppMooFynN2/lgjlu3ojo=
     subdir:
       io-sim
       io-classes

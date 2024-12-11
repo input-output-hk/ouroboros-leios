@@ -47,6 +47,10 @@ export const reducer = (
       return { ...state, speed: action.payload };
     }
 
+    case "SET_CURRENT_NODE": {
+      return { ...state, currentNode: action.payload }
+    }
+
     case "BATCH_UPDATE": {
       return {
         ...state,

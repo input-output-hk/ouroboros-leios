@@ -1,15 +1,23 @@
 use std::{fmt::Display, sync::Arc};
 
 use crate::{clock::Timestamp, config::NodeId};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 
 macro_rules! id_wrapper {
     ($outer:ident, $inner:ty) => {
-        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+        #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $outer($inner);
         impl Display for $outer {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 self.0.fmt(f)
+            }
+        }
+        impl Serialize for $outer {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_str(&self.0.to_string())
             }
         }
         impl $outer {
@@ -21,11 +29,12 @@ macro_rules! id_wrapper {
     };
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Block {
     pub slot: u64,
     pub producer: NodeId,
     pub vrf: u64,
+    pub endorsement: Option<Endorsement>,
     pub transactions: Vec<Arc<Transaction>>,
 }
 
@@ -38,31 +47,44 @@ pub struct Transaction {
     pub bytes: u64,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct InputBlockId {
-    pub slot: u64,
-    pub producer: NodeId,
-    pub index: u64,
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
-pub struct InputBlockHeader {
     pub slot: u64,
     pub producer: NodeId,
     /// Need this field to distinguish IBs from the same slot+producer.
     /// The real implementation can use the VRF proof for that.
     pub index: u64,
+}
+
+impl Display for InputBlockId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "{}-{}-{}",
+            self.slot, self.producer, self.index
+        ))
+    }
+}
+
+impl Serialize for InputBlockId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut obj = serializer.serialize_struct("InputBlockId", 4)?;
+        obj.serialize_field("id", &self.to_string())?;
+        obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("producer", &self.producer)?;
+        obj.serialize_field("index", &self.index)?;
+        obj.end()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub struct InputBlockHeader {
+    #[serde(flatten)]
+    pub id: InputBlockId,
     pub vrf: u64,
     pub timestamp: Timestamp,
-}
-impl InputBlockHeader {
-    pub fn id(&self) -> InputBlockId {
-        InputBlockId {
-            slot: self.slot,
-            producer: self.producer,
-            index: self.index,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -76,10 +98,27 @@ impl InputBlock {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EndorserBlockId {
     pub slot: u64,
     pub producer: NodeId,
+}
+impl Display for EndorserBlockId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
+    }
+}
+impl Serialize for EndorserBlockId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut obj = serializer.serialize_struct("EndorserBlockId", 4)?;
+        obj.serialize_field("id", &self.to_string())?;
+        obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("producer", &self.producer)?;
+        obj.end()
+    }
 }
 
 #[derive(Debug)]
@@ -98,10 +137,32 @@ impl EndorserBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-pub struct VoteBundle {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct VoteBundleId {
     pub slot: u64,
     pub producer: NodeId,
+}
+impl Display for VoteBundleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
+    }
+}
+impl Serialize for VoteBundleId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut obj = serializer.serialize_struct("VoteBundleId", 4)?;
+        obj.serialize_field("id", &self.to_string())?;
+        obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("producer", &self.producer)?;
+        obj.end()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VoteBundle {
+    pub id: VoteBundleId,
     pub ebs: Vec<EndorserBlockId>, // contains duplicates
 }
 
@@ -110,4 +171,10 @@ pub enum NoVoteReason {
     InvalidSlot,
     ExtraIB,
     MissingIB,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Endorsement {
+    pub eb: EndorserBlockId,
+    pub votes: Vec<NodeId>,
 }

@@ -59,6 +59,12 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
         Cluster::new(-30.0, 120.0),
         Cluster::new(-40.0, 60.0),
     ];
+
+    let relays_in_cluster = |cluster: usize| {
+        (0..pool_count)
+            .step_by(cluster_size * 2)
+            .map(move |id| (cluster * 2) + id + 1)
+    };
     let stake = distribute_stake(pool_count)?;
     for i in 0..pool_count {
         let cluster = i % 5;
@@ -66,18 +72,19 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
         let pool_id = nodes.len();
         nodes.push(RawNodeConfig {
             location: pool_loc,
+            region: None,
             stake: stake.get(i).cloned(),
         });
         let relay_id = nodes.len();
         nodes.push(RawNodeConfig {
             location: relay_loc,
+            region: None,
             stake: None,
         });
 
         links.add(pool_id, relay_id, Some(SHORT_HOP));
 
-        let mut local_candidates: Vec<usize> = (0..cluster_size)
-            .map(|i| (cluster * cluster_size) + i + 1)
+        let mut local_candidates: Vec<usize> = relays_in_cluster(cluster)
             .filter(|id| *id != relay_id)
             .collect();
 
@@ -98,9 +105,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
                     LONG_HOP
                 };
 
-            let mut candidates: Vec<usize> = (0..cluster_size)
-                .map(|i| (other_cluster * cluster_size) + i + 1)
-                .collect();
+            let mut candidates: Vec<usize> = relays_in_cluster(other_cluster).collect();
 
             // Generate at least two connections to other clusters
             for _ in 0..1 {

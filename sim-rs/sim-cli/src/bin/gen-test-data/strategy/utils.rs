@@ -44,3 +44,10 @@ pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {
         })
         .collect())
 }
+
+pub fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
+    // euclidean distance probably good enough
+    let dist_x = (lat2 - lat1).rem_euclid(180.0);
+    let dist_y = (long2 - long1).rem_euclid(180.0);
+    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
+}

@@ -20,9 +20,9 @@ import VizSimTCP
 -- Example sim visualisations
 --
 
-example1 :: Vizualisation
+example1 :: Visualization
 example1 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz model $
       LayoutAbove
         [ LayoutReqSize 100 25 $ layoutLabel 18 title
@@ -89,9 +89,9 @@ example1 =
    where
     ds = reverse vizTcpEvents
 
-example2 :: Vizualisation
+example2 :: Visualization
 example2 =
-  slowmoVizualisation 0.2 $
+  slowmoVisualization 0.2 $
     Viz model $
       LayoutAbove
         [ layoutLabelTime
@@ -118,9 +118,9 @@ example2 =
 
   trafficPattern = mkUniformTrafficPattern 15 (kilobytes 100) 0
 
-example3 :: Vizualisation
+example3 :: Visualization
 example3 =
-  slowmoVizualisation 0.2 $
+  slowmoVisualization 0.2 $
     Viz model $
       LayoutAbove
         [ layoutLabelTime

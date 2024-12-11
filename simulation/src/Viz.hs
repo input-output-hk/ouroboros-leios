@@ -28,11 +28,11 @@ import qualified Graphics.UI.Gtk as Gtk
 -- Visualisation
 --
 
-data Vizualisation where
+data Visualization where
   Viz ::
     VizModel model ->
     Layout (VizRender model) ->
-    Vizualisation
+    Visualization
 
 data VizModel model = VizModel
   { initModel :: model
@@ -415,7 +415,7 @@ defaultGtkVizConfig =
     }
 
 -- | Animate the vizualisation in a Gtk+ window.
-vizualise :: GtkVizConfig -> Vizualisation -> IO ()
+vizualise :: GtkVizConfig -> Visualization -> IO ()
 vizualise
   GtkVizConfig
     { gtkVizFPS
@@ -561,7 +561,7 @@ defaultAnimVizConfig =
 -- To turn into a video, use a command like:
 --
 -- > ffmpeg -i example/frame-%d.png -vf format=yuv420p example.mp4
-writeAnimationFrames :: AnimVizConfig -> Vizualisation -> IO ()
+writeAnimationFrames :: AnimVizConfig -> Visualization -> IO ()
 writeAnimationFrames
   AnimVizConfig
     { animVizFrameFiles = frameFilename
@@ -630,8 +630,8 @@ pairVizModel vizmodela vizmodelb =
         )
     }
 
-aboveVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
-aboveVizualisation
+aboveVisualization :: Visualization -> Visualization -> Visualization
+aboveVisualization
   (Viz vizmodela (vizrendera :: Layout (VizRender modela)))
   (Viz vizmodelb (vizrenderb :: Layout (VizRender modelb))) =
     Viz
@@ -642,8 +642,8 @@ aboveVizualisation
           ]
       )
 
-besideVizualisation :: Vizualisation -> Vizualisation -> Vizualisation
-besideVizualisation
+besideVisualization :: Visualization -> Visualization -> Visualization
+besideVisualization
   (Viz vizmodela (vizrendera :: Layout (VizRender modela)))
   (Viz vizmodelb (vizrenderb :: Layout (VizRender modelb))) =
     Viz
@@ -654,8 +654,8 @@ besideVizualisation
           ]
       )
 
-slowmoVizualisation :: DiffTime -> Vizualisation -> Vizualisation
-slowmoVizualisation
+slowmoVisualization :: DiffTime -> Visualization -> Visualization
+slowmoVisualization
   dilation
   (Viz vizmodel (vizrender :: Layout (VizRender model))) =
     Viz

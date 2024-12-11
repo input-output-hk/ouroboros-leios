@@ -1,29 +1,91 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    path::PathBuf,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
+use serde::Deserialize;
 use sim_core::config::{RawLinkConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distribute_stake, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, LinkTracker};
 
 #[derive(Debug, Parser)]
-pub struct RandomGraphArgs {
+pub struct GlobeArgs {
     node_count: usize,
     stake_pool_count: usize,
+    distribution: PathBuf,
 }
 
-fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
-    // euclidean distance probably good enough
-    let dist_x = (lat2 - lat1).rem_euclid(180.0);
-    let dist_y = (long2 - long1).rem_euclid(180.0);
-    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
+#[derive(Debug, Deserialize)]
+struct Distribution {
+    countries: Vec<Country>,
 }
 
-pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+#[derive(Debug, Deserialize)]
+struct Country {
+    name: String,
+    regions: Vec<RegionData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RegionData {
+    asn: u64,
+    latitude: f64,
+    longitude: f64,
+    proportion: u64,
+}
+
+#[derive(Clone)]
+struct Region {
+    name: String,
+    location: (f64, f64),
+}
+
+fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Region> {
+    let mut region_pool = vec![];
+    for country in distribution.countries {
+        for region in country.regions {
+            for _ in 0..region.proportion {
+                let asn = region.asn;
+                let location = (region.latitude, (region.longitude + 180.0) / 2.0);
+                region_pool.push((country.name.clone(), asn, location));
+            }
+        }
+    }
+
+    let mut country_regions: HashMap<String, Vec<u64>> = HashMap::new();
+    let mut results = vec![];
+    let mut rng = thread_rng();
+    for _ in 0..node_count {
+        let (country, asn, location) = region_pool
+            .get(rng.gen_range(0..region_pool.len()))
+            .unwrap();
+        let regions = country_regions.entry(country.clone()).or_default();
+        let number = match regions.iter().position(|r| r == asn) {
+            Some(index) => index + 1,
+            None => {
+                regions.push(*asn);
+                regions.len()
+            }
+        };
+        results.push(Region {
+            name: format!("{country} {number}"),
+            location: *location,
+        });
+    }
+
+    results
+}
+
+pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
+
+    let distribution: Distribution = toml::from_str(&std::fs::read_to_string(&args.distribution)?)?;
+    let regions = distribute_regions(args.node_count, distribution);
 
     let stake = distribute_stake(args.stake_pool_count)?;
     let mut rng = thread_rng();
@@ -32,11 +94,15 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
     let mut links = LinkTracker::new();
 
     println!("generating nodes...");
-    for id in 0..args.node_count {
+    for (id, region) in regions.into_iter().enumerate() {
+        let location = (
+            (region.location.0 + rng.gen_range(-4.0..4.0)).clamp(-90.0, 90.0),
+            (region.location.1 + rng.gen_range(-4.0..4.0)).clamp(0.0, 180.0),
+        );
         let stake = stake.get(id).cloned();
         nodes.push(RawNodeConfig {
-            location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
-            region: None,
+            location,
+            region: Some(region.name),
             stake,
         });
     }

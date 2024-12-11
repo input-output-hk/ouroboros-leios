@@ -13,7 +13,7 @@ import Viz
 
 -- Use: vizualise defaultGtkVizConfig exampleN
 
-example1 :: Vizualisation
+example1 :: Visualization
 example1 =
   Viz nullVizModel $
     LayoutAbove
@@ -22,7 +22,7 @@ example1 =
       , baseLayout (100, 100) "Block 3" (0, 0, 1)
       ]
 
-example2 :: Vizualisation
+example2 :: Visualization
 example2 =
   Viz nullVizModel $
     LayoutBeside
@@ -40,7 +40,7 @@ example2 =
           ]
       ]
 
-example3 :: Vizualisation
+example3 :: Visualization
 example3 =
   Viz nullVizModel $
     LayoutAbove
@@ -50,7 +50,7 @@ example3 =
             baseLayout (100, 100) "Block 2" (0, 1, 0)
       ]
 
-example4 :: Vizualisation
+example4 :: Visualization
 example4 =
   Viz nullVizModel $
     LayoutAbove
@@ -63,7 +63,7 @@ example4 =
             baseLayout (100, 100) "Block 3" (0, 0, 1)
       ]
 
-example5 :: Vizualisation
+example5 :: Visualization
 example5 =
   Viz nullVizModel $
     LayoutAbove
@@ -78,9 +78,9 @@ example5 =
           ]
       ]
 
-example6 :: Vizualisation
+example6 :: Visualization
 example6 =
-  slowmoVizualisation 0.1 $
+  slowmoVisualization 0.1 $
     Viz nullVizModel $
       LayoutAbove
         [ layoutLabelTime

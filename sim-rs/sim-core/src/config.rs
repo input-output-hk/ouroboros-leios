@@ -60,6 +60,7 @@ pub struct RawConfig {
     pub ib_generation_probability: f64,
     pub eb_generation_probability: f64,
     pub vote_probability: f64,
+    pub vote_threshold: u64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub stage_length: u64,
@@ -77,6 +78,7 @@ pub struct RawConfig {
 pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
+    pub region: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -120,6 +122,7 @@ impl From<RawConfig> for SimConfiguration {
             ib_generation_probability: value.ib_generation_probability,
             eb_generation_probability: value.eb_generation_probability,
             vote_probability: value.vote_probability,
+            vote_threshold: value.vote_threshold,
             max_block_size: value.max_block_size,
             max_tx_size: value.max_tx_size,
             stage_length: value.stage_length,
@@ -147,6 +150,7 @@ pub struct SimConfiguration {
     pub ib_generation_probability: f64,
     pub eb_generation_probability: f64,
     pub vote_probability: f64,
+    pub vote_threshold: u64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub stage_length: u64,

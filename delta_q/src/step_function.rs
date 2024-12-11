@@ -352,17 +352,26 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut scratch = String::new();
 
+        let mut written = 1;
         write!(f, "[")?;
         for (i, (x, y)) in self.data().iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
+                written += 2;
             }
             write!(&mut scratch, "{:.5}", x)?;
             write!(f, "({}, ", trim(&scratch))?;
+            written += 3 + scratch.len();
             scratch.clear();
             y.pretty_print(&mut scratch)?;
             write!(f, "{})", trim(&scratch))?;
+            written += 1 + scratch.len();
             scratch.clear();
+
+            if f.alternate() && written > 80 {
+                write!(f, " ...")?;
+                break;
+            }
         }
         write!(f, "]")?;
         Ok(())

@@ -3,7 +3,7 @@ use std::{collections::HashSet, fs, path::PathBuf};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sim_core::config::{DistributionConfig, RawConfig, SimConfiguration};
-use strategy::{random_graph, simplified, RandomGraphArgs, SimplifiedArgs};
+use strategy::{globe, random_graph, simplified, GlobeArgs, RandomGraphArgs, SimplifiedArgs};
 
 mod strategy;
 
@@ -18,6 +18,7 @@ struct Args {
 enum Strategy {
     RandomGraph(RandomGraphArgs),
     Simplified(SimplifiedArgs),
+    Globe(GlobeArgs),
 }
 
 fn main() -> Result<()> {
@@ -26,9 +27,11 @@ fn main() -> Result<()> {
     let (nodes, links) = match args.strategy {
         Strategy::RandomGraph(args) => random_graph(&args)?,
         Strategy::Simplified(args) => simplified(&args)?,
+        Strategy::Globe(args) => globe(&args)?,
     };
 
     let vote_probability = 500.0;
+    let vote_threshold = 150;
 
     let raw_config = RawConfig {
         seed: None,
@@ -41,6 +44,7 @@ fn main() -> Result<()> {
         ib_generation_probability: 5.0,
         eb_generation_probability: 5.0,
         vote_probability,
+        vote_threshold,
         ib_shards: 8,
         max_block_size: 90112,
         stage_length: 2,

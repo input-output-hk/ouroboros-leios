@@ -21,7 +21,7 @@ use crate::{
     events::EventTracker,
     model::{
         Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
-        Transaction, TransactionId, VoteBundle,
+        Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     network::Network,
 };
@@ -127,10 +127,8 @@ impl Simulation {
             biased;
             _ = token.cancelled() => {}
             _ = handle_events => {}
-            results = set.join_all() => {
-                for res in results {
-                    res?;
-                }
+            result = set.join_next() => {
+                result.unwrap()??;
             }
         };
 
@@ -224,8 +222,8 @@ enum SimulationMessage {
     RequestEB(EndorserBlockId),
     EB(Arc<EndorserBlock>),
     // Get out the vote
-    AnnounceVotes(u64, NodeId),
-    RequestVotes(u64, NodeId),
+    AnnounceVotes(VoteBundleId),
+    RequestVotes(VoteBundleId),
     Votes(Arc<VoteBundle>),
 }
 
@@ -252,8 +250,8 @@ impl HasBytesSize for SimulationMessage {
             Self::RequestEB(_) => 8,
             Self::EB(_) => 32,
 
-            Self::AnnounceVotes(_, _) => 8,
-            Self::RequestVotes(_, _) => 8,
+            Self::AnnounceVotes(_) => 8,
+            Self::RequestVotes(_) => 8,
             Self::Votes(v) => 8 * v.ebs.len() as u64,
         }
     }

@@ -62,7 +62,11 @@ impl Default for CDF {
 impl fmt::Display for CDF {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CDF")?;
-        write!(f, "{}", self.steps)?;
+        if f.alternate() {
+            write!(f, "{:#}", self.steps)?;
+        } else {
+            write!(f, "{}", self.steps)?;
+        }
         Ok(())
     }
 }

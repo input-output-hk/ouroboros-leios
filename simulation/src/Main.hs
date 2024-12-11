@@ -15,89 +15,70 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import TimeCompat (DiffTime)
+import TimeCompat (DiffTime, Time (..))
 import Topology (readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
 
 main :: IO ()
-main =
-  execParser (info (helper <*> options) mempty) >>= \case
-    CliCommand CliOptions{..} ->
-      case cliCommand of
-        CliConvertBenchTopology{..} -> do
-          simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency inputBenchTopology inputBenchLatencies
-          writeSimpleTopology outputSimpleTopology simpleTopology
-    VizCommand opt@VizOptions{..} -> do
-      viz <- vizOptionsToViz opt
-      case vizOutputFramesDir of
-        Nothing ->
-          let gtkVizConfig =
-                defaultGtkVizConfig
-                  { gtkVizCpuRendering = vizCpuRendering
-                  , gtkVizResolution = vizSize
-                  }
-           in vizualise gtkVizConfig viz
-        Just outputFramesDir ->
-          let animVizConfig =
-                defaultAnimVizConfig
-                  { animVizFrameFiles = \n -> outputFramesDir ++ "/frame-" ++ show n ++ ".png"
-                  , animVizDuration = fromMaybe 60 vizOutputSeconds
-                  , animVizStartTime = fromMaybe 0 vizOutputStartTime
-                  , animVizResolution = vizSize
-                  }
-           in writeAnimationFrames animVizConfig viz
+main = do
+  customExecParser parserPrefs parserInfoOptions >>= \case
+    VizCommand opt -> runVizCommand opt
+    SimCommand opt -> runSimOptions opt
+    CliCommand opt -> runCliOptions opt
 
-data Options
-  = VizCommand VizOptions
-  | CliCommand CliOptions
-
-options :: Parser Options
-options = VizCommand <$> vizOptions <|> CliCommand <$> cliOptions
-
-newtype CliOptions = CliOptions
-  { cliCommand :: CliCommand
-  }
-
-data CliCommand
-  = CliConvertBenchTopology {inputBenchTopology :: FilePath, inputBenchLatencies :: FilePath, outputSimpleTopology :: FilePath}
-
-cliOptions :: Parser CliOptions
-cliOptions =
-  CliOptions
-    <$> cliCommands
-
-cliCommands :: Parser CliCommand
-cliCommands =
-  subparser . mconcat $
-    [ commandGroup "Available utility commands:"
-    , command "convert-bench-topology" . info cliConvertBenchTopology $
-        progDesc "Convert the benchmark topology files to a simple topology file."
+parserPrefs :: ParserPrefs
+parserPrefs =
+  prefs . mconcat $
+    [ showHelpOnEmpty
+    , helpShowGlobals
     ]
 
-cliConvertBenchTopology :: Parser CliCommand
-cliConvertBenchTopology =
-  CliConvertBenchTopology
-    <$> strOption
-      ( long "input-bench-topology"
-          <> short 't'
-          <> metavar "FILE"
-          <> help "The input topology file."
-      )
-    <*> strOption
-      ( long "input-bench-latencies"
-          <> short 'l'
-          <> metavar "FILE"
-          <> help "The input latencies database."
-      )
-    <*> strOption
-      ( long "output-simple-topology"
-          <> short 'o'
-          <> metavar "FILE"
-          <> help "The output topology file."
-      )
+parserInfoOptions :: ParserInfo Options
+parserInfoOptions = info (parserOptions <**> helper) mempty
 
-data VizOptions = VizOptions
-  { vizCommand :: VizCommand
+data Options
+  = VizCommand VizCommand
+  | SimCommand SimOptions
+  | CliCommand CliCommand
+
+parserOptions :: Parser Options
+parserOptions =
+  subparser . mconcat $
+    [ command "viz" . info (VizCommand <$> parserVizCommand <**> helper) $
+        progDesc "Run a visualisation. See 'ols viz -h' for details."
+    , command "sim" . info (SimCommand <$> parserSimOptions <**> helper) $
+        progDesc "Run a simulation. See 'ols sim -h' for details."
+    , command "convert-bench-topology" . info (CliCommand <$> parserCliConvertBenchTopology <**> helper) $
+        progDesc "Convert merge benchmark topology and latency files into a simple topology file."
+    ]
+
+--------------------------------------------------------------------------------
+-- Visualisation Commands
+--------------------------------------------------------------------------------
+
+runVizCommand :: VizCommand -> IO ()
+runVizCommand opt@VizCommandWithOptions{..} = do
+  viz <- vizOptionsToViz opt
+  case vizOutputFramesDir of
+    Nothing ->
+      let gtkVizConfig =
+            defaultGtkVizConfig
+              { gtkVizCpuRendering = vizCpuRendering
+              , gtkVizResolution = vizSize
+              }
+       in vizualise gtkVizConfig viz
+    Just outputFramesDir ->
+      let animVizConfig =
+            defaultAnimVizConfig
+              { animVizFrameFiles = \n -> outputFramesDir ++ "/frame-" ++ show n ++ ".png"
+              , animVizDuration = fromMaybe 60 vizOutputSeconds
+              , animVizStartTime = fromMaybe 0 vizOutputStartTime
+              , animVizResolution = vizSize
+              }
+       in writeAnimationFrames animVizConfig viz
+
+data VizCommand = VizCommandWithOptions
+  { vizSubCommand :: VizSubCommand
   , vizOutputFramesDir :: Maybe FilePath
   , vizOutputSeconds :: Maybe Int
   , vizOutputStartTime :: Maybe Int
@@ -105,10 +86,10 @@ data VizOptions = VizOptions
   , vizSize :: Maybe VizSize
   }
 
-vizOptions :: Parser VizOptions
-vizOptions =
-  VizOptions
-    <$> vizCommands
+parserVizCommand :: Parser VizCommand
+parserVizCommand =
+  VizCommandWithOptions
+    <$> parserVizSubCommand
     <*> optional
       ( strOption
           ( long "frames-dir"
@@ -138,7 +119,7 @@ vizOptions =
       )
     <*> optional vizSizeOptions
 
-data VizCommand
+data VizSubCommand
   = VizTCP1
   | VizTCP2
   | VizTCP3
@@ -155,34 +136,8 @@ data VizCommand
   | VizRelayTest2
   | VizRelayTest3
 
-parserPraosP2P1 :: Parser VizCommand
-parserPraosP2P1 =
-  VizPraosP2P1
-    <$> option
-      auto
-      ( long "seed"
-          <> metavar "NUMBER"
-          <> help "The seed for the random number generator."
-          <> value 0
-      )
-    <*> option
-      (fmap (fromIntegral @Int) auto)
-      ( long "block-interval"
-          <> metavar "NUMBER"
-          <> help "The interval at which blocks are generated."
-          <> value 5
-      )
-    <*> optional
-      ( option
-          str
-          ( long "topology"
-              <> metavar "FILE"
-              <> help "The file describing the network topology."
-          )
-      )
-
-vizCommands :: Parser VizCommand
-vizCommands =
+parserVizSubCommand :: Parser VizSubCommand
+parserVizSubCommand =
   subparser . mconcat $
     [ commandGroup "Available visualisations:"
     , command "tcp-1" . info (pure VizTCP1) $
@@ -208,7 +163,7 @@ vizCommands =
     , command "praos-1" . info (pure VizPraos1) $
         progDesc
           "A simulation of two nodes running Praos consensus."
-    , command "praos-p2p-1" . info parserPraosP2P1 $
+    , command "praos-p2p-1" . info (parserPraosP2P1 <**> helper) $
         progDesc
           "A simulation of 100 nodes running Praos consensus."
     , command "praos-p2p-2" . info (pure VizPraosP2P2) $
@@ -223,8 +178,34 @@ vizCommands =
         progDesc ""
     ]
 
-vizOptionsToViz :: VizOptions -> IO Vizualisation
-vizOptionsToViz VizOptions{..} = case vizCommand of
+parserPraosP2P1 :: Parser VizSubCommand
+parserPraosP2P1 =
+  VizPraosP2P1
+    <$> option
+      auto
+      ( long "seed"
+          <> metavar "NUMBER"
+          <> help "The seed for the random number generator."
+          <> value 0
+      )
+    <*> option
+      (fmap (fromIntegral @Int) auto)
+      ( long "block-interval"
+          <> metavar "NUMBER"
+          <> help "The interval at which blocks are generated."
+          <> value 5
+      )
+    <*> optional
+      ( option
+          str
+          ( long "topology"
+              <> metavar "FILE"
+              <> help "The file describing the network topology."
+          )
+      )
+
+vizOptionsToViz :: VizCommand -> IO Visualization
+vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizTCP1 -> pure ExamplesTCP.example1
   VizTCP2 -> pure ExamplesTCP.example2
   VizTCP3 -> pure ExamplesTCP.example3
@@ -263,4 +244,123 @@ vizSizeOptions =
       ( long "resolution"
           <> metavar "(W,H)"
           <> help "Use a specific resolution"
+      )
+
+--------------------------------------------------------------------------------
+-- Simulation Commands
+--------------------------------------------------------------------------------
+
+runSimOptions :: SimOptions -> IO ()
+runSimOptions SimOptions{..} = case simCommand of
+  SimPraosDiffusion10{..} ->
+    VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
+  SimPraosDiffusion20{..} ->
+    VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
+
+data SimOptions = SimOptions
+  { simCommand :: SimCommand
+  , simOutputSeconds :: Time
+  , simOutputFile :: FilePath
+  }
+
+parserSimOptions :: Parser SimOptions
+parserSimOptions =
+  SimOptions
+    <$> parserSimCommand
+    <*> option
+      (Time <$> auto)
+      ( long "output-seconds"
+          <> metavar "SECONDS"
+          <> help "Output N seconds of simulation."
+          <> value (Time $ fromIntegral @Int 40)
+      )
+    <*> strOption
+      ( long "output-file"
+          <> metavar "FILE"
+          <> help "Output simulation data to file."
+      )
+
+data SimCommand
+  = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
+  | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
+
+parserSimCommand :: Parser SimCommand
+parserSimCommand =
+  subparser . mconcat $
+    [ commandGroup "Available simulations:"
+    , command "praos-diffusion-10" . info parserSimPraosDiffusion10 $
+        progDesc ""
+    , command "praos-diffusion-20" . info parserSimPraosDiffusion20 $
+        progDesc ""
+    ]
+
+parserSimPraosDiffusion10 :: Parser SimCommand
+parserSimPraosDiffusion10 =
+  SimPraosDiffusion10
+    <$> option
+      auto
+      ( long "num-close-links"
+          <> metavar "NUMBER"
+          <> help "The number of close-distance links."
+          <> value 5
+      )
+    <*> option
+      auto
+      ( long "num-random-links"
+          <> metavar "NUMBER"
+          <> help "The number of random links."
+          <> value 5
+      )
+
+parserSimPraosDiffusion20 :: Parser SimCommand
+parserSimPraosDiffusion20 =
+  SimPraosDiffusion20
+    <$> option
+      auto
+      ( long "num-close-links"
+          <> metavar "NUMBER"
+          <> help "The number of close-distance links."
+          <> value 10
+      )
+    <*> option
+      auto
+      ( long "num-random-links"
+          <> metavar "NUMBER"
+          <> help "The number of random links."
+          <> value 10
+      )
+
+--------------------------------------------------------------------------------
+-- Utility Commands
+--------------------------------------------------------------------------------
+
+runCliOptions :: CliCommand -> IO ()
+runCliOptions = \case
+  CliConvertBenchTopology{..} -> do
+    simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency inputBenchTopology inputBenchLatencies
+    writeSimpleTopology outputSimpleTopology simpleTopology
+
+data CliCommand
+  = CliConvertBenchTopology {inputBenchTopology :: FilePath, inputBenchLatencies :: FilePath, outputSimpleTopology :: FilePath}
+
+parserCliConvertBenchTopology :: Parser CliCommand
+parserCliConvertBenchTopology =
+  CliConvertBenchTopology
+    <$> strOption
+      ( long "input-bench-topology"
+          <> short 't'
+          <> metavar "FILE"
+          <> help "The input topology file."
+      )
+    <*> strOption
+      ( long "input-bench-latencies"
+          <> short 'l'
+          <> metavar "FILE"
+          <> help "The input latencies database."
+      )
+    <*> strOption
+      ( long "output-simple-topology"
+          <> short 'o'
+          <> metavar "FILE"
+          <> help "The output topology file."
       )

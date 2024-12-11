@@ -59,21 +59,21 @@ export enum EMessageType {
 
 export interface ITransactionGenerated {
   type: EMessageType.TransactionGenerated;
-  id: number;
+  id: string;
   publisher: number;
   bytes: number;
 }
 
 export interface ITransactionReceived {
   type: EMessageType.TransactionReceived;
-  id: number;
+  id: string;
   sender: number;
   recipient: number;
 }
 
 export interface ITransactionSent {
   type: EMessageType.TransactionSent;
-  id: number;
+  id: string;
   sender: number;
   recipient: number;
 }
@@ -124,19 +124,10 @@ export interface IServerMessage<T = TMessageType> {
 }
 
 export interface ITransactionMessage {
-  id: number;
+  id: string;
   generated: number;
   duration: number;
   sentTime: number;
   source: number;
   target: number;
-}
-
-export interface ITransactionRoundTrip {
-  generated: number;
-  trip: {
-    source: number;
-    target: number;
-    duration: number;
-  }[];
 }
