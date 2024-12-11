@@ -14,6 +14,7 @@ open import Leios.Blocks a using (EndorserBlock)
 StakeDistr : Type
 StakeDistr = PoolID ⇀ ℕ
 
+RankingBlock : Type
 RankingBlock = These EndorserBlock (List Tx)
 
 record BaseAbstract : Type₁ where
