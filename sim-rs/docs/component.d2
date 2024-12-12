@@ -1,0 +1,104 @@
+title: {
+  label: "sim-rs - C4 Component Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+}
+
+# Main Containers
+sim-cli: {
+  class: container
+  label: "sim-cli\nCommand line interface for running simulations"
+
+  events: {
+    class: component
+    label: "EventMonitor\nTracks and aggregates simulation events"
+  }
+
+  main: {
+    class: component
+    label: "Main\nBootstraps simulation and handles CLI args"
+  }
+}
+
+sim-core: {
+  class: container
+  label: "sim-core\nCore simulation engine"
+
+  clock: {
+    class: component
+    label: "Clock\nManages simulation time"
+  }
+
+  config: {
+    class: component
+    label: "Configuration\nHandles simulation config"
+  }
+
+  events: {
+    class: component
+    label: "EventTracker\nTracks simulation events"
+  }
+
+  model: {
+    class: component
+    label: "Model\nCore domain models"
+  }
+
+  network: {
+    class: component
+    label: "Network\nSimulates network communication"
+  }
+
+  probability: {
+    class: component
+    label: "Probability\nProbability distributions"
+  }
+
+  simulation: {
+    class: component
+    label: "Simulation\nMain simulation logic"
+  }
+}
+
+# Relationships
+sim-cli.main -> sim-cli.events: "Creates"
+sim-cli.main -> sim-core.simulation: "Initializes"
+sim-cli.events -> sim-core.events: "Receives events from"
+
+sim-core.simulation -> sim-core.clock: "Uses"
+sim-core.simulation -> sim-core.config: "Configured by"
+sim-core.simulation -> sim-core.events: "Emits events to"
+sim-core.simulation -> sim-core.network: "Manages"
+sim-core.simulation -> sim-core.model: "Uses"
+
+sim-core.network -> sim-core.clock: "Uses"
+sim-core.network -> sim-core.model: "Transmits"
+
+sim-core.events -> sim-core.model: "References"
+sim-core.events -> sim-core.clock: "Uses"
+
+sim-core.model -> sim-core.probability: "Uses"
