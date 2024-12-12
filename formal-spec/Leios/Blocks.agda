@@ -84,6 +84,12 @@ ibHeaderValid? _ = yes record {}
 ibBodyValid? : (b : IBBody) → Dec (ibBodyValid b)
 ibBodyValid? _ = yes record {}
 
+ibValid : InputBlock → Type
+ibValid record { header = h ; body = b } = ibHeaderValid h × ibBodyValid b
+
+ibValid? : (ib : InputBlock) → Dec (ibValid ib)
+ibValid? record { header = h ; body = b } = ibHeaderValid? h ×-dec ibBodyValid? b
+
 --------------------------------------------------------------------------------
 -- Endorser Blocks
 --------------------------------------------------------------------------------
