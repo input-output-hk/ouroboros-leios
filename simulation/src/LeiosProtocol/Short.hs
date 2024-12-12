@@ -173,14 +173,16 @@ stageStart l s0 slot s = fst <$> stageRange l s0 slot s
 ----------------------------------------------------------------------------------------------
 
 mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg nodeId ebs payload =
-  fixSize cfg $
-    RankingBlockBody
-      { endorseBlocks = maybe [] (: []) ebs
-      , payload
-      , nodeId
-      , size = 0
-      }
+mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) $ rb
+ where
+  rb =
+    fixSize cfg $
+      RankingBlockBody
+        { endorseBlocks = maybe [] (: []) ebs
+        , payload
+        , nodeId
+        , size = 0
+        }
 
 mkInputBlockHeader ::
   LeiosConfig ->
@@ -194,8 +196,9 @@ mkInputBlockHeader cfg id slot subSlot producer rankingBlock =
   fixSize cfg $ InputBlockHeader{size = 0, ..}
 
 mkInputBlock :: LeiosConfig -> InputBlockHeader -> Bytes -> InputBlock
-mkInputBlock _cfg header bodySize =
-  InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
+mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) $ ib
+ where
+  ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
