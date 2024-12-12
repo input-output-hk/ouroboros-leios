@@ -13,11 +13,11 @@ export const Stats: FC = () => {
 
   const currentNodeStats = useMemo(() => {
     return currentNode
-      ? aggregatedData.current.nodes.get(currentNode)
+      ? aggregatedData.nodes.get(currentNode)
       : undefined;
   }, [currentNode]);
 
-  const totals = [...aggregatedData.current.nodes].reduce(
+  const totals = [...aggregatedData.nodes].reduce(
     (total, [_id, data]) => {
       (
         Object.entries(data) as unknown as [

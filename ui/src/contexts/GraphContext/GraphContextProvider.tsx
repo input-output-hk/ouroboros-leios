@@ -13,7 +13,6 @@ import {
 } from "@/components/Graph/types";
 import { defaultState, GraphContext } from "./context";
 import { reducer } from "./reducer";
-import { ISimulationAggregatedDataState } from "./types";
 
 export const GraphContextProvider: FC<
   PropsWithChildren<IGraphWrapperProps>
@@ -51,25 +50,12 @@ export const GraphContextProvider: FC<
   }, []);
 
   const [state, dispatch] = useReducer(reducer, defaultSyncedState);
-
+  
   const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current);
-  const intervalId = useRef<Timer | undefined>(defaultState.intervalId.current);
-  const aggregatedData = useRef<ISimulationAggregatedDataState>(defaultState.aggregatedData.current);
-  const simulationPauseTime = useRef<number>(
-    defaultState.simulationPauseTime.current,
-  );
-  const simulationStartTime = useRef<number>(
-    defaultState.simulationStartTime.current,
-  );
-
   const resolvedState = useMemo(
     () => ({
       ...state,
       canvasRef,
-      aggregatedData,
-      intervalId,
-      simulationPauseTime,
-      simulationStartTime,
     }),
     [state],
   );

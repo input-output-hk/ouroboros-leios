@@ -2,31 +2,23 @@ import {
   defaultAggregatedData,
   useGraphContext,
 } from "@/contexts/GraphContext/context";
-import { ESpeedOptions } from "@/contexts/GraphContext/types";
 import { useCallback } from "react";
 
-import { CANVAS_SCALE, getOffsetCoordinates } from "../utils";
-import { useStreamMessagesHandler } from "./useStreamMessagesHandler";
 
 export const useHandlers = () => {
   const {
     state: {
       aggregatedData,
       canvasRef,
-      currentTime,
+      canvasOffsetX,
+      canvasOffsetY,
+      canvasScale,
       currentNode,
-      intervalId,
       maxTime,
-      playing,
-      speed,
-      simulationPauseTime,
-      simulationStartTime,
       topography,
     },
     dispatch,
   } = useGraphContext();
-
-  const { startStream, stopStream } = useStreamMessagesHandler();
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -45,15 +37,9 @@ export const useHandlers = () => {
     context.clearRect(0, 0, width, height);
     context.save();
 
-    const { offsetX, offsetY } = getOffsetCoordinates(
-      topography,
-      width,
-      height,
-    );
-
     // Apply translation and scaling
-    context.translate(offsetX, offsetY);
-    context.scale(CANVAS_SCALE, CANVAS_SCALE);
+    context.translate(canvasOffsetX, canvasOffsetY);
+    context.scale(canvasScale, canvasScale);
 
     // Draw the links
     topography.links.forEach((link) => {
@@ -79,7 +65,7 @@ export const useHandlers = () => {
       context.stroke();
       context.lineWidth = 1;
       
-      const hasData = aggregatedData.current.nodes.has(node.id.toString());
+      const hasData = aggregatedData.nodes.has(node.id.toString());
       if (hasData) {
         context.strokeStyle = "red";
       } else {
@@ -87,7 +73,7 @@ export const useHandlers = () => {
       }
 
       if (currentNode === node.id.toString()) {
-        console.log(node.id, hasData, aggregatedData.current.nodes.get(node.id.toString()))
+        console.log(node.id, hasData, aggregatedData.nodes.get(node.id.toString()))
         context.fillStyle = "red";
       }
 
@@ -97,54 +83,23 @@ export const useHandlers = () => {
 
     context.restore();
   }, [
-    playing,
-    speed,
     maxTime,
     topography.nodes,
     topography.links,
     currentNode,
+    canvasOffsetX,
+    canvasOffsetY,
+    canvasScale
   ]);
-
-  // Function to toggle play/pause
-  const togglePlayPause = useCallback(() => {
-    if (!playing) {
-      startStream(currentTime, speed);
-      simulationStartTime.current = Date.now() - simulationPauseTime.current;
-      intervalId.current = setInterval(() => {
-        const elapsed =
-          simulationStartTime.current !== 0
-            ? (Date.now() - simulationStartTime.current) * speed
-            : 0;
-
-        dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
-      }, 1000 / 60);
-    } else {
-      stopStream();
-      simulationPauseTime.current = Date.now() - simulationStartTime.current;
-      clearInterval(intervalId.current);
-      intervalId.current = undefined;
-    }
-
-    dispatch({ type: "TOGGLE_PLAYING" });
-  }, [drawTopography, currentTime, speed, playing]);
 
   const handleResetSim = useCallback(() => {
     dispatch({
       type: "BATCH_UPDATE",
       payload: {
         currentNode: undefined,
-        currentTime: 0,
-        playing: false,
-        speed: ESpeedOptions["3% Speed"],
+        aggregatedData: defaultAggregatedData,
       },
     });
-
-    aggregatedData.current = defaultAggregatedData;
-    simulationStartTime.current = 0;
-    simulationPauseTime.current = 0;
-
-    clearInterval(intervalId.current);
-    intervalId.current = undefined;
 
     drawTopography();
   }, []);
@@ -152,6 +107,5 @@ export const useHandlers = () => {
   return {
     handleResetSim,
     drawTopography,
-    togglePlayPause,
   };
 };

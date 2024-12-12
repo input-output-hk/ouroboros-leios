@@ -1,8 +1,7 @@
 import {
-  IServerMessage,
   ITransformedNodeMap
 } from "@/components/Graph/types";
-import { Dispatch, MutableRefObject, RefObject } from "react";
+import { Dispatch, RefObject } from "react";
 
 export enum ESpeedOptions {
   "1% Speed" = 0.01,
@@ -37,39 +36,30 @@ export interface ISimulationAggregatedData {
 }
 
 export interface ISimulationAggregatedDataState {
+  progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
 }
 
 export interface IGraphContextState {
   canvasRef: RefObject<HTMLCanvasElement>;
-  currentTime: number;
+  canvasScale: number;
+  canvasOffsetX: number;
+  canvasOffsetY: number;
   currentNode?: string;
-  generatedMessages: number[];
-  intervalId: MutableRefObject<Timer | undefined>;
-  aggregatedData: MutableRefObject<ISimulationAggregatedDataState>;
+  aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
-  messages: Map<number, IServerMessage>;
-  playing: boolean;
-  sentTxs: number[];
-  simulationStartTime: MutableRefObject<number>;
-  simulationPauseTime: MutableRefObject<number>;
-  speed: ESpeedOptions;
   topography: ITransformedNodeMap;
   topographyLoaded: boolean;
 }
 
 export type TGraphContextActions =
-  | { type: "SET_CURRENT_TIME"; payload: number }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
-  | { type: "ADD_GENERATED_MESSAGE"; payload: number }
-  | { type: "SET_GENERATED_MESSSAGES", payload: number[] }
-  | { type: "REMOVE_GENERATED_MESSAGE"; payload: number }
-  | { type: "ADD_SENT_TX"; payload: number }
-  | { type: "SET_SENT_TXS"; payload: number[] }
-  | { type: "REMOVE_SENT_TX"; payload: number }
-  | { type: "SET_PLAYING"; payload: boolean }
-  | { type: "TOGGLE_PLAYING" }
-  | { type: "SET_SPEED"; payload: ESpeedOptions }
+  | { type: "SET_CANVAS_PROPS"; payload: Partial<{
+    canvasScale: ((prev: number) => number) | number,
+    canvasOffsetX: ((prev: number) => number) | number,
+    canvasOffsetY: ((prev: number) => number) | number
+  } }
+  | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
     type: "BATCH_UPDATE";
     payload: Partial<IGraphContextState>;
