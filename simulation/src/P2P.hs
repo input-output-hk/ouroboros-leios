@@ -5,6 +5,7 @@
 
 module P2P where
 
+import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.ST (ST)
@@ -121,16 +122,17 @@ genArbitraryP2PTopography
         | (nid, rng) <- zip nodes (unfoldr (Just . Random.split) rngLinks)
         , let p = nodePositions Map.! nid
         , nid' <-
-            pickNodeLinksClose p
+            pickNodeLinksClose nid p
               ++ pickNodeLinksRandom nid rng
         , let p' = nodePositions Map.! nid'
               !latency = linkLatency p p'
         ]
 
-    pickNodeLinksClose :: Point -> [NodeId]
-    pickNodeLinksClose =
-      map snd
-        . KdMap.kNearest nodesKdMap p2pNodeLinksClose
+    pickNodeLinksClose :: NodeId -> Point -> [NodeId]
+    pickNodeLinksClose nid p =
+      case map snd $ KdMap.kNearest nodesKdMap (p2pNodeLinksClose + 1) p of
+        (nid' : nids) -> assert (nid == nid') $ nids
+        [] -> assert False []
 
     -- For efficiency in finding the K nearest neighbours, we use a K-D map
     -- of all the nodes, and then do queries in that.
