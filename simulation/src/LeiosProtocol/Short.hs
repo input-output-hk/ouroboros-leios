@@ -168,6 +168,10 @@ stageEnd l s0 slot s = snd <$> stageRange l s0 slot s
 stageStart :: LeiosConfig -> Stage -> SlotNo -> Stage -> Maybe SlotNo
 stageStart l s0 slot s = fst <$> stageRange l s0 slot s
 
+-- | Assumes pipelines start at slot 0 and keep going.
+isStage :: LeiosConfig -> Stage -> SlotNo -> Bool
+isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
+
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
@@ -335,11 +339,14 @@ splitIntoSubSlots (NetworkRate r)
         replicate q fq
 
 inputBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-inputBlockRate LeiosConfig{inputBlockFrequencyPerSlot} _slot =
-  splitIntoSubSlots $ NetworkRate inputBlockFrequencyPerSlot
+inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} slot =
+  assert (isStage cfg Propose slot) $
+    splitIntoSubSlots $
+      NetworkRate inputBlockFrequencyPerSlot
 
 endorseBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
 endorseBlockRate cfg slot = fromMaybe [] $ do
+  guard $ isStage cfg Endorse slot
   startEndorse <- stageStart cfg Endorse slot Endorse
   guard $ startEndorse == slot
   return $ splitIntoSubSlots $ NetworkRate cfg.endorseBlockFrequencyPerStage
@@ -347,6 +354,7 @@ endorseBlockRate cfg slot = fromMaybe [] $ do
 -- TODO: double check with technical report section on voting when ready.
 votingRate :: LeiosConfig -> SlotNo -> [NetworkRate]
 votingRate cfg slot = fromMaybe [] $ do
+  guard $ isStage cfg Vote slot
   range <- stageRange cfg Vote slot Vote
   guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
   let votingFrequencyPerSlot = cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
