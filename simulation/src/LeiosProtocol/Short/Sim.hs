@@ -107,7 +107,7 @@ traceRelayLink1 tcpprops =
                     , -- \^ hash matching and payload validation (incl. tx scripts)
                       endorseBlockValidation = const 0.005
                     , voteMsgValidation = const 0.005
-                    , certificateCreation = const 0.050 -- TODO: is this used?
+                    , certificateCreation = const 0.050
                     }
               }
       let leiosNodeConfig nodeId@(NodeId i) =

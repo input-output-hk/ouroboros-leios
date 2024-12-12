@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
@@ -16,10 +17,12 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Control.Exception (assert)
 import Control.Monad (forM)
+import Data.Bifunctor
 import Data.Kind
+import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
-import PraosProtocol.Common (fixupBlock, mkPartialBlock)
+import PraosProtocol.Common (CPUTask (CPUTask), fixupBlock, mkPartialBlock)
 import System.Random
 
 data BuffersView m = BuffersView
@@ -83,7 +86,7 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   , nodeId :: NodeId
   , buffers :: BuffersView m
   , schedule :: SlotNo -> m [(SomeRole, Word64)]
-  , submit :: [SomeAction] -> m ()
+  , submit :: [([CPUTask], SomeAction)] -> m ()
   }
 
 blockGenerator ::
@@ -99,30 +102,36 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     (actions, blkId') <- runStateT (mapM (execute slot) roles) blkId
     submit actions
     go (blkId', slot + 1)
-  execute slot (SomeRole r, wins) = assert (wins >= 1) $ SomeAction r <$> execute' slot r wins
-  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m a
+  execute slot (SomeRole r, wins) = assert (wins >= 1) $ second (SomeAction r) <$> execute' slot r wins
+  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m ([CPUTask], a)
   execute' slot Base _wins = do
     rbData <- lift $ atomically $ buffers.newRBData
-    let body = mkRankingBlockBody leios nodeId rbData.freshestCertifiedEB rbData.txsPayload
+    let meb = rbData.freshestCertifiedEB
+    let !task = CPUTask $ fromMaybe 0 $ leios.delays.certificateCreation . snd <$> meb
+    let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
+    let !rb = fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
     -- TODO: maybe submit should do the fixupBlock.
-    return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
-  execute' slot Propose wins = do
-    ibData <- lift $ atomically $ buffers.newIBData
-    forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
-      i <- nextBlkId InputBlockId
-      let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
-      return $! mkInputBlock leios header ibData.txsPayload
-  execute' slot Endorse _wins = do
-    i <- nextBlkId EndorseBlockId
-    ibs <- lift $ atomically $ buffers.ibs
-    return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
-  execute' slot Vote votes = do
-    votingFor <- lift $ atomically $ do
-      ibs <- buffers.ibs
-      ebs <- buffers.ebs
-      pure $ endorseBlocksToVoteFor leios slot ibs ebs
-    i <- nextBlkId VoteId
-    return $! mkVoteMsg leios i slot nodeId votes votingFor
+    return ([task], rb)
+  execute' slot Propose wins =
+    ([],) <$> do
+      ibData <- lift $ atomically $ buffers.newIBData
+      forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
+        i <- nextBlkId InputBlockId
+        let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
+        return $! mkInputBlock leios header ibData.txsPayload
+  execute' slot Endorse _wins =
+    ([],) <$> do
+      i <- nextBlkId EndorseBlockId
+      ibs <- lift $ atomically $ buffers.ibs
+      return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
+  execute' slot Vote votes =
+    ([],) <$> do
+      votingFor <- lift $ atomically $ do
+        ibs <- buffers.ibs
+        ebs <- buffers.ebs
+        pure $ endorseBlocksToVoteFor leios slot ibs ebs
+      i <- nextBlkId VoteId
+      return $! mkVoteMsg leios i slot nodeId votes votingFor
   nextBlkId :: (NodeId -> Int -> a) -> StateT Int m a
   nextBlkId f = do
     i <- get

@@ -182,7 +182,7 @@ exampleLeiosConfig slotConfig = leios
       , inputBlockValidation = const 0.1
       , endorseBlockValidation = const 0.005
       , voteMsgValidation = const 0.005
-      , certificateCreation = const 0.050 -- TODO: is this used?
+      , certificateCreation = const 0.050
       }
 
   praos =

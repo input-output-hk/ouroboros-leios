@@ -455,6 +455,7 @@ validationDispatcher tracer cfg leiosState = forever $ do
  where
   traceEnterState :: [a] -> (a -> LeiosEventBlock) -> m ()
   traceEnterState xs f = forM_ xs $ traceWith tracer . LeiosNodeEvent EnterState . f
+
 generator ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -466,21 +467,24 @@ generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
   let
-    submitOne :: SomeAction -> m ()
-    submitOne x = case x of
-      SomeAction Generate.Base rb -> do
-        atomically $ addProducedBlock st.praosState.blockFetchControllerState rb
-        traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
-      SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
-        atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
-        traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
-      SomeAction Generate.Endorse eb -> do
-        atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
-        traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
-      SomeAction Generate.Vote v -> do
-        atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
-        traceWith tracer (LeiosNodeEvent Generate (EventVote v))
+    submitOne :: ([CPUTask], SomeAction) -> m ()
+    submitOne (delays, x) = do
+      threadDelayParallel tracer (coerce delays)
+      case x of
+        SomeAction Generate.Base rb -> do
+          atomically $ addProducedBlock st.praosState.blockFetchControllerState rb
+          traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
+        SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
+          atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+          traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
+        SomeAction Generate.Endorse eb -> do
+          atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
+          traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
+        SomeAction Generate.Vote v -> do
+          atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
+          traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
+  -- TODO: more parallelism `mapM_ submitOne` will make each later submission wait.
   blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
 
 mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> BuffersView m
