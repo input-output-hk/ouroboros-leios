@@ -337,6 +337,9 @@ leiosSimVizModel =
           Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
+      , ibMsgs = pruneLeiosMsgsState now vs.ibMsgs
+      , ebMsgs = pruneLeiosMsgsState now vs.ebMsgs
+      , voteMsgs = pruneLeiosMsgsState now vs.voteMsgs
       }
    where
     secondsAgo30 :: Time
@@ -351,11 +354,17 @@ initMsgs =
     , msgsAtNodeRecentBuffer = Map.empty
     , msgsAtNodeTotalQueue = Map.empty
     , msgsAtNodeTotalBuffer = Map.empty
-    , -- these are `Block`s generated (globally).
-      numMsgsGenerated = 0
+    , numMsgsGenerated = 0
     }
 
-accumLeiosMsgs :: (Eq id, HasField "id" msg id) => Time -> NodeId -> BlockEvent -> msg -> LeiosSimVizMsgsState id msg -> LeiosSimVizMsgsState id msg
+accumLeiosMsgs ::
+  (Eq id, HasField "id" msg id) =>
+  Time ->
+  NodeId ->
+  BlockEvent ->
+  msg ->
+  LeiosSimVizMsgsState id msg ->
+  LeiosSimVizMsgsState id msg
 accumLeiosMsgs now nid Generate blk vs =
   vs
     { msgsAtNodeBuffer =
@@ -398,6 +407,22 @@ accumLeiosMsgs now nid EnterState blk vs =
     , msgsAtNodeTotalBuffer =
         Map.insertWith (+) nid 1 (msgsAtNodeTotalBuffer vs)
     }
+
+pruneLeiosMsgsState ::
+  (Eq id, HasField "id" msg id) =>
+  Time ->
+  LeiosSimVizMsgsState id msg ->
+  LeiosSimVizMsgsState id msg
+pruneLeiosMsgsState now vs =
+  vs
+    { msgsAtNodeRecentQueue =
+        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentQueue vs)
+    , msgsAtNodeRecentBuffer =
+        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentBuffer vs)
+    }
+ where
+  secondsAgo30 :: Time
+  secondsAgo30 = addTime (-30) now
 
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.
