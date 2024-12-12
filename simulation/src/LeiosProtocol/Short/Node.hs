@@ -497,7 +497,8 @@ mkBuffersView cfg st = BuffersView{..}
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
           guard (cfg.leios.votesForCertificate <= totalVotes votes)
-          return (eb.id, mkCertificate cfg.leios (Map.keysSet votes))
+          return $! (eb.id,) $! mkCertificate cfg.leios votes
+
     -- TODO: cache index of EBs ordered by .slot descending?
     let freshestCertifiedEB = listToMaybe . mapMaybe tryCertify . sortOn (Down . (.slot)) $ bufferEB
     return $

@@ -41,11 +41,10 @@ import ChanTCP
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Hashable
-import Data.Set (Set)
-import Data.Word (Word8)
+import Data.Map (Map)
+import Data.Word (Word64, Word8)
 import GHC.Generics
 import GHC.Records
-import GHC.Word (Word64)
 import Ouroboros.Network.Block as Block
 import PraosProtocol.Common (
   ChainHash (..),
@@ -193,7 +192,7 @@ data VoteMsg = VoteMsg
   deriving stock (Eq, Show)
 
 data Certificate = Certificate
-  { votes :: Set VoteId
+  { votes :: Map VoteId Word64
   }
   deriving stock (Show, Eq, Generic)
   deriving anyclass (Hashable)

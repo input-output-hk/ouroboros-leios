@@ -13,9 +13,9 @@ module LeiosProtocol.Short where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Maybe
-import Data.Set (Set)
-import qualified Data.Set as Set
 import LeiosProtocol.Common
 import ModelTCP
 import Ouroboros.Network.AnchoredFragment (Anchor)
@@ -211,8 +211,10 @@ mkEndorseBlock cfg id slot producer inputBlocks =
 mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
 mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
 
-mkCertificate :: LeiosConfig -> Set VoteId -> Certificate
-mkCertificate cfg vs = assert (Set.size vs >= cfg.votesForCertificate) $ Certificate vs
+mkCertificate :: LeiosConfig -> Map VoteId Word64 -> Certificate
+mkCertificate cfg vs =
+  assert (fromIntegral cfg.votesForCertificate <= sum (Map.elems vs)) $
+    Certificate vs
 
 ---------------------------------------------------------------------------------------
 ---- Selecting data to build blocks
