@@ -20,6 +20,7 @@ import ChanDriver
 import Data.Bifunctor (Bifunctor (bimap), second)
 import Data.Coerce
 import Data.Hashable (hash)
+import Data.List (intercalate)
 import Data.Monoid
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
@@ -28,6 +29,7 @@ import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   LeiosSimVizModel,
+  LeiosSimVizMsgsState (..),
   LeiosSimVizState (..),
   LeiosVizConfig (praosMessageColor),
   LinkPoints (..),
@@ -73,6 +75,38 @@ leiosP2PSimVizRender vizConfig =
         leiosP2PSimVizRenderModel vizConfig t m sz
     }
 
+-- TODO: should be a table?
+leiosGenCountRender :: VizRender LeiosSimVizModel
+leiosGenCountRender =
+  VizRender
+    { renderReqSize = (400, 24) -- A little taller than font to avoid clipping
+    , renderChanged = \_t _fn _m -> True
+    , renderModel = \t _fn m sz ->
+        leiosP2PSimVizRenderGenCount t m sz
+    }
+ where
+  leiosP2PSimVizRenderGenCount ::
+    Time ->
+    SimVizModel event LeiosSimVizState ->
+    (Double, Double) ->
+    Cairo.Render ()
+  leiosP2PSimVizRenderGenCount (Time t) (SimVizModel _events st) _screenSize = do
+    Cairo.moveTo 5 20
+    Cairo.setFontSize 20
+    Cairo.setSourceRGB 0 0 0
+    let perSec n = fromIntegral (n :: Int) / realToFrac t :: Double
+    let rbs = st.vizNumMsgsGenerated
+    let ibs = st.ibMsgs.numMsgsGenerated
+    let ebs = st.ebMsgs.numMsgsGenerated
+    let votes = st.voteMsgs.numMsgsGenerated
+    Cairo.showText $
+      "Blocks generated: "
+        ++ intercalate
+          ",  "
+          [ printf "%s: %i (%.2f %s/s)" lbl n (perSec n) lbl
+          | (n, lbl) <- [(rbs, "RB"), (ibs, "IB"), (ebs, "EB"), (votes, "Vote")]
+          ]
+
 leiosP2PSimVizRenderModel ::
   LeiosP2PSimVizConfig ->
   Time ->
@@ -84,7 +118,7 @@ leiosP2PSimVizRenderModel
     { nodeMessageColor
     , ptclMessageColor
     }
-  now@(Time t)
+  now
   ( SimVizModel
       _events
       LeiosSimVizState
@@ -93,23 +127,12 @@ leiosP2PSimVizRenderModel
         , vizNodeLinks
         , vizNodeTip
         , vizMsgsInTransit
-        , vizNumMsgsGenerated
         }
     )
   screenSize = do
     renderLinks
     renderNodes
-    renderGenCount
    where
-    renderGenCount = do
-      Cairo.moveTo 5 40
-      Cairo.setFontSize 20
-      Cairo.setSourceRGB 0 0 0
-      Cairo.showText $
-        "Blocks generated: "
-          ++ show vizNumMsgsGenerated
-          ++ printf " (%.2f blk/s)" (fromIntegral vizNumMsgsGenerated / realToFrac t :: Double)
-
     renderNodes = do
       Cairo.save
       Cairo.setFontSize 10
@@ -577,34 +600,35 @@ blendColors xs = coerce $ mconcat $ [(Sum (r * f), Sum (g * f), Sum (b * f)) | (
 
 example2 :: Visualization
 example2 =
-  Viz (leiosSimVizModel exampleTrace2) $
-    LayoutAbove
-      [ layoutLabelTime
-      , LayoutBeside
-          [ LayoutReqSize 1200 1000 $
-              Layout $
-                leiosP2PSimVizRender config
-          , LayoutBeside
-              [ LayoutAbove
-                  [ LayoutReqSize 350 300 $
-                      Layout $
-                        chartDiffusionLatency config
-                        -- , LayoutReqSize 350 300 $
-                        --     Layout $
-                        --       chartDiffusionImperfection
-                        --         p2pTopography
-                        --         0.1
-                        --         (96 / 1000)
-                        --         config
-                  ]
-              , LayoutAbove
-                  [ LayoutReqSize 350 300 $
-                      Layout chartBandwidth
-                  , LayoutReqSize 350 300 $
-                      Layout chartLinkUtilisation
-                  ]
-              ]
-          ]
-      ]
+  slowmoVisualization 0.8 $
+    Viz (leiosSimVizModel exampleTrace2) $
+      LayoutAbove
+        [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
+        , LayoutBeside
+            [ LayoutReqSize 1200 1000 $
+                Layout $
+                  leiosP2PSimVizRender config
+            , LayoutBeside
+                [ LayoutAbove
+                    [ LayoutReqSize 350 300 $
+                        Layout $
+                          chartDiffusionLatency config
+                          -- , LayoutReqSize 350 300 $
+                          --     Layout $
+                          --       chartDiffusionImperfection
+                          --         p2pTopography
+                          --         0.1
+                          --         (96 / 1000)
+                          --         config
+                    ]
+                , LayoutAbove
+                    [ LayoutReqSize 350 300 $
+                        Layout chartBandwidth
+                    , LayoutReqSize 350 300 $
+                        Layout chartLinkUtilisation
+                    ]
+                ]
+            ]
+        ]
  where
   config = defaultVizConfig 5
