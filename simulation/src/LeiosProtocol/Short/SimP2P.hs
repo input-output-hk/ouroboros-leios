@@ -43,7 +43,7 @@ traceLeiosP2P
     , p2pWorldShape
     }
   tcpprops
-  leiosConfig =
+  leiosNodeConfig =
     selectTimedEvents $
       runSimTrace $ do
         slotConfig <- slotConfigFromNow
@@ -82,7 +82,7 @@ traceLeiosP2P
           (\m -> mapM_ forkIO =<< m)
           [ leiosNode
             (nodeTracer nid)
-            (leiosConfig slotConfig nid rng)
+            (leiosNodeConfig slotConfig nid rng)
             (Map.findWithDefault [] nid tcplinksInChan)
             (Map.findWithDefault [] nid tcplinksOutChan)
           | (nid, rng) <-
