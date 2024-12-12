@@ -132,45 +132,7 @@ exampleTrace2' rng0 worldIsCylinder =
       , rng
       }
    where
-    -- TODO: review voting numbers, these might not make sense.
-    leios =
-      LeiosConfig
-        { praos
-        , sliceLength = 5 -- matching the interval between RBs
-        , inputBlockFrequencyPerSlot = 5
-        , endorseBlockFrequencyPerStage = 4
-        , activeVotingStageLength = 1
-        , votingFrequencyPerStage = fromIntegral p2pNumNodes
-        , votesForCertificate = p2pNumNodes `div` 4
-        , sizes
-        , delays
-        }
-    -- TODO: realistic sizes
-    sizes =
-      SizesConfig
-        { producerId = 4
-        , vrfProof = 32
-        , signature_ = 32
-        , reference = 32
-        , voteCrypto = 64
-        , certificate = const (50 * 1024)
-        }
-    delays =
-      LeiosDelays
-        { inputBlockHeaderValidation = const 0.005
-        , inputBlockValidation = const 0.1
-        , endorseBlockValidation = const 0.005
-        , voteMsgValidation = const 0.005
-        , certificateCreation = const 0.050 -- TODO: is this used?
-        }
-
-    praos =
-      PraosConfig
-        { slotConfig
-        , blockValidationDelay = const 0.1 -- 100ms --TODO: should depend on certificate/payload
-        , headerValidationDelay = const 0.005 -- 5ms
-        }
-
+    leios = exampleLeiosConfig slotConfig
   p2pTopography =
     genArbitraryP2PTopography p2pTopographyCharacteristics rng0
 
@@ -186,4 +148,46 @@ exampleTrace2' rng0 worldIsCylinder =
       , p2pNumNodes
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5
+      }
+
+exampleLeiosConfig :: SlotConfig -> LeiosConfig
+exampleLeiosConfig slotConfig = leios
+ where
+  -- TODO: review voting numbers, these might not make sense.
+  leios =
+    LeiosConfig
+      { praos
+      , sliceLength = 5 -- matching the interval between RBs
+      , inputBlockFrequencyPerSlot = 5
+      , endorseBlockFrequencyPerStage = 1.5
+      , activeVotingStageLength = 1
+      , votingFrequencyPerStage = 500
+      , votesForCertificate = 150
+      , sizes
+      , delays
+      }
+  -- TODO: realistic sizes
+  sizes =
+    SizesConfig
+      { producerId = 4
+      , vrfProof = 32
+      , signature_ = 32
+      , reference = 32
+      , voteCrypto = 64
+      , certificate = const (50 * 1024)
+      }
+  delays =
+    LeiosDelays
+      { inputBlockHeaderValidation = const 0.005
+      , inputBlockValidation = const 0.1
+      , endorseBlockValidation = const 0.005
+      , voteMsgValidation = const 0.005
+      , certificateCreation = const 0.050 -- TODO: is this used?
+      }
+
+  praos =
+    PraosConfig
+      { slotConfig
+      , blockValidationDelay = const 0.1 -- 100ms --TODO: should depend on certificate/payload
+      , headerValidationDelay = const 0.005 -- 5ms
       }
