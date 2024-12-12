@@ -4,8 +4,6 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-import Data.List as L
-
 module Leios.Simplified (⋯ : SpecStructure) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
 data SlotUpkeep : Type where
@@ -47,7 +45,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                    ks ks' : K.State
                    msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
                    eb     : EndorserBlock
-                   ebs    : List EndorserBlock
+                   rbs    : List RankingBlock
                    txs    : List Tx
                    V      : VTy
                    SD     : StakeDistr
@@ -137,12 +135,12 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs) in
          ∙ Upkeep ≡ᵉ allUpkeep
-         ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG ebs ⟧⇀ bs'
+         ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
          ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
          ───────────────────────────────────────────────────────────────────────
          just s -⟦ SLOT / EMPTY ⟧⇀ record s
              { FFDState = ffds'
-             ; Ledger   = constructLedger ebs
+             ; Ledger   = constructLedger rbs
              ; slot     = suc slot
              ; Upkeep   = ∅
              } ↑ L.filter isValid? msgs
@@ -164,14 +162,14 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
     Base₂a  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ eb ∈ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
-            ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
+            ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
     Base₂b  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
-            ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
+            ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
 

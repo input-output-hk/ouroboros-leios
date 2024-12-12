@@ -11,7 +11,17 @@ open import Class.HasOrder public
 open import Class.Hashable public
 open import Prelude.InferenceRules public
 
-import Data.List as L
+module T where
+  open import Data.These public
+open T public using (These; this; that)
+
+module L where
+  open import Data.List public
+open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
+
+module A where
+  open import Data.List.Relation.Unary.Any public
+open A public using (here; there)
 
 fromTo : ℕ → ℕ → List ℕ
 fromTo m n = map (_+ m) (upTo (n ∸ m))
