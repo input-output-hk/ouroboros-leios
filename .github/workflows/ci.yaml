@@ -106,7 +106,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build Rust packages compilation
+      - name: Check Rust packages compilation
         working-directory: sim-rs
         run: |
           cargo check
