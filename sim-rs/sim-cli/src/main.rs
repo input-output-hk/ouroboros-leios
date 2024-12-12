@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, process, time::Instant};
+use std::{fs, path::PathBuf, process};
 
 use anyhow::Result;
 use clap::Parser;
@@ -85,9 +85,9 @@ async fn main() -> Result<()> {
         tokio::spawn(EventMonitor::new(&config, events_source, args.output, args.format).run());
     pin!(monitor);
 
-    let clock = Clock::new(Instant::now(), config.timescale);
+    let clock = Clock::new();
     let tracker = EventTracker::new(events_sink, clock.clone());
-    let mut simulation = Simulation::new(config, tracker, clock)?;
+    let mut simulation = Simulation::new(config, tracker, clock).await?;
 
     select! {
         result = simulation.run(token) => { result? }
