@@ -125,6 +125,52 @@ jobs:
         with:
           version: "0.15.0.0"
 
+  generate-diagrams:
+    name: Generate D2 Diagrams
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Install D2
+        run: |
+          curl -fsSL https://d2lang.com/install.sh | sh -s --
+          d2 --version
+
+      - name: Generate PNG files
+        run: |
+          find . -name "*.d2" -type f -exec sh -c '
+            for file do
+              output_file="${file%.d2}.png"
+              echo "Converting $file to $output_file"
+              d2 "$file" "$output_file"
+            done
+          ' sh {} +
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add *.png
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit -m "Auto-generate diagram PNGs [skip ci]"
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
+
   build-docusaurus:
     runs-on: ubuntu-22.04
     steps:
