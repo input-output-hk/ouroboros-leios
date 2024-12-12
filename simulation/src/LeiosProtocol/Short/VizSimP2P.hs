@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
@@ -28,6 +29,7 @@ import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
+  IBsInRBsReport (..),
   LeiosSimVizModel,
   LeiosSimVizMsgsState (..),
   LeiosSimVizState (..),
@@ -36,6 +38,7 @@ import LeiosProtocol.Short.VizSim (
   examplesLeiosSimVizConfig,
   leiosSimVizModel,
   recentRate,
+  totalIBsInRBs,
  )
 import ModelTCP (TcpMsgForecast (..))
 import Network.TypedProtocol
@@ -99,13 +102,20 @@ leiosGenCountRender =
     let ibs = st.ibMsgs.numMsgsGenerated
     let ebs = st.ebMsgs.numMsgsGenerated
     let votes = st.voteMsgs.numMsgsGenerated
+    let IBsInRBsReport{..} = totalIBsInRBs st.ibsInRBs
     Cairo.showText $
-      "Blocks generated: "
-        ++ intercalate
-          ",  "
-          [ printf "%s: %i (%.2f %s/s)" lbl n (perSec n) lbl
-          | (n, lbl) <- [(rbs, "RB"), (ibs, "IB"), (ebs, "EB"), (votes, "Vote")]
-          ]
+      intercalate
+        ";  "
+        [ "Blocks generated: "
+            ++ intercalate
+              ",  "
+              [ printf "%s: %i (%.2f %s/s)" lbl n (perSec n) lbl
+              | (n, lbl) <- [(rbs, "RB"), (ibs, "IB"), (ebs, "EB"), (votes, "Vote")]
+              ]
+        , printf "IBs in RBs: %i (%i%%)" ibsInRBsNum ((ibsInRBsNum * 100) `div` ibs)
+        , printf "IBs in EBs: %i (%i%%)" ibsInEBsNum ((ibsInEBsNum * 100) `div` ibs)
+        , printf "EBs in RBs: %i (%i%%)" ebsInRBsNum ((ebsInRBsNum * 100) `div` ibs)
+        ]
 
 leiosP2PSimVizRenderModel ::
   LeiosP2PSimVizConfig ->

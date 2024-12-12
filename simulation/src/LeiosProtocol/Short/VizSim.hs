@@ -15,11 +15,13 @@ import Data.Coerce (coerce)
 import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
+import Data.Set (Set)
+import qualified Data.Set as Set
 import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
@@ -120,6 +122,7 @@ data LeiosSimVizState
   , ibMsgs :: !(LeiosSimVizMsgsState InputBlockId InputBlock)
   , ebMsgs :: !(LeiosSimVizMsgsState EndorseBlockId EndorseBlock)
   , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
+  , ibsInRBs :: !IBsInRBsState
   }
 
 data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
@@ -132,6 +135,22 @@ data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
   , -- these are `Block`s generated (globally).
     numMsgsGenerated :: !Int
   }
+
+data IBsInRBsState = IBsInRBsState
+  { ibsInEBs :: !(Map EndorseBlockId (Set InputBlockId))
+  , ebsInRBs :: !(Map RankingBlockId (Set EndorseBlockId))
+  }
+
+data IBsInRBsReport = IBsInRBsReport {ibsInRBsNum :: !Int, ibsInEBsNum :: !Int, ebsInRBsNum :: !Int}
+
+totalIBsInRBs :: IBsInRBsState -> IBsInRBsReport
+totalIBsInRBs s = IBsInRBsReport{..}
+ where
+  elemsSet x = Set.unions . Map.elems $ x
+  ibsInRBsNum = Set.size $ elemsSet $ Map.restrictKeys s.ibsInEBs ebsInRBsSet
+  ebsInRBsSet = elemsSet s.ebsInRBs
+  ebsInRBsNum = Set.size ebsInRBsSet
+  ibsInEBsNum = Set.size $ elemsSet s.ibsInEBs
 
 -- | The end points where the each link, including the case where the link
 -- wraps around on a cylindrical world.
@@ -208,6 +227,7 @@ leiosSimVizModel =
       , ibMsgs = initMsgs
       , ebMsgs = initMsgs
       , voteMsgs = initMsgs
+      , ibsInRBs = IBsInRBsState Map.empty Map.empty
       }
 
   accumEventVizState ::
@@ -234,7 +254,13 @@ leiosSimVizModel =
   accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) vs =
     case blk of
       EventIB x -> vs{ibMsgs = accumLeiosMsgs now nid event x vs.ibMsgs}
-      EventEB x -> vs{ebMsgs = accumLeiosMsgs now nid event x vs.ebMsgs}
+      EventEB x ->
+        vs
+          { ebMsgs = accumLeiosMsgs now nid event x vs.ebMsgs
+          , ibsInRBs = case event of
+              Generate -> accumIBsInRBs (Right x) vs.ibsInRBs
+              _ -> vs.ibsInRBs
+          }
       EventVote x -> vs{voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs}
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
     vs
@@ -254,6 +280,7 @@ leiosSimVizModel =
               (blockHash blk)
               (blockHeader blk, nid, now, [now])
               (vizMsgsDiffusionLatency vs)
+      , ibsInRBs = accumIBsInRBs (Left blk) vs.ibsInRBs
       }
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventReceived blk)))) vs =
     vs
@@ -423,6 +450,10 @@ pruneLeiosMsgsState now vs =
  where
   secondsAgo30 :: Time
   secondsAgo30 = addTime (-30) now
+
+accumIBsInRBs :: Either RankingBlock EndorseBlock -> IBsInRBsState -> IBsInRBsState
+accumIBsInRBs (Left rb) s = s{ebsInRBs = Map.insertWith Set.union (blockHash rb) (Set.fromList $ map fst rb.blockBody.endorseBlocks) s.ebsInRBs}
+accumIBsInRBs (Right eb) s = s{ibsInEBs = Map.insertWith Set.union eb.id (Set.fromList eb.inputBlocks) s.ibsInEBs}
 
 -- | The shortest distance between two points, given that the world may be
 -- considered to be a cylinder.

@@ -700,7 +700,7 @@ layoutLabelTime =
   LayoutFixed $
     Layout
       VizRender
-        { renderReqSize = (400, 20)
+        { renderReqSize = (200, 20)
         , renderChanged = \_t _fn _ -> True
         , renderModel
         }
