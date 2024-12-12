@@ -18,7 +18,6 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe
 import LeiosProtocol.Common
 import ModelTCP
-import Ouroboros.Network.AnchoredFragment (Anchor)
 import Prelude hiding (id)
 
 data SizesConfig = SizesConfig

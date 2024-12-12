@@ -22,7 +22,7 @@ import Data.Kind
 import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
-import PraosProtocol.Common (CPUTask (CPUTask), fixupBlock, mkPartialBlock)
+import PraosProtocol.Common (CPUTask (CPUTask), mkPartialBlock)
 import System.Random
 
 data BuffersView m = BuffersView
@@ -109,8 +109,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     let meb = rbData.freshestCertifiedEB
     let !task = CPUTask $ fromMaybe 0 $ leios.delays.certificateCreation . snd <$> meb
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
-    let !rb = fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
-    -- TODO: maybe submit should do the fixupBlock.
+    let !rb = mkPartialBlock slot body
     return ([task], rb)
   execute' slot Propose wins =
     ([],) <$> do
