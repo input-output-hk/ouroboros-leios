@@ -102,7 +102,7 @@ jobs:
         run: cabal test all
 
   rs-compile:
-    name: Build Rust packages
+    name: Check Rust packages
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
