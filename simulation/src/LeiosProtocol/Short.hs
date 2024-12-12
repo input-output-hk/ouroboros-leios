@@ -230,6 +230,7 @@ data NewRankingBlockData = NewRankingBlockData
   { freshestCertifiedEB :: Maybe (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
   , headAnchor :: Anchor RankingBlock
+  -- ^ points to prefix of current chain with ledger state computed.
   }
 
 data NewInputBlockData = NewInputBlockData

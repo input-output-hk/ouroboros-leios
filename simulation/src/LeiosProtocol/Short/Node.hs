@@ -37,10 +37,9 @@ import LeiosProtocol.Short.Generate
 import qualified LeiosProtocol.Short.Generate as Generate
 import ModelTCP
 import Numeric.Natural (Natural)
-import Ouroboros.Network.Mock.Chain (headHash)
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common
-import PraosProtocol.Common.Chain (headAnchor)
+import PraosProtocol.Common.Chain (dropUntil, headAnchor, headHash)
 import qualified PraosProtocol.PraosNode as PraosNode
 import System.Random
 
@@ -53,8 +52,7 @@ data LeiosMessage
   = RelayIB {fromRelayIB :: RelayIBMessage}
   | RelayEB {fromRelayEB :: RelayEBMessage}
   | RelayVote {fromRelayVote :: RelayVoteMessage}
-  | -- | `BearerMsg` here is a bit ugly, but allows us to not have to split up PraosMessage in the Leios bundle.
-    PraosMsg {fromPraosMsg :: PraosMessage}
+  | PraosMsg {fromPraosMsg :: PraosMessage}
   deriving (Show)
 
 data Leios f = Leios
@@ -491,7 +489,8 @@ mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> 
 mkBuffersView cfg st = BuffersView{..}
  where
   newRBData = do
-    headAnchor' <- headAnchor <$> PraosNode.preferredChain st.praosState
+    ledgerState <- readTVar st.ledgerStateVar
+    headAnchor' <- headAnchor . dropUntil (flip Map.member ledgerState . blockHash) <$> PraosNode.preferredChain st.praosState
     bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
