@@ -24,7 +24,7 @@ import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.List (sort, sortOn)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Ord
 import Data.Set (Set)

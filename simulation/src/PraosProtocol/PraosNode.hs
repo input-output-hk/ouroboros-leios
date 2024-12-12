@@ -16,7 +16,7 @@ import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration

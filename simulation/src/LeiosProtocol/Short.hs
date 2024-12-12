@@ -14,7 +14,7 @@ module LeiosProtocol.Short where
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import LeiosProtocol.Common
 import ModelTCP

@@ -35,7 +35,7 @@ import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Map (Map)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Data.Maybe (maybeToList)
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S

@@ -38,7 +38,7 @@ import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
