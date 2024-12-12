@@ -69,22 +69,22 @@ sim-core: {
 
   clock: {
     class: component
-    label: "Clock\n- Time management\n- Timestamp handling\n- Time scaling"
+    label: "Clock\n- Time management\n- Timestamp handling"
   }
 
   config: {
     class: component
     label: "Configuration"
 
-    node_config: {
-      class: subcomponent
-      label: "NodeConfig\n- Location\n- Stake\n- Peers"
-    }
-
     sim_config: {
       class: subcomponent
       label: "SimConfig\n- Network params\n- Protocol params\n- System params"
     }
+
+    node_config: {
+      class: subcomponent
+      label: "NodeConfig\n- Location\n- Stake\n- Peers"
+    }  
   }
 
   model: {
@@ -146,14 +146,19 @@ sim-core: {
     class: component
     label: "Simulation Engine"
 
-    event_queue: {
-      class: subcomponent
-      label: "EventQueue\n- Event scheduling\n- Event ordering"
-    }
-
     node_sim: {
       class: subcomponent
       label: "Node Simulation\n- State management\n- Protocol logic"
+    }
+
+    slot_witness: {
+      class: subcomponent
+      label: "Slot Witness\n - Slot monitoring"
+    }
+
+    tx_producer: {
+      class: subcomponent
+      label: "Transaction Producer\n- Transaction generation - Transaction scheduling"
     }
   }
 }
@@ -164,8 +169,11 @@ sim-cli.cli -> sim-core.simulation: "Initializes and runs"
 sim-cli.event_monitor -> sim-core.events: "Receives and processes events"
 
 # Simulation Engine Relationships
-sim-core.simulation.event_queue -> sim-core.clock: "Uses for timing"
+sim-core.simulation.node_sim -> sim-core.clock: "Uses for timing"
 sim-core.simulation.node_sim -> sim-core.network: "Manages communication"
+sim-core.simulation.slot_witness -> sim-core.clock: "Waits for slots"
+sim-core.simulation.tx_producer -> sim-core.simulation.node_sim: "Sends transactions"
+sim-core.simulation.tx_producer -> sim-core.clock: "Schedules transactions"
 sim-core.simulation -> sim-core.events: "Emits events"
 sim-core.simulation -> sim-core.config: "Uses configuration"
 
@@ -183,5 +191,5 @@ sim-core.events.tracker -> sim-core.model: "References for event data"
 sim-core.events.tracker -> sim-core.clock: "Uses for timestamps"
 
 # Configuration Relationships
-sim-core.config.node_config -> sim-core.model: "Configures"
+sim-core.config.node_config -> sim-core.simulation.node_sim: "Configures"
 sim-core.config.sim_config -> sim-core.simulation: "Configures"

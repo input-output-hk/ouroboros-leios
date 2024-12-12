@@ -44,6 +44,11 @@ sim-cli: {
   }
 }
 
+gen-test-data: {
+  class: component
+  label: "gen-test-data\nCommand line interface for generating input"
+}
+
 sim-core: {
   class: container
   label: "sim-core\nCore simulation engine"
@@ -73,6 +78,11 @@ sim-core: {
     label: "Network\nSimulates network communication"
   }
 
+  node: {
+    class: component
+    label: "Node\nSimulates behavior of an individual node"
+  }
+
   probability: {
     class: component
     label: "Probability\nProbability distributions"
@@ -82,6 +92,16 @@ sim-core: {
     class: component
     label: "Simulation\nMain simulation logic"
   }
+
+  slot-witness: {
+    class: component
+    label: "Slot Witness\nEmits events on new slots"
+  }
+
+  tx-producer: {
+    class: component
+    label: "Transaction Producer\nGenerates transactions, sends them to nodes"
+  }
 }
 
 # Relationships
@@ -89,16 +109,27 @@ sim-cli.main -> sim-cli.events: "Creates"
 sim-cli.main -> sim-core.simulation: "Initializes"
 sim-cli.events -> sim-core.events: "Receives events from"
 
-sim-core.simulation -> sim-core.clock: "Uses"
-sim-core.simulation -> sim-core.config: "Configured by"
-sim-core.simulation -> sim-core.events: "Emits events to"
-sim-core.simulation -> sim-core.network: "Manages"
-sim-core.simulation -> sim-core.model: "Uses"
+gen-test-data -> sim-core.config: "Generates"
 
-sim-core.network -> sim-core.clock: "Uses"
+sim-core.simulation -> sim-core.config: "Configured by"
+sim-core.simulation -> sim-core.node: "Manages"
+sim-core.simulation -> sim-core.slot-witness: "Manages"
+sim-core.simulation -> sim-core.tx-producer: "Manages"
+
+sim-core.node -> sim-core.clock: "Tracks new slots via"
+sim-core.node -> sim-core.model: "Uses"
+sim-core.node -> sim-core.network: "Sends messages via"
+sim-core.node -> sim-core.probability: "Uses"
+sim-core.node -> sim-core.events: "Emits events to"
+
+sim-core.slot-witness -> sim-core.clock: "Tracks new slots via"
+sim-core.slot-witness -> sim-core.events: "Emits events to"
+
+sim-core.tx-producer -> sim-core.clock: "Schedules new TXs via"
+sim-core.tx-producer -> sim-core.node: "Sends TXs to"
+sim-core.tx-producer -> sim-core.probability: "Uses"
+
+sim-core.network -> sim-core.clock: "Schedules messages via"
 sim-core.network -> sim-core.model: "Transmits"
 
 sim-core.events -> sim-core.model: "References"
-sim-core.events -> sim-core.clock: "Uses"
-
-sim-core.model -> sim-core.probability: "Uses"
