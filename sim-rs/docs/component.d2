@@ -1,5 +1,5 @@
 title: {
-  label: "sim-rs - C4 Component Diagram"
+  label: "sim-rs - Detailed Component Diagram"
   near: top-center
   shape: text
   style.font-size: 24
@@ -26,79 +26,162 @@ classes: {
       shadow: true
     }
   }
+  subcomponent: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
 }
 
 # Main Containers
 sim-cli: {
   class: container
-  label: "sim-cli\nCommand line interface for running simulations"
+  label: "sim-cli"
 
-  events: {
+  event_monitor: {
     class: component
-    label: "EventMonitor\nTracks and aggregates simulation events"
+    label: "EventMonitor\nTracks and processes simulation events"
+
+    stats: {
+      class: subcomponent
+      label: "Stats Tracking\n- Block stats\n- Transaction stats\n- Network stats"
+    }
+
+    output: {
+      class: subcomponent
+      label: "Output Handling\n- EventStream\n- SlotStream"
+    }
   }
 
-  main: {
+  cli: {
     class: component
-    label: "Main\nBootstraps simulation and handles CLI args"
+    label: "CLI Interface\n- Argument parsing\n- Config loading\n- Simulation setup"
   }
 }
 
 sim-core: {
   class: container
-  label: "sim-core\nCore simulation engine"
+  label: "sim-core"
 
   clock: {
     class: component
-    label: "Clock\nManages simulation time"
+    label: "Clock\n- Time management\n- Timestamp handling\n- Time scaling"
   }
 
   config: {
     class: component
-    label: "Configuration\nHandles simulation config"
-  }
+    label: "Configuration"
 
-  events: {
-    class: component
-    label: "EventTracker\nTracks simulation events"
+    node_config: {
+      class: subcomponent
+      label: "NodeConfig\n- Location\n- Stake\n- Peers"
+    }
+
+    sim_config: {
+      class: subcomponent
+      label: "SimConfig\n- Network params\n- Protocol params\n- System params"
+    }
   }
 
   model: {
     class: component
-    label: "Model\nCore domain models"
+    label: "Domain Models"
+
+    blocks: {
+      class: subcomponent
+      label: "Blocks\n- PraosBlock\n- InputBlock\n- EndorserBlock"
+    }
+
+    transactions: {
+      class: subcomponent
+      label: "Transactions\n- Transaction\n- TransactionId"
+    }
+
+    votes: {
+      class: subcomponent
+      label: "Voting\n- VoteBundle\n- Endorsement"
+    }
   }
 
   network: {
     class: component
-    label: "Network\nSimulates network communication"
+    label: "Network"
+
+    source: {
+      class: subcomponent
+      label: "NetworkSource\n- Message receiving\n- Message scheduling"
+    }
+
+    sink: {
+      class: subcomponent
+      label: "NetworkSink\n- Message sending\n- Connection management"
+    }
+  }
+
+  events: {
+    class: component
+    label: "Event System"
+
+    tracker: {
+      class: subcomponent
+      label: "EventTracker\n- Event emission\n- Event timestamping"
+    }
+
+    types: {
+      class: subcomponent
+      label: "Event Types\n- Block events\n- Transaction events\n- Vote events"
+    }
   }
 
   probability: {
     class: component
-    label: "Probability\nProbability distributions"
+    label: "Probability\n- Distribution types\n- Random sampling"
   }
 
   simulation: {
     class: component
-    label: "Simulation\nMain simulation logic"
+    label: "Simulation Engine"
+
+    event_queue: {
+      class: subcomponent
+      label: "EventQueue\n- Event scheduling\n- Event ordering"
+    }
+
+    node_sim: {
+      class: subcomponent
+      label: "Node Simulation\n- State management\n- Protocol logic"
+    }
   }
 }
 
-# Relationships
-sim-cli.main -> sim-cli.events: "Creates"
-sim-cli.main -> sim-core.simulation: "Initializes"
-sim-cli.events -> sim-core.events: "Receives events from"
+# Core Relationships
+sim-cli.cli -> sim-cli.event_monitor: "Creates and configures"
+sim-cli.cli -> sim-core.simulation: "Initializes and runs"
+sim-cli.event_monitor -> sim-core.events: "Receives and processes events"
 
-sim-core.simulation -> sim-core.clock: "Uses"
-sim-core.simulation -> sim-core.config: "Configured by"
-sim-core.simulation -> sim-core.events: "Emits events to"
-sim-core.simulation -> sim-core.network: "Manages"
-sim-core.simulation -> sim-core.model: "Uses"
+# Simulation Engine Relationships
+sim-core.simulation.event_queue -> sim-core.clock: "Uses for timing"
+sim-core.simulation.node_sim -> sim-core.network: "Manages communication"
+sim-core.simulation -> sim-core.events: "Emits events"
+sim-core.simulation -> sim-core.config: "Uses configuration"
 
-sim-core.network -> sim-core.clock: "Uses"
-sim-core.network -> sim-core.model: "Transmits"
+# Network Relationships
+sim-core.network.source -> sim-core.clock: "Uses for message timing"
+sim-core.network.sink -> sim-core.model: "Transmits"
 
-sim-core.events -> sim-core.model: "References"
-sim-core.events -> sim-core.clock: "Uses"
+# Model Relationships
+sim-core.model.blocks -> sim-core.model.transactions: "Contains"
+sim-core.model.blocks -> sim-core.model.votes: "References"
+sim-core.model -> sim-core.probability: "Uses for randomization"
 
-sim-core.model -> sim-core.probability: "Uses"
+# Event System Relationships
+sim-core.events.tracker -> sim-core.model: "References for event data"
+sim-core.events.tracker -> sim-core.clock: "Uses for timestamps"
+
+# Configuration Relationships
+sim-core.config.node_config -> sim-core.model: "Configures"
+sim-core.config.sim_config -> sim-core.simulation: "Configures"
