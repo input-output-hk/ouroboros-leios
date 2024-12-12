@@ -37,7 +37,7 @@ import LeiosProtocol.Short.VizSim (
   leiosSimVizModel,
   recentRate,
  )
-import ModelTCP (TcpMsgForecast (..), segmentSize)
+import ModelTCP (TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
@@ -283,10 +283,15 @@ data MsgsInFlightClassification
   deriving (Eq, Ord, Enum, Bounded, Ix)
 
 classifyInFlightMsgs ::
+  [(LeiosMessage, TcpMsgForecast, [TcpMsgForecast])] ->
+  MsgsInFlightClassification
+classifyInFlightMsgs = classifyInFlightMsgs' isLeiosMessageControl
+classifyInFlightMsgs' ::
+  (msg -> Bool) ->
   [(msg, TcpMsgForecast, [TcpMsgForecast])] ->
   MsgsInFlightClassification
-classifyInFlightMsgs [] = MsgsInFlightNone
-classifyInFlightMsgs msgs
+classifyInFlightMsgs' _isControl [] = MsgsInFlightNone
+classifyInFlightMsgs' isControl msgs
   | all control msgs = MsgsInFlightControl
   | all ballistic msgs = MsgsInFlightBallistic
   | otherwise = MsgsInFlightNonBallistic
@@ -296,10 +301,10 @@ classifyInFlightMsgs msgs
   ballistic (_msg, _msgforecast, _msgforecasts@[_]) = True
   ballistic _ = False
 
-  -- We arbitrarily define a control message to be one that's less than a
-  -- single TCP segment. All substantive payloads will be bigger than this.
-  control (_msg, msgforecast, _msgforecasts) =
-    msgSize msgforecast <= segmentSize
+  -- In leios some msgs (empty rbs (before first pipeline ends), ebs,
+  -- and votes) might be small, but shouldn't be considered control.
+  -- We take an extra predicate.
+  control (msg, _msgforecast, _msgforecasts) = isControl msg
 
 ------------------------------------------------------------------------------
 -- The charts
@@ -551,6 +556,22 @@ chartLinkUtilisation =
   lightBlueShade x =
     Chart.withOpacity Chart.white x
       `Chart.atop` Chart.opaque Chart.blue
+
+isLeiosMessageControl :: LeiosMessage -> Bool
+isLeiosMessageControl msg0 =
+  case msg0 of
+    PraosMsg msg ->
+      case msg of
+        PraosMessage (Right (ProtocolMessage (SomeMessage MsgBlock{}))) -> False
+        _ -> True
+    RelayIB msg -> isRelayMessageControl msg
+    RelayEB msg -> isRelayMessageControl msg
+    RelayVote msg -> isRelayMessageControl msg
+
+isRelayMessageControl :: RelayMessage id header body -> Bool
+isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
+  MsgRespondBodies _bodies -> False
+  _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
 defaultVizConfig :: Int -> LeiosP2PSimVizConfig
