@@ -469,8 +469,12 @@ generator tracer cfg st = do
     submitOne (delays, x) = do
       threadDelayParallel tracer (coerce delays)
       case x of
-        SomeAction Generate.Base rb -> do
-          atomically $ addProducedBlock st.praosState.blockFetchControllerState rb
+        SomeAction Generate.Base rb0 -> do
+          rb <- atomically $ do
+            ha <- headAnchor <$> PraosNode.preferredChain st.praosState
+            let rb = fixupBlock ha rb0
+            addProducedBlock st.praosState.blockFetchControllerState rb
+            return rb
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
         SomeAction Generate.Propose ibs -> forM_ ibs $ \ib -> do
           atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
@@ -489,8 +493,6 @@ mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> 
 mkBuffersView cfg st = BuffersView{..}
  where
   newRBData = do
-    ledgerState <- readTVar st.ledgerStateVar
-    headAnchor' <- headAnchor . dropUntil (flip Map.member ledgerState . blockHash) <$> PraosNode.preferredChain st.praosState
     bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
@@ -508,10 +510,12 @@ mkBuffersView cfg st = BuffersView{..}
       NewRankingBlockData
         { freshestCertifiedEB
         , txsPayload = cfg.rankingBlockPayload
-        , headAnchor = headAnchor'
         }
   newIBData = do
-    referenceRankingBlock <- headHash <$> PraosNode.preferredChain st.praosState
+    ledgerState <- readTVar st.ledgerStateVar
+    referenceRankingBlock <-
+      headHash . dropUntil (flip Map.member ledgerState . blockHash)
+        <$> PraosNode.preferredChain st.praosState
     let txsPayload = cfg.inputBlockPayload
     return $ NewInputBlockData{referenceRankingBlock, txsPayload}
   ibs = do

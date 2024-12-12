@@ -224,17 +224,16 @@ mkCertificate cfg vs =
 ---- Selecting data to build blocks
 ---------------------------------------------------------------------------------------
 
--- Buffers views, divided to avoid reading in unneeded buffers.
+-- Buffers views, divided to avoid reading unneeded buffers.
 
 data NewRankingBlockData = NewRankingBlockData
   { freshestCertifiedEB :: Maybe (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
-  , headAnchor :: Anchor RankingBlock
-  -- ^ points to prefix of current chain with ledger state computed.
   }
 
 data NewInputBlockData = NewInputBlockData
   { referenceRankingBlock :: ChainHash RankingBlock
+  -- ^ points to prefix of current chain with ledger state computed.
   , txsPayload :: Bytes
   }
 
