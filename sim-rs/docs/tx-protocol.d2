@@ -1,0 +1,41 @@
+title: {
+  label: "sim-rs - Transaction Propagation"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+NewTX: {
+  label: "New Transaction"
+  shape: sequence_diagram
+
+  a: {
+    label: "Node A"
+  }
+
+  b: {
+    label: "Node B"
+  }
+
+  a -> b: "Announce TX"
+  b."Has not seen\nthis TX"
+  b -> a: "Request TX"
+  a -> b: "Send TX"
+}
+
+ExistingTX: {
+  label: "Existing Transaction"
+  shape: sequence_diagram
+
+  a: {
+    label: "Node A"
+  }
+
+  b: {
+    label: "Node B"
+  }
+
+  a -> b: "Announce TX"
+  b."Has seen\nthis TX"
+}
