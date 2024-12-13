@@ -26,7 +26,7 @@ Keeping votes small is critical to having certificates that fit on a Praos ranki
 
 The KES votes are a challenge for ALBA because they would require a 90% quorum, meaning that an adversary with more than 10% of the stake could prevent voting.
 
-The CPU time estimate for ALBA are favorable, however:
+The CPU time estimate that we have benchmarked for the "centralized telescope" version of ALBA are favorable, however:
 
 - Prove: 9.0 ms
 - Verify: 85 μs
