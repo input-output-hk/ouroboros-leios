@@ -2,6 +2,9 @@
 
 ## 2024-12-12
 
+### Review Session 1 - Formal Specification
+Team reviewed formal specification and further provided input for improvements.
+
 ### Rust simulation
 
 Merged virtual time branch. The rust simulation logic is now decoupled from wall clock time.

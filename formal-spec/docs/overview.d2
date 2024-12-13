@@ -1,0 +1,110 @@
+title: {
+  label: "Leios Formal Specification - Module Dependencies"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  module: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  core: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      stroke-width: 2
+    }
+  }
+  abstract: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 25
+      stroke-dash: 5
+    }
+  }
+}
+
+# Core Abstract Modules
+Abstract: {
+  class: abstract
+  label: "Leios.Abstract\n\nDefines core types and\nprotocol parameters"
+}
+
+VRF: {
+  class: abstract
+  label: "Leios.VRF\n\nVerifiable Random\nFunction interface"
+}
+
+FFD: {
+  class: abstract
+  label: "Leios.FFD\n\nFair and Functional\nData Dissemination"
+}
+
+# Implementation Modules
+Blocks: {
+  class: module
+  label: "Leios.Blocks\n\nBlock structures and\nvalidation rules"
+}
+
+Base: {
+  class: module
+  label: "Leios.Base\n\nBase chain\ninterface"
+}
+
+Protocol: {
+  class: module
+  label: "Leios.Protocol\n\nCore protocol\nstate machine"
+}
+
+KeyReg: {
+  class: module
+  label: "Leios.KeyRegistration\n\nKey registration\nfunctionality"
+}
+
+# Protocol Variants
+variants: {
+  class: core
+  label: "Protocol Variants"
+
+  Simplified: {
+    class: module
+    label: "Leios.Simplified\n\nSimplified voting pipeline\nwith single voting phase"
+  }
+
+  UniformShort: {
+    class: module
+    label: "Leios.UniformShort\n\nUniform short pipeline\nwith optimized voting"
+  }
+}
+
+# Dependencies
+Abstract -> VRF
+Abstract -> FFD
+Abstract -> Blocks
+Abstract -> Base
+Abstract -> KeyReg
+
+VRF -> Base
+VRF -> KeyReg
+VRF -> Protocol
+
+FFD -> Protocol
+Blocks -> Protocol
+Base -> Protocol
+KeyReg -> Protocol
+
+Protocol -> variants.Simplified
+Protocol -> variants.UniformShort
