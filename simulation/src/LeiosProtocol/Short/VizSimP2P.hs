@@ -1,10 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -14,15 +16,21 @@ import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import qualified Data.Colour.SRGB as Colour
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, maybeToList)
+import qualified Diagrams.Backend.Cairo as Dia
+import qualified Diagrams.Backend.Cairo.Internal as Dia
+import qualified Diagrams.Core as Dia
+import qualified Diagrams.TwoD as Dia
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 
 import ChanDriver
 import Data.Bifunctor (Bifunctor (bimap), second)
-import Data.Coerce
 import Data.Hashable (hash)
-import Data.List (intercalate)
+import Data.List (foldl', intercalate, sortOn)
 import Data.Monoid
+import Diagrams ((#))
+import qualified Diagrams.Prelude as Dia
+import qualified Diagrams.TwoD.Adjust as Dia
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
@@ -40,6 +48,7 @@ import LeiosProtocol.Short.VizSim (
   recentRate,
   totalIBsInRBs,
  )
+import Linear.V2
 import ModelTCP (TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
@@ -56,6 +65,40 @@ import VizSim
 import VizSimTCP (lineMessageInFlight)
 import VizUtils
 
+type CairoDiagram = Dia.QDiagram Dia.Cairo V2 Double Any
+renderDiagramAt :: (Double, Double) -> (Double, Double) -> CairoDiagram -> Cairo.Render ()
+-- the reflection here is fishy, but otherwise text and shapes are upside down.
+renderDiagramAt (w, h) pos (Dia.reflectY -> d0) = do
+  Cairo.save
+  let sizesp = Dia.mkSizeSpec2D (Just w) (Just h)
+  let opts = Dia.CairoOptions "" sizesp Dia.RenderOnly True
+  let space = Dia.lc Dia.blue $ Dia.rect w h :: CairoDiagram
+  let (opts', t, _) = Dia.adjustDia2D Dia.cairoSizeSpec Dia.Cairo opts space
+  let pos' = Dia.inv t `Dia.papply` Dia.p2 pos
+  let d = Dia.position [(pos', d0)]
+  snd (Dia.renderDia Dia.Cairo opts' $ d # Dia.transform t)
+  Cairo.restore
+
+messageDiagram :: (MsgTag, Dia.Colour Double) -> CairoDiagram
+messageDiagram (tag, c) = Dia.fc c $
+  Dia.lc c $
+    case tag of
+      RB -> Dia.square 16
+      IB -> sizedAs $ Dia.triangle 16
+      EB -> sizedAs $ Dia.hexagon 16
+      VT -> sizedAs $ Dia.strokePath $ Dia.star (Dia.StarSkip 2) (Dia.regPoly 5 16)
+ where
+  sizedAs d = Dia.sizedAs (Dia.square 18 :: CairoDiagram) d
+
+messageLegend :: CairoDiagram
+messageLegend =
+  Dia.fontSizeO 20 $
+    Dia.lc Dia.black $
+      Dia.hcat
+        [Dia.hcat [messageDiagram (tag, Dia.black), textBox s] | (s, tag) <- [("RB", RB), ("IB", IB), ("EB", EB), ("Vote", VT)]]
+ where
+  textBox s = Dia.alignedText 0.7 0.5 s `Dia.atop` Dia.phantom (Dia.rect (fromIntegral $ length s * 20 + 10) 20 :: CairoDiagram)
+
 ------------------------------------------------------------------------------
 -- The vizualisation rendering
 --
@@ -64,7 +107,7 @@ data MsgTag = RB | IB | EB | VT
 data LeiosP2PSimVizConfig
   = LeiosP2PSimVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
-  , ptclMessageColor :: LeiosMessage -> Maybe (MsgTag, (Double, Double, Double))
+  , ptclMessageColor :: LeiosMessage -> Maybe (MsgTag, Dia.Colour Double)
   }
 
 leiosP2PSimVizRender ::
@@ -140,6 +183,7 @@ leiosP2PSimVizRenderModel
         }
     )
   screenSize = do
+    renderDiagramAt screenSize (20, 22) messageLegend
     renderLinks
     renderNodes
    where
@@ -206,7 +250,7 @@ leiosP2PSimVizRenderModel
           MsgsInFlightNonBallistic ->
             case catMaybes [snd <$> ptclMessageColor msg | (msg, _, _) <- msgs] of
               [] -> return ()
-              ((r, g, b) : _) -> do
+              ((toSRGB -> (r, g, b)) : _) -> do
                 Cairo.setSourceRGB r g b
                 Cairo.setLineWidth 1
                 Cairo.setDash [10, 5] 0
@@ -227,7 +271,7 @@ leiosP2PSimVizRenderModel
           MsgsInFlightBallistic ->
             case catMaybes [snd <$> ptclMessageColor msg | (msg, _, _) <- msgs] of
               [] -> return ()
-              ((r, g, b) : _) -> do
+              ((toSRGB -> (r, g, b)) : _) -> do
                 Cairo.setSourceRGB r g b
                 Cairo.setDash [] 0
                 Cairo.setLineWidth 2
@@ -253,33 +297,21 @@ leiosP2PSimVizRenderModel
             let (msgTrailingEdge, _msgLeadingEdge) =
                   lineMessageInFlight now fromPos toPos msgforecast
                 Point x y = toScreenPoint msgTrailingEdge
-            Cairo.rectangle (x - 8) (y - 8) 16 16
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
+            renderDiagramAt screenSize (x, y) $ messageDiagram msgViz
           LinkPointsWrap fromPos toPos fromPos' toPos' -> do
             let (msgTrailingEdge, _msgLeadingEdge) =
                   lineMessageInFlight now fromPos toPos msgforecast
                 Point x y = toScreenPoint msgTrailingEdge
-            Cairo.rectangle (x - 8) (y - 8) 16 16 -- TODO: use tag to pick different shape.
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
+            renderDiagramAt screenSize (x, y) $ messageDiagram msgViz
             let (msgTrailingEdge', _msgLeadingEdge) =
                   lineMessageInFlight now fromPos' toPos' msgforecast
                 Point x' y' = toScreenPoint msgTrailingEdge'
-            Cairo.rectangle (x' - 8) (y' - 8) 16 16
-            Cairo.setSourceRGB r g b
-            Cairo.fillPreserve
-            Cairo.setSourceRGB 0 0 0
-            Cairo.stroke
+            renderDiagramAt screenSize (x', y') $ messageDiagram msgViz
         | ((fromNode, toNode), msgs) <- Map.toList vizMsgsInTransit
         , (msg, msgforecast, _msgforecasts) <- msgs
         , now >= msgSendTrailingEdge msgforecast
         , now <= msgRecvTrailingEdge msgforecast
-        , (tag, (r, g, b)) <- maybeToList (ptclMessageColor msg)
+        , msgViz <- maybeToList (ptclMessageColor msg)
         ]
       Cairo.restore
 
@@ -593,45 +625,62 @@ defaultVizConfig stageLength =
  where
   testPtclMessageColor ::
     LeiosMessage ->
-    Maybe (MsgTag, (Double, Double, Double))
+    Maybe (MsgTag, Dia.Colour Double)
   testPtclMessageColor msg0 =
     case msg0 of
       PraosMsg msg ->
         (RB,) <$> case msg of
-          PraosMessage (Right (ProtocolMessage (SomeMessage MsgBlock{}))) ->
-            Just (praosMessageColor examplesLeiosSimVizConfig msg)
+          PraosMessage (Right (ProtocolMessage (SomeMessage MsgBlock{}))) -> do
+            let (r, g, b) = praosMessageColor examplesLeiosSimVizConfig msg
+            Just $ Dia.sRGB r g b
           _ -> Nothing
       RelayIB msg -> (IB,) <$> relayMessageColor (pipelineColor Propose . bimap hash (.slot)) msg
       RelayEB msg -> (EB,) <$> relayMessageColor (pipelineColor Endorse . bimap hash (.slot)) msg
       RelayVote msg -> (VT,) <$> relayMessageColor (pipelineColor Vote . bimap hash (.slot)) msg
-  relayMessageColor :: ((id, body) -> (Double, Double, Double)) -> RelayMessage id header body -> Maybe (Double, Double, Double)
+  relayMessageColor :: ((id, body) -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgRespondBodies bodies -> Just $ blendColors $ map f bodies
     _otherwise -> Nothing
   testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
   testNodeMessageColor = blockHeaderColorAsBody
-  paletteColor p seed = (r * f, g * f, b * f) -- this is also not how you adjust saturation.
+  -- alternating cold and warm colours for visual contrast.
+  palettes =
+    map snd $
+      sortOn fst $
+        zip [0 :: Int, 2 ..] [Dia.orangered, Dia.red, Dia.magenta, Dia.plum]
+          ++ zip [1, 3 ..] [Dia.blue, Dia.cyan, Dia.lime, Dia.yellow]
+  palettes_num = length palettes
+  paletteColor p seed = Dia.blend f Dia.white c
    where
     -- TODO?: better palettes than gradients on a color
-    palettes = [(0, 0, 1), (0, 1, 0), (1, 0.65, 0), (0.5, 0, 0.5)]
-    (r, g, b) = palettes !! p
-    f = fst $ uniformR (0.2, 1) seed
-  pipelineColor :: Stage -> (Int, SlotNo) -> (Double, Double, Double)
+    c = palettes !! p
+    f = fst $ uniformR (0, 0.5) seed
+  pipelineColor :: Stage -> (Int, SlotNo) -> Dia.Colour Double
   pipelineColor slotStage (i, slot) = case stageRange' stageLength slotStage slot Propose of
     Just (fromEnum -> startOfPipeline, _) ->
-      let pipeline_idx = startOfPipeline `div` (4 * stageLength)
-       in paletteColor (pipeline_idx `mod` 4) (mkStdGen i)
-    Nothing -> (0, 0, 0)
+      let
+        -- every `stageLength` a new pipeline begins
+        pipeline_idx = startOfPipeline `div` stageLength
+        -- There are at most |stages| active pipelines at once,
+        -- however we use a few more palettes to avoid reusing the
+        -- same color too soon in time.
+        palette_idx = pipeline_idx `mod` palettes_num
+       in
+        paletteColor palette_idx (mkStdGen i)
+    Nothing -> Dia.black
 
 -- might be ugly blending, but in practice it's going to be singleton lists?
-blendColors :: [(Double, Double, Double)] -> (Double, Double, Double)
-blendColors xs = coerce $ mconcat $ [(Sum (r * f), Sum (g * f), Sum (b * f)) | (r, g, b) <- xs]
- where
-  f = 1 / fromIntegral (length xs)
+blendColors :: [Dia.Colour Double] -> Dia.Colour Double
+blendColors [x] = x
+blendColors [] = Dia.black
+blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
+
+toSRGB :: Dia.Colour Double -> (Double, Double, Double)
+toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
 example2 :: Visualization
 example2 =
-  slowmoVisualization 0.8 $
+  slowmoVisualization 0.5 $
     Viz (leiosSimVizModel exampleTrace2) $
       LayoutAbove
         [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
