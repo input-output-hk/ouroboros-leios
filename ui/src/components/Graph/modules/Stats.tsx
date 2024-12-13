@@ -29,7 +29,8 @@ export const Stats: FC = () => {
           key === "txGenerated" ||
           key === "ebGenerated" ||
           key === "ibGenerated" ||
-          key === "pbGenerated"
+          key === "pbGenerated" ||
+          key === "votesGenerated"
         ) {
           total[key] += value;
         }
@@ -38,7 +39,8 @@ export const Stats: FC = () => {
           key === "txReceived" ||
           key === "ebReceived" ||
           key === "ibReceived" ||
-          key === "pbReceived"
+          key === "pbReceived" ||
+          key === "votesReceived"
         ) {
           total[key.replace("Received", "Propagations") as keyof ISimulationAggregatedTotalData] += value;
         }
@@ -55,6 +57,8 @@ export const Stats: FC = () => {
       pbPropagations: 0,
       txGenerated: 0,
       txPropagations: 0,
+      votesGenerated: 0,
+      votesPropagations: 0,
     } as ISimulationAggregatedTotalData,
   );
 
@@ -70,6 +74,8 @@ export const Stats: FC = () => {
         <h4>EB Propagations: {totals.ebPropagations}</h4>
         <h4>PB Generated: {totals.pbGenerated}</h4>
         <h4>PB Propagations: {totals.pbPropagations}</h4>
+        <h4>Votes Generated: {totals.votesGenerated}</h4>
+        <h4>Votes Propagations: {totals.votesPropagations}</h4>
       </div>
       <div className="border-2 border-gray-200 rounded p-4">
         <h2>
@@ -89,8 +95,9 @@ export const Stats: FC = () => {
             <h4>PB Generated: {currentNodeStats?.pbGenerated}</h4>
             <h4>PB Sent: {currentNodeStats?.pbSent}</h4>
             <h4>PB Received: {currentNodeStats?.pbReceived}</h4>
-            <h4>PB Sent: {currentNodeStats?.pbSent}</h4>
-            <h4>PB Received: {currentNodeStats?.pbReceived}</h4>
+            <h4>Votes Generated: {currentNodeStats?.votesGenerated}</h4>
+            <h4>Votes Sent: {currentNodeStats?.votesSent}</h4>
+            <h4>Votes Received: {currentNodeStats?.votesReceived}</h4>
           </>
         )}
       </div>

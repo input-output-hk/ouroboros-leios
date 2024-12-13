@@ -18,6 +18,8 @@ export interface ISimulationAggregatedTotalData {
   ebPropagations: number;
   pbGenerated: number;
   pbPropagations: number;
+  votesGenerated: number;
+  votesPropagations: number;
 }
 
 export interface ISimulationAggregatedData {
@@ -33,6 +35,9 @@ export interface ISimulationAggregatedData {
   pbGenerated: number;
   pbSent: number;
   pbReceived: number;
+  votesGenerated: number;
+  votesReceived: number;
+  votesSent: number;
 }
 
 export interface ISimulationAggregatedDataState {

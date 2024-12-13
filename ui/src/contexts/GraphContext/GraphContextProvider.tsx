@@ -24,8 +24,8 @@ export const GraphContextProvider: FC<
           i,
           {
             data: n,
-            fx: n.location[0],
-            fy: n.location[1],
+            fy: n.location[0],
+            fx: n.location[1],
             id: i,
           },
         ]),

@@ -53,16 +53,13 @@ export const isClickOnNode = (
   clickX: number,
   clickY: number,
   topography: ITransformedNodeMap,
-  width: number,
-  height: number,
   threshold: number = 10,
+  offsetX: number,
+  offsetY: number,
   scale: number
 ): { node: string | undefined, clicked: boolean } => {
   let node: string | undefined;
   let clicked = false;
-
-  // Get the offsets
-  const { offsetX, offsetY } = getOffsetCoordinates(topography, width, height, scale);
 
   // Adjust the click coordinates based on the offset
   const adjustedClickX = (clickX - offsetX) / scale;

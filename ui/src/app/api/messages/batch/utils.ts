@@ -26,6 +26,9 @@ export const incrementNodeAggregationData = (
     txGenerated: 0,
     txReceived: 0,
     txSent: 0,
+    votesGenerated: 0,
+    votesReceived: 0,
+    votesSent: 0,
     ...matchingNode,
     [key]: (matchingNode?.[key] || 0) + 1,
   });
@@ -72,6 +75,60 @@ export const processMessage = (
       aggregatedData.nodes,
       message.recipient.toString(),
       "ibReceived",
+    );
+  } else if (message.type === EMessageType.PraosBlockGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.producer.toString(),
+      "pbGenerated",
+    );
+  } else if (message.type === EMessageType.PraosBlockSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "pbSent",
+    );
+  } else if (message.type === EMessageType.PraosBlockReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "pbReceived",
+    );
+  } else if (message.type === EMessageType.EndorserBlockGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.producer.toString(),
+      "ebGenerated",
+    );
+  } else if (message.type === EMessageType.EndorserBlockSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "ebSent",
+    );
+  } else if (message.type === EMessageType.EndorserBlockReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "ebReceived",
+    );
+  } else if (message.type === EMessageType.VotesGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.id.id.toString(),
+      "votesGenerated",
+    );
+  } else if (message.type === EMessageType.VotesSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "votesSent",
+    );
+  } else if (message.type === EMessageType.VotesReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "votesReceived",
     );
   }
 };
