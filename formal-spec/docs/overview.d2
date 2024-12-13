@@ -92,8 +92,15 @@ variants: {
 
 # Dependencies
 Abstract -> VRF
+Abstract -> FFD
 Abstract -> Blocks
+Abstract -> Base
+Abstract -> KeyReg
+
+VRF -> Base
+VRF -> KeyReg
 VRF -> Protocol
+
 FFD -> Protocol
 Blocks -> Protocol
 Base -> Protocol
