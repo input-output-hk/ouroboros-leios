@@ -174,5 +174,14 @@ test-suite ols-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Main.hs
-  build-depends:  base
-  other-modules:  Test.Topology
+  build-depends:
+    , base
+    , fgl
+    , fgl-arbitrary
+    , ouroboros-leios-sim
+    , QuickCheck
+    , tasty
+    , tasty-quickcheck
+  other-modules:
+    Test.Topology
+  default-language: Haskell2010
