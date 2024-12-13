@@ -54,7 +54,15 @@ export enum EMessageType {
   InputBlockGenerated = "InputBlockGenerated",
   InputBlockReceived = "InputBlockReceived",
   InputBlockSent = "InputBlockSent",
+  PraosBlockGenerated = "PraosBlockGenerated",
   PraosBlockReceived = "PraosBlockReceived",
+  PraosBlockSent = "PraosBlockSent",
+  EndorserBlockGenerated = "EndorserBlockGenerated",
+  EndorserBlockReceived = "EndorserBlockReceived",
+  EndorserBlockSent = "EndorserBlockSent",
+  VotesGenerated = "VotesGenerated",
+  VotesReceived = "VotesReceived",
+  VotesSent = "VotesSent",
   Slot = "Slot",
 }
 
@@ -115,9 +123,76 @@ export interface ISlot {
   number: number;
 }
 
+export interface IPraosBlockGenerated {
+  type: EMessageType.PraosBlockGenerated;
+  id: string;
+  slot: number;
+  producer: number;
+}
+
 export interface IPraosBlockReceived {
   type: EMessageType.PraosBlockReceived;
+  id: string;
   slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IPraosBlockSent {
+  type: EMessageType.PraosBlockSent;
+  slot: number;
+  id: string;
+  sender: number;
+  recipient: number;
+}
+
+export interface IEndorserBlockGenerated {
+  type: EMessageType.EndorserBlockGenerated;
+  id: string;
+  slot: number;
+  producer: number;
+  blocks: any[] // @todo
+}
+
+export interface IEndorserBlockReceived {
+  type: EMessageType.EndorserBlockReceived;
+  id: string;
+  slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IEndorserBlockSent {
+  type: EMessageType.EndorserBlockSent;
+  slot: number;
+  id: string;
+  sender: number;
+  recipient: number;
+}
+
+export interface IVotesGenerated {
+  type: EMessageType.VotesGenerated;
+  id: {
+    id: string;
+    slot: number;
+    producer: number;
+  };
+  slot: number;
+  ebs: any[] // @todo
+}
+
+export interface IVotesReceived {
+  type: EMessageType.VotesReceived;
+  id: string;
+  slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IVotesSent {
+  type: EMessageType.VotesSent;
+  slot: number;
+  id: string;
   sender: number;
   recipient: number;
 }
@@ -126,7 +201,15 @@ export type TMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
   | IInputBlockSent
+  | IPraosBlockGenerated
   | IPraosBlockReceived
+  | IPraosBlockSent
+  | IEndorserBlockGenerated
+  | IEndorserBlockReceived
+  | IEndorserBlockSent
+  | IVotesGenerated
+  | IVotesReceived
+  | IVotesSent
   | ISlot
   | ITransactionGenerated
   | ITransactionReceived

@@ -1,117 +1,51 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { useGraphContext } from "@/contexts/GraphContext/context";
-import { EMessageType, IServerMessage } from "../types";
-import { incrementNodeAggregationData } from "../utils";
+import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
 
 export const useStreamMessagesHandler = () => {
   const {
-    state: { aggregatedData, simulationStartTime, speed },
+    dispatch
   } = useGraphContext();
   const eventSource = useRef<EventSource>();
-  const renderInterval = useRef<Timer | undefined>();
-  const pendingMsgs = useRef<Map<number, IServerMessage[]>>(new Map());
+  const [streaming, setStreaming] = useState(false);
 
-  const startStream = useCallback(
-    (startTime: number, range: number) => {
-      console.log(pendingMsgs.current.size)
-      const url = new URL("/api/messages/batch", window.location.href);
-      url.searchParams.set("startTime", startTime.toString());
-      url.searchParams.set("speed", range.toString());
+  const startStream = useCallback(() => {
+    setStreaming(true);
 
-      eventSource.current = new EventSource(url);
-      eventSource.current.onmessage = function (message) {
-        const json: IServerMessage = JSON.parse(message.data);
-        const elapsed =
-          simulationStartTime.current !== 0
-            ? (Date.now() - simulationStartTime.current) * speed
-            : 0;
+    const url = new URL("/api/messages/batch", window.location.href);
+    eventSource.current = new EventSource(url);
+    eventSource.current.onerror = function (error) {
+      stopStream();
+    };
 
-        if (json.time / 1_000_000 < elapsed) {
-          processMessage(json);
-        } else {
-          if (pendingMsgs.current.has(json.time / 1_000_000)) {
-            pendingMsgs.current.get(json.time / 1_000_000)?.push(json);
-          } else {
-            pendingMsgs.current.set(json.time / 1_000_000, [json]);
+    eventSource.current.onmessage = function (message) {
+      const json: ISimulationAggregatedDataState = JSON.parse(
+        message.data,
+        (key: string, v: any) => {
+          if (key === "nodes") {
+            return new Map(v);
           }
-        }
-      };
 
-      renderInterval.current = setInterval(processMessagesIntervalFunc, 10);
-    },
-    [speed],
-  );
+          return v;
+        },
+      );
+
+      dispatch({ type: "SET_AGGREGATED_DATA", payload: json });
+    };
+  }, []);
 
   const stopStream = useCallback(() => {
     eventSource.current?.close();
-    clearInterval(renderInterval.current);
-  }, []);
-
-  const processMessagesIntervalFunc = useCallback(() => {
-    const elapsed =
-      simulationStartTime.current !== 0
-        ? (Date.now() - simulationStartTime.current) * speed
-        : 0;
-
-    for (const [time, data] of pendingMsgs.current) {
-      if (time > elapsed) {
-        break;
-      }
-
-      data.forEach(processMessage);
-      pendingMsgs.current.delete(time);
-    }
-  }, [speed]);
-
-  // Function to process each message and update transactions
-  const processMessage = useCallback((json: IServerMessage) => {
-    const { message } = json;
-
-    if (message.type === EMessageType.TransactionGenerated) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.publisher.toString(),
-        "txGenerated",
-      );
-    } else if (message.type === EMessageType.TransactionSent) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.sender.toString(),
-        "txSent",
-      );
-    } else if (message.type === EMessageType.TransactionReceived) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.recipient.toString(),
-        "txReceived",
-      );
-    } else if (message.type === EMessageType.InputBlockGenerated) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.producer.toString(),
-        "ibGenerated",
-      );
-    } else if (message.type === EMessageType.InputBlockSent) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.sender.toString(),
-        "ibSent",
-      );
-    } else if (message.type === EMessageType.InputBlockReceived) {
-      incrementNodeAggregationData(
-        aggregatedData.current.nodes,
-        message.recipient.toString(),
-        "ibReceived",
-      );
-    }
+    setStreaming(false);
   }, []);
 
   return useMemo(
     () => ({
       startStream,
       stopStream,
+      streaming,
     }),
-    [startStream, stopStream],
+    [startStream, stopStream, streaming],
   );
 };

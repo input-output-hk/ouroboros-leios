@@ -1,10 +1,4 @@
-import {
-  ISimulationAggregatedData,
-  ISimulationAggregatedDataState,
-} from "@/contexts/GraphContext/types";
 import { ITransformedNodeMap } from "./types";
-
-export const CANVAS_SCALE = 4;
 
 export const isWithinRange = (
   elapsedTimestamp: number,
@@ -19,6 +13,7 @@ export const getOffsetCoordinates = (
   topography: ITransformedNodeMap,
   width: number,
   height: number,
+  scale: number
 ) => {
   let offsetX = 0,
     offsetY = 0;
@@ -45,8 +40,8 @@ export const getOffsetCoordinates = (
   const canvasCenterY = height / 2;
 
   // Calculate the offset to center the path
-  offsetX = canvasCenterX - (minX + pathWidth / 2) * CANVAS_SCALE;
-  offsetY = canvasCenterY - (minY + pathHeight / 2) * CANVAS_SCALE;
+  offsetX = canvasCenterX - (minX + pathWidth / 2) * scale;
+  offsetY = canvasCenterY - (minY + pathHeight / 2) * scale;
 
   return {
     offsetX,
@@ -58,19 +53,17 @@ export const isClickOnNode = (
   clickX: number,
   clickY: number,
   topography: ITransformedNodeMap,
-  width: number,
-  height: number,
   threshold: number = 10,
+  offsetX: number,
+  offsetY: number,
+  scale: number
 ): { node: string | undefined, clicked: boolean } => {
   let node: string | undefined;
   let clicked = false;
 
-  // Get the offsets
-  const { offsetX, offsetY } = getOffsetCoordinates(topography, width, height);
-
   // Adjust the click coordinates based on the offset
-  const adjustedClickX = (clickX - offsetX) / CANVAS_SCALE;
-  const adjustedClickY = (clickY - offsetY) / CANVAS_SCALE;
+  const adjustedClickX = (clickX - offsetX) / scale;
+  const adjustedClickY = (clickY - offsetY) / scale;
 
   // Iterate through nodes to find if the click is within threshold
   for (const [, { fx, fy, id }] of topography.nodes) {
@@ -85,29 +78,4 @@ export const isClickOnNode = (
   }
 
   return { node, clicked };
-};
-
-export const incrementNodeAggregationData = (
-  aggregationNodeDataRef: ISimulationAggregatedDataState["nodes"],
-  id: string,
-  key: keyof ISimulationAggregatedData,
-) => {
-  const matchingNode = aggregationNodeDataRef.get(id);
-  aggregationNodeDataRef.set(id, {
-    ebGenerated: 0,
-    ebReceived: 0,
-    ebSent: 0,
-    ibGenerated: 0,
-    ibReceived: 0,
-    ibSent: 0,
-    pbGenerated: 0,
-    pbReceived: 0,
-    pbSent: 0,
-    txGenerated: 0,
-    txPropagations: 0,
-    txReceived: 0,
-    txSent: 0,
-    ...matchingNode,
-    [key]: (matchingNode?.[key] || 0) + 1,
-  });
 };
