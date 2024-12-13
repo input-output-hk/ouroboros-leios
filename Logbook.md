@@ -15,7 +15,24 @@
 
 ## 2024-12-12
 
+### Analysis of vote size and ALBA certificates
+
+Keeping votes small is critical to having certificates that fit on a Praos ranking block. In the [draft technical report](docs/technical-report-1.md#structure-of-votes) we have estimated the minimum possible size for votes using either ephemeral keys or KES:
+
+| Method         | Common to all votes for a given EB | Specific to individual vote | Total |
+| -------------- | ---------------------------------: | --------------------------: | ----- |
+| Ephemeral keys |                               32 B |                       146 B | 178 B |
+| KES complete   |                               64 B |                       498 B | 562 B |
+
+The KES votes are a challenge for ALBA because they would require a 90% quorum, meaning that an adversary with more than 10% of the stake could prevent voting.
+
+The CPU time estimate that we have benchmarked for the "centralized telescope" version of ALBA are favorable, however:
+
+- Prove: 9.0 ms
+- Verify: 85 μs
+
 ### Review Session 1 - Formal Specification
+
 Team reviewed formal specification and further provided input for improvements.
 
 ### Rust simulation
