@@ -2,7 +2,6 @@ import { createReadStream } from "fs";
 import { NextResponse } from "next/server";
 import readline from "readline";
 
-import { getSetSimulationMaxTime } from "@/app/queries";
 import { IServerMessage } from "@/components/Graph/types";
 import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
 import { messagesPath } from "../../utils";
@@ -78,7 +77,7 @@ export async function GET(req: Request, res: Response) {
     let interval: Timer | undefined;
     const eventBuffer: string[] = [];
     let simulationDone = false;
-    const maxTime = await getSetSimulationMaxTime();
+    let isProcessing = false;
 
     const stream = new ReadableStream({
       cancel() {
@@ -94,6 +93,11 @@ export async function GET(req: Request, res: Response) {
         };
 
         interval = setInterval(() => {
+          if (isProcessing) {
+            return;
+          }
+          
+          isProcessing = true;
           if (eventBuffer.length === 0 && simulationDone) {
             clearInterval(interval);
             rl.close();
@@ -104,7 +108,7 @@ export async function GET(req: Request, res: Response) {
 
           try {
             // Process 10k events at a time.
-            const batch = eventBuffer.splice(0, 10000);
+            const batch = eventBuffer.splice(0, 100000);
             for (const line of batch) {
               const data: IServerMessage = JSON.parse(line);
               processMessage(data, aggregatedData);
@@ -117,9 +121,12 @@ export async function GET(req: Request, res: Response) {
             };
 
             controller.enqueue(`data: ${JSON.stringify(serializedData)}\n\n`);
+            isProcessing = false;
           } catch (e) {
             controller.error(e);
+            isProcessing = false;
           }
+          
         }, 100);
 
         rl.on("line", (line: string) => {
