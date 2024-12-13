@@ -13,6 +13,6 @@ rand = "0.8"
 rand_chacha = "0.3"
 rand_distr = "0.4"
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["macros", "time"] }
+tokio = { version = "1", features = ["macros"] }
 tokio-util = "0.7"
 tracing = "0.1"
