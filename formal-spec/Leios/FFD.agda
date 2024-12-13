@@ -3,7 +3,6 @@
 module Leios.FFD where
 
 open import Leios.Prelude
-open import Leios.Abstract
 
 record FFDAbstract : Type₁ where
   field Header Body ID : Type

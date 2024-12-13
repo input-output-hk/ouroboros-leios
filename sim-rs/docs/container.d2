@@ -1,0 +1,86 @@
+title: {
+  label: "sim-rs - Container Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  external: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      stroke-dash: 5
+    }
+  }
+  actor: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 25
+      shadow: true
+    }
+  }
+}
+
+# External Users/Systems
+user: {
+  class: actor
+  label: "User\n\nPerson running\nthe simulation"
+}
+
+filesystem: {
+  class: external
+  label: "Filesystem\n\nStores configuration\nand output files"
+}
+
+# Core Containers
+cli: {
+  class: container
+  label: "sim-cli\n[Rust]\n\nCommand line interface for\nconfiguring and running simulations"
+}
+
+core: {
+  class: container
+  label: "sim-core\n[Rust]\n\nCore simulation engine\nimplementing the Leios protocol"
+}
+
+telemetry: {
+  class: container
+  label: "Event Monitor\n[Rust]\n\nCollects and processes\nsimulation metrics and events"
+}
+
+storage: {
+  class: container
+  label: "Event Storage\n[JSONL]\n\nStores simulation\nevents and results"
+}
+
+# Relationships
+user -> cli: "Runs simulation with\nconfig parameters"
+user -> filesystem: "Creates simulation\nconfig files"
+
+cli -> filesystem: "Reads config files"
+cli -> core: "Initializes and\ncontrols simulation"
+cli -> telemetry: "Configures event\nmonitoring"
+
+core -> telemetry: "Emits events"
+
+telemetry -> storage: "Writes event\nstream"
+
+storage -> filesystem: "Stores data as\nJSONL files"
+
+filesystem -> user: "Provides simulation\nresults"

@@ -1,8 +1,24 @@
 # Leios logbook
 
+## 2024-12-11
+
+### Discussion with IOG SRE for nodes
+
+We met with IOG's SRE for node operations to discuss cloud engineering aspects of the current Cardano node deployments that might be relevant for Leios.
+
+- We have information now about what VM sizes are for nodes and each relay.
+- We also have acess to the grafana dashboards for examining mainnet and other nodes.
+- They've created custom grafana queries so we can see I/O, network, and disk usage.
+
+Recommendations:
+
+1. Update the cost calculator so that it has pre-defined cost defaults for several cases such as on-demand VMs, bare metal, etc.
+2. Alter the cost calculator to include a specified amount of "free" IOPS and network egress that are included with the selected base VM and/or disks.
+3. Compare the Praos telemetry on IOG's mainnet nodes to the output of the cost calculator when Leios is turned off.
+
 ## 2024-12-10
 
-## Summary of mainnet data available
+### Summary of mainnet data available
 
 - [These slides](https://docs.google.com/presentation/d/1Iy2Vu3jZMsHFrvqmiM8urK9EVXbYJW0knb5XQ7w2tZE/edit?usp=sharing) summarize data we have available for topology, block propagation, transaction delays, etc.
 - Will can reformat data we need for our simulations, so we don't end up with inconsistent input data sets.
