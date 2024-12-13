@@ -24,7 +24,8 @@ import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 
 import ChanDriver
-import Data.Bifunctor (Bifunctor (bimap), second)
+import Control.Arrow ((&&&))
+import Data.Bifunctor (second)
 import Data.Hashable (hash)
 import Data.List (foldl', intercalate, sortOn)
 import Data.Monoid
@@ -103,10 +104,14 @@ messageLegend =
 -- The vizualisation rendering
 --
 data MsgTag = RB | IB | EB | VT
+  deriving (Show, Enum, Bounded)
 
 data LeiosP2PSimVizConfig
   = LeiosP2PSimVizConfig
   { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
+  , ibColor :: InputBlockHeader -> (Double, Double, Double)
+  , ebColor :: EndorseBlock -> (Double, Double, Double)
+  , voteColor :: VoteMsg -> (Double, Double, Double)
   , ptclMessageColor :: LeiosMessage -> Maybe (MsgTag, Dia.Colour Double)
   }
 
@@ -363,48 +368,54 @@ diffusionLatencyPerStakeFraction nnodes created arrivals =
 
 chartDiffusionLatency ::
   LeiosP2PSimVizConfig ->
+  MsgTag ->
   VizRender LeiosSimVizModel
-chartDiffusionLatency LeiosP2PSimVizConfig{nodeMessageColor} =
+chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
   chartVizRender 25 $
     \_
      _
      ( SimVizModel
         _
-        LeiosSimVizState
+        st@LeiosSimVizState
           { vizNodePos
-          , vizMsgsDiffusionLatency
           }
-      ) ->
-        (Chart.def :: Chart.Layout DiffTime Chart.Percent)
-          { Chart._layout_title = "Diffusion latency"
-          , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
-          , Chart._layout_y_axis =
-              (Chart.def :: Chart.LayoutAxis Chart.Percent)
-                { Chart._laxis_generate =
-                    Chart.scaledAxis Chart.def{Chart._la_nLabels = 10} (0, 1)
-                , Chart._laxis_title = "Stake fraction reached"
-                }
-          , Chart._layout_x_axis =
-              Chart.def
-                { Chart._laxis_title = "Time (seconds)"
-                }
-          , Chart._layout_plots =
-              [ Chart.toPlot $
-                Chart.def
-                  { Chart._plot_lines_values = [timeseries]
-                  , Chart._plot_lines_style =
-                      let (r, g, b) = nodeMessageColor blk
-                       in Chart.def
-                            { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
-                            }
-                  }
-              | let nnodes = Map.size vizNodePos
-              , (blk, _nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
-              , let timeseries =
-                      map (second Chart.Percent) $
-                        diffusionLatencyPerStakeFraction nnodes created arrivals
-              ]
-          }
+      ) -> case tag of
+        RB -> theChart (show tag) vizNodePos nodeMessageColor st.vizMsgsDiffusionLatency
+        IB -> theChart (show tag) vizNodePos cfg.ibColor st.ibDiffusionLatency
+        EB -> theChart (show tag) vizNodePos cfg.ebColor st.ebDiffusionLatency
+        VT -> theChart (show tag) vizNodePos cfg.voteColor st.voteDiffusionLatency
+ where
+  theChart lbl nodePos nodeMsgColor msgsDiffusionLatency =
+    (Chart.def :: Chart.Layout DiffTime Chart.Percent)
+      { Chart._layout_title = "Diffusion latency" ++ "(" ++ lbl ++ ")"
+      , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
+      , Chart._layout_y_axis =
+          (Chart.def :: Chart.LayoutAxis Chart.Percent)
+            { Chart._laxis_generate =
+                Chart.scaledAxis Chart.def{Chart._la_nLabels = 10} (0, 1)
+            , Chart._laxis_title = "Stake fraction reached"
+            }
+      , Chart._layout_x_axis =
+          Chart.def
+            { Chart._laxis_title = "Time (seconds)"
+            }
+      , Chart._layout_plots =
+          [ Chart.toPlot $
+            Chart.def
+              { Chart._plot_lines_values = [timeseries]
+              , Chart._plot_lines_style =
+                  let (r, g, b) = nodeMsgColor blk
+                   in Chart.def
+                        { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
+                        }
+              }
+          | let nnodes = Map.size nodePos
+          , (blk, _nid, created, arrivals) <- Map.elems msgsDiffusionLatency
+          , let timeseries =
+                  map (second Chart.Percent) $
+                    diffusionLatencyPerStakeFraction nnodes created arrivals
+          ]
+      }
 
 chartDiffusionImperfection ::
   P2PTopography ->
@@ -621,6 +632,9 @@ defaultVizConfig stageLength =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
+    , voteColor = toSRGB . voteColor
+    , ebColor = toSRGB . ebColor
+    , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
     }
  where
   testPtclMessageColor ::
@@ -634,12 +648,15 @@ defaultVizConfig stageLength =
             let (r, g, b) = praosMessageColor examplesLeiosSimVizConfig msg
             Just $ Dia.sRGB r g b
           _ -> Nothing
-      RelayIB msg -> (IB,) <$> relayMessageColor (pipelineColor Propose . bimap hash (.slot)) msg
-      RelayEB msg -> (EB,) <$> relayMessageColor (pipelineColor Endorse . bimap hash (.slot)) msg
-      RelayVote msg -> (VT,) <$> relayMessageColor (pipelineColor Vote . bimap hash (.slot)) msg
-  relayMessageColor :: ((id, body) -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
+      RelayIB msg -> (IB,) <$> relayMessageColor ibColor msg
+      RelayEB msg -> (EB,) <$> relayMessageColor ebColor msg
+      RelayVote msg -> (VT,) <$> relayMessageColor voteColor msg
+  ibColor = pipelineColor Propose . (hash . (.id) &&& (.slot))
+  ebColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
+  voteColor = pipelineColor Vote . (hash . (.id) &&& (.slot))
+  relayMessageColor :: (body -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
-    MsgRespondBodies bodies -> Just $ blendColors $ map f bodies
+    MsgRespondBodies bodies -> Just $ blendColors $ map (f . snd) bodies
     _otherwise -> Nothing
   testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
   testNodeMessageColor = blockHeaderColorAsBody
@@ -690,16 +707,17 @@ example2 =
                   leiosP2PSimVizRender config
             , LayoutBeside
                 [ LayoutAbove
-                    [ LayoutReqSize 350 300 $
-                        Layout $
-                          chartDiffusionLatency config
-                          -- , LayoutReqSize 350 300 $
-                          --     Layout $
-                          --       chartDiffusionImperfection
-                          --         p2pTopography
-                          --         0.1
-                          --         (96 / 1000)
-                          --         config
+                    [ LayoutReqSize 350 250 $
+                      Layout $
+                        chartDiffusionLatency config tag
+                    | -- , LayoutReqSize 350 300 $
+                    --     Layout $
+                    --       chartDiffusionImperfection
+                    --         p2pTopography
+                    --         0.1
+                    --         (96 / 1000)
+                    --         config
+                    tag <- [minBound .. maxBound]
                     ]
                 , LayoutAbove
                     [ LayoutReqSize 350 300 $

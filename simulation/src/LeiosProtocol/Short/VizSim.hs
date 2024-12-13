@@ -119,6 +119,9 @@ data LeiosSimVizState
   , -- these are `Block`s generated (globally).
     vizNumMsgsGenerated :: !Int
   , vizMsgsDiffusionLatency :: !DiffusionLatencyMap
+  , ibDiffusionLatency :: !(DiffusionLatencyMap' InputBlockId InputBlockHeader)
+  , ebDiffusionLatency :: !(DiffusionLatencyMap' EndorseBlockId EndorseBlock)
+  , voteDiffusionLatency :: !(DiffusionLatencyMap' VoteId VoteMsg)
   , ibMsgs :: !(LeiosSimVizMsgsState InputBlockId InputBlock)
   , ebMsgs :: !(LeiosSimVizMsgsState EndorseBlockId EndorseBlock)
   , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
@@ -177,26 +180,42 @@ accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
 accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip ch)))) = IMap.insert (coerce nid) ch
 accumChains _ _ = id
 
-type DiffusionLatencyMap = Map (HeaderHash RankingBlockHeader) (RankingBlockHeader, NodeId, Time, [Time])
+type DiffusionLatencyMap = DiffusionLatencyMap' (HeaderHash RankingBlockHeader) RankingBlockHeader
+type DiffusionLatencyMap' id msg = Map id (msg, NodeId, Time, [Time])
 
 accumDiffusionLatency :: Time -> LeiosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
-accumDiffusionLatency now (LeiosEventNode (LabelNode n (PraosNodeEvent e))) = accumDiffusionLatency' now (LabelNode n e)
+accumDiffusionLatency now (LeiosEventNode (LabelNode n (PraosNodeEvent e))) =
+  case e of
+    PraosNodeEventGenerate blk -> accumDiffusionLatency' now n Generate (blockHash blk) (blockHeader blk)
+    PraosNodeEventReceived blk -> accumDiffusionLatency' now n Received (blockHash blk) (blockHeader blk)
+    PraosNodeEventEnterState blk -> accumDiffusionLatency' now n EnterState (blockHash blk) (blockHeader blk)
+    PraosNodeEventCPU{} -> id
+    PraosNodeEventNewTip{} -> id
 accumDiffusionLatency _ _ = id
-accumDiffusionLatency' :: Time -> LabelNode (PraosNodeEvent RankingBlockBody) -> DiffusionLatencyMap -> DiffusionLatencyMap
-accumDiffusionLatency' now (LabelNode nid (PraosNodeEventGenerate blk)) vs =
-  assert (not (blockHash blk `Map.member` vs)) $
+
+accumDiffusionLatency' ::
+  Ord id =>
+  Time ->
+  NodeId ->
+  BlockEvent ->
+  id ->
+  msg ->
+  DiffusionLatencyMap' id msg ->
+  DiffusionLatencyMap' id msg
+accumDiffusionLatency' now nid Generate msgid msg vs =
+  assert (not (msgid `Map.member` vs)) $
     Map.insert
-      (blockHash blk)
-      (blockHeader blk, nid, now, [now])
+      msgid
+      (msg, nid, now, [now])
       vs
-accumDiffusionLatency' now (LabelNode _nid (PraosNodeEventEnterState blk)) vs =
+accumDiffusionLatency' now _nid EnterState msgid _msg vs =
   Map.adjust
     ( \(hdr, nid', created, arrivals) ->
         (hdr, nid', created, now : arrivals)
     )
-    (blockHash blk)
+    msgid
     vs
-accumDiffusionLatency' _ _ vs = vs
+accumDiffusionLatency' _now _nid _event _id _msg vs = vs
 
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
@@ -224,6 +243,9 @@ leiosSimVizModel =
       , vizMsgsAtNodeTotalBuffer = Map.empty
       , vizNumMsgsGenerated = 0
       , vizMsgsDiffusionLatency = Map.empty
+      , ibDiffusionLatency = Map.empty
+      , ebDiffusionLatency = Map.empty
+      , voteDiffusionLatency = Map.empty
       , ibMsgs = initMsgs
       , ebMsgs = initMsgs
       , voteMsgs = initMsgs
@@ -253,15 +275,24 @@ leiosSimVizModel =
     vs{vizNodeTip = Map.insert nid (fullTip tip) (vizNodeTip vs)}
   accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) vs =
     case blk of
-      EventIB x -> vs{ibMsgs = accumLeiosMsgs now nid event x vs.ibMsgs}
+      EventIB x ->
+        vs
+          { ibMsgs = accumLeiosMsgs now nid event x vs.ibMsgs
+          , ibDiffusionLatency = accumDiffusionLatency' now nid event x.id x.header vs.ibDiffusionLatency
+          }
       EventEB x ->
         vs
           { ebMsgs = accumLeiosMsgs now nid event x vs.ebMsgs
           , ibsInRBs = case event of
               Generate -> accumIBsInRBs (Right x) vs.ibsInRBs
               _ -> vs.ibsInRBs
+          , ebDiffusionLatency = accumDiffusionLatency' now nid event x.id x vs.ebDiffusionLatency
           }
-      EventVote x -> vs{voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs}
+      EventVote x ->
+        vs
+          { voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs
+          , voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x vs.voteDiffusionLatency
+          }
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
     vs
       { vizMsgsAtNodeBuffer =
@@ -364,6 +395,12 @@ leiosSimVizModel =
           Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
+      , ibDiffusionLatency =
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (ibDiffusionLatency vs)
+      , ebDiffusionLatency =
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (ebDiffusionLatency vs)
+      , voteDiffusionLatency =
+          Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (voteDiffusionLatency vs)
       , ibMsgs = pruneLeiosMsgsState now vs.ibMsgs
       , ebMsgs = pruneLeiosMsgsState now vs.ebMsgs
       , voteMsgs = pruneLeiosMsgsState now vs.voteMsgs
