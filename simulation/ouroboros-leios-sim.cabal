@@ -182,6 +182,7 @@ test-suite ols-test
     , QuickCheck
     , tasty
     , tasty-quickcheck
+    , text
   other-modules:
     Test.Topology
   default-language: Haskell2010

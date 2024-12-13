@@ -94,8 +94,11 @@ data BenchTopologyNode
   }
   deriving (Show, Generic)
 
+benchTopologyOptions :: Options
+benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
+
 instance ToJSON BenchTopologyNode where
-  toEncoding = genericToEncoding defaultOptions
+  toEncoding = genericToEncoding benchTopologyOptions
 
 instance FromJSON BenchTopologyNode
 
@@ -105,18 +108,10 @@ newtype BenchTopology = BenchTopology
   deriving (Show, Generic)
 
 instance ToJSON BenchTopology where
-  toEncoding =
-    genericToEncoding
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  toEncoding = genericToEncoding benchTopologyOptions
 
 instance FromJSON BenchTopology where
-  parseJSON =
-    genericParseJSON
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  parseJSON = genericParseJSON benchTopologyOptions
 
 readBenchTopology :: FilePath -> IO BenchTopology
 readBenchTopology = throwDecode <=< BSL.readFile
@@ -194,19 +189,14 @@ data SimpleNode
   }
   deriving (Show, Generic)
 
+simpleNodeOptions :: Options
+simpleNodeOptions = defaultOptions{unwrapUnaryRecords = False}
+
 instance ToJSON SimpleNode where
-  toEncoding =
-    genericToEncoding
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  toEncoding = genericToEncoding simpleNodeOptions
 
 instance FromJSON SimpleNode where
-  parseJSON =
-    genericParseJSON
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  parseJSON = genericParseJSON simpleNodeOptions
 
 newtype SimpleTopology
   = SimpleTopology
@@ -215,18 +205,10 @@ newtype SimpleTopology
   deriving (Show, Generic)
 
 instance ToJSON SimpleTopology where
-  toEncoding =
-    genericToEncoding
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  toEncoding = genericToEncoding simpleNodeOptions
 
 instance FromJSON SimpleTopology where
-  parseJSON =
-    genericParseJSON
-      defaultOptions
-        { unwrapUnaryRecords = False
-        }
+  parseJSON = genericParseJSON simpleNodeOptions
 
 benchTopologyNodeToSimpleNode :: Latencies -> BenchTopologyNode -> SimpleNode
 benchTopologyNodeToSimpleNode latencies benchTopologyNode =
@@ -253,66 +235,20 @@ readSimpleTopology = throwDecode <=< BSL.readFile
 writeSimpleTopology :: FilePath -> SimpleTopology -> IO ()
 writeSimpleTopology simpleTopologyFile = BSL.writeFile simpleTopologyFile . encode
 
---------------------------------------------------------------------------------
--- General Topology
---
--- Abstraction over Bench Topology and Simple Topology
---------------------------------------------------------------------------------
+clusterSet :: SimpleTopology -> Set (Maybe ClusterName)
+clusterSet = S.fromList . map (.clusterName) . V.toList . (.nodes)
 
-class
-  ( HasField "name" node NodeName
-  , HasField "nodeId" node NodeId
-  , HasField "clusterName" node (Maybe ClusterName)
-  ) =>
-  Node node edge
-    | node -> edge
-  where
-  outgoingEdges :: node -> Map NodeName edge
-
-  adjacentNodes :: node -> [NodeName]
-  adjacentNodes = M.keys . outgoingEdges
-
-instance HasField "clusterName" BenchTopologyNode (Maybe ClusterName) where
-  getField :: BenchTopologyNode -> Maybe ClusterName
-  getField = Just . regionNameToClusterName . region
-
-instance Node BenchTopologyNode () where
-  outgoingEdges node =
-    M.fromList [(producerName, ()) | producerName <- V.toList node.producers]
-
-instance Node SimpleNode Latency where
-  outgoingEdges = (.producers)
-
-class
-  ( Node node edge
-  , HasField "nodes" topology (Vector node)
-  ) =>
-  Topology topology node edge
-    | topology -> node
-  where
-  clusterSet :: topology -> Set (Maybe ClusterName)
-  clusterSet = S.fromList . map (.clusterName) . V.toList . (.nodes)
-
-  clusters :: topology -> [Maybe ClusterName]
-  clusters = S.toList . clusterSet
-
-instance HasField "nodes" BenchTopology (Vector BenchTopologyNode) where
-  getField :: BenchTopology -> Vector BenchTopologyNode
-  getField = (.coreNodes)
-
-instance Topology BenchTopology BenchTopologyNode ()
-
-instance Topology SimpleTopology SimpleNode Latency
+clusters :: SimpleTopology -> [Maybe ClusterName]
+clusters = S.toList . clusterSet
 
 --------------------------------------------------------------------------------
--- Conversion to FGL Graph
+-- Conversion between SimpleTopology and FGL Graph
 --------------------------------------------------------------------------------
 
-topologyToGr ::
-  Topology topology node edge =>
-  topology ->
-  Gr node edge
-topologyToGr topology = G.mkGraph graphNodes graphEdges
+simpleTopologyToGr ::
+  SimpleTopology ->
+  Gr (NodeName, Maybe ClusterName) Latency
+simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
  where
   nameToIdMap =
     M.fromList
@@ -320,7 +256,7 @@ topologyToGr topology = G.mkGraph graphNodes graphEdges
       | node <- V.toList topology.nodes
       ]
   graphNodes =
-    [ (consumerId, consumer)
+    [ (consumerId, (consumer.name, consumer.clusterName))
     | consumer <- V.toList topology.nodes
     , let consumerId = nodeIdToNode consumer.nodeId
     ]
@@ -328,28 +264,21 @@ topologyToGr topology = G.mkGraph graphNodes graphEdges
     [ (producerId, consumerId, latency)
     | consumer <- V.toList topology.nodes
     , let consumerId = nodeIdToNode consumer.nodeId
-    , (producerName, latency) <- M.toList (outgoingEdges consumer)
+    , (producerName, latency) <- M.toList consumer.producers
     , let producerId = nodeIdToNode $ nameToIdMap M.! producerName
     ]
 
-simpleTopologyToGr ::
-  SimpleTopology ->
-  Gr () Latency
-simpleTopologyToGr = G.nmap (const ()) . topologyToGr
-
 grToSimpleTopology ::
-  Gr () Latency ->
+  Gr (NodeName, Maybe ClusterName) Latency ->
   SimpleTopology
 grToSimpleTopology gr = SimpleTopology{nodes}
  where
   nodes =
     V.fromList $
       [ SimpleNode{name, nodeId, producers, clusterName}
-      | node <- G.nodes gr
+      | (node, (name, clusterName)) <- G.labNodes gr
       , let nodeId = nodeToNodeId node
-      , let name = nodeIdToNodeName nodeId
       , let producers = M.findWithDefault M.empty name producersMap
-      , let clusterName = Nothing
       ]
   producersMap :: Map NodeName (Map NodeName Latency)
   producersMap =
@@ -358,18 +287,28 @@ grToSimpleTopology gr = SimpleTopology{nodes}
       | (producer, consumer, latency) <- G.labEdges gr
       , let producerId = nodeToNodeId producer
       , let consumerId = nodeToNodeId consumer
-      , let producerName = nodeIdToNodeName producerId
-      , let consumerName = nodeIdToNodeName consumerId
+      , let producerName = nodeIdToNodeNameMap M.! producerId
+      , let consumerName = nodeIdToNodeNameMap M.! consumerId
       ]
+  nodeIdToNodeNameMap :: Map NodeId NodeName
+  nodeIdToNodeNameMap =
+    M.fromList $
+      [ (nodeId, name)
+      | (node, (name, _)) <- G.labNodes gr
+      , let nodeId = nodeToNodeId node
+      ]
+
+withNodeNames :: Gr a b -> Gr (NodeName, a) b
+withNodeNames = G.gmap (\(inEdges, node, annotation, outEdges) -> (inEdges, node, (nodeToNodeName node, annotation), outEdges))
+
+nodeToNodeName :: G.Node -> NodeName
+nodeToNodeName = NodeName . T.pack . ("node-" <>) . show @Int
 
 nodeIdToNode :: NodeId -> G.Node
 nodeIdToNode = coerce
 
 nodeToNodeId :: G.Node -> NodeId
 nodeToNodeId = coerce
-
-nodeIdToNodeName :: NodeId -> NodeName
-nodeIdToNodeName = NodeName . T.pack . ("node-" <>) . show @Int . coerce
 
 {-
 toGraphWithPositionInformation ::
@@ -471,146 +410,4 @@ readP2PTopography :: WorldDimensions -> FilePath -> IO P2PTopography
 readP2PTopography worldDimensions simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
   toP2PTopography worldDimensions simpleTopology
--}
-
---------------------------------------------------------------------------------
--- Conversion to GraphViz Graph
---------------------------------------------------------------------------------
-{-
-
--- NOTE: Taken from https://sashamaps.net/docs/resources/20-colors/
-simpleDistinctColors :: [X11Color]
-simpleDistinctColors =
-  cycle
-    [ Red
-    , Green
-    , Yellow
-    , Blue
-    , Orange
-    , Purple
-    , Cyan
-    , Magenta
-    , LimeGreen
-    , Pink
-    , Turquoise
-    , Lavender
-    , Brown
-    , Beige
-    , Maroon
-    , MintCream
-    , OliveDrab
-    , Coral
-    , Navy
-    , Gray
-    , White
-    , Black
-    ]
-
-toDotGraphAsTorus ::
-  Topology topology node edge =>
-  topology ->
-  GVTG.DotGraph NodeName
-toDotGraphAsTorus topology =
-  GVTG.DotGraph True True Nothing . Seq.fromList $
-    globalStatements : nodeStatements <> edgeStatements
- where
-  globalStatements =
-    GVTG.GA . GVTG.GraphAttrs $
-      [ GVAC.Smoothing GVAC.Spring
-      , GVAC.K 0.5
-      , GVAC.RepulsiveForce 2.0
-      ]
-  nodeStatements =
-    [ GVTG.DN . GVTG.DotNode nodeName $
-      [ GVA.style GVA.filled
-      , GVA.fillColor nodeRegionColor
-      ]
-    | node <- V.toList topology.nodes
-    , let nodeName = node.name
-    , let nodeRegionColor = clusterColorMap M.! node.region
-    ]
-  edgeStatements =
-    [ GVTG.DE . GVTG.DotEdge producerName consumerName $
-      [ GVA.fillColor producerNameColor
-      ]
-    | consumer <- V.toList topology.nodes
-    , let consumerName = consumer.name
-    , producerName <- adjacentNodes consumer
-    , let producerNameColor = clusterColorMap M.! (nodeClusterMap M.! producerName)
-    ]
-  nodeClusterMap =
-    M.fromList [(node.name, node.region) | node <- V.toList topology.nodes]
-  clusterColorMap =
-    M.fromList $ zip (Nothing : (Just <$> clusters topology)) simpleDistinctColors
-
-toDotGraphByCluster ::
-  Topology topology node edge =>
-  topology ->
-  GVTG.DotGraph NodeName
-toDotGraphByCluster topology =
-  GVTG.DotGraph True True Nothing . Seq.fromList $
-    graphAttributes : subGraphStatements <> edgeStatements
- where
-  graphAttributes =
-    GVTG.GA . GVTG.GraphAttrs $
-      []
-  subGraphStatements =
-    [ GVTG.SG . GVTG.DotSG True (Just subGraphId) . Seq.fromList $
-      subGraphAttributtes : subGraphNodeStatements <> subGraphEdgeStatements
-    | clusterName <- clusters topology
-    , let subGraphId = clusterNameToGraphID clusterName
-    , let subGraphAttributtes =
-            GVTG.GA . GVTG.GraphAttrs $ GVA.textLabel . clusterNameToLazyText <$> maybeToList clusterName
-    , let subGraphNodeStatements =
-            [ GVTG.DN . GVTG.DotNode nodeName $
-              [ GVA.style GVA.filled
-              , GVA.fillColor nodeRegionColor
-              ]
-            | node <- V.toList topology.nodes
-            , let nodeName = node.name :: NodeName
-            , let nodeClusterName = node.clusterName :: Maybe ClusterName
-            , nodeClusterName == clusterName
-            , let nodeRegionColor = clusterColorMap M.! nodeClusterName
-            ]
-    , let subGraphEdgeStatements =
-            [ GVTG.DE . GVTG.DotEdge producerName consumerName $
-              [ GVA.fillColor producerNameColor
-              ]
-            | consumer <- V.toList topology.nodes
-            , let consumerName = consumer.name
-            , let consumerClusterName = consumer.region
-            , consumerClusterName == clusterName
-            , producerName <- adjacentNodes consumer
-            , let producerClusterName = nodeClusterMap M.! producerName
-            , producerClusterName == clusterName
-            , let producerNameColor = clusterColorMap M.! producerClusterName
-            ]
-    ]
-  edgeStatements =
-    [ GVTG.DE . GVTG.DotEdge producerName consumerName $
-      [ GVA.fillColor producerNameColor
-      ]
-    | consumer <- V.toList topology.nodes
-    , let consumerName = consumer.name
-    , let consumerClusterName = consumer.clusterName
-    , producerName <- adjacentNodes consumer
-    , let producerClusterName = nodeClusterMap M.! producerName
-    , let producerNameColor = clusterColorMap M.! producerClusterName
-    , consumerClusterName /= producerClusterName
-    ]
-  nodeClusterMap =
-    M.fromList [(node.name, node.region) | node <- V.toList topology.nodes]
-  clusterColorMap =
-    M.fromList $ zip (Nothing : (Just <$> clusters topology)) simpleDistinctColors
-
-renderTopologyAsTorus ::
-  Topology topology node edge => FilePath -> topology -> IO ()
-renderTopologyAsTorus outputFile topology =
-  void $ GVC.runGraphvizCommand GVC.Sfdp (toDotGraphAsTorus topology) GVC.Png outputFile
-
-renderTopologyByRegion ::
-  Topology topology node edge => FilePath -> topology -> IO ()
-renderTopologyByRegion outputFile topology =
-  void $ GVC.runGraphvizCommand GVC.Dot (toDotGraphByCluster topology) GVC.Png outputFile
-
 -}
