@@ -1,0 +1,154 @@
+title: {
+  label: "ouroboros-leios-sim - Component Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  subcomponent: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
+}
+
+# Protocol Engine Container
+protocol-engine: {
+  class: container
+  label: "Protocol Engine"
+
+  praos: {
+    class: component
+    label: "Praos Protocol\n\nImplements core consensus\nand block chain"
+  }
+
+  leios: {
+    class: component
+    label: "Leios Protocol\n\nImplements input endorsement\nand ranking blocks"
+  }
+
+  relay: {
+    class: component
+    label: "Relay Protocol\n\nHandles block and vote\ndiffusion"
+  }
+
+  node-manager: {
+    class: component
+    label: "Node Manager\n\nManages node state and\nprotocol interactions"
+  }
+}
+
+# Channel Layer Container 
+channel-layer: {
+  class: container
+  label: "Channel Layer"
+
+  chan: {
+    class: component
+    label: "Generic Channel\n\nAbstract channel\ninterface"
+  }
+
+  tcp: {
+    class: component
+    label: "TCP Channel\n\nSimulates TCP connections\nand latency"
+  }
+
+  mux: {
+    class: component
+    label: "Channel Multiplexer\n\nMultiplexes protocol\nmessages"
+  }
+
+  driver: {
+    class: component
+    label: "Channel Driver\n\nManages protocol\nchannels"
+  }
+}
+
+# Visualization Engine Container
+viz-engine: {
+  class: container
+  label: "Visualization Engine"
+
+  layout: {
+    class: component
+    label: "Layout Engine\n\nHandles visualization\nlayout"
+  }
+
+  relay-viz: {
+    class: component
+    label: "Relay Visualizer\n\nVisualizes relay\nprotocol state"
+  }
+
+  p2p-viz: {
+    class: component
+    label: "P2P Visualizer\n\nVisualizes P2P\nnetwork state"
+  }
+}
+
+# Event Monitor Container
+monitor: {
+  class: container
+  label: "Event Monitor"
+
+  metrics: {
+    class: component
+    label: "Metrics Collector\n\nCollects performance\nmetrics"
+  }
+
+  tracer: {
+    class: component
+    label: "Event Tracer\n\nTraces protocol and\nnetwork events"
+  }
+}
+
+# Core Layer Relationships
+channel-layer.tcp -> channel-layer.chan: "Implements"
+channel-layer.mux -> channel-layer.chan: "Uses"
+channel-layer.driver -> channel-layer.chan: "Uses"
+channel-layer.mux -> channel-layer.tcp: "Routes over"
+channel-layer.driver -> channel-layer.mux: "Uses for routing"
+
+# Protocol Layer Relationships
+protocol-engine.relay -> channel-layer.driver: "Uses for messaging"
+protocol-engine.praos -> channel-layer.driver: "Uses for consensus"
+protocol-engine.leios -> protocol-engine.praos: "Extends consensus"
+protocol-engine.leios -> protocol-engine.relay: "Uses for diffusion"
+protocol-engine.node-manager -> channel-layer.driver: "Manages connections"
+
+# Visualization Layer Relationships
+viz-engine.relay-viz -> protocol-engine.relay: "Visualizes state"
+viz-engine.p2p-viz -> channel-layer.tcp: "Visualizes network"
+viz-engine.layout -> viz-engine.relay-viz: "Provides layout"
+viz-engine.layout -> viz-engine.p2p-viz: "Provides layout"
+
+# Monitoring Relationships
+monitor.metrics -> protocol-engine.node-manager: "Collects metrics"
+monitor.tracer -> channel-layer.tcp: "Traces network"
+monitor.tracer -> protocol-engine.praos: "Traces consensus"
+monitor.tracer -> protocol-engine.leios: "Traces protocol"
+monitor.tracer -> protocol-engine.relay: "Traces diffusion"

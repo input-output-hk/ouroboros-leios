@@ -1,0 +1,86 @@
+title: {
+  label: "ouroboros-leios-sim - Container Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  external: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      stroke-dash: 5
+    }
+  }
+  actor: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 25
+      shadow: true
+    }
+  }
+}
+
+user: {
+  class: actor
+  label: "User\n\nPerson running\nthe simulation"
+}
+
+filesystem: {
+  class: external
+  label: "Filesystem\n[External System]\n\nStores configuration\nand results"
+}
+
+protocol-engine: {
+  class: container
+  label: "Protocol Engine\n[Haskell]\n\nImplements Praos and\nLeios protocols"
+}
+
+network: {
+  class: container
+  label: "Channel Layer\n[Haskell]\n\nSimulates TCP connections\nand multiplexing"
+}
+
+monitor: {
+  class: container
+  label: "Event Monitor\n[Haskell]\n\nCollects metrics and\ntraces protocol events"
+}
+
+viz: {
+  class: container
+  label: "Visualization Engine\n[Haskell]\n\nRenders protocol and\nnetwork state"
+}
+
+# Relationships
+user -> viz: "Views protocol\nbehavior"
+user -> filesystem: "Configures simulation\nparameters"
+
+viz -> filesystem: "Reads config files"
+viz -> protocol-engine: "Visualizes protocol state"
+viz -> network: "Visualizes network state"
+viz -> monitor: "Displays metrics"
+
+protocol-engine -> network: "Uses for message transport"
+protocol-engine -> monitor: "Emits protocol events"
+
+network -> monitor: "Reports network metrics"
+
+monitor -> filesystem: "Writes event logs"
+
+filesystem -> user: "Provides simulation\nresults"
