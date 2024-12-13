@@ -84,7 +84,7 @@ traceRelayLink1 tcpprops =
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
-    (ts, submitFetchedBlock) <- setupValidatorThreads praosConfig st 1
+    (ts, submitFetchedBlock) <- setupValidatorThreads nullTracer praosConfig st 1
     concurrently_ (mapConcurrently_ id ts) $
       concurrently_
         ( blockFetchController nullTracer st

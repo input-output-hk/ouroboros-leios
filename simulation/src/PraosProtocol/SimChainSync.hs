@@ -16,7 +16,7 @@ import Control.Monad.Class.MonadAsync (
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer,
+  Tracer (Tracer),
   traceWith,
  )
 import qualified Data.ByteString as BS
@@ -89,7 +89,8 @@ traceRelayLink1 tcpprops =
  where
   consumerNode cfg chan = do
     st <- ChainConsumerState <$> newTVarIO Chain.Genesis
-    runChainConsumer cfg chan st
+    let nullTracer = Tracer $ const $ return ()
+    runChainConsumer nullTracer cfg chan st
   producerNode chan = do
     let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain

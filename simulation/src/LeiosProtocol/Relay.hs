@@ -38,7 +38,7 @@ import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, isNothing, mapMaybe)
 import Data.Monoid (Sum (..))
 import Data.Sequence.Strict (StrictSeq)
@@ -497,6 +497,8 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
+  , headerValidationDelay :: header -> DiffTime
+  , threadDelayParallel :: [DiffTime] -> m ()
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
@@ -510,8 +512,9 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   -- ^ sends blocks to be validated/added to the buffer. Allowed to be
   -- blocking, but relayConsumer does not assume the blocks made it
   -- into the relayBuffer. Also takes a delivery time (relevant for
-  -- e.g. IB endorsement) and a callback that expects the subset of
-  -- validated blocks.
+  -- e.g. IB endorsement) and a callback that expects a subset of
+  -- validated blocks. Callback might be called more than once, with
+  -- different subsets.
   , submitPolicy :: !SubmitPolicy
   , maxHeadersToRequest :: !Word16
   , maxBodiesToRequest :: !Word16
@@ -782,6 +785,8 @@ relayConsumerPipelined config sst =
       unless (Seq.length idsSeq <= fromIntegral windowExpand) $
         throw IdsNotRequested
 
+      config.threadDelayParallel $ map config.headerValidationDelay headers
+
       -- Upon receiving a batch of new headers we extend our available set,
       -- and extend the unacknowledged sequence.
       --
@@ -811,6 +816,10 @@ relayConsumerPipelined config sst =
 
       unless (idsReceived `Set.isSubsetOf` idsRequested) $
         throw BodiesNotRequested
+
+      let notReceived = idsRequested `Set.difference` idsReceived
+      unless (Set.null notReceived) $ do
+        atomically $ modifyTVar' sst.inFlightVar (`Set.difference` notReceived)
 
       -- We can match up all the txids we requested, with those we
       -- received.
@@ -883,8 +892,8 @@ relayConsumerPipelined config sst =
           -- all blocks validated.
           modifyTVar' sst.relayBufferVar $
             flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
-          -- TODO?: the ids we did not receive could be taken out earlier.
-          modifyTVar' sst.inFlightVar (`Set.difference` idsRequested)
+          -- TODO: won't remove from inFlight blocks not validated.
+          modifyTVar' sst.inFlightVar (`Set.difference` Set.fromList (map (config.headerId . fst) validated))
 
       return $
         idle

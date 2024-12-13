@@ -1,4 +1,4 @@
-module PraosProtocol.Common.Chain (module Chain) where
+module PraosProtocol.Common.Chain (module Chain, dropUntil) where
 
 import Ouroboros.Network.Mock.Chain as Chain (
   Chain (..),
@@ -45,3 +45,10 @@ import Ouroboros.Network.Mock.Chain as Chain (
   valid,
   validExtension,
  )
+
+-- | Returns prefix where the head block satisfies the predicate.
+dropUntil :: (blk -> Bool) -> Chain blk -> Chain blk
+dropUntil _ Genesis = Genesis
+dropUntil p c0@(c :> blk)
+  | p blk = c0
+  | otherwise = dropUntil p c

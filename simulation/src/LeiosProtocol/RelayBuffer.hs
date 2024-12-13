@@ -10,7 +10,7 @@ import Data.FingerTree (FingerTree)
 import qualified Data.FingerTree as FingerTree
 import qualified Data.Foldable as Foldable
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import Data.Word (Word64)
 

@@ -16,7 +16,7 @@ import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
@@ -77,7 +77,7 @@ runPeer ::
 runPeer tracer cfg f st peerId chan = do
   let chainConsumerState = st.chainSyncConsumerStates Map.! peerId
   let blockFetchConsumerState = initBlockFetchConsumerStateForPeerId tracer peerId st.blockFetchControllerState f
-  [ Concurrently $ runChainConsumer cfg (protocolChainSync chan) chainConsumerState
+  [ Concurrently $ runChainConsumer tracer cfg (protocolChainSync chan) chainConsumerState
     , Concurrently $ runBlockFetchConsumer tracer cfg (protocolBlockFetch chan) blockFetchConsumerState
     ]
 
@@ -137,7 +137,7 @@ setupPraosThreads ::
   [Praos BlockBody (Chan m)] ->
   m [Concurrently m ()]
 setupPraosThreads tracer cfg st0 followers peers = do
-  (ts, f) <- BlockFetch.setupValidatorThreads cfg st0.blockFetchControllerState 1 -- TODO: parameter
+  (ts, f) <- BlockFetch.setupValidatorThreads tracer cfg st0.blockFetchControllerState 1 -- TODO: parameter
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg f st0 followers peers
 
 setupPraosThreads' ::

@@ -52,6 +52,10 @@ library
     LeiosProtocol.Short
     LeiosProtocol.Short.Generate
     LeiosProtocol.Short.Node
+    LeiosProtocol.Short.Sim
+    LeiosProtocol.Short.SimP2P
+    LeiosProtocol.Short.VizSim
+    LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP
@@ -106,6 +110,9 @@ library
     , containers
     , contra-tracer
     , deepseq
+    , diagrams-cairo
+    , diagrams-core
+    , diagrams-lib
     , fgl
     , filepath
     , fingertree
@@ -116,6 +123,7 @@ library
     , io-classes
     , io-sim
     , kdt
+    , linear
     , mtl
     , nothunks
     , ouroboros-network-api

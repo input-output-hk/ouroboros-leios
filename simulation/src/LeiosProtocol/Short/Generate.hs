@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
@@ -15,11 +16,13 @@ import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
+import Control.Monad (forM)
+import Data.Bifunctor
 import Data.Kind
-import Data.Traversable (forM)
+import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
-import PraosProtocol.Common (fixupBlock, mkPartialBlock)
+import PraosProtocol.Common (CPUTask (CPUTask), mkPartialBlock)
 import System.Random
 
 data BuffersView m = BuffersView
@@ -31,9 +34,9 @@ data BuffersView m = BuffersView
 
 data Role :: Type -> Type where
   Base :: Role RankingBlock
-  Propose :: SubSlotNo -> Role InputBlock
+  Propose :: Role [InputBlock]
   Endorse :: Role EndorseBlock
-  Vote :: Role [VoteMsg]
+  Vote :: Role VoteMsg
 
 data SomeRole :: Type where
   SomeRole :: Role a -> SomeRole
@@ -41,29 +44,39 @@ data SomeRole :: Type where
 data SomeAction :: Type where
   SomeAction :: Role a -> a -> SomeAction
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, NodeRate)]) -> m (SlotNo -> m [SomeRole])
+mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, [NodeRate])]) -> m (SlotNo -> m [(SomeRole, Word64)])
 mkScheduler rng0 rates = do
-  let sampleRate (role, NodeRate lambda) = do
+  let sampleRate (NodeRate lambda) = do
         (sample, rng') <- gets $ uniformR (0, 1)
         put $! rng'
         -- TODO: check poisson dist. math.
         let prob = lambda * exp (-lambda)
-        pure [role | sample <= prob]
-
+        pure $ sample <= prob
+      sampleRates (role, rs) = do
+        wins <- fromIntegral . length . filter id <$> mapM sampleRate rs
+        return [(role, wins) | wins >= 1]
   rngVar <- newTVarIO rng0
   let sched slot = atomically $ do
         rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRate $ (rates slot)
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ (rates slot)
         writeTVar rngVar rng1
         return $ acts
   return sched
 
-waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> m SlotNo
-waitNextSlot cfg = do
+-- | @waitNextSlot cfg targetSlot@ waits until the beginning of
+-- @targetSlot@ if that's now or in the future, otherwise the closest slot.
+waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => LeiosConfig -> SlotNo -> m SlotNo
+waitNextSlot cfg targetSlot = do
   now <- getCurrentTime
-  let slot =
-        assert (cfg.praos.slotConfig.duration == 1) $
-          toEnum (ceiling $ now `diffUTCTime` cfg.praos.slotConfig.start)
+  let targetSlotTime = slotTime cfg.praos.slotConfig targetSlot
+  let slot
+        | now <= targetSlotTime = targetSlot
+        | otherwise = assert (nextSlotIndex >= 0) $ toEnum nextSlotIndex
+       where
+        nextSlotIndex =
+          assert (cfg.praos.slotConfig.duration == 1) $
+            ceiling $
+              now `diffUTCTime` cfg.praos.slotConfig.start
   let tgt = slotTime cfg.praos.slotConfig slot
   threadDelayNDT (tgt `diffUTCTime` now)
   return slot
@@ -72,8 +85,8 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   { leios :: LeiosConfig
   , nodeId :: NodeId
   , buffers :: BuffersView m
-  , schedule :: SlotNo -> m [SomeRole]
-  , submit :: [SomeAction] -> m ()
+  , schedule :: SlotNo -> m [(SomeRole, Word64)]
+  , submit :: [([CPUTask], SomeAction)] -> m ()
   }
 
 blockGenerator ::
@@ -81,38 +94,43 @@ blockGenerator ::
   (MonadSTM m, MonadDelay m, MonadTime m) =>
   BlockGeneratorConfig m ->
   m ()
-blockGenerator BlockGeneratorConfig{..} = go 0
+blockGenerator BlockGeneratorConfig{..} = go (0, 0)
  where
-  go !blkId = do
-    slot <- waitNextSlot leios
+  go (!blkId, !tgtSlot) = do
+    slot <- waitNextSlot leios tgtSlot
     roles <- schedule slot
     (actions, blkId') <- runStateT (mapM (execute slot) roles) blkId
     submit actions
-    go blkId'
-  execute slot (SomeRole r) = SomeAction r <$> execute' slot r
-  execute' :: SlotNo -> Role a -> StateT Int m a
-  execute' slot Base = do
+    go (blkId', slot + 1)
+  execute slot (SomeRole r, wins) = assert (wins >= 1) $ second (SomeAction r) <$> execute' slot r wins
+  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m ([CPUTask], a)
+  execute' slot Base _wins = do
     rbData <- lift $ atomically $ buffers.newRBData
-    let body = mkRankingBlockBody leios rbData.freshestCertifiedEB rbData.txsPayload
-    -- TODO: maybe submit should do the fixupBlock.
-    return $! fixupBlock @_ @RankingBlock rbData.headAnchor (mkPartialBlock slot body)
-  execute' slot (Propose sub) = do
-    i <- nextBlkId InputBlockId
-    ibData <- lift $ atomically $ buffers.newIBData
-    let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
-    return $! mkInputBlock leios header ibData.txsPayload
-  execute' slot Endorse = do
-    i <- nextBlkId EndorseBlockId
-    ibs <- lift $ atomically $ buffers.ibs
-    return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
-  execute' slot Vote = do
-    votingFor <- lift $ atomically $ do
-      ibs <- buffers.ibs
-      ebs <- buffers.ebs
-      pure $ endorseBlocksToVoteFor leios slot ibs ebs
-    forM votingFor $ \eb -> do
+    let meb = rbData.freshestCertifiedEB
+    let !task = CPUTask $ fromMaybe 0 $ leios.delays.certificateCreation . snd <$> meb
+    let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
+    let !rb = mkPartialBlock slot body
+    return ([task], rb)
+  execute' slot Propose wins =
+    ([],) <$> do
+      ibData <- lift $ atomically $ buffers.newIBData
+      forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
+        i <- nextBlkId InputBlockId
+        let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
+        return $! mkInputBlock leios header ibData.txsPayload
+  execute' slot Endorse _wins =
+    ([],) <$> do
+      i <- nextBlkId EndorseBlockId
+      ibs <- lift $ atomically $ buffers.ibs
+      return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
+  execute' slot Vote votes =
+    ([],) <$> do
+      votingFor <- lift $ atomically $ do
+        ibs <- buffers.ibs
+        ebs <- buffers.ebs
+        pure $ endorseBlocksToVoteFor leios slot ibs ebs
       i <- nextBlkId VoteId
-      return $! mkVoteMsg leios i slot nodeId eb
+      return $! mkVoteMsg leios i slot nodeId votes votingFor
   nextBlkId :: (NodeId -> Int -> a) -> StateT Int m a
   nextBlkId f = do
     i <- get
