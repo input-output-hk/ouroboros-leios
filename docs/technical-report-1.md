@@ -557,4 +557,112 @@ The stake distribution has an important influence on the number of unique SPOs i
 ![Curve fit to stakepool distribution at epoch 500](../images/stake-fit.png)
 
 
+## Threat model
+
+The Leios protocol may have to mitigate the following categories of threats.
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate transactions
+
+The protocol already fully or partially mitigates many of these, but they are listed for completeness and eventual discussion in the Leios CIP. Others are a subject of ongoing research. The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lowered throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
+Below we comprehensively tabulation of such *hypothetical* threats. Nearly all of these are already mitigated by the protocol design, the incentive structure, or the cost of the resources needed to execute the threat. All are listed here for completeness and consideration.
+
+
+### Grinding and other threats to Praos
+
+Threats to the ranking blocks used by Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the possibility of *grinding attacks*, as discussed in [CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md), will always exist, albeit at low probability of success. Such an attack, which requires some stake, involves using CPU resources to try to manipulate the epoch nonce to a value which will result in higher probability of being select as an RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that the Praos VRF will be used for the sortition in Leios. Currently, large and expensive amounts of CPU power would be required to successfully conduct a grind attack on Praos. Nevertheless, additional research and development are underway to further harden Praos.
+
+|   # | Actor    | Method                             | Effect                           | Resources   | Mitigation                         | Notes                      |
+| --: | -------- | ---------------------------------- | -------------------------------- | ----------- | ---------------------------------- | -------------------------- |
+|   1 | Varies   | Threat to Praos                    | Leios is only as secure as Praos | -           | Varies                             | Already mitigated in Praos |
+|   2 | Producer | Grinding VRF on voting eligibility | Increased probability of voting  | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|   3 | Producer | Grinding VRF on IB eligibility     | Increased probability of IB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|   4 | Producer | Grinding VRF on EB eligibility     | Increased probability of EB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+
+
+### Equivocation
+
+In Leios, an IB producer, EB producers, or voter is only allowed one production for each winning of the sortition lottery. (Note that they may win more than once in the same slot because a lottery takes place for each lovelace staked.) A malicious producer or voter might create two conflicting IBs, EBs, or votes and diffuse them to different downstream peers in an attempt to disrupt the Leios protocol. The [Leios paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) mitigates this situation explicitly by identifying nodes that misbehave in this manner and notifying downstream peers in a controlled manner.
+
+|   # | Actor    | Method           | Effect                               | Resources | Mitigation      | Notes             |
+| --: | -------- | ---------------- | ------------------------------------ | --------- | --------------- | ----------------- |
+|   5 | Producer | Equivocated IB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|   6 | Producer | Equivocated EB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|   7 | Producer | Equivocated vote | Interferes with certificate creation | stake     | See Leios paper | Already mitigated |
+
+
+### Inaction and nuisance
+
+Producer nodes might also attempt to disrupt the protocol by failing to play their assigned role or by attempting to diffuse invalid information. Failing to produce a block (RB, IB, or EB) or to vote when entitled will result in the attacker receiving fewer rewards for their Leios work. Similarly for creating invalid blocks or votes. Very little advantage would be gained by such attacks because they really only reduce throughput or create a minor annoyance to their first downstream nodes by burdening them with useless verification work. Presumably, the loss of rewards would not compensate for the small disruption they create. The cryptographic aspects of Leios quickly catch invalid blocks or votes, of course.
+
+|   # | Actor    | Method                                            | Effect                                                   | Resources   | Mitigation                                         | Notes             |
+| --: | -------- | ------------------------------------------------- | -------------------------------------------------------- | ----------- | -------------------------------------------------- | ----------------- |
+|   8 | Producer | Decline to create IB                              | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+|   9 | Producer | Decline to create EB                              | Lowers throughput                                        | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+|  10 | Producer | Decline to vote                                   | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  11 | Producer | Create invalid IB                                 | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  12 | Producer | Create invalid EB                                 | Resource burden on nodes; lowers throughput              | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+|  13 | Producer | Create invalid vote                               | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  14 | Producer | Include invalid txs in IB                         | Resource burden on nodes; lowers throughput              | stake       | Tx verification                                    | Already mitigated |
+|  15 | Producer | Include invalid IBs in EB                         | Resource burden on nodes; lowers throughput              | stake       | IB verification                                    | Already mitigated |
+|  16 | Producer | Include invalid certificate in RB                 | Lowers throughput; resource burden on nodes              | stake       | Certificate verification                           | Already mitigated |
+|  17 | Producer | Create valid certificate without sufficient votes | Manipulates inclusion of txs and hence dapps and oracles | CPU & stake | Strong cryptography for certificates               | R&D underway      |
+
+
+### Omission and manipulation
+
+In Praos, omitting transactions from a block being forged does not directly affect the producer's rewards, but it may reduce the overall size of the rewards pot for the whole epoch. However, a malicious producer has little leverage by such omissions because of the very high probability that the omitted transactions reside elsewhere in the memory pool and will soon be included in subsequent honest blocks. Reordering IBs when an EB is created is not an option for an attacker because the Leios paper specifies a fixed ordering.
+
+|   # | Actor    | Method                       | Effect                                                                                               | Resources | Mitigation                          | Notes                            |
+| --: | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------- |
+|  18 | Producer | Omit txs when creating IB    | Lowers throughput; increases propagation speed of malicious IB; manipulate Dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+|  19 | Producer | Omit IBs when creating EB    | Lowers throughput; increases propagation speed of malicious EB; manipulate dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+|  20 | Producer | Reorder IBs when creating EB | Manipulate dapps                                                                                     | stake     | Impose canonical order of IBs in EB | Already mitigated in Leios paper |
+
+
+### Network interference
+
+Malicious network activity such as violating the sync protocol or delaying diffusion of block or votes creates a minor annoyance that the node's sync protocol will quickly avoid by preferring efficient and honest nodes. Large numbers of malicious relays would be needed to impinge on efficiency even in a small degree.
+
+|   # | Actor | Method                       | Effect                                             | Resources | Mitigation              | Notes             |
+| --: | ----- | ---------------------------- | -------------------------------------------------- | --------- | ----------------------- | ----------------- |
+|  21 | Relay | Abuse sync protocol          | Resource burden on nodes; introduces latency       | -         | Design of sync protocol | Already mitigated |
+|  22 | Relay | Delay diffusion of valid IBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+|  23 | Relay | Delay diffusion of valid EBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+|  24 | Relay | Delay diffusion of votes     | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+
+
+### Denial of service
+
+Transaction-based denial of service attacks on Leios would involve submitting numerous invalid, duplicate, or conflicting transactions to different nodes so that they would all make their way into the memory pool and then to IBs, only to be invalidated when transaction reconciliation occurs after those IBs are indirectly referenced by a certificate on a Praos ranking block. Such a denial of service would result in extra computation by the nodes and wasted permanent storage in the IBs. (Plutus transactions may be especially burdensome in this respect.) Ongoing research will mitigate such denial of service via sharding techniques and Leios's fee structure. Sharding will prevent duplicate transactions from reaching IBs and the fee structure will enforce payment for intentionally conflicted transactions, even though only one of the transactions would make it onto the ledger.
+
+|   # | Actor  | Method                                                 | Effect                                                                                          | Resources | Mitigation | Notes             |
+| --: | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------- | ---------- | ----------------- |
+|  25 | Client | Submit invalid, duplicate, or conflicting transactions | Fills memory pool; increases tx duplication in RBs; lowers throughput; resource burden on nodes | ada       | Sharding   | Research underway |
+
+
+### Insights regarding threats
+
+1. The Leios protocol already mitigates most of the threats identified.
+    1. Anti-grinding for Leios depends upon the Praos anti-grinding R&D.
+    2. Sharding, incentives/rewards/fees, and memory pool design need to account for potential threats.
+2. Some attacks may reduce the efficiency and throughput of Leios, but not threaten its security.
+    1. Short Leios is vulnerable to reduced efficiency in ways that Full Leios is not.
+    2. Simulation studies can measure the extent of this reduced efficiency as a function of the intensity of the attack.
+    3. Simulations of the behavior of the "freshest first" aspect of Leios are required.
+3. Loss of rewards disincentivizes nuisance attacks.
+
+
 ## Findings and conclusions

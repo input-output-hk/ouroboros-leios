@@ -59,6 +59,28 @@ Recommendations:
 
 ## 2024-12-10
 
+### Threat model
+
+The technical report now contains a draft section on [the Leios threat mode](docs/technical-report-1.md#threat-model) detailing 25 hypothetical threats. The general types are . . .
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate txs
+
+The protocol already fully or partially mitigates many of these, but they are listed for completeness and eventual discussion in the Leios CIP. Others are a subject of ongoing research.
+
+The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lower throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
 ### Summary of mainnet data available
 
 - [These slides](https://docs.google.com/presentation/d/1Iy2Vu3jZMsHFrvqmiM8urK9EVXbYJW0knb5XQ7w2tZE/edit?usp=sharing) summarize data we have available for topology, block propagation, transaction delays, etc.
