@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2024-12-12
+
+### Rust simulation
+
+Merged virtual time branch. The rust simulation logic is now decoupled from wall clock time.
+
+Experimented with using netsim for the networking layer again. It works, but we currently have to simulate network activity 1ms at a time, making the simulation slow. Waiting for the netsim API to expose a "lower bound" of how long to wait until another message will arrive.
+
 ## 2024-12-11
 
 ### Discussion with IOG SRE for nodes
@@ -7,7 +15,7 @@
 We met with IOG's SRE for node operations to discuss cloud engineering aspects of the current Cardano node deployments that might be relevant for Leios.
 
 - We have information now about what VM sizes are for nodes and each relay.
-- We also have acess to the grafana dashboards for examining mainnet and other nodes.
+- We also have access to the grafana dashboards for examining mainnet and other nodes.
 - They've created custom grafana queries so we can see I/O, network, and disk usage.
 
 Recommendations:
@@ -24,11 +32,20 @@ Recommendations:
 - Will can reformat data we need for our simulations, so we don't end up with inconsistent input data sets.
 - We will use the [beta-distribution fit](docs/technical-report-1.md#stake-distribution) for representing the unevenness of the stake distribution in our simulations.
 
+
+### Rust simulation
+
+Generated new test data set to match geographical distribution of mainnet nodes. In this dataset, nodes belong to a region (and have an explicit region tag) and are physically clustered near other nodes in that region.
+
 ## 2024-12-09
 
 ### Nix development environment
 
 We previously had a `nix develop` environment for the Haskell simulation, but this was removed as the Haskell package evolved. Instead of re-nixifying this repository, I created a separate [ouroboros-leios.env](https://github.com/functionally/ouroboros-leios.env) repository where one can open a `nix develop` with the correct Haskell compiler and dependencies.
+
+### Rust simulation
+
+Roland has written a fully virtual clock. When finished, this will decouple the sim's performance from the wall clock, and ensure traffic timings are still correct even when there are too many messages to simulate in real time.
 
 ## 2024-12-06
 
