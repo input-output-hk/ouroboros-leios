@@ -1,0 +1,105 @@
+title: {
+  label: "delta-q - Component Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  subcomponent: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
+}
+
+# Web Application Container
+web-app: {
+  class: container
+  label: "Web Application"
+
+  editor: {
+    class: component
+    label: "Editor\n\nWeb-based editor for\nΔQ expressions"
+  }
+
+  visualizer: {
+    class: component
+    label: "Visualizer\n\nRenders CDFs and\nresource usage graphs"
+  }
+
+  storage: {
+    class: component
+    label: "Local Storage\n\nPersists expressions\nand models"
+  }
+}
+
+# Core Engine Container
+core: {
+  class: container
+  label: "Core Engine"
+
+  parser: {
+    class: component
+    label: "Parser\n\nParses ΔQ expressions\nand metrics"
+  }
+
+  evaluator: {
+    class: component
+    label: "Evaluator\n\nComputes CDFs and\nresource metrics"
+  }
+
+  gossip: {
+    class: component
+    label: "Gossip Engine\n\nImplements gossip\noperator evaluation"
+  }
+}
+
+# Dependencies Container
+deps: {
+  class: container
+  label: "Dependencies"
+
+  yew: {
+    class: component
+    label: "Yew Framework\n\nRust/WASM web\nframework"
+  }
+
+  wasm: {
+    class: component
+    label: "WASM Bindings\n\nWeb APIs and\nJavaScript interop"
+  }
+}
+
+# Relationships
+web-app.editor -> core.parser: "Sends expressions"
+web-app.editor -> web-app.storage: "Saves/loads"
+web-app.visualizer -> core.evaluator: "Gets results"
+core.parser -> core.evaluator: "Provides AST"
+core.evaluator -> core.gossip: "Uses for gossip\noperations"
+web-app -> deps.yew: "Built with"
+deps.yew -> deps.wasm: "Uses"
