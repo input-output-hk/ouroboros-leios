@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2024-12-13
+
+### Haskell simulation
+
+- Merged leios visualizations on `main`.
+- P2P visualization improvements:
+  * Block types are differentiated by shapes, and pipelines by color.
+  * Charting diffusion latency of each block type.
+  * TODO: chart CPU usage.
+- Reworked generation of EBs and Votes to handle `>= 1` frequencies
+  like IBs (except max 1 EB per pipeline per node).
+- Visualizations helped with discovering and fixing some modeling errors.
+
 ## 2024-12-12
 
 ### Review Session 1 - Formal Specification
