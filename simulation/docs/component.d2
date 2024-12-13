@@ -70,17 +70,17 @@ channel-layer: {
 
   chan: {
     class: component
-    label: "Generic Channel\n\nAbstract channel\ninterface"
+    label: "Generic Channel\n\nBase channel abstraction"
   }
 
   tcp: {
     class: component
-    label: "TCP Channel\n\nSimulates TCP connections\nand latency"
+    label: "TCP Channel\n\nSimulates TCP behavior"
   }
 
   mux: {
     class: component
-    label: "Channel Multiplexer\n\nMultiplexes protocol\nmessages"
+    label: "Channel Multiplexer\n\nMultiplexes protocols"
   }
 
   driver: {
@@ -108,6 +108,11 @@ viz-engine: {
     class: component
     label: "P2P Visualizer\n\nVisualizes P2P\nnetwork state"
   }
+
+  frame-output: {
+    class: component
+    label: "Frame Output\n\nOutputs animation frames\nas PNG files"
+  }
 }
 
 # Event Monitor Container
@@ -117,12 +122,12 @@ monitor: {
 
   metrics: {
     class: component
-    label: "Metrics Collector\n\nCollects performance\nmetrics"
+    label: "Metrics Collector\n\nCollects in-memory\nperformance metrics"
   }
 
   tracer: {
     class: component
-    label: "Event Tracer\n\nTraces protocol and\nnetwork events"
+    label: "Event Tracer\n\nTraces protocol and\nnetwork events in memory"
   }
 }
 
@@ -145,9 +150,12 @@ viz-engine.relay-viz -> protocol-engine.relay: "Visualizes state"
 viz-engine.p2p-viz -> channel-layer.tcp: "Visualizes network"
 viz-engine.layout -> viz-engine.relay-viz: "Provides layout"
 viz-engine.layout -> viz-engine.p2p-viz: "Provides layout"
+viz-engine.frame-output -> viz-engine.relay-viz: "Captures frames"
+viz-engine.frame-output -> viz-engine.p2p-viz: "Captures frames"
 
 # Monitoring Relationships
-monitor.metrics -> protocol-engine.node-manager: "Collects metrics"
+monitor.metrics -> viz-engine.relay-viz: "Provides metrics"
+monitor.metrics -> viz-engine.p2p-viz: "Provides metrics"
 monitor.tracer -> channel-layer.tcp: "Traces network"
 monitor.tracer -> protocol-engine.praos: "Traces consensus"
 monitor.tracer -> protocol-engine.leios: "Traces protocol"

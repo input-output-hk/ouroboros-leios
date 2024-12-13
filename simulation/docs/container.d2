@@ -39,12 +39,7 @@ classes: {
 
 user: {
   class: actor
-  label: "User\n\nPerson running\nthe simulation"
-}
-
-filesystem: {
-  class: external
-  label: "Filesystem\n[External System]\n\nStores configuration\nand results"
+  label: "User\n\nSimulation operator"
 }
 
 protocol-engine: {
@@ -59,7 +54,7 @@ network: {
 
 monitor: {
   class: container
-  label: "Event Monitor\n[Haskell]\n\nCollects metrics and\ntraces protocol events"
+  label: "Event Monitor\n[Haskell]\n\nCollects in-memory metrics\nand traces events"
 }
 
 viz: {
@@ -67,20 +62,24 @@ viz: {
   label: "Visualization Engine\n[Haskell]\n\nRenders protocol and\nnetwork state"
 }
 
+filesystem: {
+  class: external
+  label: "Filesystem\n\nStores configuration and\nanimation frames"
+}
+
 # Relationships
 user -> viz: "Views protocol\nbehavior"
 user -> filesystem: "Configures simulation\nparameters"
 
-viz -> filesystem: "Reads config files"
+viz -> filesystem: "Reads config files and\nwrites animation frames"
 viz -> protocol-engine: "Visualizes protocol state"
 viz -> network: "Visualizes network state"
 viz -> monitor: "Displays metrics"
 
 protocol-engine -> network: "Uses for message transport"
 protocol-engine -> monitor: "Emits protocol events"
+protocol-engine -> filesystem: "Reads protocol config"
 
 network -> monitor: "Reports network metrics"
-
-monitor -> filesystem: "Writes event logs"
 
 filesystem -> user: "Provides simulation\nresults"
