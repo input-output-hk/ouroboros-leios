@@ -9,11 +9,19 @@ import { getOffsetCoordinates, isClickOnNode } from "../utils";
 export const Canvas: FC = () => {
   const { drawTopography } = useHandlers();
   const {
-    state: { canvasRef, canvasOffsetX, canvasOffsetY, canvasScale, topography },
+    state: {
+      canvasRef,
+      canvasOffsetX,
+      canvasOffsetY,
+      canvasScale,
+      topography,
+      currentNode,
+    },
     dispatch,
   } = useGraphContext();
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const pointerCapture = useRef<number>();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,7 +37,7 @@ export const Canvas: FC = () => {
       height,
       canvasScale,
     );
-    
+
     dispatch({
       type: "SET_CANVAS_PROPS",
       payload: {
@@ -40,17 +48,16 @@ export const Canvas: FC = () => {
   }, []);
 
   const handleClick = useCallback(
-    (ev: MouseEvent) => {
+    (ev: PointerEvent) => {
       const canvas = canvasRef.current;
-      if (!canvas || ev.target !== canvas || isDragging.current) {
+      if (!canvas || ev.target !== canvas) {
         return;
       }
 
       const rect = canvas.getBoundingClientRect();
       const x = ev.clientX - rect.left;
       const y = ev.clientY - rect.top;
-      console.log(canvasScale);
-      const { node } = isClickOnNode(
+      const { node, clicked } = isClickOnNode(
         x,
         y,
         topography,
@@ -60,9 +67,11 @@ export const Canvas: FC = () => {
         canvasScale,
       );
 
-      dispatch({ type: "SET_CURRENT_NODE", payload: node });
+      if (clicked && node) {
+        dispatch({ type: "SET_CURRENT_NODE", payload: currentNode === node ? undefined : node });
+      }
     },
-    [canvasScale, canvasOffsetX, canvasOffsetY],
+    [canvasScale, currentNode, canvasOffsetX, canvasOffsetY],
   );
 
   const handleWheel = useCallback(
@@ -95,17 +104,19 @@ export const Canvas: FC = () => {
     [canvasOffsetX, canvasOffsetY],
   );
 
-  const handleMouseDown = useCallback((ev: MouseEvent) => {
+  const handlePointerDown = useCallback((ev: PointerEvent) => {
     const canvas = canvasRef.current;
-    if (!canvas || ev.target !== canvas) {
+    if (!canvas || ev.target !== canvas || ev.button !== 0) {
       return;
     }
 
     isDragging.current = true;
+    canvas.setPointerCapture(ev.pointerId);
+    pointerCapture.current = ev.pointerId;
     dragStart.current = { x: ev.clientX, y: ev.clientY };
   }, []);
 
-  const handleMouseMove = useCallback((ev: MouseEvent) => {
+  const handlePointerMove = useCallback((ev: PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas || ev.target !== canvas || !isDragging.current) {
       return;
@@ -129,40 +140,45 @@ export const Canvas: FC = () => {
     dragStart.current = { x: ev.clientX, y: ev.clientY };
   }, []);
 
-  const handleMouseUp = useCallback((ev: MouseEvent) => {
+  const handlePointerUp = useCallback((ev: PointerEvent) => {
     const canvas = canvasRef.current;
-    if (!canvas || ev.target !== canvas) {
+    if (!canvas || ev.target !== canvas || ev.button !== 0) {
       return;
     }
 
     isDragging.current = false;
+    pointerCapture.current = undefined;
+    canvas.releasePointerCapture(ev.pointerId);
   }, []);
 
   useEffect(() => {
     drawTopography();
-    
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("click", handleClick);
-    document.addEventListener("wheel", handleWheel);
+
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerup", handleClick);
+    canvas.addEventListener("wheel", handleWheel);
 
     const redraw = debounce(drawTopography, 100);
     document.addEventListener("resize", redraw);
 
     return () => {
       document.removeEventListener("resize", redraw);
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("click", handleClick);
-      document.removeEventListener("wheel", handleWheel);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerup", handleClick);
+      canvas.removeEventListener("wheel", handleWheel);
     };
   }, [drawTopography, handleClick, handleWheel]);
 
   return (
-    <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
-      <canvas ref={canvasRef} />
-    </div>
+    <canvas ref={canvasRef} />
   );
 };

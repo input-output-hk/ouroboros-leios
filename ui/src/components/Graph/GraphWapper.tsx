@@ -4,7 +4,8 @@ import { GraphContextProvider } from "@/contexts/GraphContext/GraphContextProvid
 import { FC } from "react";
 import { Canvas } from "./modules/Canvas";
 import { Controls } from "./modules/Controls";
-import { Slider } from "./modules/Slider";
+import { NodeStats } from "./modules/NodeStats";
+import { Progress } from "./modules/Slider";
 import { Stats } from "./modules/Stats";
 import { IServerNodeMap } from "./types";
 
@@ -19,19 +20,18 @@ export const GraphWrapper: FC<IGraphWrapperProps> = ({
 }) => {
   return (
     <GraphContextProvider maxTime={maxTime} topography={topography}>
-      <div className="container mx-auto">
-        <div className="flex items-center justify-center gap-4 my-4 max-w-3xl mx-auto">
-          <Slider />
-          <Controls />
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
+        <Stats />
+      </div>
+      <div className="flex items-center justify-between gap-4 relative h-screen w-screen">
+        <div className="w-full h-full relative">
           <Canvas />
-          <div className="flex flex-col w-1/3 items-center justify-between gap-4">
-            <div className="w-full h-[400px]">
-              <Stats />
-              {/* <ChartTransactionsSent /> */}
-            </div>
+          <NodeStats />
+        </div>
+        <div className="absolute bottom-12 w-full">
+          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 max-w-3xl mx-auto bg-white/80 backdrop-blur-sm">
+            <Controls />
+            <Progress />
           </div>
         </div>
       </div>

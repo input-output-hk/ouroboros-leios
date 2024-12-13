@@ -63,7 +63,7 @@ export type TGraphContextActions =
     canvasScale: ((prev: number) => number) | number,
     canvasOffsetX: ((prev: number) => number) | number,
     canvasOffsetY: ((prev: number) => number) | number
-  } }
+  }> }
   | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
     type: "BATCH_UPDATE";

@@ -104,16 +104,15 @@ export async function GET(req: Request, res: Response) {
 
           try {
             // Process 10k events at a time.
-            for (const line of eventBuffer.splice(0, 10000)) {
+            const batch = eventBuffer.splice(0, 10000);
+            for (const line of batch) {
               const data: IServerMessage = JSON.parse(line);
               processMessage(data, aggregatedData);
             }
 
-            const nextTime = eventBuffer.length > 0 ? JSON.parse(eventBuffer[0]).time / 1_000_000 : maxTime;
-            const progress = nextTime / maxTime;
             const serializedData = {
               ...aggregatedData,
-              progress,
+              progress: JSON.parse(batch[batch.length - 1]).time / 1_000_000,
               nodes: Array.from(aggregatedData.nodes.entries()),
             };
 

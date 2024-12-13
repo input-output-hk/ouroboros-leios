@@ -3,8 +3,9 @@ import {
   useGraphContext,
 } from "@/contexts/GraphContext/context";
 import { useCallback } from "react";
-import { getOffsetCoordinates } from "../utils";
 
+import { DEFAULT_SCALE } from "@/app/constants";
+import { getOffsetCoordinates } from "../utils";
 
 export const useHandlers = () => {
   const {
@@ -54,6 +55,11 @@ export const useHandlers = () => {
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
       context.strokeStyle = "#ddd";
+
+      if (link.source === Number(currentNode) || link.target === Number(currentNode)) {
+        context.strokeStyle = "black";
+      }
+
       context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
       context.stroke();
     });
@@ -61,20 +67,22 @@ export const useHandlers = () => {
     // Draw the nodes
     topography.nodes.forEach((node) => {
       context.beginPath();
-      context.arc(node.fx, node.fy, Math.min((1 / canvasScale) * 6, 1), 0, 2 * Math.PI);
-      context.fillStyle = node.data.stake ? "green" : "blue";
+      context.arc(
+        node.fx,
+        node.fy,
+        Math.min((1 / canvasScale) * 6, 1),
+        0,
+        2 * Math.PI,
+      );
+      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
       context.stroke();
-      context.lineWidth = Math.min((1 / canvasScale) * 6, 1);
-      
-      const hasData = aggregatedData.nodes.has(node.id.toString());
-      if (hasData) {
-        context.strokeStyle = "red";
-      } else {
-        context.strokeStyle = "black";
-      }
+      context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
+      context.strokeStyle = "black";
 
       if (currentNode === node.id.toString()) {
-        context.fillStyle = "red";
+        context.fillStyle = "blue";
+      } else if (!node.data.stake) {
+        context.fillStyle = "gray"
       }
 
       context.fill();
@@ -89,7 +97,7 @@ export const useHandlers = () => {
     currentNode,
     canvasOffsetX,
     canvasOffsetY,
-    canvasScale
+    canvasScale,
   ]);
 
   const handleResetSim = useCallback(() => {
@@ -104,7 +112,7 @@ export const useHandlers = () => {
       topography,
       width,
       height,
-      canvasScale,
+      4,
     );
 
     dispatch({
@@ -114,12 +122,12 @@ export const useHandlers = () => {
         aggregatedData: defaultAggregatedData,
         canvasOffsetX: offsetX,
         canvasOffsetY: offsetY,
-        canvasScale: 4
+        canvasScale: DEFAULT_SCALE,
       },
     });
 
     drawTopography();
-  }, []);
+  }, [topography]);
 
   return {
     handleResetSim,

@@ -8,21 +8,21 @@ export const Controls: FC = memo(() => {
   const { startStream, streaming } = useStreamMessagesHandler();
 
   return (
-    <>
+    <div className="min-w-[200px] flex items-center justify-end gap-4">
       <button
-        className="bg-blue-500 text-white rounded-md px-4 py-2"
+        className="bg-[blue] text-white rounded-md px-4 py-2"
         onClick={startStream}
         disabled={streaming}
       >
-        {streaming ? "Aggregating..." : "Aggregate"}
+        {streaming ? "Running..." : "Run Sim"}
       </button>
       <button
         disabled={streaming}
-        className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
+        className="bg-gray-400 text-white w-[80px] rounded-md px-4 py-2"
         onClick={handleResetSim}
       >
         Reset
       </button>
-    </>
+    </div>
   );
 });

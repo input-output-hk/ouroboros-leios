@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_SCALE } from "@/app/constants";
 import { Context, createContext, useContext } from "react";
 import { IGraphContext, IGraphContextState, ISimulationAggregatedDataState } from "./types";
 
@@ -11,7 +12,7 @@ export const defaultState: IGraphContextState = {
   canvasRef: { current: null },
   canvasOffsetX: 0,
   canvasOffsetY: 0,
-  canvasScale: 4,
+  canvasScale: DEFAULT_SCALE,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   topography: { links: new Map(), nodes: new Map() },
