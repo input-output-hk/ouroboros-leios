@@ -51,10 +51,19 @@ export enum EMessageType {
   TransactionGenerated = "TransactionGenerated",
   TransactionReceived = "TransactionReceived",
   TransactionSent = "TransactionSent",
-  InputBlockReceived = "InputBlockReceived",
-  PraosBlockReceived = "PraosBlockReceived",
-  Slot = "Slot",
   InputBlockGenerated = "InputBlockGenerated",
+  InputBlockReceived = "InputBlockReceived",
+  InputBlockSent = "InputBlockSent",
+  PraosBlockGenerated = "PraosBlockGenerated",
+  PraosBlockReceived = "PraosBlockReceived",
+  PraosBlockSent = "PraosBlockSent",
+  EndorserBlockGenerated = "EndorserBlockGenerated",
+  EndorserBlockReceived = "EndorserBlockReceived",
+  EndorserBlockSent = "EndorserBlockSent",
+  VotesGenerated = "VotesGenerated",
+  VotesReceived = "VotesReceived",
+  VotesSent = "VotesSent",
+  Slot = "Slot",
 }
 
 export interface ITransactionGenerated {
@@ -78,8 +87,20 @@ export interface ITransactionSent {
   recipient: number;
 }
 
+export interface IInputBlockGenerated {
+  type: EMessageType.InputBlockGenerated;
+  id: string;
+  slot: number;
+  producer: number;
+  index: number;
+  vrf: number;
+  timestamp: number;
+  transactions: number[];
+}
+
 export interface IInputBlockReceived {
   type: EMessageType.InputBlockReceived;
+  id: string;
   slot: number;
   producer: number;
   index: number;
@@ -87,9 +108,12 @@ export interface IInputBlockReceived {
   recipient: number;
 }
 
-export interface IPraosBlockReceived {
-  type: EMessageType.PraosBlockReceived;
+export interface IInputBlockSent {
+  type: EMessageType.InputBlockSent;
+  id: string;
   slot: number;
+  producer: number;
+  index: number;
   sender: number;
   recipient: number;
 }
@@ -99,20 +123,93 @@ export interface ISlot {
   number: number;
 }
 
-export interface IInputBlockGenerated {
-  type: EMessageType.InputBlockGenerated;
+export interface IPraosBlockGenerated {
+  type: EMessageType.PraosBlockGenerated;
+  id: string;
   slot: number;
   producer: number;
-  index: number;
-  vrf: number;
-  timestamp: number;
-  transactions: number[];
+}
+
+export interface IPraosBlockReceived {
+  type: EMessageType.PraosBlockReceived;
+  id: string;
+  slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IPraosBlockSent {
+  type: EMessageType.PraosBlockSent;
+  slot: number;
+  id: string;
+  sender: number;
+  recipient: number;
+}
+
+export interface IEndorserBlockGenerated {
+  type: EMessageType.EndorserBlockGenerated;
+  id: string;
+  slot: number;
+  producer: number;
+  blocks: any[] // @todo
+}
+
+export interface IEndorserBlockReceived {
+  type: EMessageType.EndorserBlockReceived;
+  id: string;
+  slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IEndorserBlockSent {
+  type: EMessageType.EndorserBlockSent;
+  slot: number;
+  id: string;
+  sender: number;
+  recipient: number;
+}
+
+export interface IVotesGenerated {
+  type: EMessageType.VotesGenerated;
+  id: {
+    id: string;
+    slot: number;
+    producer: number;
+  };
+  slot: number;
+  ebs: any[] // @todo
+}
+
+export interface IVotesReceived {
+  type: EMessageType.VotesReceived;
+  id: string;
+  slot: number;
+  sender: number;
+  recipient: number;
+}
+
+export interface IVotesSent {
+  type: EMessageType.VotesSent;
+  slot: number;
+  id: string;
+  sender: number;
+  recipient: number;
 }
 
 export type TMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
+  | IInputBlockSent
+  | IPraosBlockGenerated
   | IPraosBlockReceived
+  | IPraosBlockSent
+  | IEndorserBlockGenerated
+  | IEndorserBlockReceived
+  | IEndorserBlockSent
+  | IVotesGenerated
+  | IVotesReceived
+  | IVotesSent
   | ISlot
   | ITransactionGenerated
   | ITransactionReceived

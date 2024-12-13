@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
-    time::Duration,
 };
 
 use anyhow::Result;
@@ -92,7 +91,7 @@ impl EventMonitor {
         let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
         let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
 
-        let mut last_timestamp = Timestamp(Duration::from_secs(0));
+        let mut last_timestamp = Timestamp::zero();
         let mut total_slots = 0u64;
         let mut praos_txs = 0u64;
         let mut published_bytes = 0u64;

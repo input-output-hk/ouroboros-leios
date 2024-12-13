@@ -1,95 +1,142 @@
-import {
-  EMessageType,
-  IServerMessage,
-  ITransactionGenerated,
-  ITransactionMessage,
-  ITransactionReceived,
-  ITransactionSent,
-} from "@/components/Graph/types";
+import { EMessageType, IServerMessage } from "@/components/Graph/types";
 import { createReadStream, statSync } from "fs";
 import readline from "readline";
-import { ITransactionsData } from "./types";
 
-export const processMessage = (json: IServerMessage, {
-  byId,
-  generated,
-  sent,
-  received
-}: ITransactionsData) => {
+import {
+  ISimulationAggregatedData,
+  ISimulationAggregatedDataState,
+} from "@/contexts/GraphContext/types";
+
+export const incrementNodeAggregationData = (
+  aggregationNodeDataRef: ISimulationAggregatedDataState["nodes"],
+  id: string,
+  key: keyof ISimulationAggregatedData,
+) => {
+  const matchingNode = aggregationNodeDataRef.get(id);
+  aggregationNodeDataRef.set(id, {
+    ebGenerated: 0,
+    ebReceived: 0,
+    ebSent: 0,
+    ibGenerated: 0,
+    ibReceived: 0,
+    ibSent: 0,
+    pbGenerated: 0,
+    pbReceived: 0,
+    pbSent: 0,
+    txGenerated: 0,
+    txReceived: 0,
+    txSent: 0,
+    votesGenerated: 0,
+    votesReceived: 0,
+    votesSent: 0,
+    ...matchingNode,
+    [key]: (matchingNode?.[key] || 0) + 1,
+  });
+};
+
+export const processMessage = (
+  json: IServerMessage,
+  aggregatedData: ISimulationAggregatedDataState,
+) => {
   const { message } = json;
 
   if (message.type === EMessageType.TransactionGenerated) {
-    generated.set(
-      message.id,
-      json as IServerMessage<ITransactionGenerated>,
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.publisher.toString(),
+      "txGenerated",
     );
   } else if (message.type === EMessageType.TransactionSent) {
-    let sentMessages = sent.get(message.id) || [];
-    sentMessages.push(json as IServerMessage<ITransactionSent>);
-    sent.set(message.id, sentMessages);
-
-    // Generation will always come first.
-    const generatedMsg = generated.get(
-      message.id,
-    ) as IServerMessage<ITransactionGenerated>;
-    const receivedMessages = received.get(message.id) || [];
-
-    for (const receivedMsg of receivedMessages) {
-      if (
-        receivedMsg.message.sender === message.sender &&
-        receivedMsg.message.recipient === message.recipient
-      ) {
-        const transaction: ITransactionMessage = {
-          id: message.id,
-          duration:
-            Math.floor(receivedMsg.time / 1_000_000) -
-            Math.floor(json.time / 1_000_000),
-          source: message.sender,
-          target: message.recipient,
-          sentTime: Math.floor(json.time / 1_000_000),
-          generated: Math.floor(generatedMsg?.time || 0 / 1_000_000),
-        };
-
-        let transactionList = byId.get(message.id) || [];
-        transactionList.push(transaction);
-        byId.set(message.id, transactionList);
-      }
-    }
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "txSent",
+    );
   } else if (message.type === EMessageType.TransactionReceived) {
-    let receivedMessages = received.get(message.id) || [];
-    receivedMessages.push(json as IServerMessage<ITransactionReceived>);
-    received.set(message.id, receivedMessages);
-
-    const generatedMsg = generated.get(
-      message.id,
-    ) as IServerMessage<ITransactionGenerated>;
-    const sentMessages = sent.get(message.id) || [];
-
-    for (const sentMsg of sentMessages) {
-      if (
-        sentMsg.message.sender === message.sender &&
-        sentMsg.message.recipient === message.recipient
-      ) {
-        const transaction: ITransactionMessage = {
-          id: message.id,
-          duration:
-            Math.floor(json.time / 1_000_000) -
-            Math.floor(sentMsg.time / 1_000_000),
-          source: message.sender,
-          target: message.recipient,
-          sentTime: Math.floor(sentMsg.time / 1_000_000),
-          generated: Math.floor(generatedMsg?.time || 0 / 1_000_000),
-        };
-
-        let transactionList = byId.get(message.id) || [];
-        transactionList.push(transaction);
-        byId.set(message.id, transactionList);
-      }
-    }
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "txReceived",
+    );
+  } else if (message.type === EMessageType.InputBlockGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.producer.toString(),
+      "ibGenerated",
+    );
+  } else if (message.type === EMessageType.InputBlockSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "ibSent",
+    );
+  } else if (message.type === EMessageType.InputBlockReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "ibReceived",
+    );
+  } else if (message.type === EMessageType.PraosBlockGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.producer.toString(),
+      "pbGenerated",
+    );
+  } else if (message.type === EMessageType.PraosBlockSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "pbSent",
+    );
+  } else if (message.type === EMessageType.PraosBlockReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "pbReceived",
+    );
+  } else if (message.type === EMessageType.EndorserBlockGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.producer.toString(),
+      "ebGenerated",
+    );
+  } else if (message.type === EMessageType.EndorserBlockSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "ebSent",
+    );
+  } else if (message.type === EMessageType.EndorserBlockReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "ebReceived",
+    );
+  } else if (message.type === EMessageType.VotesGenerated) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.id.id.toString(),
+      "votesGenerated",
+    );
+  } else if (message.type === EMessageType.VotesSent) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.sender.toString(),
+      "votesSent",
+    );
+  } else if (message.type === EMessageType.VotesReceived) {
+    incrementNodeAggregationData(
+      aggregatedData.nodes,
+      message.recipient.toString(),
+      "votesReceived",
+    );
   }
 };
 
-export async function findStartPosition(filePath: string, targetTimestamp: number) {
+export async function findStartPosition(
+  filePath: string,
+  targetTimestamp: number,
+) {
   const fileSize = statSync(filePath).size;
   let left = 0;
   let right = fileSize;
