@@ -14,7 +14,7 @@ import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), benchTopologyToSimpleTopology, forgetUnusedFieldsInBenchTopology, grToSimpleTopology, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology, withNodeNames)
+import Topology (ClusterName (..), NodeName (..), addNodeNames, benchTopologyToSimpleTopology, forgetUnusedFieldsInBenchTopology, grToSimpleTopology, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
@@ -23,6 +23,7 @@ tests =
     , testProperty "prop_GrToSimpleTopologyToGrIsIso" prop_GrToSimpleTopologyToGrIsIso
     ]
 
+-- | Test that the conversion between BenchTopology and SimpleTopology preserves the topology.
 test_BenchTopologyToSimpleTopologyToBenchTopologyIsIso :: Assertion
 test_BenchTopologyToSimpleTopologyToBenchTopologyIsIso = do
   -- Find test/data/BenchTopology/topology-dense-52.json
@@ -42,9 +43,10 @@ test_BenchTopologyToSimpleTopologyToBenchTopologyIsIso = do
   let benchTopology2 = sortBenchTopology . simpleTopologyToBenchTopology $ simpleTopology
   assertEqual "Conversion to/from SimpleTopology does not preserve topology" benchTopology1 benchTopology2
 
+-- | Test that the conversion between SimpleTopology and FGL Graphs preserves the topology.
 prop_GrToSimpleTopologyToGrIsIso :: SimpleGraph Gr (Maybe ClusterName) Latency -> Bool
 prop_GrToSimpleTopologyToGrIsIso gr = do
-  let gr1 = withNodeNames . nmeGraph . looplessGraph $ gr
+  let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
   let gr2 = simpleTopologyToGr . grToSimpleTopology $ gr1
   gr1 == gr2
 

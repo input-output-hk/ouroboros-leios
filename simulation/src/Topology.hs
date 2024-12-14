@@ -119,10 +119,11 @@ instance FromJSON BenchTopology where
 readBenchTopology :: FilePath -> IO BenchTopology
 readBenchTopology = throwDecode <=< BSL.readFile
 
+-- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
 sortBenchTopology :: BenchTopology -> BenchTopology
 sortBenchTopology benchTopology =
   BenchTopology
-    { coreNodes = V.fromList . sortBy (compare `on` (.nodeId)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
+    { coreNodes = V.fromList . sortBy (compare `on` (.name)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
     }
  where
   sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
@@ -132,6 +133,7 @@ sortBenchTopology benchTopology =
       , ..
       }
 
+-- | Helper for testing. Forgets fields that are not represented by `SimpleTopology`.
 forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
 forgetUnusedFieldsInBenchTopology benchTopology =
   BenchTopology
@@ -238,6 +240,7 @@ instance ToJSON SimpleTopology where
 instance FromJSON SimpleTopology where
   parseJSON = genericParseJSON simpleNodeOptions
 
+-- | Convert a 'BenchTopology' to a 'SimpleTopology' using the 'Latencies' read from the latency database.
 benchTopologyToSimpleTopology :: Latencies -> BenchTopology -> SimpleTopology
 benchTopologyToSimpleTopology latencies benchTopology =
   SimpleTopology{nodes = benchTopologyNodeToSimpleNode <$> benchTopology.coreNodes}
@@ -251,6 +254,7 @@ benchTopologyToSimpleTopology latencies benchTopology =
       , clusterName = regionNameToClusterName <$> benchTopologyNode.region
       }
 
+-- | Helper for testing. Partial inverse of 'benchTopologyToSimpleTopology'.
 simpleTopologyToBenchTopology :: SimpleTopology -> BenchTopology
 simpleTopologyToBenchTopology simpleTopology =
   BenchTopology
@@ -269,21 +273,26 @@ simpleTopologyToBenchTopology simpleTopology =
       , stakePool = Nothing
       }
 
+-- | Read a 'SimpleTopology' from a 'BenchTopology' file and a 'Latencies' database.
 readSimpleTopologyFromBenchTopologyAndLatency :: FilePath -> FilePath -> IO SimpleTopology
 readSimpleTopologyFromBenchTopologyAndLatency benchTopologyFile latencyFile = do
   benchTopology <- readBenchTopology benchTopologyFile
   latencies <- readLatencies benchTopology latencyFile
   pure $ benchTopologyToSimpleTopology latencies benchTopology
 
+-- | Read a 'SimpleTopology' from a JSON file.
 readSimpleTopology :: FilePath -> IO SimpleTopology
 readSimpleTopology = throwDecode <=< BSL.readFile
 
+-- | Write a 'SimpleTopology' to a JSON file.
 writeSimpleTopology :: FilePath -> SimpleTopology -> IO ()
 writeSimpleTopology simpleTopologyFile = BSL.writeFile simpleTopologyFile . encode
 
+-- | Get the set of cluster names in a 'SimpleTopology'.
 clusterSet :: SimpleTopology -> Set (Maybe ClusterName)
 clusterSet = S.fromList . map (.clusterName) . V.toList . (.nodes)
 
+-- | Get the list of unique cluster names in a 'SimpleTopology'.
 clusters :: SimpleTopology -> [Maybe ClusterName]
 clusters = S.toList . clusterSet
 
@@ -297,6 +306,7 @@ clusterNameToRegionName = RegionName . unClusterName
 -- Conversion between SimpleTopology and FGL Graph
 --------------------------------------------------------------------------------
 
+-- | Convert a 'SimpleTopology' to an FGL 'Gr'.
 simpleTopologyToGr ::
   SimpleTopology ->
   Gr (NodeName, Maybe ClusterName) Latency
@@ -320,6 +330,7 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
     , let producerId = nodeIdToNode $ nameToIdMap M.! producerName
     ]
 
+-- | Helper for testing. Convert an an FGL 'Gr' to a 'SimpleTopology'.
 grToSimpleTopology ::
   Gr (NodeName, Maybe ClusterName) Latency ->
   SimpleTopology
@@ -350,8 +361,8 @@ grToSimpleTopology gr = SimpleTopology{nodes}
       , let nodeId = nodeToNodeId node
       ]
 
-withNodeNames :: Gr a b -> Gr (NodeName, a) b
-withNodeNames = G.gmap (\(inEdges, node, annotation, outEdges) -> (inEdges, node, (nodeToNodeName node, annotation), outEdges))
+addNodeNames :: Gr a b -> Gr (NodeName, a) b
+addNodeNames = G.gmap (\(inEdges, node, annotation, outEdges) -> (inEdges, node, (nodeToNodeName node, annotation), outEdges))
 
 nodeToNodeName :: G.Node -> NodeName
 nodeToNodeName = NodeName . T.pack . ("node-" <>) . show @Int
