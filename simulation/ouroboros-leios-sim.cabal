@@ -19,6 +19,9 @@ maintainer:         duncan@well-typed.com
 -- category:
 build-type:         Simple
 extra-source-files: CHANGELOG.md
+data-files:
+  test/data/BenchTopology/topology-dense-52.json
+  test/data/BenchTopology/latency.sqlite3.gz
 
 flag perf
   description: Ghc options for improved performance, disables asserts.
@@ -176,13 +179,16 @@ test-suite ols-test
   main-is:        Main.hs
   build-depends:
     , base
+    , directory
     , fgl
     , fgl-arbitrary
     , ouroboros-leios-sim
     , QuickCheck
     , tasty
+    , tasty-hunit
     , tasty-quickcheck
     , text
   other-modules:
+    Paths_ouroboros_leios_sim
     Test.Topology
   default-language: Haskell2010

@@ -11,6 +11,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -26,6 +27,7 @@ import Data.Aeson.Decoding (throwDecode)
 import Data.Aeson.Types (FromJSON (..), FromJSONKey, Options (..), ToJSON (..), ToJSONKey, defaultOptions, genericParseJSON, genericToEncoding)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Coerce (coerce)
+import Data.Function (on)
 import qualified Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree (Gr)
 import Data.GraphViz (GraphvizParams (..), X11Color (..))
@@ -37,6 +39,7 @@ import qualified Data.GraphViz.Commands as GVC
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.List (sort, sortBy)
 import Data.Map (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe (maybeToList)
@@ -86,13 +89,13 @@ data BenchTopologyNode
   = BenchTopologyNode
   { name :: !NodeName
   , nodeId :: !NodeId
-  , org :: !OrgName
+  , org :: !(Maybe OrgName)
   , pools :: !(Maybe Int)
   , producers :: !(Vector NodeName)
-  , region :: !RegionName
-  , stakePool :: !Bool
+  , region :: !(Maybe RegionName)
+  , stakePool :: !(Maybe Bool)
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 benchTopologyOptions :: Options
 benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
@@ -105,7 +108,7 @@ instance FromJSON BenchTopologyNode
 newtype BenchTopology = BenchTopology
   { coreNodes :: Vector BenchTopologyNode
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON BenchTopology where
   toEncoding = genericToEncoding benchTopologyOptions
@@ -115,6 +118,34 @@ instance FromJSON BenchTopology where
 
 readBenchTopology :: FilePath -> IO BenchTopology
 readBenchTopology = throwDecode <=< BSL.readFile
+
+sortBenchTopology :: BenchTopology -> BenchTopology
+sortBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = V.fromList . sortBy (compare `on` (.nodeId)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
+    }
+ where
+  sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  sortBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { producers = V.fromList . sort . V.toList $ producers
+      , ..
+      }
+
+forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
+forgetUnusedFieldsInBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = forgetUnusedFieldsInBenchTopologyNode <$> benchTopology.coreNodes
+    }
+ where
+  forgetUnusedFieldsInBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  forgetUnusedFieldsInBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { org = Nothing
+      , pools = Nothing
+      , stakePool = Nothing
+      , ..
+      }
 
 --------------------------------------------------------------------------------
 -- Latencies
@@ -177,9 +208,6 @@ newtype ClusterName = ClusterName {unClusterName :: Text}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
-regionNameToClusterName :: RegionName -> ClusterName
-regionNameToClusterName = ClusterName . unRegionName
-
 data SimpleNode
   = SimpleNode
   { name :: !NodeName
@@ -187,7 +215,7 @@ data SimpleNode
   , producers :: !(Map NodeName Latency)
   , clusterName :: !(Maybe ClusterName)
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 simpleNodeOptions :: Options
 simpleNodeOptions = defaultOptions{unwrapUnaryRecords = False}
@@ -202,7 +230,7 @@ newtype SimpleTopology
   = SimpleTopology
   { nodes :: Vector SimpleNode
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON SimpleTopology where
   toEncoding = genericToEncoding simpleNodeOptions
@@ -210,18 +238,36 @@ instance ToJSON SimpleTopology where
 instance FromJSON SimpleTopology where
   parseJSON = genericParseJSON simpleNodeOptions
 
-benchTopologyNodeToSimpleNode :: Latencies -> BenchTopologyNode -> SimpleNode
-benchTopologyNodeToSimpleNode latencies benchTopologyNode =
-  SimpleNode
-    { name = benchTopologyNode.name
-    , nodeId = benchTopologyNode.nodeId
-    , producers = latencies M.! benchTopologyNode.name
-    , clusterName = Just . regionNameToClusterName $ benchTopologyNode.region
-    }
-
 benchTopologyToSimpleTopology :: Latencies -> BenchTopology -> SimpleTopology
 benchTopologyToSimpleTopology latencies benchTopology =
-  SimpleTopology{nodes = benchTopologyNodeToSimpleNode latencies <$> benchTopology.coreNodes}
+  SimpleTopology{nodes = benchTopologyNodeToSimpleNode <$> benchTopology.coreNodes}
+ where
+  benchTopologyNodeToSimpleNode :: BenchTopologyNode -> SimpleNode
+  benchTopologyNodeToSimpleNode benchTopologyNode =
+    SimpleNode
+      { name = benchTopologyNode.name
+      , nodeId = benchTopologyNode.nodeId
+      , producers = latencies M.! benchTopologyNode.name
+      , clusterName = regionNameToClusterName <$> benchTopologyNode.region
+      }
+
+simpleTopologyToBenchTopology :: SimpleTopology -> BenchTopology
+simpleTopologyToBenchTopology simpleTopology =
+  BenchTopology
+    { coreNodes = simpleNodeToBenchTopologyNode <$> simpleTopology.nodes
+    }
+ where
+  simpleNodeToBenchTopologyNode :: SimpleNode -> BenchTopologyNode
+  simpleNodeToBenchTopologyNode simpleNode =
+    BenchTopologyNode
+      { name = simpleNode.name
+      , nodeId = simpleNode.nodeId
+      , org = Nothing
+      , pools = Nothing
+      , producers = V.fromList . M.keys $ simpleNode.producers
+      , region = clusterNameToRegionName <$> simpleNode.clusterName
+      , stakePool = Nothing
+      }
 
 readSimpleTopologyFromBenchTopologyAndLatency :: FilePath -> FilePath -> IO SimpleTopology
 readSimpleTopologyFromBenchTopologyAndLatency benchTopologyFile latencyFile = do
@@ -240,6 +286,12 @@ clusterSet = S.fromList . map (.clusterName) . V.toList . (.nodes)
 
 clusters :: SimpleTopology -> [Maybe ClusterName]
 clusters = S.toList . clusterSet
+
+regionNameToClusterName :: RegionName -> ClusterName
+regionNameToClusterName = ClusterName . unRegionName
+
+clusterNameToRegionName :: ClusterName -> RegionName
+clusterNameToRegionName = RegionName . unClusterName
 
 --------------------------------------------------------------------------------
 -- Conversion between SimpleTopology and FGL Graph
