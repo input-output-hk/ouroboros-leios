@@ -149,3 +149,30 @@ web-app.editor -> core.parser: "Turns text into DeltaQ"
 web-app.agent -> core.evaluator: "Turns DeltaQ into CDFs\nand resource usage distribution functions"
 web-app.editor -> core.renderer: "Turns DeltaQ into HTML"
 web-app -> deps: "Built with"
+
+Editing workflow: {
+  shape: sequence_diagram
+  near: center-right
+  
+  user
+  renderer: Renderer /\nindex.html
+  editor: Editor
+  parser: Parser
+  agent: Agent
+  storage: Local Storage
+
+  user -> editor.edit: "starts editing\n(either a single expression\nor the whole model)"
+  editor."this bar represents\nthe open edit UI"
+  editor.edit -> renderer: "initialises the editor\nwith text rendering"
+  loop {
+    user -> editor.edit: "edits the expression"
+    editor.edit -> parser: "attempt parse"
+    parser -> editor.edit: "error message\nor DeltaQ"
+    editor.edit -> renderer: "updates the text\nand error status"
+  }
+  user -> editor.edit: "saves the expression"
+  editor.edit -> storage: "stores the DeltaQ"
+  editor -> agent: "evaluate selected expression"
+  agent -> editor: "returns the Outcome\nor error message"
+  editor -> renderer: "updates the\nplotly.js diagrams"
+}
