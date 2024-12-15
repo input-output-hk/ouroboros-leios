@@ -47,25 +47,39 @@ web-app: {
     label: "Editor\n\nWeb-based editor for\nΔQ expressions"
   }
 
-  visualizer: {
+  agent: {
     class: component
-    label: "Visualizer\n\nRenders CDFs and\nresource usage graphs"
+    label: "Agent\n\nEvaluates ΔQ expressions\nin a web worker"
+  }
+
+  index: {
+    class: component
+    label: index.html JS code\n\n Uses plotly.js for visualisation of CDFs and\n resource usage distribution functions
   }
 
   storage: {
     class: component
     label: "Local Storage\n\nPersists expressions\nand models"
   }
+
+  editor -> storage: "Saves/loads"
+  editor -> agent: "Sends ΔQ expression"
+  editor -> index: "Renders"
 }
 
 # Core Engine Container
 core: {
   class: container
-  label: "Core Engine"
+  label: "Core Engine (WASM)"
 
   parser: {
     class: component
     label: "Parser\n\nParses ΔQ expressions\nand metrics"
+  }
+
+  renderer: {
+    class: component
+    label: "Renderer\n\nRenders ΔQ expressions\nand supports edits"
   }
 
   evaluator: {
@@ -77,6 +91,34 @@ core: {
     class: component
     label: "Gossip Engine\n\nImplements gossip\noperator evaluation"
   }
+
+  step_function: {
+    class: component
+    label: "Step Function\n\nImplements step functions\n(also CDF specialisation)"
+  }
+
+  outcome: {
+    class: component
+    label: "Outcome\n\nCompletion CDF\nplus resource usage\nstep functions"
+  }
+
+  compaction: {
+    class: component
+    label: "Compaction\n\nCompacts the outcome\nto bounded complexity"
+  }
+
+  ast: {
+    class: component
+    label: "DeltaQ\n\nAbstract syntax tree\nfor ΔQ expressions"
+  }
+
+  evaluator -> gossip: "uses"
+  evaluator -> outcome: "uses"
+  outcome -> step_function: "uses"
+  outcome -> compaction: "uses"
+  parser -> ast: "uses"
+  renderer -> ast: "uses"
+  gossip -> ast: "uses"
 }
 
 # Dependencies Container
@@ -93,13 +135,17 @@ deps: {
     class: component
     label: "WASM Bindings\n\nWeb APIs and\nJavaScript interop"
   }
+
+  plotly: {
+    class: component
+    label: "Plotly.js\n\nJavaScript library for\nvisualisation"
+  }
+
+  yew -> wasm: "Uses"
 }
 
 # Relationships
-web-app.editor -> core.parser: "Sends expressions"
-web-app.editor -> web-app.storage: "Saves/loads"
-web-app.visualizer -> core.evaluator: "Gets results"
-core.parser -> core.evaluator: "Provides AST"
-core.evaluator -> core.gossip: "Uses for gossip\noperations"
-web-app -> deps.yew: "Built with"
-deps.yew -> deps.wasm: "Uses"
+web-app.editor -> core.parser: "Turns text into DeltaQ"
+web-app.agent -> core.evaluator: "Turns DeltaQ into CDFs\nand resource usage distribution functions"
+web-app.editor -> core.renderer: "Turns DeltaQ into HTML"
+web-app -> deps: "Built with"
