@@ -387,7 +387,7 @@ impl EventMonitor {
             info!(
                 "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
                 txs_per_ib.mean, txs_per_ib.std_dev,
-                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo), bytes_per_ib.std_dev,
+                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo),
                 empty_ibs,
             );
             info!(
