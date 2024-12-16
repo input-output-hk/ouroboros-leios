@@ -248,6 +248,7 @@ data EndorseBlocksSnapshot = EndorseBlocksSnapshot
 data InputBlocksQuery = InputBlocksQuery
   { generatedBetween :: (SlotNo, SlotNo)
   , receivedBy :: SlotNo
+  -- ^ This is checked against time the body is downloaded, before validation.
   }
 
 inputBlocksToEndorse ::
@@ -290,7 +291,8 @@ shouldVoteOnEB cfg slot buffers = cond
         { generatedBetween
         , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg Vote slot Deliver1
         }
-  -- TODO: use sets in EndorseBlock?
+  -- Order of references in EndorseBlock matters for ledger state, so we stick to lists.
+  -- Note: maybe order on (slot, subSlot, vrf proof) should be used instead?
   subset xs ys = all (`elem` ys) xs
 
   cond :: EndorseBlock -> Bool

@@ -43,6 +43,79 @@ import PraosProtocol.Common.Chain (dropUntil, headAnchor, headHash)
 import qualified PraosProtocol.PraosNode as PraosNode
 import System.Random
 
+--------------------------------------------------------------
+---- Events
+--------------------------------------------------------------
+
+data LeiosEventBlock
+  = EventIB InputBlock
+  | EventEB EndorseBlock
+  | EventVote VoteMsg
+  deriving (Show)
+
+data BlockEvent = Generate | Received | EnterState
+  deriving (Show)
+
+data LeiosNodeEvent
+  = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
+  | LeiosNodeEventCPU CPUTask
+  | LeiosNodeEvent BlockEvent LeiosEventBlock
+  deriving (Show)
+
+--------------------------------------------------------------
+---- Node Config
+--------------------------------------------------------------
+
+data LeiosNodeConfig = LeiosNodeConfig
+  { leios :: LeiosConfig
+  , rankingBlockFrequencyPerSlot :: Double
+  , nodeId :: NodeId
+  , stake :: StakeFraction
+  , rng :: StdGen
+  -- ^ for block generation
+  , baseChain :: Chain RankingBlock
+  , rankingBlockPayload :: Bytes
+  -- ^ overall size of txs to include in RBs
+  , inputBlockPayload :: Bytes
+  -- ^ overall size of txs to include in IBs
+  , processingQueueBound :: Natural
+  }
+
+--------------------------------------------------------------
+---- Node State
+--------------------------------------------------------------
+
+data LeiosNodeState m = LeiosNodeState
+  { praosState :: PraosNode.PraosNodeState RankingBlockBody m
+  , relayIBState :: RelayIBState m
+  , relayEBState :: RelayEBState m
+  , relayVoteState :: RelayVoteState m
+  , ibDeliveryTimesVar :: TVar m (Map InputBlockId UTCTime)
+  , validationQueue :: TBQueue m (ValidationRequest m)
+  , waitingForRBVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
+  -- ^ waiting for RB block itself to be validated.
+  , waitingForLedgerStateVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
+  -- ^ waiting for ledger state of RB block to be validated.
+  , ledgerStateVar :: TVar m (Map (HeaderHash RankingBlock) LedgerState)
+  , ibsNeededForEBVar :: TVar m (Map EndorseBlockId (Set InputBlockId))
+  }
+
+type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
+type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId EndorseBlock
+type RelayVoteState = RelayConsumerSharedState VoteId VoteId VoteMsg
+
+data LedgerState = LedgerState
+
+data ValidationRequest m
+  = ValidateRB !RankingBlock !(m ())
+  | ValidateIBS ![(InputBlockHeader, InputBlockBody)] !UTCTime !([(InputBlockHeader, InputBlockBody)] -> STM m ())
+  | ValidateEBS ![EndorseBlock] !([EndorseBlock] -> STM m ())
+  | ValidateVotes ![VoteMsg] !([VoteMsg] -> STM m ())
+
+--------------------------------------------------------------
+--- Messages
+--------------------------------------------------------------
+
 type RelayIBMessage = RelayMessage InputBlockId InputBlockHeader InputBlockBody
 type RelayEBMessage = RelayMessage EndorseBlockId EndorseBlockId EndorseBlock
 type RelayVoteMessage = RelayMessage VoteId VoteId VoteMsg
@@ -84,61 +157,7 @@ instance MuxBundle Leios where
 
   traverseMuxBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseMuxBundle f d
 
-type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
-type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId EndorseBlock
-type RelayVoteState = RelayConsumerSharedState VoteId VoteId VoteMsg
-
-data ValidationRequest m
-  = ValidateRB !RankingBlock !(m ())
-  | ValidateIBS ![(InputBlockHeader, InputBlockBody)] !UTCTime !([(InputBlockHeader, InputBlockBody)] -> STM m ())
-  | ValidateEBS ![EndorseBlock] !([EndorseBlock] -> STM m ())
-  | ValidateVotes ![VoteMsg] !([VoteMsg] -> STM m ())
-
-data LedgerState = LedgerState
-
-data LeiosNodeState m = LeiosNodeState
-  { praosState :: PraosNode.PraosNodeState RankingBlockBody m
-  , relayIBState :: RelayIBState m
-  , relayEBState :: RelayEBState m
-  , relayVoteState :: RelayVoteState m
-  , ibDeliveryTimesVar :: TVar m (Map InputBlockId UTCTime)
-  , validationQueue :: TBQueue m (ValidationRequest m)
-  , waitingForRBVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
-  -- ^ waiting for RB block itself to be validated.
-  , waitingForLedgerStateVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
-  -- ^ waiting for ledger state of RB block to be validated.
-  , ledgerStateVar :: TVar m (Map (HeaderHash RankingBlock) LedgerState)
-  , ibsNeededForEBVar :: TVar m (Map EndorseBlockId (Set InputBlockId))
-  }
-
-data LeiosNodeConfig = LeiosNodeConfig
-  { leios :: LeiosConfig
-  , rankingBlockFrequencyPerSlot :: Double
-  , nodeId :: NodeId
-  , stake :: StakeFraction
-  , rng :: StdGen
-  -- ^ for block generation
-  , baseChain :: Chain RankingBlock
-  , rankingBlockPayload :: Bytes
-  -- ^ overall size of txs to include in RBs
-  , inputBlockPayload :: Bytes
-  -- ^ overall size of txs to include in IBs
-  , processingQueueBound :: Natural
-  }
-
-data LeiosEventBlock
-  = EventIB InputBlock
-  | EventEB EndorseBlock
-  | EventVote VoteMsg
-  deriving (Show)
-
-data BlockEvent = Generate | Received | EnterState
-  deriving (Show)
-data LeiosNodeEvent
-  = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
-  | LeiosNodeEventCPU CPUTask
-  | LeiosNodeEvent BlockEvent LeiosEventBlock
-  deriving (Show)
+--------------------------------------------------------------
 
 newRelayState ::
   (Ord id, MonadSTM m) =>
@@ -377,7 +396,6 @@ computeLedgerStateThread _tracer _cfg st = forever $ do
   -- TODO? trace readyLedgerState
   return ()
 
--- TODO: tracing events
 validationDispatcher ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -496,8 +514,13 @@ mkBuffersView cfg st = BuffersView{..}
     bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
-    let votesForEB = Map.fromListWith Map.union [(eb, Map.singleton v.id v.votes) | v <- bufferVotes, eb <- v.endorseBlocks]
-    -- TODO: certificate construction delay?
+    let votesForEB =
+          Map.fromListWith
+            Map.union
+            [ (eb, Map.singleton v.id v.votes)
+            | v <- bufferVotes
+            , eb <- v.endorseBlocks
+            ]
     let totalVotes = fromIntegral . sum . Map.elems
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
