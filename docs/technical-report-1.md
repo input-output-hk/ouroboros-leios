@@ -28,14 +28,29 @@
 
 ## Formal Specification for Short Leios
 
+![Overview for formal specification](../formal-spec/docs/overview.png)
+
 
 ## Delta QSD network performance model
 
 
+![Overview of Delta QSD components](../delta_q/docs/overview.png)
+
+
 ## Rust simulation
+
+![Container diagram of Rust simulation](../sim-rs/docs/container.png)
+
+![Component diagram of Rust simulation](../sim-rs/docs/component.png)
+
+![Transaction-protocol diagram of Rust simulation](../sim-rs/docs/tx-protocol.png)
 
 
 ## Haskell prototype
+
+![Container diagram of Haskell prototype](../simulation/docs/container.png)
+
+![Component diagram of Haskell prototype](../simulation/docs/component.png)
 
 
 ## Voting and certificates
