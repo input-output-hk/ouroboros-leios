@@ -1,0 +1,30 @@
+\documentclass[tikz, border=3mm]{standalone}
+
+\tikzset{->, >=stealth, shorten >=2pt, shorten <=2pt, node distance=4cm }
+\definecolor{bleudefrance}{rgb}{0.19, 0.55, 0.91}
+\definecolor{jasper}{rgb}{0.84, 0.23, 0.24}
+
+\begin{document}
+\begin{tikzpicture}
+    \node (init) [circle, draw, align=center] {LeiosState\\$slot_0$};
+    \node[right of=init] (prev) [circle, draw, align=center, dotted] {LeiosState\\$slot_{n-1}$};
+    \node[right of=prev] (focus) [circle, draw, align=center] {LeiosState\\$slot_n$};
+    \node[right of=focus] (next) [circle, draw, align=center, dotted] {LeiosState\\$slot_{n+1}$};
+    \node[right of=next] (last) [circle, draw=none, align=center] {};
+    \draw[->] (init) edge node[above] {$\cdots$}(prev) [dotted];
+    \draw[->] (prev) edge node[above] {Slot} (focus);
+    \draw[->] (focus) edge node[above] {Slot} (next);
+    \draw[->] (next) edge node[above] {} (last) [dotted];
+
+    \path[-stealth] (init) edge[out=45,in=135,looseness=5] node[above] {Init} (init);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=5, color=bleudefrance] node[above] {\textcolor{black}{IB Role}} (focus);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=10, color=bleudefrance] node[above] {\textcolor{black}{EB Role}} (focus);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=15, color=bleudefrance] node[above] {\textcolor{black}{Vote Role}} (focus);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=20, color=jasper] node[above] {\textcolor{black}{$Base_{2}$}} (focus);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=25, color=jasper, dashed] node[above] {\textcolor{black}{$Base_{1}$}} (focus);
+    \path[-stealth] (focus) edge[out=45,in=135,looseness=30, dashed] node[above] {\textcolor{black}{Ftch}} (focus);
+    \path[-stealth] (focus) edge[out=225,in=315,looseness=5] node[above] {\textcolor{black}{Not IB Role}} (focus);
+    \path[-stealth] (focus) edge[out=225,in=315,looseness=10] node[above] {\textcolor{black}{Not EB Role}} (focus);
+    \path[-stealth] (focus) edge[out=225,in=315,looseness=15] node[above] {\textcolor{black}{Not Vote Role}} (focus);
+\end{tikzpicture}
+\end{document}

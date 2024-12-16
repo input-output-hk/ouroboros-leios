@@ -1,0 +1,42 @@
+\documentclass{standalone}
+\usepackage{tikz-uml}
+
+\definecolor{bleudefrance}{rgb}{0.19, 0.55, 0.91}
+\definecolor{jasper}{rgb}{0.84, 0.23, 0.24}
+
+\begin{document}
+  \begin{tikzpicture}
+    \begin{umlpackage}{Leios}
+      \begin{umlcomponent}[x=0,y=0]{SpecStructure}
+        \umlbasiccomponent[x=-6,y=-4, fill=bleudefrance]{LeiosAbstract}
+        \umlbasiccomponent[y=0]{Blocks}
+        \umlbasiccomponent[y=-2, fill=bleudefrance]{Base Ledger}
+        \umlbasiccomponent[y=-4, fill=bleudefrance]{Key Registration Functionality}
+        \umlbasiccomponent[y=-6, fill=bleudefrance]{VRF Functionality}
+        \umlbasiccomponent[y=-8, fill=bleudefrance]{FFD Functionality}
+
+        \umlassemblyconnector[with port] {LeiosAbstract}{Blocks}
+        \umlassemblyconnector[with port] {LeiosAbstract}{Base Ledger}
+        \umlassemblyconnector[with port] {LeiosAbstract}{Key Registration Functionality}
+        \umlassemblyconnector[with port] {LeiosAbstract}{VRF Functionality}
+        \umlassemblyconnector[with port] {LeiosAbstract}{FFD Functionality}
+      \end{umlcomponent}
+
+      \begin{umlcomponent}[x=6,y=-1]{Protocol}
+        \umlbasiccomponent[x=2,y=0]{LeiosState}
+        \umlbasiccomponent[x=0,y=-2]{LeiosInput}
+        \umlbasiccomponent[x=4,y=-2]{LeiosOutput}
+      \end{umlcomponent}
+
+      \begin{umlcomponent}[x=6,y=-6]{Simplified Leios}
+      \end{umlcomponent}
+
+      \begin{umlcomponent}[x=10,y=-6]{Short-Pipeline Leios}
+      \end{umlcomponent}
+
+      \umlassemblyconnector[with port] {SpecStructure}{Protocol}
+      \umlassemblyconnector[with port] {Protocol-south-port}{Simplified Leios-north-port}
+      \umlassemblyconnector[with port] {Protocol-south-port}{Short-Pipeline Leios-north-port}
+    \end{umlpackage}
+  \end{tikzpicture}
+\end{document}
