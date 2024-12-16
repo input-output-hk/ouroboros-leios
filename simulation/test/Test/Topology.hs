@@ -19,11 +19,12 @@ import Test.QuickCheck.Random (QCGen (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology, readSimpleTopologyFromBenchTopologyAndLatency)
+import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, readSimpleTopologyFromBenchTopologyAndLatency, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
-  testGroup "Topology"
+  testGroup
+    "Topology"
     [ testCase "test_benchTopologyToSimpleTopologyPreservesTopology" test_benchTopologyToSimpleTopologyPreservesTopology
     , testCase "test_benchTopologyIsConnected" test_benchTopologyIsConnected
     , testProperty "prop_grToSimpleTopologyPreservesTopology" prop_grToSimpleTopologyPreservesTopology
