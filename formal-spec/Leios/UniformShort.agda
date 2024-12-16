@@ -114,10 +114,11 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
          ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
          ───────────────────────────────────────────────────────────────────────
          just s -⟦ SLOT / EMPTY ⟧⇀ record s
-             { FFDState = ffds'
-             ; Ledger   = constructLedger rbs
-             ; slot     = suc slot
-             ; Upkeep   = ∅
+             { FFDState  = ffds'
+             ; BaseState = bs'
+             ; Ledger    = constructLedger rbs
+             ; slot      = suc slot
+             ; Upkeep    = ∅
              } ↑ L.filter isValid? msgs
 
     Ftch :
@@ -146,7 +147,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ∙ [] ≡ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
             ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
+            just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
     -- Protocol rules
 
