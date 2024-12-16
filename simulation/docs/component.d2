@@ -35,6 +35,15 @@ classes: {
       shadow: false
     }
   }
+  external: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      stroke-dash: 5
+    }
+  }
 }
 
 # Protocol Engine Container
@@ -44,22 +53,43 @@ protocol-engine: {
 
   praos: {
     class: component
-    label: "Praos Protocol\n\nImplements core consensus\nand block chain"
+    label: "Praos Protocol\n\nImplements consensus"
+  }
+
+  chain-sync: {
+      class: component
+      label: "Chain-Sync Mini-Protocol\n\nReconstrucs blockchain of peers"
+  }
+  block-fetch: {
+      class: component
+      label: "Block-Fetch Mini-Protocol\n\nFetches bodies of selected chain"
   }
 
   leios: {
     class: component
-    label: "Leios Protocol\n\nImplements input endorsement\nand ranking blocks"
+    label: "Leios Protocol"
+    ib-relay: {
+      class: subcomponent
+      label: "Input Blocks Relay"
+    }
+    eb-relay: {
+      class: subcomponent
+      label: "Endorse Blocks Relay"
+    }
+    vote-relay: {
+      class: subcomponent
+      label: "Vote Messages Relay"
+    }
   }
 
   relay: {
     class: component
-    label: "Relay Protocol\n\nHandles block and vote\ndiffusion"
+    label: "Relay Mini-Protocol\n\nRelays messages\nwith configurable priority"
   }
 
   node-manager: {
     class: component
-    label: "Node Manager\n\nManages node state and\nprotocol interactions"
+    label: "Node\n\nManages node state and\nprotocol interactions"
   }
 }
 
@@ -75,7 +105,7 @@ channel-layer: {
 
   tcp: {
     class: component
-    label: "TCP Channel\n\nSimulates TCP behavior"
+    label: "TCP Model\n\nSimulates TCP behavior"
   }
 
   mux: {
@@ -83,10 +113,10 @@ channel-layer: {
     label: "Channel Multiplexer\n\nMultiplexes protocols"
   }
 
-  driver: {
-    class: component
-    label: "Channel Driver\n\nManages protocol\nchannels"
-  }
+  # driver: {
+  #   class: component
+  #   label: "Channel Driver\n\nManages protocol\nchannels"
+  # }
 }
 
 # Visualization Engine Container
@@ -99,9 +129,9 @@ viz-engine: {
     label: "Layout Engine\n\nHandles visualization\nlayout"
   }
 
-  relay-viz: {
+  protocol-viz: {
     class: component
-    label: "Relay Visualizer\n\nVisualizes relay\nprotocol state"
+    label: "Protocol Visualizer\n\nVisualizes mini-protocol\n messages and node state"
   }
 
   p2p-viz: {
@@ -111,8 +141,11 @@ viz-engine: {
 
   frame-output: {
     class: component
-    label: "Frame Output\n\nOutputs animation frames\nas PNG files"
+    label: "Frame Output\n\nOutputs animation frames\n(on-screen or as PNG files)"
   }
+  protocol-viz -> layout: "Assembled with"
+  p2p-viz -> layout: "Assembled with"
+  layout -> frame-output: "Emits frames"
 }
 
 # Event Monitor Container
@@ -122,41 +155,48 @@ monitor: {
 
   metrics: {
     class: component
-    label: "Metrics Collector\n\nCollects in-memory\nperformance metrics"
+    label: "Metrics and State Collector\n\nComputes state and metrics from trace"
   }
 
   tracer: {
     class: component
-    label: "Event Tracer\n\nTraces protocol and\nnetwork events in memory"
+    label: "Event Tracer\n\nCollects trace of\n protocol and network events"
   }
+
+  io-sim: {
+    class: external
+    label: "IO-Sim library\n\nSimulates threading, clocks, STM, .."
+  }
+
+  file-system: {
+    class: external
+    label: "File-System"
+  }
+
+  tracer -> io-sim: "Uses to run nodes and channels"
+  metrics -> tracer: "Consumes trace"
+  metrics -> file-system: "Outputs metrics"
 }
 
 # Core Layer Relationships
 channel-layer.tcp -> channel-layer.chan: "Implements"
 channel-layer.mux -> channel-layer.chan: "Uses"
-channel-layer.driver -> channel-layer.chan: "Uses"
-channel-layer.mux -> channel-layer.tcp: "Routes over"
-channel-layer.driver -> channel-layer.mux: "Uses for routing"
+# channel-layer.driver -> channel-layer.chan: "Uses"
+# channel-layer.mux -> channel-layer.tcp: "Multiplexes over"
+# channel-layer.driver -> channel-layer.mux: "Uses for routing"
 
 # Protocol Layer Relationships
-protocol-engine.relay -> channel-layer.driver: "Uses for messaging"
-protocol-engine.praos -> channel-layer.driver: "Uses for consensus"
+protocol-engine -> channel-layer: "Uses for messaging"
+protocol-engine.praos -> protocol-engine.block-fetch:"Bodies diffusion"
+protocol-engine.praos -> protocol-engine.chain-sync:"Headers diffusion"
 protocol-engine.leios -> protocol-engine.praos: "Extends consensus"
 protocol-engine.leios -> protocol-engine.relay: "Uses for diffusion"
-protocol-engine.node-manager -> channel-layer.driver: "Manages connections"
+protocol-engine.node-manager -> protocol-engine.praos: "Manages ranking blocks\nvalidation/generation"
+protocol-engine.node-manager -> protocol-engine.leios: "Manages ledger state\nand validation/generation"
 
 # Visualization Layer Relationships
-viz-engine.relay-viz -> protocol-engine.relay: "Visualizes state"
-viz-engine.p2p-viz -> channel-layer.tcp: "Visualizes network"
-viz-engine.layout -> viz-engine.relay-viz: "Provides layout"
-viz-engine.layout -> viz-engine.p2p-viz: "Provides layout"
-viz-engine.frame-output -> viz-engine.relay-viz: "Captures frames"
-viz-engine.frame-output -> viz-engine.p2p-viz: "Captures frames"
+viz-engine -> monitor: "Visualizes state and metrics"
 
 # Monitoring Relationships
-monitor.metrics -> viz-engine.relay-viz: "Provides metrics"
-monitor.metrics -> viz-engine.p2p-viz: "Provides metrics"
-monitor.tracer -> channel-layer.tcp: "Traces network"
-monitor.tracer -> protocol-engine.praos: "Traces consensus"
-monitor.tracer -> protocol-engine.leios: "Traces protocol"
-monitor.tracer -> protocol-engine.relay: "Traces diffusion"
+monitor -> channel-layer: "Traces network messages"
+monitor -> protocol-engine: "Traces protocol and node events"
