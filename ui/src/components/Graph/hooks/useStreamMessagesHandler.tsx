@@ -1,10 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { defaultAggregatedData, useGraphContext } from "@/contexts/GraphContext/context";
 import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
 
 export const useStreamMessagesHandler = () => {
   const {
+    state: {
+      batchSize
+    },
     dispatch
   } = useGraphContext();
   const eventSource = useRef<EventSource>();
@@ -14,6 +17,7 @@ export const useStreamMessagesHandler = () => {
     setStreaming(true);
 
     const url = new URL("/api/messages/batch", window.location.href);
+    url.searchParams.set("batchSize", batchSize.toString());
     eventSource.current = new EventSource(url);
     eventSource.current.onerror = function (error) {
       stopStream();
@@ -33,11 +37,19 @@ export const useStreamMessagesHandler = () => {
 
       dispatch({ type: "SET_AGGREGATED_DATA", payload: json });
     };
-  }, []);
+  }, [batchSize]);
 
   const stopStream = useCallback(() => {
     eventSource.current?.close();
     setStreaming(false);
+
+    dispatch({
+      type: "BATCH_UPDATE",
+      payload: {
+        currentNode: undefined,
+        aggregatedData: defaultAggregatedData,
+      },
+    });
   }, []);
 
   return useMemo(

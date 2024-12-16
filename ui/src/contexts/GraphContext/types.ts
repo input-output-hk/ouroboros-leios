@@ -43,6 +43,7 @@ export interface ISimulationAggregatedData {
 export interface ISimulationAggregatedDataState {
   progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
+  lastNodesUpdated: string[];
 }
 
 export interface IGraphContextState {
@@ -55,10 +56,12 @@ export interface IGraphContextState {
   maxTime: number;
   topography: ITransformedNodeMap;
   topographyLoaded: boolean;
+  batchSize: number;
 }
 
 export type TGraphContextActions =
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
+  | { type: "SET_BATCH_SIZE"; payload: number }
   | { type: "SET_CANVAS_PROPS"; payload: Partial<{
     canvasScale: ((prev: number) => number) | number,
     canvasOffsetX: ((prev: number) => number) | number,

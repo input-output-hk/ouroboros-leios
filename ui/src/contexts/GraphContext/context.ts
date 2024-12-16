@@ -5,10 +5,12 @@ import { IGraphContext, IGraphContextState, ISimulationAggregatedDataState } fro
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
   progress: 0,
-  nodes: new Map()
+  nodes: new Map(),
+  lastNodesUpdated: []
 };
 
 export const defaultState: IGraphContextState = {
+  batchSize: 5000,
   canvasRef: { current: null },
   canvasOffsetX: 0,
   canvasOffsetY: 0,
