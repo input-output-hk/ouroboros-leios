@@ -12,7 +12,7 @@ import P2P (Latency)
 import Paths_ouroboros_leios_sim (getDataFileName)
 import SimTypes (WorldDimensions, WorldShape (..))
 import System.Directory (doesFileExist)
-import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..), Property, ioProperty)
+import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..), Positive (..), Property, ioProperty)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
@@ -103,8 +103,8 @@ instance Arbitrary ClusterName where
 instance Arbitrary WorldShape where
   arbitrary :: Gen WorldShape
   arbitrary = do
-    width <- getNonNegative <$> arbitrary
-    height <- getNonNegative <$> arbitrary
+    width <- getPositive <$> arbitrary
+    height <- getPositive <$> arbitrary
     let worldDimensions = (width, height)
     worldIsCylinder <- arbitrary
     pure $ WorldShape{..}
