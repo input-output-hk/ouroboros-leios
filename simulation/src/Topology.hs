@@ -21,7 +21,7 @@ module Topology where
 import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (assert)
-import Control.Monad (forM_, void, (<=<))
+import Control.Monad (forM_, (<=<))
 import Data.Aeson (encode)
 import Data.Aeson.Decoding (throwDecode)
 import Data.Aeson.Types (FromJSON (..), FromJSONKey, Options (..), ToJSON (..), ToJSONKey, defaultOptions, genericParseJSON, genericToEncoding)
@@ -30,20 +30,16 @@ import Data.Coerce (coerce)
 import Data.Function (on)
 import qualified Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree (Gr)
-import Data.GraphViz (GraphvizCanvas (..), GraphvizOutput (..), GraphvizParams (..), X11Color (..))
+import Data.GraphViz (GraphvizParams (..))
 import qualified Data.GraphViz as GV
-import qualified Data.GraphViz.Attributes as GV
-import Data.GraphViz.Attributes.Colors (Color (X11Color))
-import Data.GraphViz.Attributes.Complete (GraphSize (..))
 import qualified Data.GraphViz.Attributes.Complete as GV
-import qualified Data.GraphViz.Commands as GV
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as M
-import Data.Maybe (maybeToList)
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -56,8 +52,7 @@ import qualified Data.Vector as V
 import Database.SQLite.Simple (NamedParam (..))
 import qualified Database.SQLite.Simple as SQLlite
 import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
-import GHC.Generics (C, Generic)
-import GHC.Records (HasField (..))
+import GHC.Generics (Generic)
 import P2P (Latency, P2PTopography (..))
 import SimTypes (NodeId (..), Path (..), Point (..), WorldDimensions, WorldShape (..))
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
@@ -407,12 +402,12 @@ defaultParams =
     , fmtEdge = const []
     }
 
-augmentWithPositionInformation ::
+augmentWithPosition ::
   GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
   WorldDimensions ->
   Gr SimpleNodeInfo Latency ->
   IO (Gr (SimpleNodeInfo, Point) (Latency, Path))
-augmentWithPositionInformation params1 worldDimensions gr1 = do
+augmentWithPosition params1 worldDimensions gr1 = do
   -- Add world dimension and edge IDs
   let params2 =
         params1
@@ -473,11 +468,14 @@ rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
       (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
       h0 = y0u - y0l
 
-forgetPositionInformation ::
-  Gr (SimpleNodeInfo, Point) (Latency, Path) ->
-  Gr SimpleNodeInfo Latency
-forgetPositionInformation =
-  G.nemap fst fst
+forgetPaths :: Gr a (b, Path) -> Gr a b
+forgetPaths = G.emap fst
+
+forgetPosition :: Gr (a, Point) (b, Path) -> Gr a b
+forgetPosition = G.nemap fst fst
+
+forgetSimpleNodeInfo :: Gr (SimpleNodeInfo, a) b -> Gr a b
+forgetSimpleNodeInfo = G.nemap snd id
 
 --------------------------------------------------------------------------------
 -- Conversion between FGL Graph and P2PTopography
@@ -485,7 +483,7 @@ forgetPositionInformation =
 
 grToP2PTopography ::
   WorldShape ->
-  Gr (SimpleNodeInfo, Point) (Latency, Path) ->
+  Gr Point Latency ->
   P2PTopography
 grToP2PTopography p2pWorldShape gr = P2PTopography{..}
  where
@@ -494,15 +492,29 @@ grToP2PTopography p2pWorldShape gr = P2PTopography{..}
   p2pNodes =
     M.fromList
       [ (nodeToNodeId node, point)
-      | (node, (_, point)) <- M.assocs nodeInfoMap
+      | (node, point) <- M.assocs nodeInfoMap
       ]
   p2pLinks =
     M.fromList
       [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
-      | ((node1, node2), (latency, _path)) <- M.assocs edgeInfoMap
-      , let (_, _point1) = nodeInfoMap M.! node1
-      , let (_, _point2) = nodeInfoMap M.! node2
+      | ((node1, node2), latency) <- M.assocs edgeInfoMap
+      , let _point1 = nodeInfoMap M.! node1
+      , let _point2 = nodeInfoMap M.! node2
       ]
+
+p2pTopologyToGr ::
+  P2PTopography ->
+  Gr Point Latency
+p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
+ where
+  nodes =
+    [ (nodeIdToNode nodeId, point)
+    | (nodeId, point) <- M.assocs p2pNodes
+    ]
+  edges =
+    [ (nodeIdToNode nodeId1, nodeIdToNode nodeId2, latency)
+    | ((nodeId1, nodeId2), latency) <- M.assocs p2pLinks
+    ]
 
 readP2PTopography ::
   GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
@@ -512,6 +524,6 @@ readP2PTopography ::
 readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
   let gr = simpleTopologyToGr simpleTopology
-  grWithPositionInformation <- augmentWithPositionInformation params worldDimensions gr
-  let p2pTopography = grToP2PTopography worldShape grWithPositionInformation
+  grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
+  let p2pTopography = grToP2PTopography worldShape grWithPosition
   pure p2pTopography

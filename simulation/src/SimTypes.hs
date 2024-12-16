@@ -24,11 +24,11 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 
 -- | Position in simulation world coordinates
 data Point = Point {_1 :: !Double, _2 :: !Double}
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 -- | Path in simulation world
 newtype Path = Path [Point]
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
   deriving newtype (Semigroup, Monoid)
 
 instance ToJSON Point where

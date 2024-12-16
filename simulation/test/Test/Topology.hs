@@ -1,4 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Topology where
@@ -9,20 +10,21 @@ import Data.Graph.Inductive.Arbitrary (NoLoops (..), NoMultipleEdges (..), Simpl
 import qualified Data.Text as T
 import P2P (Latency)
 import Paths_ouroboros_leios_sim (getDataFileName)
-import SimTypes (WorldDimensions)
+import SimTypes (WorldDimensions, WorldShape (..))
 import System.Directory (doesFileExist)
 import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..), Property, ioProperty)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPositionInformation, benchTopologyToSimpleTopology, defaultParams, forgetPositionInformation, forgetUnusedFieldsInBenchTopology, grToSimpleTopology, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
+import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
   testGroup "Topology" $
     [ testCase "test_benchTopologyToSimpleTopologyPreservesTopology" test_benchTopologyToSimpleTopologyPreservesTopology
     , testProperty "prop_grToSimpleTopologyPreservesTopology" prop_grToSimpleTopologyPreservesTopology
-    , testProperty "prop_augmentWithPositionInformationPreservesTopology" prop_augmentWithPositionInformationPreservesTopology
+    , testProperty "prop_augmentWithPositionPreservesTopology" prop_augmentWithPositionPreservesTopology
+    , testProperty "prop_grToP2PTopographyPreservesTopology" prop_grToP2PTopographyPreservesTopology
     ]
 
 --------------------------------------------------------------------------------
@@ -64,15 +66,31 @@ prop_grToSimpleTopologyPreservesTopology gr = do
 -- Augmentation with Position Information
 --------------------------------------------------------------------------------
 
-prop_augmentWithPositionInformationPreservesTopology ::
+prop_augmentWithPositionPreservesTopology ::
   WorldDimensions ->
   SimpleGraph Gr (Maybe ClusterName) Latency ->
   Property
-prop_augmentWithPositionInformationPreservesTopology wordDimensions gr = ioProperty $ do
+prop_augmentWithPositionPreservesTopology wordDimensions gr = ioProperty $ do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
-  gr2 <- augmentWithPositionInformation defaultParams wordDimensions gr1
-  let gr3 = forgetPositionInformation gr2
+  gr2 <- augmentWithPosition defaultParams wordDimensions gr1
+  let gr3 = forgetPosition gr2
   pure $ gr1 == gr3
+
+--------------------------------------------------------------------------------
+-- Conversion between FGL Graph and P2P Topography
+--------------------------------------------------------------------------------
+
+-- | Test that the conversion between SimpleTopology and FGL Graphs preserves the topology.
+prop_grToP2PTopographyPreservesTopology ::
+  WorldShape ->
+  SimpleGraph Gr (Maybe ClusterName) Latency ->
+  Property
+prop_grToP2PTopographyPreservesTopology worldShape@WorldShape{..} gr = ioProperty $ do
+  let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
+  gr2 <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition defaultParams worldDimensions gr1
+  let gr3 = grToP2PTopography worldShape gr2
+  let gr4 = p2pTopologyToGr gr3
+  pure $ gr2 == gr4
 
 --------------------------------------------------------------------------------
 -- Instances
@@ -81,3 +99,12 @@ prop_augmentWithPositionInformationPreservesTopology wordDimensions gr = ioPrope
 instance Arbitrary ClusterName where
   arbitrary :: Gen ClusterName
   arbitrary = ClusterName . T.pack . ("cluster-" <>) . show @Int . getSmall . getNonNegative <$> arbitrary
+
+instance Arbitrary WorldShape where
+  arbitrary :: Gen WorldShape
+  arbitrary = do
+    width <- getNonNegative <$> arbitrary
+    height <- getNonNegative <$> arbitrary
+    let worldDimensions = (width, height)
+    worldIsCylinder <- arbitrary
+    pure $ WorldShape{..}
