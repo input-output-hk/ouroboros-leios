@@ -465,6 +465,12 @@ rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
       (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
       h0 = y0u - y0l
 
+forgetPositionInformation ::
+  Gr (SimpleNodeInfo, Point) (Latency, Path) ->
+  Gr SimpleNodeInfo Latency
+forgetPositionInformation =
+  G.nemap fst fst
+
 --------------------------------------------------------------------------------
 -- Conversion between FGL Graph and P2PTopography
 --------------------------------------------------------------------------------
