@@ -468,11 +468,14 @@ rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
       (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
       h0 = y0u - y0l
 
+forgetPoints :: Gr (a, Point) b -> Gr a b
+forgetPoints = G.nmap fst
+
 forgetPaths :: Gr a (b, Path) -> Gr a b
 forgetPaths = G.emap fst
 
 forgetPosition :: Gr (a, Point) (b, Path) -> Gr a b
-forgetPosition = G.nemap fst fst
+forgetPosition = forgetPoints . forgetPaths
 
 forgetSimpleNodeInfo :: Gr (SimpleNodeInfo, a) b -> Gr a b
 forgetSimpleNodeInfo = G.nemap snd id

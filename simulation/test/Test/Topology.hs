@@ -4,6 +4,7 @@
 
 module Test.Topology where
 
+import Data.Bifunctor (Bifunctor (..))
 import Data.Graph.Inductive (Gr)
 import qualified Data.Graph.Inductive as G
 import Data.Graph.Inductive.Arbitrary (NoLoops (..), NoMultipleEdges (..), SimpleGraph)
@@ -16,7 +17,7 @@ import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..), Positive (..), Pr
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
+import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
@@ -90,7 +91,8 @@ prop_grToP2PTopographyPreservesTopology worldShape@WorldShape{..} gr = ioPropert
   gr2 <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition defaultParams worldDimensions gr1
   let gr3 = grToP2PTopography worldShape gr2
   let gr4 = p2pTopologyToGr gr3
-  pure $ gr2 == gr4
+  let forgetPoints = G.nmap (const ())
+  pure $ forgetPoints gr2 == forgetPoints gr4
 
 --------------------------------------------------------------------------------
 -- Instances
@@ -103,8 +105,6 @@ instance Arbitrary ClusterName where
 instance Arbitrary WorldShape where
   arbitrary :: Gen WorldShape
   arbitrary = do
-    width <- getPositive <$> arbitrary
-    height <- getPositive <$> arbitrary
-    let worldDimensions = (width, height)
+    worldDimensions <- bimap getPositive getPositive <$> arbitrary
     worldIsCylinder <- arbitrary
     pure $ WorldShape{..}
