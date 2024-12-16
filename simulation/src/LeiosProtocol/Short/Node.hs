@@ -48,18 +48,18 @@ import System.Random
 --------------------------------------------------------------
 
 data LeiosEventBlock
-  = EventIB InputBlock
-  | EventEB EndorseBlock
-  | EventVote VoteMsg
+  = EventIB !InputBlock
+  | EventEB !EndorseBlock
+  | EventVote !VoteMsg
   deriving (Show)
 
 data BlockEvent = Generate | Received | EnterState
   deriving (Show)
 
 data LeiosNodeEvent
-  = PraosNodeEvent (PraosNode.PraosNodeEvent RankingBlockBody)
-  | LeiosNodeEventCPU CPUTask
-  | LeiosNodeEvent BlockEvent LeiosEventBlock
+  = PraosNodeEvent !(PraosNode.PraosNodeEvent RankingBlockBody)
+  | LeiosNodeEventCPU !CPUTask
+  | LeiosNodeEvent !BlockEvent !LeiosEventBlock
   deriving (Show)
 
 --------------------------------------------------------------
@@ -67,18 +67,18 @@ data LeiosNodeEvent
 --------------------------------------------------------------
 
 data LeiosNodeConfig = LeiosNodeConfig
-  { leios :: LeiosConfig
-  , rankingBlockFrequencyPerSlot :: Double
-  , nodeId :: NodeId
-  , stake :: StakeFraction
-  , rng :: StdGen
+  { leios :: !LeiosConfig
+  , rankingBlockFrequencyPerSlot :: !Double
+  , nodeId :: !NodeId
+  , stake :: !StakeFraction
+  , rng :: !StdGen
   -- ^ for block generation
-  , baseChain :: Chain RankingBlock
-  , rankingBlockPayload :: Bytes
+  , baseChain :: !(Chain RankingBlock)
+  , rankingBlockPayload :: !Bytes
   -- ^ overall size of txs to include in RBs
-  , inputBlockPayload :: Bytes
+  , inputBlockPayload :: !Bytes
   -- ^ overall size of txs to include in IBs
-  , processingQueueBound :: Natural
+  , processingQueueBound :: !Natural
   }
 
 --------------------------------------------------------------
@@ -86,18 +86,18 @@ data LeiosNodeConfig = LeiosNodeConfig
 --------------------------------------------------------------
 
 data LeiosNodeState m = LeiosNodeState
-  { praosState :: PraosNode.PraosNodeState RankingBlockBody m
-  , relayIBState :: RelayIBState m
-  , relayEBState :: RelayEBState m
-  , relayVoteState :: RelayVoteState m
-  , ibDeliveryTimesVar :: TVar m (Map InputBlockId UTCTime)
-  , validationQueue :: TBQueue m (ValidationRequest m)
-  , waitingForRBVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
+  { praosState :: !(PraosNode.PraosNodeState RankingBlockBody m)
+  , relayIBState :: !(RelayIBState m)
+  , relayEBState :: !(RelayEBState m)
+  , relayVoteState :: !(RelayVoteState m)
+  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId UTCTime))
+  , validationQueue :: !(TBQueue m (ValidationRequest m))
+  , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())]))
   -- ^ waiting for RB block itself to be validated.
-  , waitingForLedgerStateVar :: TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())])
+  , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [(DiffTime, m ())]))
   -- ^ waiting for ledger state of RB block to be validated.
-  , ledgerStateVar :: TVar m (Map (HeaderHash RankingBlock) LedgerState)
-  , ibsNeededForEBVar :: TVar m (Map EndorseBlockId (Set InputBlockId))
+  , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
+  , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
   }
 
 type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
@@ -122,10 +122,10 @@ type RelayVoteMessage = RelayMessage VoteId VoteId VoteMsg
 type PraosMessage = PraosNode.PraosMessage RankingBlockBody
 
 data LeiosMessage
-  = RelayIB {fromRelayIB :: RelayIBMessage}
-  | RelayEB {fromRelayEB :: RelayEBMessage}
-  | RelayVote {fromRelayVote :: RelayVoteMessage}
-  | PraosMsg {fromPraosMsg :: PraosMessage}
+  = RelayIB {fromRelayIB :: !RelayIBMessage}
+  | RelayEB {fromRelayEB :: !RelayEBMessage}
+  | RelayVote {fromRelayVote :: !RelayVoteMessage}
+  | PraosMsg {fromPraosMsg :: !PraosMessage}
   deriving (Show)
 
 data Leios f = Leios
