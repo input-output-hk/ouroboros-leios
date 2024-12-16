@@ -36,6 +36,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
         let stake = stake.get(id).cloned();
         nodes.push(RawNodeConfig {
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
+            region: None,
             stake,
         });
     }

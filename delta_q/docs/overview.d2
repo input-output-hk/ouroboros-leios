@@ -1,0 +1,178 @@
+title: {
+  label: "delta-q - Component Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  subcomponent: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
+}
+
+# Web Application Container
+web-app: {
+  class: container
+  label: "Web Application"
+
+  editor: {
+    class: component
+    label: "Editor\n\nWeb-based editor for\nΔQ expressions"
+  }
+
+  agent: {
+    class: component
+    label: "Agent\n\nEvaluates ΔQ expressions\nin a web worker"
+  }
+
+  index: {
+    class: component
+    label: index.html JS code\n\n Uses plotly.js for visualisation of CDFs and\n resource usage distribution functions
+  }
+
+  storage: {
+    class: component
+    label: "Local Storage\n\nPersists expressions\nand models"
+  }
+
+  editor -> storage: "Saves/loads"
+  editor -> agent: "Sends ΔQ expression"
+  editor -> index: "Renders"
+}
+
+# Core Engine Container
+core: {
+  class: container
+  label: "Core Engine (WASM)"
+
+  parser: {
+    class: component
+    label: "Parser\n\nParses ΔQ expressions\nand metrics"
+  }
+
+  renderer: {
+    class: component
+    label: "Renderer\n\nRenders ΔQ expressions\nand supports edits"
+  }
+
+  evaluator: {
+    class: component
+    label: "Evaluator\n\nComputes CDFs and\nresource metrics"
+  }
+
+  gossip: {
+    class: component
+    label: "Gossip Engine\n\nImplements gossip\noperator evaluation"
+  }
+
+  step_function: {
+    class: component
+    label: "Step Function\n\nImplements step functions\n(also CDF specialisation)"
+  }
+
+  outcome: {
+    class: component
+    label: "Outcome\n\nCompletion CDF\nplus resource usage\nstep functions"
+  }
+
+  compaction: {
+    class: component
+    label: "Compaction\n\nCompacts the outcome\nto bounded complexity"
+  }
+
+  ast: {
+    class: component
+    label: "DeltaQ\n\nAbstract syntax tree\nfor ΔQ expressions"
+  }
+
+  evaluator -> gossip: "uses"
+  evaluator -> outcome: "uses"
+  outcome -> step_function: "uses"
+  outcome -> compaction: "uses"
+  parser -> ast: "uses"
+  renderer -> ast: "uses"
+  gossip -> ast: "uses"
+}
+
+# Dependencies Container
+deps: {
+  class: container
+  label: "Dependencies"
+
+  yew: {
+    class: component
+    label: "Yew Framework\n\nRust/WASM web\nframework"
+  }
+
+  wasm: {
+    class: component
+    label: "WASM Bindings\n\nWeb APIs and\nJavaScript interop"
+  }
+
+  plotly: {
+    class: component
+    label: "Plotly.js\n\nJavaScript library for\nvisualisation"
+  }
+
+  yew -> wasm: "Uses"
+}
+
+# Relationships
+web-app.editor -> core.parser: "Turns text into DeltaQ"
+web-app.agent -> core.evaluator: "Turns DeltaQ into CDFs\nand resource usage distribution functions"
+web-app.editor -> core.renderer: "Turns DeltaQ into HTML"
+web-app -> deps: "Built with"
+
+Editing workflow: {
+  shape: sequence_diagram
+  near: center-right
+  
+  user
+  renderer: Renderer /\nindex.html
+  editor: Editor
+  parser: Parser
+  agent: Agent
+  storage: Local Storage
+
+  user -> editor.edit: "starts editing\n(either a single expression\nor the whole model)"
+  editor."this bar represents\nthe open edit UI"
+  editor.edit -> renderer: "initialises the editor\nwith text rendering"
+  loop {
+    user -> editor.edit: "edits the expression"
+    editor.edit -> parser: "attempt parse"
+    parser -> editor.edit: "error message\nor DeltaQ"
+    editor.edit -> renderer: "updates the text\nand error status"
+  }
+  user -> editor.edit: "saves the expression"
+  editor.edit -> storage: "stores the DeltaQ"
+  editor -> agent: "evaluate selected expression"
+  agent -> editor: "returns the Outcome\nor error message"
+  editor -> renderer: "updates the\nplotly.js diagrams"
+}

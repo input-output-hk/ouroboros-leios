@@ -68,26 +68,32 @@ Conceptually, a Leios vote contains the following information:
 - A proof that the votes cast are valid
 - A signature
 
-When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized. Not counting the hash of the EB, we would expect a vote to comprise at least 146 bytes. However, use of KES signature could add nearly 500 bytes more.
+When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized. Note the EB presumably includes information about which pipeline it belongs to, so that information does not also be included in the vote. So, a minimalist vote might only comprise 146 bytes of core information, not counting the hash of the EB.
 
 - *Voter identity:* 32 bytes
 - *Number of votes cast:* 2 bytes
 - *Proof of right to vote:* 80 bytes
 - *Signature:* 32 bytes
 
-> [!CAUTION]
-> 
-> Is this reasoning correct?
-> 
-> - Voter identity is 32 bytes because that is the size of a pool ID.
-> - We really only need 1 byte to count the votes cast, but two is safer.
-> - I'm not sure where the 80 byte estimate for a VRF proof came from.
-> - A Blake2b-256 signature is 32 bytes.
-> - This assumes that public keys would have been transmitted previously.
-> - This also assumes that duplicative information such as the EB hash and pipeline ID would be global to the collection of votes.
+The above assumes that the keys for verifying the signature have already been transmitted. If the signature were a full KES signature, then it would be at least 416 bytes instead of 32 bytes, though the signed time of 32 bytes would be common to all votes of a given pipeline.
 
+- Signed time: 32 bytes
+- Verification key: 32 bytes
+- Signature
+    - Merkle path (verification key hashes): 7 × 32 = 224 bytes
+    - Additional verification key: 32 bytes
+    - Ed25519
+        - Public key: 32 bytes
+        - Two points: 2 × 32 = 64 bytes
 
-It has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
+So, we have two scenarios for the minimal size of a vote.
+
+| Method         | Common to all votes for a given EB | Specific to individual vote | Total |
+| -------------- | ---------------------------------: | --------------------------: | ----- |
+| Ephemeral keys |                               32 B |                       146 B | 178 B |
+| KES complete   |                               64 B |                       498 B | 562 B |
+
+However, it has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
 
 1. A vote should be small.
     1. Smaller than a TCP MTU so it fits in a single packet
@@ -95,45 +101,6 @@ It has not been decided what types of keys and signatures will be used for Leios
 2. Key distribution should be simple and secure.
     1. Key rotation and revocation may be necessary
     2. Ideally, existing Cardano keys could be used for Leios voting, but without compromising security
-
-
-> [!IMPORTANT]
-> 
-> Below is the VRF+KES approach studied in Peras, which seems larger than it need be.
-> 
-> - [ ] Remove redundant fields
-> - [ ] Compare to fields needed for BLS and Musen
-> 
-> We have used an identical structure for single `Vote`s, for both algorithms. We define this structure as a CDDL grammar, inspired by the [block header](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/conway.cddl#L27) definition from cardano-ledger:
-> 
-> ```cddl
-> vote =
->   [ voter_id         : hash32
->   , voting_round     : round_no
->   , block_hash       : hash32
->   , voting_proof     : vrf_cert
->   , voting_weight    : voting_weight
->   , kes_period       : kes_period
->   , kes_vkey         : kes_vkey
->   , kes_signature    : kes_signature
->   ]
-> ```
-> 
-> This definition relies on the following primitive types (drawn from Ledger definitions in [crypto.cddl](https://github.com/input-output-hk/cardano-ledger/blob/e2aaf98b5ff2f0983059dc6ea9b1378c2112101a/eras/conway/impl/cddl-files/crypto.cddl#L1))
-> 
-> ```cddl
-> round_no = uint .size 8
-> voting_weight = uint .size 8
-> vrf_cert = [bytes, bytes .size 80]
-> hash32 = bytes .size 32
-> kes_vkey = bytes .size 32
-> kes_signature = bytes .size 448
-> kes_period = uint .size 8
-> ```
-> 
-> * Total vote size is **710 bytes** with the above definition,
-> * Unless explicitly mentioned, `hash` function exclusively uses 32-bytes Blake2b-256 hashes,
-> * The `voter_id` is it's pool identifier, ie. the hash of the node's cold key. 
 
 
 ### Number of unique SPOs voting
@@ -261,8 +228,14 @@ Combining the possible voting outcomes with the certificate ones yields a comple
 | Adversarial votes      | Yes                     | Yes                  | Adversarial certificate when honest one was possible | Attacked    |
 | Adversarial votes      | No                      | Yes                  | Adversarial certificate                              | Attacked    |
 
+The overriding requirement for Leios certificates is that it be essentially impossible for an adversary to forge a certificate—that would fundamentally compromise Leios security. Conversely, it is acceptable for adversaries to occasionally thwart creation of valid certificates because that thwarting only reduces Leios throughput and does not seriously compromise its security. The second critical requirement is that certificates fit in a ranking block (Praos block), whose size is currently limited to 90,112 bytes, preferably with space leftover for transactions and other certificates. Additionally, it must be feasible to create and verify certificates within the CPU budget of a Leios pipeline. The three categories of certificates currently under evaluation have different profiles in terms of certificate size and CPU load, but none is superior to the others in all categories. The "large" and "slow" ratings in the table below are potential "show stoppers" for the rated algorithm. However, most of the algorithms have several variants, including zero-knowledge variants that would radically reduce certificate size at the expense of very slow construction of certificates. Finally, the certificate size typically depends somewhat upon the number of votes and size of individual votes, so progress on keeping the vote size small may translate into smaller certificates.
 
-#### BLS certificate
+| Method               | Certificate size | Construction time | Verification time |
+| -------------------- | ---------------- | ----------------- | ----------------- |
+| ALBA                 | Large            | Fast              | Fast              |
+| BLS (Mithril)        | Medium           | Medium            | Medium            |
+| MUSEN                | Small            | Medium            | Slow              |
+| ZK variants of above | Very small       | Very slow         | Fast              |
 
 
 #### ALBA certificate
@@ -291,30 +264,54 @@ The plots below show how it is more probable to build a certificate with more vo
 | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
 | ![Probability of creating an ALBA proof](../analysis/alba-success.svg) | ![Number of items in ALBA proof](../analysis/alba-size.svg) |
 
-For the sake of argument, assume that we want the votes included in the certificate to occupy no more than 75 kB. The table below indicates that votes no larger than 400 bytes would provide a reasonable requirement for the number of honest votes needed for certification. Note that our analysis of quorum size resulted in a constraint of 60% of the votes being honest. ALBA, however, raised that constraint the to values in the table because ALBA needs more than 60% of the votes to build a compact certificate.
+For the sake of argument, assume that we want the votes included in the certificate to occupy no more than 75 kB. We set $\ell_\text{sec} = \ell_\text{rel} = 80$, $n_f = 0.6$, and $n = 500$. The table below indicates that votes no larger than 200 bytes would provide a reasonable requirement for the number of honest votes needed for certification. Note that our analysis of quorum size resulted in a constraint of 60% of the votes being honest. ALBA, however, raised that constraint the to values in the table because ALBA needs more than 60% of the votes to build a compact certificate: this means that weaker adversaries can prevent the achievement of a quorum. 
 
-| Vote size | Votes fitting into 75 kB | Minimum allowable $n_p$ | Fraction of honest votes needed, $n_p/n$ |
-| --------: | -----------------------: | ----------------------: | ---------------------------------------: |
-|     200 B |                      375 |                     355 |                                   71.0 % |
-|     250 B |                      300 |                     371 |                                   74.2 % |
-|     300 B |                      250 |                     386 |                                   77.2 % |
-|     350 B |                      214 |                     403 |                                   80.6 % |
-|     400 B |                      187 |                     421 |                                   84.2 % |
-|     450 B |                      166 |                     439 |                                   87.8 % |
-|     500 B |                      150 |                     457 |                                   91.4 % |
+| Vote size | Votes fitting into 75 kB | Minimum allowable $n_p$ | Fraction of honest votes needed, $n_p/n$ | Adversarial stake needed to prevent quorum |
+| --------: | -----------------------: | ----------------------: | ---------------------------------------: | -----------------------------------------: |
+|     200 B |                      375 |                     355 |                                   71.0 % |                                      29.0% |
+|     250 B |                      300 |                     371 |                                   74.2 % |                                      25.8% |
+|     300 B |                      250 |                     386 |                                   77.2 % |                                      22.8% |
+|     350 B |                      214 |                     403 |                                   80.6 % |                                      19.4% |
+|     400 B |                      187 |                     421 |                                   84.2 % |                                      15.8% |
+|     450 B |                      166 |                     439 |                                   87.8 % |                                      12.2% |
+|     500 B |                      150 |                     457 |                                   91.4 % |                                       8.6% |
+
+Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we show below measurements for the unoptimized "centralized telescope" version of the pipeline. This uses Blake2s hashes, but other algorithms such as SHA256, Keccak256, and Poseidon are possible alternatives. On the particular machine used for these benchmarks, proof took approximately 9.0 ms and verification took 85 μs; note that the ~148 votes in the certificate would each have to be verified, too. The optimized version of ALBA, which packs data more efficiently, might result in certificates that are 40% smaller than the nominal 75 kB of the certificate in this example.
+
+![Proof and verification times for ALBA certificates relevant to Leios](../images/leios-alba.svg)
+
+
+#### BLS certificate
 
 
 > [!IMPORTANT]
 > 
-> Include results from Raphael's analyses and benchmarking:
+> To be written
+
+
+#### MUSEN certificate
+
+> [!IMPORTANT]
 > 
-> - [ ] Certificate size for unoptimized and optimized ALBA format.
-> - [ ] How proving times vary with the underlying hash algorithm (Blake2s, SHA256, Keccak256, Poseidon, etc.).
-> - [ ] Snarkification
+> To be written
 
 
-#### Musen certificate
+### Insights regarding voting and certificates
 
+1. It is critically important to keep the size of votes small.
+    1. Large votes can mean large certificates, and votes should also fit in one TCP MTU.
+    2. Including KES signatures in votes means that votes will be 500-600 B in size.
+    3. Optimizations might take advantage of the fact that KES periods, currently spanning 1.5 days on the Cardano mainnet, persist for many Leios voting cycles.
+    4. Using ephemeral keys would make votes smaller, but then a key registration layer would have to be added to the protocol.
+2. Neither ALBA, BLS, MUSEN, or their ZK variants are clear winners for the best choice of certificate scheme for Leios.
+    1. Each has at least one strength and one drawback related to certificate size, proof time, or verification time.
+    2. ALBA is close to being viable if vote size can reduced or if quorum disruption by adversaries with 10% of stake is acceptable.
+    3. An ALBA security setting of $\ell_\text{sec} = \ell_\text{rel} = 80$ (i.e., eighty-bit security) seems sufficient for Leios voting.
+3. At least 500 votes and a 60% quorum will be needed.
+    1. These parameters ensure voting security at least as strong as Praos security over a range of adversary strengths.
+    3. ALBA would require a larger quorum.
+    4. The clumpiness of the Cardano stake distribution on mainnet means that some producer nodes might cast more than one vote in a given pipeline.
+    5. MUSEN and BLS certificates need further evaluation for Leios.
 
 
 ## Cost analyses
@@ -558,6 +555,114 @@ See [this Jupyter notebook](../analysis/tx.ipynb) for details of the analysis.
 The stake distribution has an important influence on the number of unique SPOs involved in each round of Leios voting. It turns out that the cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. This curve can be adapted to the actual number of stake pools being modeled: for example, in order to use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
 
 ![Curve fit to stakepool distribution at epoch 500](../images/stake-fit.png)
+
+
+## Threat model
+
+The Leios protocol may have to mitigate the following categories of threats.
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate transactions
+
+The protocol already fully or partially mitigates many of these, but they are listed for completeness and eventual discussion in the Leios CIP. Others are a subject of ongoing research. The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lowered throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
+Below we comprehensively tabulation of such *hypothetical* threats. Nearly all of these are already mitigated by the protocol design, the incentive structure, or the cost of the resources needed to execute the threat. All are listed here for completeness and consideration.
+
+
+### Grinding and other threats to Praos
+
+Threats to the ranking blocks used by Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the possibility of *grinding attacks*, as discussed in [CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md), will always exist, albeit at low probability of success. Such an attack, which requires some stake, involves using CPU resources to try to manipulate the epoch nonce to a value which will result in higher probability of being select as an RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that the Praos VRF will be used for the sortition in Leios. Currently, large and expensive amounts of CPU power would be required to successfully conduct a grind attack on Praos. Nevertheless, additional research and development are underway to further harden Praos.
+
+|   # | Actor    | Method                             | Effect                           | Resources   | Mitigation                         | Notes                      |
+| --: | -------- | ---------------------------------- | -------------------------------- | ----------- | ---------------------------------- | -------------------------- |
+|   1 | Varies   | Threat to Praos                    | Leios is only as secure as Praos | -           | Varies                             | Already mitigated in Praos |
+|   2 | Producer | Grinding VRF on voting eligibility | Increased probability of voting  | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|   3 | Producer | Grinding VRF on IB eligibility     | Increased probability of IB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|   4 | Producer | Grinding VRF on EB eligibility     | Increased probability of EB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+
+
+### Equivocation
+
+In Leios, an IB producer, EB producers, or voter is only allowed one production for each winning of the sortition lottery. (Note that they may win more than once in the same slot because a lottery takes place for each lovelace staked.) A malicious producer or voter might create two conflicting IBs, EBs, or votes and diffuse them to different downstream peers in an attempt to disrupt the Leios protocol. The [Leios paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) mitigates this situation explicitly by identifying nodes that misbehave in this manner and notifying downstream peers in a controlled manner.
+
+|   # | Actor    | Method           | Effect                               | Resources | Mitigation      | Notes             |
+| --: | -------- | ---------------- | ------------------------------------ | --------- | --------------- | ----------------- |
+|   5 | Producer | Equivocated IB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|   6 | Producer | Equivocated EB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|   7 | Producer | Equivocated vote | Interferes with certificate creation | stake     | See Leios paper | Already mitigated |
+
+
+### Inaction and nuisance
+
+Producer nodes might also attempt to disrupt the protocol by failing to play their assigned role or by attempting to diffuse invalid information. Failing to produce a block (RB, IB, or EB) or to vote when entitled will result in the attacker receiving fewer rewards for their Leios work. Similarly for creating invalid blocks or votes. Very little advantage would be gained by such attacks because they really only reduce throughput or create a minor annoyance to their first downstream nodes by burdening them with useless verification work. Presumably, the loss of rewards would not compensate for the small disruption they create. The cryptographic aspects of Leios quickly catch invalid blocks or votes, of course.
+
+|   # | Actor    | Method                                            | Effect                                                   | Resources   | Mitigation                                         | Notes             |
+| --: | -------- | ------------------------------------------------- | -------------------------------------------------------- | ----------- | -------------------------------------------------- | ----------------- |
+|   8 | Producer | Decline to create IB                              | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+|   9 | Producer | Decline to create EB                              | Lowers throughput                                        | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+|  10 | Producer | Decline to vote                                   | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  11 | Producer | Create invalid IB                                 | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  12 | Producer | Create invalid EB                                 | Resource burden on nodes; lowers throughput              | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+|  13 | Producer | Create invalid vote                               | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  14 | Producer | Include invalid txs in IB                         | Resource burden on nodes; lowers throughput              | stake       | Tx verification                                    | Already mitigated |
+|  15 | Producer | Include invalid IBs in EB                         | Resource burden on nodes; lowers throughput              | stake       | IB verification                                    | Already mitigated |
+|  16 | Producer | Include invalid certificate in RB                 | Lowers throughput; resource burden on nodes              | stake       | Certificate verification                           | Already mitigated |
+|  17 | Producer | Create valid certificate without sufficient votes | Manipulates inclusion of txs and hence dapps and oracles | CPU & stake | Strong cryptography for certificates               | R&D underway      |
+
+
+### Omission and manipulation
+
+In Praos, omitting transactions from a block being forged does not directly affect the producer's rewards, but it may reduce the overall size of the rewards pot for the whole epoch. However, a malicious producer has little leverage by such omissions because of the very high probability that the omitted transactions reside elsewhere in the memory pool and will soon be included in subsequent honest blocks. Reordering IBs when an EB is created is not an option for an attacker because the Leios paper specifies a fixed ordering.
+
+|   # | Actor    | Method                       | Effect                                                                                               | Resources | Mitigation                          | Notes                            |
+| --: | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------- |
+|  18 | Producer | Omit txs when creating IB    | Lowers throughput; increases propagation speed of malicious IB; manipulate Dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+|  19 | Producer | Omit IBs when creating EB    | Lowers throughput; increases propagation speed of malicious EB; manipulate dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+|  20 | Producer | Reorder IBs when creating EB | Manipulate dapps                                                                                     | stake     | Impose canonical order of IBs in EB | Already mitigated in Leios paper |
+
+
+### Network interference
+
+Malicious network activity such as violating the sync protocol or delaying diffusion of block or votes creates a minor annoyance that the node's sync protocol will quickly avoid by preferring efficient and honest nodes. Large numbers of malicious relays would be needed to impinge on efficiency even in a small degree.
+
+|   # | Actor | Method                       | Effect                                             | Resources | Mitigation              | Notes             |
+| --: | ----- | ---------------------------- | -------------------------------------------------- | --------- | ----------------------- | ----------------- |
+|  21 | Relay | Abuse sync protocol          | Resource burden on nodes; introduces latency       | -         | Design of sync protocol | Already mitigated |
+|  22 | Relay | Delay diffusion of valid IBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+|  23 | Relay | Delay diffusion of valid EBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+|  24 | Relay | Delay diffusion of votes     | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+
+
+### Denial of service
+
+Transaction-based denial of service attacks on Leios would involve submitting numerous invalid, duplicate, or conflicting transactions to different nodes so that they would all make their way into the memory pool and then to IBs, only to be invalidated when transaction reconciliation occurs after those IBs are indirectly referenced by a certificate on a Praos ranking block. Such a denial of service would result in extra computation by the nodes and wasted permanent storage in the IBs. (Plutus transactions may be especially burdensome in this respect.) Ongoing research will mitigate such denial of service via sharding techniques and Leios's fee structure. Sharding will prevent duplicate transactions from reaching IBs and the fee structure will enforce payment for intentionally conflicted transactions, even though only one of the transactions would make it onto the ledger.
+
+|   # | Actor  | Method                                                 | Effect                                                                                          | Resources | Mitigation | Notes             |
+| --: | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------- | ---------- | ----------------- |
+|  25 | Client | Submit invalid, duplicate, or conflicting transactions | Fills memory pool; increases tx duplication in RBs; lowers throughput; resource burden on nodes | ada       | Sharding   | Research underway |
+
+
+### Insights regarding threats
+
+1. The Leios protocol already mitigates most of the threats identified.
+    1. Anti-grinding for Leios depends upon the Praos anti-grinding R&D.
+    2. Sharding, incentives/rewards/fees, and memory pool design need to account for potential threats.
+2. Some attacks may reduce the efficiency and throughput of Leios, but not threaten its security.
+    1. Short Leios is vulnerable to reduced efficiency in ways that Full Leios is not.
+    2. Simulation studies can measure the extent of this reduced efficiency as a function of the intensity of the attack.
+    3. Simulations of the behavior of the "freshest first" aspect of Leios are required.
+3. Loss of rewards disincentivizes nuisance attacks.
 
 
 ## Findings and conclusions

@@ -2,57 +2,183 @@
 
 import { useGraphContext } from "@/contexts/GraphContext/context";
 import debounce from "debounce";
-import { FC, useEffect } from "react";
+import { FC, useCallback, useEffect, useRef } from "react";
 import { useHandlers } from "../hooks/useHandlers";
-import { isClickOnNode } from "../utils";
+import { getOffsetCoordinates, isClickOnNode } from "../utils";
 
 export const Canvas: FC = () => {
+  const { drawTopography } = useHandlers();
   const {
-    state: { canvasRef, topography, currentNode },
+    state: {
+      canvasRef,
+      canvasOffsetX,
+      canvasOffsetY,
+      canvasScale,
+      topography,
+      currentNode,
+    },
     dispatch,
   } = useGraphContext();
-  const { drawTopography: drawCanvas } = useHandlers();
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const pointerCapture = useRef<number>();
 
   useEffect(() => {
-    drawCanvas();
-    canvasRef.current?.addEventListener("click", (ev) => {
-      if (!canvasRef.current) {
-        return;
-      }
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
 
-      const width =
-        canvasRef.current.parentElement?.getBoundingClientRect().width || 1024;
-      const height =
-        canvasRef.current.parentElement?.getBoundingClientRect().height || 800;
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
-      const y = ev.clientY - rect.top;
-      const { node } = isClickOnNode(
-        x,
-        y,
-        topography,
-        width,
-        height,
-        2,
-      );
+    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
+    const { offsetX, offsetY } = getOffsetCoordinates(
+      topography,
+      width,
+      height,
+      canvasScale,
+    );
 
-      dispatch({ type: "SET_CURRENT_NODE", payload: node });
+    dispatch({
+      type: "SET_CANVAS_PROPS",
+      payload: {
+        canvasOffsetX: offsetX,
+        canvasOffsetY: offsetY,
+      },
     });
   }, []);
 
-  useEffect(drawCanvas, [currentNode])
+  const handleClick = useCallback(
+    (ev: PointerEvent) => {
+      const canvas = canvasRef.current;
+      if (!canvas || ev.target !== canvas) {
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const y = ev.clientY - rect.top;
+      const { node, clicked } = isClickOnNode(
+        x,
+        y,
+        topography,
+        (2 / canvasScale) * 6,
+        canvasOffsetX,
+        canvasOffsetY,
+        canvasScale,
+      );
+
+      if (clicked && node) {
+        dispatch({ type: "SET_CURRENT_NODE", payload: currentNode === node ? undefined : node });
+      }
+    },
+    [canvasScale, currentNode, canvasOffsetX, canvasOffsetY],
+  );
+
+  const handleWheel = useCallback(
+    (ev: WheelEvent) => {
+      const canvas = canvasRef.current;
+      if (!canvas || ev.target !== canvas) {
+        return;
+      }
+
+      // Get canvas dimensions
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = ev.clientX - rect.left;
+      const mouseY = ev.clientY - rect.top;
+
+      // Determine zoom direction
+      const zoomFactor = ev.deltaY > 0 ? 0.9 : 1.1;
+
+      // Calculate new scale and offsets
+      dispatch({
+        type: "SET_CANVAS_PROPS",
+        payload: {
+          canvasScale: (prevScale) => prevScale * zoomFactor,
+          canvasOffsetX: (prevOffsetX) =>
+            prevOffsetX - (mouseX - canvasOffsetX) * (zoomFactor - 1),
+          canvasOffsetY: (prevOffsetY) =>
+            prevOffsetY - (mouseY - canvasOffsetY) * (zoomFactor - 1),
+        },
+      });
+    },
+    [canvasOffsetX, canvasOffsetY],
+  );
+
+  const handlePointerDown = useCallback((ev: PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas || ev.target !== canvas || ev.button !== 0) {
+      return;
+    }
+
+    isDragging.current = true;
+    canvas.setPointerCapture(ev.pointerId);
+    pointerCapture.current = ev.pointerId;
+    dragStart.current = { x: ev.clientX, y: ev.clientY };
+  }, []);
+
+  const handlePointerMove = useCallback((ev: PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas || ev.target !== canvas || !isDragging.current) {
+      return;
+    }
+
+    const deltaX = ev.clientX - dragStart.current.x;
+    const deltaY = ev.clientY - dragStart.current.y;
+
+    dispatch({
+      type: "SET_CANVAS_PROPS",
+      payload: {
+        canvasOffsetX(prev) {
+          return prev + deltaX;
+        },
+        canvasOffsetY(prev) {
+          return prev + deltaY;
+        },
+      },
+    });
+
+    dragStart.current = { x: ev.clientX, y: ev.clientY };
+  }, []);
+
+  const handlePointerUp = useCallback((ev: PointerEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas || ev.target !== canvas || ev.button !== 0) {
+      return;
+    }
+
+    isDragging.current = false;
+    pointerCapture.current = undefined;
+    canvas.releasePointerCapture(ev.pointerId);
+  }, []);
 
   useEffect(() => {
-    const redraw = debounce(drawCanvas, 100);
+    drawTopography();
 
-    window.addEventListener("resize", redraw)
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
 
-    return () => window.removeEventListener("resize", redraw)
-  }, [])
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerup", handleClick);
+    canvas.addEventListener("wheel", handleWheel);
+
+    const redraw = debounce(drawTopography, 100);
+    document.addEventListener("resize", redraw);
+
+    return () => {
+      document.removeEventListener("resize", redraw);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerup", handleClick);
+      canvas.removeEventListener("wheel", handleWheel);
+    };
+  }, [drawTopography, handleClick, handleWheel]);
 
   return (
-    <div className="h-[80vh] border-2 border-gray-200 rounded mb-8 w-2/3">
-      <canvas ref={canvasRef} />
-    </div>
+    <canvas ref={canvasRef} />
   );
 };

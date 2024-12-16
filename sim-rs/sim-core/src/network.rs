@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::{bail, Result};
 use netsim_async::EdgePolicy;
@@ -37,7 +34,7 @@ impl<T> Network<T> {
         let to_source = self
             .sources
             .entry(to)
-            .or_insert_with(|| NetworkSource::new(self.clock.clone()));
+            .or_insert_with(|| NetworkSource::new());
         let from_sink = self
             .sinks
             .entry(from)
@@ -63,64 +60,19 @@ impl<T> Network<T> {
 }
 
 pub struct NetworkSource<T> {
-    node_messages: HashMap<NodeId, VecDeque<Message<T>>>,
-    node_next_events: HashMap<NodeId, Timestamp>,
     source: mpsc::UnboundedReceiver<Message<T>>,
     sink: mpsc::UnboundedSender<Message<T>>,
-    clock: Clock,
 }
 
 impl<T> NetworkSource<T> {
-    fn new(clock: Clock) -> Self {
+    pub(crate) fn new() -> Self {
         let (sink, source) = mpsc::unbounded_channel();
-        Self {
-            node_messages: HashMap::new(),
-            node_next_events: HashMap::new(),
-            source,
-            sink,
-            clock,
-        }
+        Self { source, sink }
     }
 
-    pub async fn recv(&mut self) -> Option<(NodeId, T)> {
-        // Pull in any messages we were waiting on
-        while let Ok(message) = self.source.try_recv() {
-            self.schedule_message(message);
-        }
-
-        // If we don't have anything pending yet, block until we do
-        if self.node_next_events.is_empty() {
-            let next = self.source.recv().await?;
-            self.schedule_message(next);
-        }
-
-        // Now we have a pending message from at least one node. Sleep until the message "should" arrive...
-        let (next_from, next_timestamp) = self.node_next_events.iter().min_by_key(|(_, ts)| *ts)?;
-        let from = *next_from;
-        let timestamp = *next_timestamp;
-        self.clock.wait_until(timestamp).await;
-
-        let messages = self.node_messages.get_mut(&from)?;
-        let msg = messages.pop_front()?;
-
-        // Track when the next message from this sender will arrive
-        if let Some(next) = messages.front() {
-            self.node_next_events
-                .insert(from, next.departure + next.latency);
-        } else {
-            self.node_next_events.remove(&from);
-        }
-
-        Some((from, msg.body))
-    }
-
-    fn schedule_message(&mut self, message: Message<T>) {
-        let messages = self.node_messages.entry(message.from).or_default();
-        if messages.is_empty() {
-            let arrival = message.departure + message.latency;
-            self.node_next_events.insert(message.from, arrival);
-        }
-        messages.push_back(message);
+    pub async fn recv(&mut self) -> Option<(NodeId, Timestamp, T)> {
+        let msg = self.source.recv().await?;
+        Some((msg.from, msg.departure + msg.latency, msg.body))
     }
 }
 

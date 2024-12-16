@@ -1,6 +1,7 @@
 use std::{
-    collections::{btree_map, hash_map, BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{btree_map, hash_map, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{bail, Result};
@@ -8,14 +9,11 @@ use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::ChaChaRng;
-use tokio::{
-    select,
-    sync::{mpsc, watch},
-};
+use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
 
 use crate::{
-    clock::{Clock, Timestamp},
+    clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
@@ -32,17 +30,25 @@ enum TransactionView {
     Received(Arc<Transaction>),
 }
 
+/// Things that can happen next for a node
+enum NodeEvent {
+    /// A new slot has started.
+    NewSlot(u64),
+    /// A message has been received.
+    Message(NodeId, SimulationMessage),
+}
+
 pub struct Node {
     pub id: NodeId,
     trace: bool,
     sim_config: Arc<SimConfiguration>,
-    msg_source: NetworkSource<SimulationMessage>,
+    msg_source: Option<NetworkSource<SimulationMessage>>,
     msg_sink: NetworkSink<SimulationMessage>,
-    slot_receiver: watch::Receiver<u64>,
-    tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
+    tx_source: Option<mpsc::UnboundedReceiver<Arc<Transaction>>>,
+    events: BinaryHeap<FutureEvent<NodeEvent>>,
     tracker: EventTracker,
     rng: ChaChaRng,
-    clock: Clock,
+    clock: ClockBarrier,
     stake: u64,
     total_stake: u64,
     peers: Vec<NodeId>,
@@ -106,23 +112,25 @@ impl Node {
         total_stake: u64,
         msg_source: NetworkSource<SimulationMessage>,
         msg_sink: NetworkSink<SimulationMessage>,
-        slot_receiver: watch::Receiver<u64>,
         tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
         tracker: EventTracker,
         rng: ChaChaRng,
-        clock: Clock,
+        clock: ClockBarrier,
     ) -> Self {
         let id = config.id;
         let stake = config.stake;
         let peers = config.peers.clone();
+        let mut events = BinaryHeap::new();
+        events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
+
         Self {
             id,
             trace: sim_config.trace_nodes.contains(&id),
             sim_config,
-            msg_source,
+            msg_source: Some(msg_source),
             msg_sink,
-            slot_receiver,
-            tx_source,
+            tx_source: Some(tx_source),
+            events,
             tracker,
             rng,
             clock,
@@ -135,98 +143,114 @@ impl Node {
         }
     }
 
+    async fn next_event(&mut self) -> NodeEvent {
+        self.clock
+            .wait_until(self.events.peek().map(|e| e.0).expect("no events"))
+            .await;
+        self.events.pop().unwrap().1
+    }
+
     pub async fn run(mut self) -> Result<()> {
+        // TODO: split struct Node into the mechanics (which can then be extracted here) and the high-level logic that handles messages
+        // (then we could remove these Option shenanigans)
+        let mut msg_source = self.msg_source.take().unwrap();
+        let mut tx_source = self.tx_source.take().unwrap();
+
         loop {
             select! {
-                change_res = self.slot_receiver.changed() => {
-                    if change_res.is_err() {
+                maybe_msg = msg_source.recv() => {
+                    let Some((from, timestamp, msg)) = maybe_msg else {
                         // sim has stopped running
                         break;
-                    }
-                    let slot = *self.slot_receiver.borrow();
-                    self.handle_new_slot(slot)?;
+                    };
+                    self.events.push(FutureEvent(timestamp, NodeEvent::Message(from, msg)));
+                    self.clock.finish_task();
                 }
-                maybe_tx = self.tx_source.recv() => {
+                maybe_tx = tx_source.recv() => {
                     let Some(tx) = maybe_tx else {
-                        // sim has stopped running
+                        // sim has stopped runinng
                         break;
                     };
                     self.receive_tx(self.id, tx)?;
                 }
-                maybe_msg = self.msg_source.recv() => {
-                    let Some((from, msg)) = maybe_msg else {
-                        // sim has stopped running
-                        break;
-                    };
-                    match msg {
-                        // TX propagation
-                        SimulationMessage::AnnounceTx(id) => {
-                            self.receive_announce_tx(from, id)?;
-                        }
-                        SimulationMessage::RequestTx(id) => {
-                            self.receive_request_tx(from, id)?;
-                        }
-                        SimulationMessage::Tx(tx) => {
-                            self.receive_tx(from, tx)?;
-                        }
-
-                        // Block propagation
-                        SimulationMessage::RollForward(slot) => {
-                            self.receive_roll_forward(from, slot)?;
-                        }
-                        SimulationMessage::RequestBlock(slot) => {
-                            self.receive_request_block(from, slot)?;
-                        }
-                        SimulationMessage::Block(block) => {
-                            self.receive_block(from, block)?;
-                        }
-
-                        // IB header propagation
-                        SimulationMessage::AnnounceIBHeader(id) => {
-                            self.receive_announce_ib_header(from, id)?;
-                        }
-                        SimulationMessage::RequestIBHeader(id) => {
-                            self.receive_request_ib_header(from, id)?;
-                        }
-                        SimulationMessage::IBHeader(header, has_body) => {
-                            self.receive_ib_header(from, header, has_body)?;
-                        }
-
-                        // IB transmission
-                        SimulationMessage::AnnounceIB(id) => {
-                            self.receive_announce_ib(from, id)?;
-                        }
-                        SimulationMessage::RequestIB(id) => {
-                            self.receive_request_ib(from, id)?;
-                        }
-                        SimulationMessage::IB(ib) => {
-                            self.receive_ib(from, ib)?;
-                        }
-
-                        // EB propagation
-                        SimulationMessage::AnnounceEB(id) => {
-                            self.receive_announce_eb(from, id)?;
-                        }
-                        SimulationMessage::RequestEB(id) => {
-                            self.receive_request_eb(from, id)?;
-                        }
-                        SimulationMessage::EB(eb) => {
-                            self.receive_eb(from, eb)?;
-                        }
-
-                        // Voting
-                        SimulationMessage::AnnounceVotes(id) => {
-                            self.receive_announce_votes(from, id)?;
-                        }
-                        SimulationMessage::RequestVotes(id) => {
-                            self.receive_request_votes(from, id)?;
-                        }
-                        SimulationMessage::Votes(votes) => {
-                            self.receive_votes(from, votes)?;
-                        }
+                event = self.next_event() => {
+                    match event {
+                        NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
+                        NodeEvent::Message(from, msg) => self.handle_message(from, msg)?,
                     }
                 }
             };
+        }
+        Ok(())
+    }
+
+    fn handle_message(&mut self, from: NodeId, msg: SimulationMessage) -> Result<()> {
+        match msg {
+            // TX propagation
+            SimulationMessage::AnnounceTx(id) => {
+                self.receive_announce_tx(from, id)?;
+            }
+            SimulationMessage::RequestTx(id) => {
+                self.receive_request_tx(from, id)?;
+            }
+            SimulationMessage::Tx(tx) => {
+                self.receive_tx(from, tx)?;
+            }
+
+            // Block propagation
+            SimulationMessage::RollForward(slot) => {
+                self.receive_roll_forward(from, slot)?;
+            }
+            SimulationMessage::RequestBlock(slot) => {
+                self.receive_request_block(from, slot)?;
+            }
+            SimulationMessage::Block(block) => {
+                self.receive_block(from, block)?;
+            }
+
+            // IB header propagation
+            SimulationMessage::AnnounceIBHeader(id) => {
+                self.receive_announce_ib_header(from, id)?;
+            }
+            SimulationMessage::RequestIBHeader(id) => {
+                self.receive_request_ib_header(from, id)?;
+            }
+            SimulationMessage::IBHeader(header, has_body) => {
+                self.receive_ib_header(from, header, has_body)?;
+            }
+
+            // IB transmission
+            SimulationMessage::AnnounceIB(id) => {
+                self.receive_announce_ib(from, id)?;
+            }
+            SimulationMessage::RequestIB(id) => {
+                self.receive_request_ib(from, id)?;
+            }
+            SimulationMessage::IB(ib) => {
+                self.receive_ib(from, ib)?;
+            }
+
+            // EB propagation
+            SimulationMessage::AnnounceEB(id) => {
+                self.receive_announce_eb(from, id)?;
+            }
+            SimulationMessage::RequestEB(id) => {
+                self.receive_request_eb(from, id)?;
+            }
+            SimulationMessage::EB(eb) => {
+                self.receive_eb(from, eb)?;
+            }
+
+            // Voting
+            SimulationMessage::AnnounceVotes(id) => {
+                self.receive_announce_votes(from, id)?;
+            }
+            SimulationMessage::RequestVotes(id) => {
+                self.receive_request_votes(from, id)?;
+            }
+            SimulationMessage::Votes(votes) => {
+                self.receive_votes(from, votes)?;
+            }
         }
         Ok(())
     }
@@ -252,6 +276,11 @@ impl Node {
         self.generate_input_blocks(slot)?;
 
         self.try_generate_praos_block(slot)?;
+
+        self.events.push(FutureEvent(
+            self.clock.now() + Duration::from_secs(1),
+            NodeEvent::NewSlot(slot + 1),
+        ));
 
         Ok(())
     }
@@ -492,7 +521,9 @@ impl Node {
 
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
-        if from != self.id {
+        if from == self.id {
+            self.tracker.track_transaction_generated(&tx, self.id);
+        } else {
             self.tracker
                 .track_transaction_received(tx.id, from, self.id);
         }
@@ -884,6 +915,7 @@ impl Node {
                 msg.bytes_size()
             );
         }
+        self.clock.start_task();
         self.msg_sink.send_to(to, msg)
     }
 }

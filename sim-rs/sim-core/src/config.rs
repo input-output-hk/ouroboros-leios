@@ -78,6 +78,7 @@ pub struct RawConfig {
 pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
+    pub region: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

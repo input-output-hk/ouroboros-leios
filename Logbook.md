@@ -1,10 +1,106 @@
 # Leios logbook
 
+## 2024-12-13
+
+### Haskell simulation
+
+- Merged leios visualizations on `main`.
+- P2P visualization improvements:
+  * Block types are differentiated by shapes, and pipelines by color.
+  * Charting diffusion latency of each block type.
+  * TODO: chart CPU usage.
+- Reworked generation of EBs and Votes to handle `>= 1` frequencies
+  like IBs (except max 1 EB per pipeline per node).
+- Visualizations helped with discovering and fixing some modeling errors.
+
+## 2024-12-12
+
+### Analysis of vote size and ALBA certificates
+
+Keeping votes small is critical to having certificates that fit on a Praos ranking block. In the [draft technical report](docs/technical-report-1.md#structure-of-votes) we have estimated the minimum possible size for votes using either ephemeral keys or KES:
+
+| Method         | Common to all votes for a given EB | Specific to individual vote | Total |
+| -------------- | ---------------------------------: | --------------------------: | ----- |
+| Ephemeral keys |                               32 B |                       146 B | 178 B |
+| KES complete   |                               64 B |                       498 B | 562 B |
+
+The KES votes are a challenge for ALBA because they would require a 90% quorum, meaning that an adversary with more than 10% of the stake could prevent voting.
+
+The CPU time estimate that we have benchmarked for the "centralized telescope" version of ALBA are favorable, however:
+
+- Prove: 9.0 ms
+- Verify: 85 μs
+
+### Review Session 1 - Formal Specification
+
+Team reviewed formal specification and further provided input for improvements.
+
+### Rust simulation
+
+Merged virtual time branch. The rust simulation logic is now decoupled from wall clock time.
+
+Experimented with using netsim for the networking layer again. It works, but we currently have to simulate network activity 1ms at a time, making the simulation slow. Waiting for the netsim API to expose a "lower bound" of how long to wait until another message will arrive.
+
+## 2024-12-11
+
+### Discussion with IOG SRE for nodes
+
+We met with IOG's SRE for node operations to discuss cloud engineering aspects of the current Cardano node deployments that might be relevant for Leios.
+
+- We have information now about what VM sizes are for nodes and each relay.
+- We also have access to the grafana dashboards for examining mainnet and other nodes.
+- They've created custom grafana queries so we can see I/O, network, and disk usage.
+
+Recommendations:
+
+1. Update the cost calculator so that it has pre-defined cost defaults for several cases such as on-demand VMs, bare metal, etc.
+2. Alter the cost calculator to include a specified amount of "free" IOPS and network egress that are included with the selected base VM and/or disks.
+3. Compare the Praos telemetry on IOG's mainnet nodes to the output of the cost calculator when Leios is turned off.
+
+## 2024-12-10
+
+### Threat model
+
+The technical report now contains a draft section on [the Leios threat mode](docs/technical-report-1.md#threat-model) detailing 25 hypothetical threats. The general types are . . .
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate txs
+
+The protocol already fully or partially mitigates many of these, but they are listed for completeness and eventual discussion in the Leios CIP. Others are a subject of ongoing research.
+
+The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lower throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
+### Summary of mainnet data available
+
+- [These slides](https://docs.google.com/presentation/d/1Iy2Vu3jZMsHFrvqmiM8urK9EVXbYJW0knb5XQ7w2tZE/edit?usp=sharing) summarize data we have available for topology, block propagation, transaction delays, etc.
+- Will can reformat data we need for our simulations, so we don't end up with inconsistent input data sets.
+- We will use the [beta-distribution fit](docs/technical-report-1.md#stake-distribution) for representing the unevenness of the stake distribution in our simulations.
+
+
+### Rust simulation
+
+Generated new test data set to match geographical distribution of mainnet nodes. In this dataset, nodes belong to a region (and have an explicit region tag) and are physically clustered near other nodes in that region.
+
 ## 2024-12-09
 
 ### Nix development environment
 
 We previously had a `nix develop` environment for the Haskell simulation, but this was removed as the Haskell package evolved. Instead of re-nixifying this repository, I created a separate [ouroboros-leios.env](https://github.com/functionally/ouroboros-leios.env) repository where one can open a `nix develop` with the correct Haskell compiler and dependencies.
+
+### Rust simulation
+
+Roland has written a fully virtual clock. When finished, this will decouple the sim's performance from the wall clock, and ensure traffic timings are still correct even when there are too many messages to simulate in real time.
 
 ## 2024-12-06
 

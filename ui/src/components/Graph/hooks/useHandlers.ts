@@ -2,31 +2,25 @@ import {
   defaultAggregatedData,
   useGraphContext,
 } from "@/contexts/GraphContext/context";
-import { ESpeedOptions } from "@/contexts/GraphContext/types";
 import { useCallback } from "react";
 
-import { CANVAS_SCALE, getOffsetCoordinates } from "../utils";
-import { useStreamMessagesHandler } from "./queries";
+import { DEFAULT_SCALE } from "@/app/constants";
+import { getOffsetCoordinates } from "../utils";
 
 export const useHandlers = () => {
   const {
     state: {
       aggregatedData,
       canvasRef,
-      currentTime,
+      canvasOffsetX,
+      canvasOffsetY,
+      canvasScale,
       currentNode,
-      intervalId,
       maxTime,
-      playing,
-      speed,
-      simulationPauseTime,
-      simulationStartTime,
       topography,
     },
     dispatch,
   } = useGraphContext();
-
-  const { startStream, stopStream } = useStreamMessagesHandler();
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -45,15 +39,9 @@ export const useHandlers = () => {
     context.clearRect(0, 0, width, height);
     context.save();
 
-    const { offsetX, offsetY } = getOffsetCoordinates(
-      topography,
-      width,
-      height,
-    );
-
     // Apply translation and scaling
-    context.translate(offsetX, offsetY);
-    context.scale(CANVAS_SCALE, CANVAS_SCALE);
+    context.translate(canvasOffsetX, canvasOffsetY);
+    context.scale(canvasScale, canvasScale);
 
     // Draw the links
     topography.links.forEach((link) => {
@@ -67,27 +55,34 @@ export const useHandlers = () => {
       context.moveTo(nodeStart.fx, nodeStart.fy);
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
       context.strokeStyle = "#ddd";
-      context.lineWidth = 0.2;
+
+      if (link.source === Number(currentNode) || link.target === Number(currentNode)) {
+        context.strokeStyle = "black";
+      }
+
+      context.lineWidth = Math.min((0.2 / canvasScale) * 6, 0.2);
       context.stroke();
     });
 
     // Draw the nodes
     topography.nodes.forEach((node) => {
       context.beginPath();
-      context.arc(node.fx, node.fy, 2, 0, 2 * Math.PI);
-      context.fillStyle = node.data.stake ? "green" : "blue";
-
-      if (currentNode === node.id.toString()) {
-        context.fillStyle = "red";
-      }
-
+      context.arc(
+        node.fx,
+        node.fy,
+        Math.min((1 / canvasScale) * 6, 1),
+        0,
+        2 * Math.PI,
+      );
+      context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
       context.stroke();
+      context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
       context.strokeStyle = "black";
 
-      const hasData = aggregatedData.current.nodes.get(node.id.toString());
-      if (hasData) {
-        context.strokeStyle = "red";
-        context.lineWidth = 1;
+      if (currentNode === node.id.toString()) {
+        context.fillStyle = "blue";
+      } else if (!node.data.stake) {
+        context.fillStyle = "gray"
       }
 
       context.fill();
@@ -95,61 +90,47 @@ export const useHandlers = () => {
 
     context.restore();
   }, [
-    playing,
-    speed,
+    aggregatedData,
     maxTime,
     topography.nodes,
     topography.links,
     currentNode,
+    canvasOffsetX,
+    canvasOffsetY,
+    canvasScale,
   ]);
 
-  // Function to toggle play/pause
-  const togglePlayPause = useCallback(() => {
-    if (!playing) {
-      startStream(currentTime, speed);
-      simulationStartTime.current = performance.now() - simulationPauseTime.current;
-      intervalId.current = setInterval(() => {
-        const elapsed =
-          simulationStartTime.current !== 0
-            ? (performance.now() - simulationStartTime.current) * speed
-            : 0;
-
-        dispatch({ type: "SET_CURRENT_TIME", payload: elapsed });
-      }, 1000 / 60);
-    } else {
-      stopStream();
-      simulationPauseTime.current = performance.now() - simulationStartTime.current;
-      clearInterval(intervalId.current);
-      intervalId.current = undefined;
+  const handleResetSim = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
     }
 
-    dispatch({ type: "TOGGLE_PLAYING" });
-  }, [drawTopography, currentTime, speed, playing]);
+    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
+    const { offsetX, offsetY } = getOffsetCoordinates(
+      topography,
+      width,
+      height,
+      4,
+    );
 
-  const handleResetSim = useCallback(() => {
     dispatch({
       type: "BATCH_UPDATE",
       payload: {
         currentNode: undefined,
-        currentTime: 0,
-        playing: false,
-        speed: ESpeedOptions["3% Speed"],
+        aggregatedData: defaultAggregatedData,
+        canvasOffsetX: offsetX,
+        canvasOffsetY: offsetY,
+        canvasScale: DEFAULT_SCALE,
       },
     });
 
-    aggregatedData.current = defaultAggregatedData;
-    simulationStartTime.current = 0;
-    simulationPauseTime.current = 0;
-
-    clearInterval(intervalId.current);
-    intervalId.current = undefined;
-
     drawTopography();
-  }, []);
+  }, [topography]);
 
   return {
     handleResetSim,
     drawTopography,
-    togglePlayPause,
   };
 };

@@ -1,52 +1,28 @@
 import { FC, memo } from "react";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
-import { ESpeedOptions } from "@/contexts/GraphContext/types";
 import { useHandlers } from "../hooks/useHandlers";
+import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 
 export const Controls: FC = memo(() => {
-  const { state: { playing, speed }, dispatch } = useGraphContext();
-  const { handleResetSim, togglePlayPause } = useHandlers();
+  const { handleResetSim } = useHandlers();
+  const { startStream, streaming } = useStreamMessagesHandler();
+
   return (
-    <>
+    <div className="min-w-[200px] flex items-center justify-end gap-4">
       <button
-        className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
-        onClick={togglePlayPause}
+        className="bg-[blue] text-white rounded-md px-4 py-2"
+        onClick={startStream}
+        disabled={streaming}
       >
-        {playing ? "Pause" : "Play"}
+        {streaming ? "Running..." : "Run Sim"}
       </button>
       <button
-        disabled={playing}
-        className="bg-blue-500 text-white w-[80px] rounded-md px-4 py-2"
+        disabled={streaming}
+        className="bg-gray-400 text-white w-[80px] rounded-md px-4 py-2"
         onClick={handleResetSim}
       >
         Reset
       </button>
-      <div className="flex items-center justify-center gap-2">
-        <label htmlFor="speed">Speed:</label>
-        <select
-          id="speed"
-          disabled={playing}
-          value={speed}
-          onChange={(e) => {
-            handleResetSim();
-            dispatch({ type: "SET_SPEED", payload: Number(e.target.value) })
-          }}
-        >
-          {Object.keys(ESpeedOptions)
-            .filter((key) => isNaN(Number(key)))
-            .map((name) => {
-              return (
-                <option
-                  key={name}
-                  value={ESpeedOptions[name as keyof typeof ESpeedOptions]}
-                >
-                  {name}
-                </option>
-              );
-            })}
-        </select>
-      </div>
-    </>
+    </div>
   );
 });

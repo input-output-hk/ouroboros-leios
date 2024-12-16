@@ -2,10 +2,6 @@
 
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
-
-import Data.List as L
-import Data.List.Relation.Unary.Any as A
-
 open import Leios.SpecStructure
 
 module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
@@ -64,8 +60,8 @@ record LeiosState : Type where
           open IBBody
           open InputBlock
 
-  constructLedger : List EndorserBlock → List Tx
-  constructLedger = concatMap lookupTxs
+  constructLedger : List RankingBlock → List Tx
+  constructLedger = L.concat ∘ L.map (T.mergeThese L._++_ ∘ T.map₁ lookupTxs)
 
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
