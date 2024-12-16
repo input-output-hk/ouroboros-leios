@@ -490,8 +490,16 @@ grToP2PTopography ::
   P2PTopography
 grToP2PTopography p2pWorldShape gr = P2PTopography{..}
  where
-  nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes gr]
-  edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges gr]
+  nodeInfoMap =
+    M.fromList
+      [ (n, nodeInfo)
+      | (n, nodeInfo) <- G.labNodes gr
+      ]
+  edgeInfoMap =
+    M.fromList
+      [ ((n1, n2), edgeInfo)
+      | (n1, n2, edgeInfo) <- G.labEdges gr
+      ]
   p2pNodes =
     M.fromList
       [ (nodeToNodeId node, point)
