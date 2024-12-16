@@ -189,9 +189,10 @@ readLatenciesSqlite3 topology latencySqliteFile = do
     forM_ consumer.producers $ \producerName -> do
       SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
         [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
-        [[latency :: Double]] ->
+        [[latencyInMilisecond :: Double]] ->
           atomicModifyIORef' latenciesRef $ \latencies ->
-            (M.adjust (M.insert producerName latency) consumer.name latencies, ())
+            let latencyInSecond = latencyInMilisecond / 1000.0 in
+              (M.adjust (M.insert producerName latencyInSecond) consumer.name latencies, ())
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
 
