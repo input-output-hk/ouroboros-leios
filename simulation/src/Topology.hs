@@ -526,5 +526,4 @@ readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
-  let p2pTopography = grToP2PTopography worldShape grWithPosition
-  pure p2pTopography
+  pure $ grToP2PTopography worldShape grWithPosition
