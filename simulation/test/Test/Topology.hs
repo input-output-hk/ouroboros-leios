@@ -23,7 +23,7 @@ import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosit
 
 tests :: TestTree
 tests =
-  testGroup "Topology" $
+  testGroup "Topology"
     [ testCase "test_benchTopologyToSimpleTopologyPreservesTopology" test_benchTopologyToSimpleTopologyPreservesTopology
     , testCase "test_benchTopologyIsConnected" test_benchTopologyIsConnected
     , testProperty "prop_grToSimpleTopologyPreservesTopology" prop_grToSimpleTopologyPreservesTopology
