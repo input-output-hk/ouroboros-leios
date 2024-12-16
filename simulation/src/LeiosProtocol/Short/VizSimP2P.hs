@@ -15,7 +15,7 @@ module LeiosProtocol.Short.VizSimP2P where
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import qualified Data.Colour.SRGB as Colour
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import qualified Diagrams.Backend.Cairo as Dia
 import qualified Diagrams.Backend.Cairo.Internal as Dia
 import qualified Diagrams.Core as Dia
@@ -58,6 +58,7 @@ import PraosProtocol.Common (BlockHeader, FullTip (FullTip), blockHeaderColorAsB
 import PraosProtocol.PraosNode (PraosMessage (..))
 import SimTypes (Point (..), WorldShape (..))
 import System.Random (uniformR)
+import qualified System.Random as Random
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
 import Viz
@@ -695,10 +696,10 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Visualization
-example2 =
+example2 :: Int -> Int -> Maybe P2PTopography -> Visualization
+example2 seed sliceLength maybeP2PTopography =
   slowmoVisualization 0.5 $
-    Viz (leiosSimVizModel exampleTrace2) $
+    Viz model $
       LayoutAbove
         [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
         , LayoutBeside
@@ -730,3 +731,19 @@ example2 =
         ]
  where
   config = defaultVizConfig 5
+  rng0 = mkStdGen seed
+  (rng1, rng2) = Random.split rng0
+  p2pTopography =
+    flip fromMaybe maybeP2PTopography $
+      flip genArbitraryP2PTopography rng1 $
+        P2PTopographyCharacteristics
+          { p2pWorldShape =
+              WorldShape
+                { worldDimensions = (0.600, 0.300)
+                , worldIsCylinder = True
+                }
+          , p2pNumNodes = 100
+          , p2pNodeLinksClose = 5
+          , p2pNodeLinksRandom = 5
+          }
+  model = leiosSimVizModel (exampleTrace2 rng2 sliceLength p2pTopography)

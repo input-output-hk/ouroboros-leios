@@ -139,7 +139,7 @@ data VizSubCommand
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -184,7 +184,7 @@ parserVizSubCommand =
     , command "short-leios-1" . info (pure VizShortLeios1) $
         progDesc
           "A simulation of two nodes running Short Leios."
-    , command "short-leios-p2p-1" . info (pure VizShortLeiosP2P1) $
+    , command "short-leios-p2p-1" . info (parserShortLeiosP2P1 <**> helper) $
         progDesc
           "A simulation of 100 nodes running Short Leios."
     ]
@@ -204,6 +204,32 @@ parserPraosP2P1 =
       ( long "block-interval"
           <> metavar "NUMBER"
           <> help "The interval at which blocks are generated."
+          <> value 5
+      )
+    <*> optional
+      ( option
+          str
+          ( long "topology"
+              <> metavar "FILE"
+              <> help "The file describing the network topology."
+          )
+      )
+
+parserShortLeiosP2P1 :: Parser VizSubCommand
+parserShortLeiosP2P1 =
+  VizShortLeiosP2P1
+    <$> option
+      auto
+      ( long "seed"
+          <> metavar "NUMBER"
+          <> help "The seed for the random number generator."
+          <> value 0
+      )
+    <*> option
+      (fmap (fromIntegral @Int) auto)
+      ( long "slice-length"
+          <> metavar "NUMBER"
+          <> help "The interval at which ranking blocks are generated."
           <> value 5
       )
     <*> optional
@@ -236,7 +262,10 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizRelayTest2 -> pure VizSimTestRelay.example2
   VizRelayTest3 -> pure VizSimTestRelay.example3
   VizShortLeios1 -> pure VizShortLeios.example1
-  VizShortLeiosP2P1 -> pure VizShortLeiosP2P.example2
+  VizShortLeiosP2P1{..} -> do
+    let worldShape = WorldShape (1200, 1000) True
+    maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
+    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography
 
 type VizSize = (Int, Int)
 
