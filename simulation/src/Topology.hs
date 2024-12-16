@@ -38,7 +38,6 @@ import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
-import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -78,6 +77,11 @@ newtype OrgName = OrgName {unOrgName :: Text}
 newtype RegionName = RegionName {unRegionName :: Text}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
+
+newtype LatencyInMiliseconds = LatencyInMiliseconds {unLatencyInMiliseconds :: Double}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
 
 data BenchTopologyNode
   = BenchTopologyNode
@@ -149,9 +153,9 @@ forgetUnusedFieldsInBenchTopology benchTopology =
 -- As provided in 'data/BenchTopology/latency.sqlite3.gz'.
 --------------------------------------------------------------------------------
 
-type Latencies = Map NodeName (Map NodeName Latency)
+type LatenciesInMiliseconds = Map NodeName (Map NodeName LatencyInMiliseconds)
 
-readLatencies :: BenchTopology -> FilePath -> IO Latencies
+readLatencies :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
 readLatencies topology latencyFile =
   case takeExtensions latencyFile of
     ".sqlite3" ->
@@ -161,7 +165,7 @@ readLatencies topology latencyFile =
     _otherwise ->
       error $ printf "unknown latency file format %s" (takeFileName latencyFile)
 
-readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO Latencies
+readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
 readLatenciesSqlite3Gz topology latencySqliteGzFile =
   assert (takeExtension latencySqliteGzFile == ".gz") $ do
     let latencySqliteDirectory = takeDirectory latencySqliteGzFile
@@ -173,7 +177,7 @@ readLatenciesSqlite3Gz topology latencySqliteGzFile =
       hClose latencySqliteHandle
       readLatencies topology latencySqliteFile
 
-readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO Latencies
+readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
 readLatenciesSqlite3 topology latencySqliteFile = do
   let queryAvgTime =
         "select avg(time) from ping \
@@ -187,10 +191,10 @@ readLatenciesSqlite3 topology latencySqliteFile = do
     forM_ consumer.producers $ \producerName -> do
       SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
         [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
-        [[latencyInMilisecond :: Double]] ->
+        [[latencyInMiliseconds :: Double]] ->
           atomicModifyIORef' latenciesRef $ \latencies ->
-            let latencyInSecond = latencyInMilisecond / 1000.0
-             in (M.adjust (M.insert producerName latencyInSecond) consumer.name latencies, ())
+            let latency = LatencyInMiliseconds latencyInMiliseconds in
+              (M.adjust (M.insert producerName latency) consumer.name latencies, ())
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
 
@@ -209,7 +213,7 @@ data SimpleNode
   = SimpleNode
   { name :: !NodeName
   , nodeId :: !NodeId
-  , producers :: !(Map NodeName Latency)
+  , producers :: !(Map NodeName LatencyInMiliseconds)
   , clusterName :: !(Maybe ClusterName)
   }
   deriving (Eq, Show, Generic)
@@ -236,7 +240,7 @@ instance FromJSON SimpleTopology where
   parseJSON = genericParseJSON simpleNodeOptions
 
 -- | Convert a 'BenchTopology' to a 'SimpleTopology' using the 'Latencies' read from the latency database.
-benchTopologyToSimpleTopology :: Latencies -> BenchTopology -> SimpleTopology
+benchTopologyToSimpleTopology :: LatenciesInMiliseconds -> BenchTopology -> SimpleTopology
 benchTopologyToSimpleTopology latencies benchTopology =
   SimpleTopology{nodes = benchTopologyNodeToSimpleNode <$> benchTopology.coreNodes}
  where
@@ -310,7 +314,7 @@ data SimpleNodeInfo = SimpleNodeInfo
 -- | Convert a 'SimpleTopology' to an FGL 'Gr'.
 simpleTopologyToGr ::
   SimpleTopology ->
-  Gr SimpleNodeInfo Latency
+  Gr SimpleNodeInfo LatencyInMiliseconds
 simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
  where
   nameToIdMap =
@@ -332,7 +336,7 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
 
 -- | Helper for testing. Convert an an FGL 'Gr' to a 'SimpleTopology'.
 grToSimpleTopology ::
-  Gr SimpleNodeInfo Latency ->
+  Gr SimpleNodeInfo LatencyInMiliseconds ->
   SimpleTopology
 grToSimpleTopology gr = SimpleTopology{nodes}
  where
@@ -343,7 +347,7 @@ grToSimpleTopology gr = SimpleTopology{nodes}
       , let nodeId = nodeToNodeId node
       , let producers = M.findWithDefault M.empty name producersMap
       ]
-  producersMap :: Map NodeName (Map NodeName Latency)
+  producersMap :: Map NodeName (Map NodeName LatencyInMiliseconds)
   producersMap =
     M.unionsWith (<>) $
       [ M.singleton consumerName (M.singleton producerName latency)
@@ -388,7 +392,7 @@ clusterNameToLazyText = TL.fromStrict . unClusterName
 clusterNameToGraphID :: ClusterName -> GVTG.GraphID
 clusterNameToGraphID = GVTG.Str . clusterNameToLazyText
 
-defaultParams :: GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo
+defaultParams :: GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo
 defaultParams =
   Params
     { isDirected = True
@@ -402,10 +406,10 @@ defaultParams =
     }
 
 augmentWithPosition ::
-  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
   WorldDimensions ->
-  Gr SimpleNodeInfo Latency ->
-  IO (Gr (SimpleNodeInfo, Point) (Latency, Path))
+  Gr SimpleNodeInfo LatencyInMiliseconds ->
+  IO (Gr (SimpleNodeInfo, Point) (LatencyInMiliseconds, Path))
 augmentWithPosition params1 worldDimensions gr1 = do
   -- Add world dimension and edge IDs
   let params2 =
@@ -485,7 +489,7 @@ forgetSimpleNodeInfo = G.nemap snd id
 
 grToP2PTopography ::
   WorldShape ->
-  Gr Point Latency ->
+  Gr Point LatencyInMiliseconds ->
   P2PTopography
 grToP2PTopography p2pWorldShape gr = P2PTopography{..}
  where
@@ -506,13 +510,13 @@ grToP2PTopography p2pWorldShape gr = P2PTopography{..}
       ]
   p2pLinks =
     M.fromList
-      [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
-      | ((node1, node2), latency) <- M.assocs edgeInfoMap
+      [ ((nodeToNodeId node1, nodeToNodeId node2), latencyInMiliseconds / 1000.0)
+      | ((node1, node2), LatencyInMiliseconds latencyInMiliseconds) <- M.assocs edgeInfoMap
       ]
 
 p2pTopologyToGr ::
   P2PTopography ->
-  Gr Point Latency
+  Gr Point LatencyInMiliseconds
 p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
  where
   nodes =
@@ -520,12 +524,12 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     | (nodeId, point) <- M.assocs p2pNodes
     ]
   edges =
-    [ (nodeIdToNode nodeId1, nodeIdToNode nodeId2, latency)
-    | ((nodeId1, nodeId2), latency) <- M.assocs p2pLinks
+    [ (nodeIdToNode nodeId1, nodeIdToNode nodeId2, LatencyInMiliseconds (latencyInSeconds * 1000.0))
+    | ((nodeId1, nodeId2), latencyInSeconds) <- M.assocs p2pLinks
     ]
 
 readP2PTopography ::
-  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
   WorldShape ->
   FilePath ->
   IO P2PTopography
@@ -536,7 +540,7 @@ readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   pure $ grToP2PTopography worldShape grWithPosition
 
 readP2PTopographyFromBenchTopologyAndLatency ::
-  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
   WorldShape ->
   FilePath ->
   FilePath ->
