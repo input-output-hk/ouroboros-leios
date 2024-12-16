@@ -82,7 +82,6 @@ newtype LatencyInMiliseconds = LatencyInMiliseconds {unLatencyInMiliseconds :: D
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
-
 data BenchTopologyNode
   = BenchTopologyNode
   { name :: !NodeName
@@ -193,8 +192,8 @@ readLatenciesSqlite3 topology latencySqliteFile = do
         [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
         [[latencyInMiliseconds :: Double]] ->
           atomicModifyIORef' latenciesRef $ \latencies ->
-            let latency = LatencyInMiliseconds latencyInMiliseconds in
-              (M.adjust (M.insert producerName latency) consumer.name latencies, ())
+            let latency = LatencyInMiliseconds latencyInMiliseconds
+             in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
 
