@@ -30,12 +30,13 @@ import Data.Coerce (coerce)
 import Data.Function (on)
 import qualified Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree (Gr)
-import Data.GraphViz (GraphvizParams (..), X11Color (..))
+import Data.GraphViz (GraphvizCanvas (..), GraphvizOutput (..), GraphvizParams (..), X11Color (..))
 import qualified Data.GraphViz as GV
-import qualified Data.GraphViz.Attributes as GVA
+import qualified Data.GraphViz.Attributes as GV
 import Data.GraphViz.Attributes.Colors (Color (X11Color))
-import qualified Data.GraphViz.Attributes.Complete as GVAC
-import qualified Data.GraphViz.Commands as GVC
+import Data.GraphViz.Attributes.Complete (GraphSize (..))
+import qualified Data.GraphViz.Attributes.Complete as GV
+import qualified Data.GraphViz.Commands as GV
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
@@ -306,10 +307,16 @@ clusterNameToRegionName = RegionName . unClusterName
 -- Conversion between SimpleTopology and FGL Graph
 --------------------------------------------------------------------------------
 
+data SimpleNodeInfo = SimpleNodeInfo
+  { name :: NodeName
+  , clusterName :: Maybe ClusterName
+  }
+  deriving (Eq, Show)
+
 -- | Convert a 'SimpleTopology' to an FGL 'Gr'.
 simpleTopologyToGr ::
   SimpleTopology ->
-  Gr (NodeName, Maybe ClusterName) Latency
+  Gr SimpleNodeInfo Latency
 simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
  where
   nameToIdMap =
@@ -318,9 +325,8 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
       | node <- V.toList topology.nodes
       ]
   graphNodes =
-    [ (consumerId, (consumer.name, consumer.clusterName))
-    | consumer <- V.toList topology.nodes
-    , let consumerId = nodeIdToNode consumer.nodeId
+    [ (nodeIdToNode nodeId, SimpleNodeInfo{..})
+    | SimpleNode{..} <- V.toList topology.nodes
     ]
   graphEdges =
     [ (producerId, consumerId, latency)
@@ -332,14 +338,14 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
 
 -- | Helper for testing. Convert an an FGL 'Gr' to a 'SimpleTopology'.
 grToSimpleTopology ::
-  Gr (NodeName, Maybe ClusterName) Latency ->
+  Gr SimpleNodeInfo Latency ->
   SimpleTopology
 grToSimpleTopology gr = SimpleTopology{nodes}
  where
   nodes =
     V.fromList $
       [ SimpleNode{name, nodeId, producers, clusterName}
-      | (node, (name, clusterName)) <- G.labNodes gr
+      | (node, SimpleNodeInfo{..}) <- G.labNodes gr
       , let nodeId = nodeToNodeId node
       , let producers = M.findWithDefault M.empty name producersMap
       ]
@@ -357,12 +363,12 @@ grToSimpleTopology gr = SimpleTopology{nodes}
   nodeIdToNodeNameMap =
     M.fromList $
       [ (nodeId, name)
-      | (node, (name, _)) <- G.labNodes gr
+      | (node, SimpleNodeInfo{..}) <- G.labNodes gr
       , let nodeId = nodeToNodeId node
       ]
 
-addNodeNames :: Gr a b -> Gr (NodeName, a) b
-addNodeNames = G.gmap (\(inEdges, node, annotation, outEdges) -> (inEdges, node, (nodeToNodeName node, annotation), outEdges))
+addNodeNames :: Gr (Maybe ClusterName) b -> Gr SimpleNodeInfo b
+addNodeNames = G.gmap (\(inEdges, node, clusterName, outEdges) -> (inEdges, node, SimpleNodeInfo{name = nodeToNodeName node, ..}, outEdges))
 
 nodeToNodeName :: G.Node -> NodeName
 nodeToNodeName = NodeName . T.pack . ("node-" <>) . show @Int
@@ -373,104 +379,125 @@ nodeIdToNode = coerce
 nodeToNodeId :: G.Node -> NodeId
 nodeToNodeId = coerce
 
-{-
-toGraphWithPositionInformation ::
-  forall topology node edge.
-  Topology topology node edge =>
-  WorldDimensions ->
-  topology ->
-  IO (Gr (node, Point) (edge, Path))
-toGraphWithPositionInformation (w, h) topology = do
-  let gr0 = toGraph topology
-  let gr1 = GV.dotizeGraph params gr0
-  let gr2 = G.nemap unsafeUnpackAttributeNode unsafeUnpackAttributeEdge gr1
-  let gr3 = rescale gr2
-  pure gr3
- where
-  params =
-    GV.defaultParams
-      { globalAttributes = [GV.GraphAttrs [GVAC.Layout GVC.Neato]]
-      , clusterBy = clusterByRegion
-      , clusterID = clusterNameToGraphID
-      }
+--------------------------------------------------------------------------------
+-- Augmentation with Position Information
+--------------------------------------------------------------------------------
 
-  rescale :: Gr (node, Point) (edge, Path) -> Gr (node, Point) (edge, Path)
-  rescale gr = G.nmap (second rescalePoint) gr
-   where
-    rescalePoint p = Point (rescaleX p._1) (rescaleY p._2)
-     where
-      ps0 = fmap (snd . snd) (G.labNodes gr)
-      rescaleX x = xPad + (x - x0l) / w0 * (w - 2 * xPad)
-       where
-        xPad = 0.05 * w
-        (x0l, x0u) = (minimum &&& maximum) (fmap _1 ps0)
-        w0 = x0u - x0l
-      rescaleY y = yPad + (y - y0l) / h0 * (h - 2 * yPad)
-       where
-        yPad = 0.05 * h
-        (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
-        h0 = y0u - y0l
-
-  unsafeUnpackAttributeNode :: GV.AttributeNode a -> (a, Point)
-  unsafeUnpackAttributeNode ([GVAC.Pos (GVAC.PointPos point)], x) = (x, unsafeToPoint point)
-  unsafeUnpackAttributeNode _ = error "post-condition of dotizeGraph violated"
-
-  unsafeToPoint :: GVAC.Point -> Point
-  unsafeToPoint (GVAC.Point x y _z False) = Point x y
-  unsafeToPoint _ = error "post-condition of dotizeGraph violated"
-
-  unsafeUnpackAttributeEdge :: GV.AttributeEdge a -> (a, Path)
-  unsafeUnpackAttributeEdge ([GVAC.Pos (GVAC.SplinePos splines)], x) = (x, unsafeToPath splines)
-  unsafeUnpackAttributeEdge _ = error "post-condition of dotizeGraph violated"
-
-  unsafeToPath :: [GVAC.Spline] -> Path
-  unsafeToPath = Path . concatMap toPoints
-   where
-    toPoints :: GVAC.Spline -> [Point]
-    toPoints (GVAC.Spline maybeEnd maybeStart points) =
-      fmap unsafeToPoint . concat $
-        [ maybeToList maybeStart
-        , points
-        , maybeToList maybeEnd
-        ]
-
-clusterByRegion :: Node node edge => G.LNode node -> GV.NodeCluster ClusterName (G.LNode node)
-clusterByRegion lnode@(_, node) = case node.clusterName of
-  Nothing -> GV.N lnode
-  Just nodeClusterName -> GV.C nodeClusterName (GV.N lnode)
+clusterByClusterName :: G.LNode SimpleNodeInfo -> GV.NodeCluster ClusterName (G.LNode SimpleNodeInfo)
+clusterByClusterName node@(_, nodeInfo) = case nodeInfo.clusterName of
+  Nothing -> GV.N node
+  Just nodeClusterName -> GV.C nodeClusterName (GV.N node)
 
 clusterNameToLazyText :: ClusterName -> LazyText
 clusterNameToLazyText = TL.fromStrict . unClusterName
 
 clusterNameToGraphID :: ClusterName -> GVTG.GraphID
 clusterNameToGraphID = GVTG.Str . clusterNameToLazyText
--}
-{-
-toP2PTopography ::
+
+defaultParams :: GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo
+defaultParams =
+  Params
+    { isDirected = True
+    , globalAttributes = []
+    , clusterBy = clusterByClusterName
+    , isDotCluster = const True
+    , clusterID = clusterNameToGraphID
+    , fmtCluster = const []
+    , fmtNode = const []
+    , fmtEdge = const []
+    }
+
+augmentWithPositionInformation ::
+  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
   WorldDimensions ->
-  SimpleTopology ->
+  Gr SimpleNodeInfo Latency ->
+  IO (Gr (SimpleNodeInfo, Point) (Latency, Path))
+augmentWithPositionInformation params1 worldDimensions gr1 = do
+  -- Add world dimension and edge IDs
+  let params2 =
+        params1
+          { fmtEdge = GV.setEdgeIDAttribute params1.fmtEdge
+          }
+  let gr2 = GV.addEdgeIDs gr1
+  let dg2 = GV.graphToDot params2 gr2
+  gr3 <- GV.dotAttributes params2.isDirected gr2 dg2
+  let gr4 = G.nemap unsafeUnpackAttributeNode unsafeUnpackAttributeEdge gr3
+  let gr5 = rescaleGraph worldDimensions gr4
+  pure gr5
+
+unsafeUnpackAttributeNode :: GV.AttributeNode a -> (a, Point)
+unsafeUnpackAttributeNode ([GV.Pos (GV.PointPos point)], x) = (x, unsafeToPoint point)
+unsafeUnpackAttributeNode _ = error "post-condition of dotizeGraph violated"
+
+unsafeToPoint :: GV.Point -> Point
+unsafeToPoint (GV.Point x y _z False) = Point x y
+unsafeToPoint _ = error "post-condition of dotizeGraph violated"
+
+unsafeUnpackAttributeEdge :: GV.AttributeEdge a -> (a, Path)
+unsafeUnpackAttributeEdge ([GV.Pos (GV.SplinePos splines)], x) = (x, unsafeToPath splines)
+unsafeUnpackAttributeEdge _ = error "post-condition of dotizeGraph violated"
+
+unsafeToPath :: [GV.Spline] -> Path
+unsafeToPath = Path . concatMap toPoints
+ where
+  toPoints :: GV.Spline -> [Point]
+  toPoints (GV.Spline maybeEnd maybeStart points) =
+    fmap unsafeToPoint . concat $
+      [ maybeToList maybeStart
+      , points
+      , maybeToList maybeEnd
+      ]
+
+rescaleGraph :: WorldDimensions -> Gr (node, Point) (edge, Path) -> Gr (node, Point) (edge, Path)
+rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
+ where
+  rescalePoint p = Point (rescaleX p._1) (rescaleY p._2)
+   where
+    ps0 = fmap (snd . snd) (G.labNodes gr)
+    rescaleX x = xPad + (x - x0l) / w0 * (w - 2 * xPad)
+     where
+      xPad = 0.05 * w
+      (x0l, x0u) = (minimum &&& maximum) (fmap _1 ps0)
+      w0 = x0u - x0l
+    rescaleY y = yPad + (y - y0l) / h0 * (h - 2 * yPad)
+     where
+      yPad = 0.05 * h
+      (y0l, y0u) = (minimum &&& maximum) (fmap _2 ps0)
+      h0 = y0u - y0l
+
+--------------------------------------------------------------------------------
+-- Conversion between FGL Graph and P2PTopography
+--------------------------------------------------------------------------------
+
+grToP2PTopography ::
+  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  WorldDimensions ->
+  Gr SimpleNodeInfo Latency ->
   IO P2PTopography
-toP2PTopography worldDimensions topology = do
-  graphWithInfo <- toGraphWithPositionInformation worldDimensions topology
-  let nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes graphWithInfo]
-  let edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges graphWithInfo]
+grToP2PTopography params worldDimensions gr1 = do
+  gr2 <- augmentWithPositionInformation params worldDimensions gr1
+  let nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes gr2]
+  let edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges gr2]
   let p2pNodes =
         M.fromList
-          [ (node.nodeId, point)
-          | (node, point) <- M.elems nodeInfoMap
+          [ (nodeToNodeId node, point)
+          | (node, (_, point)) <- M.assocs nodeInfoMap
           ]
   let p2pLinks =
         M.fromList
-          [ ((node1.nodeId, node2.nodeId), latency)
-          | ((n1, n2), (latency, _path)) <- M.assocs edgeInfoMap
-          , let (node1, _point1) = nodeInfoMap M.! n1
-          , let (node2, _point2) = nodeInfoMap M.! n2
+          [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
+          | ((node1, node2), (latency, _path)) <- M.assocs edgeInfoMap
+          , let (_, _point1) = nodeInfoMap M.! node1
+          , let (_, _point2) = nodeInfoMap M.! node2
           ]
   let p2pWorldShape = WorldShape{worldIsCylinder = True, ..}
   pure P2PTopography{..}
 
-readP2PTopography :: WorldDimensions -> FilePath -> IO P2PTopography
-readP2PTopography worldDimensions simpleTopologyFile = do
+readP2PTopography ::
+  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  WorldDimensions ->
+  FilePath ->
+  IO P2PTopography
+readP2PTopography params worldDimensions simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
-  toP2PTopography worldDimensions simpleTopology
--}
+  grToP2PTopography params worldDimensions (simpleTopologyToGr simpleTopology)
