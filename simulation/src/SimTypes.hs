@@ -29,6 +29,7 @@ data Point = Point {_1 :: !Double, _2 :: !Double}
 -- | Path in simulation world
 newtype Path = Path [Point]
   deriving (Show, Generic)
+  deriving newtype (Semigroup, Monoid)
 
 instance ToJSON Point where
   toEncoding = genericToEncoding defaultOptions

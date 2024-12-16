@@ -40,7 +40,7 @@ import qualified Data.GraphViz.Commands as GV
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
-import Data.List (sort, sortBy)
+import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as M
 import Data.Maybe (maybeToList)
@@ -426,27 +426,35 @@ augmentWithPositionInformation params1 worldDimensions gr1 = do
   pure gr5
 
 unsafeUnpackAttributeNode :: GV.AttributeNode a -> (a, Point)
-unsafeUnpackAttributeNode ([GV.Pos (GV.PointPos point)], x) = (x, unsafeToPoint point)
-unsafeUnpackAttributeNode _ = error "post-condition of dotizeGraph violated"
-
-unsafeToPoint :: GV.Point -> Point
-unsafeToPoint (GV.Point x y _z False) = Point x y
-unsafeToPoint _ = error "post-condition of dotizeGraph violated"
+unsafeUnpackAttributeNode (attrs, x) = (x, fromMaybe errorMessage $ maybeGetPoint attrs)
+ where
+  errorMessage = error $ "post-condition of dotizeGraph violated; yielded attributes " <> show attrs
+  maybeGetPoint :: GV.Attributes -> Maybe Point
+  maybeGetPoint = fmap fst . uncons . mapMaybe maybeToPoint
+   where
+    maybeToPoint :: GV.Attribute -> Maybe Point
+    maybeToPoint (GV.Pos (GV.PointPos point)) = Just (pointToPoint point)
+    maybeToPoint _ = Nothing
 
 unsafeUnpackAttributeEdge :: GV.AttributeEdge a -> (a, Path)
-unsafeUnpackAttributeEdge ([GV.Pos (GV.SplinePos splines)], x) = (x, unsafeToPath splines)
-unsafeUnpackAttributeEdge _ = error "post-condition of dotizeGraph violated"
-
-unsafeToPath :: [GV.Spline] -> Path
-unsafeToPath = Path . concatMap toPoints
+unsafeUnpackAttributeEdge (attrs, x) = (x, fromMaybe errorMessage $ maybeGetPath attrs)
  where
-  toPoints :: GV.Spline -> [Point]
-  toPoints (GV.Spline maybeEnd maybeStart points) =
-    fmap unsafeToPoint . concat $
-      [ maybeToList maybeStart
-      , points
-      , maybeToList maybeEnd
-      ]
+  errorMessage = error $ "post-condition of dotizeGraph violated; yielded attributes " <> show attrs
+  maybeGetPath :: GV.Attributes -> Maybe Path
+  maybeGetPath = fmap fst . uncons . mapMaybe maybeToPath
+   where
+    maybeToPath :: GV.Attribute -> Maybe Path
+    maybeToPath (GV.Pos (GV.SplinePos splines))
+      | null splines = Nothing
+      | otherwise = Just $ mconcat (splineToPath <$> splines)
+    maybeToPath _ = Nothing
+
+pointToPoint :: GV.Point -> Point
+pointToPoint (GV.Point x y _z _3d) = Point x y
+
+splineToPath :: GV.Spline -> Path
+splineToPath (GV.Spline maybeEnd maybeStart points) =
+  Path . map pointToPoint . concat $ [maybeToList maybeStart, points, maybeToList maybeEnd]
 
 rescaleGraph :: WorldDimensions -> Gr (node, Point) (edge, Path) -> Gr (node, Point) (edge, Path)
 rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
@@ -476,34 +484,34 @@ forgetPositionInformation =
 --------------------------------------------------------------------------------
 
 grToP2PTopography ::
-  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
-  WorldDimensions ->
-  Gr SimpleNodeInfo Latency ->
-  IO P2PTopography
-grToP2PTopography params worldDimensions gr1 = do
-  gr2 <- augmentWithPositionInformation params worldDimensions gr1
-  let nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes gr2]
-  let edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges gr2]
-  let p2pNodes =
-        M.fromList
-          [ (nodeToNodeId node, point)
-          | (node, (_, point)) <- M.assocs nodeInfoMap
-          ]
-  let p2pLinks =
-        M.fromList
-          [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
-          | ((node1, node2), (latency, _path)) <- M.assocs edgeInfoMap
-          , let (_, _point1) = nodeInfoMap M.! node1
-          , let (_, _point2) = nodeInfoMap M.! node2
-          ]
-  let p2pWorldShape = WorldShape{worldIsCylinder = True, ..}
-  pure P2PTopography{..}
+  WorldShape ->
+  Gr (SimpleNodeInfo, Point) (Latency, Path) ->
+  P2PTopography
+grToP2PTopography p2pWorldShape gr = P2PTopography{..}
+ where
+  nodeInfoMap = M.fromList [(n, nodeInfo) | (n, nodeInfo) <- G.labNodes gr]
+  edgeInfoMap = M.fromList [((n1, n2), edgeInfo) | (n1, n2, edgeInfo) <- G.labEdges gr]
+  p2pNodes =
+    M.fromList
+      [ (nodeToNodeId node, point)
+      | (node, (_, point)) <- M.assocs nodeInfoMap
+      ]
+  p2pLinks =
+    M.fromList
+      [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
+      | ((node1, node2), (latency, _path)) <- M.assocs edgeInfoMap
+      , let (_, _point1) = nodeInfoMap M.! node1
+      , let (_, _point2) = nodeInfoMap M.! node2
+      ]
 
 readP2PTopography ::
   GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
-  WorldDimensions ->
+  WorldShape ->
   FilePath ->
   IO P2PTopography
-readP2PTopography params worldDimensions simpleTopologyFile = do
+readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
-  grToP2PTopography params worldDimensions (simpleTopologyToGr simpleTopology)
+  let gr = simpleTopologyToGr simpleTopology
+  grWithPositionInformation <- augmentWithPositionInformation params worldDimensions gr
+  let p2pTopography = grToP2PTopography worldShape grWithPositionInformation
+  pure p2pTopography

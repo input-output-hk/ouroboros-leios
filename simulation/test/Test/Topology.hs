@@ -23,7 +23,6 @@ tests =
     [ testCase "test_benchTopologyToSimpleTopologyPreservesTopology" test_benchTopologyToSimpleTopologyPreservesTopology
     , testProperty "prop_grToSimpleTopologyPreservesTopology" prop_grToSimpleTopologyPreservesTopology
     , testProperty "prop_augmentWithPositionInformationPreservesTopology" prop_augmentWithPositionInformationPreservesTopology
-    , testProperty "prop_augmentWithPositionInformationPreservesTopology" prop_augmentWithPositionInformationPreservesTopology
     ]
 
 --------------------------------------------------------------------------------
