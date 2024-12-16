@@ -19,12 +19,13 @@ import Test.QuickCheck.Random (QCGen (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
+import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology, readSimpleTopologyFromBenchTopologyAndLatency)
 
 tests :: TestTree
 tests =
   testGroup "Topology" $
     [ testCase "test_benchTopologyToSimpleTopologyPreservesTopology" test_benchTopologyToSimpleTopologyPreservesTopology
+    , testCase "test_benchTopologyIsConnected" test_benchTopologyIsConnected
     , testProperty "prop_grToSimpleTopologyPreservesTopology" prop_grToSimpleTopologyPreservesTopology
     , testProperty "prop_augmentWithPositionPreservesTopology" prop_augmentWithPositionPreservesTopology
     , testProperty "prop_grToP2PTopographyPreservesTopology" prop_grToP2PTopographyPreservesTopology
@@ -55,6 +56,25 @@ test_benchTopologyToSimpleTopologyPreservesTopology = do
   let simpleTopology = benchTopologyToSimpleTopology latencies benchTopology1
   let benchTopology2 = sortBenchTopology . simpleTopologyToBenchTopology $ simpleTopology
   assertEqual "Conversion to/from SimpleTopology does not preserve topology" benchTopology1 benchTopology2
+
+test_benchTopologyIsConnected :: Assertion
+test_benchTopologyIsConnected = do
+  -- Find test/data/BenchTopology/topology-dense-52.json
+  benchTopologyFile <- getDataFileName "test/data/BenchTopology/topology-dense-52.json"
+  doesBenchTopologyFileExist <- doesFileExist benchTopologyFile
+  assertBool "File data/BenchTopology/topology-dense-52.json does not exist" doesBenchTopologyFileExist
+  -- Find test/data/BenchTopology/latency.sqlite3.gz
+  latenciesSqlite3GzFile <- getDataFileName "test/data/BenchTopology/latency.sqlite3.gz"
+  doesLatenciesFileExit <- doesFileExist latenciesSqlite3GzFile
+  assertBool "File data/BenchTopology/latency.sqlite3.gz does not exist" doesLatenciesFileExit
+  -- Read bench topology
+  benchTopology1 <- sortBenchTopology . forgetUnusedFieldsInBenchTopology <$> readBenchTopology benchTopologyFile
+  -- Read latencies
+  latencies <- readLatenciesSqlite3Gz benchTopology1 latenciesSqlite3GzFile
+  -- Test conversion to/from simple topology
+  let simpleTopology = benchTopologyToSimpleTopology latencies benchTopology1
+  let gr = simpleTopologyToGr simpleTopology
+  assertBool "BenchTopology is not connected" (G.isConnected gr)
 
 --------------------------------------------------------------------------------
 -- Conversion between SimpleTopology and FGL Graph
@@ -135,6 +155,7 @@ instance Arbitrary P2PTopography where
   arbitrary :: Gen P2PTopography
   arbitrary = arbitraryP2PTopography =<< arbitrary
    where
+    -- TODO: This appears to loop for some inputs.
     arbitraryP2PTopography :: P2PTopographyCharacteristics -> Gen P2PTopography
     arbitraryP2PTopography p2pTopographyCharacteristics = MkGen $ \gen size ->
       genArbitraryP2PTopography p2pTopographyCharacteristics gen
