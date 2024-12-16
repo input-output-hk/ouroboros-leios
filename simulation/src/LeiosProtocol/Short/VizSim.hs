@@ -15,6 +15,8 @@ import Data.Coerce (coerce)
 import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
+import Data.IntervalMap.Strict (Interval (..), IntervalMap)
+import qualified Data.IntervalMap.Strict as ILMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -126,6 +128,7 @@ data LeiosSimVizState
   , ebMsgs :: !(LeiosSimVizMsgsState EndorseBlockId EndorseBlock)
   , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
   , ibsInRBs :: !IBsInRBsState
+  , nodeCpuUsage :: !(Map NodeId (IntervalMap DiffTime Int))
   }
 
 data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
@@ -173,6 +176,13 @@ data LinkPoints
       {-# UNPACK #-} !Point
       {-# UNPACK #-} !Point
   deriving (Show)
+
+accumNodeCpuUsage :: Time -> LeiosEvent -> Map NodeId (IntervalMap DiffTime Int) -> Map NodeId (IntervalMap DiffTime Int)
+accumNodeCpuUsage (Time now) (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventCPU task)))) =
+  Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
+accumNodeCpuUsage (Time now) (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) =
+  Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
+accumNodeCpuUsage _ _ = id
 
 type ChainsMap = IntMap (Chain (Block RankingBlockBody))
 
@@ -250,6 +260,7 @@ leiosSimVizModel =
       , ebMsgs = initMsgs
       , voteMsgs = initMsgs
       , ibsInRBs = IBsInRBsState Map.empty Map.empty
+      , nodeCpuUsage = Map.empty
       }
 
   accumEventVizState ::
@@ -367,13 +378,14 @@ leiosSimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
-  accumEventVizState _now (LeiosEventNode (LabelNode _nodeId (LeiosNodeEventCPU _task))) vs = vs
+  accumEventVizState now e@(LeiosEventNode (LabelNode _nodeId (LeiosNodeEventCPU _task))) vs =
+    vs{nodeCpuUsage = accumNodeCpuUsage now e (nodeCpuUsage vs)}
   accumEventVizState
-    _now
-    ( LeiosEventNode
-        (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
-      )
-    vs = vs
+    now
+    e@( LeiosEventNode
+          (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
+        )
+    vs = vs{nodeCpuUsage = accumNodeCpuUsage now e (nodeCpuUsage vs)}
 
   pruneVisState ::
     Time ->

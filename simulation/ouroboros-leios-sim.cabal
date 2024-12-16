@@ -120,6 +120,7 @@ library
     , graphviz
     , gtk3
     , hashable
+    , IntervalMap
     , io-classes
     , io-sim
     , kdt
