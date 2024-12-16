@@ -25,8 +25,8 @@ import Data.List (mapAccumL, sort, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
+import GHC.Stack (HasCallStack)
 import SimTypes (NodeId (..), Point (..), WorldShape (..))
-import System.Random (StdGen)
 import qualified System.Random as Random
 
 data P2PTopography = P2PTopography
@@ -34,7 +34,7 @@ data P2PTopography = P2PTopography
   , p2pLinks :: !(Map (NodeId, NodeId) Latency)
   , p2pWorldShape :: !WorldShape
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON P2PTopography where
   toEncoding = genericToEncoding defaultOptions
@@ -56,7 +56,7 @@ data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   -- ^ Per-node upstream links picked as random peers, e.g. 5 of 10 total
   , p2pNodeLinksRandom :: Int
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON P2PTopographyCharacteristics where
   toEncoding = genericToEncoding defaultOptions
@@ -77,8 +77,10 @@ instance FromJSON P2PTopographyCharacteristics
 -- * The latency of each link will be chosen based on the shortest distance
 --   between the nodes: connecting over the "date line" if necessary.
 genArbitraryP2PTopography ::
+  forall g.
+  (HasCallStack, Random.RandomGen g) =>
   P2PTopographyCharacteristics ->
-  StdGen ->
+  g ->
   P2PTopography
 genArbitraryP2PTopography
   P2PTopographyCharacteristics
@@ -107,7 +109,7 @@ genArbitraryP2PTopography
     nodePositions =
       Map.fromList $ snd $ mapAccumL genNodePos rngNodes nodes
      where
-      genNodePos :: StdGen -> NodeId -> (StdGen, (NodeId, Point))
+      genNodePos :: g -> NodeId -> (g, (NodeId, Point))
       genNodePos rng nodeid =
         (rng'', (nodeid, Point x y))
        where
@@ -143,7 +145,7 @@ genArbitraryP2PTopography
         linkLatencySquared
         [(p, n) | (n, p) <- Map.toList nodePositions]
 
-    pickNodeLinksRandom :: NodeId -> StdGen -> [NodeId]
+    pickNodeLinksRandom :: NodeId -> g -> [NodeId]
     pickNodeLinksRandom nid rng =
       take
         p2pNodeLinksRandom

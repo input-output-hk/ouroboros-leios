@@ -17,8 +17,9 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
+import SimTypes (WorldShape (..))
 import TimeCompat (DiffTime, Time (..))
-import Topology (readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
+import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
 
 main :: IO ()
@@ -227,8 +228,8 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPBF1 -> pure VizBlockFetch.example1
   VizPraos1 -> pure VizPraos.example1
   VizPraosP2P1{..} -> do
-    let worldDimensions = (1200, 1000)
-    maybeP2PTopography <- traverse (readP2PTopography worldDimensions) maybeTopologyFile
+    let worldShape = WorldShape (1200, 1000) True
+    maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
     pure $ VizPraosP2P.example1 seed blockInterval maybeP2PTopography
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
