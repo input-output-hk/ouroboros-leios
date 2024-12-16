@@ -527,3 +527,15 @@ readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
   pure $ grToP2PTopography worldShape grWithPosition
+
+readP2PTopographyFromBenchTopologyAndLatency ::
+  GraphvizParams G.Node SimpleNodeInfo Latency ClusterName SimpleNodeInfo ->
+  WorldShape ->
+  FilePath ->
+  FilePath ->
+  IO P2PTopography
+readP2PTopographyFromBenchTopologyAndLatency params worldShape@WorldShape{..} benchTopologyFile latencyFile = do
+  simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency benchTopologyFile latencyFile
+  let gr = simpleTopologyToGr simpleTopology
+  grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
+  pure $ grToP2PTopography worldShape grWithPosition
