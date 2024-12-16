@@ -19,7 +19,7 @@ import Test.QuickCheck.Random (QCGen (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, readSimpleTopologyFromBenchTopologyAndLatency, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
+import Topology (ClusterName (..), LatencyInMiliseconds (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, readSimpleTopologyFromBenchTopologyAndLatency, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
@@ -82,7 +82,7 @@ test_benchTopologyIsConnected = do
 --------------------------------------------------------------------------------
 
 -- | Test that the conversion between SimpleTopology and FGL Graphs preserves the topology.
-prop_grToSimpleTopologyPreservesTopology :: SimpleGraph Gr (Maybe ClusterName) Latency -> Bool
+prop_grToSimpleTopologyPreservesTopology :: SimpleGraph Gr (Maybe ClusterName) LatencyInMiliseconds -> Bool
 prop_grToSimpleTopologyPreservesTopology gr = do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
   let gr2 = simpleTopologyToGr . grToSimpleTopology $ gr1
@@ -94,7 +94,7 @@ prop_grToSimpleTopologyPreservesTopology gr = do
 
 prop_augmentWithPositionPreservesTopology ::
   WorldDimensions ->
-  SimpleGraph Gr (Maybe ClusterName) Latency ->
+  SimpleGraph Gr (Maybe ClusterName) LatencyInMiliseconds ->
   Property
 prop_augmentWithPositionPreservesTopology wordDimensions gr = ioProperty $ do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
@@ -135,6 +135,10 @@ prop_p2pTopographyToGrPreservesTopology gr1@P2PTopography{..} = do
 instance Arbitrary ClusterName where
   arbitrary :: Gen ClusterName
   arbitrary = ClusterName . T.pack . ("cluster-" <>) . show @Int . getSmall . getNonNegative <$> arbitrary
+
+instance Arbitrary LatencyInMiliseconds where
+  arbitrary :: Gen LatencyInMiliseconds
+  arbitrary = LatencyInMiliseconds . getPositive <$> arbitrary
 
 instance Arbitrary WorldShape where
   arbitrary :: Gen WorldShape

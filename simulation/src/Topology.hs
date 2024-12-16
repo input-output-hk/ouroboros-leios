@@ -391,7 +391,7 @@ clusterNameToLazyText = TL.fromStrict . unClusterName
 clusterNameToGraphID :: ClusterName -> GVTG.GraphID
 clusterNameToGraphID = GVTG.Str . clusterNameToLazyText
 
-defaultParams :: GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo
+defaultParams :: GraphvizParams G.Node SimpleNodeInfo edge ClusterName SimpleNodeInfo
 defaultParams =
   Params
     { isDirected = True
@@ -405,10 +405,10 @@ defaultParams =
     }
 
 augmentWithPosition ::
-  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo edge ClusterName SimpleNodeInfo ->
   WorldDimensions ->
-  Gr SimpleNodeInfo LatencyInMiliseconds ->
-  IO (Gr (SimpleNodeInfo, Point) (LatencyInMiliseconds, Path))
+  Gr SimpleNodeInfo edge ->
+  IO (Gr (SimpleNodeInfo, Point) (edge, Path))
 augmentWithPosition params1 worldDimensions gr1 = do
   -- Add world dimension and edge IDs
   let params2 =
@@ -486,9 +486,21 @@ forgetSimpleNodeInfo = G.nemap snd id
 -- Conversion between FGL Graph and P2PTopography
 --------------------------------------------------------------------------------
 
+latencyFromSecondsToMiliseconds ::
+  Gr a Latency ->
+  Gr a LatencyInMiliseconds
+latencyFromSecondsToMiliseconds =
+  G.emap (LatencyInMiliseconds . (* 1000.0))
+
+latencyFromMilisecondsToSeconds ::
+  Gr a LatencyInMiliseconds ->
+  Gr a Latency
+latencyFromMilisecondsToSeconds =
+  G.emap ((/ 1000.0) . unLatencyInMiliseconds)
+
 grToP2PTopography ::
   WorldShape ->
-  Gr Point LatencyInMiliseconds ->
+  Gr Point Latency ->
   P2PTopography
 grToP2PTopography p2pWorldShape gr = P2PTopography{..}
  where
@@ -509,13 +521,13 @@ grToP2PTopography p2pWorldShape gr = P2PTopography{..}
       ]
   p2pLinks =
     M.fromList
-      [ ((nodeToNodeId node1, nodeToNodeId node2), latencyInMiliseconds / 1000.0)
-      | ((node1, node2), LatencyInMiliseconds latencyInMiliseconds) <- M.assocs edgeInfoMap
+      [ ((nodeToNodeId node1, nodeToNodeId node2), latencyInseconds)
+      | ((node1, node2), latencyInseconds) <- M.assocs edgeInfoMap
       ]
 
 p2pTopologyToGr ::
   P2PTopography ->
-  Gr Point LatencyInMiliseconds
+  Gr Point Latency
 p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
  where
   nodes =
@@ -523,7 +535,7 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     | (nodeId, point) <- M.assocs p2pNodes
     ]
   edges =
-    [ (nodeIdToNode nodeId1, nodeIdToNode nodeId2, LatencyInMiliseconds (latencyInSeconds * 1000.0))
+    [ (nodeIdToNode nodeId1, nodeIdToNode nodeId2, latencyInSeconds)
     | ((nodeId1, nodeId2), latencyInSeconds) <- M.assocs p2pLinks
     ]
 
@@ -536,7 +548,7 @@ readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
-  pure $ grToP2PTopography worldShape grWithPosition
+  pure $ grToP2PTopography worldShape . latencyFromMilisecondsToSeconds $ grWithPosition
 
 readP2PTopographyFromBenchTopologyAndLatency ::
   GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
@@ -548,4 +560,4 @@ readP2PTopographyFromBenchTopologyAndLatency params worldShape@WorldShape{..} be
   simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency benchTopologyFile latencyFile
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
-  pure $ grToP2PTopography worldShape grWithPosition
+  pure $ grToP2PTopography worldShape . latencyFromMilisecondsToSeconds $ grWithPosition
