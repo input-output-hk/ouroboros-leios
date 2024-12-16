@@ -11,7 +11,7 @@ use tokio_util::sync::CancellationToken;
 use tx::TransactionProducer;
 
 use crate::{
-    clock::Clock,
+    clock::ClockCoordinator,
     config::SimConfiguration,
     events::EventTracker,
     model::{
@@ -26,6 +26,7 @@ mod slot;
 mod tx;
 
 pub struct Simulation {
+    clock_coordinator: ClockCoordinator,
     network: Network<SimulationMessage>,
     tx_producer: TransactionProducer,
     slot_witness: SlotWitness,
@@ -36,8 +37,9 @@ impl Simulation {
     pub async fn new(
         config: SimConfiguration,
         tracker: EventTracker,
-        clock: Clock,
+        clock_coordinator: ClockCoordinator,
     ) -> Result<Self> {
+        let clock = clock_coordinator.clock();
         let config = Arc::new(config);
         let total_stake = config.nodes.iter().map(|p| p.stake).sum();
 
@@ -72,20 +74,21 @@ impl Simulation {
                 tx_source,
                 tracker.clone(),
                 ChaChaRng::seed_from_u64(rng.next_u64()),
-                clock.barrier().await,
+                clock.barrier(),
             );
             nodes.push(node);
         }
         let tx_producer = TransactionProducer::new(
             ChaChaRng::seed_from_u64(rng.next_u64()),
-            clock.barrier().await,
+            clock.barrier(),
             node_tx_sinks,
             &config,
         );
 
-        let slot_witness = SlotWitness::new(clock.barrier().await, tracker, &config);
+        let slot_witness = SlotWitness::new(clock.barrier(), tracker, &config);
 
         Ok(Self {
+            clock_coordinator,
             network,
             tx_producer,
             slot_witness,
@@ -105,6 +108,7 @@ impl Simulation {
             biased;
             _ = token.cancelled() => {}
             _ = self.slot_witness.run() => {}
+            _ = self.clock_coordinator.run() => {}
             result = self.tx_producer.run() => {
                 result?;
             }

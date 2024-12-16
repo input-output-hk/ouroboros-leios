@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use events::{EventMonitor, OutputFormat};
 use sim_core::{
-    clock::Clock,
+    clock::ClockCoordinator,
     config::{NodeId, RawConfig, SimConfiguration},
     events::EventTracker,
     sim::Simulation,
@@ -85,9 +85,10 @@ async fn main() -> Result<()> {
         tokio::spawn(EventMonitor::new(&config, events_source, args.output, args.format).run());
     pin!(monitor);
 
-    let clock = Clock::new();
+    let clock_coordinator = ClockCoordinator::new();
+    let clock = clock_coordinator.clock();
     let tracker = EventTracker::new(events_sink, clock.clone());
-    let mut simulation = Simulation::new(config, tracker, clock).await?;
+    let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;
 
     select! {
         result = simulation.run(token) => { result? }
