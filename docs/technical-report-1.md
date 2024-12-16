@@ -28,14 +28,29 @@
 
 ## Formal Specification for Short Leios
 
+![Overview for formal specification](../formal-spec/docs/overview.png)
+
 
 ## Delta QSD network performance model
 
 
+![Overview of Delta QSD components](../delta_q/docs/overview.png)
+
+
 ## Rust simulation
+
+![Container diagram of Rust simulation](../sim-rs/docs/container.png)
+
+![Component diagram of Rust simulation](../sim-rs/docs/component.png)
+
+![Transaction-protocol diagram of Rust simulation](../sim-rs/docs/tx-protocol.png)
 
 
 ## Haskell prototype
+
+![Container diagram of Haskell prototype](../simulation/docs/container.png)
+
+![Component diagram of Haskell prototype](../simulation/docs/component.png)
 
 
 ## Voting and certificates
@@ -286,14 +301,17 @@ Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we s
 
 > [!IMPORTANT]
 > 
-> To be written
+> - [ ] To be written
 
 
 #### MUSEN certificate
 
 > [!IMPORTANT]
 > 
-> To be written
+> - [ ] To be written
+> - [ ] Include benchmark results
+
+[MUSEN](https://iohk.io/en/research/library/papers/musen-aggregatable-key-evolving-verifiable-random-functions-and-applications/) ("MUlti-Stage key-Evolving verifiable random fuNctions.") builds upon the concept of VRFs by introducing a key-evolving feature and allowing for aggregating VRF outputs. The aggregation capability promises to result in small certificates attesting to the Leios votes. However, verification times may be to long for Leios.
 
 
 ### Insights regarding voting and certificates
@@ -555,6 +573,11 @@ See [this Jupyter notebook](../analysis/tx.ipynb) for details of the analysis.
 The stake distribution has an important influence on the number of unique SPOs involved in each round of Leios voting. It turns out that the cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. This curve can be adapted to the actual number of stake pools being modeled: for example, in order to use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
 
 ![Curve fit to stakepool distribution at epoch 500](../images/stake-fit.png)
+
+### Insights into mainnet characteristics
+
+1. Historically observed transaction sizes and frequencies are reasonably well modeled by simple curve fits.
+2. The current mainnet stake distribution is similarly modeled by a simple curve fit.
 
 
 ## Threat model
