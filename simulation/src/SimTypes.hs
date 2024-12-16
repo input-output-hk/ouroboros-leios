@@ -47,7 +47,7 @@ data WorldShape = WorldShape
   -- to the West edge, or if the world is a rectangle, with no wrapping at
   -- the edges. This affects the latencies.
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON WorldShape where
   toEncoding = genericToEncoding defaultOptions

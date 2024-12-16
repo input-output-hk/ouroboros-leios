@@ -184,6 +184,7 @@ test-suite ols-test
     , fgl-arbitrary
     , ouroboros-leios-sim
     , QuickCheck
+    , random
     , tasty
     , tasty-hunit
     , tasty-quickcheck

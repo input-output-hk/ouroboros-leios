@@ -501,8 +501,6 @@ grToP2PTopography p2pWorldShape gr = P2PTopography{..}
     M.fromList
       [ ((nodeToNodeId node1, nodeToNodeId node2), latency)
       | ((node1, node2), latency) <- M.assocs edgeInfoMap
-      , let _point1 = nodeInfoMap M.! node1
-      , let _point2 = nodeInfoMap M.! node2
       ]
 
 p2pTopologyToGr ::
