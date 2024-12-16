@@ -54,7 +54,7 @@ network: {
 
 monitor: {
   class: container
-  label: "Event Monitor\n[Haskell]\n\nCollects in-memory metrics\nand traces events"
+  label: "Event Monitor\n[Haskell]\n\nComputes metrics and/or\n protocol/network state"
 }
 
 viz: {
@@ -67,19 +67,28 @@ filesystem: {
   label: "Filesystem\n\nStores configuration and\nanimation frames"
 }
 
+display: {
+  class: external
+  label: "Display\n\nShows visualization"
+}
+
 # Relationships
 user -> viz: "Views protocol\nbehavior"
 user -> filesystem: "Configures simulation\nparameters"
 
 viz -> filesystem: "Reads config files and\nwrites animation frames"
-viz -> protocol-engine: "Visualizes protocol state"
-viz -> network: "Visualizes network state"
-viz -> monitor: "Displays metrics"
+#viz -> protocol-engine: "Visualizes protocol state"
+#viz -> network: "Visualizes network state"
+viz -> monitor: "Displays computed state"
+viz -> display: "Shows animation"
+
+monitor -> filesystem: "Writes simulation results"
 
 protocol-engine -> network: "Uses for message transport"
 protocol-engine -> monitor: "Emits protocol events"
 protocol-engine -> filesystem: "Reads protocol config"
 
-network -> monitor: "Reports network metrics"
+network -> monitor: "Emits message timings events"
+
 
 filesystem -> user: "Provides simulation\nresults"
