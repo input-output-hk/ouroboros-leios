@@ -9,7 +9,6 @@ module PraosProtocol.PraosNode (
 where
 
 import ChanMux
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Tracer (Tracer)
 import Data.ByteString (ByteString)
@@ -23,7 +22,7 @@ import PraosProtocol.BlockGeneration
 import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
-import STMUtils
+import STMCompat
 
 data Praos body f = Praos
   { protocolChainSync :: f ChainSyncMessage

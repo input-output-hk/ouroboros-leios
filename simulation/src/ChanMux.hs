@@ -26,21 +26,6 @@ import qualified Control.Category as Cat
 import Control.Concurrent.Class.MonadMVar (
   MonadMVar (MVar, newMVar, withMVar),
  )
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    TQueue,
-    TVar,
-    atomically,
-    modifyTVar,
-    newTQueueIO,
-    newTVarIO,
-    readTQueue,
-    readTVar,
-    readTVarIO,
-    writeTQueue,
-    writeTVar
-  ),
- )
 import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (MonadAsync)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
@@ -48,6 +33,7 @@ import Control.Tracer (Contravariant (contramap), Tracer)
 import Data.Array (Array, listArray, (!))
 import Data.Dynamic (Dynamic, Typeable, fromDynamic, toDyn)
 import Data.Maybe (fromJust)
+import STMCompat
 import TimeCompat
 
 class MuxBundle bundle where

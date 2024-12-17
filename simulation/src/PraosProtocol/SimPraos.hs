@@ -10,12 +10,10 @@ module PraosProtocol.SimPraos where
 
 import ChanMux
 import ChanTCP
-import Control.Monad.Class.MonadAsync (
-  MonadAsync (concurrently_),
- )
+import Control.Monad.Class.MonadAsync (MonadAsync (..))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
-  Contravariant (contramap),
+  Contravariant (..),
   Tracer,
   traceWith,
  )
@@ -25,7 +23,6 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.Common hiding (Point)
-import PraosProtocol.Common.Chain (Chain (..))
 import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
 import SimTCPLinks
 import SimTypes

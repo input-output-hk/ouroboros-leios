@@ -85,7 +85,7 @@ library
     Sample
     SimRelay
     SimRelayP2P
-    STMUtils
+    STMCompat
     SimTCPLinks
     SimTypes
     TimeCompat

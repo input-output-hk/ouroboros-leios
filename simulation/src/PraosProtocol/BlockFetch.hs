@@ -24,9 +24,6 @@ module PraosProtocol.BlockFetch where
 
 import Chan (Chan)
 import ChanDriver (ProtocolMessage, chanDriver)
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (..),
- )
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
 import Control.Tracer (Contravariant (contramap), Tracer, traceWith)
@@ -53,7 +50,7 @@ import Numeric.Natural (Natural)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
 import qualified PraosProtocol.Common.Chain as Chain
-import STMUtils
+import STMCompat
 
 data BlockFetchState (body :: Type)
   = StIdle

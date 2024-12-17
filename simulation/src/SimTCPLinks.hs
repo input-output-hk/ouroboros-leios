@@ -6,9 +6,6 @@ module SimTCPLinks where
 
 import Chan
 import ChanTCP
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (atomically, newTQueueIO, readTQueue, writeTQueue),
- )
 import Control.Monad (replicateM_)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
@@ -30,6 +27,7 @@ import Control.Tracer as Tracer (
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
 import ModelTCP
+import STMCompat
 import SimTypes
 import TimeCompat
 

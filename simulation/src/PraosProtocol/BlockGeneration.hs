@@ -6,7 +6,6 @@ module PraosProtocol.BlockGeneration where
 
 import Cardano.Slotting.Slot (WithOrigin (..))
 import ChanTCP (Bytes)
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad (forever)
 import Control.Tracer
 import Data.ByteString as BS
@@ -14,6 +13,7 @@ import Data.ByteString.Char8 as BS8
 import Data.Word (Word64)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
+import STMCompat
 import System.Random (StdGen, uniformR)
 
 -- | Returns a block that can extend the chain.

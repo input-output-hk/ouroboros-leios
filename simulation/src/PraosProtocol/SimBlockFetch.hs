@@ -5,7 +5,6 @@ module PraosProtocol.SimBlockFetch where
 import Chan (Chan)
 import ChanDriver (ProtocolMessage)
 import ChanTCP
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (..),
   mapConcurrently_,
@@ -23,7 +22,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
-import STMUtils
+import STMCompat
 import SimTCPLinks
 import SimTypes
 

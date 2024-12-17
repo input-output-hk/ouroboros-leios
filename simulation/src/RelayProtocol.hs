@@ -26,18 +26,6 @@ module RelayProtocol (
   relayClient,
 ) where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TVar,
-    atomically,
-    modifyTVar',
-    newTVarIO,
-    readTVar,
-    readTVarIO,
-    retry
-  ),
- )
 import Control.Exception (assert)
 import Control.Monad (when)
 import Data.FingerTree (FingerTree)
@@ -50,6 +38,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word (Word64)
+import STMCompat
 import TimeCompat
 
 import Chan (Chan (readChan, writeChan))

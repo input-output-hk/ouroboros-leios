@@ -9,9 +9,6 @@
 
 module LeiosProtocol.Short.Generate where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (..),
- )
 import Control.Exception (assert)
 import Control.Monad (forM)
 import Control.Monad.State (
@@ -25,6 +22,7 @@ import Data.Bifunctor (Bifunctor (..))
 import Data.Kind (Type)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
+import STMCompat
 import System.Random (StdGen, uniformR)
 
 --------------------------------------------------------------------------------

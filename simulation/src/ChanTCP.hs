@@ -12,22 +12,6 @@ module ChanTCP (
 ) where
 
 import Chan (Chan (..))
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    TMVar,
-    TVar,
-    atomically,
-    modifyTVar',
-    newEmptyTMVarIO,
-    newTVarIO,
-    putTMVar,
-    readTMVar,
-    readTVar,
-    retry,
-    takeTMVar,
-    writeTVar
-  ),
- )
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Class.MonadAsync (MonadAsync (async))
@@ -48,6 +32,7 @@ import ModelTCP (
   initTcpState,
   saneTcpState,
  )
+import STMCompat
 import TimeCompat
 
 -- | In the scope of a two party connection, there are just two peers. These

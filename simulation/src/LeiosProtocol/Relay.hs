@@ -26,7 +26,6 @@ module LeiosProtocol.Relay where
 
 import Chan
 import ChanDriver (ProtocolMessage, chanDriver)
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
 import Control.Monad (forM_, join, unless, void, when)
@@ -67,7 +66,7 @@ import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import NoThunks.Class (NoThunks)
 import Quiet (Quiet (..))
-import STMUtils
+import STMCompat
 
 data BlockingStyle
   = StBlocking

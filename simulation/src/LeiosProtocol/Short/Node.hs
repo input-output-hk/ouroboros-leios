@@ -13,7 +13,6 @@ module LeiosProtocol.Short.Node where
 import ChanMux
 import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
-import Control.Concurrent.Class.MonadSTM
 import Control.Exception (assert)
 import Control.Monad (forever, guard, when)
 import Control.Monad.Class.MonadAsync
@@ -44,7 +43,7 @@ import PraosProtocol.BlockFetch (
  )
 import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
-import STMUtils
+import STMCompat
 import System.Random
 
 --------------------------------------------------------------

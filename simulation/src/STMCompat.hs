@@ -1,7 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module STMUtils (
+module STMCompat (
+  MonadSTM (..),
   ReadOnly,
   asReadOnly,
   readReadOnlyTVar,

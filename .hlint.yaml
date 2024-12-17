@@ -32,6 +32,10 @@
         - "Control.Monad.Class.MonadTime.SI"
       within: "TimeCompat"
       message: "Use TimeCompat instead"
+    # Ensure that MonadSTM is imported from STMCompat
+    - name: "Control.Concurrent.Class.MonadSTM"
+      within: "STMCompat"
+      message: "Use STMCompat instead"
     # Ensure that Ouroboros.Network primitives are imported from PraosProtocol.Common hierarchy
     - name: "Ouroboros.Network.AnchoredFragment"
       within: "PraosProtocol.Common.AnchoredFragment"

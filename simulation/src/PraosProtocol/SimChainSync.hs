@@ -9,13 +9,12 @@ import ChanTCP (
   TcpEvent,
   newConnectionTCP,
  )
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
-  Contravariant (contramap),
+  Contravariant (..),
   Tracer (Tracer),
   traceWith,
  )
@@ -32,6 +31,7 @@ import PraosProtocol.ChainSync (
  )
 import PraosProtocol.Common hiding (Point)
 import qualified PraosProtocol.Common.Chain as Chain
+import STMCompat
 import SimTCPLinks (
   labelDirToLabelLink,
   mkTcpConnProps,

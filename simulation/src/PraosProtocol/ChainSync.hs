@@ -16,7 +16,6 @@ module PraosProtocol.ChainSync where
 
 import Chan (Chan)
 import ChanDriver (ProtocolMessage, chanDriver)
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Exception (assert)
 import Control.Monad (void)
 import Control.Tracer (Tracer, traceWith)
@@ -33,6 +32,7 @@ import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
+import STMCompat
 
 --------------------------------
 ---- ChainSync

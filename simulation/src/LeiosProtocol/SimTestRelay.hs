@@ -14,22 +14,6 @@ import Chan
 import ChanMux
 import ChanTCP
 import Control.Category ((>>>))
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TQueue,
-    TVar,
-    atomically,
-    modifyTVar',
-    newTQueueIO,
-    newTVarIO,
-    readTQueue,
-    readTVar,
-    retry,
-    writeTQueue,
-    writeTVar
-  ),
- )
 import Control.Exception (assert)
 import Control.Monad (forever, when)
 import Control.Monad.Class.MonadAsync (
@@ -52,7 +36,7 @@ import qualified Data.Set as Set
 import LeiosProtocol.Relay
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
-import STMUtils
+import STMCompat
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, uniform, uniformR)
