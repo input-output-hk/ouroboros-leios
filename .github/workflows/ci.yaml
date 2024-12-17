@@ -18,7 +18,7 @@ jobs:
   ################################################################################
 
   formal-spec-check:
-    name: Typecheck specification
+    name: Check formal-spec
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -60,7 +60,7 @@ jobs:
   ################################################################################
 
   simulation-test:
-    name: Build Haskell packages with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
+    name: Test simulation with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -84,7 +84,7 @@ jobs:
       - name: 🛠️ Install system dependencies
         run: sudo apt-get install -y graphviz libpango1.0-dev libgtk-3-dev
 
-      - name: 🛠️ Configure
+      - name: 🛠️ Configure simulation
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
@@ -121,7 +121,7 @@ jobs:
         run: cabal test all
 
   simulation-hlint:
-    name: Check Haskell sources with HLint
+    name: Check simulation Haskell sources with HLint
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -137,7 +137,7 @@ jobs:
           fail-on: warning
 
   simulation-fourmolu:
-    name: Check Haskell sources with fourmolu
+    name: Check simulation Haskell sources with fourmolu
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -153,7 +153,7 @@ jobs:
   ################################################################################
 
   sim-rs-build:
-    name: Check Rust packages
+    name: Check sim-rs
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
