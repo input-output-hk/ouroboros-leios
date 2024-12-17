@@ -1,5 +1,3 @@
-{-# OPTIONS --erasure #-}
-
 module Everything where
 
 open import Leios.Simplified
