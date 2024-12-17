@@ -9,9 +9,14 @@ module PraosProtocol.PraosNode (
 where
 
 import ChanMux
-import Control.Concurrent.Class.MonadSTM
-import Control.Monad.Class.MonadAsync
-import Control.Tracer
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (STM, atomically, newTVarIO, readTVar, writeTVar),
+ )
+import Control.Monad.Class.MonadAsync (
+  Concurrently (..),
+  MonadAsync (async, wait),
+ )
+import Control.Tracer (Tracer)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
@@ -174,7 +179,7 @@ praosNode ::
   PraosNodeConfig ->
   [Praos BlockBody (Chan m)] ->
   [Praos BlockBody (Chan m)] ->
-  m ([m ()])
+  m [m ()]
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
   praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers

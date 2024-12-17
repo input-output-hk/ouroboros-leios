@@ -269,7 +269,6 @@ newLeiosNodeState cfg = do
   ledgerStateVar <- newTVarIO Map.empty
   waitingForRBVar <- newTVarIO Map.empty
   waitingForLedgerStateVar <- newTVarIO Map.empty
-
   return $ LeiosNodeState{..}
 
 leiosNode ::
@@ -279,7 +278,7 @@ leiosNode ::
   LeiosNodeConfig ->
   [Leios (Chan m)] ->
   [Leios (Chan m)] ->
-  m ([m ()])
+  m [m ()]
 leiosNode tracer cfg followers peers = do
   leiosState@LeiosNodeState{..} <- newLeiosNodeState cfg
   let
@@ -290,12 +289,10 @@ leiosNode tracer cfg followers peers = do
   let submitRB rb completion = atomically $ writeTBQueue validationQueue $! ValidateRB rb completion
   let submitIB xs deliveryTime completion = do
         traceReceived xs $ EventIB . uncurry InputBlock
-        atomically $ writeTBQueue validationQueue $! ValidateIBS xs deliveryTime $ completion
-
+        atomically $ writeTBQueue validationQueue $! ValidateIBS xs deliveryTime completion
   let submitVote (map snd -> xs) _ completion = do
         traceReceived xs EventVote
         atomically $ writeTBQueue validationQueue $! ValidateVotes xs $ completion . map (\v -> (v.id, v))
-
   let submitEB (map snd -> xs) _ completion = do
         traceReceived xs EventEB
         atomically $ writeTBQueue validationQueue $! ValidateEBS xs $ completion . map (\eb -> (eb.id, eb))
@@ -462,7 +459,7 @@ validationDispatcher tracer cfg leiosState = forever $ do
         completion ebs
         ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
         let ibsNeeded = Map.fromList $ map (\eb -> (eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)) ebs
-        modifyTVar' leiosState.ibsNeededForEBVar $ (`Map.union` ibsNeeded)
+        modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
       traceEnterState ebs EventEB
     ValidateVotes vs completion -> do
       threadDelayParallel tracer $ map cfg.leios.delays.voteMsgValidation vs
@@ -561,14 +558,14 @@ mkBuffersView cfg st = BuffersView{..}
     buffer <- readTVar st.relayEBState.relayBufferVar
     let validEndorseBlocks r =
           filter (\eb -> eb.slot `inRange` r) . map snd . RB.values $ buffer
-
     return EndorseBlocksSnapshot{..}
 
 mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
 mkSchedule cfg = mkScheduler cfg.rng rates
  where
   rates slot =
-    (map . second . map) (nodeRate cfg.stake) $
+    (map . second . map)
+      (nodeRate cfg.stake)
       [ (SomeRole Generate.Propose, inputBlockRate cfg.leios slot)
       , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios slot)
       , (SomeRole Generate.Vote, votingRate cfg.leios slot)

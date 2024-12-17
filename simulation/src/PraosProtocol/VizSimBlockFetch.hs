@@ -11,7 +11,7 @@ import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
-import Network.TypedProtocol
+import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
@@ -85,7 +85,7 @@ data BlockFetchVizState
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( (BlockFetchMessage BlockBody)
+          [ ( BlockFetchMessage BlockBody
             , TcpMsgForecast
             , [TcpMsgForecast]
             )

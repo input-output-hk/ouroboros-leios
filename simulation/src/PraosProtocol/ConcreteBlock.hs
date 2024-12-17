@@ -212,7 +212,7 @@ mkAnchoredFragmentSimple :: IsBody body => [body] -> AnchoredFragment (Block bod
 mkAnchoredFragmentSimple =
   mkAnchoredFragment AnchorGenesis . zip [1 ..]
 
-mkPartialBlock :: Hashable body => SlotNo -> body -> (Block body)
+mkPartialBlock :: Hashable body => SlotNo -> body -> Block body
 mkPartialBlock sl body =
   Block
     { blockHeader = mkPartialBlockHeader sl body
@@ -244,8 +244,8 @@ fixupBlock ::
   Hashable body =>
   HeaderHash block ~ HeaderHash BlockHeader =>
   Anchor block ->
-  (Block body) ->
-  (Block body)
+  Block body ->
+  Block body
 fixupBlock prev b@Block{blockBody, blockHeader} =
   b
     { blockHeader =
@@ -273,7 +273,7 @@ fixupBlockHeader prev b =
 
 -- Like 'fixupBlock' but it takes the info from a given block.
 --
-fixupBlockAfterBlock :: IsBody body => (Block body) -> (Block body) -> (Block body)
+fixupBlockAfterBlock :: IsBody body => Block body -> Block body -> Block body
 fixupBlockAfterBlock prev = fixupBlock (AF.anchorFromBlock prev)
 
 fixupBlocks ::

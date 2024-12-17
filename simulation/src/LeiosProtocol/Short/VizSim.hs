@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module LeiosProtocol.Short.VizSim where
 
@@ -152,7 +151,8 @@ data IBsInRBsReport = IBsInRBsReport {ibsInRBsNum :: !Int, ibsInEBsNum :: !Int, 
 totalIBsInRBs :: IBsInRBsState -> IBsInRBsReport
 totalIBsInRBs s = IBsInRBsReport{..}
  where
-  elemsSet x = Set.unions . Map.elems $ x
+  elemsSet :: Ord a => Map k (Set a) -> Set a
+  elemsSet = Set.unions . Map.elems
   ibsInRBsNum = Set.size $ elemsSet $ Map.restrictKeys s.ibsInEBs ebsInRBsSet
   ebsInRBsSet = elemsSet s.ebsInRBs
   ebsInRBsNum = Set.size ebsInRBsSet
@@ -777,5 +777,5 @@ leiosSimVizRenderModel
         ]
       Cairo.restore
      where
-      nodeMessageText msg = Just $ show $ (\(InputBlockId (NodeId x) y) -> (x, y)) $ msg.id
+      nodeMessageText msg = Just $ show $ (\(InputBlockId (NodeId x) y) -> (x, y)) msg.id
       nodeMessageColor msg = hashToColor $ hash msg.id

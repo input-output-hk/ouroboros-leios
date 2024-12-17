@@ -4,14 +4,13 @@ module ExamplesRelayP2P where
 
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Word (Word8)
-import System.Random (mkStdGen, uniform)
-
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import RelayProtocol
 import SimRelay
 import SimRelayP2P
 import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes
+import System.Random (mkStdGen, uniform)
 import Viz
 import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P

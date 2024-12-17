@@ -20,7 +20,7 @@ module ModelTCP (
 import Control.Exception (assert)
 import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime)
 import Data.Foldable as Foldable (Foldable (sum))
-import Data.Hashable
+import Data.Hashable (Hashable)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)

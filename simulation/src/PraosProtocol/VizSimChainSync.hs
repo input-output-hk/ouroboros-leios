@@ -5,15 +5,15 @@
 module PraosProtocol.VizSimChainSync where
 
 import ChanDriver
-import Data.Coerce
+import Data.Coerce (coerce)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
-import Data.Word
+import Data.Word (Word8)
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
-import Network.TypedProtocol
+import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
 import PraosProtocol.ChainSync
 import PraosProtocol.Common hiding (Point)

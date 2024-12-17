@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -122,7 +121,7 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     }
  where
   bins = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
-  bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) $ bins
+  bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) bins
 
 data DiffusionLatencyState = DiffusionLatencyState
   { chains :: !ChainsMap

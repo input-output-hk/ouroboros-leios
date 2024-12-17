@@ -882,7 +882,7 @@ relayConsumerPipelined config sst =
           buffer4 =
             forceElemsToWHNF $
               buffer3
-                <> Map.fromList (zip live (repeat Nothing))
+                <> Map.fromList (map (,Nothing) live)
 
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
       unless (null bodiesToSubmit) $ do
@@ -927,7 +927,7 @@ relayConsumerPipelined config sst =
 
       availableIdsU =
         Map.filterWithKey
-          (\txid _ -> notElem txid lst.window)
+          (\txid _ -> txid `notElem` lst.window)
           idsMap
 
       available' = lst.available <> Map.intersection availableIdsMp availableIdsU
@@ -958,7 +958,7 @@ relayConsumerPipelined config sst =
         forceElemsToWHNF $
           Foldable.foldl'
             ( \m txid ->
-                if elem txid window''
+                if txid `elem` window''
                   then m
                   else Map.delete txid m
             )

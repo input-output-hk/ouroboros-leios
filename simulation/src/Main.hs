@@ -12,7 +12,35 @@ import qualified ExamplesTCP
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
-import Options.Applicative
+import Options.Applicative (
+  Alternative ((<|>)),
+  Parser,
+  ParserInfo,
+  ParserPrefs,
+  auto,
+  command,
+  commandGroup,
+  customExecParser,
+  flag',
+  help,
+  helpShowGlobals,
+  helper,
+  info,
+  long,
+  metavar,
+  option,
+  optional,
+  prefs,
+  progDesc,
+  short,
+  showHelpOnEmpty,
+  str,
+  strOption,
+  subparser,
+  switch,
+  value,
+  (<**>),
+ )
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync

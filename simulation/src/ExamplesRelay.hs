@@ -1,11 +1,10 @@
 module ExamplesRelay where
 
 import Data.Word (Word8)
-import System.Random (mkStdGen, uniform)
-
 import RelayProtocol
 import SimRelay
 import SimTCPLinks (kilobytes, mkTcpConnProps)
+import System.Random (mkStdGen, uniform)
 import Viz
 import VizSimRelay
 

@@ -4,6 +4,7 @@
 
 module LeiosProtocol.VizSimTestRelay where
 
+import ChanDriver (ProtocolMessage (..))
 import Control.Exception (assert)
 import Control.Monad.Class.MonadTime.SI (Time, addTime)
 import Data.Map (Map)
@@ -11,11 +12,17 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
+import Data.Word (Word8)
 import qualified Graphics.Rendering.Cairo as Cairo
-
+import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
+import LeiosProtocol.SimTestRelay
 import ModelTCP
+import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
+import SimTCPLinks
 import SimTypes
+import System.Random (mkStdGen)
+import System.Random.Stateful (uniform)
 import Viz
 import VizSim
 import VizSimTCP (
@@ -24,15 +31,6 @@ import VizSimTCP (
   renderMessagesInFlight,
  )
 import VizUtils
-
-import ChanDriver (ProtocolMessage (..))
-import Data.Word (Word8)
-import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
-import LeiosProtocol.SimTestRelay
-import Network.TypedProtocol (SomeMessage (..))
-import SimTCPLinks
-import System.Random (mkStdGen)
-import System.Random.Stateful (uniform)
 
 ------------------------------------------------------------------------------
 -- Examples

@@ -4,11 +4,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module LeiosProtocol.Short.VizSimP2P where
 
@@ -90,7 +87,7 @@ messageDiagram (tag, c) = Dia.fc c $
       EB -> sizedAs $ Dia.hexagon 16
       VT -> sizedAs $ Dia.strokePath $ Dia.star (Dia.StarSkip 2) (Dia.regPoly 5 16)
  where
-  sizedAs d = Dia.sizedAs (Dia.square 18 :: CairoDiagram) d
+  sizedAs = Dia.sizedAs (Dia.square 18 :: CairoDiagram)
 
 messageLegend :: CairoDiagram
 messageLegend =
@@ -363,8 +360,7 @@ diffusionLatencyPerStakeFraction nnodes created arrivals =
   [ (latency, percent)
   | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
   , let !latency = arrival `diffTime` created
-        !percent =
-          (fromIntegral n / fromIntegral nnodes)
+        !percent = fromIntegral n / fromIntegral nnodes
   ]
 
 chartDiffusionLatency ::
@@ -477,7 +473,7 @@ chartDiffusionImperfection
     idealDiffusionTimes =
       p2pGraphIdealDiffusionTimes
         p2ptopography
-        (\_ -> processingDelay)
+        (const processingDelay)
         (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
 
 chartBandwidth :: VizRender LeiosSimVizModel

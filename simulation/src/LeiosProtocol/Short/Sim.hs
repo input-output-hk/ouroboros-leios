@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -12,6 +11,8 @@ module LeiosProtocol.Short.Sim where
 
 import ChanMux
 import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -22,11 +23,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-
--- import PraosProtocol.Common hiding (Point)
-
-import Control.Monad (forever)
-import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -130,8 +126,8 @@ traceRelayLink1 tcpprops =
       (cA, pB) <- newConnectionBundleTCP (leiosTracer nodeA nodeB) tcpprops
       threads <-
         (++)
-          <$> (leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA])
-          <*> (leiosNode (nodeTracer nodeB) (leiosNodeConfig nodeB) [pB] [cB])
+          <$> leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA]
+          <*> leiosNode (nodeTracer nodeB) (leiosNodeConfig nodeB) [pB] [cB]
       mapM_ forkIO threads
       forever $ threadDelaySI 1000
  where
