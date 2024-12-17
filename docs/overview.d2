@@ -43,47 +43,73 @@ Research: {
   class: workstream
 }
 
+Crypto: {
+  class: workstream
+  label: "Cryptography"
+
+  threat: {
+    class: output
+    label: "Threat\nAnalysis"
+  }
+
+  certs: {
+    class: output
+    label: "Certificate\nDesign"
+  }
+}
+
 Formal: {
   class: workstream
-  label: "Formal Specification\n\nAgda implementation of\nprotocol semantics"
+  label: "Formal Specification\nof Protocol Semantics"
 
   spec: {
     class: output
-    label: "Categorical Model"
+    label: "Agda Relational\nSpecification"
   }
 
   proofs: {
     class: output
-    label: "Security Proofs"
-  }
-}
-
-DeltaQ: {
-  class: workstream
-  label: "ΔQ Modeling\n\nProbabilistic analysis of\nnetwork behavior"
-
-  latency: {
-    class: output
-    label: "Latency Analysis"
-  }
-
-  resources: {
-    class: output
-    label: "Resource Usage"
+    label: "Agda Executable\nSpecification"
   }
 }
 
 Simulation: {
+  label: "Simulation & Modeling"
   class: workstream
+
+  DeltaQ: {
+    class: output
+    label: "ΔQ Modeling"
+  }
 
   haskell: {
     class: output
-    label: "Haskell Prototype"
+    label: "Haskell\nPrototype"
   }
 
   rust: {
     class: output
-    label: "Rust Simulation"
+    label: "Rust\nSimulation"
+  }
+}
+
+Outreach: {
+  label: "Community Engagement"
+  class: workstream
+
+  demo: {
+    label: "Public Demo"
+    class: output
+  }
+
+  cip: {
+    label: "CIP"
+    class: output
+  }
+
+  discord: {
+    class: output
+    label: "Discord"
   }
 }
 
@@ -94,18 +120,31 @@ Optimization: {
 }
 
 # Relationships
-Research -> Formal: "Guides\nformalization"
-Research -> Simulation: "Guides\nimplementation"
-Research -> DeltaQ: "Informs\nmodeling"
-Research -> Simulation: "Defines test\nscenarios"
+Research <-> Crypto: "Outlines constraints/\nReceives Feedback"
+Research <-> Formal: "Guides\nformalization/\nReceives Feedback"
+Research <-> Simulation: "Guides\nimplementation/\nReceives Feedback"
+Research <-> Simulation: "Defines test\nscenarios/\nReceives Feedback"
 
-Formal.spec -> Optimization: "Verifies\nsecurity properties"
-Formal.proofs -> Optimization: "Proves safety\nguarantees"
+Crypto -> Optimization: "Security\nrequirements"
+Crypto -> Optimization: "Cryptographic\nguarantees"
 
-DeltaQ <-> Simulation: "Cross-Stream\nValidation"
-DeltaQ.latency -> Optimization: "Quantifies\nperformance"
-DeltaQ.resources -> Optimization: "Estimates\ncost"
+Formal -> Optimization: "Verifies\nsecurity properties"
+Formal -> Optimization: "Proves safety\nguarantees"
 
-Simulation.haskell -> DeltaQ: "Validates\nmodels"
-Simulation.rust -> DeltaQ: "Large network\nmetrics"
-Simulation.rust -> Optimization: "Network\nbehavior"
+# Simulations.DeltaQ.latency -> Optimization: "Quantifies\nperformance"
+# DeltaQ.resources -> Optimization: "Estimates\ncost"
+
+# Simulation -> Research: "Feedback\nfrom\nsimulations"
+Simulation.DeltaQ -> Simulation.haskell: "Validates\nmodels"
+Simulation.haskell -> Simulation.DeltaQ: "Prototype\nmetrics"
+
+Simulation.DeltaQ -> Simulation.rust: "Validates\nmodels"
+Simulation.rust -> Simulation.DeltaQ: "Large network\nmetrics"
+
+Simulation -> Optimization: "Network & Performance\nbehavior"
+Simulation -> Optimization: "Cost quantification"
+
+Optimization <-> Outreach: "Feedback"
+Optimization <- Outreach: "Experience"
+
+# Research-led, community-driven solution
