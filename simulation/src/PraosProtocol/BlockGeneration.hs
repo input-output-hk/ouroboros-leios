@@ -7,9 +7,7 @@ module PraosProtocol.BlockGeneration where
 
 import Cardano.Slotting.Slot (WithOrigin (..))
 import ChanTCP (Bytes)
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (..),
- )
+import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad (forever)
 import Control.Tracer
 import Data.ByteString as BS

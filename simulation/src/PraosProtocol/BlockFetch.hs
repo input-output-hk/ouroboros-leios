@@ -15,7 +15,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -401,7 +400,7 @@ blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (Pr
 blockFetchController tracer st@BlockFetchControllerState{..} = forever makeRequests
  where
   makeRequests :: m ()
-  makeRequests = (traceNewTip tracer =<<) . atomically $ do
+  makeRequests = traceNewTip tracer <=< atomically $ do
     let peerChainVars = (map . second) (.peerChainVar) $ Map.toList peers
     mchainSwitch <- longestChainSelection peerChainVars (asReadOnly cpsVar) blockHeader
     case mchainSwitch of
@@ -498,7 +497,7 @@ fillInBlocks blocks MissingBlocksChain{..} =
 initMissingBlocksChain ::
   forall body.
   IsBody body =>
-  (Blocks body) ->
+  Blocks body ->
   Chain (Block body) ->
   AnchoredFragment BlockHeader ->
   ChainsUpdate body
@@ -560,7 +559,7 @@ removeInFlight BlockFetchControllerState{..} pId points = do
 --   * adds block to blocksVar
 --   * @fillInBlocks@ on @selectedChain@, and @updateChains@
 addFetchedBlock :: (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> BlockFetchControllerState body m -> PeerId -> Block body -> m ()
-addFetchedBlock tracer st pId blk = (traceNewTip tracer =<<) . atomically $ do
+addFetchedBlock tracer st pId blk = traceNewTip tracer <=< atomically $ do
   removeInFlight st pId [blockPoint blk]
   modifyTVar' st.blocksVar (Map.insert (blockHash blk) blk)
 
@@ -646,7 +645,7 @@ setupProcessWaitingThread ::
   m (TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]), m ())
 setupProcessWaitingThread tracer npar blocksVar = do
   waitingVar <- newTVarIO Map.empty
-  return $ (waitingVar, processWaiting tracer npar blocksVar waitingVar)
+  return (waitingVar, processWaiting tracer npar blocksVar waitingVar)
 
 processWaiting ::
   forall m a b.
@@ -673,4 +672,4 @@ processWaiting tracer npar blocksVar waitingVar = go
     writeTVar waitingVar $! waiting Map.\\ toValidate
     let chunks Nothing xs = [xs]
         chunks (Just m) xs = map (take m) . takeWhile (not . null) . iterate (drop m) $ xs
-    return $ mapM_ parallelDelay $ chunks npar $ concat $ Map.elems $ toValidate
+    return . mapM_ parallelDelay . chunks npar . concat . Map.elems $ toValidate

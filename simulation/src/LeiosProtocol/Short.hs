@@ -1,12 +1,8 @@
-{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short where
@@ -15,7 +11,12 @@ import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe
+import Data.Maybe (
+  fromMaybe,
+  isNothing,
+  mapMaybe,
+  maybeToList,
+ )
 import LeiosProtocol.Common
 import ModelTCP
 import Prelude hiding (id)
@@ -151,9 +152,9 @@ stageRange cfg = stageRange' cfg.sliceLength
 stageRange' :: Int -> Stage -> SlotNo -> Stage -> Maybe (SlotNo, SlotNo)
 stageRange' l s0 slot s = slice l slot (fromEnum s0 - fromEnum s)
 
-stageRange'_prop :: Int -> SlotNo -> Bool
-stageRange'_prop l slot =
-  and [fromMaybe False $ (slot `inRange`) <$> stageRange' l stage slot stage | stage <- stages]
+prop_stageRange' :: Int -> SlotNo -> Bool
+prop_stageRange' l slot =
+  and [Just True == ((slot `inRange`) <$> stageRange' l stage slot stage) | stage <- stages]
     && and [contiguous $ mapMaybe (stageRange' l stage slot) stages | stage <- stages]
  where
   stages = [minBound .. maxBound]
@@ -176,12 +177,12 @@ isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
 ----------------------------------------------------------------------------------------------
 
 mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) $ rb
+mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) rb
  where
   rb =
     fixSize cfg $
       RankingBlockBody
-        { endorseBlocks = maybe [] (: []) ebs
+        { endorseBlocks = maybeToList ebs
         , payload
         , nodeId
         , size = 0
@@ -199,7 +200,7 @@ mkInputBlockHeader cfg id slot subSlot producer rankingBlock =
   fixSize cfg $ InputBlockHeader{size = 0, ..}
 
 mkInputBlock :: LeiosConfig -> InputBlockHeader -> Bytes -> InputBlock
-mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) $ ib
+mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) ib
  where
   ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
@@ -236,11 +237,11 @@ data NewInputBlockData = NewInputBlockData
   , txsPayload :: Bytes
   }
 
-data InputBlocksSnapshot = InputBlocksSnapshot
+newtype InputBlocksSnapshot = InputBlocksSnapshot
   { validInputBlocks :: InputBlocksQuery -> [InputBlockId]
   }
 
-data EndorseBlocksSnapshot = EndorseBlocksSnapshot
+newtype EndorseBlocksSnapshot = EndorseBlocksSnapshot
   { validEndorseBlocks :: (SlotNo, SlotNo) -> [EndorseBlock]
   }
 
@@ -301,7 +302,7 @@ shouldVoteOnEB cfg slot buffers = cond
     assumptions =
       null eb.endorseBlocksEarlierStage
         && null eb.endorseBlocksEarlierPipeline
-        && eb.slot `inRange` (fromMaybe (error "impossible") $ stageRange cfg Vote slot Endorse)
+        && eb.slot `inRange` fromMaybe (error "impossible") (stageRange cfg Vote slot Endorse)
     -- A. all referenced IBs have been received by the end of the Endorse stage,
     -- C. all referenced IBs validate (wrt. script execution), and,
     -- D. only IBs from this pipeline’s Propose stage are referenced (and not from other pipelines).

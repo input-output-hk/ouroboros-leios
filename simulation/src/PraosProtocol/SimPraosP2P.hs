@@ -5,6 +5,10 @@
 
 module PraosProtocol.SimPraosP2P where
 
+import ChanMux (newConnectionBundleTCP)
+import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -13,18 +17,13 @@ import Control.Tracer as Tracer (
  )
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
-import System.Random (StdGen, split)
-
-import ChanMux (newConnectionBundleTCP)
-import ChanTCP
-import Control.Monad (forever)
-import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import P2P (P2PTopography (..))
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
+import System.Random (StdGen, split)
 
 tracePraosP2P ::
   StdGen ->

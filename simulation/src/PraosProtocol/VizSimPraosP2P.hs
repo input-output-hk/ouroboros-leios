@@ -269,8 +269,7 @@ diffusionLatencyPerStakeFraction nnodes created arrivals =
   [ (latency, percent)
   | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
   , let !latency = arrival `diffTime` created
-        !percent =
-          (fromIntegral n / fromIntegral nnodes)
+        !percent = fromIntegral n / fromIntegral nnodes
   ]
 
 chartDiffusionLatency ::

@@ -5,25 +5,34 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short.Generate where
-
-import Control.Monad.State
 
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (..),
  )
 import Control.Exception (assert)
 import Control.Monad (forM)
-import Data.Bifunctor
-import Data.Kind
-import Data.Maybe (fromMaybe)
+import Control.Monad.State (
+  MonadState (get, put),
+  MonadTrans (lift),
+  StateT (runStateT),
+  gets,
+  runState,
+ )
+import Data.Bifunctor (Bifunctor (..))
+import Data.Kind (Type)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
 import PraosProtocol.Common (CPUTask (CPUTask), mkPartialBlock)
-import System.Random
+import System.Random (StdGen, uniformR)
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use <$>" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 data BuffersView m = BuffersView
   { newRBData :: STM m NewRankingBlockData
@@ -58,9 +67,9 @@ mkScheduler rng0 rates = do
   rngVar <- newTVarIO rng0
   let sched slot = atomically $ do
         rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ (rates slot)
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
         writeTVar rngVar rng1
-        return $ acts
+        return acts
   return sched
 
 -- | @waitNextSlot cfg targetSlot@ waits until the beginning of
@@ -107,7 +116,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
   execute' slot Base _wins = do
     rbData <- lift $ atomically $ buffers.newRBData
     let meb = rbData.freshestCertifiedEB
-    let !task = CPUTask $ fromMaybe 0 $ leios.delays.certificateCreation . snd <$> meb
+    let !task = CPUTask $ maybe 0 (leios.delays.certificateCreation . snd) meb
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
     let !rb = mkPartialBlock slot body
     return ([task], rb)
@@ -121,7 +130,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
   execute' slot Endorse _wins =
     ([],) <$> do
       i <- nextBlkId EndorseBlockId
-      ibs <- lift $ atomically $ buffers.ibs
+      ibs <- lift $ atomically buffers.ibs
       return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
   execute' slot Vote votes =
     ([],) <$> do

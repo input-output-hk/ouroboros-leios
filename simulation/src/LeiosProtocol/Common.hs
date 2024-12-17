@@ -2,13 +2,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Common (
@@ -191,7 +187,7 @@ data VoteMsg = VoteMsg
   }
   deriving stock (Eq, Show)
 
-data Certificate = Certificate
+newtype Certificate = Certificate
   { votes :: Map VoteId Word64
   }
   deriving stock (Show, Eq, Generic)

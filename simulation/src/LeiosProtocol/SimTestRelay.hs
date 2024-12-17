@@ -1,18 +1,19 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# HLINT ignore "Use void" #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module LeiosProtocol.SimTestRelay where
 
+import Chan
+import ChanMux
+import ChanTCP
+import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     STM,
@@ -29,7 +30,8 @@ import Control.Concurrent.Class.MonadSTM (
     writeTVar
   ),
  )
-import Control.Monad (forever)
+import Control.Exception (assert)
+import Control.Monad (forever, when)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
@@ -50,29 +52,27 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
-import Data.Foldable (traverse_)
+import Data.Foldable (forM_, traverse_)
+import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Ord (Down (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import System.Random (StdGen, uniform, uniformR)
-
-import Chan
-import ChanTCP
-import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
-import SimTypes
-import TimeCompat (threadDelayNDT, threadDelaySI)
-
-import ChanMux
-import Control.Category ((>>>))
-import Control.Exception (assert)
-import Data.Foldable (forM_)
-import Data.List (sortOn)
-import Data.Ord (Down (..))
 import LeiosProtocol.Relay
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
 import PraosProtocol.Common (asReadOnly)
+import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
+import SimTypes
+import System.Random (StdGen, uniform, uniformR)
+import TimeCompat (threadDelayNDT, threadDelaySI)
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use void" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 type RelaySimTrace = [(Time, RelaySimEvent)]
 
@@ -165,7 +165,7 @@ relayNode
           RelayConsumerConfig
             { relay = relayConfig
             , headerValidationDelay = const 0.1
-            , threadDelayParallel = sum >>> \d -> if d >= 0 then threadDelaySI d else return ()
+            , threadDelayParallel = sum >>> \d -> when (d >= 0) $ threadDelaySI d
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll
@@ -275,7 +275,7 @@ testHeader blk = TestBlockHeader (testBlockId blk) (testBlockExpiry blk)
 symmetric :: Ord a => Set (a, a) -> Set (a, a)
 symmetric xys = xys <> Set.map (\(x, y) -> (y, x)) xys
 
-data TestRelayBundle f = TestRelayBundle
+newtype TestRelayBundle f = TestRelayBundle
   { testMsg :: f TestBlockRelayMessage
   }
 
