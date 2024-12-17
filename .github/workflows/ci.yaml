@@ -1,4 +1,6 @@
 name: CI
+
+# TODO: If these environment variables only affect Nix, should they be moved under the `formal-spec-check` job?
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
   TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
@@ -9,13 +11,19 @@ on:
   push:
     branches:
       - main
+
 jobs:
-  typecheck:
+  ################################################################################
+  # Formal Specification in Agda - under /formal-spec/
+  ################################################################################
+
+  formal-spec-check:
     name: Typecheck specification
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+
       - name: 💾 Cache Nix store
         uses: actions/cache@v3.0.8
         id: nix-cache
@@ -23,6 +31,7 @@ jobs:
           path: /tmp/nixcache
           key: ${{ runner.os }}-nix-typecheck-${{ hashFiles('flake.lock') }}
           restore-keys: ${{ runner.os }}-nix-typecheck-
+
       - name: 🛠️ Install Nix
         uses: cachix/install-nix-action@v21
         with:
@@ -33,17 +42,24 @@ jobs:
             trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
             substituters = ${{ env.SUBSTITUTERS }}
             experimental-features = nix-command flakes
+
       - name: 💾➤ Import Nix store cache
         if: "steps.nix-cache.outputs.cache-hit == 'true'"
         run: "nix-store --import < /tmp/nixcache"
+
       - name: 🏗️ Build specification
         run: |
           nix build --show-trace --accept-flake-config .#leiosSpec
+
       - name: ➤💾 Export Nix store cache
         if: "steps.nix-cache.outputs.cache-hit != 'true'"
         run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
 
-  compile:
+  ################################################################################
+  # Simulation and Prototype in Haskell - under /simulation/
+  ################################################################################
+
+  simulation-test:
     name: Build Haskell packages with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -53,9 +69,10 @@ jobs:
         ghc-version: ["9.8"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up GHC ${{ matrix.ghc-version }}
+      - name: 🛠️ Install GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
         id: setup
         with:
@@ -64,23 +81,23 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
-      - name: Install libraries
+      - name: 🛠️ Install libraries
         run: sudo apt-get install -y graphviz libpango1.0-dev libgtk-3-dev
 
-      - name: Configure the build
+      - name: 🛠️ Configure build
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
 
-      - name: Restore cached dependencies
+      - name: 💾➤ Restore dependency cache
         uses: actions/cache/restore@v4
         id: cache
         env:
           key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
+          key: ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json') }}
           restore-keys: ${{ env.key }}-
 
       - name: Install dependencies
@@ -89,7 +106,7 @@ jobs:
         run: cabal build all --only-dependencies
 
       # Cache dependencies already here, so that we do not have to rebuild them should the subsequent steps fail.
-      - name: Save cached dependencies
+      - name: ➤💾 Save dependency cache
         uses: actions/cache/save@v4
         # If we had an exact cache hit, trying to save the cache would error because of key clash.
         if: steps.cache.outputs.cache-hit != 'true'
@@ -103,7 +120,39 @@ jobs:
       - name: Run tests
         run: cabal test all
 
-  rs-compile:
+  simulation-hlint:
+    name: Check Haskell sources with HLint
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Set up HLint
+        uses: haskell-actions/hlint-setup@v2
+
+      - name: 🛠️ Run HLint
+        uses: haskell-actions/hlint-run@v2
+        with:
+          path: simulation/
+          fail-on: warning
+
+  simulation-hlint:
+    name: Check Haskell sources with fourmolu
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Run fourmolu
+        uses: haskell-actions/run-fourmolu@v11
+        with:
+          version: "0.15.0.0"
+
+  ################################################################################
+  # Simulation in Rust - under /sim-rs/
+  ################################################################################
+
+  sim-rs-build:
     name: Check Rust packages
     runs-on: ubuntu-22.04
     steps:
@@ -117,31 +166,9 @@ jobs:
             exit 1
           fi
 
-  hlint-check:
-    name: Check Haskell sources with HLint
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: "Set up HLint"
-        uses: haskell-actions/hlint-setup@v2
-
-      - name: "Run HLint"
-        uses: haskell-actions/hlint-run@v2
-        with:
-          path: simulation/
-          fail-on: warning
-
-  fourmolu-check:
-    name: Check Haskell sources with fourmolu
-    runs-on: ubuntu-22.04
-    steps:
-      # Note that you must checkout your code before running haskell-actions/run-fourmolu
-      - uses: actions/checkout@v4
-      - uses: haskell-actions/run-fourmolu@v11
-        with:
-          version: "0.15.0.0"
+  ################################################################################
+  # Documentation - under various directories
+  ################################################################################
 
   generate-diagrams:
     name: Generate D2 Diagrams
