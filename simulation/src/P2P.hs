@@ -41,9 +41,10 @@ instance ToJSON P2PTopography where
 
 instance FromJSON P2PTopography
 
-type Latency =
-  -- | Double rather than DiffTime for efficiency
-  Double
+-- | Latency in /seconds/.
+--
+--   This uses a `Double` rather than a `DiffTime` for compatibility with Cairo.
+type Latency = Double
 
 data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   { p2pWorldShape :: !WorldShape
