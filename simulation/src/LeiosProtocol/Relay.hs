@@ -67,6 +67,7 @@ import qualified Network.TypedProtocol.Peer.Server as TS
 import NoThunks.Class (NoThunks)
 import PraosProtocol.Common
 import Quiet (Quiet (..))
+import STMUtils
 
 data BlockingStyle
   = StBlocking

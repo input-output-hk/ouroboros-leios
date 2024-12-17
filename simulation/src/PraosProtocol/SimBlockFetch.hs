@@ -24,6 +24,7 @@ import qualified Data.Set as Set
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.Common.Chain (Chain (..))
+import STMUtils
 import SimTCPLinks
 import SimTypes
 

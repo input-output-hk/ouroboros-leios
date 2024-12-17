@@ -41,6 +41,7 @@ import PraosProtocol.BlockFetch
 import PraosProtocol.Common
 import PraosProtocol.Common.Chain (dropUntil, headAnchor, headHash)
 import qualified PraosProtocol.PraosNode as PraosNode
+import STMUtils
 import System.Random
 
 --------------------------------------------------------------

@@ -52,7 +52,7 @@ import qualified Data.Set as Set
 import LeiosProtocol.Relay
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
-import PraosProtocol.Common (asReadOnly)
+import STMUtils
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, uniform, uniformR)

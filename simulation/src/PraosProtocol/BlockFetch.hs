@@ -25,26 +25,14 @@ module PraosProtocol.BlockFetch where
 import Chan (Chan)
 import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TVar,
-    atomically,
-    modifyTVar',
-    newTVar,
-    newTVarIO,
-    readTVar,
-    readTVarIO,
-    retry,
-    writeTVar
-  ),
+  MonadSTM (..),
  )
-import Control.Concurrent.Class.MonadSTM.TBQueue
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
 import Control.Tracer (Contravariant (contramap), Tracer, traceWith)
 import Data.Bifunctor (second)
 import Data.Foldable (forM_)
-import Data.Kind
+import Data.Kind (Type)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -61,10 +49,11 @@ import Network.TypedProtocol (
 import Network.TypedProtocol.Driver (runPeerWithDriver)
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
-import Numeric.Natural
+import Numeric.Natural (Natural)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
 import qualified PraosProtocol.Common.Chain as Chain
+import STMUtils
 
 data BlockFetchState (body :: Type)
   = StIdle

@@ -9,13 +9,8 @@ module PraosProtocol.PraosNode (
 where
 
 import ChanMux
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (STM, atomically, newTVarIO, readTVar, writeTVar),
- )
-import Control.Monad.Class.MonadAsync (
-  Concurrently (..),
-  MonadAsync (async, wait),
- )
+import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
+import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Tracer (Tracer)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
@@ -28,6 +23,7 @@ import PraosProtocol.BlockGeneration
 import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
+import STMUtils
 
 data Praos body f = Praos
   { protocolChainSync :: f ChainSyncMessage

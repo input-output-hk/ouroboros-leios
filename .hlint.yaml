@@ -26,11 +26,27 @@
 # - functions:
 #   - {name: unsafePerformIO, within: []} # unsafePerformIO can only appear in no modules
 - modules:
+    # Ensure that MonadDelay is imported from TimeCompat
     - name:
         - "Control.Monad.Class.MonadTime"
         - "Control.Monad.Class.MonadTime.SI"
       within: "TimeCompat"
       message: "Use TimeCompat instead"
+    # Ensure that Ouroboros.Network primitives are imported from PraosProtocol.Common hierarchy
+    - name: "Ouroboros.Network.AnchoredFragment"
+      within: "PraosProtocol.Common.AnchoredFragment"
+      message: "Use PraosProtocol.Common.AnchoredFragment instead"
+    - name: "Ouroboros.Network.Mock.Chain"
+      within: "PraosProtocol.Common.Chain"
+      message: "Use PraosProtocol.Common.Chain instead"
+    - name: "Ouroboros.Network.Block"
+      within: "PraosProtocol.Common.ConcreteBlock"
+      message: "Use PraosProtocol.Common.ConcreteBlock instead"
+    - name: "Ouroboros.Network.*"
+      within:
+        - "PraosProtocol.Common"
+        - "PraosProtocol.Common.ConcreteBlock"
+      message: "Use PraosProtocol.Common instead"
 # Add custom hints for this project
 #
 # Will suggest replacing "wibbleMany [myvar]" with "wibbleOne myvar"
