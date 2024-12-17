@@ -121,7 +121,7 @@ jobs:
         run: cabal test all
 
   simulation-hlint:
-    name: "simulation: Check Haskell sources with HLint"
+    name: "simulation: Check with HLint"
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -137,7 +137,7 @@ jobs:
           fail-on: warning
 
   simulation-fourmolu:
-    name: "simulation: Check Haskell sources with fourmolu"
+    name: "simulation: Check with fourmolu"
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
