@@ -1,0 +1,111 @@
+title: {
+  label: "Leios Protocol\nEvaluation Workflow"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# Styles
+classes: {
+  workstream: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+      shadow: true
+    }
+  }
+  output: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+    }
+  }
+  goal: {
+    style: {
+      stroke: "#1a73e8"
+      fill: "#e8f0fe"
+      font-color: "#1a73e8"
+      border-radius: 15
+      bold: true
+    }
+  }
+}
+
+# Work Streams
+Research: {
+  class: workstream
+}
+
+Formal: {
+  class: workstream
+  label: "Formal Specification\n\nAgda implementation of\nprotocol semantics"
+
+  spec: {
+    class: output
+    label: "Categorical Model"
+  }
+
+  proofs: {
+    class: output
+    label: "Security Proofs"
+  }
+}
+
+DeltaQ: {
+  class: workstream
+  label: "ΔQ Modeling\n\nProbabilistic analysis of\nnetwork behavior"
+
+  latency: {
+    class: output
+    label: "Latency Analysis"
+  }
+
+  resources: {
+    class: output
+    label: "Resource Usage"
+  }
+}
+
+Simulation: {
+  class: workstream
+
+  haskell: {
+    class: output
+    label: "Haskell Prototype"
+  }
+
+  rust: {
+    class: output
+    label: "Rust Simulation"
+  }
+}
+
+# Goal
+Optimization: {
+  class: goal
+  label: "Protocol Optimization\n\nMaximize Throughput\nMinimize Cost\nPreserve Security"
+}
+
+# Relationships
+Research -> Formal: "Guides\nformalization"
+Research -> Simulation: "Guides\nimplementation"
+Research -> DeltaQ: "Informs\nmodeling"
+Research -> Simulation: "Defines test\nscenarios"
+
+Formal.spec -> Optimization: "Verifies\nsecurity properties"
+Formal.proofs -> Optimization: "Proves safety\nguarantees"
+
+DeltaQ <-> Simulation: "Cross-Stream\nValidation"
+DeltaQ.latency -> Optimization: "Quantifies\nperformance"
+DeltaQ.resources -> Optimization: "Estimates\ncost"
+
+Simulation.haskell -> DeltaQ: "Validates\nmodels"
+Simulation.rust -> DeltaQ: "Large network\nmetrics"
+Simulation.rust -> Optimization: "Network\nbehavior"
