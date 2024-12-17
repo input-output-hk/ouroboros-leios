@@ -121,6 +121,9 @@ jobs:
     name: Check Haskell sources with HLint
     runs-on: ubuntu-22.04
     steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
       - name: "Set up HLint"
         uses: haskell-actions/hlint-setup@v2
 
