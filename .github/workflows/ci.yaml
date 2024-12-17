@@ -170,8 +170,8 @@ jobs:
   # Documentation - under various directories
   ################################################################################
 
-  generate-diagrams:
-    name: Generate D2 Diagrams
+  docs-generate-d2-diagrams:
+    name: "docs: Generate D2 Diagrams"
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -216,7 +216,8 @@ jobs:
           git commit -m "Auto-generate diagram PNGs [skip ci]"
           git push origin HEAD:${{ github.head_ref || github.ref_name }}
 
-  build-docusaurus:
+  docs-build:
+    name: "docs: Build"
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -246,11 +247,11 @@ jobs:
           path: |
             site/build/*
 
-  publish-docs:
+  docs-publish:
+    name: "docs: Publish"
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
-    needs:
-      - build-docusaurus
+    needs: docs-build
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4
