@@ -152,7 +152,7 @@ jobs:
   # Simulation in Rust - under /sim-rs/
   ################################################################################
 
-  sim-rs-build:
+  sim-rs-check:
     name: "sim-rs: Check"
     runs-on: ubuntu-22.04
     steps:
