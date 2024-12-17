@@ -118,7 +118,7 @@ jobs:
           fi
 
   hlint-check:
-    name: Check Haskell sources with fourmolu
+    name: Check Haskell sources with HLint
     runs-on: ubuntu-22.04
 
     - name: 'Set up HLint'
