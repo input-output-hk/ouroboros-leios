@@ -17,7 +17,7 @@ jobs:
   # Formal Specification in Agda - under /formal-spec/
   ################################################################################
 
-  formal-spec-check:
+  formal-spec-typecheck:
     name: "formal-spec: Typecheck"
     runs-on: ubuntu-22.04
     steps:
