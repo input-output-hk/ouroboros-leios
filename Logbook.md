@@ -1,14 +1,38 @@
 # Leios logbook
 
+## 2024-12-17
+
+### GitHub Actions
+
+- Organised the CI configuration to sort jobs by their corresponding project and added namespace prefixes to all jobs, which are either the top-level directory name for the project or `docs`.
+  For instance:
+
+  - `typecheck` changed to `formal-spec-typecheck`;
+  - `compile` changed to `simulation-test`, since it calls both `cabal build` and `cabal test`; and
+  - `rs-compile` changed to `sim-rs-check`, it only calls `cargo check`.
+
+  The jobs that relate to publishing the documentation are prefixed by `docs`, e.g., `build-docusaurus` changed to `docs-build`.
+
+### Haskell simulation
+
+- Merged code to run Praos and Leios visualisations from a file such as `data/BenchTopology/topology-dense-52-simple.json`, e.g., run:
+
+  ```sh
+  cabal run ols -- viz short-leios-p2p-1 --topology data/BenchTopology/topology-dense-52-simple.json
+  ```
+
+- Added HLint integration to check Haskell sources and ensure consistent use of module imports.
+- Added CI job for HLint named `simulation-hlint`.
+
 ## 2024-12-13
 
 ### Haskell simulation
 
 - Merged leios visualizations on `main`.
 - P2P visualization improvements:
-  * Block types are differentiated by shapes, and pipelines by color.
-  * Charting diffusion latency of each block type.
-  * TODO: chart CPU usage.
+  - Block types are differentiated by shapes, and pipelines by color.
+  - Charting diffusion latency of each block type.
+  - TODO: chart CPU usage.
 - Reworked generation of EBs and Votes to handle `>= 1` frequencies
   like IBs (except max 1 EB per pipeline per node).
 - Visualizations helped with discovering and fixing some modeling errors.
@@ -86,7 +110,6 @@ The general impact of such attacks varies:
 - [These slides](https://docs.google.com/presentation/d/1Iy2Vu3jZMsHFrvqmiM8urK9EVXbYJW0knb5XQ7w2tZE/edit?usp=sharing) summarize data we have available for topology, block propagation, transaction delays, etc.
 - Will can reformat data we need for our simulations, so we don't end up with inconsistent input data sets.
 - We will use the [beta-distribution fit](docs/technical-report-1.md#stake-distribution) for representing the unevenness of the stake distribution in our simulations.
-
 
 ### Rust simulation
 
@@ -290,7 +313,7 @@ We now have order-of-magnitude estimates for the size and computation required f
 
 ## 2024-11-26
 
-### Curve fit to empirically observed distribution of stake pools  
+### Curve fit to empirically observed distribution of stake pools
 
 The cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. To use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
 
@@ -340,7 +363,7 @@ Stopped sending as many redundant vote messages, traffic is far more reasonable.
   thread, sufficient workaround atm but would be good to investigate
   in future.
 - Fixed inaccuracy in praos simulation where it was possible for a
-  block to validate without having validated the previous one.  The
+  block to validate without having validated the previous one. The
   fix also allows for validation to happen via a dedicated queue.
 - Defined "business logic" of (Uniform) Short Leios, referencing the
   most recent draft.
@@ -431,8 +454,8 @@ See [Challenges for Leios, Part 1](analysis/challenges-1.md) for analysis of the
 Findings:
 
 1. Fees currently average 173.01 lovelace per byte of block.
-    1. Under best-case conditions, that fee will cover a cost of 115 ADA per GB of storage across 500 stakepools.
-    2. Under more realistic conditions, that fee will only cover a cost of 8 ADA per GB of storage across 2500 stakepools.
+   1. Under best-case conditions, that fee will cover a cost of 115 ADA per GB of storage across 500 stakepools.
+   2. Under more realistic conditions, that fee will only cover a cost of 8 ADA per GB of storage across 2500 stakepools.
 2. Stake pools receive on average 20.91% of rewards.
 3. The cost of perpetual storage of blocks at VMs ranges $7/GB to $30/GB, strongly depending upon the assumption of how rapidly storage costs decrease in the future.
 4. The Cardano Reserves currently supply 99% of the rewards that stake pools and delegators receive.
@@ -649,7 +672,7 @@ Work continues on visualization; we're still deciding which data to visualize fi
 - Action times
   - Pie chart of mainnet hosting types (@bwbush)
   - Work on pricing model (@bwbush)
-  
+
 ### Latency measurements of 52-node cluster
 
 The folder [data/BenchTopology/](data/BenchTopology/README.md) contains latency measurments and topology for a 52-machine `cardano-node` cluster that is used for benchmarking. The machine is spread among three AWS regions.
