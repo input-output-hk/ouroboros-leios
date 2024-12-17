@@ -36,16 +36,6 @@ import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadTime (..),
-  NominalDiffTime,
-  Time,
-  UTCTime,
-  addUTCTime,
-  diffUTCTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -66,7 +56,7 @@ import PraosProtocol.Common (asReadOnly)
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, uniform, uniformR)
-import TimeCompat (threadDelayNDT, threadDelaySI)
+import TimeCompat
 
 --------------------------------------------------------------------------------
 

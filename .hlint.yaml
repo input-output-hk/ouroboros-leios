@@ -5,11 +5,9 @@
 # This file contains a template configuration file, which is typically
 # placed as .hlint.yaml in the root of your project
 
-
 # Specify additional command line arguments
 #
 # - arguments: [--color, --cpp-simple, -XQuasiQuotes]
-
 
 # Control which extensions/flags/modules/functions can be used
 #
@@ -28,8 +26,11 @@
 # - functions:
 #   - {name: unsafePerformIO, within: []} # unsafePerformIO can only appear in no modules
 - modules:
-  - {name: ["Control.Monad.Class.MonadTime", "Control.Monad.Class.MonadTime.SI"], within: "TimeCompat"}
-
+    - name:
+        - "Control.Monad.Class.MonadTime"
+        - "Control.Monad.Class.MonadTime.SI"
+      within: "TimeCompat"
+      message: "Use TimeCompat instead"
 # Add custom hints for this project
 #
 # Will suggest replacing "wibbleMany [myvar]" with "wibbleOne myvar"
@@ -56,15 +57,12 @@
 # Warn on use of partial functions
 # - group: {name: partial, enabled: true}
 
-
 # Ignore some builtin hints
 # - ignore: {name: Use let}
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
 
-
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~
-
 
 # To generate a suitable file for HLint do:
 # $ hlint --default > .hlint.yaml

@@ -46,7 +46,7 @@ import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
 import SimTypes (WorldShape (..))
-import TimeCompat (DiffTime, Time (..))
+import TimeCompat
 import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
 

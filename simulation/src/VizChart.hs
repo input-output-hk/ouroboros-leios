@@ -5,13 +5,13 @@
 
 module VizChart where
 
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
 import Data.Functor (void)
 import Data.List (minimumBy)
 import Data.Ord (comparing)
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Backend.Cairo as Chart
 import qualified Graphics.Rendering.Chart.Easy as Chart
+import TimeCompat
 
 import ModelTCP
 import Viz

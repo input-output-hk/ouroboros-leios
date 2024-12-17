@@ -7,7 +7,6 @@ module P2P where
 
 import Control.Exception (assert)
 import Control.Monad (when)
-import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.ST (ST)
 import Data.Aeson.Types (FromJSON, ToJSON (..), defaultOptions, genericToEncoding)
 import Data.Array.ST as Array (
@@ -28,6 +27,7 @@ import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import SimTypes (NodeId (..), Point (..), WorldShape (..))
 import qualified System.Random as Random
+import TimeCompat
 
 data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)

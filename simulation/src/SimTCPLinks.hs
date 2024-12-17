@@ -14,8 +14,6 @@ import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (
   IOSim,
   SimEvent (SimEvent, seTime, seType),
@@ -33,7 +31,7 @@ import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
 import ModelTCP
 import SimTypes
-import TimeCompat (threadDelaySI)
+import TimeCompat
 
 --------------------------------------------------------------------------------
 

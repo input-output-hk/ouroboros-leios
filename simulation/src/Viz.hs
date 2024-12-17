@@ -9,7 +9,6 @@
 module Viz where
 
 import Control.Monad (when)
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime, diffTime)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -23,6 +22,7 @@ import qualified Graphics.Rendering.Pango.Font as Pango
 import qualified Graphics.Rendering.Pango.Layout as Pango
 import Graphics.UI.Gtk (AttrOp ((:=)))
 import qualified Graphics.UI.Gtk as Gtk
+import TimeCompat
 
 ------------------------------------------------------------------------------
 -- Visualisation

@@ -18,7 +18,6 @@ module ModelTCP (
 ) where
 
 import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time (Time), addTime)
 import Data.Foldable as Foldable (Foldable (sum))
 import Data.Hashable (Hashable)
 import Data.List.NonEmpty (NonEmpty ((:|)))
@@ -27,6 +26,7 @@ import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 import Data.Ratio ((%))
 import Data.Semigroup (Semigroup (sconcat))
+import TimeCompat
 
 -- | The fixed characteristics of this TCP link: the latency, bandwidth and
 -- receiver window size. Each of these imposes a limit to effective

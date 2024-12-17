@@ -7,7 +7,6 @@ module SimRelayP2P where
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
  )
-import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -18,6 +17,7 @@ import Data.Foldable (sequenceA_)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
 import System.Random (StdGen, split)
+import TimeCompat
 
 import ChanTCP
 import P2P (P2PTopography (..))
