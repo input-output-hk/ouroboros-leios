@@ -9,7 +9,6 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Graphics.Rendering.Cairo as Cairo
-
 import ModelTCP
 import SimTCPLinks
 import SimTypes (LabelLink (..), LabelNode (..), NodeId, Point (..))
@@ -46,7 +45,7 @@ tcpSimVizModel ::
   VizModel TcpSimVizModel
 tcpSimVizModel =
   simVizModel
-    (\_ -> accumEventVizState)
+    (const accumEventVizState)
     pruneVisState
     initVizState
  where

@@ -114,7 +114,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ second (SomeAction r) <$> execute' slot r wins
   execute' :: SlotNo -> Role a -> Word64 -> StateT Int m ([CPUTask], a)
   execute' slot Base _wins = do
-    rbData <- lift $ atomically $ buffers.newRBData
+    rbData <- lift $ atomically buffers.newRBData
     let meb = rbData.freshestCertifiedEB
     let !task = CPUTask $ maybe 0 (leios.delays.certificateCreation . snd) meb
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
@@ -122,7 +122,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     return ([task], rb)
   execute' slot Propose wins =
     ([],) <$> do
-      ibData <- lift $ atomically $ buffers.newIBData
+      ibData <- lift $ atomically buffers.newIBData
       forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
         i <- nextBlkId InputBlockId
         let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock

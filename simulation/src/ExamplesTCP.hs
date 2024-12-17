@@ -6,11 +6,10 @@ import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Word (Word8)
 import qualified Graphics.Rendering.Chart.Easy as Chart
-import System.Random (mkStdGen, random)
-
 import ModelTCP
 import PlotTCP
 import SimTCPLinks
+import System.Random (mkStdGen, random)
 import Viz
 import VizChart
 import VizSim

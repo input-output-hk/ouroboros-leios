@@ -1,7 +1,7 @@
 module Sample where
 
 import Data.List (foldl')
-import System.IO
+import System.IO (hFlush, stdout)
 import TimeCompat
 import VizSim
 
@@ -24,7 +24,7 @@ runSampleModel (SampleModel s0 accum render) stop = go . flip SimVizModel s0 . t
       hFlush stdout
       go m'
     (SimVizModel [] s) -> do
-      putStrLn $ "done."
+      putStrLn "done."
       render s
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)

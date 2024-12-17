@@ -11,6 +11,7 @@ module ChanTCP (
   TcpConnProps (..),
 ) where
 
+import Chan (Chan (..))
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (
     TMVar,
@@ -45,8 +46,6 @@ import Control.Tracer as Tracer (
  )
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
-
-import Chan (Chan (..))
 import ModelTCP (
   Bytes,
   TcpConnProps (..),

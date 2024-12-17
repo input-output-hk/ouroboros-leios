@@ -134,7 +134,7 @@ genArbitraryP2PTopography
     pickNodeLinksClose :: NodeId -> Point -> [NodeId]
     pickNodeLinksClose nid p =
       case map snd $ KdMap.kNearest nodesKdMap (p2pNodeLinksClose + 1) p of
-        (nid' : nids) -> assert (nid == nid') $ nids
+        (nid' : nids) -> assert (nid == nid') nids
         [] -> assert False []
 
     -- For efficiency in finding the K nearest neighbours, we use a K-D map

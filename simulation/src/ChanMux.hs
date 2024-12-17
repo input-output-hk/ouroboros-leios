@@ -3,7 +3,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTSyntax #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -21,21 +20,34 @@ module ChanMux (
   newConnectionBundleTCP,
 ) where
 
-import Data.Array
-import Data.Dynamic
-import Data.Maybe
-
-import Control.Concurrent.Class.MonadMVar
-import Control.Concurrent.Class.MonadSTM
-import Control.Monad
-import Control.Monad.Class.MonadAsync
-import Control.Monad.Class.MonadFork
-import Control.Monad.Class.MonadTimer
-import Control.Tracer
-
 import Chan
 import ChanTCP
 import qualified Control.Category as Cat
+import Control.Concurrent.Class.MonadMVar (
+  MonadMVar (MVar, newMVar, withMVar),
+ )
+import Control.Concurrent.Class.MonadSTM (
+  MonadSTM (
+    TQueue,
+    TVar,
+    atomically,
+    modifyTVar,
+    newTQueueIO,
+    newTVarIO,
+    readTQueue,
+    readTVar,
+    readTVarIO,
+    writeTQueue,
+    writeTVar
+  ),
+ )
+import Control.Monad (forever)
+import Control.Monad.Class.MonadAsync (MonadAsync)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
+import Control.Tracer (Contravariant (contramap), Tracer)
+import Data.Array (Array, listArray, (!))
+import Data.Dynamic (Dynamic, Typeable, fromDynamic, toDyn)
+import Data.Maybe (fromJust)
 import TimeCompat
 
 class MuxBundle bundle where
@@ -146,7 +158,7 @@ demuxer bearer queues =
     BearerMsg i msg <- readChan bearer
     case queues ! i of
       RecvQueue convert queue ->
-        atomically $ writeTQueue queue $! (convert msg)
+        atomically $ writeTQueue queue $! convert msg
 
 newConnectionBundleTCP ::
   forall bundle m.

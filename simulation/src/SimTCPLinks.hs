@@ -1,13 +1,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use void" #-}
-{-# HLINT ignore "Use section" #-}
 
 module SimTCPLinks where
 
+import Chan
+import ChanTCP
 import Control.Concurrent.Class.MonadSTM (
   MonadSTM (atomically, newTQueueIO, readTQueue, writeTQueue),
  )
@@ -33,12 +31,16 @@ import Control.Tracer as Tracer (
  )
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
-
-import Chan
-import ChanTCP
 import ModelTCP
 import SimTypes
 import TimeCompat (threadDelaySI)
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use void" :: String) #-}
+{-# ANN module ("HLint: ignore Use section" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Simulations
@@ -191,7 +193,7 @@ labelDirToLabelLink nfrom nto (DirClientToServer e) = LabelLink nfrom nto e
 labelDirToLabelLink nfrom nto (DirServerToClient e) = LabelLink nto nfrom e
 
 simTracer :: Typeable e => Tracer (IOSim s) e
-simTracer = Tracer.Tracer $ IOSim.traceM
+simTracer = Tracer.Tracer IOSim.traceM
 
 selectTimedEvents :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTimedEvents =

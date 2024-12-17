@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -19,7 +18,7 @@ import System.Random (StdGen, uniformR)
 
 -- | Returns a block that can extend the chain.
 --   PRECONDITION: the SlotNo is ahead of the chain tip.
-mkBlock :: IsBody body => Chain (Block body) -> SlotNo -> body -> (Block body)
+mkBlock :: IsBody body => Chain (Block body) -> SlotNo -> body -> Block body
 mkBlock c sl body = fixupBlock (Chain.headAnchor c) (mkPartialBlock sl body)
 
 type SlotGap = Word64
@@ -48,7 +47,7 @@ mkNextBlock (UniformGenerationPattern sz gap) prefix = do
     go = atomically $ do
       last_sl <- readTVar stVar
       let
-        !sl = SlotNo $ (unSlotNo last_sl + gap :: Word64)
+        !sl = SlotNo (unSlotNo last_sl + gap :: Word64)
       writeTVar stVar sl
       let body = mkBody sz prefix sl
       return (sl, body)
@@ -76,7 +75,7 @@ blockGenerator ::
   Maybe (m (SlotNo, body)) ->
   m ()
 blockGenerator _tracer _praosConfig _cpsVar _addBlockSt Nothing = return ()
-blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever $ go
+blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever go
  where
   go = do
     (sl, body) <- nextBlock
@@ -84,9 +83,8 @@ blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever $
     mblk <- atomically $ do
       chain <- chainState <$> readTVar cpsVar
       let block = mkBlock chain sl body
-      if (Chain.headSlot chain <= At sl)
-        then
-          addBlockSt block >> return (Just (block, chain))
+      if Chain.headSlot chain <= At sl
+        then addBlockSt block >> return (Just (block, chain))
         else return Nothing
     case mblk of
       Nothing -> return ()
