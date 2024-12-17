@@ -120,15 +120,15 @@ jobs:
   hlint-check:
     name: Check Haskell sources with HLint
     runs-on: ubuntu-22.04
+    steps:
+      - name: "Set up HLint"
+        uses: haskell-actions/hlint-setup@v2
 
-    - name: 'Set up HLint'
-      uses: haskell-actions/hlint-setup@v2
-
-    - name: 'Run HLint'
-      uses: haskell-actions/hlint-run@v2
-      with:
-        path: simulation/
-        fail-on: warning
+      - name: "Run HLint"
+        uses: haskell-actions/hlint-run@v2
+        with:
+          path: simulation/
+          fail-on: warning
 
   fourmolu-check:
     name: Check Haskell sources with fourmolu
