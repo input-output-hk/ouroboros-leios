@@ -81,10 +81,10 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
-      - name: 🛠️ Install libraries
+      - name: 🛠️ Install system dependencies
         run: sudo apt-get install -y graphviz libpango1.0-dev libgtk-3-dev
 
-      - name: 🛠️ Configure build
+      - name: 🛠️ Configure
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
@@ -100,7 +100,7 @@ jobs:
           key: ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json') }}
           restore-keys: ${{ env.key }}-
 
-      - name: Install dependencies
+      - name: 🛠️ Install Cabal dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
@@ -114,10 +114,10 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      - name: Build
+      - name: 🏗️ Build
         run: cabal build all
 
-      - name: Run tests
+      - name: 🏗️ Test
         run: cabal test all
 
   simulation-hlint:
