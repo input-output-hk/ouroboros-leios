@@ -25,7 +25,6 @@ import Data.Bifunctor (Bifunctor (..))
 import Data.Kind (Type)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
-import PraosProtocol.Common (CPUTask (CPUTask), mkPartialBlock)
 import System.Random (StdGen, uniformR)
 
 --------------------------------------------------------------------------------

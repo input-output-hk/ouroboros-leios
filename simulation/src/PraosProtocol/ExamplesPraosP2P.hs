@@ -26,7 +26,6 @@ import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbi
 import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
 import PraosProtocol.Common
-import PraosProtocol.Common.Chain (Chain (Genesis))
 import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos

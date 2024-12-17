@@ -9,26 +9,24 @@
 
 module LeiosProtocol.Short.VizSimP2P where
 
+import ChanDriver
+import Control.Arrow ((&&&))
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
+import Data.Bifunctor (second)
 import qualified Data.Colour.SRGB as Colour
+import Data.Hashable (hash)
+import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Monoid (Any)
+import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
 import qualified Diagrams.Backend.Cairo.Internal as Dia
 import qualified Diagrams.Core as Dia
-import qualified Diagrams.TwoD as Dia
-import qualified Graphics.Rendering.Cairo as Cairo
-import qualified Graphics.Rendering.Chart.Easy as Chart
-
-import ChanDriver
-import Control.Arrow ((&&&))
-import Data.Bifunctor (second)
-import Data.Hashable (hash)
-import Data.List (foldl', intercalate, sortOn)
-import Data.Monoid
-import Diagrams ((#))
 import qualified Diagrams.Prelude as Dia
 import qualified Diagrams.TwoD.Adjust as Dia
+import qualified Graphics.Rendering.Cairo as Cairo
+import qualified Graphics.Rendering.Chart.Easy as Chart
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
@@ -51,7 +49,6 @@ import ModelTCP (TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
-import PraosProtocol.Common (BlockHeader, FullTip (FullTip), blockHeaderColorAsBody)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import SimTypes (Point (..), WorldShape (..))
 import System.Random (uniformR)
@@ -106,7 +103,7 @@ data MsgTag = RB | IB | EB | VT
 
 data LeiosP2PSimVizConfig
   = LeiosP2PSimVizConfig
-  { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
+  { nodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   , ibColor :: InputBlockHeader -> (Double, Double, Double)
   , ebColor :: EndorseBlock -> (Double, Double, Double)
   , voteColor :: VoteMsg -> (Double, Double, Double)
@@ -655,7 +652,7 @@ defaultVizConfig stageLength =
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgRespondBodies bodies -> Just $ blendColors $ map (f . snd) bodies
     _otherwise -> Nothing
-  testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
+  testNodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   testNodeMessageColor = blockHeaderColorAsBody
   -- alternating cold and warm colours for visual contrast.
   palettes =

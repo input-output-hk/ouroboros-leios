@@ -7,7 +7,7 @@
 module PraosProtocol.Common (
   Anchor (..),
   AnchoredFragment,
-  Chain,
+  Chain (..),
   FullTip (..),
   fullTip,
   Blocks,

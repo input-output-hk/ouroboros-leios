@@ -50,6 +50,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import Data.Unit.Strict (forceElemsToWHNF)
 import Data.Word (Word16)
 import GHC.Generics (Generic)
+import LeiosProtocol.Common
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
 import Network.TypedProtocol (
@@ -65,7 +66,6 @@ import Network.TypedProtocol (
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import NoThunks.Class (NoThunks)
-import PraosProtocol.Common
 import Quiet (Quiet (..))
 import STMUtils
 

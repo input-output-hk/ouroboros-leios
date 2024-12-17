@@ -32,7 +32,6 @@ import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import qualified PraosProtocol.VizSimPraos as VizSimPraos
 import SimTypes
@@ -184,7 +183,7 @@ accumNodeCpuUsage (Time now) (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU t
   Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
 accumNodeCpuUsage _ _ = id
 
-type ChainsMap = IntMap (Chain (Block RankingBlockBody))
+type ChainsMap = IntMap (Chain RankingBlock)
 
 accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
 accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip ch)))) = IMap.insert (coerce nid) ch

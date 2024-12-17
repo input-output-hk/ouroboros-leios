@@ -47,6 +47,11 @@
         - "PraosProtocol.Common"
         - "PraosProtocol.Common.ConcreteBlock"
       message: "Use PraosProtocol.Common instead"
+    # Ensure that PraosProtocol.Common hierarchy is only used from PraosProtocol
+    - name: "PraosProtocol.Common"
+      within:
+        - "PraosProtocol.**"
+        - "LeiosProtocol.Common"
 # Add custom hints for this project
 #
 # Will suggest replacing "wibbleMany [myvar]" with "wibbleOne myvar"
