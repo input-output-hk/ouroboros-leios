@@ -136,7 +136,7 @@ jobs:
           path: simulation/
           fail-on: warning
 
-  simulation-hlint:
+  simulation-fourmolu:
     name: Check Haskell sources with fourmolu
     runs-on: ubuntu-22.04
     steps:
