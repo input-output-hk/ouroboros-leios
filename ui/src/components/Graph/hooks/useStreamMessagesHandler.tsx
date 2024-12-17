@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { defaultAggregatedData, useGraphContext } from "@/contexts/GraphContext/context";
+import { useGraphContext } from "@/contexts/GraphContext/context";
 import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
 
 export const useStreamMessagesHandler = () => {
@@ -42,14 +42,6 @@ export const useStreamMessagesHandler = () => {
   const stopStream = useCallback(() => {
     eventSource.current?.close();
     setStreaming(false);
-
-    dispatch({
-      type: "BATCH_UPDATE",
-      payload: {
-        currentNode: undefined,
-        aggregatedData: defaultAggregatedData,
-      },
-    });
   }, []);
 
   return useMemo(

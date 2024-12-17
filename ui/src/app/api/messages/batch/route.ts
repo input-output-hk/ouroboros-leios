@@ -164,11 +164,11 @@ export async function GET(req: Request, res: Response) {
         }, 100);
 
         rl.on("line", (line: string) => {
-          try {
-            eventBuffer.push(line);
-          } catch (error) {
-            controller.error(error);
+          if (!line) {
+            return;
           }
+          
+          eventBuffer.push(line);
         });
 
         rl.on("close", () => {

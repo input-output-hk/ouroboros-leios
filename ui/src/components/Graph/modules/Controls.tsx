@@ -1,9 +1,11 @@
 import { FC, memo } from "react";
 
+import { defaultAggregatedData, useGraphContext } from "@/contexts/GraphContext/context";
 import { useHandlers } from "../hooks/useHandlers";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 
 export const Controls: FC = memo(() => {
+  const { dispatch } = useGraphContext();
   const { handleResetSim } = useHandlers();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
 
@@ -18,7 +20,16 @@ export const Controls: FC = memo(() => {
       </button>
       <button
         className="bg-gray-400 text-white w-[80px] rounded-md px-4 py-2"
-        onClick={streaming ? stopStream : handleResetSim}
+        onClick={streaming ? () => {
+          stopStream();
+          dispatch({
+            type: "BATCH_UPDATE",
+            payload: {
+              currentNode: undefined,
+              aggregatedData: defaultAggregatedData,
+            },
+          });
+        } : handleResetSim}
       >
         {streaming ? "Cancel" : "Reset"}
       </button>
