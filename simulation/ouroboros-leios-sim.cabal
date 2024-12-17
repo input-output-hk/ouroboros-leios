@@ -67,10 +67,6 @@ library
     PraosProtocol.BlockFetch
     PraosProtocol.BlockGeneration
     PraosProtocol.ChainSync
-    PraosProtocol.Common
-    PraosProtocol.Common.AnchoredFragment
-    PraosProtocol.Common.Chain
-    PraosProtocol.ConcreteBlock
     PraosProtocol.ExamplesPraosP2P
     PraosProtocol.PraosNode
     PraosProtocol.SimBlockFetch
@@ -81,10 +77,15 @@ library
     PraosProtocol.VizSimChainSync
     PraosProtocol.VizSimPraos
     PraosProtocol.VizSimPraosP2P
+    PraosProtocol.Common
+    PraosProtocol.Common.AnchoredFragment
+    PraosProtocol.Common.Chain
+    PraosProtocol.Common.ConcreteBlock
     RelayProtocol
     Sample
     SimRelay
     SimRelayP2P
+    STMUtils
     SimTCPLinks
     SimTypes
     TimeCompat

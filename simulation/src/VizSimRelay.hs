@@ -4,13 +4,13 @@
 module VizSimRelay where
 
 import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (Time, addTime)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
+import TimeCompat
 
 import ModelTCP
 import P2P (linkPathLatenciesSquared)

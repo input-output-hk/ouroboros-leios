@@ -2,7 +2,6 @@
 
 module ExamplesTCP where
 
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Word (Word8)
 import qualified Graphics.Rendering.Chart.Easy as Chart
@@ -10,6 +9,7 @@ import ModelTCP
 import PlotTCP
 import SimTCPLinks
 import System.Random (mkStdGen, random)
+import TimeCompat
 import Viz
 import VizChart
 import VizSim

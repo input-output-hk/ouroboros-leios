@@ -21,12 +21,11 @@ import ChanTCP
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import qualified Data.Map.Strict as M
+import LeiosProtocol.Common
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
 import P2P (P2PTopography (..))
-import PraosProtocol.Common
-import PraosProtocol.Common.Chain (Chain (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
 

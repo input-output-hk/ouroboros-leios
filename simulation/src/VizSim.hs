@@ -3,9 +3,8 @@
 
 module VizSim where
 
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
 import Data.Foldable (Foldable (foldl'))
-
+import TimeCompat
 import Viz
 
 -- | A vizualisation model specialised to trace-based simulations: accumulate

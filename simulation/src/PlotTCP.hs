@@ -5,10 +5,10 @@
 
 module PlotTCP where
 
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time (..))
 import ModelTCP
 import SimTCPLinks
 import SimTypes
+import TimeCompat
 
 ------------------------------------------------------------------------------
 -- Plotting

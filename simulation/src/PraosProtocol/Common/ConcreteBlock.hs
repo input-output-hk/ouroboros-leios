@@ -20,7 +20,8 @@
 -- it is used; eventually it should be simplified and then moved to the
 -- network layer tests; the more sophiscated block abstraction (abstracted over
 -- an Ouroboros protocol) will live in the consensus layer.
-module PraosProtocol.ConcreteBlock (
+module PraosProtocol.Common.ConcreteBlock (
+  module Ouroboros.Network.Block,
   Block (..),
   BlockHeader (..),
   BlockBody (..),
@@ -49,14 +50,6 @@ module PraosProtocol.ConcreteBlock (
   fixupAnchoredFragmentFrom,
 ) where
 
-import Data.ByteString (ByteString)
-import Data.Function (fix)
-import Data.Hashable
-import Data.String (IsString)
-import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime (..), addUTCTime, secondsToNominalDiffTime)
-import NoThunks.Class (NoThunks)
-
 import Codec.CBOR.Decoding (
   decodeBytes,
   decodeInt,
@@ -65,16 +58,22 @@ import Codec.CBOR.Decoding (
  )
 import Codec.CBOR.Encoding (encodeBytes, encodeInt, encodeListLen, encodeWord64)
 import Codec.Serialise (Serialise (..))
+import Data.ByteString (ByteString)
+import Data.Function (fix)
+import Data.Hashable (Hashable (hash))
+import Data.String (IsString)
+import Data.Time.Calendar (fromGregorian)
+import Data.Time.Clock (UTCTime (..), addUTCTime, secondsToNominalDiffTime)
+import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-
-import Data.Typeable
-import Ouroboros.Network.AnchoredFragment (Anchor (..), AnchoredFragment)
-import Ouroboros.Network.AnchoredFragment qualified as AF
+import NoThunks.Class (NoThunks)
 import Ouroboros.Network.Block
-import Ouroboros.Network.Mock.Chain (Chain)
-import Ouroboros.Network.Mock.Chain qualified as C
 import Ouroboros.Network.Point (withOrigin)
-import Ouroboros.Network.Util.ShowProxy
+import Ouroboros.Network.Util.ShowProxy (ShowProxy)
+import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
+import PraosProtocol.Common.AnchoredFragment qualified as AnchoredFragment
+import PraosProtocol.Common.Chain (Chain)
+import PraosProtocol.Common.Chain qualified as Chain
 
 {-------------------------------------------------------------------------------
   Concrete block shape used currently in the network layer
@@ -265,8 +264,8 @@ fixupBlockHeader prev b =
   fix $ \b' ->
     b
       { headerHash = hashHeader b'
-      , headerPrevHash = castHash (AF.anchorToHash prev)
-      , headerBlockNo = withOrigin (BlockNo 0) succ (AF.anchorToBlockNo prev)
+      , headerPrevHash = castHash (AnchoredFragment.anchorToHash prev)
+      , headerBlockNo = withOrigin (BlockNo 0) succ (AnchoredFragment.anchorToBlockNo prev)
       }
 
 -- | Fixup a block so to fit it on top of a given previous block.
@@ -274,7 +273,7 @@ fixupBlockHeader prev b =
 -- Like 'fixupBlock' but it takes the info from a given block.
 --
 fixupBlockAfterBlock :: IsBody body => Block body -> Block body -> Block body
-fixupBlockAfterBlock prev = fixupBlock (AF.anchorFromBlock prev)
+fixupBlockAfterBlock prev = fixupBlock (AnchoredFragment.anchorFromBlock prev)
 
 fixupBlocks ::
   HasFullHeader b =>
@@ -295,7 +294,7 @@ fixupBlocks f z anchor fixup (b0 : c0) =
   go b (b1 : c1) = (c' `f` b', b')
    where
     (c', b1') = go b1 c1
-    b' = fixup (AF.anchorFromBlock b1') b
+    b' = fixup (AnchoredFragment.anchorFromBlock b1') b
 
 -- | Fix up the block number and hashes of a 'Chain'. This also fixes up the
 -- first block to chain-on from genesis, since by construction the 'Chain' type
@@ -307,8 +306,8 @@ fixupChain ::
   Chain b
 fixupChain =
   fixupBlocks
-    (C.:>)
-    C.Genesis
+    (Chain.:>)
+    Chain.Genesis
     AnchorGenesis
 
 fixupAnchoredFragmentFrom ::
@@ -319,8 +318,8 @@ fixupAnchoredFragmentFrom ::
   AnchoredFragment b
 fixupAnchoredFragmentFrom anchor =
   fixupBlocks
-    (AF.:>)
-    (AF.Empty anchor)
+    (AnchoredFragment.:>)
+    (AnchoredFragment.Empty anchor)
     anchor
 
 {-------------------------------------------------------------------------------

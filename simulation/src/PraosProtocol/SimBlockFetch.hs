@@ -7,13 +7,13 @@ import ChanDriver (ProtocolMessage)
 import ChanTCP
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
-  MonadAsync (concurrently_),
+  MonadAsync (..),
   mapConcurrently_,
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer (Tracer),
+  Tracer (..),
   traceWith,
  )
 import qualified Data.ByteString as BS
@@ -23,7 +23,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
-import PraosProtocol.Common.Chain (Chain (..))
+import STMUtils
 import SimTCPLinks
 import SimTypes
 

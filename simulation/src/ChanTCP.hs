@@ -31,14 +31,6 @@ import Control.Concurrent.Class.MonadSTM (
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Class.MonadAsync (MonadAsync (async))
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadMonotonicTime (..),
-  MonadTime,
-  Time,
-  diffTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
   Tracer,
@@ -56,7 +48,7 @@ import ModelTCP (
   initTcpState,
   saneTcpState,
  )
-import TimeCompat (threadDelaySI)
+import TimeCompat
 
 -- | In the scope of a two party connection, there are just two peers. These
 -- can be maped to a wider scope peer identity via contra-trace.

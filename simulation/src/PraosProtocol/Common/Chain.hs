@@ -1,6 +1,9 @@
-module PraosProtocol.Common.Chain (module Chain, dropUntil) where
+module PraosProtocol.Common.Chain (
+  module Ouroboros.Network.Mock.Chain,
+  dropUntil,
+) where
 
-import Ouroboros.Network.Mock.Chain as Chain (
+import Ouroboros.Network.Mock.Chain (
   Chain (..),
   ChainUpdate (..),
   HasHeader (..),

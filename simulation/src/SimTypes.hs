@@ -8,7 +8,7 @@ import Data.Aeson.Types (FromJSON, FromJSONKey, ToJSON (..), ToJSONKey, defaultO
 import Data.Hashable
 import Data.Ix (Ix)
 import GHC.Generics (Generic)
-import TimeCompat (DiffTime)
+import TimeCompat
 
 newtype CPUTask = CPUTask {cpuTaskDuration :: DiffTime}
   deriving (Eq, Ord, Show, Generic)

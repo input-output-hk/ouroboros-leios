@@ -7,18 +7,18 @@
 
 module PraosProtocol.VizSimPraosP2P where
 
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time, diffTime)
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import qualified Data.Colour.SRGB as Colour
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, maybeToList)
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
+import TimeCompat
 
 import Data.Bifunctor (second)
 import ModelTCP (TcpMsgForecast (..), segmentSize)
 import P2P
-import PraosProtocol.Common (BlockBody, BlockHeader, FullTip (FullTip), Time (..))
+import PraosProtocol.Common (BlockBody, BlockHeader, FullTip (FullTip))
 import PraosProtocol.PraosNode
 import PraosProtocol.VizSimPraos (
   LinkPoints (..),

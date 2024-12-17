@@ -37,10 +37,14 @@ import LeiosProtocol.Short.Generate
 import qualified LeiosProtocol.Short.Generate as Generate
 import ModelTCP
 import Numeric.Natural (Natural)
-import PraosProtocol.BlockFetch
-import PraosProtocol.Common
-import PraosProtocol.Common.Chain (dropUntil, headAnchor, headHash)
+import PraosProtocol.BlockFetch (
+  BlockFetchControllerState (blocksVar),
+  addProducedBlock,
+  processWaiting,
+ )
+import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
+import STMUtils
 import System.Random
 
 --------------------------------------------------------------
@@ -486,7 +490,7 @@ generator tracer cfg st = do
       case x of
         SomeAction Generate.Base rb0 -> do
           rb <- atomically $ do
-            ha <- headAnchor <$> PraosNode.preferredChain st.praosState
+            ha <- Chain.headAnchor <$> PraosNode.preferredChain st.praosState
             let rb = fixupBlock ha rb0
             addProducedBlock st.praosState.blockFetchControllerState rb
             return rb
@@ -534,7 +538,7 @@ mkBuffersView cfg st = BuffersView{..}
   newIBData = do
     ledgerState <- readTVar st.ledgerStateVar
     referenceRankingBlock <-
-      headHash . dropUntil (flip Map.member ledgerState . blockHash)
+      Chain.headHash . Chain.dropUntil (flip Map.member ledgerState . blockHash)
         <$> PraosNode.preferredChain st.praosState
     let txsPayload = cfg.inputBlockPayload
     return $ NewInputBlockData{referenceRankingBlock, txsPayload}

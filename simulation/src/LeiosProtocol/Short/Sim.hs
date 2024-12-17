@@ -26,8 +26,6 @@ import qualified Data.Set as Set
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
-import PraosProtocol.Common (defaultPraosConfig)
-import PraosProtocol.Common.Chain (Chain (..))
 import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)

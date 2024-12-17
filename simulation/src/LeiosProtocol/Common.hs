@@ -9,8 +9,6 @@
 
 module LeiosProtocol.Common (
   module PraosProtocol.Common,
-  module Block,
-  module TimeCompat,
   RankingBlockHeader,
   RankingBlockBody (..),
   RankingBlock,
@@ -41,27 +39,9 @@ import Data.Map (Map)
 import Data.Word (Word64, Word8)
 import GHC.Generics
 import GHC.Records
-import Ouroboros.Network.Block as Block
-import PraosProtocol.Common (
-  ChainHash (..),
-  MessageSize (..),
-  PraosConfig (..),
-  ReadOnly,
-  SlotConfig (..),
-  TakeOnly,
-  asReadOnly,
-  asTakeOnly,
-  kilobytes,
-  readReadOnlyTVar,
-  readReadOnlyTVarIO,
-  slotConfigFromNow,
-  slotTime,
-  takeTakeOnlyTMVar,
-  tryTakeTakeOnlyTMVar,
- )
-import qualified PraosProtocol.Common as Praos
+import PraosProtocol.Common hiding (Block, BlockHeader)
+import qualified PraosProtocol.Common as Praos (Block, BlockHeader)
 import SimTypes
-import TimeCompat
 
 {-
   Note [size of blocks/messages]: we add a `size` field to most

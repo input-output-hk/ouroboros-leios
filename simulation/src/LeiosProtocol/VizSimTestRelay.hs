@@ -6,7 +6,6 @@ module LeiosProtocol.VizSimTestRelay where
 
 import ChanDriver (ProtocolMessage (..))
 import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (Time, addTime)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -23,6 +22,7 @@ import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
 import System.Random.Stateful (uniform)
+import TimeCompat
 import Viz
 import VizSim
 import VizSimTCP (
