@@ -3,8 +3,9 @@
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
+open import Data.Fin.Patterns
 
-module Leios.Simplified (⋯ : SpecStructure) (let open SpecStructure ⋯) (Λ μ : ℕ) where
+module Leios.Simplified (⋯ : SpecStructure 2) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
 data SlotUpkeep : Type where
   Base IB-Role EB-Role V1-Role V2-Role : SlotUpkeep
@@ -18,12 +19,11 @@ open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 
-record VotingAbstract : Type₁ where
-  field isVote1Certified : LeiosState → EndorserBlock → Type
-        isVote2Certified : LeiosState → EndorserBlock → Type
+isVote1Certified : LeiosState → EndorserBlock → Type
+isVote1Certified s eb = isVoteCertified (LeiosState.votingState s) (0F , eb)
 
-        ⦃ isVote1Certified⁇ ⦄ : ∀ {vs eb} → isVote1Certified vs eb ⁇
-        ⦃ isVote2Certified⁇ ⦄ : ∀ {vs eb} → isVote2Certified vs eb ⁇
+isVote2Certified : LeiosState → EndorserBlock → Type
+isVote2Certified s eb = isVoteCertified (LeiosState.votingState s) (1F , eb)
 
 -- Predicates about EBs
 module _ (s : LeiosState) (eb : EndorserBlock) where
@@ -36,7 +36,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
     where candidateEBs : ℙ Hash
           candidateEBs = mapˢ getEBRef $ filterˢ (_∈ᴮ slice L slot (μ + 3)) (fromList EBs)
 
-module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
+module Protocol where
 
   private variable s s'   : LeiosState
                    ffds'  : FFD.State

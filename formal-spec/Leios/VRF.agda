@@ -22,6 +22,12 @@ record LeiosVRF : Type₁ where
   canProduceIB : ℕ → PrivKey → ℕ → VrfPf → Type
   canProduceIB slot k stake π = let (val , pf) = eval k (genIBInput slot) in val < stake × pf ≡ π
 
+  Dec-canProduceIB : ∀ {slot k stake} → (∃[ π ] canProduceIB slot k stake π) ⊎ (∀ π → ¬ canProduceIB slot k stake π)
+  Dec-canProduceIB {slot} {k} {stake} with eval k (genIBInput slot)
+  ... | (val , pf) = case ¿ val < stake ¿ of λ where
+    (yes p) → inj₁ (pf , p , refl)
+    (no ¬p) → inj₂ (λ π (h , _) → ¬p h)
+
   canProduceIBPub : ℕ → ℕ → PubKey → VrfPf → ℕ → Type
   canProduceIBPub slot val k pf stake = verify k (genIBInput slot) val pf × val < stake
 
