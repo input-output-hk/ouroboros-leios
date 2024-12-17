@@ -8,6 +8,9 @@ import Data.List.Relation.Unary.Any as A
 
 open import Leios.SpecStructure
 
+open import Tactic.Defaults
+open import Tactic.Derive.DecEq
+
 module Leios.Simple (⋯ : SpecStructure) (let open SpecStructure ⋯) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
@@ -26,7 +29,7 @@ open GenFFD
 
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
-  SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
+  SUBMIT   : List Tx → LeiosInput
   SLOT     : LeiosInput
   FTCH-LDG : LeiosInput
 
@@ -37,6 +40,8 @@ data LeiosOutput : Type where
 data SlotUpkeep : Type where
   Base IB-Role EB-Role V1-Role V2-Role : SlotUpkeep
 
+unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
+
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
 
@@ -44,7 +49,7 @@ record LeiosState : Type where
   field V         : VTy
         SD        : StakeDistr
         FFDState  : FFD.State
-        Ledger    : List Tx
+        Ledger    : List Tx -- TODO: maybe be more generic here
         ToPropose : List Tx
         IBs       : List InputBlock
         EBs       : List EndorserBlock
@@ -71,6 +76,7 @@ record LeiosState : Type where
           open IBBody
           open InputBlock
 
+  -- TODO: stop once a single reference doesn't resolve
   constructLedger : List EndorserBlock → List Tx
   constructLedger = concatMap lookupTxs
 
@@ -79,6 +85,7 @@ record LeiosState : Type where
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
+{-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
 initLeiosState : VTy → StakeDistr → B.State → LeiosState
 initLeiosState V SD bs = record
@@ -182,10 +189,11 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
        ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
        ───────────────────────────────────────────────────────────────────────
        just s -⟦ SLOT / EMPTY ⟧⇀ record s
-           { FFDState = ffds'
-           ; Ledger   = constructLedger ebs
-           ; slot     = suc slot
-           ; Upkeep   = ∅
+           { FFDState  = ffds'
+           ; Ledger    = constructLedger ebs
+           ; slot      = suc slot
+           ; BaseState = bs'
+           ; Upkeep    = ∅
            } ↑ L.filter isValid? msgs
 
   Ftch :
@@ -200,7 +208,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
 
   Base₁   :
           ───────────────────────────────────────────────────────────────────
-          just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
+          just s -⟦ SUBMIT txs / EMPTY ⟧⇀ record s { ToPropose = txs }
 
   Base₂a  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
@@ -214,7 +222,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
           ∙ [] ≡ filter (λ eb → isVote2Certified votingState eb × eb ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s Base
+          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
   -- Protocol rules
 
@@ -226,7 +234,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
           ∙ canProduceIB slot sk-IB (stake s) π
           ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { FFDState = ffds' } IB-Role
+          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep (record s { FFDState = ffds' }) IB-Role
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot (Λ + 1)) IBs
@@ -264,14 +272,14 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
 
   No-IB-Role : let open LeiosState s in
           ∙ needsUpkeep IB-Role
-          ∙ ¬ canProduceIB slot sk-IB (stake s) π
-          ─────────────────────────────────────────────
+          ∙ (∀ π → ¬ canProduceIB slot sk-IB (stake s) π)
+          ───────────────────────────────────────────────
           just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s IB-Role
 
   No-EB-Role : let open LeiosState s in
           ∙ needsUpkeep EB-Role
-          ∙ ¬ canProduceEB slot sk-EB (stake s) π
-          ─────────────────────────────────────────────
+          ∙ (∀ π → ¬ canProduceEB slot sk-EB (stake s) π)
+          ───────────────────────────────────────────────
           just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep s EB-Role
 
   No-V1-Role : let open LeiosState s in

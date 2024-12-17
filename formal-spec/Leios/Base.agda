@@ -16,10 +16,10 @@ record BaseAbstract : Type₁ where
   field Cert : Type
         VTy : Type
         initSlot : VTy → ℕ
-        V-chkCerts : List PubKey → EndorserBlock × Cert → Type
+        V-chkCerts : List PubKey → EndorserBlock × Cert → Bool
 
-  data Input : Type₁ where
-    INIT   : (EndorserBlock × Cert → Type) → Input
+  data Input : Type where
+    INIT   : (EndorserBlock × Cert → Bool) → Input
     SUBMIT : EndorserBlock ⊎ List Tx → Input -- maybe we have both
     FTCH-LDG : Input
 
@@ -31,6 +31,7 @@ record BaseAbstract : Type₁ where
   record Functionality : Type₁ where
     field State : Type
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
+          SUBMIT-total : ∀ {s b} → ∃[ s' ] s -⟦ SUBMIT b / EMPTY ⟧⇀ s'
 
     open Input public
     open Output public
