@@ -139,7 +139,7 @@ relayNode
           RelayConsumerConfig
             { relay = relayConfig
             , headerValidationDelay = const 0.1
-            , threadDelayParallel = sum >>> \d -> when (d >= 0) $ threadDelaySI d
+            , threadDelayParallel = sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll
@@ -174,7 +174,7 @@ relayNode
        where
         -- TODO: make different generators produce different non-overlapping ids
         go !blkid = do
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let blk =
                 TestBlock
@@ -192,7 +192,7 @@ relayNode
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
               gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
               blkid = TestBlockId blkidn
@@ -239,7 +239,7 @@ relayNode
     processing submitq =
       forever $ do
         (blks, completion) <- atomically $ readTQueue submitq
-        threadDelaySI (sum $ map blockProcessingDelay blks)
+        threadDelay (sum $ map blockProcessingDelay blks)
         _ <- atomically $ completion blks -- "relayNode: completions should not block"
         forM_ blks $ \blk -> traceWith tracer (RelayNodeEventEnterBuffer blk)
 

@@ -254,7 +254,7 @@ threadDelayParallel _tracer [] = return ()
 threadDelayParallel tracer ds = do
   forM_ ds (traceWith tracer . LeiosNodeEventCPU . CPUTask)
   let d = maximum ds
-  when (d >= 0) $ threadDelaySI d
+  when (d >= 0) $ threadDelay d
 
 newLeiosNodeState ::
   forall m.
@@ -415,7 +415,7 @@ validationDispatcher tracer cfg leiosState = forever $ do
       case blockPrevHash rb of
         GenesisHash -> do
           traceWith tracer . LeiosNodeEventCPU . CPUTask $ delay
-          threadDelaySI delay
+          threadDelay delay
           completion
         BlockHash prev -> atomically $ do
           let var =

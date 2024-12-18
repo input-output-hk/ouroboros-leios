@@ -206,7 +206,7 @@ chainConsumer tracer cfg (ChainConsumerState hchainVar) = idle True
     TC.Effect $ do
       let !delay = cfg.headerValidationDelay header
       traceWith tracer $ PraosNodeEventCPU (CPUTask delay)
-      threadDelaySI delay
+      threadDelay delay
       atomically $ do
         modifyTVar' hchainVar $ Chain.addBlock header
         return $ idle False

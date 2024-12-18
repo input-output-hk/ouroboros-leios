@@ -53,8 +53,8 @@ instance Chart.PlotValue DiffTime where
         (map show)
         10
         50
-  toValue = realToFrac
-  fromValue = realToFrac
+  toValue = diffTimeToSeconds
+  fromValue = secondsToDiffTime
 
 autoScaledAxis :: RealFrac a => Chart.LinearAxisParams a -> Chart.AxisFn a
 autoScaledAxis lap ps = scaledAxis lap rs ps

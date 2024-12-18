@@ -1,41 +1,57 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+
 module TimeCompat (
   DiffTime,
   MonadTime (getCurrentTime),
   MonadDelay,
-  MonadMonotonicTime (getMonotonicTime),
+  MonadMonotonicTimeNSec,
+  getMonotonicTime,
   Time (Time),
-  UTCTime,
-  NominalDiffTime,
   diffTimeToSeconds,
+  secondsToDiffTime,
   addTime,
-  addUTCTime,
   diffTime,
-  diffUTCTime,
-  threadDelaySI,
-  threadDelayNDT,
+  threadDelay,
 )
 where
 
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadMonotonicTime (getMonotonicTime),
-  MonadTime (getCurrentTime),
-  NominalDiffTime,
-  Time (..),
-  UTCTime,
-  addTime,
-  addUTCTime,
-  diffTime,
-  diffUTCTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay (threadDelay))
-import Data.Time.Clock (diffTimeToPicoseconds)
+import Control.Exception (assert)
+import Control.Monad.Class.MonadTime (MonadMonotonicTimeNSec, MonadTime (getCurrentTime))
+import qualified Control.Monad.Class.MonadTime as MonadTime (MonadMonotonicTimeNSec (getMonotonicTimeNSec))
+import Control.Monad.Class.MonadTimer (MonadDelay)
+import qualified Control.Monad.Class.MonadTimer as MonadTimer (MonadDelay (threadDelay))
+import Data.Aeson.Types (FromJSON, ToJSON)
+import Data.Word (Word64)
+
+newtype Nano = Nano Word64
+  deriving stock (Show)
+  deriving newtype (Eq, Ord, Num, Real, Enum, Integral)
+  deriving newtype (ToJSON, FromJSON)
+
+newtype DiffTime = DiffTime Nano
+  deriving newtype (Show, Eq, Ord, Num, Real, Enum, Integral)
+  deriving newtype (ToJSON, FromJSON)
+
+newtype Time = Time DiffTime
+  deriving newtype (Show, Eq, Ord)
+  deriving newtype (ToJSON, FromJSON)
+
+addTime :: DiffTime -> Time -> Time
+addTime dt (Time t) = Time (dt + t)
+
+diffTime :: Time -> Time -> DiffTime
+diffTime (Time t1) (Time t2) = assert (t1 > t2) $ t1 - t2
 
 diffTimeToSeconds :: DiffTime -> Double
-diffTimeToSeconds = (* 1e-12) . fromIntegral . diffTimeToPicoseconds
+diffTimeToSeconds (DiffTime dt) = (* 1e-9) . fromIntegral @Nano @Double $ dt
 
-threadDelaySI :: MonadDelay m => DiffTime -> m ()
-threadDelaySI = threadDelay . round . (* 1e6)
+secondsToDiffTime :: Double -> DiffTime
+secondsToDiffTime dt = DiffTime . round @Double @Nano $ dt * 1e9
 
-threadDelayNDT :: MonadDelay m => NominalDiffTime -> m ()
-threadDelayNDT = threadDelay . round . (* 1e6)
+threadDelay :: MonadDelay m => DiffTime -> m ()
+threadDelay (DiffTime dt) = MonadTimer.threadDelay . round @Double @Int . (* 1e-3) . fromIntegral @Nano @Double $ dt
+
+getMonotonicTime :: MonadMonotonicTimeNSec m => m DiffTime
+getMonotonicTime = DiffTime . Nano <$> MonadTime.getMonotonicTimeNSec
