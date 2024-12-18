@@ -62,8 +62,6 @@ import Data.ByteString (ByteString)
 import Data.Function (fix)
 import Data.Hashable (Hashable (hash))
 import Data.String (IsString)
-import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime (..), addUTCTime, secondsToNominalDiffTime)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import NoThunks.Class (NoThunks)
@@ -74,6 +72,12 @@ import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.AnchoredFragment qualified as AnchoredFragment
 import PraosProtocol.Common.Chain (Chain)
 import PraosProtocol.Common.Chain qualified as Chain
+import TimeCompat (
+  UTCTime (..),
+  addUTCTime,
+  fromGregorian,
+  secondsToNominalDiffTime,
+ )
 
 {-------------------------------------------------------------------------------
   Concrete block shape used currently in the network layer

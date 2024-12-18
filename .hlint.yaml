@@ -32,6 +32,10 @@
         - "Control.Monad.Class.MonadTime.SI"
       within: "TimeCompat"
       message: "Use TimeCompat instead"
+    # Ensure that Time and DiffTime are imported from TimeCompat
+    - name: "Data.Time.**"
+      within: "TimeCompat"
+      message: "Use TimeCompat instead"
     # Ensure that MonadSTM is imported from STMCompat
     - name: "Control.Concurrent.Class.MonadSTM"
       within: "STMCompat"

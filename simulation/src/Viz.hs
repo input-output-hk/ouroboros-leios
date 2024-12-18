@@ -14,7 +14,6 @@ import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (foldl1', mapAccumL, zip4)
 import Data.Ratio ((%))
-import qualified Data.Time as Time
 import Data.Tree as Tree (Tree (..))
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Pango.Cairo as Pango
@@ -711,7 +710,7 @@ layoutLabelTime =
     Cairo.setFontSize 20
     Cairo.setSourceRGB 0 0 0
     Cairo.showText $
-      Time.formatTime Time.defaultTimeLocale "Time (sec): %-2Es" t
+      formatDiffTime "Time (sec): %-2Es" t
 
 layoutLabel :: Int -> String -> Layout (VizRender model)
 layoutLabel size label =

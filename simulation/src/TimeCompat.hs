@@ -8,6 +8,10 @@ module TimeCompat (
   threadDelayNDT,
   threadDelaySI,
   MonadDelay,
+  fromGregorian,
+  UTCTime (..),
+  secondsToNominalDiffTime,
+  formatDiffTime,
   -- Int-as-Micros API
   Microseconds (..),
   threadDelayMS,
@@ -15,6 +19,13 @@ module TimeCompat (
 
 import Control.Monad.Class.MonadTime.SI
 import Control.Monad.Class.MonadTimer (MonadDelay (..))
+
+import Data.Time (defaultTimeLocale, formatTime)
+import Data.Time.Calendar (fromGregorian)
+import Data.Time.Clock (UTCTime (..), secondsToNominalDiffTime)
+
+formatDiffTime :: String -> (DiffTime -> String)
+formatDiffTime = formatTime defaultTimeLocale
 
 newtype Microseconds = Microseconds {getMicroseconds :: Int}
   deriving newtype (Eq, Ord, Show, Enum, Num, Real, Integral)
