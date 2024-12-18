@@ -381,7 +381,7 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
  where
   theChart lbl nodePos nodeMsgColor msgsDiffusionLatency =
     (Chart.def :: Chart.Layout DiffTime Chart.Percent)
-      { Chart._layout_title = "Diffusion latency" ++ "(" ++ lbl ++ ")"
+      { Chart._layout_title = "Diffusion latency" ++ " (" ++ lbl ++ ")"
       , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
       , Chart._layout_y_axis =
           (Chart.def :: Chart.LayoutAxis Chart.Percent)
@@ -711,7 +711,7 @@ example2 seed sliceLength maybeP2PTopography =
                     --         0.1
                     --         (96 / 1000)
                     --         config
-                    tag <- [minBound .. maxBound]
+                    tag <- [IB, EB, VT, RB]
                     ]
                 , LayoutAbove
                     [ LayoutReqSize 350 300 $
