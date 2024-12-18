@@ -31,9 +31,6 @@ module PraosProtocol.Common.ConcreteBlock (
   hashBody,
   IsBody,
 
-  -- * Converting slots to times
-  convertSlotToTimeForTestsAssumingNoHardFork,
-
   -- * Creating sample chains
   mkChain,
   mkChainSimple,
@@ -72,12 +69,6 @@ import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.AnchoredFragment qualified as AnchoredFragment
 import PraosProtocol.Common.Chain (Chain)
 import PraosProtocol.Common.Chain qualified as Chain
-import TimeCompat (
-  UTCTime (..),
-  addUTCTime,
-  fromGregorian,
-  secondsToNominalDiffTime,
- )
 
 {-------------------------------------------------------------------------------
   Concrete block shape used currently in the network layer
@@ -377,28 +368,3 @@ instance Serialise BlockBody where
   encode (BlockBody b) = encodeBytes b
 
   decode = BlockBody <$> decodeBytes
-
-{-------------------------------------------------------------------------------
-  Simple static time conversions, since no HardFork
--------------------------------------------------------------------------------}
-
--- | Arbitrarily but consistently converts slots UTCTimes.
---
--- It is only intended for use in tests. Notably it assumes a fixed system
--- start time, slot length, and the absence of a hard fork (ie no
--- HardForkCombinator). This is how it's available as a pure function.
-convertSlotToTimeForTestsAssumingNoHardFork :: SlotNo -> UTCTime
-convertSlotToTimeForTestsAssumingNoHardFork sl =
-  flip addUTCTime startTime $
-    --   ^^^ arbitrary start time for testing
-    secondsToNominalDiffTime $
-      fromIntegral $
-        unSlotNo sl * 10
- where
-  --   ^^^ arbitrary slot length for testing
-
-  startTime =
-    UTCTime
-      { utctDay = fromGregorian 2000 1 1
-      , utctDayTime = 0
-      }

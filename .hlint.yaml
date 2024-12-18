@@ -28,12 +28,11 @@
 - modules:
     # Ensure that MonadDelay is imported from TimeCompat
     - name:
+        - "Data.Time.**"
         - "Control.Monad.Class.MonadTime"
         - "Control.Monad.Class.MonadTime.SI"
-      within: "TimeCompat"
-      message: "Use TimeCompat instead"
-    # Ensure that Time and DiffTime are imported from TimeCompat
-    - name: "Data.Time.**"
+        - "Control.Monad.Class.MonadTimer"
+        - "Control.Monad.Class.MonadTimer.SI"
       within: "TimeCompat"
       message: "Use TimeCompat instead"
     # Ensure that MonadSTM is imported from STMCompat

@@ -21,6 +21,7 @@ import qualified Graphics.Rendering.Pango.Font as Pango
 import qualified Graphics.Rendering.Pango.Layout as Pango
 import Graphics.UI.Gtk (AttrOp ((:=)))
 import qualified Graphics.UI.Gtk as Gtk
+import Text.Printf (printf)
 import TimeCompat
 
 ------------------------------------------------------------------------------
@@ -709,8 +710,7 @@ layoutLabelTime =
     Cairo.moveTo 5 20
     Cairo.setFontSize 20
     Cairo.setSourceRGB 0 0 0
-    Cairo.showText $
-      formatDiffTime "Time (sec): %-2Es" t
+    Cairo.showText (printf "Time (sec): %.4fs" (diffTimeToSeconds t) :: String)
 
 layoutLabel :: Int -> String -> Layout (VizRender model)
 layoutLabel size label =
