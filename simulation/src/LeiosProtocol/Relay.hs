@@ -669,6 +669,7 @@ relayConsumerPipelined config sst =
             -- ask for so the only remaining thing to do is to ask for more
             -- txids. Since this is the only thing to do now, we make this a
             -- blocking call.
+            -- TODO: assertion failed running `cabal run ols -- viz short-leios-p2p-1 --seed 42` on 2f5a00acf691cfc54502571f7b9f9fc2d1f380dd
             assert
               ( lst.pendingExpand == 0
                   && Seq.null lst.window
