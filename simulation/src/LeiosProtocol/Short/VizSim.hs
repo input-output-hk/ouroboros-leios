@@ -229,7 +229,7 @@ accumDiffusionLatency' now _nid EnterState msgid _msg vs =
     vs
 accumDiffusionLatency' _now _nid _event _id _msg vs = vs
 
-data LeiosModelConfig = LeiosModelConfig
+newtype LeiosModelConfig = LeiosModelConfig
   { recentSpan :: DiffTime
   -- ^ length of time the Recent* maps should cover
   }

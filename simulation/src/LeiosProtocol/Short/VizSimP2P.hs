@@ -97,7 +97,7 @@ messageLegend =
  where
   textBox s = Dia.alignedText 0.7 0.5 s `Dia.atop` Dia.phantom (Dia.rect (fromIntegral $ length s * 20 + 10) 20 :: CairoDiagram)
   -- TODO: figure out why the width needs fudging.
-  addBG d = d `Dia.atop` (Dia.fc Dia.white $ Dia.lc Dia.white $ Dia.rect (Dia.width d + 20 * 12) (Dia.height d))
+  addBG d = d `Dia.atop` Dia.fc Dia.white (Dia.lc Dia.white $ Dia.rect (Dia.width d + 20 * 12) (Dia.height d))
 
 ------------------------------------------------------------------------------
 -- The vizualisation rendering
