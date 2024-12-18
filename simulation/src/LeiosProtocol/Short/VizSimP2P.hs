@@ -708,7 +708,7 @@ toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
 example2 :: Int -> Int -> Maybe P2PTopography -> Visualization
 example2 seed sliceLength maybeP2PTopography =
-  slowmoVisualization 2 $
+  slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
         [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
