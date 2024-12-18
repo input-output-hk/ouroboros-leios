@@ -19,8 +19,6 @@ module TimeCompat (
   UTCTime,
   NominalDiffTime,
   diffUTCTime,
-  threadDelaySI,
-  threadDelayNDT,
   waitUntil,
   addUTCTime,
   seTimeCompat,

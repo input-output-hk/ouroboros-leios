@@ -143,7 +143,7 @@ setupPraosThreads tracer cfg st0 followers peers = do
   let valHeader h = do
         let !delay = cfg.headerValidationDelay h
         traceWith tracer (PraosNodeEventCPU (CPUTask delay))
-        threadDelaySI delay
+        threadDelay delay
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 
 setupPraosThreads' ::

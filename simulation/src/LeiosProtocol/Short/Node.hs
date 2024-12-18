@@ -297,7 +297,7 @@ newLeiosNodeState cfg = do
 
 leiosNode ::
   forall m.
-  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadMonotonicTime m) =>
+  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadMonotonicTimeNSec m) =>
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   [Leios (Chan m)] ->
@@ -395,7 +395,7 @@ leiosNode tracer cfg followers peers = do
       ]
 
 processCPUTasks ::
-  (MonadSTM m, MonadDelay m, MonadMonotonicTime m) =>
+  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m) =>
   NumCores ->
   Tracer m CPUTask ->
   TaskMultiQueue LeiosNodeTask m ->
@@ -463,7 +463,7 @@ dispatchValidation tracer cfg leiosState req =
     atomically $ do
       completion [eb]
       ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
-      let ibsNeeded = Map.fromList $ [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
+      let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
       modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
     traceEnterState [eb] EventEB
   valVote v completion = (ValVote,) . (CPUTask $ cfg.leios.delays.voteMsgValidation v,) $ do
@@ -476,10 +476,8 @@ dispatchValidation tracer cfg leiosState req =
       let task = valRB rb completion
       case blockPrevHash rb of
         GenesisHash -> do
-          traceWith tracer . LeiosNodeEventCPU . CPUTask $ delay
-          threadDelaySI delay
-          completion
-        BlockHash prev -> atomically $ do
+          return [task]
+        BlockHash prev -> do
           let var =
                 assert (rb.blockBody.payload >= 0) $
                   if rb.blockBody.payload == 0
