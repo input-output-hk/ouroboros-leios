@@ -401,9 +401,9 @@ leiosSimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgo10) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgo10) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       , ibDiffusionLatency =
@@ -412,11 +412,17 @@ leiosSimVizModel =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (ebDiffusionLatency vs)
       , voteDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (voteDiffusionLatency vs)
-      , ibMsgs = pruneLeiosMsgsState now vs.ibMsgs
-      , ebMsgs = pruneLeiosMsgsState now vs.ebMsgs
-      , voteMsgs = pruneLeiosMsgsState now vs.voteMsgs
+      , ibMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.ibMsgs
+      , ebMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.ebMsgs
+      , voteMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.voteMsgs
+      , nodeCpuUsage =
+          Map.map
+            (`ILMap.intersecting` coerce (ClosedInterval secondsAgo10 now))
+            vs.nodeCpuUsage
       }
    where
+    secondsAgo10 :: Time
+    secondsAgo10 = addTime (-10) now
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
 
@@ -490,19 +496,16 @@ accumLeiosMsgs now nid EnterState blk vs =
 
 pruneLeiosMsgsState ::
   (Eq id, HasField "id" msg id) =>
-  Time ->
+  (Time, Time) ->
   LeiosSimVizMsgsState id msg ->
   LeiosSimVizMsgsState id msg
-pruneLeiosMsgsState now vs =
+pruneLeiosMsgsState (ago, _now) vs =
   vs
     { msgsAtNodeRecentQueue =
-        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentQueue vs)
+        Map.map (recentPrune ago) (msgsAtNodeRecentQueue vs)
     , msgsAtNodeRecentBuffer =
-        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentBuffer vs)
+        Map.map (recentPrune ago) (msgsAtNodeRecentBuffer vs)
     }
- where
-  secondsAgo30 :: Time
-  secondsAgo30 = addTime (-30) now
 
 accumIBsInRBs :: Either RankingBlock EndorseBlock -> IBsInRBsState -> IBsInRBsState
 accumIBsInRBs (Left rb) s = s{ebsInRBs = Map.insertWith Set.union (blockHash rb) (Set.fromList $ map fst rb.blockBody.endorseBlocks) s.ebsInRBs}
