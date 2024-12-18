@@ -1,7 +1,7 @@
 module TimeCompat (
   DiffTime,
   MonadTime (getCurrentTime),
-  MonadDelay (threadDelay),
+  MonadDelay,
   MonadMonotonicTime (getMonotonicTime),
   Time (Time),
   UTCTime,
