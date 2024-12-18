@@ -476,8 +476,10 @@ dispatchValidation tracer cfg leiosState req =
       let task = valRB rb completion
       case blockPrevHash rb of
         GenesisHash -> do
-          return [task]
-        BlockHash prev -> do
+          traceWith tracer . LeiosNodeEventCPU . CPUTask $ delay
+          threadDelaySI delay
+          completion
+        BlockHash prev -> atomically $ do
           let var =
                 assert (rb.blockBody.payload >= 0) $
                   if rb.blockBody.payload == 0

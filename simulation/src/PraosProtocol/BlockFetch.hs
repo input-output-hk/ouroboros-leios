@@ -600,7 +600,7 @@ setupValidatorThreads tracer cfg st n = do
   (waitingVar, processWaitingThread) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
   let doTask (delay, m) = do
         traceWith tracer . PraosNodeEventCPU . CPUTask $ delay
-        threadDelaySI delay
+        threadDelay delay
         m
 
   -- if we have the previous block, we process the task sequentially to provide back pressure on the queue.
@@ -647,7 +647,7 @@ processWaiting tracer npar blocksVar waitingVar = go
   parallelDelay xs = do
     let !d = maximum $ map fst xs
     forM_ xs $ traceWith tracer . CPUTask . fst
-    threadDelaySI d
+    threadDelay d
     mapM_ snd xs
   go = forever $ join $ atomically $ do
     waiting <- readTVar waitingVar

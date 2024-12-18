@@ -24,7 +24,6 @@ import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
-import Data.Ratio ((%))
 import Data.Semigroup (Semigroup (sconcat))
 import TimeCompat
 
@@ -306,10 +305,7 @@ forecastTcpMsgSend
 
     serialisationTime :: Bytes -> DiffTime
     serialisationTime msg =
-      fromRational
-        ( toInteger (fromBytes msg)
-            % toInteger (fromBytes tcpBandwidth)
-        )
+      secondsToDiffTime (fromIntegral (fromBytes msg) / fromIntegral (fromBytes tcpBandwidth))
 
 -- | To make the result easier to interpret, merge together any fragments
 -- that are in fact contiguous.

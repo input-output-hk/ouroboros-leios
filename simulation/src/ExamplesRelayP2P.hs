@@ -11,13 +11,14 @@ import SimRelayP2P
 import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes
 import System.Random (mkStdGen, uniform)
+import TimeCompat (secondsToDiffTime)
 import Viz
 import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P
 
 example1 :: Visualization
 example1 =
-  slowmoVisualization 0.1 $
+  slowmoVisualization (secondsToDiffTime 0.1) $
     Viz model $
       LayoutAbove
         [ layoutLabelTime
@@ -34,8 +35,8 @@ example1 =
                         Layout $
                           chartDiffusionImperfection
                             p2pTopography
-                            0.1
-                            (96 / 1000)
+                            (secondsToDiffTime 0.1)
+                            (secondsToDiffTime $ 96 / 1000)
                             config
                     ]
                 , LayoutAbove
@@ -57,7 +58,7 @@ example1 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \rng ->
             RelayNodeConfig
-              { blockProcessingDelay = const 0.1 -- 100ms
+              { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
@@ -87,7 +88,7 @@ example1 =
 
 example2 :: Visualization
 example2 =
-  slowmoVisualization 0.2 $
+  slowmoVisualization (secondsToDiffTime 0.2) $
     Viz (pairVizModel model1 model2) $
       LayoutAbove
         [ layoutLabel 18 "Flat vs cylindrical world topology"
@@ -149,7 +150,7 @@ example2 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \rng ->
             RelayNodeConfig
-              { blockProcessingDelay = const 0.1 -- 100ms
+              { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
