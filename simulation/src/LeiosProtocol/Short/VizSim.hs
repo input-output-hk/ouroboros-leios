@@ -300,7 +300,7 @@ leiosSimVizModel =
           }
       EventVote x ->
         vs
-          { voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs
+          { voteMsgs = adjustNumVotes event x $ accumLeiosMsgs now nid event x vs.voteMsgs
           , voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x vs.voteDiffusionLatency
           }
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
@@ -419,6 +419,11 @@ leiosSimVizModel =
    where
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
+
+-- | Vote messages contain multiple votes each, so we bump the count by that amount
+adjustNumVotes :: BlockEvent -> VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg
+adjustNumVotes Generate msg vs = vs{numMsgsGenerated = numMsgsGenerated vs + fromIntegral msg.votes - 1}
+adjustNumVotes _ _ vs = vs
 
 initMsgs :: LeiosSimVizMsgsState id msg
 initMsgs =
