@@ -13,9 +13,11 @@ module TimeCompat (
   diffUTCTime,
   threadDelaySI,
   threadDelayNDT,
+  waitUntil,
 )
 where
 
+import Control.Monad (when)
 import Control.Monad.Class.MonadTime.SI (
   DiffTime,
   MonadMonotonicTime (getMonotonicTime),
@@ -39,3 +41,9 @@ threadDelaySI = threadDelay . round . (* 1e6)
 
 threadDelayNDT :: MonadDelay m => NominalDiffTime -> m ()
 threadDelayNDT = threadDelay . round . (* 1e6)
+
+waitUntil :: (MonadMonotonicTime m, MonadDelay m) => Time -> m ()
+waitUntil endtime = do
+  now <- getMonotonicTime
+  let delay = endtime `diffTime` now
+  when (delay > 0) (threadDelaySI delay)

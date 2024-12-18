@@ -60,6 +60,7 @@ library
     LeiosProtocol.Short.VizSim
     LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
+    LeiosProtocol.TaskMultiQueue
     LeiosProtocol.VizSimTestRelay
     ModelTCP
     P2P
