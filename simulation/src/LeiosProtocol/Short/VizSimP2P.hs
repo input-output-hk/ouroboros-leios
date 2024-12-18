@@ -89,12 +89,15 @@ messageDiagram (tag, c) = Dia.fc c $
 
 messageLegend :: CairoDiagram
 messageLegend =
-  Dia.fontSizeO 20 $
-    Dia.lc Dia.black $
-      Dia.hcat
-        [Dia.hcat [messageDiagram (tag, Dia.black), textBox s] | (s, tag) <- [("RB", RB), ("IB", IB), ("EB", EB), ("Vote", VT)]]
+  addBG $
+    Dia.fontSizeO 20 $
+      Dia.lc Dia.black $
+        Dia.hcat
+          [Dia.hcat [messageDiagram (tag, Dia.black), textBox s] | (s, tag) <- [("RB", RB), ("IB", IB), ("EB", EB), ("Vote", VT)]]
  where
   textBox s = Dia.alignedText 0.7 0.5 s `Dia.atop` Dia.phantom (Dia.rect (fromIntegral $ length s * 20 + 10) 20 :: CairoDiagram)
+  -- TODO: figure out why the width needs fudging.
+  addBG d = d `Dia.atop` (Dia.fc Dia.white $ Dia.lc Dia.white $ Dia.rect (Dia.width d + 20 * 12) (Dia.height d))
 
 ------------------------------------------------------------------------------
 -- The vizualisation rendering
@@ -185,9 +188,9 @@ leiosP2PSimVizRenderModel
         }
     )
   screenSize = do
-    renderDiagramAt screenSize (20, 22) messageLegend
     renderLinks
     renderNodes
+    renderDiagramAt screenSize (20, 22) messageLegend
    where
     renderNodes = do
       Cairo.save
@@ -482,9 +485,7 @@ chartBandwidth LeiosModelConfig{recentSpan} =
      _
      ( SimVizModel
         _
-        vs@LeiosSimVizState
-          { vizMsgsAtNodeRecentBuffer
-          }
+        vs
       ) ->
         (Chart.def :: Chart.Layout Double Double)
           { Chart._layout_title = "Distribution of block frequency"
