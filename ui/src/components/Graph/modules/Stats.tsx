@@ -53,6 +53,7 @@ export const Stats: FC = () => {
       txPropagations: 0,
       votesGenerated: 0,
       votesPropagations: 0,
+      ...aggregatedData.global,
     } as ISimulationAggregatedTotalData,
   );
 
@@ -66,10 +67,13 @@ export const Stats: FC = () => {
         <h4 className="flex items-center justify-between gap-4">IB Propagations: <span>{totals.ibPropagations}</span></h4>
         <h4 className="flex items-center justify-between gap-4">EB Generated: <span>{totals.ebGenerated}</span></h4>
         <h4 className="flex items-center justify-between gap-4">EB Propagations: <span>{totals.ebPropagations}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">PB Generated: <span>{totals.pbGenerated}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">PB Propagations: <span>{totals.pbPropagations}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">Votes Generated: <span>{totals.votesGenerated}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">Votes Propagations: <span>{totals.votesPropagations}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Blocks Generated: <span>{totals.pbGenerated}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Block Propagations: <span>{totals.pbPropagations}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Vote Bundles Generated: <span>{totals.votesGenerated}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Vote Bundle Propagations: <span>{totals.votesPropagations}</span></h4>
+        <br />
+        <h4 className="flex items-center justify-between gap-4">Transactions On-Chain Directly<span>{totals.praosTxOnChain}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Transactions On-Chain from Leios<span>{totals.leiosTxOnChain}</span></h4>
       </div>
     </div>
   );

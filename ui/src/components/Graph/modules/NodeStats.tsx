@@ -24,27 +24,27 @@ export const NodeStats: FC = () => {
   const { left, top } = useMemo(() => {
     const margin = 10;
     const elementRect = ref.current?.getBoundingClientRect();
-  
+
     if (!elementRect) {
       return { left: 0, top: 0 };
     }
-  
+
     const fx = currentNodeData?.fx ?? 0;
     const fy = currentNodeData?.fy ?? 0;
-  
+
     // Convert node position to canvas pixel space
     const nodeCanvasX = fx * canvasScale + canvasOffsetX;
     const nodeCanvasY = fy * canvasScale + canvasOffsetY;
-  
+
     // Start by placing the box with bottom-left corner at the node's position
     let calculatedLeft = nodeCanvasX + margin;
     let calculatedTop = nodeCanvasY - margin - elementRect.height;
-  
+
     // If the box goes off the top of the screen, place it below the node
     if (calculatedTop < 0) {
       calculatedTop = nodeCanvasY - margin;
     }
-  
+
     // If the box goes off the right side of the screen, place it to the left of the node
     if (calculatedLeft + elementRect.width > screen.width) {
       calculatedLeft = nodeCanvasX - elementRect.width - margin;
@@ -52,13 +52,13 @@ export const NodeStats: FC = () => {
       // If it goes off the left side, adjust to the right again
       calculatedLeft = nodeCanvasX - margin;
     }
-  
+
     return {
       left: calculatedLeft,
       top: calculatedTop,
     };
   }, [currentNodeData, canvasScale, canvasOffsetX, canvasOffsetY]);
-  
+
   return (
     <div
       ref={ref}

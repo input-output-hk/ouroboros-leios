@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import readline from "readline";
 
 import { EMessageType, IServerMessage } from "@/components/Graph/types";
-import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
+import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/GraphContext/types";
 import { messagesPath } from "../../utils";
 import { processMessage } from "./utils";
 
@@ -97,7 +97,15 @@ export async function GET(req: Request, res: Response) {
         const aggregatedData: ISimulationAggregatedDataState = {
           progress: 0,
           nodes: new Map(),
+          global: {
+            praosTxOnChain: 0,
+            leiosTxOnChain: 0,
+          },
           lastNodesUpdated: [],
+        };
+        const intermediate: ISimulationIntermediateDataState = {
+          txsPerIb: new Map(),
+          txsPerEb: new Map(),
         };
 
         interval = setInterval(() => {
@@ -145,7 +153,7 @@ export async function GET(req: Request, res: Response) {
                 nodesUpdated.add(data.message.sender.toString())
               }
 
-              processMessage(data, aggregatedData);
+              processMessage(data, aggregatedData, intermediate);
             }
 
             const serializedData = {
@@ -167,7 +175,7 @@ export async function GET(req: Request, res: Response) {
           if (!line) {
             return;
           }
-          
+
           eventBuffer.push(line);
         });
 

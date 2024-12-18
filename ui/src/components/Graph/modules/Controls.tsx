@@ -10,16 +10,14 @@ export const Controls: FC = memo(() => {
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
 
   const handleCancelSim = useCallback(() => {
-    () => {
-      stopStream();
-      dispatch({
-        type: "BATCH_UPDATE",
-        payload: {
-          currentNode: undefined,
-          aggregatedData: defaultAggregatedData,
-        },
-      });
-    }
+    stopStream();
+    dispatch({
+      type: "BATCH_UPDATE",
+      payload: {
+        currentNode: undefined,
+        aggregatedData: defaultAggregatedData,
+      },
+    });
   }, [stopStream, dispatch])
 
   return (

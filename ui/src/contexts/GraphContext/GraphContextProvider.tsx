@@ -50,7 +50,7 @@ export const GraphContextProvider: FC<
   }, []);
 
   const [state, dispatch] = useReducer(reducer, defaultSyncedState);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current);
   const resolvedState = useMemo(
     () => ({

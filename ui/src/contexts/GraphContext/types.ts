@@ -20,6 +20,8 @@ export interface ISimulationAggregatedTotalData {
   pbPropagations: number;
   votesGenerated: number;
   votesPropagations: number;
+  praosTxOnChain: number;
+  leiosTxOnChain: number;
 }
 
 export interface ISimulationAggregatedData {
@@ -40,10 +42,21 @@ export interface ISimulationAggregatedData {
   votesSent: number;
 }
 
+export interface ISimulationGlobalData {
+  praosTxOnChain: number;
+  leiosTxOnChain: number;
+}
+
 export interface ISimulationAggregatedDataState {
   progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
+  global: ISimulationGlobalData;
   lastNodesUpdated: string[];
+}
+
+export interface ISimulationIntermediateDataState {
+  txsPerIb: Map<string, number>;
+  txsPerEb: Map<string, number>;
 }
 
 export interface IGraphContextState {
@@ -62,11 +75,13 @@ export interface IGraphContextState {
 export type TGraphContextActions =
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "SET_BATCH_SIZE"; payload: number }
-  | { type: "SET_CANVAS_PROPS"; payload: Partial<{
-    canvasScale: ((prev: number) => number) | number,
-    canvasOffsetX: ((prev: number) => number) | number,
-    canvasOffsetY: ((prev: number) => number) | number
-  }> }
+  | {
+    type: "SET_CANVAS_PROPS"; payload: Partial<{
+      canvasScale: ((prev: number) => number) | number,
+      canvasOffsetX: ((prev: number) => number) | number,
+      canvasOffsetY: ((prev: number) => number) | number
+    }>
+  }
   | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
     type: "BATCH_UPDATE";

@@ -128,6 +128,12 @@ export interface IPraosBlockGenerated {
   id: string;
   slot: number;
   producer: number;
+  endorsement: IEndorsement | null;
+  transactions: number[];
+}
+
+export interface IEndorsement {
+  eb: { id: string }
 }
 
 export interface IPraosBlockReceived {
@@ -151,7 +157,11 @@ export interface IEndorserBlockGenerated {
   id: string;
   slot: number;
   producer: number;
-  blocks: any[] // @todo
+  input_blocks: IInputBlock[] // @todo
+}
+
+export interface IInputBlock {
+  id: string;
 }
 
 export interface IEndorserBlockReceived {
