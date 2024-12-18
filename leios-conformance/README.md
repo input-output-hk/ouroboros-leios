@@ -14,9 +14,9 @@ This is inspired by, and takes into account the experience from, the work done i
   * This implies the specification should expose some interface to be called by Haskell test driver
 * Generators and test "driver" (or test model) are implemented in Haskell, using QuickCheck and possibly quickcheck-dynamic library for state-machine testing
   * The test model should be mostly trivial as it delegates the bulk of the work to the generators (for producing interesting traces) and the specification (to drive the transition system)
-  * Writing good generators is the tricky part as we want them to cover all kind of interesting potential adversarial behavior: delaying messages, injecting double-spending txs or equivocated blocks and transactions, split-brain situations, etc.
+  * Writing good generators is the tricky part as we want them to cover all kind of interesting potential adversarial behaviour: delaying messages, injecting double-spending txs or equivocated blocks and transactions, split-brain situations, etc.
   * **Note**: As the generators need to have deep knowledge of the (expected and observed) state of the SUT and the messages flowing between nodes, it might make sense to define them alongside the formal specification
-* The _test driver_ is defined as a straightforward state machine representing the beahviour of the environment of the SUT
+* The _test driver_ is defined as a straightforward state machine representing the behaviour of the environment of the SUT
   * Messages are _sent_ to the SUT, from other nodes, and _received_ from it
   * The driver could also have access to _logs_ emitted by the SUT, as a non-intrusive way to observe internal behaviour (eg. things which are only observable locally) without depending explicitly on the details of the SUT's state. This is useful to troubleshoot observed conformance failures and to analyse _coverage_ of the generated test sequences
 * The _test adapter_, as the name implies, is there to provide the SUT the _pull-based_ interface it expects
