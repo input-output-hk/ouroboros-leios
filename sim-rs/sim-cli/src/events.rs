@@ -341,6 +341,10 @@ impl EventMonitor {
                 .values()
                 .filter(|tx| tx.included_in_ib.is_some())
                 .collect();
+            let txs_which_reached_eb: BTreeSet<_> = eb_ibs.values()
+                .flatten()
+                .flat_map(|ib_id| ib_txs.get(ib_id).cloned().unwrap_or_default())
+                .collect();
             let empty_ebs = generated_ebs - ibs_in_eb.len() as u64;
             let ibs_which_reached_eb = ebs_containing_ib.len();
             let bundle_count = votes_per_bundle.len();
@@ -417,6 +421,10 @@ impl EventMonitor {
             info!(
                 "{} out of {} IBs expired before they reached an EB.",
                 expired_ibs, generated_ibs,
+            );
+            info!(
+                "{} out of {} transaction(s) were included in at least one EB.",
+                txs_which_reached_eb.len(), txs.len(),
             );
             info!("{} total votes were generated.", total_votes);
             info!("Each stake pool produced an average of {:.3} vote(s) (stddev {:.3}).",

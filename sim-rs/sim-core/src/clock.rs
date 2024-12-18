@@ -123,7 +123,7 @@ impl ClockBarrier {
         };
         if rx.await.is_ok() {
             assert_eq!(self.now(), timestamp);
-            std::mem::forget(guard);    
+            std::mem::forget(guard);
         }
     }
 }
