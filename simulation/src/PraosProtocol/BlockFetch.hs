@@ -659,3 +659,20 @@ processWaiting tracer npar blocksVar waitingVar = go
     let chunks Nothing xs = [xs]
         chunks (Just m) xs = map (take m) . takeWhile (not . null) . iterate (drop m) $ xs
     return . mapM_ parallelDelay . chunks npar . concat . Map.elems $ toValidate
+
+processWaiting' ::
+  forall m a b.
+  (MonadSTM m, MonadDelay m) =>
+  TVar m (Map ConcreteHeaderHash a) ->
+  TVar m (Map ConcreteHeaderHash [m b]) ->
+  m ()
+processWaiting' blocksVar waitingVar = go
+ where
+  go = forever $ join $ atomically $ do
+    waiting <- readTVar waitingVar
+    when (Map.null waiting) retry
+    blocks <- readTVar blocksVar
+    let toValidate = Map.intersection waiting blocks
+    when (Map.null toValidate) retry
+    writeTVar waitingVar $! waiting Map.\\ toValidate
+    return . sequence_ . concat . Map.elems $ toValidate

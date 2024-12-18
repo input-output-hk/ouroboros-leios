@@ -138,8 +138,8 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
-            , headerValidationDelay = const 0.1
-            , threadDelayParallel = sum >>> \d -> when (d >= 0) $ threadDelaySI d
+            , -- sequential validation of headers
+              validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelaySI d
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll

@@ -497,8 +497,7 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
-  , headerValidationDelay :: header -> DiffTime
-  , threadDelayParallel :: [DiffTime] -> m ()
+  , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
@@ -785,7 +784,7 @@ relayConsumerPipelined config sst =
       unless (Seq.length idsSeq <= fromIntegral windowExpand) $
         throw IdsNotRequested
 
-      config.threadDelayParallel $ map config.headerValidationDelay headers
+      config.validateHeaders headers
 
       -- Upon receiving a batch of new headers we extend our available set,
       -- and extend the unacknowledged sequence.

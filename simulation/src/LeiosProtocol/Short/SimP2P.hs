@@ -125,6 +125,7 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} =
       , rankingBlockPayload = 0
       , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
+      , processingCores = Infinite
       , nodeId
       , rng
       }

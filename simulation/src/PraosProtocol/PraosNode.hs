@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -10,7 +11,7 @@ where
 
 import ChanMux
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
-import Control.Tracer (Tracer)
+import Control.Tracer (Tracer, traceWith)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
@@ -57,12 +58,13 @@ preferredChain st = do
 -- Peer requires ChainSyncConsumer and BlockFetchConsumer
 addPeer ::
   (IsBody body, MonadSTM m, MonadDelay m) =>
+  (BlockHeader -> m ()) ->
   PraosNodeState body m ->
   m (PraosNodeState body m, PeerId)
-addPeer st = do
+addPeer f st = do
   chainVar <- newTVarIO Chain.Genesis
   (blockFetchControllerState, peerId) <- BlockFetch.addPeer (asReadOnly chainVar) st.blockFetchControllerState
-  let chainSyncConsumerStates = Map.insert peerId (ChainConsumerState chainVar) st.chainSyncConsumerStates
+  let chainSyncConsumerStates = Map.insert peerId (ChainConsumerState chainVar f) st.chainSyncConsumerStates
   return (PraosNodeState{..}, peerId)
 
 runPeer ::
@@ -138,20 +140,25 @@ setupPraosThreads ::
   m [Concurrently m ()]
 setupPraosThreads tracer cfg st0 followers peers = do
   (ts, f) <- BlockFetch.setupValidatorThreads tracer cfg st0.blockFetchControllerState 1 -- TODO: parameter
-  (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg f st0 followers peers
+  let valHeader h = do
+        let !delay = cfg.headerValidationDelay h
+        traceWith tracer (PraosNodeEventCPU (CPUTask delay))
+        threadDelaySI delay
+  (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 
 setupPraosThreads' ::
   (IsBody body, Show body, MonadAsync m, MonadSTM m, MonadDelay m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
+  (BlockHeader -> m ()) ->
   (Block body -> m () -> m ()) ->
   PraosNodeState body m ->
   [Praos body (Chan m)] ->
   [Praos body (Chan m)] ->
   m [Concurrently m ()]
-setupPraosThreads' tracer cfg submitFetchedBlock st0 followers peers = do
+setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
-  (st2, peerIds) <- repeatM addPeer (length peers) st1
+  (st2, peerIds) <- repeatM (addPeer valHeader) (length peers) st1
   let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer tracer cfg submitFetchedBlock st2) peerIds peers

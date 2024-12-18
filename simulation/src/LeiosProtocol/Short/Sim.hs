@@ -117,6 +117,7 @@ traceRelayLink1 tcpprops =
                 inputBlockPayload = 96 * 1024
               , -- \^ overall size of txs to include in IBs
                 processingQueueBound = 100
+              , processingCores = Infinite
               , ..
               }
 
