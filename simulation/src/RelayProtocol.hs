@@ -26,6 +26,8 @@ module RelayProtocol (
   relayClient,
 ) where
 
+import Chan (Chan (readChan, writeChan))
+import ChanTCP (MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad (when)
 import Data.FingerTree (FingerTree)
@@ -40,9 +42,6 @@ import qualified Data.Set as Set
 import Data.Word (Word64)
 import STMCompat
 import TimeCompat
-
-import Chan (Chan (readChan, writeChan))
-import ChanTCP (MessageSize (..))
 
 -- | The block relay buffer is a queue of blocks. The buffer is used to
 -- communicate currently active valid blocks.

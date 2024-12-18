@@ -137,7 +137,7 @@ relayNode
         -- TODO: make different generators produce different non-overlapping ids
 
         go !blkid = do
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let blk =
                 TestBlock
@@ -156,7 +156,7 @@ relayNode
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
               gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
               blkid = TestBlockId blkidn
@@ -204,7 +204,7 @@ relayNode
     processing submitq =
       forever $ do
         (blk, completion) <- atomically $ readTQueue submitq
-        threadDelaySI (blockProcessingDelay blk)
+        threadDelay (blockProcessingDelay blk)
         _ <- atomically completion -- "relayNode: completions should not block"
         traceWith tracer (RelayNodeEventEnterBuffer blk)
 

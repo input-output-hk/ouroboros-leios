@@ -86,7 +86,7 @@ tracePraosP2P
                 (Map.keys p2pNodes)
                 (unfoldr (Just . split) rng0)
           ]
-        forever $ threadDelaySI 1000
+        forever $ threadDelay 1000
    where
     tracer :: Tracer (IOSim s) PraosEvent
     tracer = simTracer

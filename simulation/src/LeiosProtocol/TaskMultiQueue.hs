@@ -1,10 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 
 module LeiosProtocol.TaskMultiQueue where
@@ -29,7 +26,7 @@ newTaskMultiQueue :: (MonadSTM m, IsLabel l) => Natural -> STM m (TaskMultiQueue
 newTaskMultiQueue = newTaskMultiQueue' (minBound, maxBound)
 
 writeTMQueue :: (MonadSTM m, IsLabel l) => TaskMultiQueue l m -> l -> (CPUTask, m ()) -> STM m ()
-writeTMQueue (TaskMultiQueue mq) lbl task = writeTBQueue (mq ! lbl) task
+writeTMQueue (TaskMultiQueue mq) lbl = writeTBQueue (mq ! lbl)
 
 readTMQueue :: forall m l. (MonadSTM m, IsLabel l) => TaskMultiQueue l m -> l -> STM m (CPUTask, m ())
 readTMQueue (TaskMultiQueue mq) lbl = readTBQueue (mq ! lbl)
@@ -39,13 +36,13 @@ flushTMQueue (TaskMultiQueue mq) = forM (assocs mq) (\(l, q) -> (l,) <$> flushTB
 
 runInfParallelBlocking ::
   forall m l.
-  (MonadSTM m, MonadDelay m, IsLabel l, MonadMonotonicTime m) =>
+  (MonadSTM m, MonadDelay m, IsLabel l, MonadMonotonicTimeNSec m) =>
   Tracer m CPUTask ->
   TaskMultiQueue l m ->
   m ()
 runInfParallelBlocking tracer mq = do
   xs <- atomically $ do
-    xs <- concat . map snd <$> flushTMQueue mq
+    xs <- concatMap snd <$> flushTMQueue mq
     when (null xs) retry
     return xs
   mapM_ (traceWith tracer . fst) xs

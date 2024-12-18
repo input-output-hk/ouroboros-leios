@@ -222,7 +222,7 @@ p2pGraphIdealDiffusionTimesFromNode
   (P2PIdealDiffusionTimes g latencies)
   (NodeId nid) =
     sort
-      [ realToFrac (latencies ! (nid, nid'))
+      [ secondsToDiffTime (latencies ! (nid, nid'))
       | nid' <- range (bounds g)
       ]
 
@@ -257,7 +257,7 @@ p2pGraphIdealDiffusionTimes
                   communicationDelay
                     (NodeId a)
                     (NodeId b)
-                    (realToFrac linkLatency)
+                    (secondsToDiffTime linkLatency)
              in realToFrac msgLatency
         )
         (realToFrac . processingDelay . NodeId)
