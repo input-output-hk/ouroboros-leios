@@ -1,31 +1,41 @@
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NumericUnderscores #-}
-
 module TimeCompat (
-  -- Legacy interfact
-  module Control.Monad.Class.MonadTime.SI,
-  threadDelayNDT,
+  DiffTime,
+  MonadTime (getCurrentTime),
+  MonadDelay (threadDelay),
+  MonadMonotonicTime (getMonotonicTime),
+  Time (Time),
+  UTCTime,
+  NominalDiffTime,
+  diffTimeToSeconds,
+  addTime,
+  addUTCTime,
+  diffTime,
+  diffUTCTime,
   threadDelaySI,
-  MonadDelay,
-  -- Int-as-Micros API
-  Microseconds (..),
-  threadDelayMS,
-) where
+  threadDelayNDT,
+)
+where
 
-import Control.Monad.Class.MonadTime.SI
-import Control.Monad.Class.MonadTimer (MonadDelay (..))
+import Control.Monad.Class.MonadTime.SI (
+  DiffTime,
+  MonadMonotonicTime (getMonotonicTime),
+  MonadTime (getCurrentTime),
+  NominalDiffTime,
+  Time (..),
+  UTCTime,
+  addTime,
+  addUTCTime,
+  diffTime,
+  diffUTCTime,
+ )
+import Control.Monad.Class.MonadTimer (MonadDelay (threadDelay))
+import Data.Time.Clock (diffTimeToPicoseconds)
 
-newtype Microseconds = Microseconds {getMicroseconds :: Int}
-  deriving newtype (Eq, Ord, Show, Enum, Num, Real, Integral)
+diffTimeToSeconds :: DiffTime -> Double
+diffTimeToSeconds = (* 1e-12) . fromIntegral . diffTimeToPicoseconds
 
-threadDelayMS :: MonadDelay m => Microseconds -> m ()
-threadDelayMS micros = threadDelay (getMicroseconds micros)
-
--- | Suspends the current thread for a given amount of time.
-threadDelayNDT :: MonadDelay m => NominalDiffTime -> m ()
-threadDelayNDT = threadDelay . round . (1_000_000 *)
-
--- | Suspends the current thread for a given amount of time.
 threadDelaySI :: MonadDelay m => DiffTime -> m ()
-threadDelaySI = threadDelay . round . (1_000_000 *)
+threadDelaySI = threadDelay . round . (* 1e6)
+
+threadDelayNDT :: MonadDelay m => NominalDiffTime -> m ()
+threadDelayNDT = threadDelay . round . (* 1e6)
