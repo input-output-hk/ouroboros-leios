@@ -52,7 +52,7 @@ example1 =
         Layout $
           leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = leiosSimVizModel trace
+  model = leiosSimVizModel (LeiosModelConfig 5) trace
    where
     trace = exampleTrace1
 
@@ -226,12 +226,18 @@ accumDiffusionLatency' now _nid EnterState msgid _msg vs =
     vs
 accumDiffusionLatency' _now _nid _event _id _msg vs = vs
 
+data LeiosModelConfig = LeiosModelConfig
+  { recentSpan :: DiffTime
+  -- ^ length of time the Recent* maps should cover
+  }
+
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
 leiosSimVizModel ::
+  LeiosModelConfig ->
   LeiosTrace ->
   VizModel LeiosSimVizModel
-leiosSimVizModel =
+leiosSimVizModel LeiosModelConfig{recentSpan} =
   simVizModel
     accumEventVizState
     pruneVisState
@@ -401,9 +407,9 @@ leiosSimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo10) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgoSpan) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo10) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgoSpan) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       , ibDiffusionLatency =
@@ -412,17 +418,17 @@ leiosSimVizModel =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (ebDiffusionLatency vs)
       , voteDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (voteDiffusionLatency vs)
-      , ibMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.ibMsgs
-      , ebMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.ebMsgs
-      , voteMsgs = pruneLeiosMsgsState (secondsAgo10, now) vs.voteMsgs
+      , ibMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.ibMsgs
+      , ebMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.ebMsgs
+      , voteMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.voteMsgs
       , nodeCpuUsage =
           Map.map
-            (`ILMap.intersecting` coerce (ClosedInterval secondsAgo10 now))
+            (`ILMap.intersecting` coerce (ClosedInterval secondsAgoSpan now))
             vs.nodeCpuUsage
       }
    where
-    secondsAgo10 :: Time
-    secondsAgo10 = addTime (-10) now
+    secondsAgoSpan :: Time
+    secondsAgoSpan = addTime (negate recentSpan) now
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
 

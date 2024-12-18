@@ -34,6 +34,7 @@ import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   IBsInRBsReport (..),
+  LeiosModelConfig (..),
   LeiosSimVizModel,
   LeiosSimVizMsgsState (..),
   LeiosSimVizState (..),
@@ -108,6 +109,7 @@ data LeiosP2PSimVizConfig
   , ebColor :: EndorseBlock -> (Double, Double, Double)
   , voteColor :: VoteMsg -> (Double, Double, Double)
   , ptclMessageColor :: LeiosMessage -> Maybe (MsgTag, Dia.Colour Double)
+  , model :: LeiosModelConfig
   }
 
 leiosP2PSimVizRender ::
@@ -473,16 +475,15 @@ chartDiffusionImperfection
         (const processingDelay)
         (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
 
-chartBandwidth :: VizRender LeiosSimVizModel
-chartBandwidth =
+chartBandwidth :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartBandwidth LeiosModelConfig{recentSpan} =
   chartVizRender 25 $
     \_
      _
      ( SimVizModel
         _
-        LeiosSimVizState
-          { vizMsgsAtNodeRecentQueue
-          , vizMsgsAtNodeRecentBuffer
+        vs@LeiosSimVizState
+          { vizMsgsAtNodeRecentBuffer
           }
       ) ->
         (Chart.def :: Chart.Layout Double Double)
@@ -492,7 +493,7 @@ chartBandwidth =
               Chart.def
                 { Chart._laxis_generate =
                     Chart.scaledAxis Chart.def{Chart._la_nLabels = maxX} (0, maxX)
-                , Chart._laxis_title = "Count of events within last 10 seconds"
+                , Chart._laxis_title = "Count of events within last " ++ show (round recentSpan :: Int) ++ " seconds"
                 }
           , Chart._layout_y_axis =
               Chart.def
@@ -510,20 +511,32 @@ chartBandwidth =
                 )
               | not (Map.null vizMsgsAtNodeRecentBuffer)
               ]
-                ++ [ bandwidthHistPlot
-                    "Network (block arrival)"
-                    Chart.blue
-                    ( map
-                        ((fromIntegral :: Int -> Double) . recentRate)
-                        (Map.elems vizMsgsAtNodeRecentQueue)
-                    )
-                   | not (Map.null vizMsgsAtNodeRecentQueue)
-                   ]
+                ++ networkPlot vs
           }
  where
+  networkPlot vs =
+    [ bandwidthHistPlot
+      "Network (block arrival)"
+      Chart.blue
+      ( map
+          (fromIntegral :: Int -> Double)
+          (Map.elems recentQueueRate)
+      )
+    | not (Map.null recentQueueRate)
+    ]
+   where
+    recentQueueRate :: Map.Map NodeId Int
+    recentQueueRate =
+      Map.unionsWith (+) $
+        [Map.map recentRate m | m <- maps]
+    maps =
+      [ vs.vizMsgsAtNodeRecentQueue
+      , vs.ibMsgs.msgsAtNodeRecentQueue
+      , vs.ebMsgs.msgsAtNodeRecentQueue
+      , vs.voteMsgs.msgsAtNodeRecentQueue
+      ]
   maxX :: Num a => a
-  maxX = 15
-
+  maxX = 150
   bandwidthHistPlot title color values =
     Chart.histToPlot $
       Chart.defaultNormedPlotHist
@@ -629,6 +642,7 @@ defaultVizConfig stageLength =
     , voteColor = toSRGB . voteColor
     , ebColor = toSRGB . ebColor
     , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
+    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength}
     }
  where
   testPtclMessageColor ::
@@ -691,7 +705,7 @@ toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
 example2 :: Int -> Int -> Maybe P2PTopography -> Visualization
 example2 seed sliceLength maybeP2PTopography =
-  slowmoVisualization 0.5 $
+  slowmoVisualization 2 $
     Viz model $
       LayoutAbove
         [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
@@ -715,7 +729,8 @@ example2 seed sliceLength maybeP2PTopography =
                     ]
                 , LayoutAbove
                     [ LayoutReqSize 350 300 $
-                        Layout chartBandwidth
+                        Layout $
+                          chartBandwidth modelConfig
                     , LayoutReqSize 350 300 $
                         Layout chartLinkUtilisation
                     ]
@@ -724,6 +739,7 @@ example2 seed sliceLength maybeP2PTopography =
         ]
  where
   config = defaultVizConfig 5
+  modelConfig = config.model
   rng0 = mkStdGen seed
   (rng1, rng2) = Random.split rng0
   p2pTopography =
@@ -739,4 +755,4 @@ example2 seed sliceLength maybeP2PTopography =
           , p2pNodeLinksClose = 5
           , p2pNodeLinksRandom = 5
           }
-  model = leiosSimVizModel (exampleTrace2 rng2 sliceLength p2pTopography)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography)
