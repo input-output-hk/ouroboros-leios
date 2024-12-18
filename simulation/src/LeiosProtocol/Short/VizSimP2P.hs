@@ -501,39 +501,41 @@ chartBandwidth LeiosModelConfig{recentSpan} =
                     Chart.scaledAxis Chart.def{Chart._la_nLabels = 4} (0, 0.35)
                 , Chart._laxis_title = "Number of nodes in each bin (normalised)"
                 }
-          , Chart._layout_plots =
-              [ bandwidthHistPlot
-                "CPU (block validation completion)"
-                Chart.red
-                ( map
-                    ((fromIntegral :: Int -> Double) . recentRate)
-                    (Map.elems vizMsgsAtNodeRecentBuffer)
-                )
-              | not (Map.null vizMsgsAtNodeRecentBuffer)
-              ]
-                ++ networkPlot vs
+          , Chart._layout_plots = validationPlot vs ++ networkPlot vs
           }
  where
-  networkPlot vs =
+  recentPlot lbl color maps =
     [ bandwidthHistPlot
-      "Network (block arrival)"
-      Chart.blue
+      lbl
+      color
       ( map
           (fromIntegral :: Int -> Double)
-          (Map.elems recentQueueRate)
+          (Map.elems recent)
       )
-    | not (Map.null recentQueueRate)
+    | not (Map.null recent)
     ]
    where
-    recentQueueRate :: Map.Map NodeId Int
-    recentQueueRate =
+    recent :: Map.Map NodeId Int
+    recent =
       Map.unionsWith (+) $
         [Map.map recentRate m | m <- maps]
-    maps =
+  networkPlot vs =
+    recentPlot
+      "Network (block arrival)"
+      Chart.blue
       [ vs.vizMsgsAtNodeRecentQueue
       , vs.ibMsgs.msgsAtNodeRecentQueue
       , vs.ebMsgs.msgsAtNodeRecentQueue
       , vs.voteMsgs.msgsAtNodeRecentQueue
+      ]
+  validationPlot vs =
+    recentPlot
+      "CPU (block validation completion)"
+      Chart.red
+      [ vs.vizMsgsAtNodeRecentBuffer
+      , vs.ibMsgs.msgsAtNodeRecentBuffer
+      , vs.ebMsgs.msgsAtNodeRecentBuffer
+      , vs.voteMsgs.msgsAtNodeRecentBuffer
       ]
   maxX :: Num a => a
   maxX = 150
