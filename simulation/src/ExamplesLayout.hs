@@ -5,6 +5,7 @@ module ExamplesLayout where
 import qualified Graphics.Rendering.Cairo as Cairo
 import Numeric (showFFloat)
 
+import TimeCompat (secondsToDiffTime)
 import Viz
 
 ------------------------------------------------------------------------------
@@ -80,7 +81,7 @@ example5 =
 
 example6 :: Visualization
 example6 =
-  slowmoVisualization 0.1 $
+  slowmoVisualization (secondsToDiffTime 0.1) $
     Viz nullVizModel $
       LayoutAbove
         [ layoutLabelTime

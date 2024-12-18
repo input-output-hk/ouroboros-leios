@@ -13,7 +13,7 @@ import Control.Monad.Class.MonadAsync (
  )
 import Control.Monad.IOSim as IOSim (
   IOSim,
-  SimEvent (SimEvent, seTime, seType),
+  SimEvent (seType),
   SimEventType (EventLog),
   SimTrace,
   runSimTrace,
@@ -196,9 +196,9 @@ selectTimedEvents =
   bifoldr
     (\_ _ -> [])
     ( \b acc -> case b of
-        SimEvent{seTime, seType}
-          | Just b' <- selectDynamic seType ->
-              (seTime, b') : acc
+        se
+          | Just b' <- selectDynamic (seType se) ->
+              (seTimeCompat se, b') : acc
         _ -> acc
     )
     []

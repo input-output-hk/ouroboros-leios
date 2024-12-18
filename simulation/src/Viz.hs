@@ -98,7 +98,7 @@ stepModelWithTime VizModel{stepModel} fps (time, frameno, model) =
     | frameno' `mod` fps == 0 =
         Time (fromIntegral (frameno' `div` fps) :: DiffTime)
     | otherwise =
-        addTime (1 / fromIntegral fps :: DiffTime) time
+        addTime (secondsToDiffTime (1 / fromIntegral fps)) time
 
   !timestep = time' `diffTime` time
 
@@ -710,7 +710,7 @@ layoutLabelTime =
     Cairo.moveTo 5 20
     Cairo.setFontSize 20
     Cairo.setSourceRGB 0 0 0
-    Cairo.showText (printf "Time (sec): %.4fs" (diffTimeToSeconds t) :: String)
+    Cairo.showText (printf "Time (sec): %.2fs" (diffTimeToSeconds t) :: String)
 
 layoutLabel :: Int -> String -> Layout (VizRender model)
 layoutLabel size label =

@@ -53,7 +53,7 @@ traceRelayP2P
               (inChan, outChan) <-
                 newConnectionTCP
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency))
+                  (tcpprops (secondsToDiffTime latency))
               return ((na, nb), (inChan, outChan))
             | ((na, nb), latency) <- Map.toList p2pLinks
             ]

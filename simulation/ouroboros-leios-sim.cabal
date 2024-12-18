@@ -138,6 +138,7 @@ library
     , quiet
     , random
     , serialise
+    , si-timers
     , singletons
     , sqlite-simple              >=0.4
     , temporary

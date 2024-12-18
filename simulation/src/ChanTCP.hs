@@ -61,7 +61,7 @@ instance (MessageSize a, MessageSize b) => MessageSize (a, b) where
 -- symmetric and without jitter.
 newConnectionTCP ::
   forall m a.
-  (MonadTime m, MonadMonotonicTime m, MonadDelay m, MonadAsync m, MessageSize a) =>
+  (MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize a) =>
   Tracer m (LabelTcpDir (TcpEvent a)) ->
   TcpConnProps ->
   m (Chan m a, Chan m a)
@@ -107,7 +107,7 @@ writeSendBuf :: MonadSTM m => SendBuf m a -> a -> m ()
 writeSendBuf sendbuf msg = atomically (putTMVar sendbuf msg)
 
 readRecvBuf ::
-  (MonadSTM m, MonadMonotonicTime m, MonadDelay m) =>
+  (MonadSTM m, MonadMonotonicTimeNSec m, MonadDelay m) =>
   RecvBuf m a ->
   m a
 readRecvBuf recvbuf = do
@@ -125,7 +125,7 @@ readRecvBuf recvbuf = do
   return msg
 
 mkChan ::
-  (MonadSTM m, MonadMonotonicTime m, MonadDelay m) =>
+  (MonadSTM m, MonadMonotonicTimeNSec m, MonadDelay m) =>
   SendBuf m a ->
   RecvBuf m a ->
   Chan m a
