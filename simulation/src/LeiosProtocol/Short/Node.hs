@@ -395,7 +395,7 @@ leiosNode tracer cfg followers peers = do
       ]
 
 processCPUTasks ::
-  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m) =>
+  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m, MonadFork m) =>
   NumCores ->
   Tracer m CPUTask ->
   TaskMultiQueue LeiosNodeTask m ->
