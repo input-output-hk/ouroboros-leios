@@ -2,6 +2,20 @@
 
 ## 2024-12-19
 
+### Revised analysis of votes and certificates
+
+Analysis and discussion of the cryptographic options for Leios votes and certificates has clarified the key challenges and constraints involved in selecting algorithms and formats. Several options still exist, but some have been eliminated.
+
+![Cryptographic options for Leios certificates](https://github.com/user-attachments/assets/58bafab1-81ba-46ed-8944-09151298cde7)
+
+Research is continuing, but interim findings indicate that BLS is most viable for Leios.
+
+- ALBA is only viable if SNARKified.
+    - It is very unlikely that Leios votes could be made small enough to fit in non-SNARKified ALBA certificates.
+- BLS is likely viable, with or without SNARKification.
+    - Options exist for creating or verifying BLS certificates incrementally.
+- MUSEN is inferior to BLS in key metrics relevant for Leios.
+
 ### Jupyter support for new DeltaQ
 
 The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Haskell packages provide a polynomial-based implementation of DeltaQ, with many new combinators and a comprehensive property-based test suite. We created [nix derivations](https://github.com/functionally/dq-revamp-jupyter) for running this locally and for creating docker images. This new library can be used for cross-checking other DeltaQ implementations such as Leios's Rust code.
