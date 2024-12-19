@@ -20,7 +20,6 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
-import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 import ModelTCP (
   Bytes,
@@ -95,13 +94,13 @@ newConnectionTCP tracer tcpprops = do
   return (clientChan, serverChan)
 
 type SendBuf m a = TMVar m a
-type RecvBuf m a = TVar m (MinPQueue Time a)
+type RecvBuf m a = TQueue m (Time, a)
 
 newSendBuf :: MonadSTM m => m (SendBuf m a)
 newSendBuf = newEmptyTMVarIO
 
 newRecvBuf :: MonadSTM m => m (RecvBuf m a)
-newRecvBuf = newTVarIO PQ.empty
+newRecvBuf = newTQueueIO
 
 writeSendBuf :: MonadSTM m => SendBuf m a -> a -> m ()
 writeSendBuf sendbuf msg = atomically (putTMVar sendbuf msg)
@@ -111,13 +110,7 @@ readRecvBuf ::
   RecvBuf m a ->
   m a
 readRecvBuf recvbuf = do
-  (arrivaltime, msg) <- atomically $ do
-    arrivals <- readTVar recvbuf
-    case PQ.minViewWithKey arrivals of
-      Nothing -> retry
-      Just (res, arrivals') -> do
-        writeTVar recvbuf arrivals'
-        return res
+  (arrivaltime, msg) <- atomically $ readTQueue recvbuf
 
   now <- getMonotonicTime
   let delay = arrivaltime `diffTime` now
@@ -175,7 +168,7 @@ transport tracer tcpprops sendbuf recvbuf = do
           ) = assert (msgsize > 0) $ forecastTcpMsgSend tcpprops tcpstate' now' msgsize
 
     -- schedule the arrival, and wait until it has finished sending
-    atomically $ modifyTVar' recvbuf (PQ.insert msgRecvTrailingEdge msg)
+    atomically $ writeTQueue recvbuf (msgRecvTrailingEdge, msg)
     traceWith tracer (TcpSendMsg msg forecast tcpforecasts)
     threadDelay (msgSendTrailingEdge `diffTime` now')
     -- We keep the sendbuf full until the message has finished sending
