@@ -3,9 +3,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
-use sim_core::config::{RawLinkConfig, RawNodeConfig};
+use sim_core::config::{RawConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distribute_stake, LinkTracker};
+use crate::strategy::utils::{distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
@@ -20,7 +20,7 @@ fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
     (dist_x.powi(2) + dist_y.powi(2)).sqrt()
 }
 
-pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -98,7 +98,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
         }
     }
 
-    Ok((nodes, links.links))
+    Ok(generate_full_config(nodes, links.links))
 }
 
 fn track_connections(
@@ -113,5 +113,24 @@ fn track_connections(
         for next in nexts {
             track_connections(connected, connections, *next);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_core::config::SimConfiguration;
+
+    use super::{random_graph, RandomGraphArgs};
+
+    #[test]
+    fn should_generate_valid_graph() {
+        let args = RandomGraphArgs {
+            node_count: 1000,
+            stake_pool_count: 50,
+        };
+
+        let raw_config = random_graph(&args).unwrap();
+        let config: SimConfiguration = raw_config.into();
+        config.validate().unwrap();
     }
 }

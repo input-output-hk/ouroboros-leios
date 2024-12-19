@@ -34762,7 +34762,7 @@ nodes = [
 [transaction_frequency_ms]
 distribution = "exp"
 lambda = 0.85
-scale = 1000.0
+scale = 40.0
 
 [transaction_size_bytes]
 distribution = "log_normal"
