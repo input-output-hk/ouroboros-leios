@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2024-12-19
+
+### Jupyter support for new DeltaQ
+
+The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Haskell packages provide a polynomial-based implementation of DeltaQ, with many new combinators and a comprehensive property-based test suite. We created [nix derivations](https://github.com/functionally/dq-revamp-jupyter) for running this locally and for creating docker images. This new library can be used for cross-checking other DeltaQ implementations such as Leios's Rust code.
+
 ## 2024-12-17
 
 ### GitHub Actions
