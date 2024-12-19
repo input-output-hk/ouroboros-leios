@@ -89,7 +89,8 @@ parserOptions =
 
 runVizCommand :: VizCommand -> IO ()
 runVizCommand opt@VizCommandWithOptions{..} = do
-  viz <- vizOptionsToViz opt
+  viz0 <- vizOptionsToViz opt
+  let viz = maybe viz0 ((`slowmoVisualization` viz0) . secondsToDiffTime) vizSlowDown
   case vizOutputFramesDir of
     Nothing ->
       let gtkVizConfig =
@@ -115,6 +116,7 @@ data VizCommand = VizCommandWithOptions
   , vizOutputStartTime :: Maybe Int
   , vizCpuRendering :: Bool
   , vizSize :: Maybe VizSize
+  , vizSlowDown :: Maybe Double
   }
 
 parserVizCommand :: Parser VizCommand
@@ -149,7 +151,14 @@ parserVizCommand =
           <> help "Use CPU-based client side Cairo rendering"
       )
     <*> optional vizSizeOptions
-
+    <*> optional
+      ( option
+          auto
+          ( long "slowdown"
+              <> metavar "R"
+              <> help "Simulation time speed multiplier, applied on top of predefined speed."
+          )
+      )
 data VizSubCommand
   = VizTCP1
   | VizTCP2
