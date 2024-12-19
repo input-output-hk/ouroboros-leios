@@ -5,19 +5,12 @@ use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use sim_core::config::{RawConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distribute_stake, generate_full_config, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
     node_count: usize,
     stake_pool_count: usize,
-}
-
-fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
-    // euclidean distance probably good enough
-    let dist_x = (lat2 - lat1).rem_euclid(180.0);
-    let dist_y = (long2 - long1).rem_euclid(180.0);
-    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
 }
 
 pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
@@ -43,8 +36,8 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
 
     println!("generating edges...");
     let alpha = 0.15;
-    let beta = 0.2;
-    let max_distance = distance((0.0, 90.0), (90.0, 180.0));
+    let beta = 0.25 * (100.0 / args.node_count as f64).min(1.0);
+    let max_distance = distance((-90.0, 90.0), (90.0, 180.0));
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
         let first_candidate_connection = if from < args.stake_pool_count {
@@ -59,7 +52,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
             }
             // nodes are connected probabilistically, based on how far apart they are
             let dist = distance(nodes[from].location, nodes[to].location);
-            let probability = alpha * (-dist / (beta * max_distance)).exp();
+            let probability = beta * (-dist / (alpha * max_distance)).exp();
             if rng.gen_bool(probability) {
                 links.add(from, to, None);
             }

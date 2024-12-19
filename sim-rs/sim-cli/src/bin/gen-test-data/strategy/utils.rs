@@ -47,9 +47,9 @@ pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {
 
 pub fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
     // euclidean distance probably good enough
-    let dist_x = (lat2 - lat1).rem_euclid(180.0);
-    let dist_y = (long2 - long1).rem_euclid(180.0);
-    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
+    let dist_lat = (lat2 - lat1).abs();
+    let dist_long = (long2 - long1).abs().min((long2 - long1 + 180.0).abs());
+    (dist_lat.powi(2) + dist_long.powi(2)).sqrt()
 }
 
 pub fn generate_full_config(nodes: Vec<RawNodeConfig>, links: Vec<RawLinkConfig>) -> RawConfig {
