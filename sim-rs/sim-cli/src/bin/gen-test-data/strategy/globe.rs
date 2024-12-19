@@ -108,9 +108,9 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
     }
 
     println!("generating edges...");
-    let alpha = 0.15;
-    let beta = 0.2;
-    let max_distance = distance((0.0, 90.0), (90.0, 180.0));
+    let alpha = 0.05;
+    let beta = 0.2 * (500.0 / args.node_count as f64).min(1.0);
+    let max_distance = distance((-90.0, 90.0), (90.0, 180.0));
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
         let first_candidate_connection = if from < args.stake_pool_count {
@@ -125,7 +125,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
             }
             // nodes are connected probabilistically, based on how far apart they are
             let dist = distance(nodes[from].location, nodes[to].location);
-            let probability = alpha * (-dist / (beta * max_distance)).exp();
+            let probability = beta * (-dist / (alpha * max_distance)).exp();
             if rng.gen_bool(probability) {
                 links.add(from, to, None);
             }
