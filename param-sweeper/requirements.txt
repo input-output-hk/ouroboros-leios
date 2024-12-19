@@ -1,0 +1,8 @@
+toml==0.10.2
+pandas
+matplotlib
+seaborn
+numpy
+tabulate
+plotly
+tqdm

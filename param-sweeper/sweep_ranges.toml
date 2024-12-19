@@ -1,0 +1,38 @@
+# Base simulation parameters
+slots = [100]
+time_scale = [1.0]
+
+# Network topology
+topology = ["realistic.toml"]
+
+# Transaction parameters
+transaction_frequency_ms = [
+    { distribution = "exp", lambda = 0.85, scale = 10.0 }
+]
+transaction_size_bytes = [
+    { distribution = "log_normal", mu = 6.833, sigma = 1.127 }
+]
+max_tx_size = [16384]
+
+# Block generation parameters
+block_generation_probability = [0.05]
+max_block_size = [90112]
+
+# Pipeline parameters
+stage_length = [15, 20]
+deliver_stage_count = [2]
+
+# IB parameters to sweep
+ib_generation_probability = [5.0]
+ib_shards = [1]
+max_ib_requests_per_peer = [1]
+max_ib_size = [32768000]
+uniform_ib_generation = [true]
+
+# EB parameters
+eb_generation_probability = [5.0]
+
+# Vote parameters
+vote_probability = [500.0]
+vote_threshold = [150]
+one_vote_per_vrf = [false]
