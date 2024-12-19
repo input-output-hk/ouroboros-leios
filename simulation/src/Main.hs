@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import LeiosProtocol.Short.Node (NumCores (..))
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
@@ -176,7 +177,7 @@ data VizSubCommand
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath}
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath, numCores :: NumCores}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -277,6 +278,18 @@ parserShortLeiosP2P1 =
               <> help "The file describing the network topology."
           )
       )
+    <*> option
+      (readCores =<< auto)
+      ( short 'N'
+          <> metavar "NUMBER"
+          <> value Infinite
+          <> help "number of simulated cores for node parallesim, -1 for unbounded (the default)."
+      )
+ where
+  readCores n
+    | n < 0 = pure Infinite
+    | n == 0 = fail "Can't run on 0 cores"
+    | otherwise = pure $ Finite n
 
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
@@ -302,7 +315,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let worldShape = WorldShape (1200, 1000) True
     maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
-    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography
+    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
 
 type VizSize = (Int, Int)
 

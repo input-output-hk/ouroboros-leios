@@ -107,8 +107,8 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> Int -> P2PTopography -> LeiosTrace
-exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} =
+exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
   traceLeiosP2P
     rng0
     p2pTopography
@@ -125,7 +125,7 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} =
       , rankingBlockPayload = 0
       , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
-      , processingCores = Infinite
+      , processingCores
       , nodeId
       , rng
       }

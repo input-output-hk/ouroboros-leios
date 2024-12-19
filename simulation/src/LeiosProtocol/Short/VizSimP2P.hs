@@ -706,8 +706,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Int -> Int -> Maybe P2PTopography -> Visualization
-example2 seed sliceLength maybeP2PTopography =
+example2 :: Int -> Int -> Maybe P2PTopography -> NumCores -> Visualization
+example2 seed sliceLength maybeP2PTopography processingCores =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -758,4 +758,4 @@ example2 seed sliceLength maybeP2PTopography =
           , p2pNodeLinksClose = 5
           , p2pNodeLinksRandom = 5
           }
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography processingCores)
