@@ -19,3 +19,9 @@ build/
 
 # Results directory
 results/
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+sweeper/
