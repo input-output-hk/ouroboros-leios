@@ -356,10 +356,10 @@ instance
   where
   messageSizeBytes MsgInit = 1
   messageSizeBytes (MsgRequestHeaders blocking expand shrink) =
-    messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
-  messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
-  messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
-  messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
+    1 + messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
+  messageSizeBytes (MsgRespondHeaders headers) = 1 + messageSizeBytes headers
+  messageSizeBytes (MsgRequestBodies ids) = 1 + sum (map messageSizeBytes ids)
+  messageSizeBytes (MsgRespondBodies bodies) = 1 + sum (map messageSizeBytes bodies)
   messageSizeBytes MsgDone = 1
 
 relayMessageLabel :: Message (RelayState id header body) st st' -> String
