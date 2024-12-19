@@ -22,10 +22,10 @@ module WorkerPool where
 -- of the sources is relevant: when there are multiple tasks available, new
 -- tasks are
 
-import Control.Concurrent.Class.MonadSTM
 import Control.Monad
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadThrow
+import STMCompat
 
 data Task m where
   Task :: m a -> !(TMVar m (Either SomeException a)) -> Task m
