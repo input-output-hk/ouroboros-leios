@@ -172,7 +172,7 @@ transport tracer tcpprops sendbuf recvbuf = do
             }
           , tcpforecasts
           , tcpstate''
-          ) = forecastTcpMsgSend tcpprops tcpstate' now' msgsize
+          ) = assert (msgsize > 0) $ forecastTcpMsgSend tcpprops tcpstate' now' msgsize
 
     -- schedule the arrival, and wait until it has finished sending
     atomically $ modifyTVar' recvbuf (PQ.insert msgRecvTrailingEdge msg)
