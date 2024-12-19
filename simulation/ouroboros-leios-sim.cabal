@@ -98,6 +98,7 @@ library
     VizSimRelayP2P
     VizSimTCP
     VizUtils
+    WorkerPool
 
   -- other-extensions:
   build-depends:

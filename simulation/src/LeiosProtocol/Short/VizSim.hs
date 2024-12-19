@@ -27,7 +27,7 @@ import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), NumCores (Infinite), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
@@ -52,7 +52,7 @@ example1 =
         Layout $
           leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = leiosSimVizModel (LeiosModelConfig 5) trace
+  model = leiosSimVizModel (LeiosModelConfig 5 Infinite) trace
    where
     trace = exampleTrace1
 
@@ -229,9 +229,10 @@ accumDiffusionLatency' now _nid EnterState msgid _msg vs =
     vs
 accumDiffusionLatency' _now _nid _event _id _msg vs = vs
 
-newtype LeiosModelConfig = LeiosModelConfig
-  { recentSpan :: DiffTime
+data LeiosModelConfig = LeiosModelConfig
+  { recentSpan :: !DiffTime
   -- ^ length of time the Recent* maps should cover
+  , numCores :: !NumCores
   }
 
 -- | Make the vizualisation model for the relay simulation from a simulation
