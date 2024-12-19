@@ -120,6 +120,9 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
         };
 
         for to in first_candidate_connection..args.node_count {
+            if from == to {
+                continue;
+            }
             // nodes are connected probabilistically, based on how far apart they are
             let dist = distance(nodes[from].location, nodes[to].location);
             let probability = alpha * (-dist / (beta * max_distance)).exp();
@@ -135,7 +138,7 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
-                (0..args.node_count).filter(|&to| to == from).collect()
+                (0..args.node_count).filter(|&to| to != from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
             links.add(from, to, None);

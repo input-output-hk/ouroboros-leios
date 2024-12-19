@@ -169,6 +169,7 @@ impl SimConfiguration {
         // The graph must be nonempty and fully connected,
         // and every link must be between two nodes which exist
         let mut connected_nodes = HashSet::new();
+        let mut self_connected_nodes = vec![];
         let mut frontier = VecDeque::new();
         let first_node = self
             .nodes
@@ -178,6 +179,9 @@ impl SimConfiguration {
         while let Some(node) = frontier.pop_front() {
             if connected_nodes.insert(node.id) {
                 for peer_id in &node.peers {
+                    if node.id == *peer_id {
+                        self_connected_nodes.push(node.id);
+                    }
                     let peer = self
                         .nodes
                         .get(peer_id.0)
@@ -185,6 +189,12 @@ impl SimConfiguration {
                     frontier.push_back(peer);
                 }
             }
+        }
+        if !self_connected_nodes.is_empty() {
+            bail!(
+                "{} node(s) are connected to themselves!",
+                self_connected_nodes.len()
+            );
         }
         if connected_nodes.len() < self.nodes.len() {
             bail!("Graph must be fully connected!");
