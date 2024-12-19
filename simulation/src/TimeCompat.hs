@@ -30,6 +30,7 @@ import Control.Monad.IOSim (SimEvent)
 import qualified Control.Monad.IOSim as IOSim (SimEvent (seTime))
 import Data.Aeson.Types (FromJSON, ToJSON)
 import Data.Coerce (coerce)
+import Data.Fixed
 import Data.Word (Word64)
 import "io-classes" Control.Monad.Class.MonadTime (MonadMonotonicTimeNSec, MonadTime (getCurrentTime), NominalDiffTime, UTCTime, addUTCTime, diffUTCTime)
 import qualified "io-classes" Control.Monad.Class.MonadTime as MonadTime (MonadMonotonicTimeNSec (getMonotonicTimeNSec))
@@ -51,9 +52,11 @@ newtype Seconds = Seconds Double
   deriving newtype (ToJSON, FromJSON)
 
 newtype DiffTime = DiffTime Seconds
-  deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Real, Enum, Fractional, RealFrac)
   deriving newtype (ToJSON, FromJSON)
+
+instance Show DiffTime where
+  show d = showFixed True (realToFrac d :: Pico) ++ "s"
 
 newtype Time = Time DiffTime
   deriving newtype (Show, Eq, Ord)
