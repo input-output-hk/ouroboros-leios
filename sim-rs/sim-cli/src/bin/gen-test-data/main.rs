@@ -1,8 +1,8 @@
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use sim_core::config::{DistributionConfig, RawConfig, SimConfiguration};
+use sim_core::config::SimConfiguration;
 use strategy::{globe, random_graph, simplified, GlobeArgs, RandomGraphArgs, SimplifiedArgs};
 
 mod strategy;
@@ -24,44 +24,10 @@ enum Strategy {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let (nodes, links) = match args.strategy {
+    let raw_config = match args.strategy {
         Strategy::RandomGraph(args) => random_graph(&args)?,
         Strategy::Simplified(args) => simplified(&args)?,
         Strategy::Globe(args) => globe(&args)?,
-    };
-
-    let vote_probability = 500.0;
-    let vote_threshold = 150;
-
-    let raw_config = RawConfig {
-        seed: None,
-        timescale: None,
-        slots: None,
-        nodes,
-        trace_nodes: HashSet::new(),
-        links,
-        block_generation_probability: 0.05,
-        ib_generation_probability: 5.0,
-        eb_generation_probability: 5.0,
-        vote_probability,
-        vote_threshold,
-        ib_shards: 8,
-        max_block_size: 90112,
-        stage_length: 2,
-        deliver_stage_count: 2,
-        uniform_ib_generation: true,
-        max_ib_requests_per_peer: 1,
-        one_vote_per_vrf: true,
-        max_ib_size: 327680,
-        max_tx_size: 16384,
-        transaction_frequency_ms: DistributionConfig::Exp {
-            lambda: 0.85,
-            scale: Some(1000.0),
-        },
-        transaction_size_bytes: DistributionConfig::LogNormal {
-            mu: 6.833,
-            sigma: 1.127,
-        },
     };
 
     let serialized = toml::to_string_pretty(&raw_config)?;

@@ -3,9 +3,9 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::{RawLinkConfig, RawNodeConfig};
+use sim_core::config::{RawConfig, RawNodeConfig};
 
-use super::utils::{distribute_stake, LinkTracker};
+use super::utils::{distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -40,7 +40,7 @@ const SHORT_HOP: Duration = Duration::from_millis(12);
 const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
-pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
     let mut rng = thread_rng();
 
     let mut nodes = vec![];
@@ -118,5 +118,21 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawL
         }
     }
 
-    Ok((nodes, links.links))
+    Ok(generate_full_config(nodes, links.links))
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_core::config::SimConfiguration;
+
+    use super::{simplified, SimplifiedArgs};
+
+    #[test]
+    fn should_generate_valid_graph() {
+        let args = SimplifiedArgs { pool_count: 1000 };
+
+        let raw_config = simplified(&args).unwrap();
+        let config: SimConfiguration = raw_config.into();
+        config.validate().unwrap();
+    }
 }

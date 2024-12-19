@@ -7,9 +7,9 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::{RawLinkConfig, RawNodeConfig};
+use sim_core::config::{RawConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distance, distribute_stake, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
@@ -31,7 +31,7 @@ struct Country {
 
 #[derive(Debug, Deserialize)]
 struct RegionData {
-    asn: u64,
+    id: u64,
     latitude: f64,
     longitude: f64,
     proportion: u64,
@@ -48,9 +48,9 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     for country in distribution.countries {
         for region in country.regions {
             for _ in 0..region.proportion {
-                let asn = region.asn;
+                let id = region.id;
                 let location = (region.latitude, (region.longitude + 180.0) / 2.0);
-                region_pool.push((country.name.clone(), asn, location));
+                region_pool.push((country.name.clone(), id, location));
             }
         }
     }
@@ -59,14 +59,14 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     let mut results = vec![];
     let mut rng = thread_rng();
     for _ in 0..node_count {
-        let (country, asn, location) = region_pool
+        let (country, id, location) = region_pool
             .get(rng.gen_range(0..region_pool.len()))
             .unwrap();
         let regions = country_regions.entry(country.clone()).or_default();
-        let number = match regions.iter().position(|r| r == asn) {
+        let number = match regions.iter().position(|r| r == id) {
             Some(index) => index + 1,
             None => {
-                regions.push(*asn);
+                regions.push(*id);
                 regions.len()
             }
         };
@@ -79,7 +79,7 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     results
 }
 
-pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -164,7 +164,7 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
         }
     }
 
-    Ok((nodes, links.links))
+    Ok(generate_full_config(nodes, links.links))
 }
 
 fn track_connections(
@@ -179,5 +179,26 @@ fn track_connections(
         for next in nexts {
             track_connections(connected, connections, *next);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_core::config::SimConfiguration;
+
+    use super::{globe, GlobeArgs};
+
+    #[test]
+    fn should_generate_valid_graph() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/test_data/distribution.toml");
+        let args = GlobeArgs {
+            node_count: 1000,
+            stake_pool_count: 50,
+            distribution: path.into(),
+        };
+
+        let raw_config = globe(&args).unwrap();
+        let config: SimConfiguration = raw_config.into();
+        config.validate().unwrap();
     }
 }
