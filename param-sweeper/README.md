@@ -71,96 +71,47 @@ The `sweep_ranges.toml` file defines which parameters to sweep:
 
 ### Adding Custom Analyzers
 
-1. Create a new analyzer in `analyzers/`:
+1. Create a new analyzer in `src/analyzers/`:
 
 ```python
-from .base import SimulationAnalyzer
-from .events import Event, EventType
-import matplotlib.pyplot as plt
+from src.core import SimulationAnalyzer
 from typing import Dict, List
 
 class MyCustomAnalyzer(SimulationAnalyzer):
-    name = "my_custom"  # Used for metric prefixes and plot filenames
-    
-    def process_events(self, events: List[Event]) -> Dict[str, float]:
-        """Process events and return metrics"""
+    def process_events(self, events: List[Dict]) -> Dict:
+        """Process simulation events and return metrics dictionary"""
         metrics = {}
         for event in events:
-            if event.is_type(EventType.SLOT):
-                # Process event...
-                pass
+            # Process event data
+            pass
         return metrics
     
-    def generate_plots(self, results_df, output_dir):
-        """Generate visualization plots"""
-        plt.figure(figsize=(10, 6))
-        # Create plots...
-        plt.savefig(output_dir / "plots" / f"{self.name}_plot.png")
-        plt.close()
+    def generate_report(self, output_dir: Path) -> None:
+        """Generate analysis report and visualizations"""
+        # Create plots, save metrics, generate reports
+        pass
 ```
 
-2. Register your analyzer in `sweep.py`:
+2. Register your analyzer in `run_sweep.py`:
 
 ```python
-from analyzers.my_custom import MyCustomAnalyzer
+from src.analyzers.my_custom import MyCustomAnalyzer
 
 sweeper = LeiosParamSweeper(...)
 sweeper.register_analyzer(MyCustomAnalyzer())
 ```
 
-### Available Event Types
-
-The following events can be analyzed:
-
-- `SLOT` - New slot started
-- `TRANSACTION_GENERATED` - New transaction created
-- `TRANSACTION_SENT/RECEIVED` - Transaction network events
-- `INPUT_BLOCK_GENERATED` - New input block created
-- `ENDORSER_BLOCK_GENERATED` - New endorser block created
-- And more... (see `analyzers/events.py`)
-
 ### Output Structure
 
-Results are saved in the `results` directory:
+Results are organized in the `results` directory by run:
 
-- `config_*.toml` - Configuration files for each simulation
-- `sim_*.jsonl` - Simulation event logs
-- `plots/` - Generated analysis plots grouped by analyzer
+- `config_XXXX.toml` - Configuration file for the run
+- Analysis artifacts from each analyzer (plots, reports, etc.)
 
 ## Example Analyzers
 
 Currently implemented analyzers:
 
-- `TopologyAnalyzer` - Network topology analysis and visualization
-  ([see example analyses](tests/topology/README.md))
-
-### Example Topology Configurations
-
-The `tests/topology/` directory contains several example network configurations:
-
-- `small` - A compact 25-node network with realistic stake distribution and
-  connectivity patterns, ideal for quick testing and development
-- `medium` - A moderate-sized network with balanced stake distribution and
-  typical relay/producer node relationships
-- `realistic` - A large-scale network configuration modeling real-world stake
-  distribution and network topology
-- `thousand` - A high-scale test configuration with 1000+ nodes, useful for
-  performance and scalability testing
-
-Each topology directory contains:
-
-- `config_0000.toml` - The network configuration file
-- `topology_metrics.png` - Visualization of network metrics and connectivity
-- `ib_diffusion.png` - Analysis of input block propagation patterns
-- `topology_issues.md` - Detailed report of network characteristics and
-  potential issues
-
-## Contributing
-
-To add new analysis capabilities:
-
-1. Create a new analyzer class inheriting from `SimulationAnalyzer`
-2. Implement the required methods:
-   - `process_events()` - Calculate metrics from events
-   - `generate_plots()` - Create visualizations
-3. Register your analyzer with the sweeper
+- `TopologyAnalyzer` - Network topology analysis and visualization. See
+  [topology test examples](tests/topology/README.md) for detailed configurations
+  and analysis results.
