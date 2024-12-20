@@ -51,7 +51,7 @@ ib_generation_probability = [5.0]           # Single value, won't be swept
 2. Run the sweeper:
 
 ```bash
-python sweep.py
+python run_sweep.py
 ```
 
 ### Parameter Sweep Configuration
@@ -69,26 +69,46 @@ The `sweep_ranges.toml` file defines which parameters to sweep:
   ```
   This will run 4 simulations (2 × 2 combinations)
 
+### Output Structure
+
+Results are organized in the `results` directory:
+
+- `configs/config_XXXX.toml` - Configuration files for each run
+- `plots/` - Generated plots and visualizations
+  - `combined_diffusion.png` - Combined visualization of all message types'
+    diffusion
+  - Individual analyzer plots and visualizations
+
+## Example Analyzers
+
+Currently implemented analyzers:
+
+- `DiffusionAnalyzer` - Base analyzer for message diffusion through the network
+  - `IBDiffusionAnalyzer` - Analysis of input block diffusion
+  - `EBDiffusionAnalyzer` - Analysis of execution block diffusion
+  - `RBDiffusionAnalyzer` - Analysis of ranking block (Praos) diffusion
+  - `VoteDiffusionAnalyzer` - Analysis of vote diffusion
+- `StakeConnectivityAnalyzer` - Analysis of stake distribution and network
+  connectivity patterns
+
 ### Adding Custom Analyzers
 
 1. Create a new analyzer in `src/analyzers/`:
 
 ```python
 from src.core import SimulationAnalyzer
-from typing import Dict, List
+from typing import Dict, Any
 
 class MyCustomAnalyzer(SimulationAnalyzer):
-    def process_events(self, events: List[Dict]) -> Dict:
+    def analyze(self, result: SimulationResult) -> Dict[str, Any]:
         """Process simulation events and return metrics dictionary"""
         metrics = {}
-        for event in events:
-            # Process event data
-            pass
+        # Process simulation data
         return metrics
     
-    def generate_report(self, output_dir: Path) -> None:
-        """Generate analysis report and visualizations"""
-        # Create plots, save metrics, generate reports
+    def visualize(self, results: SweepResults) -> None:
+        """Generate analysis visualizations"""
+        # Create plots, save metrics
         pass
 ```
 
@@ -100,27 +120,5 @@ from src.analyzers.my_custom import MyCustomAnalyzer
 sweeper = LeiosParamSweeper(...)
 sweeper.register_analyzer(MyCustomAnalyzer())
 ```
-
-### Output Structure
-
-Results are organized in the `results` directory by run:
-
-- `config_XXXX.toml` - Configuration file for the run
-- Analysis artifacts from each analyzer (plots, reports, etc.)
-
-## Example Analyzers
-
-Currently implemented analyzers:
-
-- `DiffusionAnalyzer` - Analysis of block diffusion through the network.
-  - `IBDiffusionAnalyzer` - Analysis of input block diffusion through the
-    network.
-  - `EBDiffusionAnalyzer` - Analysis of execution block diffusion through the
-    network.
-  - `RBDiffusionAnalyzer` - Analysis of ranking block (Praos) diffusion through
-    the network.
-- `StakeConnectivityAnalyzer` - Analysis of stake distribution and network
-  connectivity patterns. See [example analyses](tests/topology/README.md) for
-  detailed configurations and results.
 
 ## Contributing
