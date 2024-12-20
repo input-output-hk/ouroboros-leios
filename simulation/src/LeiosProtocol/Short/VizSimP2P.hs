@@ -15,6 +15,7 @@ import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import Data.Bifunctor (second)
 import qualified Data.Colour.SRGB as Colour
 import Data.Hashable (hash)
+import qualified Data.IntervalMap.Strict as ILMap
 import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe, maybeToList)
@@ -51,7 +52,7 @@ import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
-import SimTypes (Point (..), WorldShape (..))
+import SimTypes (NodeId (..), Point (..), WorldShape (..))
 import System.Random (uniformR)
 import qualified System.Random as Random
 import System.Random.Stateful (mkStdGen)
@@ -507,6 +508,8 @@ chartBandwidth LeiosModelConfig{recentSpan} =
  where
   recentPlot lbl color maps =
     [ bandwidthHistPlot
+      maxX
+      (0, maxX)
       lbl
       color
       ( map
@@ -540,24 +543,68 @@ chartBandwidth LeiosModelConfig{recentSpan} =
       ]
   maxX :: Num a => a
   maxX = 150
-  bandwidthHistPlot title color values =
-    Chart.histToPlot $
-      Chart.defaultNormedPlotHist
-        { Chart._plot_hist_title = title
-        , Chart._plot_hist_values = values
-        , Chart._plot_hist_range = Just (0, maxX)
-        , Chart._plot_hist_bins = maxX
-        , Chart._plot_hist_fill_style =
-            Chart.def
-              { Chart._fill_color =
-                  Chart.withOpacity color 0.4
-              }
-        , Chart._plot_hist_line_style =
-            Chart.def
-              { Chart._line_color =
-                  Chart.opaque color
-              }
-        }
+
+bandwidthHistPlot :: RealFrac x => Int -> (x, x) -> String -> Chart.Colour Double -> [x] -> Chart.Plot x Double
+bandwidthHistPlot maxX range title color values =
+  Chart.histToPlot $
+    Chart.defaultNormedPlotHist
+      { Chart._plot_hist_title = title
+      , Chart._plot_hist_values = values
+      , Chart._plot_hist_range = Just range
+      , Chart._plot_hist_bins = maxX
+      , Chart._plot_hist_fill_style =
+          Chart.def
+            { Chart._fill_color =
+                Chart.withOpacity color 0.4
+            }
+      , Chart._plot_hist_line_style =
+          Chart.def
+            { Chart._line_color =
+                Chart.opaque color
+            }
+      }
+
+chartCPUUsage :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartCPUUsage LeiosModelConfig{numCores} =
+  chartVizRender 25 $
+    \(Time now)
+     _
+     ( SimVizModel
+        _
+        vs
+      ) ->
+        let
+          numNodes = Map.size vs.vizNodePos
+          maxCPUs = case numCores of
+            Infinite -> 20
+            Finite n -> n
+          values =
+            [ (nid, [(n, if n <= 5 then "" else show n)])
+            | (NodeId nid, m) <- Map.toList vs.nodeCpuUsage
+            , let n = sum . ILMap.elems . flip ILMap.containing now $ m
+            ]
+         in
+          (Chart.def :: Chart.Layout Double Double)
+            { Chart._layout_title = "Instantaneous CPU Usage per Node"
+            , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
+            , Chart._layout_x_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis
+                        Chart.defaultIntAxis{Chart._la_nLabels = 10}
+                        (0, numNodes - 1)
+                  , Chart._laxis_title = "Node #"
+                  }
+            , Chart._layout_y_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis Chart.defaultIntAxis{Chart._la_nLabels = 5} (0, maxCPUs)
+                  , Chart._laxis_title = "CPUs in use"
+                  }
+            , Chart._layout_plots =
+                [ Chart.plotBars (Chart.def{Chart._plot_bars_values_with_labels = values})
+                ]
+            }
 
 chartLinkUtilisation :: VizRender LeiosSimVizModel
 chartLinkUtilisation =
@@ -637,15 +684,15 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength =
+defaultVizConfig :: Int -> NumCores -> LeiosP2PSimVizConfig
+defaultVizConfig stageLength numCores =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
     , voteColor = toSRGB . voteColor
     , ebColor = toSRGB . ebColor
     , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
-    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength}
+    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores}
     }
  where
   testPtclMessageColor ::
@@ -706,8 +753,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Int -> Int -> Maybe P2PTopography -> Visualization
-example2 seed sliceLength maybeP2PTopography =
+example2 :: Int -> Int -> Maybe P2PTopography -> NumCores -> Visualization
+example2 seed sliceLength maybeP2PTopography processingCores =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -735,13 +782,16 @@ example2 seed sliceLength maybeP2PTopography =
                         Layout $
                           chartBandwidth modelConfig
                     , LayoutReqSize 350 300 $
+                        Layout $
+                          chartCPUUsage modelConfig
+                    , LayoutReqSize 350 300 $
                         Layout chartLinkUtilisation
                     ]
                 ]
             ]
         ]
  where
-  config = defaultVizConfig 5
+  config = defaultVizConfig 5 processingCores
   modelConfig = config.model
   rng0 = mkStdGen seed
   (rng1, rng2) = Random.split rng0
@@ -758,4 +808,4 @@ example2 seed sliceLength maybeP2PTopography =
           , p2pNodeLinksClose = 5
           , p2pNodeLinksRandom = 5
           }
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography processingCores)

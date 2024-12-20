@@ -6,7 +6,8 @@
 
 module LeiosProtocol.TaskMultiQueue where
 
-import Control.Monad (forM, forM_, when)
+import Control.Monad
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Tracer
 import Data.Array
 import qualified Data.Map.Strict as Map
@@ -36,7 +37,7 @@ flushTMQueue (TaskMultiQueue mq) = forM (assocs mq) (\(l, q) -> (l,) <$> flushTB
 
 runInfParallelBlocking ::
   forall m l.
-  (MonadSTM m, MonadDelay m, IsLabel l, MonadMonotonicTimeNSec m) =>
+  (MonadSTM m, MonadDelay m, IsLabel l, MonadMonotonicTimeNSec m, MonadFork m) =>
   Tracer m CPUTask ->
   TaskMultiQueue l m ->
   m ()
@@ -47,9 +48,13 @@ runInfParallelBlocking tracer mq = do
     return xs
   mapM_ (traceWith tracer . fst) xs
   now <- getMonotonicTime
+  -- forking to do the waiting so we can go back to fetch more tasks.
+  -- on the worst case this forks for each task, which might degrade sim performance.
+  -- Andrea: a small experiment with short-leios-p2p-1 shows up to 16 tasks at once.
+  --         OTOH only 14% of the time we had more than 1 task.
+  void $ forkIO $ do
+    let tasksByEnd = Map.fromListWith (<>) [(addTime cpuTaskDuration now, [m]) | (CPUTask{..}, m) <- xs]
 
-  let tasksByEnd = Map.fromListWith (<>) [(addTime cpuTaskDuration now, [m]) | (CPUTask{..}, m) <- xs]
-
-  forM_ (Map.toAscList tasksByEnd) $ \(end, ms) -> do
-    waitUntil end
-    sequence_ ms
+    forM_ (Map.toAscList tasksByEnd) $ \(end, ms) -> do
+      waitUntil end
+      sequence_ ms
