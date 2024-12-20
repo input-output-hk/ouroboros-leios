@@ -33,6 +33,7 @@ import Options.Applicative (
   optional,
   prefs,
   progDesc,
+  readerError,
   short,
   showHelpOnEmpty,
   str,
@@ -279,17 +280,21 @@ parserShortLeiosP2P1 =
           )
       )
     <*> option
-      (readCores =<< auto)
+      readCores
       ( short 'N'
           <> metavar "NUMBER"
           <> value Infinite
-          <> help "number of simulated cores for node parallesim, -1 for unbounded (the default)."
+          <> help "number of simulated cores for node parallesim, or 'unbounded' (the default)."
       )
  where
-  readCores n
-    | n < 0 = pure Infinite
-    | n == 0 = fail "Can't run on 0 cores"
-    | otherwise = pure $ Finite n
+  readCores = unbounded <|> finite
+   where
+    unbounded = do
+      s <- str
+      if s == "unbounded" then pure Infinite else readerError "unrecognized"
+    finite = do
+      n <- auto
+      if n > 0 then pure (Finite n) else readerError "number of cores should be greater than 0"
 
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
