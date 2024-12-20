@@ -20,6 +20,16 @@ Research is continuing, but interim findings indicate that BLS is most viable fo
 
 The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Haskell packages provide a polynomial-based implementation of DeltaQ, with many new combinators and a comprehensive property-based test suite. We created [nix derivations](https://github.com/functionally/dq-revamp-jupyter) for running this locally and for creating docker images. This new library can be used for cross-checking other DeltaQ implementations such as Leios's Rust code.
 
+### Rust simulation
+
+Diffusion time was higher than expected; this was because the test data had sparse networks, where nodes had few/distant peers.
+
+ - Fixed a bug where nodes would link to themselves
+ - Corrected distance calculations used when generating data; we use a cylindrical topology at runtime, but weren't using it at data generation time. 
+ - Tweaked parameters to the Waxman graph generation algorithm, to generate more connections and favor nearby neighbors more.
+
+Added basic unit tests for test data generation, running in CI.
+
 ## 2024-12-17
 
 ### GitHub Actions
@@ -33,6 +43,15 @@ The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Has
 
   The jobs that relate to publishing the documentation are prefixed by `docs`, e.g., `build-docusaurus` changed to `docs-build`.
 
+### Rust simulation
+
+Started showing transaction throughput in the visualization.
+
+Tweaked settings of `thousand.toml` config to maximize throughput:
+ - Allowing multiple votes per VRF lottery win, to make up for a lack of voters
+ - Increasing stage length from 2 to 20, so that there is approximately one RB per stage
+ - Generating many more transactions, to show benefit from increased throughput
+
 ### Haskell simulation
 
 - Merged code to run Praos and Leios visualisations from a file such as `data/BenchTopology/topology-dense-52-simple.json`, e.g., run:
@@ -43,6 +62,12 @@ The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Has
 
 - Added HLint integration to check Haskell sources and ensure consistent use of module imports.
 - Added CI job for HLint named `simulation-hlint`.
+
+## 2024-12-16
+
+### Rust simulation
+
+Optimized virtual clock more; it's now lock-free, and the contention from the old implementation is gone.
 
 ## 2024-12-13
 
@@ -56,6 +81,10 @@ The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Has
 - Reworked generation of EBs and Votes to handle `>= 1` frequencies
   like IBs (except max 1 EB per pipeline per node).
 - Visualizations helped with discovering and fixing some modeling errors.
+
+### Rust simulation
+
+Started making the visualization show aggregated stats.
 
 ## 2024-12-12
 
