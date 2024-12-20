@@ -228,10 +228,20 @@ class StakeConnectivityAnalyzer(SimulationAnalyzer):
             plt.xticks(range(0, max_connections + 1))
             
             plt.title('Producer-Relay Connectivity vs Stake')
-            cbar = plt.colorbar(scatter, label='Number of Reachable Producers (1-hop)')
             
-            # Make colorbar ticks integers
-            cbar.set_ticks(np.unique(reachable))
+            # Create colorbar with fewer, evenly spaced ticks
+            min_reachable = min(reachable)
+            max_reachable = max(reachable)
+            
+            # Calculate number of intervals (aim for 5-7 ticks)
+            interval = max(1, (max_reachable - min_reachable) // 6)
+            ticks = list(range(min_reachable, max_reachable + interval, interval))
+            if max_reachable not in ticks:
+                ticks.append(max_reachable)
+                
+            cbar = plt.colorbar(scatter, 
+                              label='Number of Reachable Producers (1-hop)',
+                              ticks=ticks)
             
             plt.tight_layout()
             

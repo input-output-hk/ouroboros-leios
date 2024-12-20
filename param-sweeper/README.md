@@ -112,6 +112,13 @@ Results are organized in the `results` directory by run:
 
 Currently implemented analyzers:
 
+- `DiffusionAnalyzer` - Analysis of block diffusion through the network.
+  - `IBDiffusionAnalyzer` - Analysis of input block diffusion through the
+    network.
+  - `EBDiffusionAnalyzer` - Analysis of execution block diffusion through the
+    network.
+  - `RBDiffusionAnalyzer` - Analysis of ranking block (Praos) diffusion through
+    the network.
 - `StakeConnectivityAnalyzer` - Analysis of stake distribution and network
   connectivity patterns. See [example analyses](tests/topology/README.md) for
   detailed configurations and results.

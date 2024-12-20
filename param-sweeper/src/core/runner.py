@@ -156,16 +156,18 @@ class SimulationRunner:
         """Write simulation config to file"""
         import toml
         
-        # Start with base config
+        # Load base config but only extract topology information
         with open(self.base_config_path) as f:
-            full_config = toml.load(f)
+            base_config = toml.load(f)
+            topology_info = {
+                'nodes': base_config.get('nodes', []),
+                'links': base_config.get('links', [])
+            }
             
-        # Log the base config
-        logger.debug("Base config:")
-        for key, value in full_config.items():
-            logger.debug(f"  {key}: {value}")
+        # Start with topology info
+        full_config = topology_info
             
-        # Update with sweep parameters
+        # Add sweep parameters
         processed_params = {}
         for key, value in config.params.items():
             if isinstance(value, list) and len(value) == 1:

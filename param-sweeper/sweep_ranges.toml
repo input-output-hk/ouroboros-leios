@@ -1,9 +1,9 @@
 # Base simulation parameters
-slots = [50]
+slots = [100]
 time_scale = [1.0]
 
 # Network topology
-topology = "realistic.toml"
+topology = "medium.toml"
 
 # Transaction parameters
 transaction_frequency_ms = [

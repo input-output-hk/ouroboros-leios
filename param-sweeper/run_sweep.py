@@ -20,6 +20,10 @@ sys.path.insert(0, str(project_root))
 from src.core import LeiosParamSweeper
 from src.analyzers import StakeConnectivityAnalyzer
 from src.analyzers import IBDiffusionAnalyzer
+from src.analyzers import EBDiffusionAnalyzer
+from src.analyzers import RBDiffusionAnalyzer
+from src.analyzers import VoteDiffusionAnalyzer
+from src.analyzers.diffusion import BaseDiffusionAnalyzer
 
 def main():
     try:
@@ -53,12 +57,25 @@ def main():
         # Create output directory
         sweeper.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Register analyzer(s)
+        # Create analyzers
+        ib_analyzer = IBDiffusionAnalyzer()
+        eb_analyzer = EBDiffusionAnalyzer()
+        rb_analyzer = RBDiffusionAnalyzer()
+        vote_analyzer = VoteDiffusionAnalyzer()
+        
+        # Register analyzers
         sweeper.register_analyzer(StakeConnectivityAnalyzer())
-        sweeper.register_analyzer(IBDiffusionAnalyzer())
+        sweeper.register_analyzer(ib_analyzer)
+        sweeper.register_analyzer(eb_analyzer)
+        sweeper.register_analyzer(rb_analyzer)
+        sweeper.register_analyzer(vote_analyzer)
         
         # Run sweep
         results = sweeper.run_sweep()
+        
+        # Create combined diffusion chart
+        diffusion_analyzers = [ib_analyzer, eb_analyzer, rb_analyzer, vote_analyzer]
+        BaseDiffusionAnalyzer.create_combined_chart(results, diffusion_analyzers)
         
     except ValueError as e:
         print(f"\n❌ Error: {e}")
