@@ -1,107 +1,66 @@
-# Network Topology Analysis Examples
+# Network Topology Analysis
 
-This directory contains example network topology configurations and their
-analysis results. Each configuration demonstrates different aspects of network
-behavior and performance at various scales.
+This directory contains topology analyses for networks of varying sizes and
+configurations. The analysis helps evaluate network connectivity and stake
+distribution patterns through metrics and visualizations.
 
-## Small Network (25 nodes)
+## Small Network
 
-A compact network configuration ideal for quick testing and development:
+**Network Overview:**
 
-- 10 relay nodes forming a resilient backbone
-- 15 producer nodes with exponential stake distribution
-- Maintains realistic connectivity patterns while being easy to analyze
+- 20 Producer nodes
+- 30 Relay nodes
+- Average relay connections: 1.4
 
-![Small Network Topology](small/topology_metrics.png)
-![Small Network Block Diffusion](small/ib_diffusion.png)
+No significant issues detected.
+[View detailed metrics](small/topology_issues.md)
 
-<details>
-<summary>Network Analysis Summary</summary>
-
-See [small/topology_issues.md](small/topology_issues.md) for detailed metrics
-and analysis.
-
-</details>
+![Network Metrics](small/topology_metrics.png)
 
 ## Medium Network
 
-A moderate-sized network with balanced characteristics:
+**Network Overview:**
 
-- Mix of relay and producer nodes
-- Representative stake distribution
-- Typical network connectivity patterns
+- 50 Producer nodes
+- 50 Relay nodes
+- Average relay connections: 3.2
 
-![Medium Network Topology](medium/topology_metrics.png)
-![Medium Network Block Diffusion](medium/ib_diffusion.png)
+7 nodes with connectivity issues identified.
+[View detailed metrics](medium/topology_issues.md)
 
-<details>
-<summary>Network Analysis Summary</summary>
-
-See [medium/topology_issues.md](medium/topology_issues.md) for detailed metrics
-and analysis.
-
-</details>
+![Network Metrics](medium/topology_metrics.png)
 
 ## Realistic Network
 
-A large-scale network configuration modeling real-world conditions:
+**Network Overview:**
 
-- Production-like stake distribution
-- Complex relay network topology
-- Geographic node distribution considerations
+- 1960 Producer nodes
+- 1040 Relay nodes
+- Average relay connections: 4.7
 
-![Realistic Network Topology](realistic/topology_metrics.png)
-![Realistic Network Block Diffusion](realistic/ib_diffusion.png)
+6 nodes with connectivity issues identified.
+[View detailed metrics](realistic/topology_issues.md)
 
-<details>
-<summary>Network Analysis Summary</summary>
-
-See [realistic/topology_issues.md](realistic/topology_issues.md) for detailed
-metrics and analysis.
-
-</details>
+![Network Metrics](realistic/topology_metrics.png)
 
 ## Thousand-Node Network
 
-A high-scale test configuration for performance analysis:
+**Network Overview:**
 
-- 1000+ nodes for scalability testing
-- Complex stake distribution patterns
-- Dense interconnection topology
+- 50 Producer nodes
+- 950 Relay nodes
+- Average relay connections: 11.2
 
-![Thousand-Node Network Topology](thousand/topology_metrics.png)
-![Thousand-Node Block Diffusion](thousand/ib_diffusion.png)
+7 nodes with connectivity issues identified.
+[View detailed metrics](thousand/topology_issues.md)
 
-<details>
-<summary>Network Analysis Summary</summary>
+![Network Metrics](thousand/topology_metrics.png)
 
-See [thousand/topology_issues.md](thousand/topology_issues.md) for detailed
-metrics and analysis.
+## Visualization Guide
 
-</details>
+The topology metrics plot shows:
 
-## Understanding the Visualizations
-
-### Topology Metrics Plot
-
-- Node size represents stake (larger = higher stake)
-- Node color indicates connectivity (darker = more connections)
-- Edge thickness shows connection strength
-- Relay nodes (no stake) shown in gray
-
-### Input Block Diffusion Plot
-
-- X-axis: Time steps
-- Y-axis: Block propagation percentage
-- Each line represents a different input block
-- Steeper slopes indicate faster network propagation
-
-### Topology Issues Report
-
-Each `topology_issues.md` file contains:
-
-- Network overview statistics
-- Identification of problematic nodes
-- Detailed connectivity metrics
-- Stake distribution analysis
-- Recommendations for topology improvements
+- X-axis: Number of relay connections per producer
+- Y-axis: Node stake (log scale)
+- Color: Number of other producers reachable through direct relay connections
+  (1-hop)

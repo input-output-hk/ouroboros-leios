@@ -280,45 +280,26 @@ class TopologyAnalyzer(SimulationAnalyzer):
             # Generate issues report
             self.generate_topology_report(metrics, results.output_dir)
             
-            # Create plots with more space
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 16))
+            # Create single plot with larger size
+            plt.figure(figsize=(12, 8))
             
-            # Plot 1: Producer-Relay Connectivity vs Stake
+            # Plot: Producer-Relay Connectivity vs Stake
             relay_connections = [m['relay_connections'] for m in producer_metrics.values()]
             stakes = [m['stake'] for m in producer_metrics.values()]
             reachable = [m['reachable_producers'] for m in producer_metrics.values()]
             
-            scatter = ax1.scatter(relay_connections, stakes, 
-                              c=reachable,  # Color by reachable producers
-                              cmap='viridis',
-                              alpha=0.7,
-                              s=100)
+            scatter = plt.scatter(relay_connections, stakes, 
+                             c=reachable,  # Color by reachable producers
+                             cmap='viridis',
+                             alpha=0.7,
+                             s=100)
             
-            ax1.set_xlabel('Number of Relay Connections')
-            ax1.set_ylabel('Node Stake')
-            ax1.set_yscale('log')
-            ax1.set_title('Producer-Relay Connectivity vs Stake')
-            ax1.grid(True, alpha=0.3)
-            plt.colorbar(scatter, ax=ax1, label='Number of Reachable Producers')
-            
-            # Plot 2: Producer Reachability Distribution
-            reachable_counts = np.bincount([m['reachable_producers'] for m in producer_metrics.values()])
-            x = np.arange(len(reachable_counts))
-            colors = plt.cm.viridis(np.linspace(0, 1, len(reachable_counts)))
-            
-            bars = ax2.bar(x, reachable_counts, color=colors, alpha=0.7)
-            ax2.set_xlabel('Number of Reachable Producers')
-            ax2.set_ylabel('Count of Producers')
-            ax2.set_title('Producer Reachability Distribution')
-            ax2.grid(True, alpha=0.3)
-            
-            # Add value labels on top of bars
-            for bar in bars:
-                height = bar.get_height()
-                if height > 0:
-                    ax2.text(bar.get_x() + bar.get_width()/2., height,
-                            f'{int(height)}',
-                            ha='center', va='bottom')
+            plt.xlabel('Number of Relay Connections')
+            plt.ylabel('Node Stake')
+            plt.yscale('log')
+            plt.title('Producer-Relay Connectivity vs Stake')
+            plt.grid(True, alpha=0.3)
+            plt.colorbar(scatter, label='Number of Reachable Producers')
             
             plt.tight_layout()
             
