@@ -131,9 +131,29 @@ Results are saved in the `results` directory:
 
 Currently implemented analyzers:
 
-- `IBStatsAnalyzer` - Input Block generation statistics and distribution
-- `EBStatsAnalyzer` - Endorser Block generation patterns
-- `TransactionAnalyzer` - Transaction throughput and confirmation rates
+- `TopologyAnalyzer` - Network topology analysis and visualization
+  ([see example analyses](tests/topology/README.md))
+
+### Example Topology Configurations
+
+The `tests/topology/` directory contains several example network configurations:
+
+- `small` - A compact 25-node network with realistic stake distribution and
+  connectivity patterns, ideal for quick testing and development
+- `medium` - A moderate-sized network with balanced stake distribution and
+  typical relay/producer node relationships
+- `realistic` - A large-scale network configuration modeling real-world stake
+  distribution and network topology
+- `thousand` - A high-scale test configuration with 1000+ nodes, useful for
+  performance and scalability testing
+
+Each topology directory contains:
+
+- `config_0000.toml` - The network configuration file
+- `topology_metrics.png` - Visualization of network metrics and connectivity
+- `ib_diffusion.png` - Analysis of input block propagation patterns
+- `topology_issues.md` - Detailed report of network characteristics and
+  potential issues
 
 ## Contributing
 

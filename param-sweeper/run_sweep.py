@@ -17,6 +17,7 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from src.core import LeiosParamSweeper
+from src.analyzers.topology import TopologyAnalyzer
 from src.analyzers.ib_diffusion import IBDiffusionAnalyzer
 
 def main():
@@ -54,8 +55,8 @@ def main():
         sweeper.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Register analyzer(s)
-        analyzer = IBDiffusionAnalyzer()
-        sweeper.register_analyzer(analyzer)
+        sweeper.register_analyzer(TopologyAnalyzer())
+        sweeper.register_analyzer(IBDiffusionAnalyzer())
         
         # Run sweep
         results = sweeper.run_sweep()

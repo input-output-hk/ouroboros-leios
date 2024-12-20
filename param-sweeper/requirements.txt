@@ -6,3 +6,4 @@ numpy
 tabulate
 plotly
 scipy
+adjustText
