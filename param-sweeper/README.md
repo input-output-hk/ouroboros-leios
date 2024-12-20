@@ -112,6 +112,8 @@ Results are organized in the `results` directory by run:
 
 Currently implemented analyzers:
 
-- `TopologyAnalyzer` - Network topology analysis and visualization. See
-  [topology test examples](tests/topology/README.md) for detailed configurations
-  and analysis results.
+- `StakeConnectivityAnalyzer` - Analysis of stake distribution and network
+  connectivity patterns. See [example analyses](tests/topology/README.md) for
+  detailed configurations and results.
+
+## Contributing

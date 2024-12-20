@@ -140,14 +140,6 @@ class IBDiffusionAnalyzer(SimulationAnalyzer):
                     for node in nodes:
                         node_connections[node] = node_connections.get(node, 0) + 1
             
-            # Log connectivity for suspicious nodes
-            logger.info(f"Node 97 connections: {node_connections.get(97, 0)}")
-            logger.info(f"Average node connections: {np.mean(list(node_connections.values())):.1f}")
-            
-            # Log node's peers
-            node_97_peers = [link['nodes'] for link in links if 97 in link.get('nodes', [])]
-            logger.info(f"Node 97 peers: {node_97_peers}")
-            
             return metrics
             
         except Exception as e:

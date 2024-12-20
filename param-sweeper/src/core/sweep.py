@@ -134,10 +134,6 @@ class LeiosParamSweeper:
         topology_file = topology[0]
         topology_path = self.base_config_path.parent / topology_file
         
-        logger.info(f"Base config path: {self.base_config_path}")
-        logger.info(f"Topology file: {topology_file}")
-        logger.info(f"Full topology path: {topology_path}")
-        
         if not topology_path.exists():
             raise FileNotFoundError(f"Topology file not found: {topology_path}")
         

@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 import toml
 import logging
+import traceback
 
 # Configure logging
 logging.basicConfig(
@@ -17,8 +18,8 @@ project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from src.core import LeiosParamSweeper
-from src.analyzers.topology import TopologyAnalyzer
-from src.analyzers.ib_diffusion import IBDiffusionAnalyzer
+from src.analyzers import StakeConnectivityAnalyzer
+from src.analyzers import IBDiffusionAnalyzer
 
 def main():
     try:
@@ -30,7 +31,7 @@ def main():
         param_ranges_path = project_root / "sweep_ranges.toml"
         param_ranges = toml.load(param_ranges_path)
         
-        topology_file = param_ranges.get('topology', [None])[0]
+        topology_file = param_ranges.get('topology')
         
         if not topology_file:
             raise ValueError("No topology specified in sweep_ranges.toml")
@@ -41,8 +42,6 @@ def main():
         # Verify topology file exists
         if not base_config.exists():
             raise FileNotFoundError(f"Topology file not found: {base_config}")
-            
-        logger.info(f"Using topology file: {base_config}")
         
         # Initialize sweeper with correct base config
         sweeper = LeiosParamSweeper(
@@ -55,7 +54,7 @@ def main():
         sweeper.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Register analyzer(s)
-        sweeper.register_analyzer(TopologyAnalyzer())
+        sweeper.register_analyzer(StakeConnectivityAnalyzer())
         sweeper.register_analyzer(IBDiffusionAnalyzer())
         
         # Run sweep
@@ -63,12 +62,15 @@ def main():
         
     except ValueError as e:
         print(f"\n❌ Error: {e}")
+        traceback.print_exc()
         sys.exit(1)
     except FileNotFoundError as e:
         print(f"\n❌ Error: {e}")
+        traceback.print_exc()
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Unexpected error: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":

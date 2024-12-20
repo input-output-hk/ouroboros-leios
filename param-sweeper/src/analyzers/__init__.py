@@ -2,10 +2,7 @@
 Analysis modules for simulation results.
 """
 
+from .stake_connectivity import StakeConnectivityAnalyzer
 from .ib_diffusion import IBDiffusionAnalyzer
-from .topology import TopologyAnalyzer
 
-__all__ = [
-    'IBDiffusionAnalyzer',
-    'TopologyAnalyzer',
-] 
+__all__ = ['StakeConnectivityAnalyzer', 'IBDiffusionAnalyzer'] 
