@@ -5,4 +5,4 @@ seaborn
 numpy
 tabulate
 plotly
-tqdm
+scipy
