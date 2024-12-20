@@ -18,11 +18,12 @@ import Control.Exception (assert)
 import Control.Monad (forever, guard, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadThrow
 import Control.Tracer
 import Data.Bifunctor
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
-import Data.Ix (Ix)
+import Data.Ix (Ix, range)
 import Data.List (sort, sortOn)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -48,6 +49,7 @@ import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
 import System.Random
+import WorkerPool
 
 --------------------------------------------------------------
 ---- Events
@@ -297,7 +299,15 @@ newLeiosNodeState cfg = do
 
 leiosNode ::
   forall m.
-  (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadMonotonicTimeNSec m) =>
+  ( MonadMVar m
+  , MonadFork m
+  , MonadAsync m
+  , MonadSTM m
+  , MonadTime m
+  , MonadDelay m
+  , MonadMonotonicTimeNSec m
+  , MonadCatch m
+  ) =>
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   [Leios (Chan m)] ->
@@ -395,13 +405,23 @@ leiosNode tracer cfg followers peers = do
       ]
 
 processCPUTasks ::
-  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m) =>
+  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m, MonadFork m, MonadAsync m, MonadCatch m) =>
   NumCores ->
   Tracer m CPUTask ->
   TaskMultiQueue LeiosNodeTask m ->
   m ()
 processCPUTasks Infinite tracer queue = forever $ runInfParallelBlocking tracer queue
-processCPUTasks (Finite _) _ _ = error "TBD"
+processCPUTasks (Finite n) tracer queue = newBoundedWorkerPool n [taskSource l | l <- range (minBound, maxBound)]
+ where
+  taskSource l = do
+    (cpu, m) <- readTMQueue queue l
+    var <- newEmptyTMVar
+    let action = do
+          traceWith tracer cpu
+          threadDelay (cpuTaskDuration cpu)
+          m
+    -- TODO: read from var and log exception.
+    return $ Task action var
 
 computeLedgerStateThread ::
   forall m.

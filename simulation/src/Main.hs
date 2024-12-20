@@ -9,6 +9,7 @@ import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import LeiosProtocol.Short.Node (NumCores (..))
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
@@ -32,6 +33,7 @@ import Options.Applicative (
   optional,
   prefs,
   progDesc,
+  readerError,
   short,
   showHelpOnEmpty,
   str,
@@ -176,7 +178,7 @@ data VizSubCommand
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath}
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath, numCores :: NumCores}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -277,6 +279,22 @@ parserShortLeiosP2P1 =
               <> help "The file describing the network topology."
           )
       )
+    <*> option
+      readCores
+      ( short 'N'
+          <> metavar "NUMBER"
+          <> value Infinite
+          <> help "number of simulated cores for node parallesim, or 'unbounded' (the default)."
+      )
+ where
+  readCores = unbounded <|> finite
+   where
+    unbounded = do
+      s <- str
+      if s == "unbounded" then pure Infinite else readerError "unrecognized"
+    finite = do
+      n <- auto
+      if n > 0 then pure (Finite n) else readerError "number of cores should be greater than 0"
 
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
@@ -302,7 +320,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let worldShape = WorldShape (1200, 1000) True
     maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
-    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography
+    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
 
 type VizSize = (Int, Int)
 
