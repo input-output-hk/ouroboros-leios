@@ -12,6 +12,7 @@ class SimulationConfig:
     output_dir: Path
     config_dir: Path
     sim_dir: Path
+    base_config_path: Path
     
     @property
     def output_file(self) -> Path:
@@ -20,7 +21,7 @@ class SimulationConfig:
     
     @property
     def config_file(self) -> Path:
-        """Path to simulation config file"""
+        """Path to config file"""
         return self.config_dir / f"config_{self.iteration:04d}.toml"
 
 @dataclass

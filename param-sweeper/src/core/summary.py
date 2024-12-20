@@ -151,7 +151,8 @@ class SweepSummary:
         # Print summary
         summary_file = base_dir / "summary.md"
         if summary_file.exists():
-            print(f"├── 📝 summary.md -> {summary_file}")
+            size = self._format_size(summary_file.stat().st_size)
+            print(f"├── 📝 summary.md ({size})")
         
         # Print configs
         config_dir = base_dir / "configs"
@@ -160,7 +161,8 @@ class SweepSummary:
             config_files = sorted(config_dir.glob("*.toml"))
             for i, f in enumerate(config_files):
                 prefix = "├──" if i < len(config_files) - 1 else "└──"
-                print(f"│   {prefix} {f.name} -> {f}")
+                size = self._format_size(f.stat().st_size)
+                print(f"│   {prefix} {f.name} ({size})")
         
         # Print simulation logs
         sim_dir = base_dir / "simulations"
@@ -169,7 +171,8 @@ class SweepSummary:
             sim_files = sorted(sim_dir.glob("*.jsonl"))
             for i, f in enumerate(sim_files):
                 prefix = "├──" if i < len(sim_files) - 1 else "└──"
-                print(f"│   {prefix} {f.name} -> {f}")
+                size = self._format_size(f.stat().st_size)
+                print(f"│   {prefix} {f.name} ({size})")
         
         # Print plots
         plot_dir = base_dir / "plots"
@@ -179,7 +182,8 @@ class SweepSummary:
                 print("└── 📊 plots/")
                 for i, f in enumerate(plot_files):
                     prefix = "├──" if i < len(plot_files) - 1 else "└──"
-                    print(f"    {prefix} {f.name} -> {f}")
+                    size = self._format_size(f.stat().st_size)
+                    print(f"    {prefix} {f.name} ({size})")
             else:
                 print("└── (no plot files generated)")
         else:
@@ -199,3 +203,13 @@ class SweepSummary:
         """Load TOML file"""
         with open(path) as f:
             return toml.load(f) 
+    
+    def _get_editor_url_scheme(self) -> str:
+        """Get the appropriate URL scheme for the current editor"""
+        import os
+        
+        # Check if running in Cursor
+        if os.environ.get('CURSOR_TERMINAL'):
+            return 'cursor://file'
+        # Default to VS Code
+        return 'vscode://file'

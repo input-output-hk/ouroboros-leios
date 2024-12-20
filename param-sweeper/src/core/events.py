@@ -2,6 +2,8 @@ from enum import Enum
 from typing import Dict, Any, Iterator, Optional
 from dataclasses import dataclass
 from .types import SimulationEvent
+from .time import VirtualTime
+import json
 
 class EventType(Enum):
     # Core events
@@ -78,3 +80,59 @@ class EventStream:
     
     def __iter__(self) -> Iterator[SimulationEvent]:
         return iter(self.events) 
+
+@dataclass
+class Event:
+    """Base class for simulation events"""
+    time: VirtualTime
+    message: Dict[str, Any]
+    
+    @classmethod
+    def from_json(cls, json_str: str) -> 'Event':
+        """Create event from JSON string"""
+        data = json.loads(json_str)
+        time = VirtualTime(data['time'])
+        msg = data['message']
+        msg_type = msg.get('type')
+        
+        # Create specific event type based on message type
+        if msg_type == 'InputBlockGenerated':
+            return InputBlockGenerated(
+                time=time,
+                message=msg,
+                id=msg['id'],
+                slot=msg['slot'],
+                producer=msg['producer'],
+                index=msg['index']
+            )
+        elif msg_type == 'InputBlockReceived':
+            return InputBlockReceived(
+                time=time,
+                message=msg,
+                id=msg['id'],
+                slot=msg['slot'],
+                producer=msg['producer'],
+                index=msg['index'],
+                sender=msg['sender'],
+                recipient=msg['recipient']
+            )
+        else:
+            return cls(time=time, message=msg)
+
+@dataclass
+class InputBlockGenerated(Event):
+    """Input block generation event"""
+    id: str
+    slot: int
+    producer: int
+    index: int
+
+@dataclass
+class InputBlockReceived(Event):
+    """Input block receipt event"""
+    id: str
+    slot: int
+    producer: int
+    index: int
+    sender: int
+    recipient: int

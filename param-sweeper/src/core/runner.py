@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 from tqdm import tqdm
-import sys
 
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(levelname)s - %(message)s')
@@ -57,20 +56,18 @@ class SimulationRunner:
         try:
             # Get total slots from config
             slots_param = config.params.get('slots')
-            total_slots = slots_param[0] if isinstance(slots_param, list) else slots_param or 100
+            total_slots = slots_param[0] if isinstance(slots_param, list) else slots_param
             
-            # Setup progress bar with dynamic_ncols=True for better terminal handling
+            # Setup progress bar
             pbar = tqdm(
                 total=total_slots,
                 desc=f"Simulation {config.iteration}",
                 unit="slots",
-                leave=True,
-                position=0,
-                dynamic_ncols=True,
-                mininterval=0.1,  # Update more frequently
-                maxinterval=0.5   # Don't wait too long between updates
+                bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} slots [{elapsed}<{remaining}, {rate_fmt}]",
+                leave=True
             )
             
+            # Start simulation process
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -80,32 +77,58 @@ class SimulationRunner:
             )
             
             current_slot = 0
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    try:
-                        event = json.loads(output)
-                        msg = event.get("message", {})
-                        if msg.get("type") == "Slot":
-                            slot_num = msg.get("number", 0)
-                            # Update to exact slot number
-                            if slot_num > current_slot:
-                                pbar.update(slot_num - current_slot)
-                                current_slot = slot_num
-                                pbar.refresh()  # Force refresh
-                    except json.JSONDecodeError:
-                        continue
+            last_file_position = 0
+            
+            while process.poll() is None:
+                # Read new content from output file
+                if config.output_file.exists():
+                    with open(config.output_file) as f:
+                        # Seek to last position
+                        f.seek(last_file_position)
+                        
+                        # Process new lines
+                        for line in f:
+                            try:
+                                event = json.loads(line)
+                                if "message" in event and event["message"]["type"] == "Slot":
+                                    slot_num = event["message"]["number"]
+                                    if slot_num > current_slot:
+                                        pbar.update(slot_num - current_slot)
+                                        current_slot = slot_num
+                                        pbar.refresh()
+                            except json.JSONDecodeError:
+                                continue
+                                
+                        # Remember position for next read
+                        last_file_position = f.tell()
+                
+                # Small sleep to prevent busy waiting
+                time.sleep(0.1)
+            
+            # Process any remaining output
+            if config.output_file.exists():
+                with open(config.output_file) as f:
+                    f.seek(last_file_position)
+                    for line in f:
+                        try:
+                            event = json.loads(line)
+                            if "message" in event and event["message"]["type"] == "Slot":
+                                slot_num = event["message"]["number"]
+                                if slot_num > current_slot:
+                                    pbar.update(slot_num - current_slot)
+                                    current_slot = slot_num
+                        except json.JSONDecodeError:
+                            continue
+            
+            # Wait for process to finish
+            return_code = process.wait()
             
             # Ensure progress bar shows completion
-            if current_slot < total_slots:
+            if return_code == 0 and current_slot < total_slots:
                 pbar.update(total_slots - current_slot)
             pbar.refresh()
             pbar.close()
             print()  # Add newline after progress bar
-            
-            return_code = process.wait()
             
             if return_code == 0:
                 logger.info(f"Output written to: {config.output_file}")
@@ -137,7 +160,12 @@ class SimulationRunner:
         with open(self.base_config_path) as f:
             full_config = toml.load(f)
             
-        # Update with sweep parameters - unpack lists with single values
+        # Log the base config
+        logger.debug("Base config:")
+        for key, value in full_config.items():
+            logger.debug(f"  {key}: {value}")
+            
+        # Update with sweep parameters
         processed_params = {}
         for key, value in config.params.items():
             if isinstance(value, list) and len(value) == 1:
@@ -145,6 +173,11 @@ class SimulationRunner:
             else:
                 processed_params[key] = value
                 
+        # Log the updated params
+        logger.debug("Updated params:")
+        for key, value in processed_params.items():
+            logger.debug(f"  {key}: {value}")
+            
         full_config.update(processed_params)
         
         # Write to output directory

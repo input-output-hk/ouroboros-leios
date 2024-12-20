@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Iterator
 import itertools
 import toml
-from tqdm import tqdm
 
 from .types import SimulationConfig, SimulationResult, SweepResults
 from .runner import SimulationRunner
@@ -41,13 +40,6 @@ class LeiosParamSweeper:
         # Load configurations
         self.base_config = self._load_toml(base_config_path)
         self.param_ranges = self._load_param_ranges(param_ranges_path)
-        
-        # Update topology path to be relative to sim-rs/test_data
-        if 'topology' in self.param_ranges:
-            topology = self.param_ranges['topology']
-            if isinstance(topology, list):
-                topology = topology[0]
-            self.param_ranges['topology'] = [str(self.base_config_path.parent / topology)]
         
         # Initialize components
         self.analyzers: List[SimulationAnalyzer] = []
@@ -129,6 +121,26 @@ class LeiosParamSweeper:
         else:
             ranges = self._extract_ranges_from_base()
         
+        # Validate topology is specified
+        if 'topology' not in ranges:
+            raise ValueError("No topology specified in parameter ranges")
+        
+        # Ensure topology exists and is a list
+        topology = ranges['topology']
+        if not isinstance(topology, list):
+            topology = [topology]
+        ranges['topology'] = topology
+        
+        topology_file = topology[0]
+        topology_path = self.base_config_path.parent / topology_file
+        
+        logger.info(f"Base config path: {self.base_config_path}")
+        logger.info(f"Topology file: {topology_file}")
+        logger.info(f"Full topology path: {topology_path}")
+        
+        if not topology_path.exists():
+            raise FileNotFoundError(f"Topology file not found: {topology_path}")
+        
         # Ensure all values are lists
         for key, value in ranges.items():
             if not isinstance(value, list):
@@ -153,29 +165,26 @@ class LeiosParamSweeper:
         return param_ranges
     
     def _generate_configs(self) -> Iterator[SimulationConfig]:
-        """Generate configurations for all parameter combinations"""
+        """Generate all parameter combinations"""
         param_names = list(self.param_ranges.keys())
         param_values = [self.param_ranges[name] for name in param_names]
         
         for i, values in enumerate(itertools.product(*param_values)):
             params = dict(zip(param_names, values))
             
-            # Log the config being generated
-            logger.debug(f"Generating config {i} with params: {params}")
+            # Debug log the params
+            logger.debug(f"Generated params for simulation {i}:")
+            for key, value in params.items():
+                logger.debug(f"  {key}: {value}")
             
             config = SimulationConfig(
                 params=params,
                 iteration=i,
                 output_dir=self.output_dir,
                 config_dir=self.config_dir,
-                sim_dir=self.sim_dir
+                sim_dir=self.sim_dir,
+                base_config_path=self.base_config_path
             )
-            
-            # Log the full config path and contents
-            if config.config_file.exists():
-                with open(config.config_file) as f:
-                    logger.debug(f"Config contents for {config.config_file}:")
-                    logger.debug(f"{f.read()}")
             
             yield config
     

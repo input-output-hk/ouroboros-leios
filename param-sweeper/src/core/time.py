@@ -1,24 +1,33 @@
 from dataclasses import dataclass
+from typing import Union
 
 @dataclass
 class VirtualTime:
-    """Represents simulation virtual time with microsecond precision"""
-    micros: int
-    time_scale: float = 1.0
+    """Represents simulation virtual time in nanoseconds"""
+    nanoseconds: int
     
-    @property
-    def seconds(self) -> float:
-        """Convert to seconds for readability, applying time scale"""
-        return (self.micros * self.time_scale) / 1_000_000
+    def __init__(self, time: Union[int, float]):
+        """Initialize from nanoseconds (int) or seconds (float)"""
+        if isinstance(time, float):
+            self.nanoseconds = int(time * 1_000_000_000)
+        else:
+            self.nanoseconds = time
     
-    def __sub__(self, other: 'VirtualTime') -> 'VirtualTime':
-        """Calculate time difference"""
-        if self.time_scale != other.time_scale:
-            raise ValueError("Cannot subtract times with different scale factors")
-        return VirtualTime(self.micros - other.micros, self.time_scale)
+    def as_seconds(self) -> float:
+        """Convert to seconds"""
+        return self.nanoseconds / 1_000_000_000
     
     def __lt__(self, other: 'VirtualTime') -> bool:
-        """Compare times"""
-        if self.time_scale != other.time_scale:
-            raise ValueError("Cannot compare times with different scale factors")
-        return self.micros < other.micros 
+        return self.nanoseconds < other.nanoseconds
+    
+    def __gt__(self, other: 'VirtualTime') -> bool:
+        return self.nanoseconds > other.nanoseconds
+    
+    def __eq__(self, other: 'VirtualTime') -> bool:
+        return self.nanoseconds == other.nanoseconds
+    
+    def __add__(self, other: 'VirtualTime') -> 'VirtualTime':
+        return VirtualTime(self.nanoseconds + other.nanoseconds)
+    
+    def __sub__(self, other: 'VirtualTime') -> 'VirtualTime':
+        return VirtualTime(self.nanoseconds - other.nanoseconds)
