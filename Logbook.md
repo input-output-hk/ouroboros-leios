@@ -1,5 +1,27 @@
 # Leios logbook
 
+## 2024-12-20
+
+### Haskell simulation
+
+- Added support for bounded and unbounded parallesim to leios node.
+    - shot-leios-p2p-1 takes -N flag to control number of cores.
+    - visualization charts number of cores active at that time per node
+        - with unbounded parallelism we currently see spikes of even
+          13 right after vote diffusion.
+    - TODO: consider whether an aggregate measure would improve readability.
+- Fixed Relay protocol messages to always have size > 0
+  - Probable cause of out of order delivery experienced
+    with pipelined peers.
+  - Simplified ChanTCP to use a simple queue, so ordered delivery is
+    guaranteed regardless of forecasted time.
+
+Next steps:
+- Load protocol configuration from disk, and write out event log.
+- Investigate low rate of EB inclusion in RB, and implementation
+  correctness more generally.
+- Run larger leios p2p networks in simulation mode to collect metrics.
+
 ## 2024-12-19
 
 ### Revised analysis of votes and certificates
