@@ -94,12 +94,12 @@ $$
 \lim_{k \rightarrow \infty} k \cdot \phi_f\left( \frac{\sigma}{k} \right) = \phi_h(\sigma)
 $$
 
-where $h = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$, which implies a fractional benefit limited to $f \cdot \sigma / 2$.
+where $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$, which implies a fractional benefit limited to $f \cdot \sigma / 2$.
 
 > [!NOTE]
 > 
-> - [ ] Do we need to include a proof of $h = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$, perhaps in an appendix?
-> - [ ] Should we instead include the exact result, which is really messy?
+> - [ ] Do we need to include the derivation of $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$?
+> - [ ] . . . perhaps in an appendix?
 
 The following plot shows this effect on splitting stake. The horizontal axis represents the production rate $f$, which would be per-slot for RBs or IBs and per-period for EBs. The vertical axis shows the fractional benefit of the splitting, $f / (h - f)$. Even a controller of 45% of the stake would only benefit with less than a 20% advantage in block production, even at a high production rate such as a 75% chance per period, if they split their stake minutely. This small advantage would be outweighed by the cost of the computing hardware and bandwidth required to deploy the large number of node having very little stake delegated to them.
 
@@ -159,6 +159,34 @@ Short Leios also relies on the EB being included in an RB before another EB is p
 
 
 ### Votes
+
+
+#### Leader-election like voting[​](https://peras.cardano-scaling.org/docs/reports/tech-report-2#leader-election-like-voting "Direct link to Leader-election like voting")
+
+The first algorithm is basically identical to the one used for [Mithril](https://mithril.network/) signatures, and is also the one envisioned for [Leios](https://leios.cardano-scaling.org/) (see Appendix D of the recent Leios paper). It is based on the following principles:
+
+- The goal of the algorithm is to produce a number of votes targeting a certain threshold such that each voter receives a number of vote proportionate to σσ, their fraction of total stake, according to the basic probability function ϕ(σ)=1−(1−f)σϕ(σ)=1−(1−f)σ,
+- There are various parameters to the algorithm:
+    - ff is the fraction of slots that are "active" for voting
+    - mm is the number of _lotteries_ each voter should try to get a vote for,
+    - kk is the target total number of votes for each round (e.g., quorum) kk should be chosen such that k=m⋅ϕ(0.5)k=m⋅ϕ(0.5) to reach a majority quorum,
+- When its turn to vote comes, each node run iterates over an index i∈[1…m]i∈[1…m], computes a hash from the _nonce_ and the index ii, and compares this hash with f(σ)f(σ): if it is lower than or equal, then the node has one vote.
+    - Note the computation f(σ)f(σ) is exactly identical to the one used for [leader election](https://github.com/intersectmbo/cardano-ledger/blob/f0d71456e5df5a05a29dc7c0ac9dd3d61819edc8/libs/cardano-protocol-tpraos/src/Cardano/Protocol/TPraos/BHeader.hs#L434).
+
+We [prototyped](https://github.com/input-output-hk/peras-design/blob/73eabecd272c703f1e1ed0be7eeb437d937e1179/peras-vote/src/Peras/Voting/Vote.hs#L311) this approach in Haskell.
+
+#### Sortition-like voting[​](https://peras.cardano-scaling.org/docs/reports/tech-report-2#sortition-like-voting "Direct link to Sortition-like voting")
+
+The second algorithm is based on the _sortition_ process initially invented by [Algorand](https://web.archive.org/web/20170728124435id_/https://people.csail.mit.edu/nickolai/papers/gilad-algorand-eprint.pdf) and [implemented](https://github.com/algorand/sortition/blob/main/sortition.cpp) in their node. It is based on the same idea, namely that a node should have a number of votes proportional to their fraction of total stake, given a target "committee size" expressed as a fraction of total stake pp. And it uses the fact the number of votes a single node should get based on these parameters follows a binomial distribution.
+
+The process for voting is thus:
+
+- Compute the individual probability of each "coin" to win a single vote pp as the ratio of expected committee size over total stake.
+- Compute the binomial distribution B(n,p)B(n,p) where nn is the node's stake.
+- Compute a random number between 0 and 1 using _nonce_ as the denominator over maximum possible value (e.g., all bits set to 1) for the nonce as denominator.
+- Use [bisection method](https://en.wikipedia.org/wiki/Bisection_method) to find the value corresponding to this probability in the CDF for the aforementioned distribution.
+
+This yields a vote with some _weight_ attached to it "randomly" computed so that the overall sum of weights should be around expected committee size.
 
 
 ## Voting and certificates
