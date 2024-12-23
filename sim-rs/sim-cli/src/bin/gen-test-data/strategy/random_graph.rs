@@ -11,6 +11,8 @@ use crate::strategy::utils::{distance, distribute_stake, generate_full_config, L
 pub struct RandomGraphArgs {
     node_count: usize,
     stake_pool_count: usize,
+    min_connections: usize,
+    max_connections: usize,
 }
 
 pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
@@ -35,8 +37,6 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
     }
 
     println!("generating edges...");
-    let alpha = 0.15;
-    let beta = 0.25 * (100.0 / args.node_count as f64).min(1.0);
     let max_distance = distance((-90.0, 90.0), (90.0, 180.0));
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
@@ -46,16 +46,32 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
             from + 1
         };
 
-        for to in first_candidate_connection..args.node_count {
-            if from == to {
-                continue;
-            }
-            // nodes are connected probabilistically, based on how far apart they are
-            let dist = distance(nodes[from].location, nodes[to].location);
-            let probability = beta * (-dist / (alpha * max_distance)).exp();
-            if rng.gen_bool(probability) {
-                links.add(from, to, None);
-            }
+        let mut candidates: Vec<_> = (first_candidate_connection..args.node_count)
+            .filter(|c| *c != from && !links.exists(from, *c))
+            .map(|c| {
+                (
+                    c,
+                    (max_distance / distance(nodes[from].location, nodes[c].location)) as u64,
+                )
+            })
+            .collect();
+        let mut total_weight: u64 = candidates.iter().map(|(_, weight)| *weight).sum();
+        let conn_count = rng.gen_range(args.min_connections..args.max_connections);
+        while links.count(from) < conn_count && !candidates.is_empty() {
+            let next = rng.gen_range(0..total_weight);
+            let Some(to_index) = candidates
+                .iter()
+                .scan(0u64, |cum_weight, (_, weight)| {
+                    *cum_weight += weight;
+                    Some(*cum_weight)
+                })
+                .position(|weight| weight >= next)
+            else {
+                break;
+            };
+            let (to, to_weight) = candidates.remove(to_index);
+            links.add(from, to, None);
+            total_weight -= to_weight;
         }
     }
 
@@ -120,6 +136,8 @@ mod tests {
         let args = RandomGraphArgs {
             node_count: 1000,
             stake_pool_count: 50,
+            min_connections: 5,
+            max_connections: 15,
         };
 
         let raw_config = random_graph(&args).unwrap();
