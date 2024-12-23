@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2024-12-23
+
+### Rust simulation
+
+Abandoned Waxman graph generation, using a simpler distance-weighted approach that gives more control over connectivity of the graph.
+
 ## 2024-12-20
 
 ### Haskell simulation
