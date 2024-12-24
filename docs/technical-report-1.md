@@ -80,6 +80,9 @@ $$
 \phi_f(\sigma) = \psi_{f^\prime}(\sigma \cdot S) = 1 - (1 - f)^\sigma
 $$
 
+Sortition reuses the Praos VRF, but prepending a string such as `Leios-IB`, `Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order to remove correlations between the uses of the VRF. The resulting VRF value `v` is compared to the probability (in the case of IBs and EBs) or the cumulative probability (in the case of votes) for winning the sortition lottery. This is equivalent to the eligibility checks in the Leios paper.
+
+
 ### Advantage gained by splitting stake among nodes
 
 Note that this formulation encourages the splitting of stake among many nodes: by pooling stake at a single node the stake has only one chance to build an RB, IB, or EB, but by splitting the stake among many nodes there is a chance for multiple RBs, IBs, or EBs in the same lottery. We can quantify this effect by comparing the expected number of lottery wins when splitting $\sigma$ into two $\frac{1}{2}\sigma$ pieces. The expected number of lottery wins for split stake minus combined stake is always positive for $\sigma > 0$.
@@ -113,6 +116,8 @@ In Leios, even if a node wins the IB lottery several times, it is only allowed t
 $$
 p_\text{IB} = \phi_{f_\text{IB}}(\sigma) = 1 - (1 - f_\text{IB})^\sigma
 $$
+
+If $v_\text{IB} \in [0,1]$ is the node's IB VRF value for the current slot, then the node's eligibility condition is $v_\text{IB} \leq p_\text{IB}$.
 
 Given the IB-production phase of length $L$ in each Leios pipeline, we want to avoid the situation where an unlucky lottery results in no IBs being produced during that phase. The probability of none of the $i$ nodes with stake $\sigma_i$ winning the lottery in a slot is
 
@@ -150,6 +155,8 @@ and the probability that no EB is produced by any node is
 $$
 q_\text{E} = 1 - f_\text{EB}
 $$
+
+If $v_\text{EB} \in [0,1]$ is the node's EB VRF value for the current phase, then the node's eligibility condition is $v_\text{EB} \leq p_\text{EB}$.
 
 In Short Leios it is critically important that at least one EB be produced in the pipeline because, otherwise, the pipeline's IBs will not be referenced in the RB and the work done creating them will be lost and their transactions will have to wait for another IB.
 
