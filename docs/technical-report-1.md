@@ -143,7 +143,7 @@ The figure below illustrates the relationship between $f_\text{IB}$ and $q_\text
 
 
 ### Endorser blocks
-
+ 
 The sortition for EBs occurs per phase, not per slot. The previous section's analysis for input blocks holds with minor modification: The probability that a node with stake $\sigma$ wins the EB lottery for a pipeline is
 
 $$
@@ -151,6 +151,10 @@ p_\text{EB} = \phi_{f_\text{EB}}(\sigma) = 1 - (1 - f_\text{EB})^\sigma
 $$
 
 If $v_\text{EB} \in [0,1]$ is the node's EB VRF value for the current phase, then the node's eligibility condition is $v_\text{EB} \leq p_\text{EB}$.
+
+> [!IMPORTANT]
+> 
+> This formulation makes it likely (probability = 1 - f) that some pipelines will have no EBs. Should there be two or more lotteries instead of just one? Or do we just need to accept this as part of Short Leios?
 
 In Short Leios it is critically important that at least one EB be produced in the pipeline because, otherwise, the pipeline's IBs will not be referenced in the RB and the work done creating them will be lost and their transactions will have to wait for another IB. There are four situations of interest for EB production in a particular pipeline:
 
@@ -169,7 +173,38 @@ If we account for stake being divided among many nodes, we get a nearly identica
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
 | ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |
 
-Short Leios also relies on the EB being included in an RB before another EB is produced: endorser blocks are not allowed to queue awaiting RBs or to reference other EBs. Thus, the EB rate should be consistent with the RB rate.
+> [!CAUTION]
+> 
+> - [ ] Is there a theoretical argument (like the law of large numbers) why splitting the stake doesn't make a visible difference?
+> - [ ] Is it pointless to include such repetitive plots?
+
+Short Leios also relies on the EB being included in an RB before another EB is produced: endorser blocks are not allowed to queue awaiting RBs or to reference other EBs. Thus, the EB rate should be consistent with the RB rate. We can approximate the probability of there not being an RB in time to include a new EB by answering the following question: given that an EB has been produced, what is the probability that the *next* EB will be produced before the *first* RB? In such a situation, the freshest-first rule would result in the first EB being discarded because the second EB is included in the new RB. The distribution of waiting times for the next EB and next RB are
+
+$$
+\mathcal{P}(\text{next EB at phase } n) = (1 - f_\text{EB})^{n-1} f_\text{EB}
+$$
+
+and
+
+$$
+\mathcal{P}(\text{next RB at slot } s) = (1 - f_\text{RB})^{s-1} f_\text{RB}
+$$
+
+Hence the probability for the next EB not coming before the next RB is
+
+$$
+p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s \lt n L \lt \infty} (1 - f_\text{EB})^{n-1} f_\text{EB} (1 - f_\text{RB})^{s-1} f_\text{RB}
+ = \frac{1 - [f_\text{RB} (f_\text{EB} - 1) + 1] (1 - f_\text{RB})^{L-1}}{1 - (1 - f_\text{EB}) (1 - f_\text{RB})^L}
+$$
+
+The plots below indicate that the phase length $L$ should be several times ${f_\text{RB}}^{-1}$ in order for there to be a high probability that an RB will appear before the next EB. 
+
+![Probability of the next RB prior to the next EB](../images/leios-eb-rb.svg)
+
+> [!IMPORTANT]
+> 
+> The above argument needs reworking because it doesn't account for various effects like the EB being per-pipeline, propagation delays, and the RB being per-slot or that there are multiple pipelines. There also may be ambiguities in the specification for the case when several EBs are waiting for an RB: presumably, the "freshest first" rule would be applied here, so the newest EB would go into the RB. We might need simulation for this analysis.
+
 
 
 ### Votes
