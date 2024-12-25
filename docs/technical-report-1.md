@@ -91,7 +91,7 @@ $$
 \delta = 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) + 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) - 1 \cdot \phi_f(\sigma) = 2 \left[ 1 - (1 - f)^{\sigma/2} \right] - \left[ 1 - (1 - f)^\sigma \right] = \left[ 1 - (1 - f)^{\sigma/2} \right]^2 = \left[ \phi_f\left(\frac{\sigma}{2}\right) \right]^2 > 0
 $$
 
-In relative terms, $\frac{\delta}{\phi_f(\sigma)} \approx \frac{\phi_f(\sigma)}{4}$ , so the advantage is small unless the node starts with an appreciable probability of producing a block. A Taylor-series expansion reveals $2\phi_f(\sigma/2) = \phi_g(\sigma)$ with $g = f \cdot (1 + \frac{1}{4}f \cdot \sigma) + \mathcal{O}(f^3)$, implying that the benefit of splitting stake in half is equivalent to the protocol parameter for the lottery being fractionally increased by $f \cdot \sigma / 4$. In the limit of splitting the stake into a large number of parts, we have the limit
+In relative terms, $\frac{\delta}{\phi_f(\sigma)} \approx \frac{\phi_f(\sigma)}{4}$ , so the advantage is small unless the node starts with an appreciable probability of producing a block. A Taylor-series expansion reveals $2\phi_f(\sigma/2) = \phi_g(\sigma)$ with $g = f \cdot (1 + \frac{1}{4}f \cdot \sigma) + \mathcal{O}(f^3)$, implying that the benefit of splitting stake in half is equivalent to the protocol parameter for the lottery being fractionally increased by $f \cdot \sigma / 4$. This renormalization can be extended to the limit of splitting the stake into a large number of parts, where we have a simple result,
 
 $$
 \lim_{k \rightarrow \infty} k \cdot \phi_f\left( \frac{\sigma}{k} \right) = \phi_h(\sigma)
@@ -150,17 +150,24 @@ $$
 p_\text{EB} = \phi_{f_\text{EB}}(\sigma) = 1 - (1 - f_\text{EB})^\sigma
 $$
 
-and the probability that no EB is produced by any node is
-
-$$
-q_\text{E} = 1 - f_\text{EB}
-$$
-
 If $v_\text{EB} \in [0,1]$ is the node's EB VRF value for the current phase, then the node's eligibility condition is $v_\text{EB} \leq p_\text{EB}$.
 
-In Short Leios it is critically important that at least one EB be produced in the pipeline because, otherwise, the pipeline's IBs will not be referenced in the RB and the work done creating them will be lost and their transactions will have to wait for another IB.
+In Short Leios it is critically important that at least one EB be produced in the pipeline because, otherwise, the pipeline's IBs will not be referenced in the RB and the work done creating them will be lost and their transactions will have to wait for another IB. There are four situations of interest for EB production in a particular pipeline:
+
+1. No EB is produced: $(1 - p_\text{hon}) \cdot (1 - p_\text{adv}) = 1 - f_\text{EB}$.
+2. Only honest parties produce EBs: $p_\text{hon} \cdot (1 - p_\text{adv})$.
+3. Only adversarial parties produce EBs: $(1 - p_\text{hon}) \cdot p_\text{adv}$.
+4. Both honest and adversarial parties produce EBs: $p_\text{hon} \cdot p_\text{adv}$.
+
+where $p_\text{hon} = \phi_{f_\text{EB}}(\sigma_\text{hon})$, $p_\text{adv} = \phi_{f_\text{EB}}(\sigma_\text{adv})$, and $\sigma_\text{hon} + \sigma_\text{adv} = 1$. For this analysis we ignore the splitting of stake because the analysis of it in a previous section indicated that it is inconsequential even in the worst case.
 
 ![Probability of no EB in phase](../images/prob-no-eb.svg)
+
+If we account for stake being divided among many nodes, we get a nearly identical result. The left plot below shows the scenario where stake is divided evenly among 1000 nodes and the right plot shows when it is divided among 2500 nodes according to a non-uniform stake distribution similar to that of epoch 500.
+
+| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |
 
 Short Leios also relies on the EB being included in an RB before another EB is produced: endorser blocks are not allowed to queue awaiting RBs or to reference other EBs. Thus, the EB rate should be consistent with the RB rate.
 
