@@ -74,6 +74,7 @@ where the approximation holds for the very large total stake $S$, which is great
 $$
 \psi_{f^\prime}(s) = 1 - (1 - f^\prime)^s
 $$
+
 which can be simplified with the relative stake $\sigma = s / S$ to 
 
 $$
