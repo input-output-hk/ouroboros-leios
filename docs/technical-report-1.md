@@ -66,10 +66,10 @@
 In Leios stake-based sortition occurs for the selection of the producers of IBs, EBs, and votes. The selection of the producers of IBs and EBs occurs similarly to Praos and the selection of the votes occurs similarly to Mithril. We define two functions for the probability of being elected as a producer or vote in the Bernoulli trials for each unit of stake (i.e., one lottery for each lovelace). Consider the situation where there is a total stake $S$ and a Leios node has $s$ stake delegated to it. Let $f^\prime$ be the probability that a single lovelace wins the lottery and $f$ be the probability that any of the $S$ lovelace win it:
 
 $$
-f = 1 - (1 - f^\prime)^S
+f = 1 - (1 - f^\prime)^S \approx S \cdot f^\prime
 $$
 
-The probability that the node with $s$ stake delegated to it wins any of the lotteries is
+where the approximation holds for the very large total stake $S$, which is greater than $10^{16}$ on the Cardano mainnet. The probability that the node with $s$ stake delegated to it wins any of the lotteries is
 
 $$
 \psi_{f^\prime}(s) = 1 - (1 - f^\prime)^s
@@ -206,36 +206,25 @@ The plots below indicate that the phase length $L$ should be several times ${f_\
 > The above argument needs reworking because it doesn't account for various effects like the EB being per-pipeline, propagation delays, and the RB being per-slot or that there are multiple pipelines. There also may be ambiguities in the specification for the case when several EBs are waiting for an RB: presumably, the "freshest first" rule would be applied here, so the newest EB would go into the RB. We might need simulation for this analysis.
 
 
-
 ### Votes
 
+The sortition for voting differs from that for blocks because, in principle, a node may win several votes in the lottery.
 
-#### Leader-election like voting[​](https://peras.cardano-scaling.org/docs/reports/tech-report-2#leader-election-like-voting "Direct link to Leader-election like voting")
+$$
+\mathcal{P}(n \text{ votes given stake } s) = {s \choose n} {f_\text{vote}^\prime}^n (1 - f_\text{vote}^\prime)^{s-n} \approx \frac{(f_\text{vote} \cdot \sigma)^n \cdot e^{- f_\text{vote} \cdot \sigma}}{n!}
+$$
 
-The first algorithm is basically identical to the one used for [Mithril](https://mithril.network/) signatures, and is also the one envisioned for [Leios](https://leios.cardano-scaling.org/) (see Appendix D of the recent Leios paper). It is based on the following principles:
+where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes in the lottery and the stake is very large relative to the number of votes $n \ll s$. Note that even in this approximation the probabilities sum to one. The formula above and this approximation may be sufficient for use with a VRF to determine the number of votes that a node is entitled to. The table below show the VRF conditions for determining the number of votes in this approximation, which can be expressed as a Taylor series involving operations only on rational numbers. The Cardano mainnet decentralization parameter is current 500, so if we consider the case where the mean number of votes is 500 and a node has 1/500th of the stake, then $f_\text{vote} \cdot \sigma =1$ in this computations, corresponding to the right edge in the plot below: any pool with more stake would be oversaturated. Even in the worst-case scenario of a fully saturated pool, the probability of more than three votes is about 1.90%.
 
-- The goal of the algorithm is to produce a number of votes targeting a certain threshold such that each voter receives a number of vote proportionate to σσ, their fraction of total stake, according to the basic probability function ϕ(σ)=1−(1−f)σϕ(σ)=1−(1−f)σ,
-- There are various parameters to the algorithm:
-    - ff is the fraction of slots that are "active" for voting
-    - mm is the number of _lotteries_ each voter should try to get a vote for,
-    - kk is the target total number of votes for each round (e.g., quorum) kk should be chosen such that k=m⋅ϕ(0.5)k=m⋅ϕ(0.5) to reach a majority quorum,
-- When its turn to vote comes, each node run iterates over an index i∈[1…m]i∈[1…m], computes a hash from the _nonce_ and the index ii, and compares this hash with f(σ)f(σ): if it is lower than or equal, then the node has one vote.
-    - Note the computation f(σ)f(σ) is exactly identical to the one used for [leader election](https://github.com/intersectmbo/cardano-ledger/blob/f0d71456e5df5a05a29dc7c0ac9dd3d61819edc8/libs/cardano-protocol-tpraos/src/Cardano/Protocol/TPraos/BHeader.hs#L434).
+| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                  |
+| 1               | $1 \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
+| 2               | $1 + \sigma \cdot f_\text{vote} \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
+| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
+| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
 
-We [prototyped](https://github.com/input-output-hk/peras-design/blob/73eabecd272c703f1e1ed0be7eeb437d937e1179/peras-vote/src/Peras/Voting/Vote.hs#L311) this approach in Haskell.
-
-#### Sortition-like voting[​](https://peras.cardano-scaling.org/docs/reports/tech-report-2#sortition-like-voting "Direct link to Sortition-like voting")
-
-The second algorithm is based on the _sortition_ process initially invented by [Algorand](https://web.archive.org/web/20170728124435id_/https://people.csail.mit.edu/nickolai/papers/gilad-algorand-eprint.pdf) and [implemented](https://github.com/algorand/sortition/blob/main/sortition.cpp) in their node. It is based on the same idea, namely that a node should have a number of votes proportional to their fraction of total stake, given a target "committee size" expressed as a fraction of total stake pp. And it uses the fact the number of votes a single node should get based on these parameters follows a binomial distribution.
-
-The process for voting is thus:
-
-- Compute the individual probability of each "coin" to win a single vote pp as the ratio of expected committee size over total stake.
-- Compute the binomial distribution B(n,p)B(n,p) where nn is the node's stake.
-- Compute a random number between 0 and 1 using _nonce_ as the denominator over maximum possible value (e.g., all bits set to 1) for the nonce as denominator.
-- Use [bisection method](https://en.wikipedia.org/wiki/Bisection_method) to find the value corresponding to this probability in the CDF for the aforementioned distribution.
-
-This yields a vote with some _weight_ attached to it "randomly" computed so that the overall sum of weights should be around expected committee size.
+![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
 
 
 ## Voting and certificates
