@@ -226,6 +226,25 @@ where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes
 
 ![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
 
+Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+
+### Insights regarding sortition
+
+- All of the sortition is based on Bernoulli trials for each stake of lovelace.
+- A probabilistic analysis shows that splitting stake among many nodes only provides a minor benefit in winning the lottery more times.
+- The IB lottery is per-slot and limits a node to building a maximum of one IB per slot.
+    - Careful selection of protocol parameters ensures a high probability of at least one IB in each pipeline.
+- The EB lottery is per-pipeline and limits a node to building a maximum of one EB per pipeline.
+    - The formulation of the EB lottery implies that there will always be a significant chance that a pipeline contains no EB.
+    - Setting protocol parameters so that there is a high probability of an EB in a pipeline makes the protocol more susceptible to influence by adversaries with significant stake.
+    - However, the unevenness in stake distribution or splitting of adversarial stake does not exacerbate the situation.
+- The pipeline length should be several multiples of the inverse of the active-slot coefficient, in order that there is a high probability for an RB to be available for an EB certificate.
+- The vote lottery can award multiple votes to the same node if they have a lot of stake and are luck.
+    - Nodes nearly saturated with stake have an appreciable chance of receiving several votes.
+    - The mathematics and code for determining from the VRF the number of votes a node winds is more complex and involves complications to avoid floating-point computations.
+    - Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+
+
 
 ## Voting and certificates
 
