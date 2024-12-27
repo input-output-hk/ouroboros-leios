@@ -178,7 +178,11 @@ If we account for stake being divided among many nodes, we get a nearly identica
 >   
 > - [ ] Is there a theoretical argument (like the law of large numbers) why splitting the stake doesn't make a visible difference?  
 > - [ ] Is it pointless to include such repetitive plots?  
-  
+
+For the case of realistic, non-uniform stake the follow plot shows the expected number of EBs are proportioned among honest and adversarial parties. Ensuring that there is an honest EB might also open the possibility of adversarial EBs.
+
+![Number of EBs expected](../images/expected-ebs-2500.svg)
+
 Short Leios also relies on the EB being included in an RB before another EB is produced: endorser blocks are not allowed to queue awaiting RBs or to reference other EBs. Thus, the EB rate should be consistent with the RB rate. We can approximate the probability of there not being an RB in time to include a new EB by answering the following question: given that an EB has been produced, what is the probability that the *next* EB will be produced before the *first* RB? In such a situation, the freshest-first rule would result in the first EB being discarded because the second EB is included in the new RB. The distribution of waiting times for the next EB and next RB are  
   
 $$  
