@@ -81,7 +81,7 @@ $$
 \phi_f(\sigma) = \psi_{f^\prime}(\sigma \cdot S) = 1 - (1 - f)^\sigma  
 $$  
   
-Sortition reuses the Praos VRF, but prepending a string such as `Leios-IB`, `Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order to remove correlations between the uses of the VRF. The resulting VRF value `v` is compared to the probability (in the case of IBs and EBs) or the cumulative probability (in the case of votes) for winning the sortition lottery. This is equivalent to the eligibility checks in the Leios paper.  
+Sortition reuses the Praos VRF, but prepending a string such as `Leios-IB`, `Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order to remove correlations between the uses of the VRF. Figures 6, 7, and 8 of the Leios paper describe the eligibility computations. In essence, the resulting eligibility value $v$ is compared to the probability (in the case of IBs and EBs) or the cumulative probability (in the case of votes) for winning the sortition lottery.
   
   
 ### Advantage gained by splitting stake among nodes  
