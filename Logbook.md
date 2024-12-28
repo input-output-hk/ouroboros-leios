@@ -1,6 +1,12 @@
 # Leios logbook
 
-## 2024-12-26
+## 2024-12-27
+
+### Votes and certificates
+
+- Updated size estimates for votes.
+- Added CPU time estimates for BLS votes and certificates.
+- Wrote technical report sections on BLS and MUSEN certificates.
 
 ### Sortition
 
