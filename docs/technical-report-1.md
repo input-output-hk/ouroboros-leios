@@ -271,36 +271,40 @@ The next subsections contain preliminary analyses of concerns and potential deci
 
 Conceptually, a Leios vote contains the following information:
 
-- The hash of the EB being voted for
-- The identity of the voter
-- The number of votes cast
-- A proof that the votes cast are valid
-- A signature
+- The hash of the EB being voted for.
+- The identifier for the pipeline.
+    - This could be omitted because it can be inferred from the EB.
+- The identity of the voter.
+- The number of votes cast.
+- A proof that the votes cast are valid.
+- A signature.
 
-When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized. Note the EB presumably includes information about which pipeline it belongs to, so that information does not also be included in the vote. So, a minimalist vote might only comprise 146 bytes of core information, not counting the hash of the EB.
+When collecting votes for the same EB, the hash of the EB and the identifier for the pipeline would only have to be listed once for the whole set. This will save 64 bytes per vote serialized. So, a minimalist vote might only comprise 209 bytes of core information, not counting the hash of the EB.
 
 - *Voter identity:* 32 bytes
-- *Number of votes cast:* 2 bytes
-- *Proof of right to vote:* 80 bytes
-- *Signature:* 32 bytes
+- *Number of votes cast:* 1 bytes
+- *ECVRF signature on pipeline identifier and nonce:* 80 bytes
+- *Compressed BLS12-381 signature:* 96 bytes
 
-The above assumes that the keys for verifying the signature have already been transmitted. If the signature were a full KES signature, then it would be at least 416 bytes instead of 32 bytes, though the signed time of 32 bytes would be common to all votes of a given pipeline.
+The above assumes that the keys for verifying the signature and the proof of possession have already been transmitted. These would need to be registered on the chain, presumably on the Praos chain.
+
+Instead of ephemeral keys, if the signature were a full KES signature, then it would be at least 448 bytes instead of 96 bytes, though the signed time of 32 bytes would be common to all votes of a given pipeline.
 
 - Signed time: 32 bytes
 - Verification key: 32 bytes
-- Signature
+- KES Signature
     - Merkle path (verification key hashes): 7 × 32 = 224 bytes
     - Additional verification key: 32 bytes
     - Ed25519
         - Public key: 32 bytes
-        - Two points: 2 × 32 = 64 bytes
+        - Two points: 2 x 64 = 128 bytes
 
-So, we have two scenarios for the minimal size of a vote.
+Much of larger size of the KES signature size comes from the Merkle path needed to prove the currently active key. If voting occurs frequently in Leios, that proof would be repeated many times using the 36-hour KES period. Perhaps that proof would only have to be recorded in a certificate during the node's first vote during a KES period. Also, MUSEN is an alternative to KES, but it still suffers from large descriptions of the evolved keys. So, in essence, we have two scenarios for the minimal size of a vote.
 
-| Method         | Common to all votes for a given EB | Specific to individual vote | Total |
-| -------------- | ---------------------------------: | --------------------------: | ----- |
-| Ephemeral keys |                               32 B |                       146 B | 178 B |
-| KES complete   |                               64 B |                       498 B | 562 B |
+| Method        | Common to all votes for a given EB | Specific to individual vote | Total | Comments                                                                   |
+| ------------- | ---------------------------------: | --------------------------: | ----- | -------------------------------------------------------------------------- |
+| Ephemeral key |                               32 B |                       209 B | 241 B | The ephemeral keys would have to have been registered on-chain.            |
+| KES key       |                               64 B |                       529 B | 593 B | The KES Merkle path for stays constant for one KES period (e.g, 36 hours). |
 
 However, it has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
 
@@ -492,20 +496,27 @@ Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we s
 
 #### BLS certificate
 
+The BLS certificate describe in the Leios paper does not compress votes the way that ALBA does, so votes must be fully stored in the certificate. However, only a quorum of votes, not all of them, need to be stored, which affords a type of compression. Additionally, two aggregate signature must also be stored. A certificate for a quorum of votes attested by ephemeral keys would fit in a Praos block, but a certificate attested by KES keys is about 50% too large.
 
-> [!IMPORTANT]
-> 
-> - [ ] To be written
+| Method        | Common to all votes | Specific to individual vote | Aggregation | Number of votes | Certificate of all votes | Quorum | Certificate of quorum |
+| ------------- | ------------------: | --------------------------: | ----------: | --------------: | -----------------------: | -----: | --------------------: |
+| Ephemeral key |                32 B |                       209 B |       192 B |             500 |                   105 kB |    60% |                 63 kB |
+| KES key       |                64 B |                       529 B |       192 B |             500 |                   265 kB |    60% |                159 kB |
+
+Also recall that any ephemeral keys would have to be registered on-chain, consuming additional precious space and complicating bookkeeping: that would only provide benefit if the keys were reused for many votes. It might also be possible to only store the Merkle proof for the KES key only at the start of the KES period (e.g., every 36 hours).
+
+The construction and verification times below are based on previous experience with Mithril certificates:
+
+| Metric                              | Value |
+| ----------------------------------- | ----- |
+| Proving time (per vote)             | 70 ms |
+| Aggregation time (per certificate)  | 1.2 s |
+| Verification time (per certificate) | 17 ms |
 
 
 #### MUSEN certificate
 
-> [!IMPORTANT]
-> 
-> - [ ] To be written
-> - [ ] Include benchmark results
-
-[MUSEN](https://iohk.io/en/research/library/papers/musen-aggregatable-key-evolving-verifiable-random-functions-and-applications/) ("MUlti-Stage key-Evolving verifiable random fuNctions.") builds upon the concept of VRFs by introducing a key-evolving feature and allowing for aggregating VRF outputs. The aggregation capability promises to result in small certificates attesting to the Leios votes. However, verification times may be to long for Leios.
+[MUSEN](https://iohk.io/en/research/library/papers/musen-aggregatable-key-evolving-verifiable-random-functions-and-applications/) ("MUlti-Stage key-Evolving verifiable random fuNctions.") builds upon the concept of VRFs by introducing a key-evolving feature and allowing for aggregating VRF outputs. The aggregation capability promises to result in small certificates attesting to the Leios votes, MUSEN suffers from the need to record all of the verification keys (e.g., in a Merkle tree). MUSEN signature are approximately the same size as KES signatures. However, verification times may be too long for Leios. Overall, the benefit of MUSEN's key evolution is minor and its other resource costs may be greater than plain BLS.
 
 
 ### Insights regarding voting and certificates
@@ -519,6 +530,9 @@ Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we s
     1. Each has at least one strength and one drawback related to certificate size, proof time, or verification time.
     2. ALBA is close to being viable if vote size can reduced or if quorum disruption by adversaries with 10% of stake is acceptable.
     3. An ALBA security setting of $\ell_\text{sec} = \ell_\text{rel} = 80$ (i.e., eighty-bit security) seems sufficient for Leios voting.
+    4. BLS is viable if ephemeral keys are used, but those would require pre-registration.
+    5. BLS with KES keys could work if oversized Praos blocks (~160 kB) are allowed.
+    6. ZK variants would result in small certificates but long proving times.
 3. At least 500 votes and a 60% quorum will be needed.
     1. These parameters ensure voting security at least as strong as Praos security over a range of adversary strengths.
     3. ALBA would require a larger quorum.
