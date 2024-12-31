@@ -3,9 +3,31 @@ Analysis modules for simulation results.
 """
 
 from .stake_connectivity import StakeConnectivityAnalyzer
-from .ib_diffusion import IBDiffusionAnalyzer
-from .eb_diffusion import EBDiffusionAnalyzer
-from .rb_diffusion import RBDiffusionAnalyzer
-from .vote_diffusion import VoteDiffusionAnalyzer
+from .base_diffusion import BaseDiffusionAnalyzer
+from .base_processing import BaseProcessingTimeAnalyzer
+from .diffusion_analyzers import (
+    IBDiffusionAnalyzer,
+    EBDiffusionAnalyzer,
+    RBDiffusionAnalyzer,
+    VoteDiffusionAnalyzer
+)
+from .processing_analyzers import (
+    IBProcessingAnalyzer,
+    EBProcessingAnalyzer,
+    RBProcessingAnalyzer,
+    VoteProcessingAnalyzer
+)
 
-__all__ = ['StakeConnectivityAnalyzer', 'IBDiffusionAnalyzer', 'EBDiffusionAnalyzer', 'RBDiffusionAnalyzer', 'VoteDiffusionAnalyzer'] 
+__all__ = [
+    'StakeConnectivityAnalyzer',
+    'BaseDiffusionAnalyzer',
+    'BaseProcessingTimeAnalyzer',
+    'IBDiffusionAnalyzer',
+    'EBDiffusionAnalyzer',
+    'RBDiffusionAnalyzer',
+    'VoteDiffusionAnalyzer',
+    'IBProcessingAnalyzer',
+    'EBProcessingAnalyzer',
+    'RBProcessingAnalyzer',
+    'VoteProcessingAnalyzer'
+] 

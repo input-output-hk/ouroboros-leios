@@ -19,11 +19,9 @@ sys.path.insert(0, str(project_root))
 
 from src.core import LeiosParamSweeper
 from src.analyzers import StakeConnectivityAnalyzer
-from src.analyzers import IBDiffusionAnalyzer
-from src.analyzers import EBDiffusionAnalyzer
-from src.analyzers import RBDiffusionAnalyzer
-from src.analyzers import VoteDiffusionAnalyzer
-from src.analyzers.diffusion import BaseDiffusionAnalyzer
+from src.analyzers.base_diffusion import BaseDiffusionAnalyzer
+from src.analyzers.diffusion_analyzers import IBDiffusionAnalyzer, EBDiffusionAnalyzer, RBDiffusionAnalyzer, VoteDiffusionAnalyzer
+from src.analyzers.processing_analyzers import IBProcessingAnalyzer, EBProcessingAnalyzer, RBProcessingAnalyzer, VoteProcessingAnalyzer
 
 def main():
     try:
@@ -62,6 +60,11 @@ def main():
         eb_analyzer = EBDiffusionAnalyzer()
         rb_analyzer = RBDiffusionAnalyzer()
         vote_analyzer = VoteDiffusionAnalyzer()
+
+        ib_processing_analyzer = IBProcessingAnalyzer()
+        eb_processing_analyzer = EBProcessingAnalyzer()
+        rb_processing_analyzer = RBProcessingAnalyzer()
+        vote_processing_analyzer = VoteProcessingAnalyzer()
         
         # Register analyzers
         sweeper.register_analyzer(StakeConnectivityAnalyzer())
@@ -69,13 +72,14 @@ def main():
         sweeper.register_analyzer(eb_analyzer)
         sweeper.register_analyzer(rb_analyzer)
         sweeper.register_analyzer(vote_analyzer)
+
+        sweeper.register_analyzer(ib_processing_analyzer)
+        sweeper.register_analyzer(eb_processing_analyzer)
+        sweeper.register_analyzer(rb_processing_analyzer)
+        sweeper.register_analyzer(vote_processing_analyzer)
         
         # Run sweep
         results = sweeper.run_sweep()
-        
-        # Create combined diffusion chart
-        diffusion_analyzers = [ib_analyzer, eb_analyzer, rb_analyzer, vote_analyzer]
-        BaseDiffusionAnalyzer.create_combined_chart(results, diffusion_analyzers)
         
     except ValueError as e:
         print(f"\n❌ Error: {e}")

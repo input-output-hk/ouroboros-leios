@@ -40,6 +40,60 @@ class SimulationEvent:
             type=data["message"]["type"],
             data=data["message"]
         )
+        
+    def get_message_id(self) -> Optional[str]:
+        """Get a consistent string message ID from the event data.
+        
+        For most events, this is the 'id' field.
+        For PraosBlock events, this is 'slot-{slot}'.
+        For Vote events with dictionary IDs, this is '{slot}-{producer}'.
+        
+        Returns:
+            str: A consistent string ID for the message, or None if no ID could be determined
+        """
+        msg_id = self.data.get('id')
+        
+        # For PraosBlock events, use slot as ID
+        if msg_id is None:
+            slot = self.data.get('slot')
+            if slot is not None:
+                return f"slot-{slot}"
+            return None
+            
+        # For Vote events with dictionary IDs
+        if isinstance(msg_id, dict):
+            if 'id' in msg_id:
+                return msg_id['id']
+            # Create a consistent string representation
+            slot = msg_id.get('slot')
+            producer = msg_id.get('producer')
+            if slot is not None and producer is not None:
+                return f"{slot}-{producer}"
+            return None
+            
+        # For all other events, convert ID to string
+        return str(msg_id)
+        
+    def is_producer_event(self, msg_id: str) -> bool:
+        """Check if this event is from the message producer.
+        
+        For PraosBlock events, the sender is considered the producer.
+        For other events, checks if sender matches producer.
+        
+        Args:
+            msg_id: The message ID to check (needed to determine event type)
+            
+        Returns:
+            bool: True if this is a producer event, False otherwise
+        """
+        if msg_id.startswith('slot-'):
+            # For PraosBlock events, sender is the producer
+            return True
+        else:
+            # For other events, check producer matches sender
+            producer = self.data.get('producer')
+            sender = self.data.get('sender')
+            return producer == sender
 
 @dataclass
 class SimulationResult:
