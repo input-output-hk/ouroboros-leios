@@ -29,6 +29,18 @@ impl LinkTracker {
         self.connections.entry(from).or_default().insert(to);
         self.connections.entry(to).or_default().insert(from);
     }
+    pub fn count(&self, from: usize) -> usize {
+        self.connections
+            .get(&from)
+            .map(|c| c.len())
+            .unwrap_or_default()
+    }
+    pub fn exists(&self, from: usize, to: usize) -> bool {
+        self.connections
+            .get(&from)
+            .map(|c| c.contains(&to))
+            .unwrap_or_default()
+    }
 }
 
 pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {
