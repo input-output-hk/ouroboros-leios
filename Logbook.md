@@ -1,5 +1,31 @@
 # Leios logbook
 
+## 2025-01-02
+
+### Benchmarking BLS signatures and aggregate verifications
+
+The construction and verification BLS votes were benchmarked using the Rust [bls-signatures](https://lib.rs/crates/bls-signatures) package. Note that aggregate verification speeds the process significantly.
+
+| Operation                            |       CPU time |
+| ------------------------------------ | -------------: |
+| Signing an item                      | 1.369±0.030 ms |
+| Verifying a single item              | 1.662±0.090 ms |
+| Verifying an aggregate of 500 items  |    55.3±5.3 ms |
+| Verifying an aggregate of 1000 items |    100.±20. ms |
+
+![Benchmark for verifying an aggregate BLS signature](images/bls-verification.svg)
+
+Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
+
+- Number of votes: 600
+- Quorum: 60%
+- Vote size: 250 B / vote
+- Certificate size: 75 kB / vote
+- Generate vote: 2 ms / vote
+- Verify vote: 3 ms / vote
+- Generate certificate: 50 ms / certificate + 0.5 ms / vote
+- Verify certificate: 50 ms / certificate + 0.5 ms / vote
+
 ## 2024-12-27
 
 ### Votes and certificates
