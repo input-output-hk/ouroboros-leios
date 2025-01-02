@@ -94,14 +94,17 @@ stake' pid s = let open LeiosState s in
     (just s) → s
     nothing  → 0
 
+stake'' : PubKey → LeiosState → ℕ
+stake'' pk = stake' (poolID pk)
+
 stake : LeiosState → ℕ
 stake = stake' id
 
 lookupPubKeyAndStake : ∀ {B} → ⦃ _ : IsBlock B ⦄ → LeiosState → B → Maybe (PubKey × ℕ)
-lookupPubKeyAndStake s x =
+lookupPubKeyAndStake s b =
   L.head $
-    L.map (λ y → (y , stake' (poolID y) s))
-      $ L.filter (λ y → producerID x ≟ poolID y) (LeiosState.PubKeys s)
+    L.map (λ pk → (pk , stake'' pk s)) $
+      L.filter ((producerID b ≟_) ∘ poolID) (LeiosState.PubKeys s)
 
 module _ (s : LeiosState)  where
 
@@ -126,13 +129,13 @@ module _ (s : LeiosState)  where
   ibValid : InputBlock → Type
   ibValid record { header = h ; body = b }
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid h pk (stake' (poolID pk) s) × ibBodyValid b
+  ... | just (pk , pid) = ibHeaderValid h pk (stake'' pk s) × ibBodyValid b
   ... | nothing = ⊥
 
   ibValid? : (ib : InputBlock) → Dec (ibValid ib)
   ibValid? record { header = h ; body = b }
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid? h pk (stake' (poolID pk) s) ×-dec ibBodyValid? b
+  ... | just (pk , pid) = ibHeaderValid? h pk (stake'' pk s) ×-dec ibBodyValid? b
   ... | nothing = no λ x → x
 
   record ebValid (eb : EndorserBlock) (pk : PubKey) (st : ℕ) : Type where
@@ -160,22 +163,22 @@ module _ (s : LeiosState)  where
   headerValid : Header → Type
   headerValid (ibHeader h)
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid h pk (stake' (poolID pk) s)
+  ... | just (pk , pid) = ibHeaderValid h pk (stake'' pk s)
   ... | nothing = ⊥
   headerValid (ebHeader h)
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ebValid h pk (stake' (poolID pk) s)
+  ... | just (pk , pid) = ebValid h pk (stake'' pk s)
   ... | nothing = ⊥
   headerValid (vHeader h)  = vsValid h
 
   headerValid? : (h : Header) → Dec (headerValid h)
   headerValid? (ibHeader h)
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid? h pk (stake' (poolID pk) s)
+  ... | just (pk , pid) = ibHeaderValid? h pk (stake'' pk s)
   ... | nothing = no λ x → x
   headerValid? (ebHeader h)
     with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ebValid? h pk (stake' (poolID pk) s)
+  ... | just (pk , pid) = ebValid? h pk (stake'' pk s)
   ... | nothing = no λ x → x
   headerValid? (vHeader h) = vsValid? h
 
