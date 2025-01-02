@@ -34,7 +34,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                    rbs    : List RankingBlock
                    txs    : List Tx
                    V      : VTy
-                   SD     : StakeDistr
+                   sd     : StakeDistr
                    pks    : List PubKey
 
   -- Uniform Short Pipeline:
@@ -96,9 +96,9 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     Init :
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
-         ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
+         ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE sd ⟧⇀ bs'
          ────────────────────────────────────────────────────────────────
-         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
+         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V sd bs' pks
 
     -- Network and Ledger
 
@@ -113,8 +113,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
              ; Ledger    = constructLedger rbs
              ; slot      = suc slot
              ; Upkeep    = ∅
-             } ↑ L.filter isValid? msgs
-
+             } ↑ L.filter (isValid? s) msgs
     Ftch :
          ────────────────────────────────────────────────────────
          just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s

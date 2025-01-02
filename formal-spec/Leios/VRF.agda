@@ -9,9 +9,14 @@ record VRF (Dom Range PubKey : Type) : Type₁ where
   field isKeyPair : PubKey → PrivKey → Type
         eval : PrivKey → Dom → Range × VrfPf
         verify : PubKey → Dom → Range → VrfPf → Type
+        verify? : (pk : PubKey) → (d : Dom) → (r : Range) → (pf : VrfPf) → Dec (verify pk d r pf)
 
 record LeiosVRF : Type₁ where
   field PubKey : Type
+        poolID : PubKey → PoolID
+        verifySig : PubKey → Sig → Type
+        verifySig? : (pk : PubKey) → (sig : Sig) → Dec (verifySig pk sig)
+
         vrf : VRF ℕ ℕ PubKey
 
   open VRF vrf public
@@ -33,3 +38,4 @@ record LeiosVRF : Type₁ where
 
   canProduceV : ℕ → PrivKey → ℕ → Type
   canProduceV slot k stake = proj₁ (eval k (genVInput slot)) < stake
+

@@ -44,6 +44,7 @@ record LeiosState : Type where
         IBBodies  : List IBBody
         Upkeep    : ℙ SlotUpkeep
         BaseState : B.State
+        PubKeys   : List PubKey
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -69,22 +70,128 @@ record LeiosState : Type where
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 
-initLeiosState : VTy → StakeDistr → B.State → LeiosState
-initLeiosState V SD bs = record
-  { V           = V
-  ; SD          = SD
-  ; FFDState    = FFD.initFFDState
-  ; Ledger      = []
-  ; ToPropose   = []
-  ; IBs         = []
-  ; EBs         = []
-  ; Vs          = []
-  ; slot        = initSlot V
-  ; IBHeaders   = []
-  ; IBBodies    = []
-  ; Upkeep      = ∅
-  ; BaseState   = bs
+initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
+initLeiosState V SD bs pks = record
+  { V         = V
+  ; SD        = SD
+  ; FFDState  = FFD.initFFDState
+  ; Ledger    = []
+  ; ToPropose = []
+  ; IBs       = []
+  ; EBs       = []
+  ; Vs        = []
+  ; slot      = initSlot V
+  ; IBHeaders = []
+  ; IBBodies  = []
+  ; Upkeep    = ∅
+  ; BaseState = bs
+  ; PubKeys   = pks
   }
+
+stake' : PoolID → LeiosState → ℕ
+stake' pid s = let open LeiosState s in
+  case lookupᵐ? SD pid of λ where
+    (just s) → s
+    nothing  → 0
+
+stake : LeiosState → ℕ
+stake = stake' id
+
+lookupPubKeyAndStake : ∀ {B} → ⦃ _ : IsBlock B ⦄ → LeiosState → B → Maybe (PubKey × ℕ)
+lookupPubKeyAndStake s x =
+  L.head $
+    L.map (λ y → (y , stake' (poolID y) s))
+      $ L.filter (λ y → producerID x ≟ poolID y) (LeiosState.PubKeys s)
+
+module _ (s : LeiosState)  where
+
+  record ibHeaderValid (h : IBHeader) (pk : PubKey) (st : ℕ) : Type where
+    field lotteryPfValid : verify pk (slotNumber h) st (lotteryPf h)
+          signatureValid : verifySig pk (signature h)
+
+  record ibBodyValid (b : IBBody) : Type where
+
+  ibHeaderValid? : (h : IBHeader) (pk : PubKey) (st : ℕ) → Dec (ibHeaderValid h pk st)
+  ibHeaderValid? h pk st
+    with verify? pk (slotNumber h) st (lotteryPf h)
+  ... | no ¬p = no (¬p ∘ ibHeaderValid.lotteryPfValid)
+  ... | yes p
+    with verifySig? pk (signature h)
+  ... | yes q = yes (record { lotteryPfValid = p ; signatureValid = q })
+  ... | no ¬q = no (¬q ∘ ibHeaderValid.signatureValid)
+
+  ibBodyValid? : (b : IBBody) → Dec (ibBodyValid b)
+  ibBodyValid? _ = yes record {}
+
+  ibValid : InputBlock → Type
+  ibValid record { header = h ; body = b }
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ibHeaderValid h pk (stake' (poolID pk) s) × ibBodyValid b
+  ... | nothing = ⊥
+
+  ibValid? : (ib : InputBlock) → Dec (ibValid ib)
+  ibValid? record { header = h ; body = b }
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ibHeaderValid? h pk (stake' (poolID pk) s) ×-dec ibBodyValid? b
+  ... | nothing = no λ x → x
+
+  record ebValid (eb : EndorserBlock) (pk : PubKey) (st : ℕ) : Type where
+    field lotteryPfValid : verify pk (slotNumber eb) st (lotteryPf eb)
+          signatureValid : verifySig pk (signature eb)
+    -- TODO
+    -- ibRefsValid : ?
+    -- ebRefsValid : ?
+
+  ebValid? : (eb : EndorserBlock) (pk : PubKey) (st : ℕ) → Dec (ebValid eb pk st)
+  ebValid? h pk st
+    with verify? pk (slotNumber h) st (lotteryPf h)
+  ... | no ¬p = no (¬p ∘ ebValid.lotteryPfValid)
+  ... | yes p
+    with verifySig? pk (signature h)
+  ... | yes q = yes (record { lotteryPfValid = p ; signatureValid = q })
+  ... | no ¬q = no (¬q ∘ ebValid.signatureValid)
+
+  -- TODO
+  record vsValid (vs : List Vote) : Type where
+
+  vsValid? : (vs : List Vote) → Dec (vsValid vs)
+  vsValid? _ = yes record {}
+
+  headerValid : Header → Type
+  headerValid (ibHeader h)
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ibHeaderValid h pk (stake' (poolID pk) s)
+  ... | nothing = ⊥
+  headerValid (ebHeader h)
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ebValid h pk (stake' (poolID pk) s)
+  ... | nothing = ⊥
+  headerValid (vHeader h)  = vsValid h
+
+  headerValid? : (h : Header) → Dec (headerValid h)
+  headerValid? (ibHeader h)
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ibHeaderValid? h pk (stake' (poolID pk) s)
+  ... | nothing = no λ x → x
+  headerValid? (ebHeader h)
+    with lookupPubKeyAndStake s h
+  ... | just (pk , pid) = ebValid? h pk (stake' (poolID pk) s)
+  ... | nothing = no λ x → x
+  headerValid? (vHeader h) = vsValid? h
+
+  bodyValid : Body → Type
+  bodyValid (ibBody b) = ibBodyValid b
+
+  bodyValid? : (b : Body) → Dec (bodyValid b)
+  bodyValid? (ibBody b) = ibBodyValid? b
+
+  isValid : Header ⊎ Body → Type
+  isValid (inj₁ h) = headerValid h
+  isValid (inj₂ b) = bodyValid b
+
+  isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
+  isValid? (inj₁ h) = headerValid? h
+  isValid? (inj₂ b) = bodyValid? b
 
 -- some predicates about EBs
 module _ (s : LeiosState) (eb : EndorserBlock) where
@@ -93,11 +200,6 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
 
   allIBRefsKnown : Type
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
-
-stake : LeiosState → ℕ
-stake record { SD = SD } = case lookupᵐ? SD id of λ where
-  (just s) → s
-  nothing  → 0
 
 module _ (s : LeiosState) where
 

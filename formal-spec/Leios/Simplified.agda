@@ -129,7 +129,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
          ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
          ────────────────────────────────────────────────────────────────
-         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
+         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
 
     -- Network and Ledger
 
@@ -143,7 +143,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
              ; Ledger   = constructLedger rbs
              ; slot     = suc slot
              ; Upkeep   = ∅
-             } ↑ L.filter isValid? msgs
+             } ↑ L.filter (isValid? s) msgs
 
     Ftch :
          ────────────────────────────────────────────────────────
