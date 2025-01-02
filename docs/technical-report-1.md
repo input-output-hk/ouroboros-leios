@@ -505,7 +505,18 @@ The BLS certificate describe in the Leios paper does not compress votes the way 
 
 Also recall that any ephemeral keys would have to be registered on-chain, consuming additional precious space and complicating bookkeeping: that would only provide benefit if the keys were reused for many votes. It might also be possible to only store the Merkle proof for the KES key only at the start of the KES period (e.g., every 36 hours).
 
-The construction and verification times below are based on previous experience with Mithril certificates:
+The construction and verification times below are based on benchmarking using the Rust [bls-signatures](https://lib.rs/crates/bls-signatures) package.
+
+| Operation                            |       CPU time |
+| ------------------------------------ | -------------: |
+| Signing an item                      | 1.369±0.030 ms |
+| Verifying a single item              | 1.662±0.090 ms |
+| Verifying an aggregate of 500 items  |    55.3±5.3 ms |
+| Verifying an aggregate of 1000 items |    100.±20. ms |
+
+![Benchmark for verifying an aggregate BLS signature](../images/bls-verification.svg)
+
+However, these measurements are not consistent with the experience of Mithril:
 
 | Metric                              | Value |
 | ----------------------------------- | ----- |
@@ -538,6 +549,15 @@ The construction and verification times below are based on previous experience w
     3. ALBA would require a larger quorum.
     4. The clumpiness of the Cardano stake distribution on mainnet means that some producer nodes might cast more than one vote in a given pipeline.
     5. MUSEN and BLS certificates need further evaluation for Leios.
+4. Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
+    1. Number of votes: 600
+    2. Quorum: 60%
+    3. Vote size: 250 B / vote
+    4. Certificate size: 75 kB / vote
+    6. Generate vote: 2 ms / vote
+    7. Verify vote: 3 ms / vote
+    8. Generate certificate: 50 ms / certificate + 0.5 ms / vote
+    9. Verify certificate: 50 ms / certificate + 0.5 ms / vote
 
 
 ## Cost analyses
