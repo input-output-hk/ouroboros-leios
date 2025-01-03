@@ -75,6 +75,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
             region: None,
             stake: stake.get(i).cloned(),
             cpu_multiplier: 1.0,
+            cores: 4,
         });
         let relay_id = nodes.len();
         nodes.push(RawNodeConfig {
@@ -82,6 +83,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
             region: None,
             stake: None,
             cpu_multiplier: 1.0,
+            cores: 4,
         });
 
         links.add(pool_id, relay_id, Some(SHORT_HOP));

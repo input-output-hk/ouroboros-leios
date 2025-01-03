@@ -107,6 +107,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
             region: Some(region.name),
             stake,
             cpu_multiplier: 1.0,
+            cores: 4,
         });
     }
 

@@ -34,6 +34,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
             region: None,
             stake,
             cpu_multiplier: 1.0,
+            cores: 4,
         });
     }
 

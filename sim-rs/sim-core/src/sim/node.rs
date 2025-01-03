@@ -1,5 +1,7 @@
 use std::{
-    collections::{btree_map, hash_map, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
+    collections::{
+        btree_map, hash_map, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque,
+    },
     sync::Arc,
     time::Duration,
 };
@@ -30,12 +32,7 @@ enum TransactionView {
     Received(Arc<Transaction>),
 }
 
-/// Things that can happen next for a node
-enum NodeEvent {
-    /// A new slot has started.
-    NewSlot(u64),
-    /// A message has been received.
-    MessageReceived(NodeId, SimulationMessage),
+enum CpuTask {
     /// An input block has been generated and is ready to propagate
     InputBlockGenerated(InputBlock),
     /// An input block has been received and validated, and is ready to propagate
@@ -44,6 +41,16 @@ enum NodeEvent {
     EndorserBlockGenerated(EndorserBlock),
     /// An endorser block has been received and validated, and is ready to propagate
     EndorserBlockValidated(NodeId, Arc<EndorserBlock>),
+}
+
+/// Things that can happen next for a node
+enum NodeEvent {
+    /// A new slot has started.
+    NewSlot(u64),
+    /// A message has been received.
+    MessageReceived(NodeId, SimulationMessage),
+    /// A core has finished running some task, and is free to run another.
+    CpuTaskCompleted { core: u64, task: CpuTask },
 }
 
 pub struct Node {
@@ -60,6 +67,8 @@ pub struct Node {
     stake: u64,
     total_stake: u64,
     cpu_multiplier: f64,
+    cpu_task_queue: VecDeque<(Duration, CpuTask)>,
+    cores: Vec<u64>,
     peers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
     praos: NodePraosState,
@@ -129,6 +138,7 @@ impl Node {
         let id = config.id;
         let stake = config.stake;
         let cpu_multiplier = config.cpu_multiplier;
+        let cores = (0..config.cores).rev().collect();
         let peers = config.peers.clone();
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
@@ -147,6 +157,8 @@ impl Node {
             stake,
             total_stake,
             cpu_multiplier,
+            cpu_task_queue: VecDeque::new(),
+            cores,
             peers,
             txs: HashMap::new(),
             praos: NodePraosState::default(),
@@ -161,7 +173,24 @@ impl Node {
         self.events.pop().unwrap().1
     }
 
-    fn schedule_cpu_bound_event(&mut self, cpu_time: Duration, event: NodeEvent) {
+    fn schedule_cpu_task(&mut self, cpu_time: Duration, task: CpuTask) {
+        if let Some(core) = self.cores.pop() {
+            self.run_cpu_task(cpu_time, task, core);
+        } else {
+            self.cpu_task_queue.push_back((cpu_time, task));
+        }
+    }
+
+    fn free_core(&mut self, core: u64) {
+        if let Some((cpu_time, task)) = self.cpu_task_queue.pop_front() {
+            self.run_cpu_task(cpu_time, task, core);
+        } else {
+            self.cores.push(core);
+        }
+    }
+
+    fn run_cpu_task(&mut self, cpu_time: Duration, task: CpuTask, core: u64) {
+        let event = NodeEvent::CpuTaskCompleted { core, task };
         let timestamp = self.clock.now() + cpu_time.mul_f64(self.cpu_multiplier);
         self.events.push(FutureEvent(timestamp, event));
     }
@@ -193,10 +222,15 @@ impl Node {
                     match event {
                         NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
                         NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
-                        NodeEvent::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
-                        NodeEvent::InputBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
-                        NodeEvent::EndorserBlockGenerated(eb) => self.finish_generating_eb(eb)?,
-                        NodeEvent::EndorserBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                        NodeEvent::CpuTaskCompleted { core, task } => {
+                            self.free_core(core);
+                            match task {
+                                CpuTask::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTask::InputBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
+                                CpuTask::EndorserBlockGenerated(eb) => self.finish_generating_eb(eb)?,
+                                CpuTask::EndorserBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                            }
+                        }
                     }
                 }
             };
@@ -350,9 +384,9 @@ impl Node {
                     ibs: vec![],
                 };
                 self.try_filling_eb(&mut eb);
-                self.schedule_cpu_bound_event(
+                self.schedule_cpu_task(
                     self.sim_config.eb_generation_cpu_time,
-                    NodeEvent::EndorserBlockGenerated(eb),
+                    CpuTask::EndorserBlockGenerated(eb),
                 );
                 // A node should only generate at most 1 EB per slot
                 return;
@@ -418,9 +452,9 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            self.schedule_cpu_bound_event(
+            self.schedule_cpu_task(
                 self.sim_config.ib_generation_cpu_time,
-                NodeEvent::InputBlockGenerated(ib),
+                CpuTask::InputBlockGenerated(ib),
             );
         }
     }
@@ -676,9 +710,9 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
-        self.schedule_cpu_bound_event(
+        self.schedule_cpu_task(
             self.sim_config.ib_validation_cpu_time,
-            NodeEvent::InputBlockValidated(from, ib),
+            CpuTask::InputBlockValidated(from, ib),
         );
     }
 
@@ -740,9 +774,9 @@ impl Node {
 
     fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         self.tracker.track_eb_received(eb.id(), from, self.id);
-        self.schedule_cpu_bound_event(
+        self.schedule_cpu_task(
             self.sim_config.eb_validation_cpu_time,
-            NodeEvent::EndorserBlockValidated(from, eb),
+            CpuTask::EndorserBlockValidated(from, eb),
         );
     }
 

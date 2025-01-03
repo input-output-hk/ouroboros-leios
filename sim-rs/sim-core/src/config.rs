@@ -86,6 +86,12 @@ pub struct RawNodeConfig {
     pub region: Option<String>,
     #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
     pub cpu_multiplier: f64,
+    #[serde(default = "default_cores")]
+    pub cores: u64,
+}
+
+const fn default_cores() -> u64 {
+    4
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -106,6 +112,7 @@ impl From<RawConfig> for SimConfiguration {
                 location: to_netsim_location(raw.location),
                 stake: raw.stake.unwrap_or_default(),
                 cpu_multiplier: raw.cpu_multiplier,
+                cores: raw.cores,
                 peers: vec![],
             })
             .collect();
@@ -240,6 +247,7 @@ pub struct NodeConfiguration {
     pub location: Location,
     pub stake: u64,
     pub cpu_multiplier: f64,
+    pub cores: u64,
     pub peers: Vec<NodeId>,
 }
 
