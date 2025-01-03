@@ -13,7 +13,7 @@
         <h2>v0.3, <small><a href="https://drive.google.com/file/d/1pH1GYRInevlKcrkpFRJYIvRqFtcv3yFd/view?usp=sharing">video tutorial</a></small></h2>
       </div>
       <p><em>Explore the costs and benefits of Ouroborous Leios</em></p>
-      <p>WARNING: This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
+      <p><span style="color:red">WARNING:</span> This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
     </div>
     <div id="uiDisplays">
       <table>
@@ -80,7 +80,7 @@
           </tr>
           <tr>
             <th>IO <span title="Input/output operations per Input Block">ⓘ</span></th>
-            <td><input id="uiIbIo" type="number" min="0" max="1000" value="200" step="1"/></td>
+            <td><input id="uiIbIo" type="number" min="0" max="10000" value="1000" step="1"/></td>
             <td>IO/IB</td>
           </tr>
           <tr>
@@ -106,7 +106,7 @@
           </tr>
           <tr>
             <th>IO <span title="Input/output operations per Endorser Block">ⓘ</span></th>
-            <td><input id="uiEbIo" type="number" min="0" max="1000" value="10" step="1"/></td>
+            <td><input id="uiEbIo" type="number" min="0" max="10000" value="1000" step="1"/></td>
             <td>IO/EB</td>
           </tr>
           <tr>
@@ -127,7 +127,7 @@
           </tr>
           <tr>
             <th>IO <span title="Input/output operations per vote.">ⓘ</span></th>
-            <td><input id="uiVoteIo" type="number" min="0" max="1000" value="2" step="1"/></td>
+            <td><input id="uiVoteIo" type="number" min="0" max="10000" value="25" step="1"/></td>
             <td>IO/vote</td>
           </tr>
           <tr>
@@ -148,7 +148,7 @@
           </tr>
           <tr>
             <th>IO <span title="Input/output operations per certificate.">ⓘ</span></th>
-            <td><input id="uiCertIo" type="number" min="0" max="1000" value="100" step="1"/></td>
+            <td><input id="uiCertIo" type="number" min="0" max="10000" value="1000" step="1"/></td>
             <td>IO/cert</td>
           </tr>
           <tr>
@@ -182,16 +182,21 @@
             <td>RB/slot</td>
           </tr>
           <tr>
-            <th rowspan="5">Praos assumptions</th>
+            <th rowspan="6">Praos assumptions</th>
             <th colspan="2">Transaction rate <span title="Throughput of transactions submitted to the Praos layer and included in Ranking Blocks.">ⓘ</span></th>
             <td><input id="uiPraosTx" type="number" min="0" max="200" value="1" step="1"/></td>
             <td>tx/s</td>
           </tr>
           <tr>
-            <th rowspan="3">RB <span title="A Praos block, also called a Ranking Block in Leios.">ⓘ</span></th>
+            <th rowspan="4">RB <span title="A Praos block, also called a Ranking Block in Leios.">ⓘ</span></th>
             <th>Size <span title="Size of each Ranking Block.">ⓘ</span></th>
             <td><input id="uiRbSize" type="number" disabled="true"/></td>
             <td>kB/RB</td>
+          </tr>
+          <tr>
+            <th>IO <span title="Input/output operations per block">ⓘ</span></th>
+            <td><input id="uiRbIo" type="number" min="0" max="10000" value="1000" step="1"/></td>
+            <td>IO/RB</td>
           </tr>
           <tr>
             <th>Build <span title="CPU time required to build a Ranking Block.">ⓘ</span></th>
