@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2025-01-3
+
+### Updates to cost dashboard
+
+The cost dashboard was updated with improved input parameters and computations:
+
+- Lengthen phases and reduced EB rate, per analysis in technical report.
+- Updated CPU costs for votes and certificates, per analysis in technical report.
+- Revised IOPS values, based upon empirical data from Cardano nodes operating in production.
+- Updated Agda code to align with web interface, and cross-checked.
+
+Further updates will require calibration data from the Haskell and Rust simulations for Leios.
+
 ## 2025-01-02
 
 ### Benchmarking BLS signatures and aggregate verifications
