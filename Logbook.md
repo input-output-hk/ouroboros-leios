@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2025-01-3
+
+### Updates to cost dashboard
+
+The cost dashboard was updated with improved input parameters and computations:
+
+- Lengthen phases and reduced EB rate, per analysis in technical report.
+- Updated CPU costs for votes and certificates, per analysis in technical report.
+- Revised IOPS values, based upon empirical data from Cardano nodes operating in production.
+- Updated Agda code to align with web interface, and cross-checked.
+
+Further updates will require calibration data from the Haskell and Rust simulations for Leios.
+
 ## 2025-01-02
 
 ### Benchmarking BLS signatures and aggregate verifications
@@ -17,7 +30,7 @@ The construction and verification BLS votes were benchmarked using the Rust [bls
 
 Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
 
-- Number of votes: 600
+- Number of votes: 500
 - Quorum: 60%
 - Vote size: 250 B / vote
 - Certificate size: 75 kB / vote

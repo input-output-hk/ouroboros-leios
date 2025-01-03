@@ -74,7 +74,6 @@ function certResources() {
 
 function rbResources() {
   const rate = getFloat(uiRbRate)  //  RB/slot
-  const uiRbIo = uiCertIo
   return calculateResources(rate, uiRbSize, uiRbIo, uiRbBuild, uiRbVerify, true)
 }
 
@@ -220,6 +219,7 @@ export async function initialize() {
   , uiRbLedger
   , uiRbRate
 //, uiRbSize
+  , uiRbIo
   , uiRbVerify
   , uiRelays
   , uiRetained
