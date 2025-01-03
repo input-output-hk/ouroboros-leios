@@ -983,6 +983,7 @@ dependencies = [
  "async-stream",
  "futures",
  "netsim-async",
+ "num-traits",
  "priority-queue",
  "rand",
  "rand_chacha",

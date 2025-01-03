@@ -223,6 +223,7 @@ impl EventMonitor {
                 }
                 Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
+                Event::InputBlockLotteryWon { .. } => {}
                 Event::InputBlockGenerated {
                     header,
                     transactions,
@@ -260,6 +261,7 @@ impl EventMonitor {
                     ib_messages.received += 1;
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
+                Event::EndorserBlockLotteryWon { .. } => {}
                 Event::EndorserBlockGenerated { id, input_blocks } => {
                     generated_ebs += 1;
                     eb_ibs.insert(id, input_blocks.clone());
