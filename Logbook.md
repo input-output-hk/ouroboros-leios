@@ -17,7 +17,7 @@ The construction and verification BLS votes were benchmarked using the Rust [bls
 
 Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
 
-- Number of votes: 600
+- Number of votes: 500
 - Quorum: 60%
 - Vote size: 250 B / vote
 - Certificate size: 75 kB / vote

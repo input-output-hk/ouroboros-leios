@@ -122,7 +122,7 @@
           <tr>
             <th rowspan="4">Vote <span title="A committee of SPOs votes on whether each Endorser Block was correctly constructed.">ⓘ</span></th>
             <th>Size <span title="Size of a vote.">ⓘ</span></th>
-            <td><input id="uiVoteSize" type="number" min="0" max="2" value="0.725" step="0.001"/></td>
+            <td><input id="uiVoteSize" type="number" min="0" max="2" value="0.250" step="0.001"/></td>
             <td>kB/vote</td>
           </tr>
           <tr>
@@ -132,18 +132,18 @@
           </tr>
           <tr>
             <th>Build <span title="CPU time required to build a vote.">ⓘ</span></th>
-            <td><input id="uiVoteBuild" type="number" min="0" max="20" value="0.01" step="0.0001"/></td>
+            <td><input id="uiVoteBuild" type="number" min="0" max="20" value="2.0" step="0.0001"/></td>
             <td>vCPU*ms/vote</td>
           </tr>
           <tr>
             <th>Verify <span title="CPU time required to verify a vote.">ⓘ</span></th>
-            <td><input id="uiVoteVerify" type="number" min="0" max="20" value="0.005" step="0.001"/></td>
+            <td><input id="uiVoteVerify" type="number" min="0" max="20" value="3.0" step="0.001"/></td>
             <td>vCPU*ms/vote</td>
           </tr>
           <tr>
             <th rowspan="4">Certificate <span title="A Leios certificate records a successful vote for an Endorser Block.">ⓘ</span></th>
             <th>Size <span title="Size of a certificate.">ⓘ</span></th>
-            <td><input id="uiCertSize" type="number" min="0" max="200" value="30" step="1"/></td>
+            <td><input id="uiCertSize" type="number" min="0" max="200" value="75" step="1"/></td>
             <td>kB/cert</td>
           </tr>
           <tr>
@@ -153,12 +153,12 @@
           </tr>
           <tr>
             <th>Build <span title="CPU time required to build a certificate.">ⓘ</span></th>
-            <td><input id="uiCertBuild" type="number" min="0" max="1000" value="100" step="0.1"/></td>
+            <td><input id="uiCertBuild" type="number" min="0" max="1000" value="200" step="0.1"/></td>
             <td>vCPU*ms/cert</td>
           </tr>
           <tr>
             <th>Verify <span title="CPU time required to verify a certificate.">ⓘ</span></th>
-            <td><input id="uiCertVerify" type="number" min="0" max="1000" value="50" step="0.1"/></td>
+            <td><input id="uiCertVerify" type="number" min="0" max="1000" value="200" step="0.1"/></td>
             <td>vCPU*ms/cert</td>
           </tr>
         </tbody>
