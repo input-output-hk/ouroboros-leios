@@ -320,6 +320,10 @@ impl Node {
     fn generate_endorser_blocks(&mut self, slot: u64) -> Result<()> {
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
+                self.tracker.track_eb_lottery_won(EndorserBlockId {
+                    slot,
+                    producer: self.id,
+                });
                 let mut eb = EndorserBlock {
                     slot,
                     producer: self.id,
@@ -386,6 +390,7 @@ impl Node {
             return Ok(());
         };
         for header in headers {
+            self.tracker.track_ib_lottery_won(header.id);
             let mut ib = InputBlock {
                 header,
                 transactions: vec![],

@@ -49,6 +49,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
+    InputBlockLotteryWon {
+        #[serde(flatten)]
+        id: InputBlockId,
+    },
     InputBlockGenerated {
         #[serde(flatten)]
         header: InputBlockHeader,
@@ -65,6 +69,10 @@ pub enum Event {
         id: InputBlockId,
         sender: NodeId,
         recipient: NodeId,
+    },
+    EndorserBlockLotteryWon {
+        #[serde(flatten)]
+        id: EndorserBlockId,
     },
     EndorserBlockGenerated {
         #[serde(flatten)]
@@ -170,6 +178,10 @@ impl EventTracker {
         });
     }
 
+    pub fn track_ib_lottery_won(&self, id: InputBlockId) {
+        self.send(Event::InputBlockLotteryWon { id });
+    }
+
     pub fn track_ib_generated(&self, block: &InputBlock) {
         self.send(Event::InputBlockGenerated {
             header: block.header.clone(),
@@ -191,6 +203,10 @@ impl EventTracker {
             sender,
             recipient,
         });
+    }
+
+    pub fn track_eb_lottery_won(&self, id: EndorserBlockId) {
+        self.send(Event::EndorserBlockLotteryWon { id });
     }
 
     pub fn track_eb_generated(&self, block: &EndorserBlock) {
