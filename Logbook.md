@@ -2,6 +2,49 @@
 
 ## 2025-01-3
 
+### Belated summary of discussion and requests during Dec 17 Q&A
+
+- Throughput dashboard
+    - Make it into a formal website after cleaning it up
+        - It can become a special-purpose web asset
+        - Or part of a Leios micro site
+    - It is useful as an explainer of the web of tradeoffs involved with Leios and Cardano
+    - In essence it creates a game and helps folks understand different notions of "optimality"
+    - ACTION: Sync with Sam on next steps
+- How much "heart surgery" will Leios trigger?
+    - Ledger changes
+    - Data structures
+    - Ecosystem around Leios
+    - Technical dependencie
+    - In order to accelerate the transition to Leios, what downstream work can be done in parallel and prior to Leios being completed?
+- Can we use Mithril for proofs of equivocation?
+    - Helpful to know proof requirements
+    - Coordinate with mithril voting
+    - What zk variants do we have in mind?
+    - ACTION: Brian will create diagram with options and suboptions
+- What gets committed by Leios certificates in the Praos blocks?
+    - The proof is for availability and correctness of Leios IBs, EBs, and votes
+- Elasticity and adaptability of nodes
+    - Mempool is like a distributed database
+    - Could it be sized to throughput of system?
+    - All nodes can make meaningful contribution
+      - "Supernodes" vs Raspberry Pis
+    - Sharding according to resources
+    - Self-regulation system instead of manual tuning
+        - Ideally, it would measure and adapt
+        - Likely beyond current scope for Leios
+    - ACTION: create a ledger of "nice to have" functionality and of potential follow-up papers
+- How might/do emerging hydra protocols interact with the L1? How will this look in the world of leios?
+    - Tail protocols
+    - ZK rollups in the Hydra heads
+    - Align roadmaps and coordinate reuse
+    - Share "common DNA" on the proof and network sides
+    - What level of isomorphism exists among transactions in the layers?
+    - Rollups could use Blob Leios functionality
+    - Attend each others' working groups: Midgard, Gummiworms, ZKfold, Mithril
+        - For Leios, a new devrel play this role of attending other project's meetings
+    - ACTION: Nicolas
+
 ### Updates to cost dashboard
 
 The cost dashboard was updated with improved input parameters and computations:
