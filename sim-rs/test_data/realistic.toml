@@ -1,7 +1,11 @@
 block_generation_probability = 0.05
 deliver_stage_count = 2
+eb_generation_cpu_time_ms = 300
 eb_generation_probability = 5.0
+eb_validation_cpu_time_ms = 100
+ib_generation_cpu_time_ms = 300
 ib_generation_probability = 5.0
+ib_validation_cpu_time_ms = 100
 ib_shards = 1
 max_block_size = 90112
 max_ib_requests_per_peer = 1

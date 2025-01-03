@@ -33,6 +33,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
             region: None,
             stake,
+            cpu_multiplier: 1.0,
         });
     }
 

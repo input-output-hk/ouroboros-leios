@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use netsim_async::geo::{self, Location};
+use num_traits::One as _;
 use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
@@ -70,6 +71,10 @@ pub struct RawConfig {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
+    pub ib_generation_cpu_time_ms: u64,
+    pub ib_validation_cpu_time_ms: u64,
+    pub eb_generation_cpu_time_ms: u64,
+    pub eb_validation_cpu_time_ms: u64,
     pub transaction_frequency_ms: DistributionConfig,
     pub transaction_size_bytes: DistributionConfig,
 }
@@ -79,6 +84,8 @@ pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
     pub region: Option<String>,
+    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
+    pub cpu_multiplier: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,6 +105,7 @@ impl From<RawConfig> for SimConfiguration {
                 id: NodeId::new(index),
                 location: to_netsim_location(raw.location),
                 stake: raw.stake.unwrap_or_default(),
+                cpu_multiplier: raw.cpu_multiplier,
                 peers: vec![],
             })
             .collect();
@@ -132,6 +140,10 @@ impl From<RawConfig> for SimConfiguration {
             max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             ib_shards: value.ib_shards,
             one_vote_per_vrf: value.one_vote_per_vrf,
+            ib_generation_cpu_time: Duration::from_millis(value.ib_generation_cpu_time_ms),
+            ib_validation_cpu_time: Duration::from_millis(value.ib_validation_cpu_time_ms),
+            eb_generation_cpu_time: Duration::from_millis(value.eb_generation_cpu_time_ms),
+            eb_validation_cpu_time: Duration::from_millis(value.eb_validation_cpu_time_ms),
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
@@ -160,6 +172,10 @@ pub struct SimConfiguration {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
+    pub ib_generation_cpu_time: Duration,
+    pub ib_validation_cpu_time: Duration,
+    pub eb_generation_cpu_time: Duration,
+    pub eb_validation_cpu_time: Duration,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }
@@ -223,6 +239,7 @@ pub struct NodeConfiguration {
     pub id: NodeId,
     pub location: Location,
     pub stake: u64,
+    pub cpu_multiplier: f64,
     pub peers: Vec<NodeId>,
 }
 
