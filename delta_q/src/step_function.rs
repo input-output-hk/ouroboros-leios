@@ -1,4 +1,6 @@
-use crate::{compaction::simplify_cdf, CompactionMode, StepValue, CDF};
+use crate::{
+    compaction::simplify_cdf, step_value::StepValueMinMax, CompactionMode, StepValue, CDF,
+};
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -260,6 +262,40 @@ impl<T: StepValue> StepFunction<T> {
             mode: self.mode,
             zero: T::sum_up_zero(),
         })
+    }
+
+    pub fn min(&self, other: &Self) -> Self
+    where
+        T: StepValueMinMax,
+    {
+        let mut data = Vec::new();
+        for (x, (l, r)) in self.zip(other) {
+            data.push((x, l.min(r).clone()));
+        }
+        T::compact(&mut data, self.mode, self.max_size);
+        Self {
+            data: (!data.is_empty()).then_some(data.into()),
+            max_size: self.max_size,
+            mode: self.mode,
+            zero: T::sum_up_zero(),
+        }
+    }
+
+    pub fn max(&self, other: &Self) -> Self
+    where
+        T: StepValueMinMax,
+    {
+        let mut data = Vec::new();
+        for (x, (l, r)) in self.zip(other) {
+            data.push((x, l.max(r).clone()));
+        }
+        T::compact(&mut data, self.mode, self.max_size);
+        Self {
+            data: (!data.is_empty()).then_some(data.into()),
+            max_size: self.max_size,
+            mode: self.mode,
+            zero: T::sum_up_zero(),
+        }
     }
 
     pub fn similar(&self, other: &Self) -> bool {

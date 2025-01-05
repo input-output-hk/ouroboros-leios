@@ -172,6 +172,18 @@ impl CDF {
             .sum::<f32>()
     }
 
+    pub fn min(&self, other: &Self) -> Self {
+        Self {
+            steps: self.steps.min(&other.steps),
+        }
+    }
+
+    pub fn max(&self, other: &Self) -> Self {
+        Self {
+            steps: self.steps.max(&other.steps),
+        }
+    }
+
     /// Combine two CDFs by choosing between them, using the given fraction as the probability for
     /// the first CDF.
     pub fn choice(&self, my_fraction: f32, other: &CDF) -> Result<CDF, CDFError> {

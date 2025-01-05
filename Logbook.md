@@ -1,49 +1,63 @@
 # Leios logbook
 
+## 2025-01-05
+
+### Summary update on DeltaQ
+
+- added MIN / MAX combinators to get best- and worst-case for simulation results
+- tried to make sense of those data sets, and failed
+  - Rust simulation best case does not match the analytically best behaviour conceivable by pure reasoning, the last 5% of nodes take far too long
+  - Haskell simulation best case is far too fast; ΔQ expression to match the result must assume >200 peers per node and no validation delay
+- I (Roland) must admit that this has become quite a frustrating exercise.
+  The theory seems nice and reasonable, but it stubbornly refuses to explain the simulation results.
+  I don't feel confident pursuing this further regarding quick website experiments or extracting realistic resource usage predictions due to the above reasons.
+  Perhaps it just isn't applicable to the level of detail I am attempting, but to me that would be a red flag in general and it sure would mean that offering it to a wider audience has a high potential for misleading people.
+  My recommendation is to conclude that this work stream has failed.
+
 ## 2025-01-3
 
 ### Belated summary of discussion and requests during Dec 17 Q&A
 
 - Throughput dashboard
-    - Make it into a formal website after cleaning it up
-        - It can become a special-purpose web asset
-        - Or part of a Leios micro site
-    - It is useful as an explainer of the web of tradeoffs involved with Leios and Cardano
-    - In essence it creates a game and helps folks understand different notions of "optimality"
-    - ACTION: Sync with Sam on next steps
+  - Make it into a formal website after cleaning it up
+    - It can become a special-purpose web asset
+    - Or part of a Leios micro site
+  - It is useful as an explainer of the web of tradeoffs involved with Leios and Cardano
+  - In essence it creates a game and helps folks understand different notions of "optimality"
+  - ACTION: Sync with Sam on next steps
 - How much "heart surgery" will Leios trigger?
-    - Ledger changes
-    - Data structures
-    - Ecosystem around Leios
-    - Technical dependencie
-    - In order to accelerate the transition to Leios, what downstream work can be done in parallel and prior to Leios being completed?
+  - Ledger changes
+  - Data structures
+  - Ecosystem around Leios
+  - Technical dependencie
+  - In order to accelerate the transition to Leios, what downstream work can be done in parallel and prior to Leios being completed?
 - Can we use Mithril for proofs of equivocation?
-    - Helpful to know proof requirements
-    - Coordinate with mithril voting
-    - What zk variants do we have in mind?
-    - ACTION: Brian will create diagram with options and suboptions
+  - Helpful to know proof requirements
+  - Coordinate with mithril voting
+  - What zk variants do we have in mind?
+  - ACTION: Brian will create diagram with options and suboptions
 - What gets committed by Leios certificates in the Praos blocks?
-    - The proof is for availability and correctness of Leios IBs, EBs, and votes
+  - The proof is for availability and correctness of Leios IBs, EBs, and votes
 - Elasticity and adaptability of nodes
-    - Mempool is like a distributed database
-    - Could it be sized to throughput of system?
-    - All nodes can make meaningful contribution
-      - "Supernodes" vs Raspberry Pis
-    - Sharding according to resources
-    - Self-regulation system instead of manual tuning
-        - Ideally, it would measure and adapt
-        - Likely beyond current scope for Leios
-    - ACTION: create a ledger of "nice to have" functionality and of potential follow-up papers
+  - Mempool is like a distributed database
+  - Could it be sized to throughput of system?
+  - All nodes can make meaningful contribution
+    - "Supernodes" vs Raspberry Pis
+  - Sharding according to resources
+  - Self-regulation system instead of manual tuning
+    - Ideally, it would measure and adapt
+    - Likely beyond current scope for Leios
+  - ACTION: create a ledger of "nice to have" functionality and of potential follow-up papers
 - How might/do emerging hydra protocols interact with the L1? How will this look in the world of leios?
-    - Tail protocols
-    - ZK rollups in the Hydra heads
-    - Align roadmaps and coordinate reuse
-    - Share "common DNA" on the proof and network sides
-    - What level of isomorphism exists among transactions in the layers?
-    - Rollups could use Blob Leios functionality
-    - Attend each others' working groups: Midgard, Gummiworms, ZKfold, Mithril
-        - For Leios, a new devrel play this role of attending other project's meetings
-    - ACTION: Nicolas
+  - Tail protocols
+  - ZK rollups in the Hydra heads
+  - Align roadmaps and coordinate reuse
+  - Share "common DNA" on the proof and network sides
+  - What level of isomorphism exists among transactions in the layers?
+  - Rollups could use Blob Leios functionality
+  - Attend each others' working groups: Midgard, Gummiworms, ZKfold, Mithril
+    - For Leios, a new devrel play this role of attending other project's meetings
+  - ACTION: Nicolas
 
 ### Updates to cost dashboard
 
@@ -97,16 +111,16 @@ Analyses of sortition for IBs, EBs, and votes were made and added to the draft o
 - All of the sortition is based on Bernoulli trials for each stake of lovelace.
 - A probabilistic analysis shows that splitting stake among many nodes only provides a minor benefit in winning the lottery more times.
 - The IB lottery is per-slot and limits a node to building a maximum of one IB per slot.
-    - Careful selection of protocol parameters ensures a high probability of at least one IB in each pipeline.
+  - Careful selection of protocol parameters ensures a high probability of at least one IB in each pipeline.
 - The EB lottery is per-pipeline and limits a node to building a maximum of one EB per pipeline.
-    - The formulation of the EB lottery implies that there will always be a significant chance that a pipeline contains no EB.
-    - Setting protocol parameters so that there is a high probability of an EB in a pipeline makes the protocol more susceptible to influence by adversaries with significant stake.
-    - However, the unevenness in stake distribution or splitting of adversarial stake does not exacerbate the situation.
+  - The formulation of the EB lottery implies that there will always be a significant chance that a pipeline contains no EB.
+  - Setting protocol parameters so that there is a high probability of an EB in a pipeline makes the protocol more susceptible to influence by adversaries with significant stake.
+  - However, the unevenness in stake distribution or splitting of adversarial stake does not exacerbate the situation.
 - The pipeline length should be several multiples of the inverse of the active-slot coefficient, in order that there is a high probability for an RB to be available for an EB certificate.
 - The vote lottery can award multiple votes to the same node if they have a lot of stake and are luck.
-    - Nodes nearly saturated with stake have an appreciable chance of receiving several votes.
-    - The mathematics and code for determining from the VRF the number of votes a node winds is more complex and involves complications to avoid floating-point computations.
-    - Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+  - Nodes nearly saturated with stake have an appreciable chance of receiving several votes.
+  - The mathematics and code for determining from the VRF the number of votes a node winds is more complex and involves complications to avoid floating-point computations.
+  - Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
 
 ## 2024-12-23
 
@@ -119,11 +133,11 @@ Abandoned Waxman graph generation, using a simpler distance-weighted approach th
 ### Haskell simulation
 
 - Added support for bounded and unbounded parallesim to leios node.
-    - shot-leios-p2p-1 takes -N flag to control number of cores.
-    - visualization charts number of cores active at that time per node
-        - with unbounded parallelism we currently see spikes of even
+  - shot-leios-p2p-1 takes -N flag to control number of cores.
+  - visualization charts number of cores active at that time per node
+    - with unbounded parallelism we currently see spikes of even
           13 right after vote diffusion.
-    - TODO: consider whether an aggregate measure would improve readability.
+  - TODO: consider whether an aggregate measure would improve readability.
 - Fixed Relay protocol messages to always have size > 0
   - Probable cause of out of order delivery experienced
     with pipelined peers.
@@ -131,6 +145,7 @@ Abandoned Waxman graph generation, using a simpler distance-weighted approach th
     guaranteed regardless of forecasted time.
 
 Next steps:
+
 - Load protocol configuration from disk, and write out event log.
 - Investigate low rate of EB inclusion in RB, and implementation
   correctness more generally.
@@ -147,9 +162,9 @@ Analysis and discussion of the cryptographic options for Leios votes and certifi
 Research is continuing, but interim findings indicate that BLS is most viable for Leios.
 
 - ALBA is only viable if SNARKified.
-    - It is very unlikely that Leios votes could be made small enough to fit in non-SNARKified ALBA certificates.
+  - It is very unlikely that Leios votes could be made small enough to fit in non-SNARKified ALBA certificates.
 - BLS is likely viable, with or without SNARKification.
-    - Options exist for creating or verifying BLS certificates incrementally.
+  - Options exist for creating or verifying BLS certificates incrementally.
 - MUSEN is inferior to BLS in key metrics relevant for Leios.
 
 ### Jupyter support for new DeltaQ
@@ -160,9 +175,9 @@ The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Has
 
 Diffusion time was higher than expected; this was because the test data had sparse networks, where nodes had few/distant peers.
 
- - Fixed a bug where nodes would link to themselves
- - Corrected distance calculations used when generating data; we use a cylindrical topology at runtime, but weren't using it at data generation time. 
- - Tweaked parameters to the Waxman graph generation algorithm, to generate more connections and favor nearby neighbors more.
+- Fixed a bug where nodes would link to themselves
+- Corrected distance calculations used when generating data; we use a cylindrical topology at runtime, but weren't using it at data generation time.
+- Tweaked parameters to the Waxman graph generation algorithm, to generate more connections and favor nearby neighbors more.
 
 Added basic unit tests for test data generation, running in CI.
 
@@ -184,9 +199,10 @@ Added basic unit tests for test data generation, running in CI.
 Started showing transaction throughput in the visualization.
 
 Tweaked settings of `thousand.toml` config to maximize throughput:
- - Allowing multiple votes per VRF lottery win, to make up for a lack of voters
- - Increasing stage length from 2 to 20, so that there is approximately one RB per stage
- - Generating many more transactions, to show benefit from increased throughput
+
+- Allowing multiple votes per VRF lottery win, to make up for a lack of voters
+- Increasing stage length from 2 to 20, so that there is approximately one RB per stage
+- Generating many more transactions, to show benefit from increased throughput
 
 ### Haskell simulation
 

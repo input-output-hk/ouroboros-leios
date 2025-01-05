@@ -71,7 +71,7 @@ impl StepValue for f32 {
     fn similar(&self, other: &Self) -> bool {
         *self == 0.0 && other.abs() < 1e-6
             || *other == 0.0 && self.abs() < 1e-6
-            || (self - other).abs() / self.max(*other) < 1e-6
+            || (self - other).abs() / f32::max(*self, *other) < 1e-6
     }
 
     fn pretty_print(&self, f: &mut String) -> fmt::Result {
@@ -131,5 +131,20 @@ impl StepValue for CDF {
         } else {
             write!(f, "{}", self)
         }
+    }
+}
+
+pub trait StepValueMinMax: StepValue {
+    fn min(&self, other: &Self) -> Self;
+    fn max(&self, other: &Self) -> Self;
+}
+
+impl StepValueMinMax for f32 {
+    fn min(&self, other: &Self) -> Self {
+        f32::min(*self, *other)
+    }
+
+    fn max(&self, other: &Self) -> Self {
+        f32::max(*self, *other)
     }
 }

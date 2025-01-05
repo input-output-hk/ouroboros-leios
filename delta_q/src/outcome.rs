@@ -23,6 +23,10 @@ impl Outcome {
         Self::new(CDF::top())
     }
 
+    pub fn bottom() -> Self {
+        Self::new(CDF::bottom())
+    }
+
     pub fn new_with_load(cdf: CDF, load: BTreeMap<Name, StepFunction>) -> Self {
         let load = load
             .into_iter()
@@ -143,6 +147,20 @@ impl Outcome {
             load: self
                 .map_loads(other, ctx, |_n, l, r| Ok(l.sum_up(r)))
                 .expect("infallible"),
+        }
+    }
+
+    pub fn min(&self, other: &Self) -> Self {
+        Self {
+            cdf: self.cdf.min(&other.cdf),
+            load: BTreeMap::default(),
+        }
+    }
+
+    pub fn max(&self, other: &Self) -> Self {
+        Self {
+            cdf: self.cdf.max(&other.cdf),
+            load: BTreeMap::default(),
         }
     }
 
