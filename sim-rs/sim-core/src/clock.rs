@@ -94,6 +94,9 @@ impl ClockBarrier {
     }
 
     pub async fn wait_until(&mut self, timestamp: Timestamp) {
+        if self.now() == timestamp {
+            return;
+        }
         let (tx, rx) = oneshot::channel();
         if self
             .tx
