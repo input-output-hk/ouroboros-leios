@@ -168,6 +168,7 @@ impl EventMonitor {
                 Event::TransactionReceived { .. } => {
                     tx_messages.received += 1;
                 }
+                Event::PraosBlockLotteryWon { .. } => {}
                 Event::PraosBlockGenerated {
                     slot,
                     producer,
@@ -289,6 +290,7 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
+                Event::VoteLotteryWon { .. } => {}
                 Event::VotesGenerated { id, ebs } => {
                     for eb in ebs {
                         total_votes += 1;

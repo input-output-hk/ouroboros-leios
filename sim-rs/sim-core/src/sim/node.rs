@@ -473,6 +473,7 @@ impl Node {
             ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
         };
         if !votes.ebs.is_empty() {
+            self.tracker.track_vote_lottery_won(&votes);
             self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));
         }
     }
@@ -534,6 +535,7 @@ impl Node {
             endorsement,
             transactions,
         };
+        self.tracker.track_praos_block_lottery_won(&block);
         self.schedule_cpu_task(CpuTask::PraosBlockGenerated(block));
 
         Ok(())
