@@ -1,5 +1,15 @@
 # Leios logbook
 
+## 2025-01-06
+
+### Rust simulation
+
+Added basic simulation of CPU usage/latency. Includes new "lottery won" events which can be used to identify the start of CPU processing ("generated" events identify the end).
+
+Every node has 4 simulated cores and takes the same amount of time to run CPU-bound tasks. (this is configurable per-node). TX validation and RB/IB/EB generation/validation each take one CPU task. Certificate CPU time is included as part of RB CPU time, for RBs with a certificate attached. Each vote is generated/validated as an independent CPU task, running as much in parallel as possible (and usually saturating all cores).
+
+All vCPU costs were copied from the cost estimator.
+
 ## 2025-01-05
 
 ### Summary update on DeltaQ
@@ -14,7 +24,7 @@
   Perhaps it just isn't applicable to the level of detail I am attempting, but to me that would be a red flag in general and it sure would mean that offering it to a wider audience has a high potential for misleading people.
   My recommendation is to conclude that this work stream has failed.
 
-## 2025-01-3
+## 2025-01-03
 
 ### Belated summary of discussion and requests during Dec 17 Q&A
 
