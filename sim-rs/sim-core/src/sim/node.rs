@@ -23,11 +23,69 @@ use crate::{
     network::{NetworkSink, NetworkSource},
 };
 
-use super::SimulationMessage;
+use super::{
+    cpu::{CpuTaskQueue, Subtask},
+    SimulationMessage,
+};
 
 enum TransactionView {
     Pending,
     Received(Arc<Transaction>),
+}
+
+enum CpuTask {
+    /// A transaction has been received and validated, and is ready to propagate
+    TransactionValidated(NodeId, Arc<Transaction>),
+    /// A Praos block has been generated and is ready to propagate
+    PraosBlockGenerated(Block),
+    /// A Praos block has been received and validated, and is ready to propagate
+    PraosBlockValidated(NodeId, Arc<Block>),
+    /// An input block has been generated and is ready to propagate
+    InputBlockGenerated(InputBlock),
+    /// An input block has been received and validated, and is ready to propagate
+    InputBlockValidated(NodeId, Arc<InputBlock>),
+    /// An endorser block has been generated and is ready to propagate
+    EndorserBlockGenerated(EndorserBlock),
+    /// An endorser block has been received and validated, and is ready to propagate
+    EndorserBlockValidated(NodeId, Arc<EndorserBlock>),
+    /// A bundle of votes has been generated and is ready to propagate
+    VoteBundleGenerated(VoteBundle),
+    /// A bundle of votes has been received and validated, and is ready to propagate
+    VoteBundleValidated(NodeId, Arc<VoteBundle>),
+}
+
+impl CpuTask {
+    fn cpu_times(&self, config: &SimConfiguration) -> Vec<Duration> {
+        match self {
+            Self::TransactionValidated(_, _) => vec![config.tx_validation_cpu_time],
+            Self::PraosBlockGenerated(block) => {
+                let base_time = config.block_generation_cpu_time;
+                if block.endorsement.is_some() {
+                    vec![base_time + config.certificate_generation_cpu_time]
+                } else {
+                    vec![base_time]
+                }
+            }
+            Self::PraosBlockValidated(_, block) => {
+                let base_time = config.block_validation_cpu_time;
+                if block.endorsement.is_some() {
+                    vec![base_time + config.certificate_validation_cpu_time]
+                } else {
+                    vec![base_time]
+                }
+            }
+            Self::InputBlockGenerated(_) => vec![config.ib_generation_cpu_time],
+            Self::InputBlockValidated(_, _) => vec![config.ib_validation_cpu_time],
+            Self::EndorserBlockGenerated(_) => vec![config.eb_generation_cpu_time],
+            Self::EndorserBlockValidated(_, _) => vec![config.eb_validation_cpu_time],
+            Self::VoteBundleGenerated(votes) => {
+                vec![config.vote_generation_cpu_time; votes.ebs.len()]
+            }
+            Self::VoteBundleValidated(_, votes) => {
+                vec![config.vote_validation_cpu_time; votes.ebs.len()]
+            }
+        }
+    }
 }
 
 /// Things that can happen next for a node
@@ -35,7 +93,9 @@ enum NodeEvent {
     /// A new slot has started.
     NewSlot(u64),
     /// A message has been received.
-    Message(NodeId, SimulationMessage),
+    MessageReceived(NodeId, SimulationMessage),
+    /// A core has finished running some task, and is free to run another.
+    CpuSubtaskCompleted(Subtask),
 }
 
 pub struct Node {
@@ -51,6 +111,7 @@ pub struct Node {
     clock: ClockBarrier,
     stake: u64,
     total_stake: u64,
+    cpu: CpuTaskQueue<CpuTask>,
     peers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
     praos: NodePraosState,
@@ -119,6 +180,7 @@ impl Node {
     ) -> Self {
         let id = config.id;
         let stake = config.stake;
+        let cpu = CpuTaskQueue::new(config.cores, config.cpu_multiplier);
         let peers = config.peers.clone();
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
@@ -136,6 +198,7 @@ impl Node {
             clock,
             stake,
             total_stake,
+            cpu,
             peers,
             txs: HashMap::new(),
             praos: NodePraosState::default(),
@@ -148,6 +211,21 @@ impl Node {
             .wait_until(self.events.peek().map(|e| e.0).expect("no events"))
             .await;
         self.events.pop().unwrap().1
+    }
+
+    fn schedule_cpu_task(&mut self, task: CpuTask) {
+        let cpu_times = task.cpu_times(&self.sim_config);
+        for subtask in self.cpu.schedule_task(task, cpu_times) {
+            self.schedule_cpu_subtask(subtask);
+        }
+    }
+
+    fn schedule_cpu_subtask(&mut self, subtask: Subtask) {
+        let timestamp = self.clock.now() + subtask.duration;
+        self.events.push(FutureEvent(
+            timestamp,
+            NodeEvent::CpuSubtaskCompleted(subtask),
+        ))
     }
 
     pub async fn run(mut self) -> Result<()> {
@@ -163,7 +241,7 @@ impl Node {
                         // sim has stopped running
                         break;
                     };
-                    self.events.push(FutureEvent(timestamp, NodeEvent::Message(from, msg)));
+                    self.events.push(FutureEvent(timestamp, NodeEvent::MessageReceived(from, msg)));
                     self.clock.finish_task();
                 }
                 maybe_tx = tx_source.recv() => {
@@ -171,12 +249,32 @@ impl Node {
                         // sim has stopped runinng
                         break;
                     };
-                    self.receive_tx(self.id, tx)?;
+                    self.generate_tx(tx)?;
                 }
                 event = self.next_event() => {
                     match event {
                         NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
-                        NodeEvent::Message(from, msg) => self.handle_message(from, msg)?,
+                        NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
+                        NodeEvent::CpuSubtaskCompleted(subtask) => {
+                            let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
+                            if let Some(subtask) = next_subtask {
+                                self.schedule_cpu_subtask(subtask);
+                            }
+                            let Some(task) = finished_task else {
+                                continue;
+                            };
+                            match task {
+                                CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
+                                CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
+                                CpuTask::PraosBlockValidated(from, block) => self.finish_validating_block(from, block)?,
+                                CpuTask::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTask::InputBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
+                                CpuTask::EndorserBlockGenerated(eb) => self.finish_generating_eb(eb)?,
+                                CpuTask::EndorserBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                                CpuTask::VoteBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
+                                CpuTask::VoteBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
+                            }
+                        }
                     }
                 }
             };
@@ -194,7 +292,7 @@ impl Node {
                 self.receive_request_tx(from, id)?;
             }
             SimulationMessage::Tx(tx) => {
-                self.receive_tx(from, tx)?;
+                self.receive_tx(from, tx);
             }
 
             // Block propagation
@@ -205,7 +303,7 @@ impl Node {
                 self.receive_request_block(from, slot)?;
             }
             SimulationMessage::Block(block) => {
-                self.receive_block(from, block)?;
+                self.receive_block(from, block);
             }
 
             // IB header propagation
@@ -227,7 +325,7 @@ impl Node {
                 self.receive_request_ib(from, id)?;
             }
             SimulationMessage::IB(ib) => {
-                self.receive_ib(from, ib)?;
+                self.receive_ib(from, ib);
             }
 
             // EB propagation
@@ -238,7 +336,7 @@ impl Node {
                 self.receive_request_eb(from, id)?;
             }
             SimulationMessage::EB(eb) => {
-                self.receive_eb(from, eb)?;
+                self.receive_eb(from, eb);
             }
 
             // Voting
@@ -249,7 +347,7 @@ impl Node {
                 self.receive_request_votes(from, id)?;
             }
             SimulationMessage::Votes(votes) => {
-                self.receive_votes(from, votes)?;
+                self.receive_votes(from, votes);
             }
         }
         Ok(())
@@ -263,17 +361,17 @@ impl Node {
             // A new stage has begun.
 
             // Vote for any EBs which satisfy all requirements.
-            self.vote_for_endorser_blocks(slot)?;
+            self.vote_for_endorser_blocks(slot);
 
             // Generate any EBs we're allowed to in this slot.
-            self.generate_endorser_blocks(slot)?;
+            self.generate_endorser_blocks(slot);
 
             // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
         }
 
         // Generate any IBs scheduled for this slot.
-        self.generate_input_blocks(slot)?;
+        self.generate_input_blocks(slot);
 
         self.try_generate_praos_block(slot)?;
 
@@ -317,36 +415,39 @@ impl Node {
         }
     }
 
-    fn generate_endorser_blocks(&mut self, slot: u64) -> Result<()> {
+    fn generate_endorser_blocks(&mut self, slot: u64) {
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
+                self.tracker.track_eb_lottery_won(EndorserBlockId {
+                    slot,
+                    producer: self.id,
+                });
                 let mut eb = EndorserBlock {
                     slot,
                     producer: self.id,
                     ibs: vec![],
                 };
                 self.try_filling_eb(&mut eb);
-                self.generate_eb(eb)?;
+                self.schedule_cpu_task(CpuTask::EndorserBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
-                return Ok(());
+                return;
             }
         }
-        Ok(())
     }
 
-    fn vote_for_endorser_blocks(&mut self, slot: u64) -> Result<()> {
+    fn vote_for_endorser_blocks(&mut self, slot: u64) {
         let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
-            return Ok(());
+            return;
         };
         let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
-            return Ok(());
+            return;
         };
         let mut ebs = ebs.clone();
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
         if vrf_wins == 0 {
-            return Ok(());
+            return;
         }
         ebs.retain(|eb_id| {
             let eb = self.leios.ebs.get(eb_id).unwrap();
@@ -359,7 +460,7 @@ impl Node {
             }
         });
         if ebs.is_empty() {
-            return Ok(());
+            return;
         }
         let votes_allowed = if self.sim_config.one_vote_per_vrf {
             // For every VRF lottery you won, you can vote for one EB
@@ -376,24 +477,24 @@ impl Node {
             ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
         };
         if !votes.ebs.is_empty() {
-            self.send_votes(votes)?;
+            self.tracker.track_vote_lottery_won(&votes);
+            self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));
         }
-        Ok(())
     }
 
-    fn generate_input_blocks(&mut self, slot: u64) -> Result<()> {
+    fn generate_input_blocks(&mut self, slot: u64) {
         let Some(headers) = self.leios.ibs_to_generate.remove(&slot) else {
-            return Ok(());
+            return;
         };
         for header in headers {
+            self.tracker.track_ib_lottery_won(header.id);
             let mut ib = InputBlock {
                 header,
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            self.generate_ib(ib)?;
+            self.schedule_cpu_task(CpuTask::InputBlockGenerated(ib));
         }
-        Ok(())
     }
 
     fn try_generate_praos_block(&mut self, slot: u64) -> Result<()> {
@@ -438,8 +539,8 @@ impl Node {
             endorsement,
             transactions,
         };
-        self.tracker.track_praos_block_generated(&block);
-        self.publish_block(Arc::new(block))?;
+        self.tracker.track_praos_block_lottery_won(&block);
+        self.schedule_cpu_task(CpuTask::PraosBlockGenerated(block));
 
         Ok(())
     }
@@ -485,6 +586,12 @@ impl Node {
         Some(tx_set.len())
     }
 
+    fn finish_generating_block(&mut self, block: Block) -> Result<()> {
+        self.tracker.track_praos_block_generated(&block);
+
+        self.publish_block(Arc::new(block))
+    }
+
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
         // Do not remove TXs in these blocks from the leios mempool.
         // Wait until we learn more about how praos and leios interact.
@@ -519,14 +626,19 @@ impl Node {
         Ok(())
     }
 
-    fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
+    fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) {
+        self.tracker
+            .track_transaction_received(tx.id, from, self.id);
+        self.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
+    }
+
+    fn generate_tx(&mut self, tx: Arc<Transaction>) -> Result<()> {
+        self.tracker.track_transaction_generated(&tx, self.id);
+        self.propagate_tx(self.id, tx)
+    }
+
+    fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
-        if from == self.id {
-            self.tracker.track_transaction_generated(&tx, self.id);
-        } else {
-            self.tracker
-                .track_transaction_received(tx.id, from, self.id);
-        }
         if self.trace {
             info!("node {} saw tx {id}", self.id);
         }
@@ -557,9 +669,13 @@ impl Node {
         Ok(())
     }
 
-    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
+    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
+        self.schedule_cpu_task(CpuTask::PraosBlockValidated(from, block));
+    }
+
+    fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
         if let Some(old_block) = self.praos.blocks.get(&block.slot) {
             // SLOT BATTLE!!! lower VRF wins
             if old_block.vrf <= block.vrf {
@@ -645,9 +761,13 @@ impl Node {
         Ok(())
     }
 
-    fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
+    fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
+        self.tracker.track_ib_received(ib.header.id, from, self.id);
+        self.schedule_cpu_task(CpuTask::InputBlockValidated(from, ib));
+    }
+
+    fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id;
-        self.tracker.track_ib_received(id, from, self.id);
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
@@ -702,9 +822,13 @@ impl Node {
         Ok(())
     }
 
-    fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
+    fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
+        self.tracker.track_eb_received(eb.id(), from, self.id);
+        self.schedule_cpu_task(CpuTask::EndorserBlockValidated(from, eb));
+    }
+
+    fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
         let id = eb.id();
-        self.tracker.track_eb_received(id, from, self.id);
         if self.leios.ebs.insert(id, eb).is_some() {
             return Ok(());
         }
@@ -735,9 +859,17 @@ impl Node {
         Ok(())
     }
 
-    fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) -> Result<()> {
-        let id = votes.id;
+    fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
         self.tracker.track_votes_received(&votes, from, self.id);
+        self.schedule_cpu_task(CpuTask::VoteBundleValidated(from, votes));
+    }
+
+    fn finish_validating_vote_bundle(
+        &mut self,
+        from: NodeId,
+        votes: Arc<VoteBundle>,
+    ) -> Result<()> {
+        let id = votes.id;
         if self
             .leios
             .votes
@@ -787,7 +919,7 @@ impl Node {
         }
     }
 
-    fn generate_ib(&mut self, mut ib: InputBlock) -> Result<()> {
+    fn finish_generating_ib(&mut self, mut ib: InputBlock) -> Result<()> {
         ib.header.timestamp = self.clock.now();
         let ib = Arc::new(ib);
 
@@ -822,7 +954,7 @@ impl Node {
         }
     }
 
-    fn generate_eb(&mut self, eb: EndorserBlock) -> Result<()> {
+    fn finish_generating_eb(&mut self, eb: EndorserBlock) -> Result<()> {
         let eb = Arc::new(eb);
         self.tracker.track_eb_generated(&eb);
 
@@ -877,7 +1009,7 @@ impl Node {
         Ok(())
     }
 
-    fn send_votes(&mut self, votes: VoteBundle) -> Result<()> {
+    fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
         for eb in &votes.ebs {
             self.leios

@@ -43,10 +43,13 @@ links = [
 # transaction parameters
 transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
 transaction_size_bytes = { distribution = "log_normal", mu = 6.833, sigma = 1.127 }
+tx_validation_cpu_time_ms = 1.5
 max_tx_size = 16384
 
 # praos block generation parameters
 block_generation_probability = 0.05
+block_generation_cpu_time_ms = 300
+block_validation_cpu_time_ms = 100
 max_block_size = 90112
 
 # Leios parameters
@@ -55,6 +58,8 @@ deliver_stage_count = 2
 
 # IB parameters
 ib_generation_probability = 0.5 # corresponds to 𝑓I in the model
+ib_generation_cpu_time_ms = 300
+ib_validation_cpu_time_ms = 100
 ib_shards = 2
 max_ib_requests_per_peer = 1
 max_ib_size = 327680
@@ -62,8 +67,14 @@ uniform_ib_generation = true
 
 # EB parameters
 eb_generation_probability = 5.0
+eb_generation_cpu_time_ms = 300
+eb_validation_cpu_time_ms = 100
 
 # Vote parameters
 vote_probability = 500
 vote_threshold = 150
+vote_generation_cpu_time_ms = 2
+vote_validation_cpu_time_ms = 3
 one_vote_per_vrf = true
+certificate_generation_cpu_time_ms = 200
+certificate_validation_cpu_time_ms = 200

@@ -21,6 +21,7 @@ use crate::{
     network::Network,
 };
 
+mod cpu;
 mod node;
 mod slot;
 mod tx;

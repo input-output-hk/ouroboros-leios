@@ -32,6 +32,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
+    PraosBlockLotteryWon {
+        slot: u64,
+        producer: NodeId,
+    },
     PraosBlockGenerated {
         slot: u64,
         producer: NodeId,
@@ -48,6 +52,10 @@ pub enum Event {
         slot: u64,
         sender: NodeId,
         recipient: NodeId,
+    },
+    InputBlockLotteryWon {
+        #[serde(flatten)]
+        id: InputBlockId,
     },
     InputBlockGenerated {
         #[serde(flatten)]
@@ -66,6 +74,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
+    EndorserBlockLotteryWon {
+        #[serde(flatten)]
+        id: EndorserBlockId,
+    },
     EndorserBlockGenerated {
         #[serde(flatten)]
         id: EndorserBlockId,
@@ -82,6 +94,9 @@ pub enum Event {
         id: EndorserBlockId,
         sender: NodeId,
         recipient: NodeId,
+    },
+    VoteLotteryWon {
+        id: VoteBundleId,
     },
     VotesGenerated {
         id: VoteBundleId,
@@ -118,6 +133,13 @@ impl EventTracker {
 
     pub fn track_slot(&self, number: u64) {
         self.send(Event::Slot { number });
+    }
+
+    pub fn track_praos_block_lottery_won(&self, block: &Block) {
+        self.send(Event::PraosBlockLotteryWon {
+            slot: block.slot,
+            producer: block.producer,
+        });
     }
 
     pub fn track_praos_block_generated(&self, block: &Block) {
@@ -170,6 +192,10 @@ impl EventTracker {
         });
     }
 
+    pub fn track_ib_lottery_won(&self, id: InputBlockId) {
+        self.send(Event::InputBlockLotteryWon { id });
+    }
+
     pub fn track_ib_generated(&self, block: &InputBlock) {
         self.send(Event::InputBlockGenerated {
             header: block.header.clone(),
@@ -193,6 +219,10 @@ impl EventTracker {
         });
     }
 
+    pub fn track_eb_lottery_won(&self, id: EndorserBlockId) {
+        self.send(Event::EndorserBlockLotteryWon { id });
+    }
+
     pub fn track_eb_generated(&self, block: &EndorserBlock) {
         self.send(Event::EndorserBlockGenerated {
             id: block.id(),
@@ -214,6 +244,10 @@ impl EventTracker {
             sender,
             recipient,
         });
+    }
+
+    pub fn track_vote_lottery_won(&self, votes: &VoteBundle) {
+        self.send(Event::VoteLotteryWon { id: votes.id });
     }
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
