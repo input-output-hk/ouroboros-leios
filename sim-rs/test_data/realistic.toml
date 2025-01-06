@@ -1,4 +1,6 @@
+block_generation_cpu_time_ms = 300
 block_generation_probability = 0.05
+block_validation_cpu_time_ms = 100
 deliver_stage_count = 2
 eb_generation_cpu_time_ms = 300
 eb_generation_probability = 5.0

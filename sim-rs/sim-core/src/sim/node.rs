@@ -33,6 +33,10 @@ enum TransactionView {
 }
 
 enum CpuTask {
+    /// A Praos block has been generated and is ready to propagate
+    PraosBlockGenerated(Block),
+    /// A Praos block has been received and validated, and is ready to propagate
+    PraosBlockValidated(NodeId, Arc<Block>),
     /// An input block has been generated and is ready to propagate
     InputBlockGenerated(InputBlock),
     /// An input block has been received and validated, and is ready to propagate
@@ -225,6 +229,8 @@ impl Node {
                         NodeEvent::CpuTaskCompleted { core, task } => {
                             self.free_core(core);
                             match task {
+                                CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
+                                CpuTask::PraosBlockValidated(from, block) => self.finish_validating_block(from, block)?,
                                 CpuTask::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
                                 CpuTask::InputBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
                                 CpuTask::EndorserBlockGenerated(eb) => self.finish_generating_eb(eb)?,
@@ -259,7 +265,7 @@ impl Node {
                 self.receive_request_block(from, slot)?;
             }
             SimulationMessage::Block(block) => {
-                self.receive_block(from, block)?;
+                self.receive_block(from, block);
             }
 
             // IB header propagation
@@ -501,8 +507,10 @@ impl Node {
             endorsement,
             transactions,
         };
-        self.tracker.track_praos_block_generated(&block);
-        self.publish_block(Arc::new(block))?;
+        self.schedule_cpu_task(
+            self.sim_config.block_generation_cpu_time,
+            CpuTask::PraosBlockGenerated(block),
+        );
 
         Ok(())
     }
@@ -546,6 +554,12 @@ impl Node {
             }
         }
         Some(tx_set.len())
+    }
+
+    fn finish_generating_block(&mut self, block: Block) -> Result<()> {
+        self.tracker.track_praos_block_generated(&block);
+
+        self.publish_block(Arc::new(block))
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
@@ -620,9 +634,16 @@ impl Node {
         Ok(())
     }
 
-    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
+    fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
+        self.schedule_cpu_task(
+            self.sim_config.block_validation_cpu_time,
+            CpuTask::PraosBlockValidated(from, block),
+        );
+    }
+
+    fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
         if let Some(old_block) = self.praos.blocks.get(&block.slot) {
             // SLOT BATTLE!!! lower VRF wins
             if old_block.vrf <= block.vrf {

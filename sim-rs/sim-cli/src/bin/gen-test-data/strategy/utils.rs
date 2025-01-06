@@ -89,6 +89,8 @@ pub fn generate_full_config(nodes: Vec<RawNodeConfig>, links: Vec<RawLinkConfig>
         one_vote_per_vrf: true,
         max_ib_size: 327680,
         max_tx_size: 16384,
+        block_generation_cpu_time_ms: 300,
+        block_validation_cpu_time_ms: 100,
         ib_generation_cpu_time_ms: 300,
         ib_validation_cpu_time_ms: 100,
         eb_generation_cpu_time_ms: 300,

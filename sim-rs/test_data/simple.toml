@@ -47,6 +47,8 @@ max_tx_size = 16384
 
 # praos block generation parameters
 block_generation_probability = 0.05
+block_generation_cpu_time_ms = 300
+block_validation_cpu_time_ms = 100
 max_block_size = 90112
 
 # Leios parameters
