@@ -95,6 +95,8 @@ pub fn generate_full_config(nodes: Vec<RawNodeConfig>, links: Vec<RawLinkConfig>
         ib_validation_cpu_time_ms: 100,
         eb_generation_cpu_time_ms: 300,
         eb_validation_cpu_time_ms: 100,
+        vote_generation_cpu_time_ms: 30,
+        vote_validation_cpu_time_ms: 10,
         transaction_frequency_ms: DistributionConfig::Exp {
             lambda: 0.85,
             scale: Some(1000.0),

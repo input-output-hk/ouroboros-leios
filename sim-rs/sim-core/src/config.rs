@@ -77,6 +77,8 @@ pub struct RawConfig {
     pub ib_validation_cpu_time_ms: u64,
     pub eb_generation_cpu_time_ms: u64,
     pub eb_validation_cpu_time_ms: u64,
+    pub vote_generation_cpu_time_ms: u64,
+    pub vote_validation_cpu_time_ms: u64,
     pub transaction_frequency_ms: DistributionConfig,
     pub transaction_size_bytes: DistributionConfig,
 }
@@ -155,6 +157,8 @@ impl From<RawConfig> for SimConfiguration {
             ib_validation_cpu_time: Duration::from_millis(value.ib_validation_cpu_time_ms),
             eb_generation_cpu_time: Duration::from_millis(value.eb_generation_cpu_time_ms),
             eb_validation_cpu_time: Duration::from_millis(value.eb_validation_cpu_time_ms),
+            vote_generation_cpu_time: Duration::from_millis(value.vote_generation_cpu_time_ms),
+            vote_validation_cpu_time: Duration::from_millis(value.vote_validation_cpu_time_ms),
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
@@ -189,6 +193,8 @@ pub struct SimConfiguration {
     pub ib_validation_cpu_time: Duration,
     pub eb_generation_cpu_time: Duration,
     pub eb_validation_cpu_time: Duration,
+    pub vote_generation_cpu_time: Duration,
+    pub vote_validation_cpu_time: Duration,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }

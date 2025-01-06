@@ -72,4 +72,6 @@ eb_validation_cpu_time_ms = 100
 # Vote parameters
 vote_probability = 500
 vote_threshold = 150
+vote_generation_cpu_time_ms = 30
+vote_validation_cpu_time_ms = 10
 one_vote_per_vrf = true

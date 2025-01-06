@@ -18,6 +18,8 @@ ib_generation_cpu_time_ms = 300
 ib_validation_cpu_time_ms = 100
 eb_generation_cpu_time_ms = 300
 eb_validation_cpu_time_ms = 100
+vote_generation_cpu_time_ms = 30
+vote_validation_cpu_time_ms = 10
 
 [[nodes]]
 location = [
