@@ -55,8 +55,22 @@ enum CpuTask {
 impl CpuTask {
     fn cpu_times(&self, config: &SimConfiguration) -> Vec<Duration> {
         match self {
-            Self::PraosBlockGenerated(_) => vec![config.block_generation_cpu_time],
-            Self::PraosBlockValidated(_, _) => vec![config.block_validation_cpu_time],
+            Self::PraosBlockGenerated(block) => {
+                let base_time = config.block_generation_cpu_time;
+                if block.endorsement.is_some() {
+                    vec![base_time + config.certificate_generation_cpu_time]
+                } else {
+                    vec![base_time]
+                }
+            }
+            Self::PraosBlockValidated(_, block) => {
+                let base_time = config.block_validation_cpu_time;
+                if block.endorsement.is_some() {
+                    vec![base_time + config.certificate_validation_cpu_time]
+                } else {
+                    vec![base_time]
+                }
+            }
             Self::InputBlockGenerated(_) => vec![config.ib_generation_cpu_time],
             Self::InputBlockValidated(_, _) => vec![config.ib_validation_cpu_time],
             Self::EndorserBlockGenerated(_) => vec![config.eb_generation_cpu_time],
