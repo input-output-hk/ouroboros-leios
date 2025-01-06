@@ -17,6 +17,7 @@ max_ib_size = 32768000
 max_tx_size = 16384
 one_vote_per_vrf = false
 stage_length = 20
+tx_validation_cpu_time_ms = 1.5
 uniform_ib_generation = true
 vote_generation_cpu_time_ms = 30
 vote_probability = 500

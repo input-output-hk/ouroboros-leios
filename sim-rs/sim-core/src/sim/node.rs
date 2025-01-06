@@ -34,6 +34,8 @@ enum TransactionView {
 }
 
 enum CpuTask {
+    /// A transaction has been received and validated, and is ready to propagate
+    TransactionValidated(NodeId, Arc<Transaction>),
     /// A Praos block has been generated and is ready to propagate
     PraosBlockGenerated(Block),
     /// A Praos block has been received and validated, and is ready to propagate
@@ -55,6 +57,7 @@ enum CpuTask {
 impl CpuTask {
     fn cpu_times(&self, config: &SimConfiguration) -> Vec<Duration> {
         match self {
+            Self::TransactionValidated(_, _) => vec![config.tx_validation_cpu_time],
             Self::PraosBlockGenerated(block) => {
                 let base_time = config.block_generation_cpu_time;
                 if block.endorsement.is_some() {
@@ -246,7 +249,7 @@ impl Node {
                         // sim has stopped runinng
                         break;
                     };
-                    self.receive_tx(self.id, tx)?;
+                    self.generate_tx(tx)?;
                 }
                 event = self.next_event() => {
                     match event {
@@ -261,6 +264,7 @@ impl Node {
                                 continue;
                             };
                             match task {
+                                CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
                                 CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
                                 CpuTask::PraosBlockValidated(from, block) => self.finish_validating_block(from, block)?,
                                 CpuTask::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
@@ -288,7 +292,7 @@ impl Node {
                 self.receive_request_tx(from, id)?;
             }
             SimulationMessage::Tx(tx) => {
-                self.receive_tx(from, tx)?;
+                self.receive_tx(from, tx);
             }
 
             // Block propagation
@@ -622,14 +626,19 @@ impl Node {
         Ok(())
     }
 
-    fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
+    fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) {
+        self.tracker
+            .track_transaction_received(tx.id, from, self.id);
+        self.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
+    }
+
+    fn generate_tx(&mut self, tx: Arc<Transaction>) -> Result<()> {
+        self.tracker.track_transaction_generated(&tx, self.id);
+        self.propagate_tx(self.id, tx)
+    }
+
+    fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
-        if from == self.id {
-            self.tracker.track_transaction_generated(&tx, self.id);
-        } else {
-            self.tracker
-                .track_transaction_received(tx.id, from, self.id);
-        }
         if self.trace {
             info!("node {} saw tx {id}", self.id);
         }

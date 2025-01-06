@@ -43,6 +43,7 @@ links = [
 # transaction parameters
 transaction_frequency_ms = { distribution = "exp", lambda = 0.85, scale = 1000 }
 transaction_size_bytes = { distribution = "log_normal", mu = 6.833, sigma = 1.127 }
+tx_validation_cpu_time_ms = 1.5
 max_tx_size = 16384
 
 # praos block generation parameters

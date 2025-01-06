@@ -71,16 +71,17 @@ pub struct RawConfig {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
-    pub block_generation_cpu_time_ms: u64,
-    pub block_validation_cpu_time_ms: u64,
-    pub certificate_generation_cpu_time_ms: u64,
-    pub certificate_validation_cpu_time_ms: u64,
-    pub ib_generation_cpu_time_ms: u64,
-    pub ib_validation_cpu_time_ms: u64,
-    pub eb_generation_cpu_time_ms: u64,
-    pub eb_validation_cpu_time_ms: u64,
-    pub vote_generation_cpu_time_ms: u64,
-    pub vote_validation_cpu_time_ms: u64,
+    pub tx_validation_cpu_time_ms: f64,
+    pub block_generation_cpu_time_ms: f64,
+    pub block_validation_cpu_time_ms: f64,
+    pub certificate_generation_cpu_time_ms: f64,
+    pub certificate_validation_cpu_time_ms: f64,
+    pub ib_generation_cpu_time_ms: f64,
+    pub ib_validation_cpu_time_ms: f64,
+    pub eb_generation_cpu_time_ms: f64,
+    pub eb_validation_cpu_time_ms: f64,
+    pub vote_generation_cpu_time_ms: f64,
+    pub vote_validation_cpu_time_ms: f64,
     pub transaction_frequency_ms: DistributionConfig,
     pub transaction_size_bytes: DistributionConfig,
 }
@@ -153,20 +154,39 @@ impl From<RawConfig> for SimConfiguration {
             max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             ib_shards: value.ib_shards,
             one_vote_per_vrf: value.one_vote_per_vrf,
-            block_generation_cpu_time: Duration::from_millis(value.block_generation_cpu_time_ms),
-            block_validation_cpu_time: Duration::from_millis(value.block_validation_cpu_time_ms),
-            certificate_generation_cpu_time: Duration::from_millis(
-                value.certificate_generation_cpu_time_ms,
+            tx_validation_cpu_time: Duration::from_secs_f64(
+                value.tx_validation_cpu_time_ms / 1000.0,
             ),
-            certificate_validation_cpu_time: Duration::from_millis(
-                value.certificate_validation_cpu_time_ms,
+            block_generation_cpu_time: Duration::from_secs_f64(
+                value.block_generation_cpu_time_ms / 1000.0,
             ),
-            ib_generation_cpu_time: Duration::from_millis(value.ib_generation_cpu_time_ms),
-            ib_validation_cpu_time: Duration::from_millis(value.ib_validation_cpu_time_ms),
-            eb_generation_cpu_time: Duration::from_millis(value.eb_generation_cpu_time_ms),
-            eb_validation_cpu_time: Duration::from_millis(value.eb_validation_cpu_time_ms),
-            vote_generation_cpu_time: Duration::from_millis(value.vote_generation_cpu_time_ms),
-            vote_validation_cpu_time: Duration::from_millis(value.vote_validation_cpu_time_ms),
+            block_validation_cpu_time: Duration::from_secs_f64(
+                value.block_validation_cpu_time_ms / 1000.0,
+            ),
+            certificate_generation_cpu_time: Duration::from_secs_f64(
+                value.certificate_generation_cpu_time_ms / 1000.0,
+            ),
+            certificate_validation_cpu_time: Duration::from_secs_f64(
+                value.certificate_validation_cpu_time_ms / 1000.0,
+            ),
+            ib_generation_cpu_time: Duration::from_secs_f64(
+                value.ib_generation_cpu_time_ms / 1000.0,
+            ),
+            ib_validation_cpu_time: Duration::from_secs_f64(
+                value.ib_validation_cpu_time_ms / 1000.0,
+            ),
+            eb_generation_cpu_time: Duration::from_secs_f64(
+                value.eb_generation_cpu_time_ms / 1000.0,
+            ),
+            eb_validation_cpu_time: Duration::from_secs_f64(
+                value.eb_validation_cpu_time_ms / 1000.0,
+            ),
+            vote_generation_cpu_time: Duration::from_secs_f64(
+                value.vote_generation_cpu_time_ms / 1000.0,
+            ),
+            vote_validation_cpu_time: Duration::from_secs_f64(
+                value.vote_validation_cpu_time_ms / 1000.0,
+            ),
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
@@ -195,6 +215,7 @@ pub struct SimConfiguration {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
+    pub tx_validation_cpu_time: Duration,
     pub block_generation_cpu_time: Duration,
     pub block_validation_cpu_time: Duration,
     pub certificate_generation_cpu_time: Duration,
