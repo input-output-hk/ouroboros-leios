@@ -1,8 +1,8 @@
 block_generation_cpu_time_ms = 300
 block_generation_probability = 0.05
 block_validation_cpu_time_ms = 100
-certificate_generation_cpu_time_ms = 100
-certificate_validation_cpu_time_ms = 50
+certificate_generation_cpu_time_ms = 200
+certificate_validation_cpu_time_ms = 200
 deliver_stage_count = 2
 eb_generation_cpu_time_ms = 300
 eb_generation_probability = 5.0
@@ -19,10 +19,10 @@ one_vote_per_vrf = false
 stage_length = 20
 tx_validation_cpu_time_ms = 1.5
 uniform_ib_generation = true
-vote_generation_cpu_time_ms = 30
+vote_generation_cpu_time_ms = 2
 vote_probability = 500
 vote_threshold = 150
-vote_validation_cpu_time_ms = 10
+vote_validation_cpu_time_ms = 3
 
 [transaction_frequency_ms]
 distribution = "exp"
