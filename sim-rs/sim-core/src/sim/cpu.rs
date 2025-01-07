@@ -9,7 +9,8 @@ struct TaskState<T> {
 }
 
 pub struct Subtask {
-    task_id: u64,
+    pub task_id: u64,
+    pub subtask_id: u64,
     pub duration: Duration,
 }
 
@@ -32,7 +33,7 @@ impl<T> CpuTaskQueue<T> {
         }
     }
 
-    pub fn schedule_task(&mut self, task: T, durations: Vec<Duration>) -> Vec<Subtask> {
+    pub fn schedule_task(&mut self, task: T, durations: Vec<Duration>) -> (u64, Vec<Subtask>) {
         assert!(!durations.is_empty());
 
         let task_id = self.next_task_id;
@@ -46,9 +47,10 @@ impl<T> CpuTaskQueue<T> {
         );
 
         let mut scheduled_subtasks = vec![];
-        for duration in durations {
+        for (subtask_id, duration) in durations.into_iter().enumerate() {
             let subtask = Subtask {
                 task_id,
+                subtask_id: subtask_id as u64,
                 duration: duration.mul_f64(self.multiplier),
             };
             if self.available_cores.is_none_or(|c| c > 0) {
@@ -59,7 +61,7 @@ impl<T> CpuTaskQueue<T> {
             }
         }
 
-        scheduled_subtasks
+        (task_id, scheduled_subtasks)
     }
 
     pub fn complete_subtask(&mut self, subtask: Subtask) -> (Option<T>, Option<Subtask>) {

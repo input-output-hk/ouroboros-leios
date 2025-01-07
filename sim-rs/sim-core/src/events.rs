@@ -17,6 +17,22 @@ pub enum Event {
     Slot {
         number: u64,
     },
+    CpuTaskScheduled {
+        task_id: String,
+        task_type: String,
+        subtasks: usize,
+    },
+    CpuTaskFinished {
+        task_id: String,
+    },
+    CpuSubtaskStarted {
+        task_id: String,
+        subtask_id: u64,
+    },
+    CpuSubtaskFinished {
+        task_id: String,
+        subtask_id: u64,
+    },
     TransactionGenerated {
         id: TransactionId,
         publisher: NodeId,
@@ -133,6 +149,32 @@ impl EventTracker {
 
     pub fn track_slot(&self, number: u64) {
         self.send(Event::Slot { number });
+    }
+
+    pub fn track_cpu_task_scheduled(&self, task_id: String, task_type: String, subtasks: usize) {
+        self.send(Event::CpuTaskScheduled {
+            task_id,
+            task_type,
+            subtasks,
+        });
+    }
+
+    pub fn track_cpu_task_finished(&self, task_id: String) {
+        self.send(Event::CpuTaskFinished { task_id });
+    }
+
+    pub fn track_cpu_subtask_started(&self, task_id: String, subtask_id: u64) {
+        self.send(Event::CpuSubtaskStarted {
+            task_id,
+            subtask_id,
+        });
+    }
+
+    pub fn track_cpu_subtask_finished(&self, task_id: String, subtask_id: u64) {
+        self.send(Event::CpuSubtaskFinished {
+            task_id,
+            subtask_id,
+        });
     }
 
     pub fn track_praos_block_lottery_won(&self, block: &Block) {
