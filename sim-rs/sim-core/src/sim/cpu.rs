@@ -17,12 +17,12 @@ pub struct CpuTaskQueue<T> {
     next_task_id: u64,
     tasks: HashMap<u64, TaskState<T>>,
     pending_subtasks: VecDeque<Subtask>,
-    available_cores: u64,
+    available_cores: Option<u64>,
     multiplier: f64,
 }
 
 impl<T> CpuTaskQueue<T> {
-    pub fn new(cores: u64, multiplier: f64) -> Self {
+    pub fn new(cores: Option<u64>, multiplier: f64) -> Self {
         Self {
             next_task_id: 0,
             tasks: HashMap::new(),
@@ -51,8 +51,8 @@ impl<T> CpuTaskQueue<T> {
                 task_id,
                 duration: duration.mul_f64(self.multiplier),
             };
-            if self.available_cores > 0 {
-                self.available_cores -= 1;
+            if self.available_cores.is_none_or(|c| c > 0) {
+                self.available_cores = self.available_cores.map(|c| c - 1);
                 scheduled_subtasks.push(subtask);
             } else {
                 self.pending_subtasks.push_back(subtask);
@@ -63,7 +63,7 @@ impl<T> CpuTaskQueue<T> {
     }
 
     pub fn complete_subtask(&mut self, subtask: Subtask) -> (Option<T>, Option<Subtask>) {
-        self.available_cores += 1;
+        self.available_cores = self.available_cores.map(|c| c + 1);
 
         let task = self
             .tasks

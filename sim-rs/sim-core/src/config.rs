@@ -93,12 +93,8 @@ pub struct RawNodeConfig {
     pub region: Option<String>,
     #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
     pub cpu_multiplier: f64,
-    #[serde(default = "default_cores")]
-    pub cores: u64,
-}
-
-const fn default_cores() -> u64 {
-    4
+    #[serde(default)]
+    pub cores: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -290,7 +286,7 @@ pub struct NodeConfiguration {
     pub location: Location,
     pub stake: u64,
     pub cpu_multiplier: f64,
-    pub cores: u64,
+    pub cores: Option<u64>,
     pub peers: Vec<NodeId>,
 }
 
