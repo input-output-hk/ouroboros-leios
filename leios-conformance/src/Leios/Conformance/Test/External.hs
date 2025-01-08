@@ -60,6 +60,7 @@ data NodeRequest
   | NewSlot
       { newIBs :: [InputBlock]
       , newEBs :: [EndorserBlock]
+      , newVotes :: [Vote]
       }
   | Stop
   deriving (Eq, Generic, Show)
@@ -71,6 +72,7 @@ data NodeResponse
   = NodeResponse
       { diffuseIBs :: [InputBlock]
       , diffuseEBs :: [EndorserBlock]
+      , diffuseVotes :: [Vote]
       }
   | Failed
       { failure :: String
@@ -79,7 +81,7 @@ data NodeResponse
   deriving (Eq, Generic, Show)
 
 instance Default NodeResponse where
-  def = NodeResponse mempty mempty
+  def = NodeResponse mempty mempty mempty
 
 instance FromJSON NodeResponse
 instance ToJSON NodeResponse
@@ -89,6 +91,7 @@ data RunState = RunState
   , hWriter :: Handle
   , unfetchedIBs :: [InputBlock]
   , unfetchedEBs :: [EndorserBlock]
+  , unfetchedVotes :: [Vote]
   }
 
 callSUT :: RunState -> NodeRequest -> IO NodeResponse
@@ -98,32 +101,36 @@ callSUT RunState{hReader, hWriter} req =
 
 type Runtime = StateT RunState IO
 
-instance Realized IO ([InputBlock], [EndorserBlock]) ~ ([InputBlock], [EndorserBlock]) => RunModel NetworkModel Runtime where
+instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [EndorserBlock], [Vote]) => RunModel NetworkModel Runtime where
 
   perform net@NetworkModel{nodeModel = NodeModel{..}} (Step a) _ = case a of
     Tick -> do
       rs@RunState{..} <- get
-      modify $ \rs' -> rs' {unfetchedIBs = mempty, unfetchedEBs = mempty}
+      modify $ \rs' -> rs' {unfetchedIBs = mempty, unfetchedEBs = mempty, unfetchedVotes = mempty}
       lift
         ( callSUT
             rs
             NewSlot
               { newIBs = unfetchedIBs
               , newEBs = unfetchedEBs
+              , newVotes = unfetchedVotes
               }
         )
         >>= \case
-          NodeResponse{..} -> pure (diffuseIBs, diffuseEBs)
-          _ -> pure (mempty, mempty) -- FIXME: The state model should define an error type.
+          NodeResponse{..} -> pure (diffuseIBs, diffuseEBs, diffuseVotes)
+          _ -> pure (mempty, mempty, mempty) -- FIXME: The state model should define an error type.
     NewIB ib -> do
       modify $ \rs -> rs{unfetchedIBs = unfetchedIBs rs ++ pure ib}
-      pure (mempty, mempty)
+      pure (mempty, mempty, mempty)
     NewEB eb -> do
       modify $ \rs -> rs{unfetchedEBs = unfetchedEBs rs ++ pure eb}
-      pure (mempty, mempty)
+      pure (mempty, mempty, mempty)
+    NewVote v -> do
+      modify $ \rs -> rs{unfetchedVotes = unfetchedVotes rs ++ pure v}
+      pure (mempty, mempty, mempty)
 
-  postcondition (net@NetworkModel{nodeModel = s}, NetworkModel{nodeModel = s'}) (Step a) _ (ibs, ebs) = do
-    let (expectedIBs, expectedEBs) = maybe (mempty, mempty) fst $ transition s a
+  postcondition (net@NetworkModel{nodeModel = s}, NetworkModel{nodeModel = s'}) (Step a) _ (ibs, ebs, votes) = do
+    let (expectedIBs, expectedEBs, expectedVotes) = maybe (mempty, mempty, mempty) fst $ transition s a
     let ok = (ibs, ebs) == (expectedIBs, expectedEBs)
     monitorPost . counterexample . show $ "  action $" <+> pPrint a
     when (a == Tick && slot s == slot s' + 1) $
@@ -136,6 +143,10 @@ instance Realized IO ([InputBlock], [EndorserBlock]) ~ ([InputBlock], [EndorserB
       monitorPost . counterexample . show $ "  --      got EndorserBlocks:" <+> pPrint ebs
     when (ebs /= expectedEBs) $
       counterexamplePost . show $ "  -- expected EndorserBlocks:" <+> pPrint expectedEBs
+    unless (null votes) $
+      monitorPost . counterexample . show $ "  --      got Votes:" <+> pPrint votes
+    when (votes /= expectedVotes) $
+      counterexamplePost . show $ "  -- expected Votes:" <+> pPrint expectedVotes
     pure ok
 
 prop_node :: Handle -> Handle -> Blind (Actions NetworkModel) -> Property
@@ -143,6 +154,7 @@ prop_node hReader hWriter (Blind as) = noShrinking $
   ioProperty $ do
     let unfetchedIBs = mempty
         unfetchedEBs = mempty
+        unfetchedVotes = mempty
     callSUT
       RunState{..}
       Initialize

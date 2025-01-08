@@ -12,6 +12,7 @@ data EnvAction
   = Tick
   | NewIB InputBlock
   | NewEB EndorserBlock
+  | NewVote Vote
   deriving (Eq, Show)
 
 -- TODO: use InputBlock extracted from Agda
@@ -32,16 +33,26 @@ instance ToJSON EndorserBlock
 instance Pretty EndorserBlock where
   pPrint EndorserBlock = "EndorserBlock"
 
+-- TODO: use Vote extracted from Agda
+data Vote = Vote
+  deriving (Show, Eq, Generic)
+
+instance FromJSON Vote
+instance ToJSON Vote
+instance Pretty Vote where
+  pPrint Vote = "Vote"
+
 -- TODO: use LeiosState extracted from Agda
 data NodeModel = NodeModel
   { slot :: Integer
   , ibs :: [InputBlock]
   , ebs :: [EndorserBlock]
+  , votes :: [Vote]
   }
   deriving Show
 
 initialModelState :: NodeModel
-initialModelState = NodeModel 0 [] []
+initialModelState = NodeModel 0 [] [] []
 
 --TODO
 makeIB :: NodeModel -> Maybe InputBlock
@@ -51,22 +62,33 @@ makeIB _ = Nothing
 makeEB :: NodeModel -> Maybe EndorserBlock
 makeEB _ = Nothing
 
+--TODO
+makeVote :: NodeModel -> Maybe Vote
+makeVote _ = Nothing
+
 addIB :: InputBlock -> NodeModel -> NodeModel
 addIB ib nm@NodeModel{..} = nm { ibs = ib : ibs }
 
 addEB :: EndorserBlock -> NodeModel -> NodeModel
 addEB eb nm@NodeModel{..} = nm { ebs = eb : ebs }
 
+addVote :: Vote -> NodeModel -> NodeModel
+addVote v nm@NodeModel{..} = nm { votes = v : votes }
+
 -- TODO: Leios executable specification
-transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock]), NodeModel)
+transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [Vote]), NodeModel)
 transition nm Tick = do
   -- TODO: guards
   let ibs = maybeToList (makeIB nm)
       ebs = maybeToList (makeEB nm)
-  pure ((ibs, ebs), nm)
+      votes = maybeToList (makeVote nm)
+  pure ((ibs, ebs, votes), nm)
 transition nm (NewIB ib) = do
   -- TODO: guards
-  pure (([], []), addIB ib nm)
+  pure (([], [], []), addIB ib nm)
 transition nm (NewEB eb) = do
   -- TODO: guards
-  pure (([], []), addEB eb nm)
+  pure (([], [], []), addEB eb nm)
+transition nm (NewVote v) = do
+  -- TODO: guards
+  pure (([], [], []), addVote v nm)

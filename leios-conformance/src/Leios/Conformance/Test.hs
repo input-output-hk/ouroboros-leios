@@ -36,6 +36,7 @@ import Leios.Conformance.Model (
   NodeModel(..),
   InputBlock(..),
   EndorserBlock(..),
+  Vote(..),
   initialModelState,
   transition
  )
@@ -62,10 +63,11 @@ instance Pretty EnvAction where
   pPrint Tick = "Tick"
   pPrint (NewIB ib) = "NewIB" <+> pPrint ib
   pPrint (NewEB eb) = "NewEB" <+> pPrint eb
+  pPrint (NewVote v) = "NewVote" <+> pPrint v
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
-    Step :: EnvAction -> Action NetworkModel ([InputBlock], [EndorserBlock])
+    Step :: EnvAction -> Action NetworkModel ([InputBlock], [EndorserBlock], [Vote])
 
   initialState =
     NetworkModel
