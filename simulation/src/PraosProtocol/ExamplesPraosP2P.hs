@@ -35,6 +35,7 @@ import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
+import System.FilePath
 import System.Random (StdGen, mkStdGen)
 import qualified System.Random as Random
 import Viz
@@ -191,9 +192,11 @@ example1000Diffusion ::
   FilePath ->
   IO ()
 example1000Diffusion clinks rlinks stop fp =
-  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
+  runSampleModel traceFile logEvent (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
     example1Trace rng 20 p2pTopography
  where
+  logEvent = const () -- TODO: internal representation too noisy, we want to use a more compact/flat repr for log.
+  traceFile = dropExtension fp <.> "log"
   rng = mkStdGen 42
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
   p2pTopographyCharacteristics =
