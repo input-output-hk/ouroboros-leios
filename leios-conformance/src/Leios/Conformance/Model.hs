@@ -43,7 +43,7 @@ initialModelState :: NodeModel
 initialModelState = NodeModel 0 [] []
 
 -- TODO: Leios executable specification
-transition :: NodeModel -> EnvAction -> Maybe NodeModel
-transition nm Tick = Just nm
-transition nm (NewIB _) = Just nm
-transition nm (NewEB _) = Just nm
+transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock]), NodeModel)
+transition nm Tick = Just (([], []), nm)
+transition nm (NewIB _) = Just (([], []), nm)
+transition nm (NewEB _) = Just (([], []), nm)

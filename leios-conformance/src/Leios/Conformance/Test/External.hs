@@ -13,6 +13,7 @@
 
 module Leios.Conformance.Test.External where
 
+import Control.Monad (unless, when)
 import Control.Monad.IO.Class ()
 import Control.Monad.State (
   MonadState (get),
@@ -41,8 +42,14 @@ import Test.QuickCheck.StateModel (
   Actions,
   Realized,
   RunModel (perform, postcondition),
+  counterexamplePost,
+  monitorPost,
   runActions
  )
+
+import Text.PrettyPrint (hang, vcat, (<+>))
+import Text.PrettyPrint.HughesPJClass (Pretty (pPrint))
+
 import Prelude hiding (round)
 
 import Leios.Conformance.Model
@@ -116,7 +123,20 @@ instance Realized IO ([InputBlock], [EndorserBlock]) ~ ([InputBlock], [EndorserB
       pure (mempty, mempty)
 
   postcondition (net@NetworkModel{nodeModel = s}, NetworkModel{nodeModel = s'}) (Step a) _ (ibs, ebs) = do
-    pure False -- FIXME: just fail for now
+    let (expectedIBs, expectedEBs) = maybe (mempty, mempty) fst $ transition s a
+    let ok = (ibs, ebs) == (expectedIBs, expectedEBs)
+    monitorPost . counterexample . show $ "  action $" <+> pPrint a
+    when (a == Tick && slot s == slot s' + 1) $
+      monitorPost . counterexample $ "  -- new slot: " ++ show (slot s')
+    unless (null ibs) $
+      monitorPost . counterexample . show $ "  --      got InputBlocks:" <+> pPrint ibs
+    when (ibs /= expectedIBs) $
+      counterexamplePost . show $ "  -- expected InputBlocks:" <+> pPrint expectedIBs
+    unless (null ebs) $
+      monitorPost . counterexample . show $ "  --      got EndorserBlocks:" <+> pPrint ebs
+    when (ebs /= expectedEBs) $
+      counterexamplePost . show $ "  -- expected EndorserBlocks:" <+> pPrint expectedEBs
+    pure ok
 
 prop_node :: Handle -> Handle -> Blind (Actions NetworkModel) -> Property
 prop_node hReader hWriter (Blind as) = noShrinking $
