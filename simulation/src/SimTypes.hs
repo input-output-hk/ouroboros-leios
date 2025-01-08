@@ -12,7 +12,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import TimeCompat
 
-data CPUTask = CPUTask {cpuTaskDuration :: DiffTime, cpuTaskLabel :: Text}
+data CPUTask = CPUTask {cpuTaskDuration :: !DiffTime, cpuTaskLabel :: !Text}
   deriving (Eq, Ord, Show, Generic)
   deriving (ToJSON, FromJSON)
 
