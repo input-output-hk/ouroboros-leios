@@ -2,6 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -31,6 +32,7 @@ import Data.Maybe
 import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import LeiosProtocol.Common
 import LeiosProtocol.Relay
 import qualified LeiosProtocol.RelayBuffer as RB
@@ -122,7 +124,7 @@ data LeiosNodeTask
   | GenEB
   | GenVote
   | GenRB
-  deriving (Eq, Ord, Ix, Bounded)
+  deriving (Eq, Ord, Ix, Bounded, Show)
 
 type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
 type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId EndorseBlock
@@ -332,10 +334,10 @@ leiosNode tracer cfg followers peers = do
         traceReceived xs EventEB
         dispatch $! ValidateEBS xs $ completion . map (\eb -> (eb.id, eb))
   let valHeaderIB =
-        queueAndWait leiosState ValIH . map (CPUTask . cfg.leios.delays.inputBlockHeaderValidation)
+        queueAndWait leiosState ValIH . map (flip CPUTask "ValIH" . cfg.leios.delays.inputBlockHeaderValidation)
   let valHeaderRB h = do
         let !delay = cfg.leios.praos.headerValidationDelay h
-        queueAndWait leiosState ValRH [CPUTask delay]
+        queueAndWait leiosState ValRH [CPUTask delay "ValRH"]
 
   praosThreads <-
     PraosNode.setupPraosThreads'
@@ -461,9 +463,10 @@ dispatchValidation tracer cfg leiosState req =
   atomically $ mapM_ (uncurry $ writeTMQueue leiosState.taskQueue) =<< go req
  where
   queue = atomically . mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
+  labelTask (tag, (f, m)) = (tag, (f (T.pack (show tag)), m))
   valRB rb m = do
     let !delay = cfg.leios.praos.blockValidationDelay rb
-    (ValRB, (CPUTask delay, m))
+    labelTask (ValRB, (CPUTask delay, m))
   valIB x deliveryTime completion =
     let
       !delay = CPUTask $ cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
@@ -478,15 +481,15 @@ dispatchValidation tracer cfg leiosState req =
         -- TODO: likely needs optimization
         modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete (fst x).id))
      in
-      (ValIB, (delay, task >> traceEnterState [uncurry InputBlock x] EventIB))
-  valEB eb completion = (ValEB,) . (CPUTask $ cfg.leios.delays.endorseBlockValidation eb,) $ do
+      labelTask (ValIB, (delay, task >> traceEnterState [uncurry InputBlock x] EventIB))
+  valEB eb completion = labelTask . (ValEB,) . (CPUTask $ cfg.leios.delays.endorseBlockValidation eb,) $ do
     atomically $ do
       completion [eb]
       ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
       let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
       modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
     traceEnterState [eb] EventEB
-  valVote v completion = (ValVote,) . (CPUTask $ cfg.leios.delays.voteMsgValidation v,) $ do
+  valVote v completion = labelTask . (ValVote,) . (CPUTask $ cfg.leios.delays.voteMsgValidation v,) $ do
     atomically $ completion [v]
     traceEnterState [v] EventVote
 

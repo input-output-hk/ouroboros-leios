@@ -4,8 +4,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.ExamplesPraosP2P where
@@ -195,7 +197,16 @@ example1000Diffusion clinks rlinks stop fp =
   runSampleModel traceFile logEvent (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
     example1Trace rng 20 p2pTopography
  where
-  logEvent = const () -- TODO: internal representation too noisy, we want to use a more compact/flat repr for log.
+  asString x = x :: String
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) =
+    object ["nid" .= nid, "tag" .= asString "generated", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventReceived blk))) =
+    object ["nid" .= nid, "tag" .= asString "received", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventEnterState blk))) =
+    object ["nid" .= nid, "tag" .= asString "enterstate", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventCPU task))) =
+    object ["nid" .= nid, "tag" .= asString "cpu", "task" .= task]
+  logEvent _ = toJSON ()
   traceFile = dropExtension fp <.> "log"
   rng = mkStdGen 42
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng

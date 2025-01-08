@@ -36,6 +36,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
@@ -598,9 +599,9 @@ setupValidatorThreads ::
 setupValidatorThreads tracer cfg st n = do
   queue <- newTBQueueIO n
   (waitingVar, processWaitingThread) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
-  let doTask (delay, m) = do
-        traceWith tracer . PraosNodeEventCPU . CPUTask $ delay
-        threadDelay delay
+  let doTask (cpuTask, m) = do
+        traceWith tracer . PraosNodeEventCPU $ cpuTask
+        threadDelay cpuTask.cpuTaskDuration
         m
 
   -- if we have the previous block, we process the task sequentially to provide back pressure on the queue.
@@ -616,8 +617,8 @@ setupValidatorThreads tracer cfg st n = do
         (block, completion) <- atomically $ readTBQueue queue
         assert (blockInvariant block) $ do
           waitForPrev block $
-            let !delay = cfg.blockValidationDelay block
-             in (delay, completion)
+            let !cpuTask = CPUTask (cfg.blockValidationDelay block) (T.pack $ "Validate " ++ show (blockHash block))
+             in (cpuTask, completion)
       add block completion = atomically $ writeTBQueue queue (block, completion)
   return ([fetch, processWaitingThread], add)
 
@@ -628,7 +629,7 @@ setupProcessWaitingThread ::
   -- | how many waiting to process in parallel
   Maybe Int ->
   TVar m (Map ConcreteHeaderHash a) ->
-  m (TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]), m ())
+  m (TVar m (Map ConcreteHeaderHash [(CPUTask, m b)]), m ())
 setupProcessWaitingThread tracer npar blocksVar = do
   waitingVar <- newTVarIO Map.empty
   return (waitingVar, processWaiting tracer npar blocksVar waitingVar)
@@ -640,13 +641,13 @@ processWaiting ::
   -- | how many waiting to process in parallel
   Maybe Int ->
   TVar m (Map ConcreteHeaderHash a) ->
-  TVar m (Map ConcreteHeaderHash [(DiffTime, m b)]) ->
+  TVar m (Map ConcreteHeaderHash [(CPUTask, m b)]) ->
   m ()
 processWaiting tracer npar blocksVar waitingVar = go
  where
   parallelDelay xs = do
-    let !d = maximum $ map fst xs
-    forM_ xs $ traceWith tracer . CPUTask . fst
+    let !d = maximum $ map (cpuTaskDuration . fst) xs
+    forM_ xs $ traceWith tracer . fst
     threadDelay d
     mapM_ snd xs
   go = forever $ join $ atomically $ do

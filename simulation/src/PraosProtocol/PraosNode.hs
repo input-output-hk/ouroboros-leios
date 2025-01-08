@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module PraosProtocol.PraosNode (
@@ -10,6 +11,7 @@ module PraosProtocol.PraosNode (
 where
 
 import ChanMux
+import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Tracer (Tracer, traceWith)
 import Data.ByteString (ByteString)
@@ -17,6 +19,7 @@ import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
@@ -140,9 +143,9 @@ setupPraosThreads ::
   m [Concurrently m ()]
 setupPraosThreads tracer cfg st0 followers peers = do
   (ts, f) <- BlockFetch.setupValidatorThreads tracer cfg st0.blockFetchControllerState 1 -- TODO: parameter
-  let valHeader h = do
+  let valHeader h = assert (blockInvariant h) $ do
         let !delay = cfg.headerValidationDelay h
-        traceWith tracer (PraosNodeEventCPU (CPUTask delay))
+        traceWith tracer (PraosNodeEventCPU (CPUTask delay $ T.pack $ "ValidateHeader " ++ show (coerce @_ @Int $ blockHash h)))
         threadDelay delay
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 

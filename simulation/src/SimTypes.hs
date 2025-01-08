@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -7,12 +8,13 @@ module SimTypes where
 import Data.Aeson.Types (FromJSON, FromJSONKey, ToJSON (..), ToJSONKey, defaultOptions, genericToEncoding)
 import Data.Hashable
 import Data.Ix (Ix)
+import Data.Text (Text)
 import GHC.Generics (Generic)
 import TimeCompat
 
-newtype CPUTask = CPUTask {cpuTaskDuration :: DiffTime}
+data CPUTask = CPUTask {cpuTaskDuration :: DiffTime, cpuTaskLabel :: Text}
   deriving (Eq, Ord, Show, Generic)
-  deriving newtype (ToJSON, FromJSON)
+  deriving (ToJSON, FromJSON)
 
 newtype NodeId = NodeId Int
   deriving (Eq, Ord, Ix, Show)
