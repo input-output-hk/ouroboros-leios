@@ -356,10 +356,10 @@ instance
   where
   messageSizeBytes MsgInit = 1
   messageSizeBytes (MsgRequestHeaders blocking expand shrink) =
-    messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
-  messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
-  messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
-  messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
+    1 + messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
+  messageSizeBytes (MsgRespondHeaders headers) = 1 + messageSizeBytes headers
+  messageSizeBytes (MsgRequestBodies ids) = 1 + sum (map messageSizeBytes ids)
+  messageSizeBytes (MsgRespondBodies bodies) = 1 + sum (map messageSizeBytes bodies)
   messageSizeBytes MsgDone = 1
 
 relayMessageLabel :: Message (RelayState id header body) st st' -> String
@@ -497,8 +497,7 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
-  , headerValidationDelay :: header -> DiffTime
-  , threadDelayParallel :: [DiffTime] -> m ()
+  , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
@@ -785,7 +784,7 @@ relayConsumerPipelined config sst =
       unless (Seq.length idsSeq <= fromIntegral windowExpand) $
         throw IdsNotRequested
 
-      config.threadDelayParallel $ map config.headerValidationDelay headers
+      config.validateHeaders headers
 
       -- Upon receiving a batch of new headers we extend our available set,
       -- and extend the unacknowledged sequence.

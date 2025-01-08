@@ -7,14 +7,16 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::{RawLinkConfig, RawNodeConfig};
+use sim_core::config::{RawConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distance, distribute_stake, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
     node_count: usize,
     stake_pool_count: usize,
+    min_connections: usize,
+    max_connections: usize,
     distribution: PathBuf,
 }
 
@@ -31,7 +33,7 @@ struct Country {
 
 #[derive(Debug, Deserialize)]
 struct RegionData {
-    asn: u64,
+    id: u64,
     latitude: f64,
     longitude: f64,
     proportion: u64,
@@ -48,9 +50,9 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     for country in distribution.countries {
         for region in country.regions {
             for _ in 0..region.proportion {
-                let asn = region.asn;
+                let id = region.id;
                 let location = (region.latitude, (region.longitude + 180.0) / 2.0);
-                region_pool.push((country.name.clone(), asn, location));
+                region_pool.push((country.name.clone(), id, location));
             }
         }
     }
@@ -59,14 +61,14 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     let mut results = vec![];
     let mut rng = thread_rng();
     for _ in 0..node_count {
-        let (country, asn, location) = region_pool
+        let (country, id, location) = region_pool
             .get(rng.gen_range(0..region_pool.len()))
             .unwrap();
         let regions = country_regions.entry(country.clone()).or_default();
-        let number = match regions.iter().position(|r| r == asn) {
+        let number = match regions.iter().position(|r| r == id) {
             Some(index) => index + 1,
             None => {
-                regions.push(*asn);
+                regions.push(*id);
                 regions.len()
             }
         };
@@ -79,7 +81,7 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     results
 }
 
-pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -104,13 +106,13 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
             location,
             region: Some(region.name),
             stake,
+            cpu_multiplier: 1.0,
+            cores: None,
         });
     }
 
     println!("generating edges...");
-    let alpha = 0.15;
-    let beta = 0.2;
-    let max_distance = distance((0.0, 90.0), (90.0, 180.0));
+    let max_distance = distance((-90.0, 90.0), (90.0, 180.0));
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
         let first_candidate_connection = if from < args.stake_pool_count {
@@ -119,13 +121,32 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
             from + 1
         };
 
-        for to in first_candidate_connection..args.node_count {
-            // nodes are connected probabilistically, based on how far apart they are
-            let dist = distance(nodes[from].location, nodes[to].location);
-            let probability = alpha * (-dist / (beta * max_distance)).exp();
-            if rng.gen_bool(probability) {
-                links.add(from, to, None);
-            }
+        let mut candidates: Vec<_> = (first_candidate_connection..args.node_count)
+            .filter(|c| *c != from && !links.exists(from, *c))
+            .map(|c| {
+                (
+                    c,
+                    (max_distance / distance(nodes[from].location, nodes[c].location)) as u64,
+                )
+            })
+            .collect();
+        let mut total_weight: u64 = candidates.iter().map(|(_, weight)| *weight).sum();
+        let conn_count = rng.gen_range(args.min_connections..args.max_connections);
+        while links.count(from) < conn_count && !candidates.is_empty() {
+            let next = rng.gen_range(0..total_weight);
+            let Some(to_index) = candidates
+                .iter()
+                .scan(0u64, |cum_weight, (_, weight)| {
+                    *cum_weight += weight;
+                    Some(*cum_weight)
+                })
+                .position(|weight| weight >= next)
+            else {
+                break;
+            };
+            let (to, to_weight) = candidates.remove(to_index);
+            links.add(from, to, None);
+            total_weight -= to_weight;
         }
     }
 
@@ -135,7 +156,7 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
-                (0..args.node_count).filter(|&to| to == from).collect()
+                (0..args.node_count).filter(|&to| to != from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
             links.add(from, to, None);
@@ -161,7 +182,7 @@ pub fn globe(args: &GlobeArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>
         }
     }
 
-    Ok((nodes, links.links))
+    Ok(generate_full_config(nodes, links.links))
 }
 
 fn track_connections(
@@ -176,5 +197,28 @@ fn track_connections(
         for next in nexts {
             track_connections(connected, connections, *next);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_core::config::SimConfiguration;
+
+    use super::{globe, GlobeArgs};
+
+    #[test]
+    fn should_generate_valid_graph() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/test_data/distribution.toml");
+        let args = GlobeArgs {
+            node_count: 1000,
+            stake_pool_count: 50,
+            min_connections: 5,
+            max_connections: 15,
+            distribution: path.into(),
+        };
+
+        let raw_config = globe(&args).unwrap();
+        let config: SimConfiguration = raw_config.into();
+        config.validate().unwrap();
     }
 }

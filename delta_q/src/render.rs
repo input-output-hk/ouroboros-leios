@@ -64,6 +64,12 @@ pub fn delta_q_component(props: &Props) -> Html {
         } => {
             html! { <Gossip send={send.clone()} receive={receive.clone()} size={*size} branching={*branching} cluster_coeff={*cluster_coeff} disjoint_names={disjoint_names.clone()} {on_change} /> }
         }
+        DeltaQExpr::Min(outcomes) => {
+            html! { <Min outcomes={outcomes.clone()} label="MIN" {on_change} /> }
+        }
+        DeltaQExpr::Max(outcomes) => {
+            html! { <Min outcomes={outcomes.clone()} label="MAX" {on_change} /> }
+        }
     }
 }
 
@@ -583,6 +589,29 @@ pub fn gossip(props: &GossipProps) -> Html {
                     }
                 </div>
             }
+        </div>
+    }
+}
+
+#[derive(Properties, Clone, PartialEq)]
+pub struct MinProps {
+    pub outcomes: Arc<[Outcome]>,
+    pub label: &'static str,
+    pub on_change: Callback<(String, Option<Arc<DeltaQExpr>>)>,
+}
+
+#[function_component(Min)]
+pub fn min(props: &MinProps) -> Html {
+    html! {
+        <div class={classes!("row", "frame")}>
+            <div class={classes!("row", "center")}>{props.label}</div>
+            <div class={classes!("column", "left")} style="border-left: 2px solid black;">
+                { for props.outcomes.iter().map(|outcome| html! {
+                    <div class={classes!("row", "left")} >
+                        <DeltaQComponent delta_q={Arc::new(DeltaQExpr::Outcome(outcome.clone()))} on_change={|_| {}} />
+                    </div>
+                }) }
+            </div>
         </div>
     }
 }

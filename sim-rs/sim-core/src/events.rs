@@ -17,6 +17,22 @@ pub enum Event {
     Slot {
         number: u64,
     },
+    CpuTaskScheduled {
+        task_id: String,
+        task_type: String,
+        subtasks: usize,
+    },
+    CpuTaskFinished {
+        task_id: String,
+    },
+    CpuSubtaskStarted {
+        task_id: String,
+        subtask_id: u64,
+    },
+    CpuSubtaskFinished {
+        task_id: String,
+        subtask_id: u64,
+    },
     TransactionGenerated {
         id: TransactionId,
         publisher: NodeId,
@@ -31,6 +47,10 @@ pub enum Event {
         id: TransactionId,
         sender: NodeId,
         recipient: NodeId,
+    },
+    PraosBlockLotteryWon {
+        slot: u64,
+        producer: NodeId,
     },
     PraosBlockGenerated {
         slot: u64,
@@ -49,6 +69,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
+    InputBlockLotteryWon {
+        #[serde(flatten)]
+        id: InputBlockId,
+    },
     InputBlockGenerated {
         #[serde(flatten)]
         header: InputBlockHeader,
@@ -66,6 +90,10 @@ pub enum Event {
         sender: NodeId,
         recipient: NodeId,
     },
+    EndorserBlockLotteryWon {
+        #[serde(flatten)]
+        id: EndorserBlockId,
+    },
     EndorserBlockGenerated {
         #[serde(flatten)]
         id: EndorserBlockId,
@@ -82,6 +110,9 @@ pub enum Event {
         id: EndorserBlockId,
         sender: NodeId,
         recipient: NodeId,
+    },
+    VoteLotteryWon {
+        id: VoteBundleId,
     },
     VotesGenerated {
         id: VoteBundleId,
@@ -118,6 +149,39 @@ impl EventTracker {
 
     pub fn track_slot(&self, number: u64) {
         self.send(Event::Slot { number });
+    }
+
+    pub fn track_cpu_task_scheduled(&self, task_id: String, task_type: String, subtasks: usize) {
+        self.send(Event::CpuTaskScheduled {
+            task_id,
+            task_type,
+            subtasks,
+        });
+    }
+
+    pub fn track_cpu_task_finished(&self, task_id: String) {
+        self.send(Event::CpuTaskFinished { task_id });
+    }
+
+    pub fn track_cpu_subtask_started(&self, task_id: String, subtask_id: u64) {
+        self.send(Event::CpuSubtaskStarted {
+            task_id,
+            subtask_id,
+        });
+    }
+
+    pub fn track_cpu_subtask_finished(&self, task_id: String, subtask_id: u64) {
+        self.send(Event::CpuSubtaskFinished {
+            task_id,
+            subtask_id,
+        });
+    }
+
+    pub fn track_praos_block_lottery_won(&self, block: &Block) {
+        self.send(Event::PraosBlockLotteryWon {
+            slot: block.slot,
+            producer: block.producer,
+        });
     }
 
     pub fn track_praos_block_generated(&self, block: &Block) {
@@ -170,6 +234,10 @@ impl EventTracker {
         });
     }
 
+    pub fn track_ib_lottery_won(&self, id: InputBlockId) {
+        self.send(Event::InputBlockLotteryWon { id });
+    }
+
     pub fn track_ib_generated(&self, block: &InputBlock) {
         self.send(Event::InputBlockGenerated {
             header: block.header.clone(),
@@ -193,6 +261,10 @@ impl EventTracker {
         });
     }
 
+    pub fn track_eb_lottery_won(&self, id: EndorserBlockId) {
+        self.send(Event::EndorserBlockLotteryWon { id });
+    }
+
     pub fn track_eb_generated(&self, block: &EndorserBlock) {
         self.send(Event::EndorserBlockGenerated {
             id: block.id(),
@@ -214,6 +286,10 @@ impl EventTracker {
             sender,
             recipient,
         });
+    }
+
+    pub fn track_vote_lottery_won(&self, votes: &VoteBundle) {
+        self.send(Event::VoteLotteryWon { id: votes.id });
     }
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {

@@ -117,6 +117,7 @@ traceRelayLink1 tcpprops =
                 inputBlockPayload = 96 * 1024
               , -- \^ overall size of txs to include in IBs
                 processingQueueBound = 100
+              , processingCores = Infinite
               , ..
               }
 
@@ -127,7 +128,7 @@ traceRelayLink1 tcpprops =
           <$> leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA]
           <*> leiosNode (nodeTracer nodeB) (leiosNodeConfig nodeB) [pB] [cB]
       mapM_ forkIO threads
-      forever $ threadDelaySI 1000
+      forever $ threadDelay 1000
  where
   (nodeA, nodeB) = (NodeId 0, NodeId 1)
 

@@ -14,7 +14,6 @@ import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.List (foldl1', mapAccumL, zip4)
 import Data.Ratio ((%))
-import qualified Data.Time as Time
 import Data.Tree as Tree (Tree (..))
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Pango.Cairo as Pango
@@ -22,6 +21,7 @@ import qualified Graphics.Rendering.Pango.Font as Pango
 import qualified Graphics.Rendering.Pango.Layout as Pango
 import Graphics.UI.Gtk (AttrOp ((:=)))
 import qualified Graphics.UI.Gtk as Gtk
+import Text.Printf (printf)
 import TimeCompat
 
 ------------------------------------------------------------------------------
@@ -98,7 +98,7 @@ stepModelWithTime VizModel{stepModel} fps (time, frameno, model) =
     | frameno' `mod` fps == 0 =
         Time (fromIntegral (frameno' `div` fps) :: DiffTime)
     | otherwise =
-        addTime (1 / fromIntegral fps :: DiffTime) time
+        addTime (secondsToDiffTime (1 / fromIntegral fps)) time
 
   !timestep = time' `diffTime` time
 
@@ -710,8 +710,7 @@ layoutLabelTime =
     Cairo.moveTo 5 20
     Cairo.setFontSize 20
     Cairo.setSourceRGB 0 0 0
-    Cairo.showText $
-      Time.formatTime Time.defaultTimeLocale "Time (sec): %-2Es" t
+    Cairo.showText (printf "Time (sec): %.2fs" (diffTimeToSeconds t) :: String)
 
 layoutLabel :: Int -> String -> Layout (VizRender model)
 layoutLabel size label =

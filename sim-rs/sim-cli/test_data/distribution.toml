@@ -1,0 +1,969 @@
+[[countries]]
+name = "C1"
+
+[[countries.regions]]
+id = 0
+latitude = -38.03622568487944
+longitude = -63.21786956751585
+proportion = 3
+
+[[countries.regions]]
+id = 1
+latitude = -38.31629216052825
+longitude = -63.283501143193426
+proportion = 7
+
+[[countries]]
+name = "C2"
+
+[[countries.regions]]
+id = 2
+latitude = -27.903358703787422
+longitude = 127.67645801341341
+proportion = 1
+
+[[countries.regions]]
+id = 3
+latitude = -22.563199437929626
+longitude = 129.37291921467693
+proportion = 16
+
+[[countries.regions]]
+id = 4
+latitude = -28.63657457949694
+longitude = 138.63961103494248
+proportion = 6
+
+[[countries.regions]]
+id = 5
+latitude = -31.090838651693197
+longitude = 132.59446395622837
+proportion = 7
+
+[[countries.regions]]
+id = 6
+latitude = -19.31906223227333
+longitude = 132.29101430227
+proportion = 171
+
+[[countries.regions]]
+id = 7
+latitude = -21.224128344988227
+longitude = 129.03942737404867
+proportion = 201
+
+[[countries.regions]]
+id = 8
+latitude = -30.83734777648009
+longitude = 136.1642980270293
+proportion = 29
+
+[[countries.regions]]
+id = 9
+latitude = -28.795240759497837
+longitude = 139.92499354417345
+proportion = 42
+
+[[countries.regions]]
+id = 10
+latitude = -30.332885859650194
+longitude = 138.74926789389139
+proportion = 2
+
+[[countries.regions]]
+id = 11
+latitude = -29.95082937429092
+longitude = 133.3637964134825
+proportion = 6
+
+[[countries.regions]]
+id = 12
+latitude = -23.896130513119317
+longitude = 131.4937156000215
+proportion = 16
+
+[[countries.regions]]
+id = 13
+latitude = -19.61272338853232
+longitude = 135.1545931571488
+proportion = 3
+
+[[countries.regions]]
+id = 14
+latitude = -26.832724955093827
+longitude = 139.1694230602141
+proportion = 1
+
+[[countries.regions]]
+id = 15
+latitude = -24.468805693320128
+longitude = 130.69368039148944
+proportion = 1
+
+[[countries.regions]]
+id = 16
+latitude = -21.546419214883716
+longitude = 128.67582201544687
+proportion = 37
+
+[[countries]]
+name = "C3"
+
+[[countries.regions]]
+id = 17
+latitude = 49.29104873400595
+longitude = 16.595818282073935
+proportion = 1
+
+[[countries.regions]]
+id = 18
+latitude = 48.95199023630058
+longitude = 14.110879968123232
+proportion = 2
+
+[[countries.regions]]
+id = 19
+latitude = 46.12556087101831
+longitude = 12.423836346870372
+proportion = 2
+
+[[countries.regions]]
+id = 20
+latitude = 47.698378835822524
+longitude = 14.89321854192006
+proportion = 2
+
+[[countries.regions]]
+id = 21
+latitude = 44.899695501461
+longitude = 15.711979943551219
+proportion = 1
+
+[[countries.regions]]
+id = 22
+latitude = 46.72604761431705
+longitude = 12.384213453986623
+proportion = 5
+
+[[countries.regions]]
+id = 23
+latitude = 48.323852050799005
+longitude = 15.16931751299782
+proportion = 1
+
+[[countries.regions]]
+id = 24
+latitude = 50.154265210800816
+longitude = 12.311993421978526
+proportion = 6
+
+[[countries.regions]]
+id = 25
+latitude = 45.24039693559121
+longitude = 13.283797620952546
+proportion = 122
+
+[[countries]]
+name = "C4"
+
+[[countries.regions]]
+id = 26
+latitude = 50.04986310708063
+longitude = 3.5397527350081406
+proportion = 2
+
+[[countries.regions]]
+id = 27
+latitude = 49.752962232649296
+longitude = 4.449316638398279
+proportion = 1
+
+[[countries.regions]]
+id = 28
+latitude = 50.97574864822745
+longitude = 3.813948317245704
+proportion = 1
+
+[[countries.regions]]
+id = 29
+latitude = 50.30128192099148
+longitude = 4.6464021350919396
+proportion = 92
+
+[[countries]]
+name = "C5"
+
+[[countries.regions]]
+id = 31
+latitude = -14.12222268391826
+longitude = -52.24277992791333
+proportion = 201
+
+[[countries.regions]]
+id = 32
+latitude = -14.796105649082362
+longitude = -52.39670796997153
+proportion = 42
+
+[[countries.regions]]
+id = 33
+latitude = -13.961388971969006
+longitude = -51.93110002493603
+proportion = 3
+
+[[countries]]
+name = "C6"
+
+[[countries.regions]]
+id = 34
+latitude = 42.359354728093194
+longitude = 25.844554937940487
+proportion = 1
+
+[[countries.regions]]
+id = 35
+latitude = 42.53669652407704
+longitude = 25.19288670791111
+proportion = 1
+
+[[countries]]
+name = "C7"
+
+[[countries.regions]]
+id = 36
+latitude = 58.952042549000055
+longitude = -104.71499367963793
+proportion = 19
+
+[[countries.regions]]
+id = 37
+latitude = 53.77078865750063
+longitude = -99.53064361970875
+proportion = 3
+
+[[countries.regions]]
+id = 38
+latitude = 57.74711118462347
+longitude = -108.33402655860122
+proportion = 12
+
+[[countries.regions]]
+id = 39
+latitude = 59.21821784344146
+longitude = -107.80617346919257
+proportion = 4
+
+[[countries.regions]]
+id = 40
+latitude = 56.544567276981994
+longitude = -104.44591636867263
+proportion = 1
+
+[[countries.regions]]
+id = 41
+latitude = 50.944723524184326
+longitude = -99.88672114853294
+proportion = 4
+
+[[countries.regions]]
+id = 42
+latitude = 49.95305213998074
+longitude = -108.47118067349551
+proportion = 3
+
+[[countries.regions]]
+id = 43
+latitude = 59.30681208050421
+longitude = -105.51340070150637
+proportion = 6
+
+[[countries.regions]]
+id = 44
+latitude = 55.238844204051695
+longitude = -107.00376717576817
+proportion = 5
+
+[[countries.regions]]
+id = 45
+latitude = 63.10892054914455
+longitude = -112.77222567846815
+proportion = 34
+
+[[countries.regions]]
+id = 46
+latitude = 60.15660696009593
+longitude = -106.09576599665871
+proportion = 1
+
+[[countries.regions]]
+id = 47
+latitude = 55.10552066341502
+longitude = -102.52566582138992
+proportion = 73
+
+[[countries.regions]]
+id = 48
+latitude = 61.85563914662925
+longitude = -108.62331138523027
+proportion = 171
+
+[[countries.regions]]
+id = 49
+latitude = 49.26336897636078
+longitude = -107.82770098451819
+proportion = 201
+
+[[countries.regions]]
+id = 50
+latitude = 51.95950602851039
+longitude = -100.15516405725722
+proportion = 1
+
+[[countries.regions]]
+id = 51
+latitude = 57.59805276992398
+longitude = -99.40112787039384
+proportion = 1
+
+[[countries.regions]]
+id = 52
+latitude = 54.4984115812133
+longitude = -112.16436609959133
+proportion = 42
+
+[[countries.regions]]
+id = 53
+latitude = 53.380545331627445
+longitude = -108.7779735984088
+proportion = 2
+
+[[countries.regions]]
+id = 54
+latitude = 59.08237161992423
+longitude = -111.31578180608575
+proportion = 13
+
+[[countries.regions]]
+id = 55
+latitude = 52.70174473777992
+longitude = -113.5510242652841
+proportion = 1
+
+[[countries.regions]]
+id = 56
+latitude = 61.56607833437275
+longitude = -111.60361409933698
+proportion = 2
+
+[[countries.regions]]
+id = 57
+latitude = 49.13642069722209
+longitude = -108.00831321147693
+proportion = 1
+
+[[countries.regions]]
+id = 58
+latitude = 55.18569181022074
+longitude = -109.33378823958442
+proportion = 16
+
+[[countries.regions]]
+id = 59
+latitude = 60.09694107522817
+longitude = -107.30080313720406
+proportion = 1
+
+[[countries.regions]]
+id = 60
+latitude = 59.404927526661666
+longitude = -107.35121705180151
+proportion = 1
+
+[[countries.regions]]
+id = 61
+latitude = 57.291569905100374
+longitude = -105.42348670791762
+proportion = 92
+
+[[countries]]
+name = "C8"
+
+[[countries.regions]]
+id = 64
+latitude = 36.849512608671404
+longitude = 103.44729100445589
+proportion = 2
+
+[[countries.regions]]
+id = 65
+latitude = 35.14046029582054
+longitude = 105.15234367263665
+proportion = 26
+
+[[countries.regions]]
+id = 66
+latitude = 35.4291506049424
+longitude = 104.47143621736731
+proportion = 1
+
+[[countries.regions]]
+id = 67
+latitude = 36.114681328910464
+longitude = 103.22289342026848
+proportion = 2
+
+[[countries.regions]]
+id = 68
+latitude = 35.843373349345775
+longitude = 104.33549327348169
+proportion = 92
+
+[[countries]]
+name = "C9"
+
+[[countries.regions]]
+id = 69
+latitude = 50.76739813904493
+longitude = 14.704948574478248
+proportion = 2
+
+[[countries.regions]]
+id = 70
+latitude = 47.7317610101286
+longitude = 17.16734213689404
+proportion = 1
+
+[[countries.regions]]
+id = 71
+latitude = 47.58336612727736
+longitude = 14.867679930732177
+proportion = 1
+
+[[countries.regions]]
+id = 72
+latitude = 51.25799029080064
+longitude = 16.658516518620143
+proportion = 1
+
+[[countries.regions]]
+id = 73
+latitude = 51.31955317947126
+longitude = 17.217095335738826
+proportion = 1
+
+[[countries.regions]]
+id = 74
+latitude = 51.340043813522236
+longitude = 14.80769471338966
+proportion = 1
+
+[[countries.regions]]
+id = 75
+latitude = 51.02903046366674
+longitude = 15.214886374233519
+proportion = 1
+
+[[countries.regions]]
+id = 76
+latitude = 48.62914640312075
+longitude = 15.367765306943351
+proportion = 1
+
+[[countries]]
+name = "C10"
+
+[[countries.regions]]
+id = 77
+latitude = 56.6948678228339
+longitude = 8.803560693996799
+proportion = 1
+
+[[countries.regions]]
+id = 78
+latitude = 56.42235733286618
+longitude = 8.932698470436963
+proportion = 1
+
+[[countries.regions]]
+id = 79
+latitude = 56.5598909295043
+longitude = 8.953292132354894
+proportion = 1
+
+[[countries]]
+name = "C11"
+
+[[countries.regions]]
+id = 80
+latitude = 58.48766811741532
+longitude = 24.82782530954769
+proportion = 2
+
+[[countries.regions]]
+id = 81
+latitude = 58.677570895853826
+longitude = 24.84402855366961
+proportion = 2
+
+[[countries]]
+name = "C12"
+
+[[countries.regions]]
+id = 84
+latitude = 47.10888589828341
+longitude = 1.2936786256131705
+proportion = 4
+
+[[countries.regions]]
+id = 85
+latitude = 49.04127399007976
+longitude = 0.6651778272642694
+proportion = 1
+
+[[countries.regions]]
+id = 86
+latitude = 45.24221410948164
+longitude = 4.969648221629742
+proportion = 41
+
+[[countries.regions]]
+id = 87
+latitude = 48.38826261008469
+longitude = 0.3161040673772135
+proportion = 7
+
+[[countries.regions]]
+id = 88
+latitude = 46.878763922736354
+longitude = 2.3837381167938285
+proportion = 13
+
+[[countries.regions]]
+id = 89
+latitude = 47.23663715513184
+longitude = 0.8011076201473064
+proportion = 3
+
+[[countries.regions]]
+id = 90
+latitude = 47.947611147638526
+longitude = 3.4071646220671266
+proportion = 171
+
+[[countries.regions]]
+id = 91
+latitude = 46.77326631336265
+longitude = 3.645731856185181
+proportion = 201
+
+[[countries.regions]]
+id = 92
+latitude = 48.75800804790642
+longitude = 5.147497414067944
+proportion = 1
+
+[[countries.regions]]
+id = 93
+latitude = 46.46523501117245
+longitude = 1.066741980744025
+proportion = 2
+
+[[countries.regions]]
+id = 94
+latitude = 45.08169575506519
+longitude = 3.386373139959387
+proportion = 42
+
+[[countries]]
+name = "C13"
+
+[[countries.regions]]
+id = 95
+latitude = 45.92478517533928
+longitude = 6.632490218301066
+proportion = 2
+
+[[countries.regions]]
+id = 96
+latitude = 42.96092695744504
+longitude = 2.2705431361655712
+proportion = 3
+
+[[countries.regions]]
+id = 97
+latitude = 42.24198413992377
+longitude = 10.624802183849969
+proportion = 2
+
+[[countries.regions]]
+id = 98
+latitude = 53.33937913963886
+longitude = 2.9813917162026886
+proportion = 2
+
+[[countries.regions]]
+id = 99
+latitude = 55.259146889153584
+longitude = 7.416938140808958
+proportion = 9
+
+[[countries.regions]]
+id = 100
+latitude = 55.07599541826343
+longitude = 16.426805946789354
+proportion = 34
+
+[[countries.regions]]
+id = 101
+latitude = 45.95650270659978
+longitude = 3.9040996667798176
+proportion = 41
+
+[[countries.regions]]
+id = 102
+latitude = 59.91654395461519
+longitude = 20.007431708293403
+proportion = 5
+
+[[countries.regions]]
+id = 103
+latitude = 48.26271206495175
+longitude = 17.208886181005994
+proportion = 73
+
+[[countries.regions]]
+id = 104
+latitude = 46.97571017791253
+longitude = 6.2060064487606
+proportion = 1
+
+[[countries.regions]]
+id = 105
+latitude = 48.58518838549018
+longitude = 19.200474818611355
+proportion = 171
+
+[[countries]]
+name = "C14"
+
+[[countries.regions]]
+id = 124
+latitude = 39.50751151244664
+longitude = 21.80015790649443
+proportion = 1
+
+[[countries.regions]]
+id = 125
+latitude = 38.634559564109324
+longitude = 22.327672454336213
+proportion = 1
+
+[[countries.regions]]
+id = 126
+latitude = 39.0123085144993
+longitude = 22.33831604515428
+proportion = 1
+
+[[countries]]
+name = "C15"
+
+[[countries.regions]]
+id = 127
+latitude = 47.62341580124913
+longitude = 19.688840557183973
+proportion = 1
+
+[[countries.regions]]
+id = 128
+latitude = 46.7605723510406
+longitude = 18.979621339392736
+proportion = 1
+
+[[countries.regions]]
+id = 129
+latitude = 47.12566307178612
+longitude = 18.98026405189281
+proportion = 1
+
+[[countries]]
+name = "C16"
+
+[[countries.regions]]
+id = 130
+latitude = 20.724591147386846
+longitude = 77.76133626781902
+proportion = 73
+
+[[countries.regions]]
+id = 131
+latitude = 20.490149942792588
+longitude = 78.47414710451949
+proportion = 171
+
+[[countries.regions]]
+id = 132
+latitude = 21.248123956411927
+longitude = 77.78772843548016
+proportion = 201
+
+[[countries.regions]]
+id = 133
+latitude = 21.120106295544264
+longitude = 80.11130927891365
+proportion = 6
+
+[[countries.regions]]
+id = 134
+latitude = 19.356115387334555
+longitude = 78.78209680944431
+proportion = 37
+
+[[countries.regions]]
+id = 135
+latitude = 19.742624921992615
+longitude = 78.1508278130722
+proportion = 92
+
+[[countries]]
+name = "C17"
+
+[[countries.regions]]
+id = 136
+latitude = 0.05960660593535316
+longitude = 113.86662241866465
+proportion = 2
+
+[[countries.regions]]
+id = 137
+latitude = 0.07262134117597852
+longitude = 114.01891677464067
+proportion = 1
+
+[[countries.regions]]
+id = 138
+latitude = -0.901284019226692
+longitude = 114.7353020070326
+proportion = 92
+
+
+[[countries]]
+name = "C18"
+
+[[countries.regions]]
+id = 140
+latitude = 53.002139260468624
+longitude = -8.61215975408745
+proportion = 34
+
+[[countries.regions]]
+id = 141
+latitude = 52.97285513274569
+longitude = -8.027760258170735
+proportion = 201
+
+[[countries.regions]]
+id = 142
+latitude = 53.81269469780404
+longitude = -8.758941328095156
+proportion = 6
+
+[[countries]]
+name = "C19"
+
+[[countries.regions]]
+id = 145
+latitude = 39.446969252080386
+longitude = 13.093374794815025
+proportion = 1
+
+[[countries.regions]]
+id = 146
+latitude = 40.76744693161533
+longitude = 13.72199092458278
+proportion = 5
+
+[[countries.regions]]
+id = 147
+latitude = 42.92358917679721
+longitude = 13.256675928535225
+proportion = 1
+
+[[countries.regions]]
+id = 148
+latitude = 39.56304249789992
+longitude = 11.15918703469292
+proportion = 3
+
+[[countries.regions]]
+id = 149
+latitude = 43.888090250237056
+longitude = 11.027202765677176
+proportion = 1
+
+[[countries.regions]]
+id = 150
+latitude = 44.36156410441219
+longitude = 10.699340070898216
+proportion = 2
+
+[[countries.regions]]
+id = 151
+latitude = 42.21145819623264
+longitude = 13.268210391159535
+proportion = 1
+
+[[countries.regions]]
+id = 152
+latitude = 41.755092827972916
+longitude = 11.591525942736776
+proportion = 42
+
+[[countries.regions]]
+id = 153
+latitude = 40.00229570313413
+longitude = 10.902482570222954
+proportion = 1
+
+[[countries.regions]]
+id = 154
+latitude = 40.886276537394075
+longitude = 13.352936147762328
+proportion = 3
+
+[[countries.regions]]
+id = 155
+latitude = 41.225272242075846
+longitude = 14.797946639245069
+proportion = 1
+
+[[countries]]
+name = "C20"
+
+[[countries.regions]]
+id = 156
+latitude = 33.64011161555008
+longitude = 135.1763230125189
+proportion = 10
+
+[[countries.regions]]
+id = 157
+latitude = 41.25024643885934
+longitude = 139.07594733995347
+proportion = 4
+
+[[countries.regions]]
+id = 158
+latitude = 31.462290257397612
+longitude = 135.02539218948905
+proportion = 4
+
+[[countries.regions]]
+id = 159
+latitude = 34.782592684494794
+longitude = 143.19753718507124
+proportion = 4
+
+[[countries.regions]]
+id = 160
+latitude = 33.26167406592714
+longitude = 141.3099923667399
+proportion = 2
+
+[[countries.regions]]
+id = 161
+latitude = 31.76433460540997
+longitude = 141.7260550935049
+proportion = 1
+
+[[countries.regions]]
+id = 162
+latitude = 41.48662872159862
+longitude = 142.46078663861252
+proportion = 8
+
+[[countries.regions]]
+id = 163
+latitude = 36.3669129309687
+longitude = 134.47594402590846
+proportion = 3
+
+[[countries.regions]]
+id = 164
+latitude = 39.58782352504376
+longitude = 135.69483200880057
+proportion = 1
+
+[[countries.regions]]
+id = 165
+latitude = 38.52483220275795
+longitude = 138.47440849677793
+proportion = 6
+
+[[countries.regions]]
+id = 166
+latitude = 31.726549900295236
+longitude = 133.84183198091998
+proportion = 1
+
+[[countries.regions]]
+id = 167
+latitude = 40.5927684465004
+longitude = 141.3632477796972
+proportion = 201
+
+[[countries.regions]]
+id = 168
+latitude = 39.63369450368333
+longitude = 138.11590520239082
+proportion = 2
+
+[[countries.regions]]
+id = 169
+latitude = 32.447868887244006
+longitude = 136.67452062674238
+proportion = 29
+
+[[countries.regions]]
+id = 170
+latitude = 39.30677752996972
+longitude = 137.91417569566357
+proportion = 42
+
+[[countries.regions]]
+id = 171
+latitude = 30.99434948138098
+longitude = 142.32475013959876
+proportion = 1
+
+[[countries.regions]]
+id = 172
+latitude = 37.642420012888884
+longitude = 133.89748019156613
+proportion = 5
+
+[[countries.regions]]
+id = 173
+latitude = 38.60088452869515
+longitude = 136.97471384271424
+proportion = 6
+
+[[countries]]
+name = "C20"
+
+[[countries.regions]]
+id = 181
+latitude = 55.50282993857809
+longitude = 23.86451601619407
+proportion = 2
+
+[[countries.regions]]
+id = 182
+latitude = 55.968174970389164
+longitude = 23.627220814161767
+proportion = 3
+
+[[countries.regions]]
+id = 183
+latitude = 54.45237046282806
+longitude = 24.280717753169355
+proportion = 3

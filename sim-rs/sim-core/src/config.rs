@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 use netsim_async::geo::{self, Location};
+use num_traits::One as _;
 use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
@@ -70,6 +71,17 @@ pub struct RawConfig {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
+    pub tx_validation_cpu_time_ms: f64,
+    pub block_generation_cpu_time_ms: f64,
+    pub block_validation_cpu_time_ms: f64,
+    pub certificate_generation_cpu_time_ms: f64,
+    pub certificate_validation_cpu_time_ms: f64,
+    pub ib_generation_cpu_time_ms: f64,
+    pub ib_validation_cpu_time_ms: f64,
+    pub eb_generation_cpu_time_ms: f64,
+    pub eb_validation_cpu_time_ms: f64,
+    pub vote_generation_cpu_time_ms: f64,
+    pub vote_validation_cpu_time_ms: f64,
     pub transaction_frequency_ms: DistributionConfig,
     pub transaction_size_bytes: DistributionConfig,
 }
@@ -79,6 +91,10 @@ pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
     pub region: Option<String>,
+    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
+    pub cpu_multiplier: f64,
+    #[serde(default)]
+    pub cores: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,6 +114,8 @@ impl From<RawConfig> for SimConfiguration {
                 id: NodeId::new(index),
                 location: to_netsim_location(raw.location),
                 stake: raw.stake.unwrap_or_default(),
+                cpu_multiplier: raw.cpu_multiplier,
+                cores: raw.cores,
                 peers: vec![],
             })
             .collect();
@@ -132,6 +150,39 @@ impl From<RawConfig> for SimConfiguration {
             max_ib_requests_per_peer: value.max_ib_requests_per_peer,
             ib_shards: value.ib_shards,
             one_vote_per_vrf: value.one_vote_per_vrf,
+            tx_validation_cpu_time: Duration::from_secs_f64(
+                value.tx_validation_cpu_time_ms / 1000.0,
+            ),
+            block_generation_cpu_time: Duration::from_secs_f64(
+                value.block_generation_cpu_time_ms / 1000.0,
+            ),
+            block_validation_cpu_time: Duration::from_secs_f64(
+                value.block_validation_cpu_time_ms / 1000.0,
+            ),
+            certificate_generation_cpu_time: Duration::from_secs_f64(
+                value.certificate_generation_cpu_time_ms / 1000.0,
+            ),
+            certificate_validation_cpu_time: Duration::from_secs_f64(
+                value.certificate_validation_cpu_time_ms / 1000.0,
+            ),
+            ib_generation_cpu_time: Duration::from_secs_f64(
+                value.ib_generation_cpu_time_ms / 1000.0,
+            ),
+            ib_validation_cpu_time: Duration::from_secs_f64(
+                value.ib_validation_cpu_time_ms / 1000.0,
+            ),
+            eb_generation_cpu_time: Duration::from_secs_f64(
+                value.eb_generation_cpu_time_ms / 1000.0,
+            ),
+            eb_validation_cpu_time: Duration::from_secs_f64(
+                value.eb_validation_cpu_time_ms / 1000.0,
+            ),
+            vote_generation_cpu_time: Duration::from_secs_f64(
+                value.vote_generation_cpu_time_ms / 1000.0,
+            ),
+            vote_validation_cpu_time: Duration::from_secs_f64(
+                value.vote_validation_cpu_time_ms / 1000.0,
+            ),
             transaction_frequency_ms: value.transaction_frequency_ms.into(),
             transaction_size_bytes: value.transaction_size_bytes.into(),
         }
@@ -160,6 +211,17 @@ pub struct SimConfiguration {
     pub max_ib_requests_per_peer: usize,
     pub ib_shards: u64,
     pub one_vote_per_vrf: bool,
+    pub tx_validation_cpu_time: Duration,
+    pub block_generation_cpu_time: Duration,
+    pub block_validation_cpu_time: Duration,
+    pub certificate_generation_cpu_time: Duration,
+    pub certificate_validation_cpu_time: Duration,
+    pub ib_generation_cpu_time: Duration,
+    pub ib_validation_cpu_time: Duration,
+    pub eb_generation_cpu_time: Duration,
+    pub eb_validation_cpu_time: Duration,
+    pub vote_generation_cpu_time: Duration,
+    pub vote_validation_cpu_time: Duration,
     pub transaction_frequency_ms: FloatDistribution,
     pub transaction_size_bytes: FloatDistribution,
 }
@@ -169,6 +231,7 @@ impl SimConfiguration {
         // The graph must be nonempty and fully connected,
         // and every link must be between two nodes which exist
         let mut connected_nodes = HashSet::new();
+        let mut self_connected_nodes = vec![];
         let mut frontier = VecDeque::new();
         let first_node = self
             .nodes
@@ -178,6 +241,9 @@ impl SimConfiguration {
         while let Some(node) = frontier.pop_front() {
             if connected_nodes.insert(node.id) {
                 for peer_id in &node.peers {
+                    if node.id == *peer_id {
+                        self_connected_nodes.push(node.id);
+                    }
                     let peer = self
                         .nodes
                         .get(peer_id.0)
@@ -185,6 +251,12 @@ impl SimConfiguration {
                     frontier.push_back(peer);
                 }
             }
+        }
+        if !self_connected_nodes.is_empty() {
+            bail!(
+                "{} node(s) are connected to themselves!",
+                self_connected_nodes.len()
+            );
         }
         if connected_nodes.len() < self.nodes.len() {
             bail!("Graph must be fully connected!");
@@ -213,6 +285,8 @@ pub struct NodeConfiguration {
     pub id: NodeId,
     pub location: Location,
     pub stake: u64,
+    pub cpu_multiplier: f64,
+    pub cores: Option<u64>,
     pub peers: Vec<NodeId>,
 }
 

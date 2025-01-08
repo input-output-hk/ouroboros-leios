@@ -6,6 +6,10 @@
 
 module LeiosProtocol.Short.SimP2P where
 
+import ChanMux (newConnectionBundleTCP)
+import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -13,14 +17,8 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import Data.List (unfoldr)
-import qualified Data.Map.Strict as Map
-import System.Random (StdGen, split)
-
-import ChanMux (newConnectionBundleTCP)
-import ChanTCP
-import Control.Monad (forever)
-import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as Map
 import LeiosProtocol.Common
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -28,6 +26,7 @@ import LeiosProtocol.Short.Sim
 import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
+import System.Random (StdGen, split)
 
 traceLeiosP2P ::
   StdGen ->
@@ -90,7 +89,7 @@ traceLeiosP2P
                 (Map.keys p2pNodes)
                 (unfoldr (Just . split) rng0)
           ]
-        forever $ threadDelaySI 1000
+        forever $ threadDelay 1000
    where
     tracer :: Tracer (IOSim s) LeiosEvent
     tracer = simTracer
@@ -108,8 +107,8 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> Int -> P2PTopography -> LeiosTrace
-exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} =
+exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
   traceLeiosP2P
     rng0
     p2pTopography
@@ -126,6 +125,7 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} =
       , rankingBlockPayload = 0
       , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
+      , processingCores
       , nodeId
       , rng
       }

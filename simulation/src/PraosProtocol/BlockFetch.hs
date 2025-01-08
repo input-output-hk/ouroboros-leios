@@ -600,7 +600,7 @@ setupValidatorThreads tracer cfg st n = do
   (waitingVar, processWaitingThread) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
   let doTask (delay, m) = do
         traceWith tracer . PraosNodeEventCPU . CPUTask $ delay
-        threadDelaySI delay
+        threadDelay delay
         m
 
   -- if we have the previous block, we process the task sequentially to provide back pressure on the queue.
@@ -647,7 +647,7 @@ processWaiting tracer npar blocksVar waitingVar = go
   parallelDelay xs = do
     let !d = maximum $ map fst xs
     forM_ xs $ traceWith tracer . CPUTask . fst
-    threadDelaySI d
+    threadDelay d
     mapM_ snd xs
   go = forever $ join $ atomically $ do
     waiting <- readTVar waitingVar
@@ -659,3 +659,20 @@ processWaiting tracer npar blocksVar waitingVar = go
     let chunks Nothing xs = [xs]
         chunks (Just m) xs = map (take m) . takeWhile (not . null) . iterate (drop m) $ xs
     return . mapM_ parallelDelay . chunks npar . concat . Map.elems $ toValidate
+
+processWaiting' ::
+  forall m a b.
+  (MonadSTM m, MonadDelay m) =>
+  TVar m (Map ConcreteHeaderHash a) ->
+  TVar m (Map ConcreteHeaderHash [m b]) ->
+  m ()
+processWaiting' blocksVar waitingVar = go
+ where
+  go = forever $ join $ atomically $ do
+    waiting <- readTVar waitingVar
+    when (Map.null waiting) retry
+    blocks <- readTVar blocksVar
+    let toValidate = Map.intersection waiting blocks
+    when (Map.null toValidate) retry
+    writeTVar waitingVar $! waiting Map.\\ toValidate
+    return . sequence_ . concat . Map.elems $ toValidate

@@ -153,16 +153,16 @@ jobs:
   ################################################################################
 
   sim-rs-check:
-    name: "sim-rs: Check"
+    name: "sim-rs: Test"
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check Rust packages compilation
+      - name: Test Rust packages
         working-directory: sim-rs
         run: |
-          cargo check
+          cargo test
           if [ $? -ne 0 ]; then
-            echo "Cargo check failed"
+            echo "Cargo test failed"
             exit 1
           fi
 

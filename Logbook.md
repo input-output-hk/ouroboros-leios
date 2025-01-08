@@ -1,5 +1,196 @@
 # Leios logbook
 
+## 2025-01-06
+
+### Rust simulation
+
+Added basic simulation of CPU usage/latency. Includes new "lottery won" events which can be used to identify the start of CPU processing ("generated" events identify the end).
+
+Every node has 4 simulated cores and takes the same amount of time to run CPU-bound tasks. (this is configurable per-node). TX validation and RB/IB/EB generation/validation each take one CPU task. Certificate CPU time is included as part of RB CPU time, for RBs with a certificate attached. Each vote is generated/validated as an independent CPU task, running as much in parallel as possible (and usually saturating all cores).
+
+All vCPU costs were copied from the cost estimator.
+
+## 2025-01-05
+
+### Summary update on DeltaQ
+
+- added MIN / MAX combinators to get best- and worst-case for simulation results
+- tried to make sense of those data sets, and failed
+  - Rust simulation best case does not match the analytically best behaviour conceivable by pure reasoning, the last 5% of nodes take far too long
+  - Haskell simulation best case is far too fast; ΔQ expression to match the result must assume >200 peers per node and no validation delay
+- I (Roland) must admit that this has become quite a frustrating exercise.
+  The theory seems nice and reasonable, but it stubbornly refuses to explain the simulation results.
+  I don't feel confident pursuing this further regarding quick website experiments or extracting realistic resource usage predictions due to the above reasons.
+  Perhaps it just isn't applicable to the level of detail I am attempting, but to me that would be a red flag in general and it sure would mean that offering it to a wider audience has a high potential for misleading people.
+  My recommendation is to conclude that this work stream has failed.
+
+## 2025-01-03
+
+### Belated summary of discussion and requests during Dec 17 Q&A
+
+- Throughput dashboard
+  - Make it into a formal website after cleaning it up
+    - It can become a special-purpose web asset
+    - Or part of a Leios micro site
+  - It is useful as an explainer of the web of tradeoffs involved with Leios and Cardano
+  - In essence it creates a game and helps folks understand different notions of "optimality"
+  - ACTION: Sync with Sam on next steps
+- How much "heart surgery" will Leios trigger?
+  - Ledger changes
+  - Data structures
+  - Ecosystem around Leios
+  - Technical dependencie
+  - In order to accelerate the transition to Leios, what downstream work can be done in parallel and prior to Leios being completed?
+- Can we use Mithril for proofs of equivocation?
+  - Helpful to know proof requirements
+  - Coordinate with mithril voting
+  - What zk variants do we have in mind?
+  - ACTION: Brian will create diagram with options and suboptions
+- What gets committed by Leios certificates in the Praos blocks?
+  - The proof is for availability and correctness of Leios IBs, EBs, and votes
+- Elasticity and adaptability of nodes
+  - Mempool is like a distributed database
+  - Could it be sized to throughput of system?
+  - All nodes can make meaningful contribution
+    - "Supernodes" vs Raspberry Pis
+  - Sharding according to resources
+  - Self-regulation system instead of manual tuning
+    - Ideally, it would measure and adapt
+    - Likely beyond current scope for Leios
+  - ACTION: create a ledger of "nice to have" functionality and of potential follow-up papers
+- How might/do emerging hydra protocols interact with the L1? How will this look in the world of leios?
+  - Tail protocols
+  - ZK rollups in the Hydra heads
+  - Align roadmaps and coordinate reuse
+  - Share "common DNA" on the proof and network sides
+  - What level of isomorphism exists among transactions in the layers?
+  - Rollups could use Blob Leios functionality
+  - Attend each others' working groups: Midgard, Gummiworms, ZKfold, Mithril
+    - For Leios, a new devrel play this role of attending other project's meetings
+  - ACTION: Nicolas
+
+### Updates to cost dashboard
+
+The cost dashboard was updated with improved input parameters and computations:
+
+- Lengthen phases and reduced EB rate, per analysis in technical report.
+- Updated CPU costs for votes and certificates, per analysis in technical report.
+- Revised IOPS values, based upon empirical data from Cardano nodes operating in production.
+- Updated Agda code to align with web interface, and cross-checked.
+
+Further updates will require calibration data from the Haskell and Rust simulations for Leios.
+
+## 2025-01-02
+
+### Benchmarking BLS signatures and aggregate verifications
+
+The construction and verification BLS votes were benchmarked using the Rust [bls-signatures](https://lib.rs/crates/bls-signatures) package. Note that aggregate verification speeds the process significantly.
+
+| Operation                            |       CPU time |
+| ------------------------------------ | -------------: |
+| Signing an item                      | 1.369±0.030 ms |
+| Verifying a single item              | 1.662±0.090 ms |
+| Verifying an aggregate of 500 items  |    55.3±5.3 ms |
+| Verifying an aggregate of 1000 items |    100.±20. ms |
+
+![Benchmark for verifying an aggregate BLS signature](images/bls-verification.svg)
+
+Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
+
+- Number of votes: 500
+- Quorum: 60%
+- Vote size: 250 B / vote
+- Certificate size: 75 kB / vote
+- Generate vote: 2 ms / vote
+- Verify vote: 3 ms / vote
+- Generate certificate: 50 ms / certificate + 0.5 ms / vote
+- Verify certificate: 50 ms / certificate + 0.5 ms / vote
+
+## 2024-12-27
+
+### Votes and certificates
+
+- Updated size estimates for votes.
+- Added CPU time estimates for BLS votes and certificates.
+- Wrote technical report sections on BLS and MUSEN certificates.
+
+### Sortition
+
+Analyses of sortition for IBs, EBs, and votes were made and added to the draft of the first technical report.
+
+- All of the sortition is based on Bernoulli trials for each stake of lovelace.
+- A probabilistic analysis shows that splitting stake among many nodes only provides a minor benefit in winning the lottery more times.
+- The IB lottery is per-slot and limits a node to building a maximum of one IB per slot.
+  - Careful selection of protocol parameters ensures a high probability of at least one IB in each pipeline.
+- The EB lottery is per-pipeline and limits a node to building a maximum of one EB per pipeline.
+  - The formulation of the EB lottery implies that there will always be a significant chance that a pipeline contains no EB.
+  - Setting protocol parameters so that there is a high probability of an EB in a pipeline makes the protocol more susceptible to influence by adversaries with significant stake.
+  - However, the unevenness in stake distribution or splitting of adversarial stake does not exacerbate the situation.
+- The pipeline length should be several multiples of the inverse of the active-slot coefficient, in order that there is a high probability for an RB to be available for an EB certificate.
+- The vote lottery can award multiple votes to the same node if they have a lot of stake and are luck.
+  - Nodes nearly saturated with stake have an appreciable chance of receiving several votes.
+  - The mathematics and code for determining from the VRF the number of votes a node winds is more complex and involves complications to avoid floating-point computations.
+  - Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+
+## 2024-12-23
+
+### Rust simulation
+
+Abandoned Waxman graph generation, using a simpler distance-weighted approach that gives more control over connectivity of the graph.
+
+## 2024-12-20
+
+### Haskell simulation
+
+- Added support for bounded and unbounded parallesim to leios node.
+  - shot-leios-p2p-1 takes -N flag to control number of cores.
+  - visualization charts number of cores active at that time per node
+    - with unbounded parallelism we currently see spikes of even
+          13 right after vote diffusion.
+  - TODO: consider whether an aggregate measure would improve readability.
+- Fixed Relay protocol messages to always have size > 0
+  - Probable cause of out of order delivery experienced
+    with pipelined peers.
+  - Simplified ChanTCP to use a simple queue, so ordered delivery is
+    guaranteed regardless of forecasted time.
+
+Next steps:
+
+- Load protocol configuration from disk, and write out event log.
+- Investigate low rate of EB inclusion in RB, and implementation
+  correctness more generally.
+- Run larger leios p2p networks in simulation mode to collect metrics.
+
+## 2024-12-19
+
+### Revised analysis of votes and certificates
+
+Analysis and discussion of the cryptographic options for Leios votes and certificates has clarified the key challenges and constraints involved in selecting algorithms and formats. Several options still exist, but some have been eliminated.
+
+![Cryptographic options for Leios certificates](https://github.com/user-attachments/assets/58bafab1-81ba-46ed-8944-09151298cde7)
+
+Research is continuing, but interim findings indicate that BLS is most viable for Leios.
+
+- ALBA is only viable if SNARKified.
+  - It is very unlikely that Leios votes could be made small enough to fit in non-SNARKified ALBA certificates.
+- BLS is likely viable, with or without SNARKification.
+  - Options exist for creating or verifying BLS certificates incrementally.
+- MUSEN is inferior to BLS in key metrics relevant for Leios.
+
+### Jupyter support for new DeltaQ
+
+The new high-performance [dq-revamp](https://github.com/DeltaQ-SD/dq-revamp) Haskell packages provide a polynomial-based implementation of DeltaQ, with many new combinators and a comprehensive property-based test suite. We created [nix derivations](https://github.com/functionally/dq-revamp-jupyter) for running this locally and for creating docker images. This new library can be used for cross-checking other DeltaQ implementations such as Leios's Rust code.
+
+### Rust simulation
+
+Diffusion time was higher than expected; this was because the test data had sparse networks, where nodes had few/distant peers.
+
+- Fixed a bug where nodes would link to themselves
+- Corrected distance calculations used when generating data; we use a cylindrical topology at runtime, but weren't using it at data generation time.
+- Tweaked parameters to the Waxman graph generation algorithm, to generate more connections and favor nearby neighbors more.
+
+Added basic unit tests for test data generation, running in CI.
+
 ## 2024-12-17
 
 ### GitHub Actions
@@ -13,6 +204,16 @@
 
   The jobs that relate to publishing the documentation are prefixed by `docs`, e.g., `build-docusaurus` changed to `docs-build`.
 
+### Rust simulation
+
+Started showing transaction throughput in the visualization.
+
+Tweaked settings of `thousand.toml` config to maximize throughput:
+
+- Allowing multiple votes per VRF lottery win, to make up for a lack of voters
+- Increasing stage length from 2 to 20, so that there is approximately one RB per stage
+- Generating many more transactions, to show benefit from increased throughput
+
 ### Haskell simulation
 
 - Merged code to run Praos and Leios visualisations from a file such as `data/BenchTopology/topology-dense-52-simple.json`, e.g., run:
@@ -23,6 +224,12 @@
 
 - Added HLint integration to check Haskell sources and ensure consistent use of module imports.
 - Added CI job for HLint named `simulation-hlint`.
+
+## 2024-12-16
+
+### Rust simulation
+
+Optimized virtual clock more; it's now lock-free, and the contention from the old implementation is gone.
 
 ## 2024-12-13
 
@@ -36,6 +243,10 @@
 - Reworked generation of EBs and Votes to handle `>= 1` frequencies
   like IBs (except max 1 EB per pipeline per node).
 - Visualizations helped with discovering and fixing some modeling errors.
+
+### Rust simulation
+
+Started making the visualization show aggregated stats.
 
 ## 2024-12-12
 

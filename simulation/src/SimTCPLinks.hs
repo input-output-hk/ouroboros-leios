@@ -1,4 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -13,7 +12,7 @@ import Control.Monad.Class.MonadAsync (
  )
 import Control.Monad.IOSim as IOSim (
   IOSim,
-  SimEvent (SimEvent, seTime, seType),
+  SimEvent (seType),
   SimEventType (EventLog),
   SimTrace,
   runSimTrace,
@@ -138,7 +137,7 @@ generatorNode tracer (UniformTrafficPattern nmsgs msgsz mdelay) chan = do
     [ do
       writeChan chan msg
       traceWith tracer (MsgDepart msg)
-      maybe (return ()) threadDelaySI mdelay
+      maybe (return ()) threadDelay mdelay
     | msg <- map (flip TestMessage msgsz) [0 .. nmsgs - 1]
     ]
 
@@ -196,9 +195,9 @@ selectTimedEvents =
   bifoldr
     (\_ _ -> [])
     ( \b acc -> case b of
-        SimEvent{seTime, seType}
-          | Just b' <- selectDynamic seType ->
-              (seTime, b') : acc
+        se
+          | Just b' <- selectDynamic (seType se) ->
+              (seTimeCompat se, b') : acc
         _ -> acc
     )
     []

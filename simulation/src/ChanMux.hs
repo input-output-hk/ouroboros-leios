@@ -148,7 +148,7 @@ demuxer bearer queues =
 
 newConnectionBundleTCP ::
   forall bundle m.
-  (MuxBundle bundle, MonadTime m, MonadMonotonicTime m, MonadDelay m, MonadAsync m, MessageSize (MuxMsg bundle), MonadMVar m, MonadFork m) =>
+  (MuxBundle bundle, MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize (MuxMsg bundle), MonadMVar m, MonadFork m) =>
   Tracer m (LabelTcpDir (TcpEvent (MuxMsg bundle))) ->
   TcpConnProps ->
   m (bundle (Chan m), bundle (Chan m))

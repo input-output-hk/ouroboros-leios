@@ -6,13 +6,13 @@
 module VizChart where
 
 import Data.Functor (void)
-import Data.List (minimumBy)
-import Data.Ord (comparing)
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Backend.Cairo as Chart
 import qualified Graphics.Rendering.Chart.Easy as Chart
 import TimeCompat
 
+import Data.Foldable (minimumBy)
+import Data.Ord (comparing)
 import ModelTCP
 import Viz
 
@@ -53,8 +53,8 @@ instance Chart.PlotValue DiffTime where
         (map show)
         10
         50
-  toValue = realToFrac
-  fromValue = realToFrac
+  toValue = diffTimeToSeconds
+  fromValue = secondsToDiffTime
 
 autoScaledAxis :: RealFrac a => Chart.LinearAxisParams a -> Chart.AxisFn a
 autoScaledAxis lap ps = scaledAxis lap rs ps

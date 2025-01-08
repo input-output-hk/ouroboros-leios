@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -6,7 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -18,7 +17,7 @@ import Chan (Chan)
 import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (void)
-import Control.Tracer (Tracer, traceWith)
+import Control.Tracer (Tracer)
 import Data.Maybe (fromMaybe)
 import Data.Type.Equality ((:~:) (Refl))
 import Network.TypedProtocol (
@@ -147,8 +146,9 @@ type ChainSyncMessage = ProtocolMessage ChainSyncState
 ---- ChainSync Consumer
 --------------------------------
 
-newtype ChainConsumerState m = ChainConsumerState
-  { chainVar :: TVar m (Chain BlockHeader)
+data ChainConsumerState m = ChainConsumerState
+  { chainVar :: !(TVar m (Chain BlockHeader))
+  , validateHeader :: !(BlockHeader -> m ())
   }
 
 runChainConsumer ::
@@ -170,7 +170,7 @@ chainConsumer ::
   PraosConfig body ->
   ChainConsumerState m ->
   ChainConsumer 'StIdle m ()
-chainConsumer tracer cfg (ChainConsumerState hchainVar) = idle True
+chainConsumer _tracer _cfg (ChainConsumerState{chainVar = hchainVar, ..}) = idle True
  where
   -- NOTE: The specification says to do an initial intersection with
   --       exponentially spaced points, and perform binary search to
@@ -204,9 +204,7 @@ chainConsumer tracer cfg (ChainConsumerState hchainVar) = idle True
   rollForward :: BlockHeader -> ChainConsumer 'StIdle m ()
   rollForward header =
     TC.Effect $ do
-      let !delay = cfg.headerValidationDelay header
-      traceWith tracer $ PraosNodeEventCPU (CPUTask delay)
-      threadDelaySI delay
+      validateHeader header
       atomically $ do
         modifyTVar' hchainVar $ Chain.addBlock header
         return $ idle False

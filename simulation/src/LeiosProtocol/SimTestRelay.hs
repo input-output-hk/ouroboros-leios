@@ -138,8 +138,8 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
-            , headerValidationDelay = const 0.1
-            , threadDelayParallel = sum >>> \d -> when (d >= 0) $ threadDelaySI d
+            , -- sequential validation of headers
+              validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll
@@ -174,7 +174,7 @@ relayNode
        where
         -- TODO: make different generators produce different non-overlapping ids
         go !blkid = do
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let blk =
                 TestBlock
@@ -192,7 +192,7 @@ relayNode
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
               gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
               blkid = TestBlockId blkidn
@@ -239,7 +239,7 @@ relayNode
     processing submitq =
       forever $ do
         (blks, completion) <- atomically $ readTQueue submitq
-        threadDelaySI (sum $ map blockProcessingDelay blks)
+        threadDelay (sum $ map blockProcessingDelay blks)
         _ <- atomically $ completion blks -- "relayNode: completions should not block"
         forM_ blks $ \blk -> traceWith tracer (RelayNodeEventEnterBuffer blk)
 
@@ -286,7 +286,7 @@ traceRelayLink1 tcpprops generationPattern =
           ( Set.fromList
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
-      (TestRelayBundle inChan, TestRelayBundle outChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
+      (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
         (relayNode (nodeTracer na) configNode0 [] [inChan])
         (relayNode (nodeTracer nb) configNode1 [outChan] [])
@@ -339,10 +339,10 @@ traceRelayLink4 tcpprops generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
-      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcpprops
-      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcpprops
-      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcpprops
+      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcpprops
+      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcpprops
+      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcpprops
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $
@@ -401,10 +401,10 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcppropsLong
-      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcppropsShort
-      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcppropsLong
-      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcppropsShort
+      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcppropsLong
+      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcppropsShort
+      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcppropsLong
+      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcppropsShort
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $

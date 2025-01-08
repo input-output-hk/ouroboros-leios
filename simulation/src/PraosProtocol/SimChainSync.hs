@@ -88,7 +88,8 @@ traceRelayLink1 tcpprops =
       return ()
  where
   consumerNode cfg chan = do
-    st <- ChainConsumerState <$> newTVarIO Chain.Genesis
+    let valHeader = threadDelay . cfg.headerValidationDelay
+    st <- ChainConsumerState <$> newTVarIO Chain.Genesis <*> pure valHeader
     let nullTracer = Tracer $ const $ return ()
     runChainConsumer nullTracer cfg chan st
   producerNode chan = do
