@@ -2,10 +2,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module SimTypes where
 
-import Data.Aeson.Types (FromJSON, FromJSONKey, ToJSON (..), ToJSONKey, defaultOptions, genericToEncoding)
+import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericToEncoding, object, typeMismatch, withObject, (.!=), (.:), (.:?))
+import Data.Default (Default (..))
 import Data.Hashable
 import Data.Ix (Ix)
 import Data.Text (Text)
@@ -48,10 +52,19 @@ data WorldShape
   | Cylinder
   deriving (Eq, Show, Generic, Bounded, Enum)
 
-instance ToJSON WorldShape where
-  toEncoding = genericToEncoding defaultOptions
+instance Default WorldShape where
+  def = Rectangle
 
-instance FromJSON WorldShape
+instance ToJSON WorldShape where
+  toJSON = \case
+    Rectangle -> String "rectangle"
+    Cylinder -> String "cylinder"
+
+instance FromJSON WorldShape where
+  parseJSON (String txt)
+    | txt == "rectangle" = pure Rectangle
+    | txt == "cylinder" = pure Cylinder
+  parseJSON value = typeMismatch "WorldShape" value
 
 data World = World
   { worldDimensions :: !WorldDimensions
@@ -59,7 +72,18 @@ data World = World
   }
   deriving (Eq, Show, Generic)
 
-instance ToJSON World where
-  toEncoding = genericToEncoding defaultOptions
+instance Default World where
+  def = World (0.6, 0.3) Rectangle
 
-instance FromJSON World
+instance ToJSON World where
+  toJSON World{..} =
+    object
+      [ "dimensions" .= worldDimensions
+      , "shape" .= worldShape
+      ]
+
+instance FromJSON World where
+  parseJSON = withObject "Word" $ \o -> do
+    worldDimensions <- o .: "dimensions"
+    worldShape <- o .:? "shape" .!= Rectangle
+    pure World{..}

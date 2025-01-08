@@ -39,12 +39,11 @@ import SimTCPLinks (mkTcpConnProps)
 import SimTypes
 import System.FilePath
 import System.Random (StdGen, mkStdGen)
-import qualified System.Random as Random
 import Viz
 
-example1 :: Int -> DiffTime -> Maybe P2PTopography -> Visualization
-example1 seed blockInterval maybeP2PTopography =
-  Viz model $
+example1 :: StdGen -> DiffTime -> P2PTopography -> Visualization
+example1 rng0 blockInterval p2pTopography =
+  Viz (praosSimVizModel (example1Trace rng0 blockInterval p2pTopography)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -73,23 +72,6 @@ example1 seed blockInterval maybeP2PTopography =
               ]
           ]
       ]
- where
-  rng0 = mkStdGen seed
-  (rng1, rng2) = Random.split rng0
-  p2pTopography =
-    flip fromMaybe maybeP2PTopography $
-      flip genArbitraryP2PTopography rng1 $
-        P2PTopographyCharacteristics
-          { p2pWorld =
-              World
-                { worldDimensions = (0.600, 0.300)
-                , worldShape = Cylinder
-                }
-          , p2pNumNodes = 100
-          , p2pNodeLinksClose = 5
-          , p2pNodeLinksRandom = 5
-          }
-  model = praosSimVizModel (example1Trace rng2 blockInterval p2pTopography)
 
 data DiffusionEntry = DiffusionEntry
   { hash :: Int

@@ -2,13 +2,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module P2P where
 
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.ST (ST)
-import Data.Aeson.Types (FromJSON, ToJSON (..), defaultOptions, genericToEncoding)
+import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), ToJSON (..), defaultOptions, genericToEncoding, object, withObject, (.!=), (.:?))
 import Data.Array.ST as Array (
   Ix (range),
   MArray (newArray),
@@ -18,6 +20,7 @@ import Data.Array.ST as Array (
   writeArray,
  )
 import Data.Array.Unboxed as Array (IArray (bounds), UArray, (!))
+import Data.Default (Default (..))
 import Data.Graph as Graph (Edge, Graph, Vertex, buildG, edges)
 import qualified Data.KdMap.Static as KdMap
 import Data.List (mapAccumL, sort, unfoldr)
@@ -59,10 +62,31 @@ data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   }
   deriving (Eq, Show, Generic)
 
-instance ToJSON P2PTopographyCharacteristics where
-  toEncoding = genericToEncoding defaultOptions
+instance Default P2PTopographyCharacteristics where
+  def =
+    P2PTopographyCharacteristics
+      { p2pWorld = def
+      , p2pNumNodes = 100
+      , p2pNodeLinksClose = 5
+      , p2pNodeLinksRandom = 5
+      }
 
-instance FromJSON P2PTopographyCharacteristics
+instance ToJSON P2PTopographyCharacteristics where
+  toJSON P2PTopographyCharacteristics{..} =
+    object
+      [ "world" .= p2pWorld
+      , "num_nodes" .= p2pNumNodes
+      , "num_links_close" .= p2pNodeLinksClose
+      , "num_links_random" .= p2pNodeLinksRandom
+      ]
+
+instance FromJSON P2PTopographyCharacteristics where
+  parseJSON = withObject "P2PTopographyCharacteristics" $ \o -> do
+    p2pWorld <- o .:? "world" .!= def
+    p2pNumNodes <- o .:? "num_nodes" .!= 100
+    p2pNodeLinksClose <- o .:? "num_links_close" .!= 5
+    p2pNodeLinksRandom <- o .:? "num_links_random" .!= 5
+    pure P2PTopographyCharacteristics{..}
 
 -- | Strategy for creating an arbitrary P2P network:
 --
