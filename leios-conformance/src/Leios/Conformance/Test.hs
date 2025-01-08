@@ -9,7 +9,7 @@
 
 module Leios.Conformance.Test where
 
-import Data.Maybe (isJust, fromMaybe)
+import Data.Maybe (isJust)
 import Test.QuickCheck (
   frequency
  )
@@ -84,4 +84,4 @@ instance StateModel NetworkModel where
 
   precondition NetworkModel{nodeModel = s} (Step a) = isJust $ transition s a
 
-  nextState net@NetworkModel{nodeModel = s} (Step a) _ = net{nodeModel = fromMaybe s $ transition s a}
+  nextState net@NetworkModel{nodeModel = s} (Step a) _ = net{nodeModel = maybe s snd $ transition s a}
