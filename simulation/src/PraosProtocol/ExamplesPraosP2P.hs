@@ -78,10 +78,10 @@ example1 seed blockInterval maybeP2PTopography =
     flip fromMaybe maybeP2PTopography $
       flip genArbitraryP2PTopography rng1 $
         P2PTopographyCharacteristics
-          { p2pWorldShape =
-              WorldShape
+          { p2pWorld =
+              World
                 { worldDimensions = (0.600, 0.300)
-                , worldIsCylinder = True
+                , worldShape = Cylinder
                 }
           , p2pNumNodes = 100
           , p2pNodeLinksClose = 5
@@ -201,10 +201,10 @@ example1000Diffusion clinks rlinks stop fp =
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
-      { p2pWorldShape =
-          WorldShape
+      { p2pWorld =
+          World
             { worldDimensions = (0.600, 0.300)
-            , worldIsCylinder = True
+            , worldShape = Cylinder
             }
       , p2pNumNodes = 1000
       , p2pNodeLinksClose = clinks
@@ -285,9 +285,9 @@ example2 =
   model1 =
     model
       p2pTopographyCharacteristicsCommon
-        { p2pWorldShape =
-            p2pWorldShape
-              { worldIsCylinder = False
+        { p2pWorld =
+            p2pWorld
+              { worldShape = Rectangle
               }
         }
   model2 = model p2pTopographyCharacteristicsCommon
@@ -323,14 +323,14 @@ example2 =
 
   rng0 = mkStdGen 4 -- TODO: make a param
   p2pNumNodes = 100
-  p2pWorldShape =
-    WorldShape
+  p2pWorld =
+    World
       { worldDimensions = (0.600, 0.300)
-      , worldIsCylinder = True
+      , worldShape = Cylinder
       }
   p2pTopographyCharacteristicsCommon =
     P2PTopographyCharacteristics
-      { p2pWorldShape
+      { p2pWorld
       , p2pNumNodes
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5

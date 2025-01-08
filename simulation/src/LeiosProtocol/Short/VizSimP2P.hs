@@ -52,7 +52,7 @@ import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
-import SimTypes (NodeId (..), Point (..), WorldShape (..))
+import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
 import System.Random (uniformR)
 import qualified System.Random as Random
 import System.Random.Stateful (mkStdGen)
@@ -181,7 +181,7 @@ leiosP2PSimVizRenderModel
   ( SimVizModel
       _events
       LeiosSimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizNodeTip
@@ -799,10 +799,10 @@ example2 seed sliceLength maybeP2PTopography processingCores =
     flip fromMaybe maybeP2PTopography $
       flip genArbitraryP2PTopography rng1 $
         P2PTopographyCharacteristics
-          { p2pWorldShape =
-              WorldShape
+          { p2pWorld =
+              World
                 { worldDimensions = (0.600, 0.300)
-                , worldIsCylinder = True
+                , worldShape = Cylinder
                 }
           , p2pNumNodes = 100
           , p2pNodeLinksClose = 5

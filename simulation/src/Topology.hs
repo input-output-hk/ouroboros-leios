@@ -51,7 +51,7 @@ import qualified Database.SQLite.Simple as SQLlite
 import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import P2P (Latency, P2PTopography (..))
-import SimTypes (NodeId (..), Path (..), Point (..), WorldDimensions, WorldShape (..))
+import SimTypes (NodeId (..), Path (..), Point (..), World (..), WorldDimensions)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose)
 import System.IO.Temp (withTempFile)
@@ -499,10 +499,10 @@ latencyFromMilisecondsToSeconds =
   G.emap ((/ 1000.0) . unLatencyInMiliseconds)
 
 grToP2PTopography ::
-  WorldShape ->
+  World ->
   Gr Point Latency ->
   P2PTopography
-grToP2PTopography p2pWorldShape gr = P2PTopography{..}
+grToP2PTopography p2pWorld gr = P2PTopography{..}
  where
   nodeInfoMap =
     M.fromList
@@ -541,23 +541,23 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
 
 readP2PTopography ::
   GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
-  WorldShape ->
+  World ->
   FilePath ->
   IO P2PTopography
-readP2PTopography params worldShape@WorldShape{..} simpleTopologyFile = do
+readP2PTopography params world@World{..} simpleTopologyFile = do
   simpleTopology <- readSimpleTopology simpleTopologyFile
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
-  pure $ grToP2PTopography worldShape . latencyFromMilisecondsToSeconds $ grWithPosition
+  pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition
 
 readP2PTopographyFromBenchTopologyAndLatency ::
   GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
-  WorldShape ->
+  World ->
   FilePath ->
   FilePath ->
   IO P2PTopography
-readP2PTopographyFromBenchTopologyAndLatency params worldShape@WorldShape{..} benchTopologyFile latencyFile = do
+readP2PTopographyFromBenchTopologyAndLatency params world@World{..} benchTopologyFile latencyFile = do
   simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency benchTopologyFile latencyFile
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
-  pure $ grToP2PTopography worldShape . latencyFromMilisecondsToSeconds $ grWithPosition
+  pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition

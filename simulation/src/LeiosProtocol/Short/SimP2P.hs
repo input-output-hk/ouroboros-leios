@@ -39,7 +39,7 @@ traceLeiosP2P
   P2PTopography
     { p2pNodes
     , p2pLinks
-    , p2pWorldShape
+    , p2pWorld
     }
   tcpprops
   leiosNodeConfig =
@@ -48,7 +48,7 @@ traceLeiosP2P
         slotConfig <- slotConfigFromNow
         traceWith tracer $
           LeiosEventSetup
-            p2pWorldShape
+            p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
         tcplinks <-

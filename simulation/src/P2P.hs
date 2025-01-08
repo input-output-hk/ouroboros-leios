@@ -25,14 +25,14 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
-import SimTypes (NodeId (..), Point (..), WorldShape (..))
+import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
 import qualified System.Random as Random
 import TimeCompat
 
 data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)
   , p2pLinks :: !(Map (NodeId, NodeId) Latency)
-  , p2pWorldShape :: !WorldShape
+  , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic)
 
@@ -47,7 +47,7 @@ instance FromJSON P2PTopography
 type Latency = Double
 
 data P2PTopographyCharacteristics = P2PTopographyCharacteristics
-  { p2pWorldShape :: !WorldShape
+  { p2pWorld :: !World
   -- ^ Size of the world (in seconds): (Circumference, pole-to-pole)
   , -- \^ Number of nodes, e.g. 100, 1000, 10,000
 
@@ -85,10 +85,10 @@ genArbitraryP2PTopography ::
   P2PTopography
 genArbitraryP2PTopography
   P2PTopographyCharacteristics
-    { p2pWorldShape =
-      p2pWorldShape@WorldShape
+    { p2pWorld =
+      p2pWorld@World
         { worldDimensions = (widthSeconds, heightSeconds)
-        , worldIsCylinder
+        , worldShape
         }
     , p2pNumNodes
     , p2pNodeLinksClose
@@ -98,7 +98,7 @@ genArbitraryP2PTopography
     P2PTopography
       { p2pNodes = nodePositions
       , p2pLinks = nodeLinks
-      , p2pWorldShape
+      , p2pWorld
       }
    where
     nodes :: [NodeId]
@@ -161,7 +161,7 @@ genArbitraryP2PTopography
 
     linkLatencySquared :: Point -> Point -> Latency
     linkLatencySquared p1 p2
-      | worldIsCylinder = min d2 d2'
+      | worldShape == Cylinder = min d2 d2'
       | otherwise = d2
      where
       (d2, d2') = linkPathLatenciesSquared widthSeconds p1 p2
@@ -198,10 +198,10 @@ pointToPointLatencySquared (Point x1 y1) (Point x2 y2) =
 exampleTopographyCharacteristics1 :: P2PTopographyCharacteristics
 exampleTopographyCharacteristics1 =
   P2PTopographyCharacteristics
-    { p2pWorldShape =
-        WorldShape
+    { p2pWorld =
+        World
           { worldDimensions = (0.600, 0.300)
-          , worldIsCylinder = True
+          , worldShape = Cylinder
           }
     , p2pNumNodes = 50
     , p2pNodeLinksClose = 5

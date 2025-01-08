@@ -47,7 +47,7 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTypes (WorldShape (..))
+import SimTypes (World (..), WorldShape (..))
 import TimeCompat
 import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
@@ -309,7 +309,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPBF1 -> pure VizBlockFetch.example1
   VizPraos1 -> pure VizPraos.example1
   VizPraosP2P1{..} -> do
-    let worldShape = WorldShape (1200, 1000) True
+    let worldShape = World (1200, 1000) Cylinder
     maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
     pure $ VizPraosP2P.example1 seed blockInterval maybeP2PTopography
   VizPraosP2P2 -> pure VizPraosP2P.example2
@@ -318,7 +318,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizRelayTest3 -> pure VizSimTestRelay.example3
   VizShortLeios1 -> pure VizShortLeios.example1
   VizShortLeiosP2P1{..} -> do
-    let worldShape = WorldShape (1200, 1000) True
+    let worldShape = World (1200, 1000) Cylinder
     maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
     pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
 

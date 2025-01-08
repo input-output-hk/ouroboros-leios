@@ -35,7 +35,7 @@ type LeiosTrace = [(Time, LeiosEvent)]
 data LeiosEvent
   = -- | Declare the nodes and links
     LeiosEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -58,9 +58,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         LeiosEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (nodeA, Point 50 100)
