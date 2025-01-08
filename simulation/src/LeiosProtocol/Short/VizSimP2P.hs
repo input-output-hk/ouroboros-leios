@@ -32,6 +32,7 @@ import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
+import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   IBsInRBsReport (..),
@@ -52,7 +53,9 @@ import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
+import Sample
 import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
+import System.FilePath (dropExtension, (<.>))
 import System.Random (uniformR)
 import qualified System.Random as Random
 import System.Random.Stateful (mkStdGen)
@@ -793,6 +796,12 @@ example2 seed sliceLength maybeP2PTopography processingCores =
  where
   config = defaultVizConfig 5 processingCores
   modelConfig = config.model
+  model = leiosSimVizModel modelConfig (exampleTracer2' seed sliceLength maybeP2PTopography processingCores)
+
+exampleTracer2' :: Int -> Int -> Maybe P2PTopography -> NumCores -> LeiosTrace
+exampleTracer2' seed sliceLength maybeP2PTopography processingCores =
+  exampleTrace2 rng2 sliceLength p2pTopography processingCores
+ where
   rng0 = mkStdGen seed
   (rng1, rng2) = Random.split rng0
   p2pTopography =
@@ -808,4 +817,11 @@ example2 seed sliceLength maybeP2PTopography processingCores =
           , p2pNodeLinksClose = 5
           , p2pNodeLinksRandom = 5
           }
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng2 sliceLength p2pTopography processingCores)
+
+exampleSim :: Int -> Int -> Maybe P2PTopography -> NumCores -> Time -> FilePath -> IO ()
+exampleSim seed sliceLength maybeP2PTopography processingCores stop fp = do
+  let trace = exampleTracer2' seed sliceLength maybeP2PTopography processingCores
+  let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
+  runSampleModel traceFile logLeiosEvent sampleModel stop trace
+ where
+  traceFile = dropExtension fp <.> "log"

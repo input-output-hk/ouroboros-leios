@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -353,6 +354,13 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimPraosDiffusion20{..} ->
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
+  SimShortLeios -> do
+    -- TODO: read from parameter file
+    let seed = 42
+    let sliceLength = 5
+    let maybeP2PTopography = Nothing
+    let numCores = Infinite
+    VizShortLeiosP2P.exampleSim seed sliceLength maybeP2PTopography numCores simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -380,6 +388,7 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
   | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
+  | SimShortLeios
 
 parserSimCommand :: Parser SimCommand
 parserSimCommand =
@@ -388,6 +397,8 @@ parserSimCommand =
     , command "praos-diffusion-10" . info parserSimPraosDiffusion10 $
         progDesc ""
     , command "praos-diffusion-20" . info parserSimPraosDiffusion20 $
+        progDesc ""
+    , command "short-leios" . info parserShortLeios $
         progDesc ""
     ]
 
@@ -426,6 +437,9 @@ parserSimPraosDiffusion20 =
           <> help "The number of random links."
           <> value 10
       )
+
+parserShortLeios :: Parser SimCommand
+parserShortLeios = pure SimShortLeios
 
 --------------------------------------------------------------------------------
 -- Utility Commands

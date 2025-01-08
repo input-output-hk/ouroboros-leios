@@ -199,14 +199,18 @@ example1000Diffusion clinks rlinks stop fp =
  where
   asString x = x :: String
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) =
-    object ["nid" .= nid, "tag" .= asString "generated", "hash" .= show (coerce @_ @Int (blockHash blk))]
+    Just $
+      object ["nid" .= nid, "tag" .= asString "generated", "hash" .= show (coerce @_ @Int (blockHash blk))]
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventReceived blk))) =
-    object ["nid" .= nid, "tag" .= asString "received", "hash" .= show (coerce @_ @Int (blockHash blk))]
+    Just $
+      object ["nid" .= nid, "tag" .= asString "received", "hash" .= show (coerce @_ @Int (blockHash blk))]
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventEnterState blk))) =
-    object ["nid" .= nid, "tag" .= asString "enterstate", "hash" .= show (coerce @_ @Int (blockHash blk))]
+    Just $
+      object ["nid" .= nid, "tag" .= asString "enterstate", "hash" .= show (coerce @_ @Int (blockHash blk))]
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventCPU task))) =
-    object ["nid" .= nid, "tag" .= asString "cpu", "task" .= task]
-  logEvent _ = toJSON ()
+    Just $
+      object ["nid" .= nid, "tag" .= asString "cpu", "task" .= task]
+  logEvent _ = Nothing
   traceFile = dropExtension fp <.> "log"
   rng = mkStdGen 42
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng

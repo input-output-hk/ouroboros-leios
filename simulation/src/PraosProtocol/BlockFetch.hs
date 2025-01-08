@@ -93,6 +93,8 @@ instance Protocol (BlockFetchState body) where
     MsgStartBatch ::
       Message (BlockFetchState body) StBusy StStreaming
     MsgBlock ::
+      -- \| Hash only here for tracing, not counted in msg size.
+      HeaderHash (Block body) ->
       body ->
       Message (BlockFetchState body) StStreaming StStreaming
     MsgBatchDone ::
@@ -117,7 +119,7 @@ instance MessageSize body => MessageSize (Message (BlockFetchState body) st st')
     MsgRequestRange pt1 pt2 -> messageSizeBytes pt1 + messageSizeBytes pt2
     MsgNoBlocks -> 1
     MsgStartBatch -> 1
-    MsgBlock blk -> messageSizeBytes blk
+    MsgBlock !_ blk -> messageSizeBytes blk
     MsgBatchDone -> 1
     MsgClientDone -> 1
 
@@ -126,7 +128,7 @@ blockFetchMessageLabel = \case
   MsgRequestRange _ _ -> "MsgRequestRange"
   MsgNoBlocks -> "MsgNoBlocks"
   MsgStartBatch -> "MsgStartBatch"
-  MsgBlock _ -> "MsgBlock"
+  MsgBlock{} -> "MsgBlock"
   MsgBatchDone -> "MsgBatchDone"
   MsgClientDone -> "MsgClientDone"
 
@@ -150,16 +152,16 @@ resolveRange ::
   BlockFetchProducerState body m ->
   Point (Block body) ->
   Point (Block body) ->
-  STM m (Maybe [body])
+  STM m (Maybe [Block body])
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
-  let resolveRangeAcc :: [body] -> Point (Block body) -> Maybe [body]
+  let resolveRangeAcc :: [Block body] -> Point (Block body) -> Maybe [Block body]
       resolveRangeAcc _acc bpoint | pointSlot start > pointSlot bpoint = Nothing
       resolveRangeAcc acc GenesisPoint = assert (start == GenesisPoint) (Just acc)
       resolveRangeAcc acc bpoint@(BlockPoint pslot phash) = do
-        Block{..} <- Map.lookup phash blocks
+        block@Block{..} <- Map.lookup phash blocks
         guard $ blockSlot blockHeader == pslot
-        let acc' = blockBody : acc
+        let acc' = block : acc
         if start == bpoint
           then Just acc'
           else resolveRangeAcc acc' =<< blockPrevPoint blocks blockHeader
@@ -181,9 +183,9 @@ blockFetchProducer st = idle
         Just blocks -> return $ TS.Yield MsgStartBatch (streaming blocks)
     MsgClientDone -> TS.Done ()
 
-  streaming :: [body] -> TS.Server (BlockFetchState body) NonPipelined StStreaming m ()
+  streaming :: [Block body] -> TS.Server (BlockFetchState body) NonPipelined StStreaming m ()
   streaming [] = TS.Yield MsgBatchDone idle
-  streaming (block : blocks) = TS.Yield (MsgBlock block) (streaming blocks)
+  streaming (block : blocks) = TS.Yield (MsgBlock (blockHash block) (blockBody block)) (streaming blocks)
 
 -- NOTE: Variant that uses the current chain.
 
@@ -286,7 +288,7 @@ blockFetchConsumer tracer _cfg st = idle
   streaming range headers = TC.Await $ \msg ->
     case (msg, headers) of
       (MsgBatchDone, []) -> idle
-      (MsgBlock body, header : headers') -> TC.Effect $ do
+      (MsgBlock _ body, header : headers') -> TC.Effect $ do
         let block = Block header body
         traceWith tracer $ PraosNodeEventReceived block
         st.submitFetchedBlock block $ do
@@ -295,7 +297,7 @@ blockFetchConsumer tracer _cfg st = idle
 
         return $ streaming range headers'
       (MsgBatchDone, _ : _) -> TC.Effect $ error "TooFewBlocks" -- TODO?
-      (MsgBlock _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
+      (MsgBlock _ _, []) -> TC.Effect $ error "TooManyBlocks" -- TODO?
 
 --------------------------------------------
 ---- BlockFetch controller

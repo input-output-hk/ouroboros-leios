@@ -24,7 +24,7 @@ data SampleEvent e = SampleEvent {time :: Time, event :: e}
 runSampleModel ::
   ToJSON a =>
   FilePath ->
-  (event -> a) ->
+  (event -> Maybe a) ->
   SampleModel event state ->
   Time ->
   [(Time, event)] ->
@@ -46,4 +46,6 @@ runSampleModel traceFile logEvent (SampleModel s0 accum render) stop =
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
   writeEvents h es = flip mapM_ es $ \(t, e) ->
-    T.hPutStrLn h (encodeToLazyText (SampleEvent t (logEvent e)))
+    case logEvent e of
+      Nothing -> return ()
+      Just x -> T.hPutStrLn h (encodeToLazyText (SampleEvent t x))

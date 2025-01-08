@@ -65,7 +65,7 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
     BlockFetchMessage body ->
     (Double, Double, Double)
   blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
-    MsgBlock blk -> blockBodyColor blk
+    MsgBlock _ blk -> blockBodyColor blk
     _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
