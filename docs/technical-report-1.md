@@ -34,8 +34,34 @@ maintaining robust security guarantees.
 
 > [!NOTE]
 >
-> Consider discussing the roadmap and/or methodology of the Leios innovation
-> stream here.
+> **Roadmap and Methodology**
+>
+> The development of the Leios protocol is currently focused on comparing
+> outputs from various simulations to gain deeper insights into its performance
+> and potential optimizations. This involves exploring the spectrum of
+> configuration parameters to identify optimal settings and understand potential
+> constraints and attack vectors.
+>
+> Key areas of ongoing research include:
+>
+> - **Sharded Mempool Design**: Investigating designs that minimize transaction
+>   duplicates across different Input Blocks (IBs) and determining the
+>   transaction fee structure.
+> - **Voting Schemes**: Early work has begun on voting mechanisms, but further
+>   exploration is needed to finalize these schemes.
+> - **Cost Analysis**: Estimating the cost of running a Leios node compared to
+>   the expected increase in throughput. This analysis will be crucial for
+>   community feedback and engagement.
+>
+> In the near future, the team aims to draft a Cardano Improvement Proposal
+> (CIP) for Leios. This proposal will detail the requirements for building a
+> reference implementation, informed by the data and insights gathered from
+> ongoing research and simulations.
+>
+> The roadmap includes engaging with the community to gather feedback and
+> iterating on the protocol design based on this input. The goal is to ensure
+> that Leios not only meets technical specifications but also aligns with the
+> needs and expectations of the Cardano ecosystem.
 
 ### Audience
 
