@@ -17,19 +17,22 @@ data SlotUpkeep : Type where
 
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V-Role ∷ [])
-
+```
+```agda
 open import Leios.Protocol (⋯) SlotUpkeep public
-
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
-
+```
+```agda
 record VotingAbstract : Type₁ where
   field isVoteCertified : LeiosState → EndorserBlock → Type
         ⦃ isVoteCertified⁇ ⦄ : ∀ {vs eb} → isVoteCertified vs eb ⁇
-
+```
+```agda
 module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
-
+```
+```agda
   private variable s s'   : LeiosState
                    ffds'  : FFD.State
                    π      : VrfPf
@@ -53,7 +56,8 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
    If elected, propose RB
 ```agda
   data _↝_ : LeiosState → LeiosState → Type where
-
+```
+```agda
     IB-Role : let open LeiosState s renaming (FFDState to ffds)
                   b = ibBody (record { txs = ToPropose })
                   h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
@@ -63,7 +67,15 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
-
+```
+```agda
+    No-IB-Role : let open LeiosState s in
+            ∙ needsUpkeep IB-Role
+            ∙ ¬ canProduceIB slot sk-IB (stake s) π
+            ─────────────────────────────────────────────
+            s ↝ addUpkeep s IB-Role
+```
+```agda
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
                   LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                   h = mkEB slot id π sk-EB LI []
@@ -73,7 +85,15 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
-
+```
+```agda
+    No-EB-Role : let open LeiosState s in
+            ∙ needsUpkeep EB-Role
+            ∙ ¬ canProduceEB slot sk-EB (stake s) π
+            ─────────────────────────────────────────────
+            s ↝ addUpkeep s EB-Role
+```
+```agda
     V-Role : let open LeiosState s renaming (FFDState to ffds)
                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                  votes = map (vote sk-V ∘ hash) EBs'
@@ -82,24 +102,15 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } V-Role
-
-    No-IB-Role : let open LeiosState s in
-            ∙ needsUpkeep IB-Role
-            ∙ ¬ canProduceIB slot sk-IB (stake s) π
-            ─────────────────────────────────────────────
-            s ↝ addUpkeep s IB-Role
-
-    No-EB-Role : let open LeiosState s in
-            ∙ needsUpkeep EB-Role
-            ∙ ¬ canProduceEB slot sk-EB (stake s) π
-            ─────────────────────────────────────────────
-            s ↝ addUpkeep s EB-Role
-
+```
+```agda
     No-V-Role : let open LeiosState s in
             ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
             s ↝ addUpkeep s V-Role
-
+```
+## Transition rules
+```agda
   data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
 #### Initialization
@@ -124,7 +135,8 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
              ; slot      = suc slot
              ; Upkeep    = ∅
              } ↑ L.filter (isValid? s) msgs
-
+```
+```agda
     Ftch :
          ────────────────────────────────────────────────────────
          just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
@@ -137,14 +149,16 @@ Note: Submitted data to the base chain is only taken into account
     Base₁   :
             ───────────────────────────────────────────────────────────────────
             just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
-
+```
+```agda
     Base₂a  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ eb ∈ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
             ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
-
+```
+```agda
     Base₂b  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ [] ≡ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
@@ -152,7 +166,7 @@ Note: Submitted data to the base chain is only taken into account
             ───────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 ```
-Protocol rules
+#### Protocol rules
 ```agda
     Roles : ∙ s ↝ s'
             ─────────────────────────────
