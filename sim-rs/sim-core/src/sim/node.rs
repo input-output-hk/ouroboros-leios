@@ -497,12 +497,16 @@ impl Node {
             // For every VRF lottery you won, you can vote for every EB
             vrf_wins * ebs.len()
         };
+        let mut eb_counts = BTreeMap::new();
+        for eb in ebs.iter().cycle().take(votes_allowed) {
+            *eb_counts.entry(*eb).or_default() += 1;
+        }
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,
                 producer: self.id,
             },
-            ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
+            ebs: eb_counts,
         };
         if !votes.ebs.is_empty() {
             self.tracker.track_vote_lottery_won(&votes);
@@ -906,12 +910,12 @@ impl Node {
         {
             return Ok(());
         }
-        for eb in votes.ebs.iter() {
+        for (eb, count) in votes.ebs.iter() {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
@@ -1039,12 +1043,12 @@ impl Node {
 
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
-        for eb in &votes.ebs {
+        for (eb, count) in &votes.ebs {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         let votes = Arc::new(votes);
         self.leios
