@@ -1,8 +1,7 @@
 ---
 title: Weekly Progress Summary - November 4, 2024
 authors:
-- William Wolff
-email: wolff.william@iohk.io
+- will
 tags: [progress, update]
 ---
 

@@ -1,8 +1,7 @@
 ---
 title: Weekly Progress Summary - October 28, 2024
 authors:
-- William Wolff
-email: wolff.william@iohk.io
+- will
 tags: [progress, update]
 ---
 

@@ -1,8 +1,7 @@
 ---
 title: Weekly Progress Summary - January 6, 2025
 authors:
-- William Wolff
-email: wolff.william@iohk.io
+- will
 tags: [progress, update]
 ---
 
