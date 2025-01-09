@@ -114,7 +114,7 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
   execute' slot Base _wins = do
     rbData <- lift $ atomically buffers.newRBData
     let meb = rbData.freshestCertifiedEB
-    let !task = CPUTask (maybe 0 (leios.delays.certificateCreation . snd) meb) $ T.pack $ "Cert creation"
+    let !task = CPUTask (maybe 0 (leios.delays.certificateCreation . snd) meb) $ T.pack "Cert creation"
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
     let !rb = mkPartialBlock slot body
     return (Just task, rb)

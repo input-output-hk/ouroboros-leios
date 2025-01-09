@@ -799,8 +799,8 @@ example2 seed sliceLength maybeP2PTopography processingCores =
   model = leiosSimVizModel modelConfig (exampleTracer2' seed sliceLength maybeP2PTopography processingCores)
 
 exampleTracer2' :: Int -> Int -> Maybe P2PTopography -> NumCores -> LeiosTrace
-exampleTracer2' seed sliceLength maybeP2PTopography processingCores =
-  exampleTrace2 rng2 sliceLength p2pTopography processingCores
+exampleTracer2' seed sliceLength maybeP2PTopography =
+  exampleTrace2 rng2 sliceLength p2pTopography
  where
   rng0 = mkStdGen seed
   (rng1, rng2) = Random.split rng0

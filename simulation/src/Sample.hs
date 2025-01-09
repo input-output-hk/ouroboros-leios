@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Sample where
 
+import Control.Monad
 import Data.Aeson
 import Data.Aeson.Text (encodeToLazyText)
 import Data.List (foldl')
@@ -32,7 +34,7 @@ runSampleModel ::
 runSampleModel traceFile logEvent (SampleModel s0 accum render) stop =
   process . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
  where
-  process m = withFile traceFile WriteMode (flip go m)
+  process m = withFile traceFile WriteMode (`go` m)
   go h m = case stepSimViz 10000 m of
     (before, m'@(SimVizModel ((now, _) : _) _)) -> do
       writeEvents h before
@@ -45,7 +47,7 @@ runSampleModel traceFile logEvent (SampleModel s0 accum render) stop =
       render s
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
-  writeEvents h es = flip mapM_ es $ \(t, e) ->
+  writeEvents h es = forM_ es $ \(t, e) ->
     case logEvent e of
       Nothing -> return ()
       Just x -> T.hPutStrLn h (encodeToLazyText (SampleEvent t x))

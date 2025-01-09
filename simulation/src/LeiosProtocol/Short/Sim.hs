@@ -91,29 +91,29 @@ logLeiosEvent e = case e of
   stringId :: (HasField "node" a NodeId, HasField "num" a Int) => a -> String
   stringId x = concat [show (coerce @_ @Int x.node), "-", show x.num]
   logPraos (PraosNodeEventGenerate blk) =
-    Just $
+    Just
       ["tag" .= asString "generated", rbKind, "id" .= show (coerce @_ @Int (blockHash blk))]
   logPraos (PraosNodeEventReceived blk) =
-    Just $
+    Just
       ["tag" .= asString "received", "kind" .= asString "RB", "id" .= show (coerce @_ @Int (blockHash blk))]
   logPraos (PraosNodeEventEnterState blk) =
-    Just $
+    Just
       ["tag" .= asString "enteredstate", "kind" .= asString "RB", "id" .= show (coerce @_ @Int (blockHash blk))]
   logPraos (PraosNodeEventCPU task) =
     assert False $
-      Just $
+      Just
         ["tag" .= asString "cpu", "task" .= task]
   logPraos (PraosNodeEventNewTip _chain) = Nothing
   logMsg (RelayIB msg) = (ibKind :) <$> logRelay msg
   logMsg (RelayEB msg) = (ebKind :) <$> logRelay msg
   logMsg (RelayVote msg) = (vtKind :) <$> logRelay msg
   logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
-    Just $
+    Just
       ["tag" .= asString "Sent", rbKind, "id" .= show (coerce @_ @Int hash)]
   logMsg (PraosMsg (PraosMessage _)) = Nothing
   logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => RelayMessage id h b -> Maybe [Pair]
   logRelay (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
-    Just $
+    Just
       ["tag" .= asString "Sent", "ids" .= map (stringId . fst) xs]
   logRelay _ = Nothing
   asString x = x :: String
