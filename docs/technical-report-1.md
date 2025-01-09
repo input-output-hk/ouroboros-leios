@@ -4,10 +4,44 @@
 
 ## Introduction
 
+The Leios protocol represents a significant advancement in blockchain
+technology, building upon the foundations of the Ouroboros consensus protocol.
+This technical report aims to provide a comprehensive analysis of the Leios
+protocol, focusing on its design, implementation, and potential impact on the
+Cardano ecosystem.
+
+### Purpose
+
+The primary purpose of this report is to document the technical specifications
+and economic implications of the Leios protocol. It serves as a resource for
+developers, researchers, and stakeholders interested in understanding the
+intricacies of Leios and its role within the broader Cardano network.
+
+### Scope
+
+This report covers various aspects of the Leios protocol, including its formal
+specifications, simulation results, economic analysis, and threat model. It also
+explores the interactions between Leios and existing Cardano components, such as
+Praos and Mithril.
+
+### Context
+
+Leios is designed to enhance the scalability and efficiency of the Cardano
+blockchain by introducing innovative mechanisms for block production and
+validation. By leveraging probabilistic sortition and advanced cryptographic
+techniques, Leios aims to achieve high throughput and low latency while
+maintaining robust security guarantees.
+
 > [!NOTE]
 >
 > Consider discussing the roadmap and/or methodology of the Leios innovation
 > stream here.
+
+### Audience
+
+This report is intended for a technical audience, including blockchain
+developers, researchers, and Cardano stakeholders. It assumes a foundational
+understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Informal description of Short Leios
 
