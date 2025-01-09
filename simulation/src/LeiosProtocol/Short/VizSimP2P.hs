@@ -822,6 +822,6 @@ exampleSim :: Int -> Int -> Maybe P2PTopography -> NumCores -> Time -> FilePath 
 exampleSim seed sliceLength maybeP2PTopography processingCores stop fp = do
   let trace = exampleTracer2' seed sliceLength maybeP2PTopography processingCores
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
-  runSampleModel traceFile logLeiosEvent sampleModel stop trace
+  runSampleModel' traceFile logLeiosEvent sampleModel stop trace
  where
   traceFile = dropExtension fp <.> "log"
