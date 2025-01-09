@@ -115,6 +115,7 @@ library
     , colour
     , containers
     , contra-tracer
+    , data-default
     , deepseq
     , diagrams-cairo
     , diagrams-core
@@ -166,9 +167,12 @@ executable ols
 
   main-is:          src/Main.hs
   build-depends:
+    , aeson
     , base
+    , data-default
     , optparse-applicative
     , ouroboros-leios-sim
+    , random
 
   default-language: Haskell2010
   ghc-options:      -Wall

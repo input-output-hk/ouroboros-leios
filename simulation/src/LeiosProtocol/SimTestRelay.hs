@@ -53,7 +53,7 @@ type RelaySimTrace = [(Time, RelaySimEvent)]
 data RelaySimEvent
   = -- | Declare the nodes and links
     RelaySimEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -274,9 +274,9 @@ traceRelayLink1 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)
@@ -320,9 +320,9 @@ traceRelayLink4 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 250)
@@ -382,9 +382,9 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 70)

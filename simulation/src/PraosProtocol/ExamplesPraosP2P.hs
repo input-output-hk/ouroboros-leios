@@ -4,8 +4,10 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.ExamplesPraosP2P where
@@ -35,13 +37,13 @@ import PraosProtocol.VizSimPraosP2P
 import Sample
 import SimTCPLinks (mkTcpConnProps)
 import SimTypes
+import System.FilePath
 import System.Random (StdGen, mkStdGen)
-import qualified System.Random as Random
 import Viz
 
-example1 :: Int -> DiffTime -> Maybe P2PTopography -> Visualization
-example1 seed blockInterval maybeP2PTopography =
-  Viz model $
+example1 :: StdGen -> DiffTime -> P2PTopography -> Visualization
+example1 rng0 blockInterval p2pTopography =
+  Viz (praosSimVizModel (example1Trace rng0 blockInterval p2pTopography)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -70,23 +72,6 @@ example1 seed blockInterval maybeP2PTopography =
               ]
           ]
       ]
- where
-  rng0 = mkStdGen seed
-  (rng1, rng2) = Random.split rng0
-  p2pTopography =
-    flip fromMaybe maybeP2PTopography $
-      flip genArbitraryP2PTopography rng1 $
-        P2PTopographyCharacteristics
-          { p2pWorldShape =
-              WorldShape
-                { worldDimensions = (0.600, 0.300)
-                , worldIsCylinder = True
-                }
-          , p2pNumNodes = 100
-          , p2pNodeLinksClose = 5
-          , p2pNodeLinksRandom = 5
-          }
-  model = praosSimVizModel (example1Trace rng2 blockInterval p2pTopography)
 
 data DiffusionEntry = DiffusionEntry
   { hash :: Int
@@ -191,17 +176,32 @@ example1000Diffusion ::
   FilePath ->
   IO ()
 example1000Diffusion clinks rlinks stop fp =
-  runSampleModel (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
+  runSampleModel traceFile logEvent (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
     example1Trace rng 20 p2pTopography
  where
+  asString x = x :: String
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) =
+    Just $
+      object ["nid" .= nid, "tag" .= asString "generated", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventReceived blk))) =
+    Just $
+      object ["nid" .= nid, "tag" .= asString "received", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventEnterState blk))) =
+    Just $
+      object ["nid" .= nid, "tag" .= asString "enterstate", "hash" .= show (coerce @_ @Int (blockHash blk))]
+  logEvent (PraosEventNode (LabelNode nid (PraosNodeEventCPU task))) =
+    Just $
+      object ["nid" .= nid, "tag" .= asString "cpu", "task" .= task]
+  logEvent _ = Nothing
+  traceFile = dropExtension fp <.> "log"
   rng = mkStdGen 42
   p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
-      { p2pWorldShape =
-          WorldShape
+      { p2pWorld =
+          World
             { worldDimensions = (0.600, 0.300)
-            , worldIsCylinder = True
+            , worldShape = Cylinder
             }
       , p2pNumNodes = 1000
       , p2pNodeLinksClose = clinks
@@ -282,9 +282,9 @@ example2 =
   model1 =
     model
       p2pTopographyCharacteristicsCommon
-        { p2pWorldShape =
-            p2pWorldShape
-              { worldIsCylinder = False
+        { p2pWorld =
+            p2pWorld
+              { worldShape = Rectangle
               }
         }
   model2 = model p2pTopographyCharacteristicsCommon
@@ -320,14 +320,14 @@ example2 =
 
   rng0 = mkStdGen 4 -- TODO: make a param
   p2pNumNodes = 100
-  p2pWorldShape =
-    WorldShape
+  p2pWorld =
+    World
       { worldDimensions = (0.600, 0.300)
-      , worldIsCylinder = True
+      , worldShape = Cylinder
       }
   p2pTopographyCharacteristicsCommon =
     P2PTopographyCharacteristics
-      { p2pWorldShape
+      { p2pWorld
       , p2pNumNodes
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5

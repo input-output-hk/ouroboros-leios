@@ -26,7 +26,7 @@ import PraosProtocol.VizSimPraos (
   PraosSimVizState (..),
   recentRate,
  )
-import SimTypes (Point (..), WorldShape (..))
+import SimTypes (Point (..), World (..))
 import Text.Printf (printf)
 import Viz
 import VizChart
@@ -70,7 +70,7 @@ praosP2PSimVizRenderModel
   ( SimVizModel
       _events
       PraosSimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizNodeTip

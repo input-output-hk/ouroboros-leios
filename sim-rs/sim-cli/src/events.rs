@@ -158,6 +158,10 @@ impl EventMonitor {
                         });
                     }
                 }
+                Event::CpuTaskScheduled { .. } => {}
+                Event::CpuTaskFinished { .. } => {}
+                Event::CpuSubtaskStarted { .. } => {}
+                Event::CpuSubtaskFinished { .. } => {}
                 Event::TransactionGenerated { id, bytes, .. } => {
                     txs.insert(id, Transaction::new(bytes, time));
                     pending_txs.insert(id);

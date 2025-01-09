@@ -1,10 +1,14 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
 
+import Data.Aeson (eitherDecodeFileStrict')
+import Data.Default (Default (..))
 import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
@@ -22,6 +26,7 @@ import Options.Applicative (
   command,
   commandGroup,
   customExecParser,
+  eitherReader,
   flag',
   help,
   helpShowGlobals,
@@ -43,11 +48,14 @@ import Options.Applicative (
   value,
   (<**>),
  )
+import Options.Applicative.Types (ReadM)
+import P2P (P2PTopography, P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTypes (WorldShape (..))
+import SimTypes (World (..), WorldDimensions, WorldShape (..))
+import qualified System.Random as Random
 import TimeCompat
 import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
 import Viz
@@ -172,7 +180,7 @@ data VizSubCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, maybeTopologyFile :: Maybe FilePath}
+  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topologyOptions :: TopographyOptions}
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
@@ -245,14 +253,7 @@ parserPraosP2P1 =
           <> help "The interval at which blocks are generated."
           <> value 5
       )
-    <*> optional
-      ( option
-          str
-          ( long "topology"
-              <> metavar "FILE"
-              <> help "The file describing the network topology."
-          )
-      )
+    <*> parserTopographyOptions
 
 parserShortLeiosP2P1 :: Parser VizSubCommand
 parserShortLeiosP2P1 =
@@ -309,17 +310,18 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPBF1 -> pure VizBlockFetch.example1
   VizPraos1 -> pure VizPraos.example1
   VizPraosP2P1{..} -> do
-    let worldShape = WorldShape (1200, 1000) True
-    maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
-    pure $ VizPraosP2P.example1 seed blockInterval maybeP2PTopography
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    p2pTopography <- execTopographyOptions rng1 topologyOptions
+    pure $ VizPraosP2P.example1 rng2 blockInterval p2pTopography
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
   VizRelayTest2 -> pure VizSimTestRelay.example2
   VizRelayTest3 -> pure VizSimTestRelay.example3
   VizShortLeios1 -> pure VizShortLeios.example1
   VizShortLeiosP2P1{..} -> do
-    let worldShape = WorldShape (1200, 1000) True
-    maybeP2PTopography <- traverse (readP2PTopography defaultParams worldShape) maybeTopologyFile
+    let world = World (1200, 1000) Cylinder
+    maybeP2PTopography <- traverse (readP2PTopography defaultParams world) maybeTopologyFile
     pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
 
 type VizSize = (Int, Int)
@@ -353,6 +355,13 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimPraosDiffusion20{..} ->
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
+  SimShortLeios -> do
+    -- TODO: read from parameter file
+    let seed = 42
+    let sliceLength = 5
+    let maybeP2PTopography = Nothing
+    let numCores = Infinite
+    VizShortLeiosP2P.exampleSim seed sliceLength maybeP2PTopography numCores simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -380,6 +389,7 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
   | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
+  | SimShortLeios
 
 parserSimCommand :: Parser SimCommand
 parserSimCommand =
@@ -388,6 +398,8 @@ parserSimCommand =
     , command "praos-diffusion-10" . info parserSimPraosDiffusion10 $
         progDesc ""
     , command "praos-diffusion-20" . info parserSimPraosDiffusion20 $
+        progDesc ""
+    , command "short-leios" . info parserShortLeios $
         progDesc ""
     ]
 
@@ -427,6 +439,9 @@ parserSimPraosDiffusion20 =
           <> value 10
       )
 
+parserShortLeios :: Parser SimCommand
+parserShortLeios = pure SimShortLeios
+
 --------------------------------------------------------------------------------
 -- Utility Commands
 --------------------------------------------------------------------------------
@@ -460,4 +475,119 @@ parserCliConvertBenchTopology =
           <> short 'o'
           <> metavar "FILE"
           <> help "The output topology file."
+      )
+
+--------------------------------------------------------------------------------
+-- Parsing Topography Options
+--------------------------------------------------------------------------------
+
+execTopographyOptions :: Random.RandomGen g => g -> TopographyOptions -> IO P2PTopography
+execTopographyOptions rng = \case
+  SimpleTopologyFile simpleTopologyFile -> do
+    -- TODO: infer world size from latencies
+    let world = World (1200, 1000) Rectangle
+    readP2PTopography defaultParams world simpleTopologyFile
+  TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
+    eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
+    case eitherP2PTopographyCharacteristics of
+      Right p2pTopographyCharacteristics ->
+        pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+      Left errorMessage ->
+        fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
+  TopographyCharacteristics p2pTopographyCharacteristics -> do
+    pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+
+data TopographyOptions
+  = SimpleTopologyFile FilePath
+  | TopographyCharacteristicsFile FilePath
+  | TopographyCharacteristics P2PTopographyCharacteristics
+
+parserTopographyOptions :: Parser TopographyOptions
+parserTopographyOptions =
+  parserSimpleTopologyFile
+    <|> parserTopographyCharacteristicsFile
+    <|> (TopographyCharacteristics <$> parserTopographyCharacteristics)
+ where
+  parserSimpleTopologyFile =
+    SimpleTopologyFile
+      <$> strOption
+        ( short 't'
+            <> long "topology-file"
+            <> metavar "FILE"
+            <> help "A simple topology file describing the world topology."
+        )
+  parserTopographyCharacteristicsFile =
+    TopographyCharacteristicsFile
+      <$> strOption
+        ( long "tc"
+            <> long "topology-characteristics-file"
+            <> metavar "FILE"
+            <> help "A file describing the characteristics of the world topology."
+        )
+
+parserTopographyCharacteristics :: Parser P2PTopographyCharacteristics
+parserTopographyCharacteristics =
+  P2PTopographyCharacteristics
+    <$> parserWorld
+    <*> option
+      auto
+      ( long "tc-num-nodes"
+          <> metavar "NUMBER"
+          <> help "The number of nodes."
+          <> value (p2pNumNodes def)
+      )
+    <*> option
+      auto
+      ( long "tc-num-links-close"
+          <> metavar "NUMBER"
+          <> help "The number of links to close peers for each node."
+          <> value (p2pNodeLinksClose def)
+      )
+    <*> option
+      auto
+      ( long "tc-num-links-random"
+          <> metavar "NUMBER"
+          <> help "The number of links to random peers for each node."
+          <> value (p2pNodeLinksRandom def)
+      )
+
+parserWorld :: Parser World
+parserWorld =
+  World
+    <$> parserWorldDimensions
+    <*> parserWorldShape
+
+parserWorldShape :: Parser WorldShape
+parserWorldShape =
+  option
+    readWorldShape
+    ( long "tc-world-shape"
+        <> metavar "SHAPE"
+        <> help "The shape of the generated world. Supported shapes are rectangle and cylinder."
+        <> value def
+    )
+
+readWorldShape :: ReadM WorldShape
+readWorldShape = eitherReader $ \txt ->
+  if
+    | txt == "rectangle" -> Right Rectangle
+    | txt == "cylinder" -> Right Cylinder
+    | otherwise -> Left ("Could not parse WorldShape '" <> txt <> "'")
+
+parserWorldDimensions :: Parser WorldDimensions
+parserWorldDimensions =
+  (,)
+    <$> option
+      auto
+      ( long "tc-world-width"
+          <> metavar "SECONDS"
+          <> help "The east-west size of the generated world."
+          <> value (fst $ worldDimensions def)
+      )
+    <*> option
+      auto
+      ( long "tc-world-height"
+          <> metavar "SECONDS"
+          <> help "The north-south length of the generated world."
+          <> value (snd $ worldDimensions def)
       )
