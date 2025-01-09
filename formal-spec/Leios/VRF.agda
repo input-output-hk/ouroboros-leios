@@ -38,4 +38,3 @@ record LeiosVRF : Type₁ where
 
   canProduceV : ℕ → PrivKey → ℕ → Type
   canProduceV slot k stake = proj₁ (eval k (genVInput slot)) < stake
-

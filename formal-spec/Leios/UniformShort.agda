@@ -118,6 +118,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
              ; slot      = suc slot
              ; Upkeep    = ∅
              } ↑ L.filter (isValid? s) msgs
+
     Ftch :
          ────────────────────────────────────────────────────────
          just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
