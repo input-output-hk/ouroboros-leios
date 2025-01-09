@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-01-07
+
+### Rust simulation
+
+Simulate infinite CPUs, and output CPU events in logs.
+
 ## 2025-01-06
 
 ### Rust simulation
