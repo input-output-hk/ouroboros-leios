@@ -34,7 +34,7 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
                    rbs    : List RankingBlock
                    txs    : List Tx
                    V      : VTy
-                   sd     : StakeDistr
+                   SD     : StakeDistr
                    pks    : List PubKey
 
   -- Uniform Short Pipeline:
@@ -100,9 +100,9 @@ module Protocol (va : VotingAbstract) (let open VotingAbstract va) where
 
     Init :
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
-         ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE sd ⟧⇀ bs'
+         ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
          ────────────────────────────────────────────────────────────────
-         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V sd bs' pks
+         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
 
     -- Network and Ledger
 
