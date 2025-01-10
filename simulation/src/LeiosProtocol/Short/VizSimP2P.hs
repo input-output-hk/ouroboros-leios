@@ -18,7 +18,7 @@ import Data.Hashable (hash)
 import qualified Data.IntervalMap.Strict as ILMap
 import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import Data.Monoid (Any)
 import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
@@ -32,7 +32,6 @@ import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
-import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   IBsInRBsReport (..),
@@ -54,10 +53,9 @@ import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
 import Sample
-import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
+import SimTypes (NodeId (..), Point (..), World (..))
 import System.FilePath (dropExtension, (<.>))
-import System.Random (uniformR)
-import qualified System.Random as Random
+import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
 import Viz
@@ -756,8 +754,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Int -> Int -> Maybe P2PTopography -> NumCores -> Visualization
-example2 seed sliceLength maybeP2PTopography processingCores =
+example2 :: StdGen -> Int -> P2PTopography -> NumCores -> Visualization
+example2 rng sliceLength p2pTopography processingCores =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -796,31 +794,11 @@ example2 seed sliceLength maybeP2PTopography processingCores =
  where
   config = defaultVizConfig 5 processingCores
   modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTracer2' seed sliceLength maybeP2PTopography processingCores)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng sliceLength p2pTopography processingCores)
 
-exampleTracer2' :: Int -> Int -> Maybe P2PTopography -> NumCores -> LeiosTrace
-exampleTracer2' seed sliceLength maybeP2PTopography =
-  exampleTrace2 rng2 sliceLength p2pTopography
- where
-  rng0 = mkStdGen seed
-  (rng1, rng2) = Random.split rng0
-  p2pTopography =
-    flip fromMaybe maybeP2PTopography $
-      flip genArbitraryP2PTopography rng1 $
-        P2PTopographyCharacteristics
-          { p2pWorld =
-              World
-                { worldDimensions = (0.600, 0.300)
-                , worldShape = Cylinder
-                }
-          , p2pNumNodes = 100
-          , p2pNodeLinksClose = 5
-          , p2pNodeLinksRandom = 5
-          }
-
-exampleSim :: Int -> Int -> Maybe P2PTopography -> NumCores -> Time -> FilePath -> IO ()
-exampleSim seed sliceLength maybeP2PTopography processingCores stop fp = do
-  let trace = exampleTracer2' seed sliceLength maybeP2PTopography processingCores
+exampleSim :: StdGen -> Int -> P2PTopography -> NumCores -> Time -> FilePath -> IO ()
+exampleSim seed sliceLength p2pTopography processingCores stop fp = do
+  let trace = exampleTrace2 seed sliceLength p2pTopography processingCores
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
   runSampleModel' traceFile logLeiosEvent sampleModel stop trace
  where
