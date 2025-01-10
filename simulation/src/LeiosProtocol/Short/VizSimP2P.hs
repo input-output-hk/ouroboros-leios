@@ -32,6 +32,7 @@ import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
+import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   IBsInRBsReport (..),
