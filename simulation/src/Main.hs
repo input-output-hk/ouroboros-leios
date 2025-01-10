@@ -180,13 +180,13 @@ data VizSubCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topologyOptions :: TopographyOptions}
+  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topographyOptions :: TopographyOptions}
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath, numCores :: NumCores}
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, topographyOptions :: TopographyOptions, numCores :: NumCores}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -272,14 +272,7 @@ parserShortLeiosP2P1 =
           <> help "The interval at which ranking blocks are generated."
           <> value 5
       )
-    <*> optional
-      ( option
-          str
-          ( long "topology"
-              <> metavar "FILE"
-              <> help "The file describing the network topology."
-          )
-      )
+    <*> parserTopographyOptions
     <*> option
       readCores
       ( short 'N'
@@ -312,7 +305,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPraosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pTopography <- execTopographyOptions rng1 topologyOptions
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
     pure $ VizPraosP2P.example1 rng2 blockInterval p2pTopography
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
@@ -320,9 +313,10 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizRelayTest3 -> pure VizSimTestRelay.example3
   VizShortLeios1 -> pure VizShortLeios.example1
   VizShortLeiosP2P1{..} -> do
-    let world = World (1200, 1000) Cylinder
-    maybeP2PTopography <- traverse (readP2PTopography defaultParams world) maybeTopologyFile
-    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
+    pure $ VizShortLeiosP2P.example2 rng2 sliceLength p2pTopography numCores
 
 type VizSize = (Int, Int)
 
@@ -357,11 +351,14 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimShortLeios -> do
     -- TODO: read from parameter file
-    let seed = 42
     let sliceLength = 5
-    let maybeP2PTopography = Nothing
-    let numCores = Infinite
-    VizShortLeiosP2P.exampleSim seed sliceLength maybeP2PTopography numCores simOutputSeconds simOutputFile
+    let numCores = Finite 5
+    let seed = 42
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 600 5 5
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
+    VizShortLeiosP2P.exampleSim rng2 sliceLength p2pTopography numCores simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
