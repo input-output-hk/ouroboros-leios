@@ -2,6 +2,11 @@
 
 ## 2025-01-13
 
+### Haskell and Rust simulations
+
+- Added shared configuration file format with default parameters under
+  `data/simulation/default.yaml`. This does not include the topology.
+
 ### Haskell simulation
 
 - Added event log output:
@@ -10,7 +15,7 @@
   - TODO: parallelize disk writes with other processing.
 - Added `short-leios` to possible simulations, parameters are
   hardcoded atm, mostly same as `viz` default but with `sliceLength =
-  20` to match mainnet ranking block interval. Only writes event log
+20` to match mainnet ranking block interval. Only writes event log
   for now.
 - Progress on syncing input format with rust simulation, to be merged
   after review with rust team.
@@ -169,7 +174,7 @@ Abandoned Waxman graph generation, using a simpler distance-weighted approach th
   - shot-leios-p2p-1 takes -N flag to control number of cores.
   - visualization charts number of cores active at that time per node
     - with unbounded parallelism we currently see spikes of even
-          13 right after vote diffusion.
+      13 right after vote diffusion.
   - TODO: consider whether an aggregate measure would improve readability.
 - Fixed Relay protocol messages to always have size > 0
   - Probable cause of out of order delivery experienced
