@@ -21,7 +21,7 @@ record BaseAbstract : Type₁ where
         initSlot : VTy → ℕ
         V-chkCerts : List PubKey → EndorserBlock × Cert → Bool
 
-  data Input : Type₁ where
+  data Input : Type where
     INIT   : (EndorserBlock × Cert → Bool) → Input
     SUBMIT : RankingBlock → Input
     FTCH-LDG : Input

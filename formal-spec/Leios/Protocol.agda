@@ -69,6 +69,7 @@ record LeiosState : Type where
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
+{-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
 initLeiosState : VTy → StakeDistr → B.State → LeiosState
 initLeiosState V SD bs = record

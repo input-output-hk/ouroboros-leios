@@ -13,11 +13,11 @@ open import Data.List.Relation.Unary.Any using (here)
 
 open import Leios.SpecStructure
 
-module Leios.Simple.Deterministic (⋯ : SpecStructure) (let open SpecStructure ⋯) where
+module Leios.Simple.Deterministic (⋯ : SpecStructure 2) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
-import Leios.Simple
-open import Leios.Simple ⋯ hiding (_-⟦_/_⟧⇀_)
-module ND = Leios.Simple ⋯
+import Leios.Simplified
+open import Leios.Simplified ⋯ Λ μ hiding (_-⟦_/_⟧⇀_)
+module ND = Leios.Simplified ⋯ Λ μ
 
 open import Class.Computational
 open import Class.Computational22
@@ -37,7 +37,7 @@ private variable s s' s0 s1 s2 s3 s4 s5 : LeiosState
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
                  eb     : EndorserBlock
-                 ebs    : List EndorserBlock
+                 rbs    : List RankingBlock
                  txs    : List Tx
                  V      : VTy
                  SD     : StakeDistr
@@ -61,15 +61,15 @@ data _-⟦Base⟧⇀_ : LeiosState → LeiosState → Type where
 
   Base₂a  : ∀ {ebs} → let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
-          ∙ eb ∷ ebs ≡ filter (λ eb → isVote2Certified votingState eb × eb ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (inj₁ eb) / B.EMPTY ⟧⇀ bs'
+          ∙ eb ∷ ebs ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
+          ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
           s -⟦Base⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
   Base₂b  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
-          ∙ [] ≡ filter (λ eb → isVote2Certified votingState eb × eb ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (inj₂ ToPropose) / B.EMPTY ⟧⇀ bs'
+          ∙ [] ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs
+          ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
           s -⟦Base⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
@@ -80,7 +80,7 @@ Base⇒ND (Base₂b x x₁ x₂) = Base₂b x x₁ x₂
 opaque
   Base-total : LeiosState.needsUpkeep s Base → ∃[ s' ] s -⟦Base⟧⇀ s'
   Base-total {s = s} needsUpkeep with
-    (let open LeiosState s in filter (λ eb → isVote2Certified votingState eb × eb ∈ᴮ slice L slot 2) EBs)
+    (let open LeiosState s in filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs)
     in eq
   ... | []    = -, Base₂b needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
   ... | x ∷ l = -, Base₂a needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
@@ -108,8 +108,8 @@ data _-⟦IB-Role⟧⇀_ : LeiosState → LeiosState → Type where
           s -⟦IB-Role⟧⇀ addUpkeep s IB-Role
 
 IB-Role⇒ND : s -⟦IB-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
-IB-Role⇒ND (IB-Role x x₁ x₂) = IB-Role x x₁ x₂
-IB-Role⇒ND (No-IB-Role x x₁) = No-IB-Role x x₁
+IB-Role⇒ND (IB-Role x x₁ x₂) = Roles (IB-Role x x₁ x₂)
+IB-Role⇒ND (No-IB-Role x x₁) = Roles (No-IB-Role x x₁)
 
 opaque
   IB-Role-total : LeiosState.needsUpkeep s IB-Role → ∃[ s' ] s -⟦IB-Role⟧⇀ s'
@@ -125,7 +125,7 @@ data _-⟦EB-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot (Λ + 1)) IBs
-                LE = map getEBRef $ filter (isVote1Certified votingState) $
+                LE = map getEBRef $ filter (isVote1Certified s) $
                            filter (_∈ᴮ slice L slot (μ + 2)) EBs
                 h = mkEB slot id π sk-EB LI LE
           in
@@ -142,8 +142,8 @@ data _-⟦EB-Role⟧⇀_ : LeiosState → LeiosState → Type where
           s -⟦EB-Role⟧⇀ addUpkeep s EB-Role
 
 EB-Role⇒ND : s -⟦EB-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
-EB-Role⇒ND (EB-Role x x₁ x₂) = EB-Role x x₁ x₂
-EB-Role⇒ND (No-EB-Role x x₁) = No-EB-Role x x₁
+EB-Role⇒ND (EB-Role x x₁ x₂) = Roles (EB-Role x x₁ x₂)
+EB-Role⇒ND (No-EB-Role x x₁) = Roles (No-EB-Role x x₁)
 
 opaque
   EB-Role-total : LeiosState.needsUpkeep s EB-Role → ∃[ s' ] s -⟦EB-Role⟧⇀ s'
@@ -172,8 +172,8 @@ data _-⟦V1-Role⟧⇀_ : LeiosState → LeiosState → Type where
           s -⟦V1-Role⟧⇀ addUpkeep s V1-Role
 
 V1-Role⇒ND : s -⟦V1-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
-V1-Role⇒ND (V1-Role x x₁ x₂) = V1-Role x x₁ x₂
-V1-Role⇒ND (No-V1-Role x x₁) = No-V1-Role x x₁
+V1-Role⇒ND (V1-Role x x₁ x₂) = Roles (V1-Role x x₁ x₂)
+V1-Role⇒ND (No-V1-Role x x₁) = Roles (No-V1-Role x x₁)
 
 V1-Role-Upkeep : s -⟦V1-Role⟧⇀ s' → LeiosState.needsUpkeep s V1-Role × ¬ LeiosState.needsUpkeep s' V1-Role
 V1-Role-Upkeep (V1-Role x x₁ x₂) = x , addUpkeep⇒¬needsUpkeep
@@ -198,8 +198,8 @@ data _-⟦V2-Role⟧⇀_ : LeiosState → LeiosState → Type where
           s -⟦V2-Role⟧⇀ addUpkeep s V2-Role
 
 V2-Role⇒ND : s -⟦V2-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
-V2-Role⇒ND (V2-Role x x₁ x₂) = V2-Role x x₁ x₂
-V2-Role⇒ND (No-V2-Role x x₁) = No-V2-Role x x₁
+V2-Role⇒ND (V2-Role x x₁ x₂) = Roles (V2-Role x x₁ x₂)
+V2-Role⇒ND (No-V2-Role x x₁) = Roles (No-V2-Role x x₁)
 
 V2-Role-Upkeep : s -⟦V2-Role⟧⇀ s' → LeiosState.needsUpkeep s V2-Role × ¬ LeiosState.needsUpkeep s' V2-Role
 V2-Role-Upkeep (V2-Role x x₁ x₂) = x , addUpkeep⇒¬needsUpkeep
@@ -215,14 +215,14 @@ data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
              s0 = record s
                     { FFDState = ffds'
-                    ; Ledger   = constructLedger ebs
+                    ; Ledger   = constructLedger rbs
                     ; slot     = suc slot
                     ; Upkeep   = ∅
                     ; BaseState = bs'
                     } ↑ L.filter isValid? msgs
        in
        ∙ Upkeep ≡ᵉ allUpkeep
-       ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG ebs ⟧⇀ bs'
+       ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
        ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
        ∙ s0 -⟦Base⟧⇀    s1
        ∙ s1 -⟦IB-Role⟧⇀ s2
@@ -244,7 +244,7 @@ data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState 
 
   Base₁   :
           ──────────────────────────────────────────────────────────────
-          s -⟦ SUBMIT txs / EMPTY ⟧⇀ record s { ToPropose = txs }
+          s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
 
   -- Protocol rules
 
@@ -275,7 +275,7 @@ module _ ⦃ Computational-B : Computational22 B._-⟦_/_⟧⇀_ String ⦄
   instance
     Computational--⟦/⟧⇀ : Computational22 _-⟦_/_⟧⇀_ String
     Computational--⟦/⟧⇀ .computeProof s (INIT x) = failure "No handling of INIT here"
-    Computational--⟦/⟧⇀ .computeProof s (SUBMIT _) = success (-, Base₁)
+    Computational--⟦/⟧⇀ .computeProof s (SUBMIT _) = success {!(-, Base₁)!}
     Computational--⟦/⟧⇀ .computeProof s SLOT = let open LeiosState s in
       case (¿ Upkeep ≡ᵉ allUpkeep ¿ ,′ computeProof BaseState B.FTCH-LDG ,′ computeProof FFDState FFD.Fetch) of λ where
         (yes p , success ((B.BASE-LDG l , bs) , p₁) , success ((FFD.FetchRes msgs , ffds) , p₂)) →
