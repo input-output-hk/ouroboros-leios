@@ -1,5 +1,22 @@
 # Leios logbook
 
+## 2025-01-13
+
+### Haskell simulation
+
+- Added event log output:
+  - `cabal run ols -- sim $sim_name --output-file $output.json` now
+    also writes an event log to `$output.log`
+  - TODO: parallelize disk writes with other processing.
+- Added `short-leios` to possible simulations, parameters are
+  hardcoded atm, mostly same as `viz` default but with `sliceLength =
+  20` to match mainnet ranking block interval. Only writes event log
+  for now.
+- Progress on syncing input format with rust simulation, to be merged
+  after review with rust team.
+- Fixed coordination between Relay mini-protocol consumers:
+  `inFlightVar` wasn't necessarily respected when requesting bodies.
+
 ## 2025-01-07
 
 ### Rust simulation
