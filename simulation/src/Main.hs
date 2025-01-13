@@ -351,12 +351,12 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimShortLeios -> do
     -- TODO: read from parameter file
-    let sliceLength = 5
-    let numCores = Finite 5
+    let sliceLength = 20 -- matching mainnet ranking block interval
+    let numCores = Infinite
     let seed = 42
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 600 5 5
+    let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 100 5 5
     p2pTopography <- execTopographyOptions rng1 topographyOptions
     VizShortLeiosP2P.exampleSim rng2 sliceLength p2pTopography numCores simOutputSeconds simOutputFile
 
