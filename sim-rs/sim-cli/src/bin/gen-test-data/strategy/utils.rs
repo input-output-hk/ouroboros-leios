@@ -83,8 +83,6 @@ pub fn generate_full_config(nodes: Vec<RawNodeConfig>, links: Vec<RawLinkConfig>
         ib_shards: 8,
         max_block_size: 90112,
         stage_length: 2,
-        deliver_stage_count: 2,
-        uniform_ib_generation: true,
         max_ib_requests_per_peer: 1,
         one_vote_per_vrf: true,
         max_ib_size: 327680,
