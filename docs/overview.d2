@@ -1,0 +1,150 @@
+title: {
+  label: "Leios Protocol\nEvaluation Workflow"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# Styles
+classes: {
+  workstream: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+      shadow: true
+    }
+  }
+  output: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+    }
+  }
+  goal: {
+    style: {
+      stroke: "#1a73e8"
+      fill: "#e8f0fe"
+      font-color: "#1a73e8"
+      border-radius: 15
+      bold: true
+    }
+  }
+}
+
+# Work Streams
+Research: {
+  class: workstream
+}
+
+Crypto: {
+  class: workstream
+  label: "Cryptography"
+
+  threat: {
+    class: output
+    label: "Threat\nAnalysis"
+  }
+
+  certs: {
+    class: output
+    label: "Certificate\nDesign"
+  }
+}
+
+Formal: {
+  class: workstream
+  label: "Formal Specification\nof Protocol Semantics"
+
+  spec: {
+    class: output
+    label: "Agda Relational\nSpecification"
+  }
+
+  proofs: {
+    class: output
+    label: "Agda Executable\nSpecification"
+  }
+}
+
+Simulation: {
+  label: "Simulation & Modeling"
+  class: workstream
+
+  DeltaQ: {
+    class: output
+    label: "ΔQ Modeling"
+  }
+
+  haskell: {
+    class: output
+    label: "Haskell\nPrototype"
+  }
+
+  rust: {
+    class: output
+    label: "Rust\nSimulation"
+  }
+}
+
+Outreach: {
+  label: "Community Engagement"
+  class: workstream
+
+  demo: {
+    label: "Public Demo"
+    class: output
+  }
+
+  cip: {
+    label: "CIP"
+    class: output
+  }
+
+  discord: {
+    class: output
+    label: "Discord"
+  }
+}
+
+# Goal
+Optimization: {
+  class: goal
+  label: "Protocol Optimization\n\nMaximize Throughput\nMinimize Cost\nPreserve Security"
+}
+
+# Relationships
+Research <-> Crypto: "Outlines constraints/\nReceives Feedback"
+Research <-> Formal: "Guides\nformalization/\nReceives Feedback"
+Research <-> Simulation: "Guides\nimplementation/\nReceives Feedback"
+Research <-> Simulation: "Defines test\nscenarios/\nReceives Feedback"
+
+Crypto -> Optimization: "Security\nrequirements"
+Crypto -> Optimization: "Cryptographic\nguarantees"
+
+Formal -> Optimization: "Verifies\nsecurity properties"
+Formal -> Optimization: "Proves safety\nguarantees"
+
+# Simulations.DeltaQ.latency -> Optimization: "Quantifies\nperformance"
+# DeltaQ.resources -> Optimization: "Estimates\ncost"
+
+# Simulation -> Research: "Feedback\nfrom\nsimulations"
+Simulation.DeltaQ -> Simulation.haskell: "Validates\nmodels"
+Simulation.haskell -> Simulation.DeltaQ: "Prototype\nmetrics"
+
+Simulation.DeltaQ -> Simulation.rust: "Validates\nmodels"
+Simulation.rust -> Simulation.DeltaQ: "Large network\nmetrics"
+
+Simulation -> Optimization: "Network & Performance\nbehavior"
+Simulation -> Optimization: "Cost quantification"
+
+Optimization <-> Outreach: "Feedback"
+Optimization <- Outreach: "Experience"
+
+# Research-led, community-driven solution
