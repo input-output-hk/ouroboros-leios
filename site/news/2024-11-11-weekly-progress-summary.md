@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - November 11, 2024
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Network Simulation for Leios

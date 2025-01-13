@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - October 21, 2024
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Designing Test Environment

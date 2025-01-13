@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - January 6, 2025
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Rust Simulation

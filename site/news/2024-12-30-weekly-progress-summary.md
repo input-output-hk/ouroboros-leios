@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - December 30, 2024
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Rust Simulation

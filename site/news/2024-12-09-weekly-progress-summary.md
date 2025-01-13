@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - December 9, 2024
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Discussion with IOG SRE for Nodes

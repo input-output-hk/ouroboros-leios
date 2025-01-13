@@ -2,7 +2,7 @@
 title: Weekly Progress Summary - November 18, 2024
 authors:
 - will
-tags: [progress, update]
+tags: [progress, update, weekly]
 ---
 
 ## Structuring Repository for Open-source
