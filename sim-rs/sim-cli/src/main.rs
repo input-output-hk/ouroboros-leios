@@ -3,9 +3,13 @@ use std::{fs, path::PathBuf, process};
 use anyhow::Result;
 use clap::Parser;
 use events::{EventMonitor, OutputFormat};
+use figment::{
+    providers::{Format as _, Yaml},
+    Figment,
+};
 use sim_core::{
     clock::ClockCoordinator,
-    config::{NodeId, RawConfig, SimConfiguration},
+    config::{NodeId, RawParameters, RawTopology, SimConfiguration, Topology},
     events::EventTracker,
     sim::Simulation,
 };
@@ -21,8 +25,10 @@ mod events;
 
 #[derive(Parser)]
 struct Args {
-    filename: PathBuf,
+    topology: PathBuf,
     output: Option<PathBuf>,
+    #[clap(short, long)]
+    parameters: Vec<PathBuf>,
     #[clap(short, long)]
     format: Option<OutputFormat>,
     #[clap(short, long)]
@@ -34,19 +40,30 @@ struct Args {
 }
 
 fn read_config(args: &Args) -> Result<SimConfiguration> {
-    let file = fs::read_to_string(&args.filename)?;
-    let mut raw_config: RawConfig = toml::from_str(&file)?;
+    let topology_str = fs::read_to_string(&args.topology)?;
+    let raw_topology: RawTopology = toml::from_str(&topology_str)?;
+    let topology: Topology = raw_topology.into();
+    topology.validate()?;
+
+    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
+        "../../../data/simulation/default.yaml"
+    )));
+
+    for params_file in &args.parameters {
+        raw_params = raw_params.merge(Yaml::file_exact(params_file));
+    }
+
+    let params: RawParameters = raw_params.extract()?;
+    let mut config = SimConfiguration::build(params, topology);
     if let Some(slots) = args.slots {
-        raw_config.slots = Some(slots);
+        config.slots = Some(slots);
     }
     if let Some(ts) = args.timescale {
-        raw_config.timescale = Some(ts);
+        config.timescale = ts;
     }
     for id in &args.trace_node {
-        raw_config.trace_nodes.insert(NodeId::new(*id));
+        config.trace_nodes.insert(NodeId::new(*id));
     }
-    let config: SimConfiguration = raw_config.into();
-    config.validate()?;
     Ok(config)
 }
 

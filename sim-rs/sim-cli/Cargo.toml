@@ -9,6 +9,7 @@ anyhow = "1"
 average = "0.15"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
+figment = { version = "0.10", features = ["yaml"] }
 itertools = "0.13"
 pretty-bytes-rust = "0.3.0"
 rand = "0.8"
