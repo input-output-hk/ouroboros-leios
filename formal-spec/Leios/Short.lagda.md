@@ -81,9 +81,9 @@ module Protocol where
             s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
 ```
 ```agda
-    V-Role : let open LeiosState s renaming (FFDState to ffds)
-                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                 votes = map (vote sk-V ∘ hash) EBs'
+    V-Role  : let open LeiosState s renaming (FFDState to ffds)
+                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
+                  votes = map (vote sk-V ∘ hash) EBs'
             in
             ∙ needsUpkeep V-Role
             ∙ canProduceV slot sk-V (stake s)
@@ -94,24 +94,24 @@ module Protocol where
 #### Negative Block/Vote production rules
 ```agda
     No-IB-Role : let open LeiosState s in
-            ∙ needsUpkeep IB-Role
-            ∙ ¬ canProduceIB slot sk-IB (stake s) π
-            ─────────────────────────────────────────────
-            s ↝ addUpkeep s IB-Role
+               ∙ needsUpkeep IB-Role
+               ∙ ¬ canProduceIB slot sk-IB (stake s) π
+               ─────────────────────────────────────────────
+               s ↝ addUpkeep s IB-Role
 ```
 ```agda
     No-EB-Role : let open LeiosState s in
-            ∙ needsUpkeep EB-Role
-            ∙ ¬ canProduceEB slot sk-EB (stake s) π
-            ─────────────────────────────────────────────
-            s ↝ addUpkeep s EB-Role
+               ∙ needsUpkeep EB-Role
+               ∙ ¬ canProduceEB slot sk-EB (stake s) π
+               ─────────────────────────────────────────────
+               s ↝ addUpkeep s EB-Role
 ```
 ```agda
-    No-V-Role : let open LeiosState s in
-            ∙ needsUpkeep V-Role
-            ∙ ¬ canProduceV slot sk-V (stake s)
-            ─────────────────────────────────────────────
-            s ↝ addUpkeep s V-Role
+    No-V-Role  : let open LeiosState s in
+               ∙ needsUpkeep V-Role
+               ∙ ¬ canProduceV slot sk-V (stake s)
+               ─────────────────────────────────────────────
+               s ↝ addUpkeep s V-Role
 ```
 ### Uniform short-pipeline
 ```agda
@@ -172,7 +172,8 @@ Note: Submitted data to the base chain is only taken into account
 ```
 #### Protocol rules
 ```agda
-    Roles : ∙ s ↝ s'
-            ─────────────────────────────
-            just s -⟦ SLOT / EMPTY ⟧⇀ s'
+    Roles :
+          ∙ s ↝ s'
+          ─────────────────────────────
+          just s -⟦ SLOT / EMPTY ⟧⇀ s'
 ```
