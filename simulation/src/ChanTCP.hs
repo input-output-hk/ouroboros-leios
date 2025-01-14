@@ -11,42 +11,16 @@ module ChanTCP (
   TcpConnProps (..),
 ) where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    TMVar,
-    TVar,
-    atomically,
-    modifyTVar',
-    newEmptyTMVarIO,
-    newTVarIO,
-    putTMVar,
-    readTMVar,
-    readTVar,
-    retry,
-    takeTMVar,
-    writeTVar
-  ),
- )
+import Chan (Chan (..))
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Class.MonadAsync (MonadAsync (async))
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadMonotonicTime (..),
-  MonadTime,
-  Time,
-  diffTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
   Tracer,
   traceWith,
  )
-import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
-
-import Chan (Chan (..))
 import ModelTCP (
   Bytes,
   TcpConnProps (..),
@@ -57,7 +31,8 @@ import ModelTCP (
   initTcpState,
   saneTcpState,
  )
-import TimeCompat (threadDelaySI)
+import STMCompat
+import TimeCompat
 
 -- | In the scope of a two party connection, there are just two peers. These
 -- can be maped to a wider scope peer identity via contra-trace.
@@ -85,7 +60,7 @@ instance (MessageSize a, MessageSize b) => MessageSize (a, b) where
 -- symmetric and without jitter.
 newConnectionTCP ::
   forall m a.
-  (MonadTime m, MonadMonotonicTime m, MonadDelay m, MonadAsync m, MessageSize a) =>
+  (MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize a) =>
   Tracer m (LabelTcpDir (TcpEvent a)) ->
   TcpConnProps ->
   m (Chan m a, Chan m a)
@@ -119,37 +94,31 @@ newConnectionTCP tracer tcpprops = do
   return (clientChan, serverChan)
 
 type SendBuf m a = TMVar m a
-type RecvBuf m a = TVar m (MinPQueue Time a)
+type RecvBuf m a = TQueue m (Time, a)
 
 newSendBuf :: MonadSTM m => m (SendBuf m a)
 newSendBuf = newEmptyTMVarIO
 
 newRecvBuf :: MonadSTM m => m (RecvBuf m a)
-newRecvBuf = newTVarIO PQ.empty
+newRecvBuf = newTQueueIO
 
 writeSendBuf :: MonadSTM m => SendBuf m a -> a -> m ()
 writeSendBuf sendbuf msg = atomically (putTMVar sendbuf msg)
 
 readRecvBuf ::
-  (MonadSTM m, MonadMonotonicTime m, MonadDelay m) =>
+  (MonadSTM m, MonadMonotonicTimeNSec m, MonadDelay m) =>
   RecvBuf m a ->
   m a
 readRecvBuf recvbuf = do
-  (arrivaltime, msg) <- atomically $ do
-    arrivals <- readTVar recvbuf
-    case PQ.minViewWithKey arrivals of
-      Nothing -> retry
-      Just (res, arrivals') -> do
-        writeTVar recvbuf arrivals'
-        return res
+  (arrivaltime, msg) <- atomically $ readTQueue recvbuf
 
   now <- getMonotonicTime
   let delay = arrivaltime `diffTime` now
-  when (delay > 0) (threadDelaySI delay)
+  when (delay > 0) (threadDelay delay)
   return msg
 
 mkChan ::
-  (MonadSTM m, MonadMonotonicTime m, MonadDelay m) =>
+  (MonadSTM m, MonadMonotonicTimeNSec m, MonadDelay m) =>
   SendBuf m a ->
   RecvBuf m a ->
   Chan m a
@@ -160,7 +129,7 @@ mkChan sendbuf recvbuf =
     }
 
 transport ::
-  (MonadSTM m, MonadMonotonicTime m, MonadDelay m, MessageSize a) =>
+  (MonadSTM m, MonadMonotonicTimeNSec m, MonadDelay m, MessageSize a) =>
   Tracer m (TcpEvent a) ->
   TcpConnProps ->
   SendBuf m a ->
@@ -196,12 +165,12 @@ transport tracer tcpprops sendbuf recvbuf = do
             }
           , tcpforecasts
           , tcpstate''
-          ) = forecastTcpMsgSend tcpprops tcpstate' now' msgsize
+          ) = assert (msgsize > 0) $ forecastTcpMsgSend tcpprops tcpstate' now' msgsize
 
     -- schedule the arrival, and wait until it has finished sending
-    atomically $ modifyTVar' recvbuf (PQ.insert msgRecvTrailingEdge msg)
+    atomically $ writeTQueue recvbuf (msgRecvTrailingEdge, msg)
     traceWith tracer (TcpSendMsg msg forecast tcpforecasts)
-    threadDelaySI (msgSendTrailingEdge `diffTime` now')
+    threadDelay (msgSendTrailingEdge `diffTime` now')
     -- We keep the sendbuf full until the message has finished sending
     -- so that there's less buffering, and better simulates the TCP buffer
     -- rather than an extra app-level buffer.

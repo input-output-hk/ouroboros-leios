@@ -57,7 +57,7 @@ impl EventMonitor {
             .filter_map(|p| if p.stake > 0 { Some(p.id) } else { None })
             .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
+        let maximum_ib_age = stage_length * 3;
         Self {
             node_ids,
             pool_ids,
@@ -158,15 +158,12 @@ impl EventMonitor {
                         });
                     }
                 }
+                Event::CpuTaskScheduled { .. } => {}
+                Event::CpuTaskFinished { .. } => {}
+                Event::CpuSubtaskStarted { .. } => {}
+                Event::CpuSubtaskFinished { .. } => {}
                 Event::TransactionGenerated { id, bytes, .. } => {
-                    txs.insert(
-                        id,
-                        Transaction {
-                            bytes,
-                            generated: time,
-                            included_in_ib: None,
-                        },
-                    );
+                    txs.insert(id, Transaction::new(bytes, time));
                     pending_txs.insert(id);
                 }
                 Event::TransactionSent { .. } => {
@@ -175,6 +172,7 @@ impl EventMonitor {
                 Event::TransactionReceived { .. } => {
                     tx_messages.received += 1;
                 }
+                Event::PraosBlockLotteryWon { .. } => {}
                 Event::PraosBlockGenerated {
                     slot,
                     producer,
@@ -220,13 +218,17 @@ impl EventMonitor {
                         blocks.insert(slot, (producer, vrf));
                     }
                     for published_tx in all_txs {
-                        let tx = txs.get(&published_tx).unwrap();
+                        let tx = txs.get_mut(&published_tx).unwrap();
+                        if tx.included_in_block.is_none() {
+                            tx.included_in_block = Some(time);
+                        }
                         published_bytes += tx.bytes;
                         pending_txs.remove(&published_tx);
                     }
                 }
                 Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
+                Event::InputBlockLotteryWon { .. } => {}
                 Event::InputBlockGenerated {
                     header,
                     transactions,
@@ -264,6 +266,7 @@ impl EventMonitor {
                     ib_messages.received += 1;
                     *seen_ibs.entry(recipient).or_default() += 1.;
                 }
+                Event::EndorserBlockLotteryWon { .. } => {}
                 Event::EndorserBlockGenerated { id, input_blocks } => {
                     generated_ebs += 1;
                     eb_ibs.insert(id, input_blocks.clone());
@@ -271,6 +274,12 @@ impl EventMonitor {
                         *ibs_in_eb.entry(id).or_default() += 1.0;
                         *ebs_containing_ib.entry(*ib_id).or_default() += 1.0;
                         pending_ibs.remove(ib_id);
+                        for tx_id in ib_txs.get(ib_id).unwrap() {
+                            let tx = txs.get_mut(tx_id).unwrap();
+                            if tx.included_in_eb.is_none() {
+                                tx.included_in_eb = Some(time);
+                            }
+                        }
                     }
                     info!(
                         "Pool {} generated an EB with {} IBs(s) in slot {}.",
@@ -285,12 +294,13 @@ impl EventMonitor {
                 Event::EndorserBlockReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::VotesGenerated { id, ebs } => {
-                    for eb in ebs {
-                        total_votes += 1;
-                        *votes_per_bundle.entry(id).or_default() += 1.0;
-                        *eb_votes.entry(eb).or_default() += 1.0;
-                        *votes_per_pool.entry(id.producer).or_default() += 1.0;
+                Event::VoteLotteryWon { .. } => {}
+                Event::VotesGenerated { id, votes } => {
+                    for (eb, count) in votes.0 {
+                        total_votes += count as u64;
+                        *votes_per_bundle.entry(id).or_default() += count as f64;
+                        *eb_votes.entry(eb).or_default() += count as f64;
+                        *votes_per_pool.entry(id.producer).or_default() += count as f64;
                     }
                 }
                 Event::NoVote { .. } => {}
@@ -337,9 +347,26 @@ impl EventMonitor {
         });
 
         info_span!("leios").in_scope(|| {
-            let txs_which_reached_ib: Vec<_> = txs
+            let times_to_reach_ib: Vec<_> = txs
                 .values()
-                .filter(|tx| tx.included_in_ib.is_some())
+                .filter_map(|tx| {
+                    let ib_time = tx.included_in_ib?;
+                    Some(ib_time - tx.generated)
+                })
+                .collect();
+            let times_to_reach_eb: Vec<_> = txs
+                .values()
+                .filter_map(|tx| {
+                    let eb_time = tx.included_in_eb?;
+                    Some(eb_time - tx.generated)
+                })
+                .collect();
+            let times_to_reach_block: Vec<_> = txs
+                .values()
+                .filter_map(|tx| {
+                    let block_time = tx.included_in_block?;
+                    Some(block_time - tx.generated)
+                })
                 .collect();
             let empty_ebs = generated_ebs - ibs_in_eb.len() as u64;
             let ibs_which_reached_eb = ebs_containing_ib.len();
@@ -349,10 +376,9 @@ impl EventMonitor {
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
             let ibs_per_eb = compute_stats(ebs_containing_ib.into_values());
             let ebs_per_ib = compute_stats(ibs_in_eb.into_values());
-            let times_to_reach_ibs = compute_stats(txs_which_reached_ib.iter().map(|tx| {
-                let duration = tx.included_in_ib.unwrap() - tx.generated;
-                duration.as_secs_f64()
-            }));
+            let ib_time_stats = compute_stats(times_to_reach_ib.iter().map(|t| t.as_secs_f64()));
+            let eb_time_stats = compute_stats(times_to_reach_eb.iter().map(|t| t.as_secs_f64()));
+            let block_time_stats = compute_stats(times_to_reach_block.iter().map(|t| t.as_secs_f64()));
             let ibs_received = compute_stats(
                 self.node_ids
                     .iter()
@@ -368,7 +394,7 @@ impl EventMonitor {
             );
             info!(
                 "{} out of {} transaction(s) were included in at least one IB.",
-                txs_which_reached_ib.len(),
+                times_to_reach_ib.len(),
                 txs.len(),
             );
             let avg_age = pending_txs.iter().map(|id| {
@@ -387,12 +413,8 @@ impl EventMonitor {
             info!(
                 "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
                 txs_per_ib.mean, txs_per_ib.std_dev,
-                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo), bytes_per_ib.std_dev,
+                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo),
                 empty_ibs,
-            );
-            info!(
-                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
-                times_to_reach_ibs.mean, times_to_reach_ibs.std_dev,
             );
             info!(
                 "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
@@ -418,6 +440,10 @@ impl EventMonitor {
                 "{} out of {} IBs expired before they reached an EB.",
                 expired_ibs, generated_ibs,
             );
+            info!(
+                "{} out of {} transaction(s) were included in at least one EB.",
+                times_to_reach_eb.len(), txs.len(),
+            );
             info!("{} total votes were generated.", total_votes);
             info!("Each stake pool produced an average of {:.3} vote(s) (stddev {:.3}).",
                 votes_per_pool.mean, votes_per_pool.std_dev);
@@ -428,6 +454,18 @@ impl EventMonitor {
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) were referenced by a Leios endorsement.", leios_txs);
             info!("{} tx(s) were included directly in a Praos block.", praos_txs);
+            info!(
+                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
+                ib_time_stats.mean, ib_time_stats.std_dev,
+            );
+            info!(
+                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an EB.",
+                eb_time_stats.mean, eb_time_stats.std_dev,
+            );
+            info!(
+                "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in a block.",
+                block_time_stats.mean, block_time_stats.std_dev,
+            );
         });
 
         info_span!("network").in_scope(|| {
@@ -445,6 +483,19 @@ struct Transaction {
     bytes: u64,
     generated: Timestamp,
     included_in_ib: Option<Timestamp>,
+    included_in_eb: Option<Timestamp>,
+    included_in_block: Option<Timestamp>,
+}
+impl Transaction {
+    fn new(bytes: u64, generated: Timestamp) -> Self {
+        Self {
+            bytes,
+            generated,
+            included_in_ib: None,
+            included_in_eb: None,
+            included_in_block: None,
+        }
+    }
 }
 
 #[derive(Default)]

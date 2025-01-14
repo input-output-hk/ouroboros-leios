@@ -18,7 +18,7 @@ baseScenario =
 
     slots_per_s             = 1.0
   ; phase_per_pipeline      = 5.0
-  ; slot_per_pipeline       = 20.0
+  ; slot_per_pipeline       = 60.0
 
   ; praos_tx_per_s          = 1.0
   ; leios_tx_per_s          = 100.0
@@ -26,30 +26,30 @@ baseScenario =
   ; verify_vcpu_ms_per_tx   = 1.50
 
   ; ib_per_slot             = 0.25
-  ; io_per_ib               = 200.0
+  ; io_per_ib               = 1000.0
   ; build_vcpu_ms_per_ib    = 300.0
   ; verify_vcpu_ms_per_ib   = 100.0
    
-  ; eb_per_pipeline         = 1.0
-  ; io_per_eb               = 10.0
+  ; eb_per_pipeline         = 0.8
+  ; io_per_eb               = 200.0
   ; build_vcpu_ms_per_eb    = 300.0
   ; verify_vcpu_ms_per_eb   = 100.0
 
   ; vote_per_pipeline       = 500.0
-  ; kb_per_vote             = 0.725
-  ; io_per_vote             = 2.0
-  ; build_vcpu_ms_per_vote  = 0.01
-  ; verify_vcpu_ms_per_vote = 0.005
+  ; kb_per_vote             = 0.250
+  ; io_per_vote             = 25.0
+  ; build_vcpu_ms_per_vote  = 2.0
+  ; verify_vcpu_ms_per_vote = 3.0
 
   ; cert_per_pipeline       = 1.0
-  ; kb_per_cert             = 30.0
-  ; io_per_cert             = 100.0
-  ; build_vcpu_ms_per_cert  = 100.0
-  ; verify_vcpu_ms_per_cert = 50.0
+  ; kb_per_cert             = 75.0
+  ; io_per_cert             = 1000.0
+  ; build_vcpu_ms_per_cert  = 200.0
+  ; verify_vcpu_ms_per_cert = 200.0
 
   ; rb_per_slot             = 0.05
   ; kb_per_ibref            = 1.2
-  ; io_per_rb               = 100.0  -- NB: Copied from `io_per_cert`
+  ; io_per_rb               = 1000.0
   ; build_vcpu_ms_per_rb    = 300.0
   ; verify_vcpu_ms_per_rb   = 100.0
   ; ledger_gb               = 200.0

@@ -2,14 +2,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module P2P where
 
 import Control.Exception (assert)
 import Control.Monad (when)
-import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.ST (ST)
-import Data.Aeson.Types (FromJSON, ToJSON (..), defaultOptions, genericToEncoding)
+import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), ToJSON (..), defaultOptions, genericToEncoding, object, withObject, (.!=), (.:?))
 import Data.Array.ST as Array (
   Ix (range),
   MArray (newArray),
@@ -19,34 +20,37 @@ import Data.Array.ST as Array (
   writeArray,
  )
 import Data.Array.Unboxed as Array (IArray (bounds), UArray, (!))
+import Data.Default (Default (..))
 import Data.Graph as Graph (Edge, Graph, Vertex, buildG, edges)
 import qualified Data.KdMap.Static as KdMap
 import Data.List (mapAccumL, sort, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
-import SimTypes (NodeId (..), Point (..), WorldShape (..))
-import System.Random (StdGen)
+import GHC.Stack (HasCallStack)
+import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
 import qualified System.Random as Random
+import TimeCompat
 
 data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)
   , p2pLinks :: !(Map (NodeId, NodeId) Latency)
-  , p2pWorldShape :: !WorldShape
+  , p2pWorld :: !World
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
 
 instance ToJSON P2PTopography where
   toEncoding = genericToEncoding defaultOptions
 
 instance FromJSON P2PTopography
 
-type Latency =
-  -- | Double rather than DiffTime for efficiency
-  Double
+-- | Latency in /seconds/.
+--
+--   This uses a `Double` rather than a `DiffTime` for compatibility with Cairo.
+type Latency = Double
 
 data P2PTopographyCharacteristics = P2PTopographyCharacteristics
-  { p2pWorldShape :: !WorldShape
+  { p2pWorld :: !World
   -- ^ Size of the world (in seconds): (Circumference, pole-to-pole)
   , -- \^ Number of nodes, e.g. 100, 1000, 10,000
 
@@ -56,12 +60,33 @@ data P2PTopographyCharacteristics = P2PTopographyCharacteristics
   -- ^ Per-node upstream links picked as random peers, e.g. 5 of 10 total
   , p2pNodeLinksRandom :: Int
   }
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
+
+instance Default P2PTopographyCharacteristics where
+  def =
+    P2PTopographyCharacteristics
+      { p2pWorld = def
+      , p2pNumNodes = 100
+      , p2pNodeLinksClose = 5
+      , p2pNodeLinksRandom = 5
+      }
 
 instance ToJSON P2PTopographyCharacteristics where
-  toEncoding = genericToEncoding defaultOptions
+  toJSON P2PTopographyCharacteristics{..} =
+    object
+      [ "world" .= p2pWorld
+      , "num_nodes" .= p2pNumNodes
+      , "num_links_close" .= p2pNodeLinksClose
+      , "num_links_random" .= p2pNodeLinksRandom
+      ]
 
-instance FromJSON P2PTopographyCharacteristics
+instance FromJSON P2PTopographyCharacteristics where
+  parseJSON = withObject "P2PTopographyCharacteristics" $ \o -> do
+    p2pWorld <- o .:? "world" .!= def
+    p2pNumNodes <- o .:? "num_nodes" .!= 100
+    p2pNodeLinksClose <- o .:? "num_links_close" .!= 5
+    p2pNodeLinksRandom <- o .:? "num_links_random" .!= 5
+    pure P2PTopographyCharacteristics{..}
 
 -- | Strategy for creating an arbitrary P2P network:
 --
@@ -77,15 +102,17 @@ instance FromJSON P2PTopographyCharacteristics
 -- * The latency of each link will be chosen based on the shortest distance
 --   between the nodes: connecting over the "date line" if necessary.
 genArbitraryP2PTopography ::
+  forall g.
+  (HasCallStack, Random.RandomGen g) =>
   P2PTopographyCharacteristics ->
-  StdGen ->
+  g ->
   P2PTopography
 genArbitraryP2PTopography
   P2PTopographyCharacteristics
-    { p2pWorldShape =
-      p2pWorldShape@WorldShape
+    { p2pWorld =
+      p2pWorld@World
         { worldDimensions = (widthSeconds, heightSeconds)
-        , worldIsCylinder
+        , worldShape
         }
     , p2pNumNodes
     , p2pNodeLinksClose
@@ -95,7 +122,7 @@ genArbitraryP2PTopography
     P2PTopography
       { p2pNodes = nodePositions
       , p2pLinks = nodeLinks
-      , p2pWorldShape
+      , p2pWorld
       }
    where
     nodes :: [NodeId]
@@ -107,7 +134,7 @@ genArbitraryP2PTopography
     nodePositions =
       Map.fromList $ snd $ mapAccumL genNodePos rngNodes nodes
      where
-      genNodePos :: StdGen -> NodeId -> (StdGen, (NodeId, Point))
+      genNodePos :: g -> NodeId -> (g, (NodeId, Point))
       genNodePos rng nodeid =
         (rng'', (nodeid, Point x y))
        where
@@ -131,7 +158,7 @@ genArbitraryP2PTopography
     pickNodeLinksClose :: NodeId -> Point -> [NodeId]
     pickNodeLinksClose nid p =
       case map snd $ KdMap.kNearest nodesKdMap (p2pNodeLinksClose + 1) p of
-        (nid' : nids) -> assert (nid == nid') $ nids
+        (nid' : nids) -> assert (nid == nid') nids
         [] -> assert False []
 
     -- For efficiency in finding the K nearest neighbours, we use a K-D map
@@ -143,7 +170,7 @@ genArbitraryP2PTopography
         linkLatencySquared
         [(p, n) | (n, p) <- Map.toList nodePositions]
 
-    pickNodeLinksRandom :: NodeId -> StdGen -> [NodeId]
+    pickNodeLinksRandom :: NodeId -> g -> [NodeId]
     pickNodeLinksRandom nid rng =
       take
         p2pNodeLinksRandom
@@ -158,7 +185,7 @@ genArbitraryP2PTopography
 
     linkLatencySquared :: Point -> Point -> Latency
     linkLatencySquared p1 p2
-      | worldIsCylinder = min d2 d2'
+      | worldShape == Cylinder = min d2 d2'
       | otherwise = d2
      where
       (d2, d2') = linkPathLatenciesSquared widthSeconds p1 p2
@@ -195,10 +222,10 @@ pointToPointLatencySquared (Point x1 y1) (Point x2 y2) =
 exampleTopographyCharacteristics1 :: P2PTopographyCharacteristics
 exampleTopographyCharacteristics1 =
   P2PTopographyCharacteristics
-    { p2pWorldShape =
-        WorldShape
+    { p2pWorld =
+        World
           { worldDimensions = (0.600, 0.300)
-          , worldIsCylinder = True
+          , worldShape = Cylinder
           }
     , p2pNumNodes = 50
     , p2pNodeLinksClose = 5
@@ -219,7 +246,7 @@ p2pGraphIdealDiffusionTimesFromNode
   (P2PIdealDiffusionTimes g latencies)
   (NodeId nid) =
     sort
-      [ realToFrac (latencies ! (nid, nid'))
+      [ secondsToDiffTime (latencies ! (nid, nid'))
       | nid' <- range (bounds g)
       ]
 
@@ -254,7 +281,7 @@ p2pGraphIdealDiffusionTimes
                   communicationDelay
                     (NodeId a)
                     (NodeId b)
-                    (realToFrac linkLatency)
+                    (secondsToDiffTime linkLatency)
              in realToFrac msgLatency
         )
         (realToFrac . processingDelay . NodeId)

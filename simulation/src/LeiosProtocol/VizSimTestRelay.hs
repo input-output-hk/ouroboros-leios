@@ -4,18 +4,25 @@
 
 module LeiosProtocol.VizSimTestRelay where
 
+import ChanDriver (ProtocolMessage (..))
 import Control.Exception (assert)
-import Control.Monad.Class.MonadTime.SI (Time, addTime)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
+import Data.Word (Word8)
 import qualified Graphics.Rendering.Cairo as Cairo
-
+import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
+import LeiosProtocol.SimTestRelay
 import ModelTCP
+import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
+import SimTCPLinks
 import SimTypes
+import System.Random (mkStdGen)
+import System.Random.Stateful (uniform)
+import TimeCompat
 import Viz
 import VizSim
 import VizSimTCP (
@@ -24,15 +31,6 @@ import VizSimTCP (
   renderMessagesInFlight,
  )
 import VizUtils
-
-import ChanDriver (ProtocolMessage (..))
-import Data.Word (Word8)
-import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
-import LeiosProtocol.SimTestRelay
-import Network.TypedProtocol (SomeMessage (..))
-import SimTCPLinks
-import System.Random (mkStdGen)
-import System.Random.Stateful (uniform)
 
 ------------------------------------------------------------------------------
 -- Examples
@@ -125,7 +123,7 @@ type RelaySimVizModel =
 
 -- | The vizualisation state within the data model for the relay simulation
 data RelaySimVizState = RelaySimVizState
-  { vizWorldShape :: !WorldShape
+  { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
@@ -179,7 +177,7 @@ relaySimVizModel =
  where
   initVizState =
     RelaySimVizState
-      { vizWorldShape = WorldShape (0, 0) False
+      { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
@@ -200,7 +198,7 @@ relaySimVizModel =
     RelaySimVizState
   accumEventVizState _now (RelaySimEventSetup shape nodes links) vs =
     vs
-      { vizWorldShape = shape
+      { vizWorld = shape
       , vizNodePos = nodes
       , vizNodeLinks =
           Map.fromSet
@@ -331,12 +329,12 @@ relaySimVizModel =
 -- considered to be a cylinder.
 --
 -- These points are computed in normalised (unit square) coordinates
-linkPoints :: WorldShape -> Point -> Point -> LinkPoints
+linkPoints :: World -> Point -> Point -> LinkPoints
 linkPoints
-  WorldShape{worldDimensions = (widthSeconds, _), worldIsCylinder}
+  World{worldDimensions = (widthSeconds, _), worldShape}
   p1@(Point x1 y1)
   p2@(Point x2 y2)
-    | not worldIsCylinder || d2 < d2' =
+    | worldShape == Rectangle || d2 < d2' =
         LinkPointsNoWrap (Point x1 y1) (Point x2 y2)
     | x1 <= x2 =
         LinkPointsWrap
@@ -409,7 +407,7 @@ relaySimVizRenderModel
   ( SimVizModel
       _events
       RelaySimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizMsgsInTransit

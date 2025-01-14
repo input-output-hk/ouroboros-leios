@@ -110,6 +110,8 @@ fn atom(input: &mut &str) -> PResult<DeltaQExpr> {
             for_all,
             for_some,
             gossip,
+            min,
+            max,
             name_expr,
             delimited('(', delta_q, closing_paren),
             fail.context(StrContext::Label("atom"))
@@ -251,6 +253,38 @@ fn gossip(input: &mut &str) -> PResult<DeltaQExpr> {
             disjoint_names,
         },
     )
+    .parse_next(input)
+}
+
+fn min(input: &mut &str) -> PResult<DeltaQExpr> {
+    delimited(
+        "MIN(",
+        cut_err(separated(0.., cdf, (ws, ',', ws)))
+            .context(StrContext::Label("outcomes"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                "outcomes",
+            ))),
+        closing_paren,
+    )
+    .map(|outcomes: Vec<CDF>| {
+        DeltaQExpr::Min(outcomes.into_iter().map(|cdf| Outcome::new(cdf)).collect())
+    })
+    .parse_next(input)
+}
+
+fn max(input: &mut &str) -> PResult<DeltaQExpr> {
+    delimited(
+        "MAX(",
+        cut_err(separated(0.., cdf, (ws, ',', ws)))
+            .context(StrContext::Label("outcomes"))
+            .context(StrContext::Expected(StrContextValue::Description(
+                "outcomes",
+            ))),
+        closing_paren,
+    )
+    .map(|outcomes: Vec<CDF>| {
+        DeltaQExpr::Max(outcomes.into_iter().map(|cdf| Outcome::new(cdf)).collect())
+    })
     .parse_next(input)
 }
 

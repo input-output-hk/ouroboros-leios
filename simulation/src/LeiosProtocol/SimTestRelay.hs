@@ -1,85 +1,59 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# HLINT ignore "Use void" #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module LeiosProtocol.SimTestRelay where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TQueue,
-    TVar,
-    atomically,
-    modifyTVar',
-    newTQueueIO,
-    newTVarIO,
-    readTQueue,
-    readTVar,
-    retry,
-    writeTQueue,
-    writeTVar
-  ),
- )
-import Control.Monad (forever)
+import Chan
+import ChanMux
+import ChanTCP
+import Control.Category ((>>>))
+import Control.Exception (assert)
+import Control.Monad (forever, when)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadTime (..),
-  NominalDiffTime,
-  Time,
-  UTCTime,
-  addUTCTime,
-  diffUTCTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
   Tracer,
   traceWith,
  )
-import Data.Foldable (traverse_)
+import Data.Foldable (forM_, traverse_)
+import Data.List (sortOn)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Ord (Down (..))
 import Data.Set (Set)
 import qualified Data.Set as Set
-import System.Random (StdGen, uniform, uniformR)
-
-import Chan
-import ChanTCP
-import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
-import SimTypes
-import TimeCompat (threadDelayNDT, threadDelaySI)
-
-import ChanMux
-import Control.Category ((>>>))
-import Control.Exception (assert)
-import Data.Foldable (forM_)
-import Data.List (sortOn)
-import Data.Ord (Down (..))
 import LeiosProtocol.Relay
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
-import PraosProtocol.Common (asReadOnly)
+import STMCompat
+import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
+import SimTypes
+import System.Random (StdGen, uniform, uniformR)
+import TimeCompat
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use void" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 type RelaySimTrace = [(Time, RelaySimEvent)]
 
 data RelaySimEvent
   = -- | Declare the nodes and links
     RelaySimEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -164,8 +138,8 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
-            , headerValidationDelay = const 0.1
-            , threadDelayParallel = sum >>> \d -> if d >= 0 then threadDelaySI d else return ()
+            , -- sequential validation of headers
+              validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId
             , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
             , submitPolicy = SubmitAll
@@ -200,7 +174,7 @@ relayNode
        where
         -- TODO: make different generators produce different non-overlapping ids
         go !blkid = do
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let blk =
                 TestBlock
@@ -218,7 +192,7 @@ relayNode
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
               gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
               blkid = TestBlockId blkidn
@@ -265,7 +239,7 @@ relayNode
     processing submitq =
       forever $ do
         (blks, completion) <- atomically $ readTQueue submitq
-        threadDelaySI (sum $ map blockProcessingDelay blks)
+        threadDelay (sum $ map blockProcessingDelay blks)
         _ <- atomically $ completion blks -- "relayNode: completions should not block"
         forM_ blks $ \blk -> traceWith tracer (RelayNodeEventEnterBuffer blk)
 
@@ -275,7 +249,7 @@ testHeader blk = TestBlockHeader (testBlockId blk) (testBlockExpiry blk)
 symmetric :: Ord a => Set (a, a) -> Set (a, a)
 symmetric xys = xys <> Set.map (\(x, y) -> (y, x)) xys
 
-data TestRelayBundle f = TestRelayBundle
+newtype TestRelayBundle f = TestRelayBundle
   { testMsg :: f TestBlockRelayMessage
   }
 
@@ -300,9 +274,9 @@ traceRelayLink1 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)
@@ -312,7 +286,7 @@ traceRelayLink1 tcpprops generationPattern =
           ( Set.fromList
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
-      (TestRelayBundle inChan, TestRelayBundle outChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
+      (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
         (relayNode (nodeTracer na) configNode0 [] [inChan])
         (relayNode (nodeTracer nb) configNode1 [outChan] [])
@@ -346,9 +320,9 @@ traceRelayLink4 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 250)
@@ -365,10 +339,10 @@ traceRelayLink4 tcpprops generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcpprops
-      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcpprops
-      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcpprops
-      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcpprops
+      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcpprops
+      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcpprops
+      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcpprops
+      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcpprops
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $
@@ -408,9 +382,9 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 70)
@@ -427,10 +401,10 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
                 , (NodeId 2, NodeId 3)
                 ]
           )
-      (TestRelayBundle a2bInChan, TestRelayBundle a2bOutChan) <- newConnectionBundleTCP (linkTracer na nb) tcppropsLong
-      (TestRelayBundle a2cInChan, TestRelayBundle a2cOutChan) <- newConnectionBundleTCP (linkTracer na nc) tcppropsShort
-      (TestRelayBundle b2dInChan, TestRelayBundle b2dOutChan) <- newConnectionBundleTCP (linkTracer nb nd) tcppropsLong
-      (TestRelayBundle c2dInChan, TestRelayBundle c2dOutChan) <- newConnectionBundleTCP (linkTracer nc nd) tcppropsShort
+      (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) tcppropsLong
+      (a2cInChan, a2cOutChan) <- newConnectionTCP (linkTracer na nc) tcppropsShort
+      (b2dInChan, b2dOutChan) <- newConnectionTCP (linkTracer nb nd) tcppropsLong
+      (c2dInChan, c2dOutChan) <- newConnectionTCP (linkTracer nc nd) tcppropsShort
       let generator n = relayNode (nodeTracer n) configGen
           relay n = relayNode (nodeTracer n) configRelay
       runConcurrently $

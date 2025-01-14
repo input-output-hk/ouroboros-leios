@@ -32,6 +32,13 @@ export const reducer = (
       };
     }
 
+    case "SET_BATCH_SIZE": {
+      return {
+        ...state,
+        batchSize: action.payload
+      }
+    }
+
     case "BATCH_UPDATE": {
       return {
         ...state,

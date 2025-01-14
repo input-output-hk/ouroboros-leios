@@ -5,10 +5,16 @@ import { IGraphContext, IGraphContextState, ISimulationAggregatedDataState } fro
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
   progress: 0,
-  nodes: new Map()
+  nodes: new Map(),
+  global: {
+    praosTxOnChain: 0,
+    leiosTxOnChain: 0,
+  },
+  lastNodesUpdated: []
 };
 
 export const defaultState: IGraphContextState = {
+  batchSize: 5000,
   canvasRef: { current: null },
   canvasOffsetX: 0,
   canvasOffsetY: 0,
@@ -21,6 +27,6 @@ export const defaultState: IGraphContextState = {
 
 export const GraphContext: Context<IGraphContext> = createContext({
   state: defaultState,
-  dispatch: (_val) => {}
+  dispatch: (_val) => { }
 });
 export const useGraphContext = () => useContext(GraphContext);

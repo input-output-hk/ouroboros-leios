@@ -5,6 +5,10 @@
 
 module PraosProtocol.SimPraosP2P where
 
+import ChanMux (newConnectionBundleTCP)
+import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -13,18 +17,13 @@ import Control.Tracer as Tracer (
  )
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
-import System.Random (StdGen, split)
-
-import ChanMux (newConnectionBundleTCP)
-import ChanTCP
-import Control.Monad (forever)
-import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import P2P (P2PTopography (..))
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
+import System.Random (StdGen, split)
 
 tracePraosP2P ::
   StdGen ->
@@ -37,7 +36,7 @@ tracePraosP2P
   P2PTopography
     { p2pNodes
     , p2pLinks
-    , p2pWorldShape
+    , p2pWorld
     }
   tcpprops
   praosConfig =
@@ -46,7 +45,7 @@ tracePraosP2P
         slotConfig <- slotConfigFromNow
         traceWith tracer $
           PraosEventSetup
-            p2pWorldShape
+            p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
         tcplinks <-
@@ -87,7 +86,7 @@ tracePraosP2P
                 (Map.keys p2pNodes)
                 (unfoldr (Just . split) rng0)
           ]
-        forever $ threadDelaySI 1000
+        forever $ threadDelay 1000
    where
     tracer :: Tracer (IOSim s) PraosEvent
     tracer = simTracer

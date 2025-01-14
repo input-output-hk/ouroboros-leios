@@ -1,20 +1,18 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE NamedFieldPuns #-}
 
 module PraosProtocol.SimBlockFetch where
 
 import Chan (Chan)
 import ChanDriver (ProtocolMessage)
 import ChanTCP
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
-  MonadAsync (concurrently_),
+  MonadAsync (..),
   mapConcurrently_,
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
-  Tracer (Tracer),
+  Tracer (..),
   traceWith,
  )
 import qualified Data.ByteString as BS
@@ -24,7 +22,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
-import PraosProtocol.Common.Chain (Chain (..))
+import STMCompat
 import SimTCPLinks
 import SimTypes
 
@@ -33,7 +31,7 @@ type BlockFetchTrace = [(Time, BlockFetchEvent)]
 data BlockFetchEvent
   = -- | Declare the nodes and links
     BlockFetchEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -57,9 +55,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         BlockFetchEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)

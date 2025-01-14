@@ -11,7 +11,7 @@ import Data.PQueue.Min (MinQueue)
 import qualified Data.PQueue.Min as PQ
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
-import Network.TypedProtocol
+import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
@@ -79,13 +79,13 @@ type BlockFetchVizModel =
 -- | The vizualisation state within the data model for the relay simulation
 data BlockFetchVizState
   = BlockFetchVizState
-  { vizWorldShape :: !WorldShape
+  { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
-          [ ( (BlockFetchMessage BlockBody)
+          [ ( BlockFetchMessage BlockBody
             , TcpMsgForecast
             , [TcpMsgForecast]
             )
@@ -133,7 +133,7 @@ relaySimVizModel =
  where
   initVizState =
     BlockFetchVizState
-      { vizWorldShape = WorldShape (0, 0) False
+      { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
@@ -154,7 +154,7 @@ relaySimVizModel =
     BlockFetchVizState
   accumEventVizState _now (BlockFetchEventSetup shape nodes links) vs =
     vs
-      { vizWorldShape = shape
+      { vizWorld = shape
       , vizNodePos = nodes
       , vizNodeLinks =
           Map.fromSet
@@ -218,12 +218,12 @@ relaySimVizModel =
 -- considered to be a cylinder.
 --
 -- These points are computed in normalised (unit square) coordinates
-linkPoints :: WorldShape -> Point -> Point -> LinkPoints
+linkPoints :: World -> Point -> Point -> LinkPoints
 linkPoints
-  WorldShape{worldDimensions = (widthSeconds, _), worldIsCylinder}
+  World{worldDimensions = (widthSeconds, _), worldShape}
   p1@(Point x1 y1)
   p2@(Point x2 y2)
-    | not worldIsCylinder || d2 < d2' =
+    | worldShape == Rectangle || d2 < d2' =
         LinkPointsNoWrap (Point x1 y1) (Point x2 y2)
     | x1 <= x2 =
         LinkPointsWrap
@@ -293,7 +293,7 @@ relaySimVizRenderModel
   ( SimVizModel
       _events
       BlockFetchVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizMsgsInTransit

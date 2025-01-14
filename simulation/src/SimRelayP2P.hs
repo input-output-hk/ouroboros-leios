@@ -7,7 +7,6 @@ module SimRelayP2P where
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
  )
-import Control.Monad.Class.MonadTime.SI (DiffTime)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -18,6 +17,7 @@ import Data.Foldable (sequenceA_)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
 import System.Random (StdGen, split)
+import TimeCompat
 
 import ChanTCP
 import P2P (P2PTopography (..))
@@ -36,7 +36,7 @@ traceRelayP2P
   P2PTopography
     { p2pNodes
     , p2pLinks
-    , p2pWorldShape
+    , p2pWorld
     }
   tcpprops
   relayConfig =
@@ -44,7 +44,7 @@ traceRelayP2P
       runSimTrace $ do
         traceWith tracer $
           RelaySimEventSetup
-            p2pWorldShape
+            p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
         tcplinks <-
@@ -53,7 +53,7 @@ traceRelayP2P
               (inChan, outChan) <-
                 newConnectionTCP
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency))
+                  (tcpprops (secondsToDiffTime latency))
               return ((na, nb), (inChan, outChan))
             | ((na, nb), latency) <- Map.toList p2pLinks
             ]

@@ -8,12 +8,16 @@ export const Progress: FC = () => {
 
   const percent = (aggregatedData.progress / maxTime) * 100;
 
+  const minutes = Math.floor(aggregatedData.progress / 60_000);
+  const seconds = (aggregatedData.progress / 1000 % 60).toFixed(3);
+  const time = minutes ? `${minutes}m${seconds}s` : `${seconds}s`;
+
   return (
     <div className="w-full mx-auto px-4 flex flex-col items-between justify-center">
       <p className="mb-0">
-        Time in ms: {aggregatedData.progress}<br/>
+        Time: {time}<br />
       </p>
-      
+
       <div
         className="relative w-full mt-2"
       >

@@ -4,21 +4,21 @@ module ExamplesRelayP2P where
 
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Word (Word8)
-import System.Random (mkStdGen, uniform)
-
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import RelayProtocol
 import SimRelay
 import SimRelayP2P
 import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes
+import System.Random (mkStdGen, uniform)
+import TimeCompat (secondsToDiffTime)
 import Viz
 import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P
 
 example1 :: Visualization
 example1 =
-  slowmoVisualization 0.1 $
+  slowmoVisualization (secondsToDiffTime 0.1) $
     Viz model $
       LayoutAbove
         [ layoutLabelTime
@@ -35,8 +35,8 @@ example1 =
                         Layout $
                           chartDiffusionImperfection
                             p2pTopography
-                            0.1
-                            (96 / 1000)
+                            (secondsToDiffTime 0.1)
+                            (secondsToDiffTime $ 96 / 1000)
                             config
                     ]
                 , LayoutAbove
@@ -58,7 +58,7 @@ example1 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \rng ->
             RelayNodeConfig
-              { blockProcessingDelay = const 0.1 -- 100ms
+              { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
@@ -76,10 +76,10 @@ example1 =
   p2pNumNodes = 100
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
-      { p2pWorldShape =
-          WorldShape
+      { p2pWorld =
+          World
             { worldDimensions = (0.600, 0.300)
-            , worldIsCylinder = True
+            , worldShape = Cylinder
             }
       , p2pNumNodes
       , p2pNodeLinksClose = 5
@@ -88,7 +88,7 @@ example1 =
 
 example2 :: Visualization
 example2 =
-  slowmoVisualization 0.2 $
+  slowmoVisualization (secondsToDiffTime 0.2) $
     Viz (pairVizModel model1 model2) $
       LayoutAbove
         [ layoutLabel 18 "Flat vs cylindrical world topology"
@@ -133,9 +133,9 @@ example2 =
   model1 =
     model
       p2pTopographyCharacteristicsCommon
-        { p2pWorldShape =
-            p2pWorldShape
-              { worldIsCylinder = False
+        { p2pWorld =
+            p2pWorld
+              { worldShape = Cylinder
               }
         }
   model2 = model p2pTopographyCharacteristicsCommon
@@ -150,7 +150,7 @@ example2 =
         (\latency -> mkTcpConnProps latency (kilobytes 1000))
         ( \rng ->
             RelayNodeConfig
-              { blockProcessingDelay = const 0.1 -- 100ms
+              { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
               , blockGeneration =
                   PoissonGenerationPattern
                     (kilobytes 96)
@@ -165,14 +165,14 @@ example2 =
 
   rng0 = mkStdGen 4 -- TODO: make a param
   p2pNumNodes = 100
-  p2pWorldShape =
-    WorldShape
+  p2pWorld =
+    World
       { worldDimensions = (0.600, 0.300)
-      , worldIsCylinder = True
+      , worldShape = Cylinder
       }
   p2pTopographyCharacteristicsCommon =
     P2PTopographyCharacteristics
-      { p2pWorldShape
+      { p2pWorld
       , p2pNumNodes
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5

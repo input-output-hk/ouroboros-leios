@@ -6,6 +6,10 @@
 
 module LeiosProtocol.Short.SimP2P where
 
+import ChanMux (newConnectionBundleTCP)
+import ChanTCP
+import Control.Monad (forever)
+import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -13,21 +17,16 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import Data.List (unfoldr)
+import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import System.Random (StdGen, mkStdGen, split)
-
-import ChanMux (newConnectionBundleTCP)
-import ChanTCP
-import Control.Monad (forever)
-import Control.Monad.Class.MonadFork (MonadFork (forkIO))
+import LeiosProtocol.Common
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import P2P (P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
-import PraosProtocol.Common
-import PraosProtocol.Common.Chain (Chain (..))
+import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
+import System.Random (StdGen, split)
 
 traceLeiosP2P ::
   StdGen ->
@@ -40,7 +39,7 @@ traceLeiosP2P
   P2PTopography
     { p2pNodes
     , p2pLinks
-    , p2pWorldShape
+    , p2pWorld
     }
   tcpprops
   leiosNodeConfig =
@@ -49,7 +48,7 @@ traceLeiosP2P
         slotConfig <- slotConfigFromNow
         traceWith tracer $
           LeiosEventSetup
-            p2pWorldShape
+            p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
         tcplinks <-
@@ -90,7 +89,7 @@ traceLeiosP2P
                 (Map.keys p2pNodes)
                 (unfoldr (Just . split) rng0)
           ]
-        forever $ threadDelaySI 1000
+        forever $ threadDelay 1000
    where
     tracer :: Tracer (IOSim s) LeiosEvent
     tracer = simTracer
@@ -108,56 +107,39 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: LeiosTrace
-exampleTrace2 = exampleTrace2' (mkStdGen 4) True
-
-exampleTrace2' :: StdGen -> Bool -> LeiosTrace
-exampleTrace2' rng0 worldIsCylinder =
+exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
   traceLeiosP2P
     rng0
     p2pTopography
     (\latency -> mkTcpConnProps latency (kilobytes 1000))
     leiosNodeConfig
  where
+  p2pNumNodes = fromIntegral (M.size p2pNodes)
   leiosNodeConfig slotConfig nodeId rng =
     LeiosNodeConfig
-      { stake = StakeFraction $ 1 / fromIntegral p2pNumNodes
+      { stake = StakeFraction $ 1 / p2pNumNodes
       , baseChain = Genesis
       , leios
       , rankingBlockFrequencyPerSlot = 1 / fromIntegral leios.sliceLength
       , rankingBlockPayload = 0
       , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
+      , processingCores
       , nodeId
       , rng
       }
    where
-    leios = exampleLeiosConfig slotConfig
-  p2pTopography =
-    genArbitraryP2PTopography p2pTopographyCharacteristics rng0
+    leios = exampleLeiosConfig sliceLength slotConfig
 
-  p2pNumNodes = 100
-  p2pWorldShape =
-    WorldShape
-      { worldDimensions = (0.600, 0.300)
-      , worldIsCylinder
-      }
-  p2pTopographyCharacteristics =
-    P2PTopographyCharacteristics
-      { p2pWorldShape
-      , p2pNumNodes
-      , p2pNodeLinksClose = 5
-      , p2pNodeLinksRandom = 5
-      }
-
-exampleLeiosConfig :: SlotConfig -> LeiosConfig
-exampleLeiosConfig slotConfig = leios
+exampleLeiosConfig :: Int -> SlotConfig -> LeiosConfig
+exampleLeiosConfig sliceLength slotConfig = leios
  where
   -- TODO: review voting numbers, these might not make sense.
   leios =
     LeiosConfig
       { praos
-      , sliceLength = 5 -- matching the interval between RBs
+      , sliceLength = sliceLength -- matching the interval between RBs
       , inputBlockFrequencyPerSlot = 5
       , endorseBlockFrequencyPerStage = 1.5
       , activeVotingStageLength = 1

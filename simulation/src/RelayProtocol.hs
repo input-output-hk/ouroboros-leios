@@ -26,21 +26,10 @@ module RelayProtocol (
   relayClient,
 ) where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TVar,
-    atomically,
-    modifyTVar',
-    newTVarIO,
-    readTVar,
-    readTVarIO,
-    retry
-  ),
- )
+import Chan (Chan (readChan, writeChan))
+import ChanTCP (MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad (when)
-import Control.Monad.Class.MonadTime (MonadTime (..), UTCTime)
 import Data.FingerTree (FingerTree)
 import qualified Data.FingerTree as FingerTree
 import qualified Data.Foldable as Foldable
@@ -51,9 +40,8 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word (Word64)
-
-import Chan (Chan (readChan, writeChan))
-import ChanTCP (MessageSize (..))
+import STMCompat
+import TimeCompat
 
 -- | The block relay buffer is a queue of blocks. The buffer is used to
 -- communicate currently active valid blocks.

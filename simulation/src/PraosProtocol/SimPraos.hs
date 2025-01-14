@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -11,12 +10,10 @@ module PraosProtocol.SimPraos where
 
 import ChanMux
 import ChanTCP
-import Control.Monad.Class.MonadAsync (
-  MonadAsync (concurrently_),
- )
+import Control.Monad.Class.MonadAsync (MonadAsync (..))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
-  Contravariant (contramap),
+  Contravariant (..),
   Tracer,
   traceWith,
  )
@@ -26,7 +23,6 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import PraosProtocol.Common hiding (Point)
-import PraosProtocol.Common.Chain (Chain (..))
 import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
 import SimTCPLinks
 import SimTypes
@@ -36,7 +32,7 @@ type PraosTrace = [(Time, PraosEvent)]
 data PraosEvent
   = -- | Declare the nodes and links
     PraosEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -56,9 +52,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         PraosEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (nodeA, Point 50 100)

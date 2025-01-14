@@ -73,10 +73,13 @@ impl Default for PersistentContext {
 impl PersistentContext {
     pub fn put(&mut self, name: String, delta_q: DeltaQ) {
         let name = Name::from(name);
-        let existed = self.ctx.insert(name.clone(), (delta_q, None)).is_some();
-        if !existed {
-            self.order.push(name);
-        }
+        self.ctx
+            .entry(name.clone())
+            .and_modify(|(dq, _)| *dq = delta_q.clone())
+            .or_insert_with(|| {
+                self.order.push(name);
+                (delta_q.clone(), None)
+            });
     }
 
     pub fn put_comment(&mut self, comment: &str) {
@@ -244,6 +247,8 @@ pub enum DeltaQExpr {
         cluster_coeff: f32,
         disjoint_names: BTreeSet<Name>,
     },
+    Min(#[serde(with = "arc_serde")] Arc<[Outcome]>),
+    Max(#[serde(with = "arc_serde")] Arc<[Outcome]>),
 }
 
 mod delta_q_serde {
@@ -264,6 +269,31 @@ mod delta_q_serde {
     {
         let delta_q = DeltaQExpr::deserialize(deserializer)?;
         Ok(Arc::new(delta_q))
+    }
+}
+
+mod arc_serde {
+    use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
+
+    pub(super) fn serialize<S, T: Serialize>(
+        this: &Arc<[T]>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        (**this).serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D, T: Deserialize<'de>>(
+        deserializer: D,
+    ) -> Result<Arc<[T]>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let outcomes = Vec::<T>::deserialize(deserializer)?;
+        Ok(Arc::from(outcomes))
     }
 }
 
@@ -335,7 +365,11 @@ impl Drop for DeltaQExpr {
         // replace such that the meaty part can actually be dropped before incrementing DEPTH again
         let expr = std::mem::replace(self, DeltaQExpr::BlackBox);
         match &expr {
-            DeltaQExpr::BlackBox | DeltaQExpr::Name(..) | DeltaQExpr::Outcome(..) => {}
+            DeltaQExpr::BlackBox
+            | DeltaQExpr::Name(..)
+            | DeltaQExpr::Outcome(..)
+            | DeltaQExpr::Min(..)
+            | DeltaQExpr::Max(..) => {}
             DeltaQExpr::Seq(l, _, r) => {
                 save(depth, l);
                 save(depth, r);
@@ -539,6 +573,26 @@ impl DeltaQ {
                 }
                 write!(f, "])")
             }
+            DeltaQExpr::Min(outcomes) => {
+                write!(f, "MIN(")?;
+                for (idx, outcome) in outcomes.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", outcome)?;
+                }
+                write!(f, ")")
+            }
+            DeltaQExpr::Max(outcomes) => {
+                write!(f, "MAX(")?;
+                for (idx, outcome) in outcomes.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", outcome)?;
+                }
+                write!(f, ")")
+            }
         }
     }
 
@@ -607,6 +661,20 @@ impl DeltaQ {
                         ));
                         op_stack.push(Op::Expand(receive));
                         op_stack.push(Op::Expand(send));
+                    }
+                    DeltaQExpr::Min(outcomes) => {
+                        let mut result = Outcome::top();
+                        for outcome in outcomes.iter() {
+                            result = result.min(outcome);
+                        }
+                        res_stack.push(Arc::new(DeltaQExpr::Outcome(result)));
+                    }
+                    DeltaQExpr::Max(outcomes) => {
+                        let mut result = Outcome::bottom();
+                        for outcome in outcomes.iter() {
+                            result = result.max(outcome);
+                        }
+                        res_stack.push(Arc::new(DeltaQExpr::Outcome(result)));
                     }
                 },
                 Op::AssembleSeq(delta_q, load) => {
@@ -804,6 +872,8 @@ impl DeltaQ {
                             op_stack.push(Op::Eval(first));
                         }
                         DeltaQExpr::Gossip { .. } => panic!("gossip not expanded"),
+                        DeltaQExpr::Min(..) => panic!("min not expanded"),
+                        DeltaQExpr::Max(..) => panic!("max not expanded"),
                     }
                 }
                 Op::Seq {

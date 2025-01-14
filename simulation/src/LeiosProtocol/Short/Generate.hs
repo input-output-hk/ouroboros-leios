@@ -5,25 +5,32 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short.Generate where
 
-import Control.Monad.State
-
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (..),
- )
 import Control.Exception (assert)
 import Control.Monad (forM)
-import Data.Bifunctor
-import Data.Kind
-import Data.Maybe (fromMaybe)
+import Control.Monad.State (
+  MonadState (get, put),
+  MonadTrans (lift),
+  StateT (runStateT),
+  gets,
+  runState,
+ )
+import Data.Bifunctor (Bifunctor (..))
+import Data.Kind (Type)
+import qualified Data.Text as T
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
-import PraosProtocol.Common (CPUTask (CPUTask), mkPartialBlock)
-import System.Random
+import STMCompat
+import System.Random (StdGen, uniformR)
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use <$>" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 data BuffersView m = BuffersView
   { newRBData :: STM m NewRankingBlockData
@@ -58,9 +65,9 @@ mkScheduler rng0 rates = do
   rngVar <- newTVarIO rng0
   let sched slot = atomically $ do
         rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ (rates slot)
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
         writeTVar rngVar rng1
-        return $ acts
+        return acts
   return sched
 
 -- | @waitNextSlot cfg targetSlot@ waits until the beginning of
@@ -86,7 +93,7 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   , nodeId :: NodeId
   , buffers :: BuffersView m
   , schedule :: SlotNo -> m [(SomeRole, Word64)]
-  , submit :: [([CPUTask], SomeAction)] -> m ()
+  , submit :: [(Maybe CPUTask, SomeAction)] -> m ()
   }
 
 blockGenerator ::
@@ -103,28 +110,28 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     submit actions
     go (blkId', slot + 1)
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ second (SomeAction r) <$> execute' slot r wins
-  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m ([CPUTask], a)
+  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m (Maybe CPUTask, a)
   execute' slot Base _wins = do
-    rbData <- lift $ atomically $ buffers.newRBData
+    rbData <- lift $ atomically buffers.newRBData
     let meb = rbData.freshestCertifiedEB
-    let !task = CPUTask $ fromMaybe 0 $ leios.delays.certificateCreation . snd <$> meb
+    let !task = CPUTask (maybe 0 (leios.delays.certificateCreation . snd) meb) $ T.pack "Cert creation"
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
     let !rb = mkPartialBlock slot body
-    return ([task], rb)
+    return (Just task, rb)
   execute' slot Propose wins =
-    ([],) <$> do
-      ibData <- lift $ atomically $ buffers.newIBData
+    (Nothing,) <$> do
+      ibData <- lift $ atomically buffers.newIBData
       forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
         i <- nextBlkId InputBlockId
         let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
         return $! mkInputBlock leios header ibData.txsPayload
   execute' slot Endorse _wins =
-    ([],) <$> do
+    (Nothing,) <$> do
       i <- nextBlkId EndorseBlockId
-      ibs <- lift $ atomically $ buffers.ibs
+      ibs <- lift $ atomically buffers.ibs
       return $! mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
   execute' slot Vote votes =
-    ([],) <$> do
+    (Nothing,) <$> do
       votingFor <- lift $ atomically $ do
         ibs <- buffers.ibs
         ebs <- buffers.ebs

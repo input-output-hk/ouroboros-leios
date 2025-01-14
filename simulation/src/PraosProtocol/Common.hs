@@ -5,8 +5,9 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module PraosProtocol.Common (
+  Anchor (..),
   AnchoredFragment,
-  Chain,
+  Chain (..),
   FullTip (..),
   fullTip,
   Blocks,
@@ -17,17 +18,8 @@ module PraosProtocol.Common (
   blockBodyColor,
   blockHeaderColor,
   blockHeaderColorAsBody,
-  module Block,
   module ConcreteBlock,
   module ProducerState,
-  ReadOnly,
-  asReadOnly,
-  readReadOnlyTVar,
-  readReadOnlyTVarIO,
-  TakeOnly,
-  asTakeOnly,
-  takeTakeOnlyTMVar,
-  tryTakeTakeOnlyTMVar,
   SlotConfig (..),
   slotTime,
   slotConfigFromNow,
@@ -41,21 +33,16 @@ module PraosProtocol.Common (
   hashToColor,
 ) where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (..),
- )
+import ChanTCP (MessageSize (..))
 import Control.Exception (assert)
+import Data.Coerce (coerce)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Ouroboros.Network.Block as Block
-import Ouroboros.Network.Mock.ProducerState as ProducerState
-import PraosProtocol.Common.AnchoredFragment (AnchoredFragment)
-import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
-import PraosProtocol.ConcreteBlock as ConcreteBlock
-
-import ChanTCP (MessageSize (..))
-import Data.Coerce (coerce)
 import Data.Word (Word8)
+import Ouroboros.Network.Mock.ProducerState as ProducerState
+import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
+import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
+import PraosProtocol.Common.ConcreteBlock as ConcreteBlock
 import SimTCPLinks (kilobytes)
 import SimTypes (CPUTask (..))
 import System.Random (mkStdGen, uniform)
@@ -161,30 +148,3 @@ defaultPraosConfig = do
       , blockValidationDelay = const 0.1
       , headerValidationDelay = const 0.005
       }
-
---------------------------------
----- Common Utility Types
---------------------------------
-
--- | Readonly TVar.
-newtype ReadOnly a = ReadOnly {unReadOnly :: a}
-
-asReadOnly :: a -> ReadOnly a
-asReadOnly = ReadOnly
-
-readReadOnlyTVar :: MonadSTM m => ReadOnly (TVar m a) -> STM m a
-readReadOnlyTVar ReadOnly{unReadOnly} = readTVar unReadOnly
-
-readReadOnlyTVarIO :: MonadSTM m => ReadOnly (TVar m a) -> m a
-readReadOnlyTVarIO ReadOnly{unReadOnly} = readTVarIO unReadOnly
-
-newtype TakeOnly a = TakeOnly {unTakeOnly :: a}
-
-asTakeOnly :: a -> TakeOnly a
-asTakeOnly = TakeOnly
-
-takeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m a
-takeTakeOnlyTMVar TakeOnly{unTakeOnly} = takeTMVar unTakeOnly
-
-tryTakeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m (Maybe a)
-tryTakeTakeOnlyTMVar TakeOnly{unTakeOnly} = tryTakeTMVar unTakeOnly

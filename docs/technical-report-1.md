@@ -6,11 +6,19 @@
 
 ## Introduction
 
+> [!NOTE]
+> 
+> Consider discussing the roadmap and/or methodology of the Leios innovation stream here.
+
 
 ## Informal description of Short Leios
 
 
 ### Glossary
+
+> [!NOTE]
+> 
+> Should the glossary be moved to the appendix?
 
 - Input block (IB)
 - Endoser block (EB)
@@ -28,14 +36,215 @@
 
 ## Formal Specification for Short Leios
 
+![Overview for formal specification](../formal-spec/docs/overview.png)
+
 
 ## Delta QSD network performance model
 
 
+![Overview of Delta QSD components](../delta_q/docs/overview.png)
+
+
 ## Rust simulation
+
+![Container diagram of Rust simulation](../sim-rs/docs/container.png)
+
+![Component diagram of Rust simulation](../sim-rs/docs/component.png)
+
+![Transaction-protocol diagram of Rust simulation](../sim-rs/docs/tx-protocol.png)
 
 
 ## Haskell prototype
+
+![Container diagram of Haskell prototype](../simulation/docs/container.png)
+
+![Component diagram of Haskell prototype](../simulation/docs/component.png)
+
+
+## Sortition
+
+In Leios stake-based sortition occurs for the selection of the producers of IBs, EBs, and votes. The selection of the producers of IBs and EBs occurs similarly to Praos and the selection of the votes occurs similarly to Mithril. We define two functions for the probability of being elected as a producer or vote in the Bernoulli trials for each unit of stake (i.e., one lottery for each lovelace). Consider the situation where there is a total stake $S$ and a Leios node has $s$ stake delegated to it. Let $f^\prime$ be the probability that a single lovelace wins the lottery and $f$ be the probability that any of the $S$ lovelace win it:
+
+$$
+f = 1 - (1 - f^\prime)^S \approx S \cdot f^\prime
+$$
+
+where the approximation holds for the very large total stake $S$, which is greater than $10^{16}$ on the Cardano mainnet. The probability that the node with $s$ stake delegated to it wins any of the lotteries is
+
+$$
+\psi_{f^\prime}(s) = 1 - (1 - f^\prime)^s
+$$
+
+which can be simplified with the relative stake $\sigma = s / S$ to 
+
+$$
+\phi_f(\sigma) = \psi_{f^\prime}(\sigma \cdot S) = 1 - (1 - f)^\sigma
+$$
+
+Sortition reuses the Praos VRF, but prepending a string such as `Leios-IB`, `Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order to remove correlations between the uses of the VRF. The resulting VRF value `v` is compared to the probability (in the case of IBs and EBs) or the cumulative probability (in the case of votes) for winning the sortition lottery. This is equivalent to the eligibility checks in the Leios paper.
+
+
+### Advantage gained by splitting stake among nodes
+
+Note that this formulation encourages the splitting of stake among many nodes: by pooling stake at a single node the stake has only one chance to build an RB, IB, or EB, but by splitting the stake among many nodes there is a chance for multiple RBs, IBs, or EBs in the same lottery. We can quantify this effect by comparing the expected number of lottery wins when splitting $\sigma$ into two $\frac{1}{2}\sigma$ pieces. The expected number of lottery wins for split stake minus combined stake is always positive for $\sigma > 0$.
+
+$$
+\delta = 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) + 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) - 1 \cdot \phi_f(\sigma) = 2 \left[ 1 - (1 - f)^{\sigma/2} \right] - \left[ 1 - (1 - f)^\sigma \right] = \left[ 1 - (1 - f)^{\sigma/2} \right]^2 = \left[ \phi_f\left(\frac{\sigma}{2}\right) \right]^2 > 0
+$$
+
+In relative terms, $\frac{\delta}{\phi_f(\sigma)} \approx \frac{\phi_f(\sigma)}{4}$ , so the advantage is small unless the node starts with an appreciable probability of producing a block. A Taylor-series expansion reveals $2\phi_f(\sigma/2) = \phi_g(\sigma)$ with $g = f \cdot (1 + \frac{1}{4}f \cdot \sigma) + \mathcal{O}(f^3)$, implying that the benefit of splitting stake in half is equivalent to the protocol parameter for the lottery being fractionally increased by $f \cdot \sigma / 4$. This renormalization can be extended to the limit of splitting the stake into a large number of parts, where we have a simple result,
+
+$$
+\lim_{k \rightarrow \infty} k \cdot \phi_f\left( \frac{\sigma}{k} \right) = \phi_h(\sigma)
+$$
+
+where $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$, which implies a fractional benefit limited to $f \cdot \sigma / 2$.
+
+> [!NOTE]
+> 
+> - [ ] Do we need to include the derivation of $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$?
+> - [ ] . . . perhaps in an appendix?
+
+The following plot shows this effect on splitting stake. The horizontal axis represents the production rate $f$, which would be per-slot for RBs or IBs and per-period for EBs. The vertical axis shows the fractional benefit of the splitting, $f / (h - f)$. Even a controller of 45% of the stake would only benefit with less than a 20% advantage in block production, even at a high production rate such as a 75% chance per period, if they split their stake minutely. This small advantage would be outweighed by the cost of the computing hardware and bandwidth required to deploy the large number of node having very little stake delegated to them.
+
+![Effective boost in production from splitting stake](../images/splitting-stake.svg)
+
+
+### Input blocks
+
+In Leios, even if a node wins the IB lottery several times, it is only allowed to build a single block. This is identical to the sortition rule in Praos. Let $f_\text{IB}$ be the protocol parameter specifying the per-slot probability of a node producing an IB:
+
+$$
+p_\text{IB} = \phi_{f_\text{IB}}(\sigma) = 1 - (1 - f_\text{IB})^\sigma
+$$
+
+If $v_\text{IB} \in [0,1]$ is the node's IB VRF value for the current slot, then the node's eligibility condition is $v_\text{IB} \leq p_\text{IB}$.
+
+Given the IB-production phase of length $L$ in each Leios pipeline, we want to avoid the situation where an unlucky lottery results in no IBs being produced during that phase. The probability of none of the $i$ nodes with stake $\sigma_i$ winning the lottery in a slot is
+
+$$
+\prod_i \left( 1 - \phi_{f_\text{IB}}(\sigma_i) \right) = \prod_i (1 - f_\text{IB})^{\sigma_i} = (1 - f_\text{IB})^{\sum_i \sigma_i} = 1 - f_\text{IB}
+$$
+
+where $\sum_i \sigma_i = 1$ because the individual stakes sum to the total stake, $S \equiv \sum_i s_i$. Hence the probability of no nodes winning the lottery in any slot of the phase is
+
+$$
+q_\text{IB} = (1 - f_\text{IB})^L
+$$
+
+and the expected number of IBs in the phase is
+
+$$
+n_\text{IB} = f_\text{IB} \cdot L
+$$
+
+The figure below illustrates the relationship between $f_\text{IB}$ and $q_\text{IB}$. Understandably, short phases can result in appreciable probabilities of no having an input block in the pipeline.
+
+![Probability of no IB in a phase](../images/prob-no-ib.svg)
+
+
+### Endorser blocks
+ 
+The sortition for EBs occurs per phase, not per slot. The previous section's analysis for input blocks holds with minor modification: The probability that a node with stake $\sigma$ wins the EB lottery for a pipeline is
+
+$$
+p_\text{EB} = \phi_{f_\text{EB}}(\sigma) = 1 - (1 - f_\text{EB})^\sigma
+$$
+
+If $v_\text{EB} \in [0,1]$ is the node's EB VRF value for the current phase, then the node's eligibility condition is $v_\text{EB} \leq p_\text{EB}$.
+
+> [!IMPORTANT]
+> 
+> This formulation makes it likely (probability = 1 - f) that some pipelines will have no EBs. Should there be two or more lotteries instead of just one? Or do we just need to accept this as part of Short Leios?
+
+In Short Leios it is critically important that at least one EB be produced in the pipeline because, otherwise, the pipeline's IBs will not be referenced in the RB and the work done creating them will be lost and their transactions will have to wait for another IB. There are four situations of interest for EB production in a particular pipeline:
+
+1. No EB is produced: $(1 - p_\text{hon}) \cdot (1 - p_\text{adv}) = 1 - f_\text{EB}$.
+2. Only honest parties produce EBs: $p_\text{hon} \cdot (1 - p_\text{adv})$.
+3. Only adversarial parties produce EBs: $(1 - p_\text{hon}) \cdot p_\text{adv}$.
+4. Both honest and adversarial parties produce EBs: $p_\text{hon} \cdot p_\text{adv}$.
+
+where $p_\text{hon} = \phi_{f_\text{EB}}(\sigma_\text{hon})$, $p_\text{adv} = \phi_{f_\text{EB}}(\sigma_\text{adv})$, and $\sigma_\text{hon} + \sigma_\text{adv} = 1$. For this analysis we ignore the splitting of stake because the analysis of it in a previous section indicated that it is inconsequential even in the worst case.
+
+![Probability of no EB in phase](../images/prob-no-eb.svg)
+
+If we account for stake being divided among many nodes, we get a nearly identical result. The left plot below shows the scenario where stake is divided evenly among 1000 nodes and the right plot shows when it is divided among 2500 nodes according to a non-uniform stake distribution similar to that of epoch 500.
+
+| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |
+
+> [!CAUTION]
+> 
+> - [ ] Is there a theoretical argument (like the law of large numbers) why splitting the stake doesn't make a visible difference?
+> - [ ] Is it pointless to include such repetitive plots?
+
+Short Leios also relies on the EB being included in an RB before another EB is produced: endorser blocks are not allowed to queue awaiting RBs or to reference other EBs. Thus, the EB rate should be consistent with the RB rate. We can approximate the probability of there not being an RB in time to include a new EB by answering the following question: given that an EB has been produced, what is the probability that the *next* EB will be produced before the *first* RB? In such a situation, the freshest-first rule would result in the first EB being discarded because the second EB is included in the new RB. The distribution of waiting times for the next EB and next RB are
+
+$$
+\mathcal{P}(\text{next EB at phase } n) = (1 - f_\text{EB})^{n-1} f_\text{EB}
+$$
+
+and
+
+$$
+\mathcal{P}(\text{next RB at slot } s) = (1 - f_\text{RB})^{s-1} f_\text{RB}
+$$
+
+Hence the probability for the next EB not coming before the next RB is
+
+$$
+p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s < n L < \infty} (1 - f_\text{EB})^{n-1} f_\text{EB} (1 - f_\text{RB})^{s-1} f_\text{RB}
+ = \frac{1 - [f_\text{RB} (f_\text{EB} - 1) + 1] (1 - f_\text{RB})^{L-1}}{1 - (1 - f_\text{EB}) (1 - f_\text{RB})^L}
+$$
+
+The plots below indicate that the phase length $L$ should be several times ${f_\text{RB}}^{-1}$ in order for there to be a high probability that an RB will appear before the next EB. 
+
+![Probability of the next RB prior to the next EB](../images/leios-eb-rb.svg)
+
+> [!IMPORTANT]
+> 
+> The above argument needs reworking because it doesn't account for various effects like the EB being per-pipeline, propagation delays, and the RB being per-slot or that there are multiple pipelines. There also may be ambiguities in the specification for the case when several EBs are waiting for an RB: presumably, the "freshest first" rule would be applied here, so the newest EB would go into the RB. We might need simulation for this analysis.
+
+
+### Votes
+
+The sortition for voting differs from that for blocks because, in principle, a node may win several votes in the lottery.
+
+$$
+\mathcal{P}(n \text{ votes given stake } s) = {s \choose n} {f_\text{vote}^\prime}^n (1 - f_\text{vote}^\prime)^{s-n} \approx \frac{(f_\text{vote} \cdot \sigma)^n \cdot e^{- f_\text{vote} \cdot \sigma}}{n!}
+$$
+
+where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes in the lottery and the stake is very large relative to the number of votes $n \ll s$. Note that even in this approximation the probabilities sum to one. The formula above and this approximation may be sufficient for use with a VRF to determine the number of votes that a node is entitled to. The table below show the VRF conditions for determining the number of votes in this approximation, which can be expressed as a Taylor series involving operations only on rational numbers. The Cardano mainnet decentralization parameter is current 500, so if we consider the case where the mean number of votes is 500 and a node has 1/500th of the stake, then $f_\text{vote} \cdot \sigma =1$ in this computations, corresponding to the right edge in the plot below: any pool with more stake would be oversaturated. Even in the worst-case scenario of a fully saturated pool, the probability of more than three votes is about 1.90%.
+
+| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                  |
+| 1               | $1 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
+| 2               | $1 + \sigma \cdot f_\text{vote} < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
+| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
+| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m < v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
+
+![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
+
+Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+
+### Insights regarding sortition
+
+- All of the sortition is based on Bernoulli trials for each stake of lovelace.
+- A probabilistic analysis shows that splitting stake among many nodes only provides a minor benefit in winning the lottery more times.
+- The IB lottery is per-slot and limits a node to building a maximum of one IB per slot.
+    - Careful selection of protocol parameters ensures a high probability of at least one IB in each pipeline.
+- The EB lottery is per-pipeline and limits a node to building a maximum of one EB per pipeline.
+    - The formulation of the EB lottery implies that there will always be a significant chance that a pipeline contains no EB.
+    - Setting protocol parameters so that there is a high probability of an EB in a pipeline makes the protocol more susceptible to influence by adversaries with significant stake.
+    - However, the unevenness in stake distribution or splitting of adversarial stake does not exacerbate the situation.
+- The pipeline length should be several multiples of the inverse of the active-slot coefficient, in order that there is a high probability for an RB to be available for an EB certificate.
+- The vote lottery can award multiple votes to the same node if they have a lot of stake and are luck.
+    - Nodes nearly saturated with stake have an appreciable chance of receiving several votes.
+    - The mathematics and code for determining from the VRF the number of votes a node winds is more complex and involves complications to avoid floating-point computations.
+    - Limiting nodes to a maximum of one vote would likely be safe if the mean number of votes is no larger than the effective decentralizations (i.e., the number of nodes with appreciable stake) would likely be safe, though it might result is larger concentrations of stake having smaller voting rewards, and it would greatly simplify the computation of sortition.
+
 
 
 ## Voting and certificates
@@ -62,36 +271,40 @@ The next subsections contain preliminary analyses of concerns and potential deci
 
 Conceptually, a Leios vote contains the following information:
 
-- The hash of the EB being voted for
-- The identity of the voter
-- The number of votes cast
-- A proof that the votes cast are valid
-- A signature
+- The hash of the EB being voted for.
+- The identifier for the pipeline.
+    - This could be omitted because it can be inferred from the EB.
+- The identity of the voter.
+- The number of votes cast.
+- A proof that the votes cast are valid.
+- A signature.
 
-When collecting votes for the same EB, the hash of the EB would only have to be listed once for the whole set. This will save 32 bytes per vote serialized. Note the EB presumably includes information about which pipeline it belongs to, so that information does not also be included in the vote. So, a minimalist vote might only comprise 146 bytes of core information, not counting the hash of the EB.
+When collecting votes for the same EB, the hash of the EB and the identifier for the pipeline would only have to be listed once for the whole set. This will save 64 bytes per vote serialized. So, a minimalist vote might only comprise 209 bytes of core information, not counting the hash of the EB.
 
 - *Voter identity:* 32 bytes
-- *Number of votes cast:* 2 bytes
-- *Proof of right to vote:* 80 bytes
-- *Signature:* 32 bytes
+- *Number of votes cast:* 1 bytes
+- *ECVRF signature on pipeline identifier and nonce:* 80 bytes
+- *Compressed BLS12-381 signature:* 96 bytes
 
-The above assumes that the keys for verifying the signature have already been transmitted. If the signature were a full KES signature, then it would be at least 416 bytes instead of 32 bytes, though the signed time of 32 bytes would be common to all votes of a given pipeline.
+The above assumes that the keys for verifying the signature and the proof of possession have already been transmitted. These would need to be registered on the chain, presumably on the Praos chain.
+
+Instead of ephemeral keys, if the signature were a full KES signature, then it would be at least 448 bytes instead of 96 bytes, though the signed time of 32 bytes would be common to all votes of a given pipeline.
 
 - Signed time: 32 bytes
 - Verification key: 32 bytes
-- Signature
+- KES Signature
     - Merkle path (verification key hashes): 7 × 32 = 224 bytes
     - Additional verification key: 32 bytes
     - Ed25519
         - Public key: 32 bytes
-        - Two points: 2 × 32 = 64 bytes
+        - Two points: 2 x 64 = 128 bytes
 
-So, we have two scenarios for the minimal size of a vote.
+Much of larger size of the KES signature size comes from the Merkle path needed to prove the currently active key. If voting occurs frequently in Leios, that proof would be repeated many times using the 36-hour KES period. Perhaps that proof would only have to be recorded in a certificate during the node's first vote during a KES period. Also, MUSEN is an alternative to KES, but it still suffers from large descriptions of the evolved keys. So, in essence, we have two scenarios for the minimal size of a vote.
 
-| Method         | Common to all votes for a given EB | Specific to individual vote | Total |
-| -------------- | ---------------------------------: | --------------------------: | ----- |
-| Ephemeral keys |                               32 B |                       146 B | 178 B |
-| KES complete   |                               64 B |                       498 B | 562 B |
+| Method        | Common to all votes for a given EB | Specific to individual vote | Total | Comments                                                                   |
+| ------------- | ---------------------------------: | --------------------------: | ----- | -------------------------------------------------------------------------- |
+| Ephemeral key |                               32 B |                       209 B | 241 B | The ephemeral keys would have to have been registered on-chain.            |
+| KES key       |                               64 B |                       529 B | 593 B | The KES Merkle path for stays constant for one KES period (e.g, 36 hours). |
 
 However, it has not been decided what types of keys and signatures will be used for Leios votes. Key considerations are . . .
 
@@ -283,17 +496,38 @@ Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we s
 
 #### BLS certificate
 
+The BLS certificate describe in the Leios paper does not compress votes the way that ALBA does, so votes must be fully stored in the certificate. However, only a quorum of votes, not all of them, need to be stored, which affords a type of compression. Additionally, two aggregate signature must also be stored. A certificate for a quorum of votes attested by ephemeral keys would fit in a Praos block, but a certificate attested by KES keys is about 50% too large.
 
-> [!IMPORTANT]
-> 
-> To be written
+| Method        | Common to all votes | Specific to individual vote | Aggregation | Number of votes | Certificate of all votes | Quorum | Certificate of quorum |
+| ------------- | ------------------: | --------------------------: | ----------: | --------------: | -----------------------: | -----: | --------------------: |
+| Ephemeral key |                32 B |                       209 B |       192 B |             500 |                   105 kB |    60% |                 63 kB |
+| KES key       |                64 B |                       529 B |       192 B |             500 |                   265 kB |    60% |                159 kB |
+
+Also recall that any ephemeral keys would have to be registered on-chain, consuming additional precious space and complicating bookkeeping: that would only provide benefit if the keys were reused for many votes. It might also be possible to only store the Merkle proof for the KES key only at the start of the KES period (e.g., every 36 hours).
+
+The construction and verification times below are based on benchmarking using the Rust [bls-signatures](https://lib.rs/crates/bls-signatures) package.
+
+| Operation                            |       CPU time |
+| ------------------------------------ | -------------: |
+| Signing an item                      | 1.369±0.030 ms |
+| Verifying a single item              | 1.662±0.090 ms |
+| Verifying an aggregate of 500 items  |    55.3±5.3 ms |
+| Verifying an aggregate of 1000 items |    100.±20. ms |
+
+![Benchmark for verifying an aggregate BLS signature](../images/bls-verification.svg)
+
+However, these measurements are not consistent with the experience of Mithril:
+
+| Metric                              | Value |
+| ----------------------------------- | ----- |
+| Proving time (per vote)             | 70 ms |
+| Aggregation time (per certificate)  | 1.2 s |
+| Verification time (per certificate) | 17 ms |
 
 
 #### MUSEN certificate
 
-> [!IMPORTANT]
-> 
-> To be written
+[MUSEN](https://iohk.io/en/research/library/papers/musen-aggregatable-key-evolving-verifiable-random-functions-and-applications/) ("MUlti-Stage key-Evolving verifiable random fuNctions.") builds upon the concept of VRFs by introducing a key-evolving feature and allowing for aggregating VRF outputs. The aggregation capability promises to result in small certificates attesting to the Leios votes, MUSEN suffers from the need to record all of the verification keys (e.g., in a Merkle tree). MUSEN signature are approximately the same size as KES signatures. However, verification times may be too long for Leios. Overall, the benefit of MUSEN's key evolution is minor and its other resource costs may be greater than plain BLS.
 
 
 ### Insights regarding voting and certificates
@@ -307,11 +541,23 @@ Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we s
     1. Each has at least one strength and one drawback related to certificate size, proof time, or verification time.
     2. ALBA is close to being viable if vote size can reduced or if quorum disruption by adversaries with 10% of stake is acceptable.
     3. An ALBA security setting of $\ell_\text{sec} = \ell_\text{rel} = 80$ (i.e., eighty-bit security) seems sufficient for Leios voting.
+    4. BLS is viable if ephemeral keys are used, but those would require pre-registration.
+    5. BLS with KES keys could work if oversized Praos blocks (~160 kB) are allowed.
+    6. ZK variants would result in small certificates but long proving times.
 3. At least 500 votes and a 60% quorum will be needed.
     1. These parameters ensure voting security at least as strong as Praos security over a range of adversary strengths.
     3. ALBA would require a larger quorum.
     4. The clumpiness of the Cardano stake distribution on mainnet means that some producer nodes might cast more than one vote in a given pipeline.
     5. MUSEN and BLS certificates need further evaluation for Leios.
+4. Generic benchmarks for cryptographic operations have provided guidance on the pros and cons of the prospective voting and certificate schemes, but further work on estimating CPU resources needed will require detailed implementation of the prospective voting and certificate schemes. For the time being, the following values can be used in simulation studies.
+    1. Number of votes: 600
+    2. Quorum: 60%
+    3. Vote size: 250 B / vote
+    4. Certificate size: 75 kB / vote
+    6. Generate vote: 2 ms / vote
+    7. Verify vote: 3 ms / vote
+    8. Generate certificate: 50 ms / certificate + 0.5 ms / vote
+    9. Verify certificate: 50 ms / certificate + 0.5 ms / vote
 
 
 ## Cost analyses
@@ -555,6 +801,11 @@ See [this Jupyter notebook](../analysis/tx.ipynb) for details of the analysis.
 The stake distribution has an important influence on the number of unique SPOs involved in each round of Leios voting. It turns out that the cumulative distribution function for the beta distribution (the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function)) with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of stake pools at epoch 500. This curve can be adapted to the actual number of stake pools being modeled: for example, in order to use this for 2000 stake pools, just divide the x axis into 2000 points and take the difference in consecutive y values as the amount of stake the corresponding pool has.
 
 ![Curve fit to stakepool distribution at epoch 500](../images/stake-fit.png)
+
+### Insights into mainnet characteristics
+
+1. Historically observed transaction sizes and frequencies are reasonably well modeled by simple curve fits.
+2. The current mainnet stake distribution is similarly modeled by a simple curve fit.
 
 
 ## Threat model

@@ -7,10 +7,13 @@
 
 # Check for fourmolu
 fourmolu_required_version="0.15.0.0"
-fourmolu="$(which fourmolu)"
+fourmolu="$(which fourmolu-0.15.0.0)"
 if [ "${fourmolu}" = "" ]; then
-    echo "pre-commit: Requires fourmolu version ${fourmolu_required_version}; no version found"
-    exit 1
+    fourmolu="$(which fourmolu)"
+    if [ "${fourmolu}" = "" ]; then
+        echo "pre-commit: Requires fourmolu version ${fourmolu_required_version}; no version found"
+        exit 1
+    fi
 fi
 fourmolu_installed_version="$($fourmolu --version | head -n 1 | cut -d' ' -f2)"
 if [ ! "${fourmolu_installed_version}" = "${fourmolu_required_version}" ]; then
@@ -28,7 +31,7 @@ fi
 
 # Check Haskell files with fourmolu
 echo "Formatting Haskell source files with fourmolu version ${fourmolu_required_version}"
-if ! git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 fourmolu --mode=check --quiet; then
-    git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 fourmolu --mode=inplace --quiet
+if ! git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 "${fourmolu}" --mode=check --quiet; then
+    git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 "${fourmolu}" --mode=inplace --quiet
     exit 1
 fi

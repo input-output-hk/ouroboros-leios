@@ -135,12 +135,12 @@ viz-engine: {
 
   protocol-viz: {
     class: component
-    label: "Protocol Visualizer\n\nVisualizes mini-protocol\n messages and node state"
+    label: "Protocol Renderer\n\nRenders mini-protocol\n messages and node state\n(made for small sims)"
   }
 
   p2p-viz: {
     class: component
-    label: "P2P Visualizer\n\nVisualizes P2P\nnetwork state"
+    label: "P2P Renderer\n\nVisualizes P2P\nnetwork state\nand charts\n(made for ~100 nodes sims)"
   }
 
   frame-output: {
@@ -152,20 +152,20 @@ viz-engine: {
   layout -> frame-output: "Emits frames"
 }
 
-# Event Monitor Container
+# Event Consumer Container
 monitor: {
   near: bottom-right
   class: container
-  label: "Event Monitor"
+  label: "Event Consumer"
 
   metrics: {
     class: component
-    label: "Metrics and State Collector\n\nComputes state and metrics from trace"
+    label: "Model\n\nComputes state and metrics from trace"
   }
 
   tracer: {
     class: component
-    label: "Event Tracer\n\nCollects trace of\n protocol and network events"
+    label: "Event Tracer\n\nCollects trace of\nnode and network events"
   }
 
   io-sim: {
@@ -203,5 +203,5 @@ protocol-engine.node-manager -> protocol-engine.leios: "Manages ledger state\nan
 viz-engine -> monitor: "Visualizes state and metrics"
 
 # Monitoring Relationships
-monitor -> channel-layer: "Traces network messages"
-monitor -> protocol-engine: "Traces protocol and node events"
+monitor -> channel-layer: "Traces network events"
+monitor -> protocol-engine: "Traces node events"

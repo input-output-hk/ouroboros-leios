@@ -53,11 +53,12 @@ export const Stats: FC = () => {
       txPropagations: 0,
       votesGenerated: 0,
       votesPropagations: 0,
+      ...aggregatedData.global,
     } as ISimulationAggregatedTotalData,
   );
 
   return (
-    <div className={`flex flex-col gap-4 backdrop-blur-sm bg-white/80 min-w-[300px]`}>
+    <div className={`flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]`}>
       <div className="border-2 border-gray-200 rounded p-4">
         <h2 className="font-bold uppercase mb-2">Global Stats</h2>
         <h4 className="flex items-center justify-between gap-4">Tx Generated: <span>{totals.txGenerated}</span></h4>
@@ -66,10 +67,13 @@ export const Stats: FC = () => {
         <h4 className="flex items-center justify-between gap-4">IB Propagations: <span>{totals.ibPropagations}</span></h4>
         <h4 className="flex items-center justify-between gap-4">EB Generated: <span>{totals.ebGenerated}</span></h4>
         <h4 className="flex items-center justify-between gap-4">EB Propagations: <span>{totals.ebPropagations}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">PB Generated: <span>{totals.pbGenerated}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">PB Propagations: <span>{totals.pbPropagations}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">Votes Generated: <span>{totals.votesGenerated}</span></h4>
-        <h4 className="flex items-center justify-between gap-4">Votes Propagations: <span>{totals.votesPropagations}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Blocks Generated: <span>{totals.pbGenerated}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Block Propagations: <span>{totals.pbPropagations}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Vote Bundles Generated: <span>{totals.votesGenerated}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Vote Bundle Propagations: <span>{totals.votesPropagations}</span></h4>
+        <br />
+        <h4 className="flex items-center justify-between gap-4">Transactions On-Chain Directly<span>{totals.praosTxOnChain}</span></h4>
+        <h4 className="flex items-center justify-between gap-4">Transactions On-Chain from Leios<span>{totals.leiosTxOnChain}</span></h4>
       </div>
     </div>
   );

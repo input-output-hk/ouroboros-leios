@@ -19,6 +19,9 @@ maintainer:         duncan@well-typed.com
 -- category:
 build-type:         Simple
 extra-source-files: CHANGELOG.md
+data-files:
+  test/data/BenchTopology/topology-dense-52.json
+  test/data/BenchTopology/latency.sqlite3.gz
 
 flag perf
   description: Ghc options for improved performance, disables asserts.
@@ -47,6 +50,7 @@ library
     ExamplesRelayP2P
     ExamplesTCP
     LeiosProtocol.Common
+    LeiosProtocol.Config
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.Short
@@ -57,6 +61,7 @@ library
     LeiosProtocol.Short.VizSim
     LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
+    LeiosProtocol.TaskMultiQueue
     LeiosProtocol.VizSimTestRelay
     ModelTCP
     P2P
@@ -64,10 +69,6 @@ library
     PraosProtocol.BlockFetch
     PraosProtocol.BlockGeneration
     PraosProtocol.ChainSync
-    PraosProtocol.Common
-    PraosProtocol.Common.AnchoredFragment
-    PraosProtocol.Common.Chain
-    PraosProtocol.ConcreteBlock
     PraosProtocol.ExamplesPraosP2P
     PraosProtocol.PraosNode
     PraosProtocol.SimBlockFetch
@@ -78,10 +79,15 @@ library
     PraosProtocol.VizSimChainSync
     PraosProtocol.VizSimPraos
     PraosProtocol.VizSimPraosP2P
+    PraosProtocol.Common
+    PraosProtocol.Common.AnchoredFragment
+    PraosProtocol.Common.Chain
+    PraosProtocol.Common.ConcreteBlock
     RelayProtocol
     Sample
     SimRelay
     SimRelayP2P
+    STMCompat
     SimTCPLinks
     SimTypes
     TimeCompat
@@ -93,6 +99,7 @@ library
     VizSimRelayP2P
     VizSimTCP
     VizUtils
+    WorkerPool
 
   -- other-extensions:
   build-depends:
@@ -109,6 +116,7 @@ library
     , colour
     , containers
     , contra-tracer
+    , data-default
     , deepseq
     , diagrams-cairo
     , diagrams-core
@@ -120,6 +128,7 @@ library
     , graphviz
     , gtk3
     , hashable
+    , IntervalMap
     , io-classes
     , io-sim
     , kdt
@@ -141,6 +150,7 @@ library
     , time
     , typed-protocols            >=0.3
     , vector
+    , yaml
     , zlib
 
   hs-source-dirs:     src
@@ -159,9 +169,36 @@ executable ols
 
   main-is:          src/Main.hs
   build-depends:
+    , aeson
     , base
+    , data-default
     , optparse-applicative
     , ouroboros-leios-sim
+    , random
 
   default-language: Haskell2010
   ghc-options:      -Wall
+
+test-suite ols-test
+  if flag(perf)
+    import: performance-opts
+
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Main.hs
+  build-depends:
+    , base
+    , directory
+    , fgl
+    , fgl-arbitrary
+    , ouroboros-leios-sim
+    , QuickCheck
+    , random
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
+    , text
+  other-modules:
+    Paths_ouroboros_leios_sim
+    Test.Topology
+  default-language: Haskell2010

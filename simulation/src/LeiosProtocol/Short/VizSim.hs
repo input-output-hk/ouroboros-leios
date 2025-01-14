@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 
 module LeiosProtocol.Short.VizSim where
 
@@ -15,6 +14,8 @@ import Data.Coerce (coerce)
 import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
+import Data.IntervalMap.Strict (Interval (..), IntervalMap)
+import qualified Data.IntervalMap.Strict as ILMap
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -26,12 +27,11 @@ import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), NumCores (Infinite), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
-import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage (..))
 import qualified PraosProtocol.VizSimPraos as VizSimPraos
 import SimTypes
@@ -52,7 +52,7 @@ example1 =
         Layout $
           leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = leiosSimVizModel trace
+  model = leiosSimVizModel (LeiosModelConfig 5 Infinite) trace
    where
     trace = exampleTrace1
 
@@ -93,7 +93,7 @@ type LeiosSimVizModel =
 -- | The vizualisation state within the data model for the relay simulation
 data LeiosSimVizState
   = LeiosSimVizState
-  { vizWorldShape :: !WorldShape
+  { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
@@ -126,6 +126,7 @@ data LeiosSimVizState
   , ebMsgs :: !(LeiosSimVizMsgsState EndorseBlockId EndorseBlock)
   , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
   , ibsInRBs :: !IBsInRBsState
+  , nodeCpuUsage :: !(Map NodeId (IntervalMap DiffTime Int))
   }
 
 data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
@@ -149,7 +150,8 @@ data IBsInRBsReport = IBsInRBsReport {ibsInRBsNum :: !Int, ibsInEBsNum :: !Int, 
 totalIBsInRBs :: IBsInRBsState -> IBsInRBsReport
 totalIBsInRBs s = IBsInRBsReport{..}
  where
-  elemsSet x = Set.unions . Map.elems $ x
+  elemsSet :: Ord a => Map k (Set a) -> Set a
+  elemsSet = Set.unions . Map.elems
   ibsInRBsNum = Set.size $ elemsSet $ Map.restrictKeys s.ibsInEBs ebsInRBsSet
   ebsInRBsSet = elemsSet s.ebsInRBs
   ebsInRBsNum = Set.size ebsInRBsSet
@@ -174,10 +176,20 @@ data LinkPoints
       {-# UNPACK #-} !Point
   deriving (Show)
 
-type ChainsMap = IntMap (Chain (Block RankingBlockBody))
+accumNodeCpuUsage ::
+  Time ->
+  NodeId ->
+  CPUTask ->
+  Map NodeId (IntervalMap DiffTime Int) ->
+  Map NodeId (IntervalMap DiffTime Int)
+accumNodeCpuUsage (Time now) nid task =
+  Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
+
+type ChainsMap = IntMap (Chain RankingBlock)
 
 accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
-accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip ch)))) = IMap.insert (coerce nid) ch
+accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewTip ch)))) =
+  IMap.insert (coerce nid) ch
 accumChains _ _ = id
 
 type DiffusionLatencyMap = DiffusionLatencyMap' (HeaderHash RankingBlockHeader) RankingBlockHeader
@@ -217,12 +229,19 @@ accumDiffusionLatency' now _nid EnterState msgid _msg vs =
     vs
 accumDiffusionLatency' _now _nid _event _id _msg vs = vs
 
+data LeiosModelConfig = LeiosModelConfig
+  { recentSpan :: !DiffTime
+  -- ^ length of time the Recent* maps should cover
+  , numCores :: !NumCores
+  }
+
 -- | Make the vizualisation model for the relay simulation from a simulation
 -- trace.
 leiosSimVizModel ::
+  LeiosModelConfig ->
   LeiosTrace ->
   VizModel LeiosSimVizModel
-leiosSimVizModel =
+leiosSimVizModel LeiosModelConfig{recentSpan} =
   simVizModel
     accumEventVizState
     pruneVisState
@@ -230,7 +249,7 @@ leiosSimVizModel =
  where
   initVizState =
     LeiosSimVizState
-      { vizWorldShape = WorldShape (0, 0) False
+      { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
@@ -250,6 +269,7 @@ leiosSimVizModel =
       , ebMsgs = initMsgs
       , voteMsgs = initMsgs
       , ibsInRBs = IBsInRBsState Map.empty Map.empty
+      , nodeCpuUsage = Map.empty
       }
 
   accumEventVizState ::
@@ -259,7 +279,7 @@ leiosSimVizModel =
     LeiosSimVizState
   accumEventVizState _now (LeiosEventSetup shape nodes links) vs =
     vs
-      { vizWorldShape = shape
+      { vizWorld = shape
       , vizNodePos = nodes
       , vizNodeLinks =
           Map.fromSet
@@ -290,7 +310,7 @@ leiosSimVizModel =
           }
       EventVote x ->
         vs
-          { voteMsgs = accumLeiosMsgs now nid event x vs.voteMsgs
+          { voteMsgs = adjustNumVotes event x $ accumLeiosMsgs now nid event x vs.voteMsgs
           , voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x vs.voteDiffusionLatency
           }
   accumEventVizState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
@@ -367,13 +387,14 @@ leiosSimVizModel =
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
         }
-  accumEventVizState _now (LeiosEventNode (LabelNode _nodeId (LeiosNodeEventCPU _task))) vs = vs
+  accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) vs =
+    vs{nodeCpuUsage = accumNodeCpuUsage now nid task (nodeCpuUsage vs)}
   accumEventVizState
     _now
     ( LeiosEventNode
         (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
       )
-    vs = vs
+    _vs = error "PraosNodeEventCPU should not be generated by leios nodes"
 
   pruneVisState ::
     Time ->
@@ -390,9 +411,9 @@ leiosSimVizModel =
             )
             (vizMsgsInTransit vs)
       , vizMsgsAtNodeRecentQueue =
-          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentQueue vs)
+          Map.map (recentPrune secondsAgoSpan) (vizMsgsAtNodeRecentQueue vs)
       , vizMsgsAtNodeRecentBuffer =
-          Map.map (recentPrune secondsAgo30) (vizMsgsAtNodeRecentBuffer vs)
+          Map.map (recentPrune secondsAgoSpan) (vizMsgsAtNodeRecentBuffer vs)
       , vizMsgsDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (vizMsgsDiffusionLatency vs)
       , ibDiffusionLatency =
@@ -401,13 +422,24 @@ leiosSimVizModel =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (ebDiffusionLatency vs)
       , voteDiffusionLatency =
           Map.filter (\(_, _, t, _) -> t >= secondsAgo30) (voteDiffusionLatency vs)
-      , ibMsgs = pruneLeiosMsgsState now vs.ibMsgs
-      , ebMsgs = pruneLeiosMsgsState now vs.ebMsgs
-      , voteMsgs = pruneLeiosMsgsState now vs.voteMsgs
+      , ibMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.ibMsgs
+      , ebMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.ebMsgs
+      , voteMsgs = pruneLeiosMsgsState (secondsAgoSpan, now) vs.voteMsgs
+      , nodeCpuUsage =
+          Map.map
+            (`ILMap.intersecting` coerce (ClosedInterval secondsAgoSpan now))
+            vs.nodeCpuUsage
       }
    where
+    secondsAgoSpan :: Time
+    secondsAgoSpan = addTime (negate recentSpan) now
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
+
+-- | Vote messages contain multiple votes each, so we bump the count by that amount
+adjustNumVotes :: BlockEvent -> VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg
+adjustNumVotes Generate msg vs = vs{numMsgsGenerated = numMsgsGenerated vs + fromIntegral msg.votes - 1}
+adjustNumVotes _ _ vs = vs
 
 initMsgs :: LeiosSimVizMsgsState id msg
 initMsgs =
@@ -474,19 +506,16 @@ accumLeiosMsgs now nid EnterState blk vs =
 
 pruneLeiosMsgsState ::
   (Eq id, HasField "id" msg id) =>
-  Time ->
+  (Time, Time) ->
   LeiosSimVizMsgsState id msg ->
   LeiosSimVizMsgsState id msg
-pruneLeiosMsgsState now vs =
+pruneLeiosMsgsState (ago, _now) vs =
   vs
     { msgsAtNodeRecentQueue =
-        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentQueue vs)
+        Map.map (recentPrune ago) (msgsAtNodeRecentQueue vs)
     , msgsAtNodeRecentBuffer =
-        Map.map (recentPrune secondsAgo30) (msgsAtNodeRecentBuffer vs)
+        Map.map (recentPrune ago) (msgsAtNodeRecentBuffer vs)
     }
- where
-  secondsAgo30 :: Time
-  secondsAgo30 = addTime (-30) now
 
 accumIBsInRBs :: Either RankingBlock EndorseBlock -> IBsInRBsState -> IBsInRBsState
 accumIBsInRBs (Left rb) s = s{ebsInRBs = Map.insertWith Set.union (blockHash rb) (Set.fromList $ map fst rb.blockBody.endorseBlocks) s.ebsInRBs}
@@ -496,12 +525,12 @@ accumIBsInRBs (Right eb) s = s{ibsInEBs = Map.insertWith Set.union eb.id (Set.fr
 -- considered to be a cylinder.
 --
 -- These points are computed in normalised (unit square) coordinates
-linkPoints :: WorldShape -> Point -> Point -> LinkPoints
+linkPoints :: World -> Point -> Point -> LinkPoints
 linkPoints
-  WorldShape{worldDimensions = (widthSeconds, _), worldIsCylinder}
+  World{worldDimensions = (widthSeconds, _), worldShape}
   p1@(Point x1 y1)
   p2@(Point x2 y2)
-    | not worldIsCylinder || d2 < d2' =
+    | worldShape == Rectangle || d2 < d2' =
         LinkPointsNoWrap (Point x1 y1) (Point x2 y2)
     | x1 <= x2 =
         LinkPointsWrap
@@ -590,7 +619,7 @@ leiosSimVizRenderModel
   ( SimVizModel
       _events
       LeiosSimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeTip
         , vizNodeLinks
@@ -765,5 +794,5 @@ leiosSimVizRenderModel
         ]
       Cairo.restore
      where
-      nodeMessageText msg = Just $ show $ (\(InputBlockId (NodeId x) y) -> (x, y)) $ msg.id
+      nodeMessageText msg = Just $ show $ (\(InputBlockId (NodeId x) y) -> (x, y)) msg.id
       nodeMessageColor msg = hashToColor $ hash msg.id

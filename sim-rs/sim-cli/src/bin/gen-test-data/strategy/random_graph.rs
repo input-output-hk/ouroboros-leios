@@ -3,24 +3,19 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
-use sim_core::config::{RawLinkConfig, RawNodeConfig};
+use sim_core::config::{RawConfig, RawNodeConfig};
 
-use crate::strategy::utils::{distribute_stake, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
     node_count: usize,
     stake_pool_count: usize,
+    min_connections: usize,
+    max_connections: usize,
 }
 
-fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
-    // euclidean distance probably good enough
-    let dist_x = (lat2 - lat1).rem_euclid(180.0);
-    let dist_y = (long2 - long1).rem_euclid(180.0);
-    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
-}
-
-pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<RawLinkConfig>)> {
+pub fn random_graph(args: &RandomGraphArgs) -> Result<RawConfig> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -38,13 +33,13 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
             region: None,
             stake,
+            cpu_multiplier: 1.0,
+            cores: None,
         });
     }
 
     println!("generating edges...");
-    let alpha = 0.15;
-    let beta = 0.2;
-    let max_distance = distance((0.0, 90.0), (90.0, 180.0));
+    let max_distance = distance((-90.0, 90.0), (90.0, 180.0));
     for from in 0..args.node_count {
         // stake pools don't connect directly to each other
         let first_candidate_connection = if from < args.stake_pool_count {
@@ -53,13 +48,32 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
             from + 1
         };
 
-        for to in first_candidate_connection..args.node_count {
-            // nodes are connected probabilistically, based on how far apart they are
-            let dist = distance(nodes[from].location, nodes[to].location);
-            let probability = alpha * (-dist / (beta * max_distance)).exp();
-            if rng.gen_bool(probability) {
-                links.add(from, to, None);
-            }
+        let mut candidates: Vec<_> = (first_candidate_connection..args.node_count)
+            .filter(|c| *c != from && !links.exists(from, *c))
+            .map(|c| {
+                (
+                    c,
+                    (max_distance / distance(nodes[from].location, nodes[c].location)) as u64,
+                )
+            })
+            .collect();
+        let mut total_weight: u64 = candidates.iter().map(|(_, weight)| *weight).sum();
+        let conn_count = rng.gen_range(args.min_connections..args.max_connections);
+        while links.count(from) < conn_count && !candidates.is_empty() {
+            let next = rng.gen_range(0..total_weight);
+            let Some(to_index) = candidates
+                .iter()
+                .scan(0u64, |cum_weight, (_, weight)| {
+                    *cum_weight += weight;
+                    Some(*cum_weight)
+                })
+                .position(|weight| weight >= next)
+            else {
+                break;
+            };
+            let (to, to_weight) = candidates.remove(to_index);
+            links.add(from, to, None);
+            total_weight -= to_weight;
         }
     }
 
@@ -69,7 +83,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
-                (0..args.node_count).filter(|&to| to == from).collect()
+                (0..args.node_count).filter(|&to| to != from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
             links.add(from, to, None);
@@ -95,7 +109,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<(Vec<RawNodeConfig>, Vec<R
         }
     }
 
-    Ok((nodes, links.links))
+    Ok(generate_full_config(nodes, links.links))
 }
 
 fn track_connections(
@@ -110,5 +124,26 @@ fn track_connections(
         for next in nexts {
             track_connections(connected, connections, *next);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use sim_core::config::SimConfiguration;
+
+    use super::{random_graph, RandomGraphArgs};
+
+    #[test]
+    fn should_generate_valid_graph() {
+        let args = RandomGraphArgs {
+            node_count: 1000,
+            stake_pool_count: 50,
+            min_connections: 5,
+            max_connections: 15,
+        };
+
+        let raw_config = random_graph(&args).unwrap();
+        let config: SimConfiguration = raw_config.into();
+        config.validate().unwrap();
     }
 }

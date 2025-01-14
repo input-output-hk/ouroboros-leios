@@ -4,41 +4,39 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# HLINT ignore "Use const" #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module LeiosProtocol.Short.VizSimP2P where
 
+import ChanDriver
+import Control.Arrow ((&&&))
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
+import Data.Bifunctor (second)
 import qualified Data.Colour.SRGB as Colour
+import Data.Hashable (hash)
+import qualified Data.IntervalMap.Strict as ILMap
+import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, maybeToList)
+import Data.Monoid (Any)
+import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
 import qualified Diagrams.Backend.Cairo.Internal as Dia
 import qualified Diagrams.Core as Dia
-import qualified Diagrams.TwoD as Dia
-import qualified Graphics.Rendering.Cairo as Cairo
-import qualified Graphics.Rendering.Chart.Easy as Chart
-
-import ChanDriver
-import Control.Arrow ((&&&))
-import Data.Bifunctor (second)
-import Data.Hashable (hash)
-import Data.List (foldl', intercalate, sortOn)
-import Data.Monoid
-import Diagrams ((#))
 import qualified Diagrams.Prelude as Dia
 import qualified Diagrams.TwoD.Adjust as Dia
+import qualified Graphics.Rendering.Cairo as Cairo
+import qualified Graphics.Rendering.Chart.Easy as Chart
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
+import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
   IBsInRBsReport (..),
+  LeiosModelConfig (..),
   LeiosSimVizModel,
   LeiosSimVizMsgsState (..),
   LeiosSimVizState (..),
@@ -54,10 +52,11 @@ import ModelTCP (TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
-import PraosProtocol.Common (BlockHeader, FullTip (FullTip), blockHeaderColorAsBody)
 import PraosProtocol.PraosNode (PraosMessage (..))
-import SimTypes (Point (..), WorldShape (..))
-import System.Random (uniformR)
+import Sample
+import SimTypes (NodeId (..), Point (..), World (..))
+import System.FilePath (dropExtension, (<.>))
+import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
 import Viz
@@ -89,16 +88,19 @@ messageDiagram (tag, c) = Dia.fc c $
       EB -> sizedAs $ Dia.hexagon 16
       VT -> sizedAs $ Dia.strokePath $ Dia.star (Dia.StarSkip 2) (Dia.regPoly 5 16)
  where
-  sizedAs d = Dia.sizedAs (Dia.square 18 :: CairoDiagram) d
+  sizedAs = Dia.sizedAs (Dia.square 18 :: CairoDiagram)
 
 messageLegend :: CairoDiagram
 messageLegend =
-  Dia.fontSizeO 20 $
-    Dia.lc Dia.black $
-      Dia.hcat
-        [Dia.hcat [messageDiagram (tag, Dia.black), textBox s] | (s, tag) <- [("RB", RB), ("IB", IB), ("EB", EB), ("Vote", VT)]]
+  addBG $
+    Dia.fontSizeO 20 $
+      Dia.lc Dia.black $
+        Dia.hcat
+          [Dia.hcat [messageDiagram (tag, Dia.black), textBox s] | (s, tag) <- [("RB", RB), ("IB", IB), ("EB", EB), ("Vote", VT)]]
  where
   textBox s = Dia.alignedText 0.7 0.5 s `Dia.atop` Dia.phantom (Dia.rect (fromIntegral $ length s * 20 + 10) 20 :: CairoDiagram)
+  -- TODO: figure out why the width needs fudging.
+  addBG d = d `Dia.atop` Dia.fc Dia.white (Dia.lc Dia.white $ Dia.rect (Dia.width d + 20 * 12) (Dia.height d))
 
 ------------------------------------------------------------------------------
 -- The vizualisation rendering
@@ -108,11 +110,12 @@ data MsgTag = RB | IB | EB | VT
 
 data LeiosP2PSimVizConfig
   = LeiosP2PSimVizConfig
-  { nodeMessageColor :: BlockHeader -> (Double, Double, Double)
+  { nodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   , ibColor :: InputBlockHeader -> (Double, Double, Double)
   , ebColor :: EndorseBlock -> (Double, Double, Double)
   , voteColor :: VoteMsg -> (Double, Double, Double)
   , ptclMessageColor :: LeiosMessage -> Maybe (MsgTag, Dia.Colour Double)
+  , model :: LeiosModelConfig
   }
 
 leiosP2PSimVizRender ::
@@ -180,7 +183,7 @@ leiosP2PSimVizRenderModel
   ( SimVizModel
       _events
       LeiosSimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizNodeTip
@@ -188,9 +191,9 @@ leiosP2PSimVizRenderModel
         }
     )
   screenSize = do
-    renderDiagramAt screenSize (20, 22) messageLegend
     renderLinks
     renderNodes
+    renderDiagramAt screenSize (20, 22) messageLegend
    where
     renderNodes = do
       Cairo.save
@@ -362,8 +365,7 @@ diffusionLatencyPerStakeFraction nnodes created arrivals =
   [ (latency, percent)
   | (arrival, n) <- zip (reverse arrivals) [1 :: Int ..]
   , let !latency = arrival `diffTime` created
-        !percent =
-          (fromIntegral n / fromIntegral nnodes)
+        !percent = fromIntegral n / fromIntegral nnodes
   ]
 
 chartDiffusionLatency ::
@@ -387,7 +389,7 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
  where
   theChart lbl nodePos nodeMsgColor msgsDiffusionLatency =
     (Chart.def :: Chart.Layout DiffTime Chart.Percent)
-      { Chart._layout_title = "Diffusion latency" ++ "(" ++ lbl ++ ")"
+      { Chart._layout_title = "Diffusion latency" ++ " (" ++ lbl ++ ")"
       , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
       , Chart._layout_y_axis =
           (Chart.def :: Chart.LayoutAxis Chart.Percent)
@@ -476,20 +478,17 @@ chartDiffusionImperfection
     idealDiffusionTimes =
       p2pGraphIdealDiffusionTimes
         p2ptopography
-        (\_ -> processingDelay)
+        (const processingDelay)
         (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
 
-chartBandwidth :: VizRender LeiosSimVizModel
-chartBandwidth =
+chartBandwidth :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartBandwidth LeiosModelConfig{recentSpan} =
   chartVizRender 25 $
     \_
      _
      ( SimVizModel
         _
-        LeiosSimVizState
-          { vizMsgsAtNodeRecentQueue
-          , vizMsgsAtNodeRecentBuffer
-          }
+        vs
       ) ->
         (Chart.def :: Chart.Layout Double Double)
           { Chart._layout_title = "Distribution of block frequency"
@@ -498,7 +497,7 @@ chartBandwidth =
               Chart.def
                 { Chart._laxis_generate =
                     Chart.scaledAxis Chart.def{Chart._la_nLabels = maxX} (0, maxX)
-                , Chart._laxis_title = "Count of events within last 30 seconds"
+                , Chart._laxis_title = "Count of events within last " ++ show (round recentSpan :: Int) ++ " seconds"
                 }
           , Chart._layout_y_axis =
               Chart.def
@@ -506,48 +505,108 @@ chartBandwidth =
                     Chart.scaledAxis Chart.def{Chart._la_nLabels = 4} (0, 0.35)
                 , Chart._laxis_title = "Number of nodes in each bin (normalised)"
                 }
-          , Chart._layout_plots =
-              [ bandwidthHistPlot
-                "CPU (block validation completion)"
-                Chart.red
-                ( map
-                    ((fromIntegral :: Int -> Double) . recentRate)
-                    (Map.elems vizMsgsAtNodeRecentBuffer)
-                )
-              | not (Map.null vizMsgsAtNodeRecentBuffer)
-              ]
-                ++ [ bandwidthHistPlot
-                    "Network (block arrival)"
-                    Chart.blue
-                    ( map
-                        ((fromIntegral :: Int -> Double) . recentRate)
-                        (Map.elems vizMsgsAtNodeRecentQueue)
-                    )
-                   | not (Map.null vizMsgsAtNodeRecentQueue)
-                   ]
+          , Chart._layout_plots = validationPlot vs ++ networkPlot vs
           }
  where
+  recentPlot lbl color maps =
+    [ bandwidthHistPlot
+      maxX
+      (0, maxX)
+      lbl
+      color
+      ( map
+          (fromIntegral :: Int -> Double)
+          (Map.elems recent)
+      )
+    | not (Map.null recent)
+    ]
+   where
+    recent :: Map.Map NodeId Int
+    recent =
+      Map.unionsWith (+) $
+        [Map.map recentRate m | m <- maps]
+  networkPlot vs =
+    recentPlot
+      "Network (block arrival)"
+      Chart.blue
+      [ vs.vizMsgsAtNodeRecentQueue
+      , vs.ibMsgs.msgsAtNodeRecentQueue
+      , vs.ebMsgs.msgsAtNodeRecentQueue
+      , vs.voteMsgs.msgsAtNodeRecentQueue
+      ]
+  validationPlot vs =
+    recentPlot
+      "CPU (block validation completion)"
+      Chart.red
+      [ vs.vizMsgsAtNodeRecentBuffer
+      , vs.ibMsgs.msgsAtNodeRecentBuffer
+      , vs.ebMsgs.msgsAtNodeRecentBuffer
+      , vs.voteMsgs.msgsAtNodeRecentBuffer
+      ]
   maxX :: Num a => a
-  maxX = 15
+  maxX = 150
 
-  bandwidthHistPlot title color values =
-    Chart.histToPlot $
-      Chart.defaultNormedPlotHist
-        { Chart._plot_hist_title = title
-        , Chart._plot_hist_values = values
-        , Chart._plot_hist_range = Just (0, maxX)
-        , Chart._plot_hist_bins = maxX
-        , Chart._plot_hist_fill_style =
-            Chart.def
-              { Chart._fill_color =
-                  Chart.withOpacity color 0.4
-              }
-        , Chart._plot_hist_line_style =
-            Chart.def
-              { Chart._line_color =
-                  Chart.opaque color
-              }
-        }
+bandwidthHistPlot :: RealFrac x => Int -> (x, x) -> String -> Chart.Colour Double -> [x] -> Chart.Plot x Double
+bandwidthHistPlot maxX range title color values =
+  Chart.histToPlot $
+    Chart.defaultNormedPlotHist
+      { Chart._plot_hist_title = title
+      , Chart._plot_hist_values = values
+      , Chart._plot_hist_range = Just range
+      , Chart._plot_hist_bins = maxX
+      , Chart._plot_hist_fill_style =
+          Chart.def
+            { Chart._fill_color =
+                Chart.withOpacity color 0.4
+            }
+      , Chart._plot_hist_line_style =
+          Chart.def
+            { Chart._line_color =
+                Chart.opaque color
+            }
+      }
+
+chartCPUUsage :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartCPUUsage LeiosModelConfig{numCores} =
+  chartVizRender 25 $
+    \(Time now)
+     _
+     ( SimVizModel
+        _
+        vs
+      ) ->
+        let
+          numNodes = Map.size vs.vizNodePos
+          maxCPUs = case numCores of
+            Infinite -> 20
+            Finite n -> n
+          values =
+            [ (nid, [(n, if n <= 5 then "" else show n)])
+            | (NodeId nid, m) <- Map.toList vs.nodeCpuUsage
+            , let n = sum . ILMap.elems . flip ILMap.containing now $ m
+            ]
+         in
+          (Chart.def :: Chart.Layout Double Double)
+            { Chart._layout_title = "Instantaneous CPU Usage per Node"
+            , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
+            , Chart._layout_x_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis
+                        Chart.defaultIntAxis{Chart._la_nLabels = 10}
+                        (0, numNodes - 1)
+                  , Chart._laxis_title = "Node #"
+                  }
+            , Chart._layout_y_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis Chart.defaultIntAxis{Chart._la_nLabels = 5} (0, maxCPUs)
+                  , Chart._laxis_title = "CPUs in use"
+                  }
+            , Chart._layout_plots =
+                [ Chart.plotBars (Chart.def{Chart._plot_bars_values_with_labels = values})
+                ]
+            }
 
 chartLinkUtilisation :: VizRender LeiosSimVizModel
 chartLinkUtilisation =
@@ -627,14 +686,15 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength =
+defaultVizConfig :: Int -> NumCores -> LeiosP2PSimVizConfig
+defaultVizConfig stageLength numCores =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
     , voteColor = toSRGB . voteColor
     , ebColor = toSRGB . ebColor
     , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
+    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores}
     }
  where
   testPtclMessageColor ::
@@ -658,7 +718,7 @@ defaultVizConfig stageLength =
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgRespondBodies bodies -> Just $ blendColors $ map (f . snd) bodies
     _otherwise -> Nothing
-  testNodeMessageColor :: BlockHeader -> (Double, Double, Double)
+  testNodeMessageColor :: RankingBlockHeader -> (Double, Double, Double)
   testNodeMessageColor = blockHeaderColorAsBody
   -- alternating cold and warm colours for visual contrast.
   palettes =
@@ -695,10 +755,10 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Visualization
-example2 =
+example2 :: StdGen -> Int -> P2PTopography -> NumCores -> Visualization
+example2 rng sliceLength p2pTopography processingCores =
   slowmoVisualization 0.5 $
-    Viz (leiosSimVizModel exampleTrace2) $
+    Viz model $
       LayoutAbove
         [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
         , LayoutBeside
@@ -717,11 +777,15 @@ example2 =
                     --         0.1
                     --         (96 / 1000)
                     --         config
-                    tag <- [minBound .. maxBound]
+                    tag <- [IB, EB, VT, RB]
                     ]
                 , LayoutAbove
                     [ LayoutReqSize 350 300 $
-                        Layout chartBandwidth
+                        Layout $
+                          chartBandwidth modelConfig
+                    , LayoutReqSize 350 300 $
+                        Layout $
+                          chartCPUUsage modelConfig
                     , LayoutReqSize 350 300 $
                         Layout chartLinkUtilisation
                     ]
@@ -729,4 +793,14 @@ example2 =
             ]
         ]
  where
-  config = defaultVizConfig 5
+  config = defaultVizConfig 5 processingCores
+  modelConfig = config.model
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng sliceLength p2pTopography processingCores)
+
+exampleSim :: StdGen -> Int -> P2PTopography -> NumCores -> Time -> FilePath -> IO ()
+exampleSim seed sliceLength p2pTopography processingCores stop fp = do
+  let trace = exampleTrace2 seed sliceLength p2pTopography processingCores
+  let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
+  runSampleModel' traceFile logLeiosEvent sampleModel stop trace
+ where
+  traceFile = dropExtension fp <.> "log"

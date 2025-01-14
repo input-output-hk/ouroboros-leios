@@ -5,6 +5,7 @@ import readline from "readline";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
+  ISimulationIntermediateDataState,
 } from "@/contexts/GraphContext/types";
 
 export const incrementNodeAggregationData = (
@@ -37,6 +38,7 @@ export const incrementNodeAggregationData = (
 export const processMessage = (
   json: IServerMessage,
   aggregatedData: ISimulationAggregatedDataState,
+  intermediate: ISimulationIntermediateDataState,
 ) => {
   const { message } = json;
 
@@ -64,6 +66,7 @@ export const processMessage = (
       message.producer.toString(),
       "ibGenerated",
     );
+    intermediate.txsPerIb.set(message.id, message.transactions.length);
   } else if (message.type === EMessageType.InputBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -82,6 +85,11 @@ export const processMessage = (
       message.producer.toString(),
       "pbGenerated",
     );
+    aggregatedData.global.praosTxOnChain += message.transactions.length;
+    if (message.endorsement != null) {
+      let eb = message.endorsement.eb.id;
+      aggregatedData.global.leiosTxOnChain += intermediate.txsPerEb.get(eb) ?? 0;
+    }
   } else if (message.type === EMessageType.PraosBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -100,6 +108,10 @@ export const processMessage = (
       message.producer.toString(),
       "ebGenerated",
     );
+    const txs = message.input_blocks
+      .map(ib => intermediate.txsPerIb.get(ib.id) ?? 0)
+      .reduce((p, c) => p + c, 0);
+    intermediate.txsPerEb.set(message.id, txs);
   } else if (message.type === EMessageType.EndorserBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,

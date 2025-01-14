@@ -20,7 +20,8 @@
 -- it is used; eventually it should be simplified and then moved to the
 -- network layer tests; the more sophiscated block abstraction (abstracted over
 -- an Ouroboros protocol) will live in the consensus layer.
-module PraosProtocol.ConcreteBlock (
+module PraosProtocol.Common.ConcreteBlock (
+  module Ouroboros.Network.Block,
   Block (..),
   BlockHeader (..),
   BlockBody (..),
@@ -29,9 +30,6 @@ module PraosProtocol.ConcreteBlock (
   ConcreteHeaderHash (..),
   hashBody,
   IsBody,
-
-  -- * Converting slots to times
-  convertSlotToTimeForTestsAssumingNoHardFork,
 
   -- * Creating sample chains
   mkChain,
@@ -49,14 +47,6 @@ module PraosProtocol.ConcreteBlock (
   fixupAnchoredFragmentFrom,
 ) where
 
-import Data.ByteString (ByteString)
-import Data.Function (fix)
-import Data.Hashable
-import Data.String (IsString)
-import Data.Time.Calendar (fromGregorian)
-import Data.Time.Clock (UTCTime (..), addUTCTime, secondsToNominalDiffTime)
-import NoThunks.Class (NoThunks)
-
 import Codec.CBOR.Decoding (
   decodeBytes,
   decodeInt,
@@ -65,16 +55,20 @@ import Codec.CBOR.Decoding (
  )
 import Codec.CBOR.Encoding (encodeBytes, encodeInt, encodeListLen, encodeWord64)
 import Codec.Serialise (Serialise (..))
+import Data.ByteString (ByteString)
+import Data.Function (fix)
+import Data.Hashable (Hashable (hash))
+import Data.String (IsString)
+import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-
-import Data.Typeable
-import Ouroboros.Network.AnchoredFragment (Anchor (..), AnchoredFragment)
-import Ouroboros.Network.AnchoredFragment qualified as AF
+import NoThunks.Class (NoThunks)
 import Ouroboros.Network.Block
-import Ouroboros.Network.Mock.Chain (Chain)
-import Ouroboros.Network.Mock.Chain qualified as C
 import Ouroboros.Network.Point (withOrigin)
-import Ouroboros.Network.Util.ShowProxy
+import Ouroboros.Network.Util.ShowProxy (ShowProxy)
+import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
+import PraosProtocol.Common.AnchoredFragment qualified as AnchoredFragment
+import PraosProtocol.Common.Chain (Chain)
+import PraosProtocol.Common.Chain qualified as Chain
 
 {-------------------------------------------------------------------------------
   Concrete block shape used currently in the network layer
@@ -212,7 +206,7 @@ mkAnchoredFragmentSimple :: IsBody body => [body] -> AnchoredFragment (Block bod
 mkAnchoredFragmentSimple =
   mkAnchoredFragment AnchorGenesis . zip [1 ..]
 
-mkPartialBlock :: Hashable body => SlotNo -> body -> (Block body)
+mkPartialBlock :: Hashable body => SlotNo -> body -> Block body
 mkPartialBlock sl body =
   Block
     { blockHeader = mkPartialBlockHeader sl body
@@ -244,8 +238,8 @@ fixupBlock ::
   Hashable body =>
   HeaderHash block ~ HeaderHash BlockHeader =>
   Anchor block ->
-  (Block body) ->
-  (Block body)
+  Block body ->
+  Block body
 fixupBlock prev b@Block{blockBody, blockHeader} =
   b
     { blockHeader =
@@ -265,16 +259,16 @@ fixupBlockHeader prev b =
   fix $ \b' ->
     b
       { headerHash = hashHeader b'
-      , headerPrevHash = castHash (AF.anchorToHash prev)
-      , headerBlockNo = withOrigin (BlockNo 0) succ (AF.anchorToBlockNo prev)
+      , headerPrevHash = castHash (AnchoredFragment.anchorToHash prev)
+      , headerBlockNo = withOrigin (BlockNo 0) succ (AnchoredFragment.anchorToBlockNo prev)
       }
 
 -- | Fixup a block so to fit it on top of a given previous block.
 
 -- Like 'fixupBlock' but it takes the info from a given block.
 --
-fixupBlockAfterBlock :: IsBody body => (Block body) -> (Block body) -> (Block body)
-fixupBlockAfterBlock prev = fixupBlock (AF.anchorFromBlock prev)
+fixupBlockAfterBlock :: IsBody body => Block body -> Block body -> Block body
+fixupBlockAfterBlock prev = fixupBlock (AnchoredFragment.anchorFromBlock prev)
 
 fixupBlocks ::
   HasFullHeader b =>
@@ -295,7 +289,7 @@ fixupBlocks f z anchor fixup (b0 : c0) =
   go b (b1 : c1) = (c' `f` b', b')
    where
     (c', b1') = go b1 c1
-    b' = fixup (AF.anchorFromBlock b1') b
+    b' = fixup (AnchoredFragment.anchorFromBlock b1') b
 
 -- | Fix up the block number and hashes of a 'Chain'. This also fixes up the
 -- first block to chain-on from genesis, since by construction the 'Chain' type
@@ -307,8 +301,8 @@ fixupChain ::
   Chain b
 fixupChain =
   fixupBlocks
-    (C.:>)
-    C.Genesis
+    (Chain.:>)
+    Chain.Genesis
     AnchorGenesis
 
 fixupAnchoredFragmentFrom ::
@@ -319,8 +313,8 @@ fixupAnchoredFragmentFrom ::
   AnchoredFragment b
 fixupAnchoredFragmentFrom anchor =
   fixupBlocks
-    (AF.:>)
-    (AF.Empty anchor)
+    (AnchoredFragment.:>)
+    (AnchoredFragment.Empty anchor)
     anchor
 
 {-------------------------------------------------------------------------------
@@ -374,28 +368,3 @@ instance Serialise BlockBody where
   encode (BlockBody b) = encodeBytes b
 
   decode = BlockBody <$> decodeBytes
-
-{-------------------------------------------------------------------------------
-  Simple static time conversions, since no HardFork
--------------------------------------------------------------------------------}
-
--- | Arbitrarily but consistently converts slots UTCTimes.
---
--- It is only intended for use in tests. Notably it assumes a fixed system
--- start time, slot length, and the absence of a hard fork (ie no
--- HardForkCombinator). This is how it's available as a pure function.
-convertSlotToTimeForTestsAssumingNoHardFork :: SlotNo -> UTCTime
-convertSlotToTimeForTestsAssumingNoHardFork sl =
-  flip addUTCTime startTime $
-    --   ^^^ arbitrary start time for testing
-    secondsToNominalDiffTime $
-      fromIntegral $
-        unSlotNo sl * 10
- where
-  --   ^^^ arbitrary slot length for testing
-
-  startTime =
-    UTCTime
-      { utctDay = fromGregorian 2000 1 1
-      , utctDayTime = 0
-      }

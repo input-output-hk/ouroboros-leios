@@ -1,26 +1,18 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use void" #-}
-{-# HLINT ignore "Use section" #-}
 
 module SimTCPLinks where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (atomically, newTQueueIO, readTQueue, writeTQueue),
- )
+import Chan
+import ChanTCP
 import Control.Monad (replicateM_)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (DiffTime, Time)
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (
   IOSim,
-  SimEvent (SimEvent, seTime, seType),
+  SimEvent (seType),
   SimEventType (EventLog),
   SimTrace,
   runSimTrace,
@@ -33,12 +25,17 @@ import Control.Tracer as Tracer (
  )
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
-
-import Chan
-import ChanTCP
 import ModelTCP
+import STMCompat
 import SimTypes
-import TimeCompat (threadDelaySI)
+import TimeCompat
+
+--------------------------------------------------------------------------------
+
+{-# ANN module ("HLint: ignore Use void" :: String) #-}
+{-# ANN module ("HLint: ignore Use section" :: String) #-}
+
+--------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------------
 -- Simulations
@@ -140,7 +137,7 @@ generatorNode tracer (UniformTrafficPattern nmsgs msgsz mdelay) chan = do
     [ do
       writeChan chan msg
       traceWith tracer (MsgDepart msg)
-      maybe (return ()) threadDelaySI mdelay
+      maybe (return ()) threadDelay mdelay
     | msg <- map (flip TestMessage msgsz) [0 .. nmsgs - 1]
     ]
 
@@ -191,16 +188,16 @@ labelDirToLabelLink nfrom nto (DirClientToServer e) = LabelLink nfrom nto e
 labelDirToLabelLink nfrom nto (DirServerToClient e) = LabelLink nto nfrom e
 
 simTracer :: Typeable e => Tracer (IOSim s) e
-simTracer = Tracer.Tracer $ IOSim.traceM
+simTracer = Tracer.Tracer IOSim.traceM
 
 selectTimedEvents :: forall a b. Typeable b => SimTrace a -> [(Time, b)]
 selectTimedEvents =
   bifoldr
     (\_ _ -> [])
     ( \b acc -> case b of
-        SimEvent{seTime, seType}
-          | Just b' <- selectDynamic seType ->
-              (seTime, b') : acc
+        se
+          | Just b' <- selectDynamic (seType se) ->
+              (seTimeCompat se, b') : acc
         _ -> acc
     )
     []

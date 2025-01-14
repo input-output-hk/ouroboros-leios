@@ -78,7 +78,7 @@ export const getSetSimulationMaxTime = async (): Promise<number> => {
 export const getSimulationTopography = async () => {
   const filePath = path.resolve(
     __dirname,
-    "../../../../../sim-rs/test_data/realistic.toml",
+    "../../../../../sim-rs/test_data/thousand.toml",
   );
   const fileStream = createReadStream(filePath, {
     encoding: "utf8",

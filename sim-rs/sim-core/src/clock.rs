@@ -1,12 +1,15 @@
-use std::{cmp::Reverse, sync::Arc};
+use std::{
+    cmp::Reverse,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
-pub use barrier::ClockBarrier;
-use barrier::ClockBarrierState;
+pub use coordinator::ClockCoordinator;
+use coordinator::ClockEvent;
 use timestamp::AtomicTimestamp;
 pub use timestamp::Timestamp;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, oneshot};
 
-mod barrier;
+mod coordinator;
 mod timestamp;
 
 // wrapper struct which holds a SimulationEvent,
@@ -42,27 +45,88 @@ impl<T> Ord for FutureEvent<T> {
 #[derive(Clone)]
 pub struct Clock {
     time: Arc<AtomicTimestamp>,
-    inner: Arc<Mutex<ClockBarrierState>>,
-}
-
-impl Default for Clock {
-    fn default() -> Self {
-        Self::new()
-    }
+    waiters: Arc<AtomicUsize>,
+    tx: mpsc::UnboundedSender<ClockEvent>,
 }
 
 impl Clock {
-    pub fn new() -> Self {
-        let time = Arc::new(AtomicTimestamp::new(Timestamp::zero()));
-        let inner = Arc::new(Mutex::new(ClockBarrierState::new(time.clone())));
-        Self { time, inner }
+    fn new(
+        time: Arc<AtomicTimestamp>,
+        waiters: Arc<AtomicUsize>,
+        tx: mpsc::UnboundedSender<ClockEvent>,
+    ) -> Self {
+        Self { time, waiters, tx }
     }
 
     pub fn now(&self) -> Timestamp {
         self.time.load(std::sync::atomic::Ordering::Acquire)
     }
 
-    pub async fn barrier(&self) -> ClockBarrier {
-        ClockBarrier::new(self.time.clone(), self.inner.clone()).await
+    pub fn barrier(&self) -> ClockBarrier {
+        let id = self
+            .waiters
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        ClockBarrier {
+            id,
+            time: self.time.clone(),
+            tx: self.tx.clone(),
+        }
+    }
+}
+
+pub struct ClockBarrier {
+    id: usize,
+    time: Arc<AtomicTimestamp>,
+    tx: mpsc::UnboundedSender<ClockEvent>,
+}
+
+impl ClockBarrier {
+    pub fn now(&self) -> Timestamp {
+        self.time.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub fn start_task(&self) {
+        let _ = self.tx.send(ClockEvent::StartTask);
+    }
+
+    pub fn finish_task(&self) {
+        let _ = self.tx.send(ClockEvent::FinishTask);
+    }
+
+    pub async fn wait_until(&mut self, timestamp: Timestamp) {
+        if self.now() == timestamp {
+            return;
+        }
+        let (tx, rx) = oneshot::channel();
+        if self
+            .tx
+            .send(ClockEvent::Wait {
+                actor: self.id,
+                until: timestamp,
+                done: tx,
+            })
+            .is_err()
+        {
+            return;
+        }
+
+        struct Guard<'a> {
+            id: usize,
+            tx: &'a mpsc::UnboundedSender<ClockEvent>,
+        }
+        impl Drop for Guard<'_> {
+            fn drop(&mut self) {
+                let _ = self.tx.send(ClockEvent::CancelWait { actor: self.id });
+            }
+        }
+
+        let guard = Guard {
+            id: self.id,
+            tx: &self.tx,
+        };
+        if rx.await.is_ok() {
+            assert_eq!(self.now(), timestamp);
+            std::mem::forget(guard);
+        }
     }
 }

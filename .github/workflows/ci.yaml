@@ -1,4 +1,6 @@
 name: CI
+
+# TODO: If these environment variables only affect Nix, should they be moved under the `formal-spec-check` job?
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
   TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
@@ -9,13 +11,19 @@ on:
   push:
     branches:
       - main
+
 jobs:
-  typecheck:
-    name: Typecheck specification
+  ################################################################################
+  # Formal Specification in Agda - under /formal-spec/
+  ################################################################################
+
+  formal-spec-typecheck:
+    name: "formal-spec: Typecheck"
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+
       - name: 💾 Cache Nix store
         uses: actions/cache@v3.0.8
         id: nix-cache
@@ -23,6 +31,7 @@ jobs:
           path: /tmp/nixcache
           key: ${{ runner.os }}-nix-typecheck-${{ hashFiles('flake.lock') }}
           restore-keys: ${{ runner.os }}-nix-typecheck-
+
       - name: 🛠️ Install Nix
         uses: cachix/install-nix-action@v21
         with:
@@ -33,18 +42,25 @@ jobs:
             trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
             substituters = ${{ env.SUBSTITUTERS }}
             experimental-features = nix-command flakes
+
       - name: 💾➤ Import Nix store cache
         if: "steps.nix-cache.outputs.cache-hit == 'true'"
         run: "nix-store --import < /tmp/nixcache"
+
       - name: 🏗️ Build specification
         run: |
           nix build --show-trace --accept-flake-config .#leiosSpec
+
       - name: ➤💾 Export Nix store cache
         if: "steps.nix-cache.outputs.cache-hit != 'true'"
         run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
 
-  compile:
-    name: Build Haskell packages with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}
+  ################################################################################
+  # Simulation and Prototype in Haskell - under /simulation/
+  ################################################################################
+
+  simulation-test:
+    name: "simulation: Test with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -53,9 +69,10 @@ jobs:
         ghc-version: ["9.8"]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up GHC ${{ matrix.ghc-version }}
+      - name: 🛠️ Install GHC ${{ matrix.ghc-version }}
         uses: haskell-actions/setup@v2
         id: setup
         with:
@@ -63,31 +80,33 @@ jobs:
           # Defaults, added for clarity:
           cabal-version: "latest"
           cabal-update: true
-      - name: Install libraries
-        run: sudo apt-get install -y libpango1.0-dev libgtk-3-dev
-      - name: Configure the build
+
+      - name: 🛠️ Install system dependencies
+        run: sudo apt-get install -y graphviz libpango1.0-dev libgtk-3-dev
+
+      - name: 🛠️ Configure
         run: |
           cabal configure --enable-tests --enable-benchmarks --disable-documentation
           cabal build all --dry-run
         # The last step generates dist-newstyle/cache/plan.json for the cache key.
 
-      - name: Restore cached dependencies
+      - name: 💾➤ Restore dependency cache
         uses: actions/cache/restore@v4
         id: cache
         env:
           key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ env.key }}-plan-${{ hashFiles('**/plan.json') }}
+          key: ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json') }}
           restore-keys: ${{ env.key }}-
 
-      - name: Install dependencies
+      - name: 🛠️ Install Cabal dependencies
         # If we had an exact cache hit, the dependencies will be up to date.
         if: steps.cache.outputs.cache-hit != 'true'
         run: cabal build all --only-dependencies
 
       # Cache dependencies already here, so that we do not have to rebuild them should the subsequent steps fail.
-      - name: Save cached dependencies
+      - name: ➤💾 Save dependency cache
         uses: actions/cache/save@v4
         # If we had an exact cache hit, trying to save the cache would error because of key clash.
         if: steps.cache.outputs.cache-hit != 'true'
@@ -95,38 +114,64 @@ jobs:
           path: ${{ steps.setup.outputs.cabal-store }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
 
-      - name: Build
+      - name: 🏗️ Build
         run: cabal build all
 
-      - name: Run tests
+      - name: 🏗️ Test
         run: cabal test all
 
-  rs-compile:
-    name: Check Rust packages
+  simulation-hlint:
+    name: "simulation: Check with HLint"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Check Rust packages compilation
-        working-directory: sim-rs
-        run: |
-          cargo check
-          if [ $? -ne 0 ]; then
-            echo "Cargo check failed"
-            exit 1
-          fi
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-  fourmolu-check:
-    name: Check Haskell sources with fourmolu
+      - name: 🛠️ Set up HLint
+        uses: haskell-actions/hlint-setup@v2
+
+      - name: 🛠️ Run HLint
+        uses: haskell-actions/hlint-run@v2
+        with:
+          path: simulation/
+          fail-on: warning
+
+  simulation-fourmolu:
+    name: "simulation: Check with fourmolu"
     runs-on: ubuntu-22.04
     steps:
-      # Note that you must checkout your code before running haskell-actions/run-fourmolu
-      - uses: actions/checkout@v4
-      - uses: haskell-actions/run-fourmolu@v11
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Run fourmolu
+        uses: haskell-actions/run-fourmolu@v11
         with:
           version: "0.15.0.0"
 
-  generate-diagrams:
-    name: Generate D2 Diagrams
+  ################################################################################
+  # Simulation in Rust - under /sim-rs/
+  ################################################################################
+
+  sim-rs-check:
+    name: "sim-rs: Test"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Rust packages
+        working-directory: sim-rs
+        run: |
+          cargo test
+          if [ $? -ne 0 ]; then
+            echo "Cargo test failed"
+            exit 1
+          fi
+
+  ################################################################################
+  # Documentation - under various directories
+  ################################################################################
+
+  docs-generate-d2-diagrams:
+    name: "docs: Generate D2 Diagrams"
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -171,7 +216,8 @@ jobs:
           git commit -m "Auto-generate diagram PNGs [skip ci]"
           git push origin HEAD:${{ github.head_ref || github.ref_name }}
 
-  build-docusaurus:
+  docs-build:
+    name: "docs: Build"
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -201,11 +247,11 @@ jobs:
           path: |
             site/build/*
 
-  publish-docs:
+  docs-publish:
+    name: "docs: Publish"
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
-    needs:
-      - build-docusaurus
+    needs: docs-build
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4

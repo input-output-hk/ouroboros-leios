@@ -9,13 +9,12 @@ import ChanTCP (
   TcpEvent,
   newConnectionTCP,
  )
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.Monad.Class.MonadAsync (
   MonadAsync (concurrently_),
  )
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
-  Contravariant (contramap),
+  Contravariant (..),
   Tracer (Tracer),
   traceWith,
  )
@@ -32,6 +31,7 @@ import PraosProtocol.ChainSync (
  )
 import PraosProtocol.Common hiding (Point)
 import qualified PraosProtocol.Common.Chain as Chain
+import STMCompat
 import SimTCPLinks (
   labelDirToLabelLink,
   mkTcpConnProps,
@@ -45,7 +45,7 @@ type ChainSyncTrace = [(Time, ChainSyncEvent)]
 data ChainSyncEvent
   = -- | Declare the nodes and links
     ChainSyncEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -68,9 +68,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         ChainSyncEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)
@@ -88,7 +88,8 @@ traceRelayLink1 tcpprops =
       return ()
  where
   consumerNode cfg chan = do
-    st <- ChainConsumerState <$> newTVarIO Chain.Genesis
+    let valHeader = threadDelay . cfg.headerValidationDelay
+    st <- ChainConsumerState <$> newTVarIO Chain.Genesis <*> pure valHeader
     let nullTracer = Tracer $ const $ return ()
     runChainConsumer nullTracer cfg chan st
   producerNode chan = do

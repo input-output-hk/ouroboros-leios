@@ -1,6 +1,8 @@
-module PraosProtocol.Common.AnchoredFragment (module AnchoredFragment) where
+module PraosProtocol.Common.AnchoredFragment (
+  module Ouroboros.Network.AnchoredFragment,
+) where
 
-import Ouroboros.Network.AnchoredFragment as AnchoredFragment (
+import Ouroboros.Network.AnchoredFragment (
   Anchor (..),
   AnchoredFragment,
   AnchoredSeq (..),

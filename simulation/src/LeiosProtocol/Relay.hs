@@ -26,7 +26,6 @@ module LeiosProtocol.Relay where
 
 import Chan
 import ChanDriver (ProtocolMessage, chanDriver)
-import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
 import Control.Monad (forM_, join, unless, void, when)
@@ -34,7 +33,6 @@ import Control.Monad.Class.MonadAsync (MonadAsync)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
-import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
@@ -50,6 +48,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import Data.Unit.Strict (forceElemsToWHNF)
 import Data.Word (Word16)
 import GHC.Generics (Generic)
+import LeiosProtocol.Common
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
 import Network.TypedProtocol (
@@ -65,8 +64,8 @@ import Network.TypedProtocol (
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
 import NoThunks.Class (NoThunks)
-import PraosProtocol.Common
 import Quiet (Quiet (..))
+import STMCompat
 
 data BlockingStyle
   = StBlocking
@@ -356,10 +355,10 @@ instance
   where
   messageSizeBytes MsgInit = 1
   messageSizeBytes (MsgRequestHeaders blocking expand shrink) =
-    messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
-  messageSizeBytes (MsgRespondHeaders headers) = messageSizeBytes headers
-  messageSizeBytes (MsgRequestBodies ids) = sum $ map messageSizeBytes ids
-  messageSizeBytes (MsgRespondBodies bodies) = sum $ map messageSizeBytes bodies
+    1 + messageSizeBytes blocking + finiteByteSize expand + finiteByteSize shrink
+  messageSizeBytes (MsgRespondHeaders headers) = 1 + messageSizeBytes headers
+  messageSizeBytes (MsgRequestBodies ids) = 1 + sum (map messageSizeBytes ids)
+  messageSizeBytes (MsgRespondBodies bodies) = 1 + sum (map messageSizeBytes bodies)
   messageSizeBytes MsgDone = 1
 
 relayMessageLabel :: Message (RelayState id header body) st st' -> String
@@ -497,8 +496,7 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
-  , headerValidationDelay :: header -> DiffTime
-  , threadDelayParallel :: [DiffTime] -> m ()
+  , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
@@ -626,6 +624,17 @@ initRelayConsumerLocalState =
     , buffer = Map.empty
     }
 
+relayConsumerLocalStateInvariant :: Ord id => RelayConsumerLocalState id header body n -> Bool
+relayConsumerLocalStateInvariant lst =
+  let
+    windowSet = Set.fromList (Foldable.toList lst.window)
+    bufferSet = Map.keysSet lst.buffer
+    availableSet = Map.keysSet lst.available
+   in
+    bufferSet `Set.isSubsetOf` windowSet
+      && availableSet `Set.isSubsetOf` windowSet
+      && Set.null (Set.intersection bufferSet availableSet)
+
 data Collect id header body
   = CollectHeaders WindowExpand [header]
   | CollectBodies [header] [(id, body)]
@@ -709,11 +718,27 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     STM m (RelayConsumer id header body n 'StIdle m ())
   requestBodies lst = do
-    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize lst.available
+    -- New headers are filtered before becoming available, but we have
+    -- to filter `lst.available` again in the same STM tx that sets them as
+    -- `inFlight`.
+    inFlight <- readTVar sst.inFlightVar
+    relayBuffer <- readTVar sst.relayBufferVar
+    let (ignored, available1) =
+          Map.partitionWithKey
+            ( \k _ ->
+                k `Set.member` inFlight
+                  || k `RB.member` relayBuffer
+            )
+            lst.available
+    -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
+    let buffer' = lst.buffer <> Map.map (const Nothing) ignored
+
+    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize available1
     let idsToRequest = map config.headerId hdrsToRequest
-    modifyTVar' sst.inFlightVar (Set.union $ Set.fromList idsToRequest)
-    let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
-    let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
+    let idsToRequestSet = Set.fromList idsToRequest
+    modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+    let available2 = Map.withoutKeys available1 idsToRequestSet
+    let !lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available2, buffer = buffer'}
     return $
       TS.YieldPipelined
         (MsgRequestBodies idsToRequest)
@@ -785,7 +810,7 @@ relayConsumerPipelined config sst =
       unless (Seq.length idsSeq <= fromIntegral windowExpand) $
         throw IdsNotRequested
 
-      config.threadDelayParallel $ map config.headerValidationDelay headers
+      config.validateHeaders headers
 
       -- Upon receiving a batch of new headers we extend our available set,
       -- and extend the unacknowledged sequence.
@@ -882,7 +907,7 @@ relayConsumerPipelined config sst =
           buffer4 =
             forceElemsToWHNF $
               buffer3
-                <> Map.fromList (zip live (repeat Nothing))
+                <> Map.fromList (map (,Nothing) live)
 
       -- if lst.window has duplicated ids, we might submit duplicated blocks.
       unless (null bodiesToSubmit) $ do
@@ -890,6 +915,7 @@ relayConsumerPipelined config sst =
         config.submitBlocks bodiesToSubmit now $ \validated -> do
           -- Note: here we could set a flag to drop this producer if not
           -- all blocks validated.
+          -- TODO: the validation logic should be the one inserting into relayBuffer.
           modifyTVar' sst.relayBufferVar $
             flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
           -- TODO: won't remove from inFlight blocks not validated.
@@ -927,7 +953,7 @@ relayConsumerPipelined config sst =
 
       availableIdsU =
         Map.filterWithKey
-          (\txid _ -> notElem txid lst.window)
+          (\txid _ -> txid `notElem` lst.window)
           idsMap
 
       available' = lst.available <> Map.intersection availableIdsMp availableIdsU
@@ -958,7 +984,7 @@ relayConsumerPipelined config sst =
         forceElemsToWHNF $
           Foldable.foldl'
             ( \m txid ->
-                if elem txid window''
+                if txid `elem` window''
                   then m
                   else Map.delete txid m
             )

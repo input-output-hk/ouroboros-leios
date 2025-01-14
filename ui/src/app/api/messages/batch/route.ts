@@ -2,8 +2,8 @@ import { createReadStream } from "fs";
 import { NextResponse } from "next/server";
 import readline from "readline";
 
-import { IServerMessage } from "@/components/Graph/types";
-import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
+import { EMessageType, IServerMessage } from "@/components/Graph/types";
+import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/GraphContext/types";
 import { messagesPath } from "../../utils";
 import { processMessage } from "./utils";
 
@@ -66,6 +66,13 @@ function getTimestampAtPosition(
 
 export async function GET(req: Request, res: Response) {
   try {
+    const url = new URL(req.url);
+    const batchSize = url.searchParams.get("batchSize");
+
+    if (isNaN(Number(batchSize))) {
+      throw new Error("Invalid batch size.");
+    }
+
     const fileStream = createReadStream(messagesPath, {
       encoding: "utf8",
     });
@@ -90,13 +97,22 @@ export async function GET(req: Request, res: Response) {
         const aggregatedData: ISimulationAggregatedDataState = {
           progress: 0,
           nodes: new Map(),
+          global: {
+            praosTxOnChain: 0,
+            leiosTxOnChain: 0,
+          },
+          lastNodesUpdated: [],
+        };
+        const intermediate: ISimulationIntermediateDataState = {
+          txsPerIb: new Map(),
+          txsPerEb: new Map(),
         };
 
         interval = setInterval(() => {
           if (isProcessing) {
             return;
           }
-          
+
           isProcessing = true;
           if (eventBuffer.length === 0 && simulationDone) {
             clearInterval(interval);
@@ -108,16 +124,43 @@ export async function GET(req: Request, res: Response) {
 
           try {
             // Process 10k events at a time.
-            const batch = eventBuffer.splice(0, 100000);
+            const batch = eventBuffer.splice(0, Number(batchSize));
+            const nodesUpdated = new Set<string>();
             for (const line of batch) {
               const data: IServerMessage = JSON.parse(line);
-              processMessage(data, aggregatedData);
+              if (
+                data.message.type === EMessageType.EndorserBlockGenerated ||
+                data.message.type === EMessageType.InputBlockGenerated ||
+                data.message.type === EMessageType.PraosBlockGenerated ||
+                data.message.type === EMessageType.TransactionGenerated
+              ) {
+                nodesUpdated.add(data.message.id);
+              } else if (
+                data.message.type === EMessageType.EndorserBlockReceived ||
+                data.message.type === EMessageType.InputBlockReceived ||
+                data.message.type === EMessageType.PraosBlockReceived ||
+                data.message.type === EMessageType.VotesReceived ||
+                data.message.type === EMessageType.TransactionReceived
+              ) {
+                nodesUpdated.add(data.message.recipient.toString())
+              } else if (
+                data.message.type === EMessageType.EndorserBlockSent ||
+                data.message.type === EMessageType.InputBlockSent ||
+                data.message.type === EMessageType.PraosBlockSent ||
+                data.message.type === EMessageType.VotesSent ||
+                data.message.type === EMessageType.TransactionSent
+              ) {
+                nodesUpdated.add(data.message.sender.toString())
+              }
+
+              processMessage(data, aggregatedData, intermediate);
             }
 
             const serializedData = {
               ...aggregatedData,
               progress: JSON.parse(batch[batch.length - 1]).time / 1_000_000,
               nodes: Array.from(aggregatedData.nodes.entries()),
+              lastNodesUpdated: [...nodesUpdated],
             };
 
             controller.enqueue(`data: ${JSON.stringify(serializedData)}\n\n`);
@@ -126,15 +169,14 @@ export async function GET(req: Request, res: Response) {
             controller.error(e);
             isProcessing = false;
           }
-          
         }, 100);
 
         rl.on("line", (line: string) => {
-          try {
-            eventBuffer.push(line);
-          } catch (error) {
-            controller.error(error);
+          if (!line) {
+            return;
           }
+
+          eventBuffer.push(line);
         });
 
         rl.on("close", () => {

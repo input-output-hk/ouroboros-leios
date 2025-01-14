@@ -16,12 +16,13 @@ More documentation about Leios can be found in the [web site](https://leios.card
 
 ## Current
 
-* [Logbook](Logbook.md) contains a detailed account of
+- [Logbook](Logbook.md) contains a detailed account of
   problems,successes, failures, ideas, references and is intended as a
   tool to help the team members stay in sync. It's updated frequently
   with notes about the day-to-day work, meetings, ideas, etc.
-* [leios-sim](leios-sim) contains experimental code to simulate the Leios protocol
-* [site](site) contains the sources of the aforementioned web site
+- [simulation](simulation) contains experimental Haskell code to simulate the Leios protocol
+- [sim-rs](sim-rs) contains experimental Rust code to simulate the Leios protocol
+- [site](site) contains the sources of the aforementioned web site
 
 ## Specification
 
@@ -48,6 +49,6 @@ initially proposed in November 2022, yielded the following
 content. While the material there is still relevant and useful, it
 won't be updated in the future.
 
-* `report`: the LaTeX source for the design report
-* `CIP`: the initial version of the Leios CIP
-* `simulation`: simulation and visualisation code for investigating Leios-like network traffic patterns.
+- `report`: the LaTeX source for the design report
+- `CIP`: the initial version of the Leios CIP
+- `simulation`: simulation and visualisation code for investigating Leios-like network traffic patterns.

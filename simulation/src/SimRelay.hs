@@ -10,35 +10,11 @@
 
 module SimRelay where
 
-import Control.Concurrent.Class.MonadSTM (
-  MonadSTM (
-    STM,
-    TQueue,
-    atomically,
-    newTQueueIO,
-    newTVarIO,
-    readTQueue,
-    readTVar,
-    retry,
-    writeTQueue,
-    writeTVar
-  ),
- )
 import Control.Monad (forever)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
   MonadAsync (concurrently_),
  )
-import Control.Monad.Class.MonadTime.SI (
-  DiffTime,
-  MonadTime (..),
-  NominalDiffTime,
-  Time,
-  UTCTime,
-  addUTCTime,
-  diffUTCTime,
- )
-import Control.Monad.Class.MonadTimer (MonadDelay)
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
   Contravariant (contramap),
@@ -50,6 +26,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import STMCompat
 import System.Random (StdGen, uniform, uniformR)
 
 import Chan
@@ -57,14 +34,14 @@ import ChanTCP
 import RelayProtocol
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
-import TimeCompat (threadDelayNDT, threadDelaySI)
+import TimeCompat
 
 type RelaySimTrace = [(Time, RelaySimEvent)]
 
 data RelaySimEvent
   = -- | Declare the nodes and links
     RelaySimEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -160,7 +137,7 @@ relayNode
         -- TODO: make different generators produce different non-overlapping ids
 
         go !blkid = do
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let blk =
                 TestBlock
@@ -179,7 +156,7 @@ relayNode
         go !rng = do
           let (u, rng') = uniformR (0, 1) rng
               gendelay = realToFrac ((-log u) * lambda :: Double) :: DiffTime
-          threadDelaySI gendelay
+          threadDelay gendelay
           now <- getCurrentTime
           let (blkidn, rng'') = uniform rng'
               blkid = TestBlockId blkidn
@@ -227,7 +204,7 @@ relayNode
     processing submitq =
       forever $ do
         (blk, completion) <- atomically $ readTQueue submitq
-        threadDelaySI (blockProcessingDelay blk)
+        threadDelay (blockProcessingDelay blk)
         _ <- atomically completion -- "relayNode: completions should not block"
         traceWith tracer (RelayNodeEventEnterBuffer blk)
 
@@ -243,9 +220,9 @@ traceRelayLink1 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)
@@ -289,9 +266,9 @@ traceRelayLink4 tcpprops generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 250)
@@ -351,9 +328,9 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
     runSimTrace $ do
       traceWith tracer $
         RelaySimEventSetup
-          WorldShape
+          World
             { worldDimensions = (1000, 500)
-            , worldIsCylinder = False
+            , worldShape = Cylinder
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 70)

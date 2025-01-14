@@ -1,17 +1,26 @@
+block_generation_cpu_time_ms = 300
 block_generation_probability = 0.05
-deliver_stage_count = 2
+block_validation_cpu_time_ms = 100
+certificate_generation_cpu_time_ms = 200
+certificate_validation_cpu_time_ms = 200
+eb_generation_cpu_time_ms = 300
 eb_generation_probability = 5.0
+eb_validation_cpu_time_ms = 100
+ib_generation_cpu_time_ms = 300
 ib_generation_probability = 5.0
-ib_shards = 16
+ib_validation_cpu_time_ms = 100
+ib_shards = 1
 max_block_size = 90112
 max_ib_requests_per_peer = 1
-max_ib_size = 327680
+max_ib_size = 32768000
 max_tx_size = 16384
 one_vote_per_vrf = false
 stage_length = 20
-uniform_ib_generation = true
+tx_validation_cpu_time_ms = 1.5
+vote_generation_cpu_time_ms = 2
 vote_probability = 500
 vote_threshold = 150
+vote_validation_cpu_time_ms = 3
 
 [transaction_frequency_ms]
 distribution = "exp"

@@ -1,18 +1,27 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module SimTypes where
 
-import Data.Aeson.Types (FromJSON, FromJSONKey, ToJSON (..), ToJSONKey, defaultOptions, genericToEncoding)
+import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), Parser, ToJSON (..), ToJSONKey, Value (..), object, typeMismatch, withObject, (.!=), (.:), (.:?))
+import Data.Default (Default (..))
 import Data.Hashable
 import Data.Ix (Ix)
+import Data.Text (Text)
+import qualified Data.Vector as V
 import GHC.Generics (Generic)
-import TimeCompat (DiffTime)
+import TimeCompat
 
-newtype CPUTask = CPUTask {cpuTaskDuration :: DiffTime}
+data CPUTask = CPUTask {cpuTaskDuration :: !DiffTime, cpuTaskLabel :: !Text}
   deriving (Eq, Ord, Show, Generic)
-  deriving newtype (ToJSON, FromJSON)
+  deriving (ToJSON, FromJSON)
 
 newtype NodeId = NodeId Int
   deriving (Eq, Ord, Ix, Show)
@@ -24,31 +33,72 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 
 -- | Position in simulation world coordinates
 data Point = Point {_1 :: !Double, _2 :: !Double}
-  deriving (Show, Generic)
+  deriving (Eq, Show, Generic)
+
+instance ToJSON Point where
+  toJSON :: Point -> Value
+  toJSON (Point x y) = toJSON [x, y]
+
+instance FromJSON Point where
+  parseJSON :: Value -> Parser Point
+  parseJSON = withTuple "Point" $ \(x, y) ->
+    Point <$> parseJSON x <*> parseJSON y
+   where
+    withTuple :: String -> ((Value, Value) -> Parser a) -> Value -> Parser a
+    withTuple _expected k (toTuple -> Just xy) = k xy
+    withTuple expected _k v = typeMismatch expected v
+
+    toTuple :: Value -> Maybe (Value, Value)
+    toTuple (Array v) | V.length v == 2 = Just (v V.! 0, v V.! 1)
+    toTuple _ = Nothing
 
 -- | Path in simulation world
 newtype Path = Path [Point]
-  deriving (Show, Generic)
-
-instance ToJSON Point where
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Point
+  deriving (Eq, Show, Generic)
+  deriving newtype (Semigroup, Monoid)
 
 type WorldDimensions = (Double, Double)
 
-data WorldShape = WorldShape
-  { worldDimensions :: !WorldDimensions
-  -- ^ The dimensions of the world in simulation world coordinates
-  -- (Circumference, pole-to-pole)
-  , worldIsCylinder :: !Bool
-  -- ^ If the world is a cylinder, and so wraps around from the East edge
-  -- to the West edge, or if the world is a rectangle, with no wrapping at
-  -- the edges. This affects the latencies.
-  }
-  deriving (Show, Generic)
+-- | If the world is a cylinder, and so wraps around from the East edge
+-- to the West edge, or if the world is a rectangle, with no wrapping at
+-- the edges. This affects the latencies.
+data WorldShape
+  = Rectangle
+  | Cylinder
+  deriving (Eq, Show, Generic, Bounded, Enum)
+
+instance Default WorldShape where
+  def = Rectangle
 
 instance ToJSON WorldShape where
-  toEncoding = genericToEncoding defaultOptions
+  toJSON = \case
+    Rectangle -> String "rectangle"
+    Cylinder -> String "cylinder"
 
-instance FromJSON WorldShape
+instance FromJSON WorldShape where
+  parseJSON (String txt)
+    | txt == "rectangle" = pure Rectangle
+    | txt == "cylinder" = pure Cylinder
+  parseJSON value = typeMismatch "WorldShape" value
+
+data World = World
+  { worldDimensions :: !WorldDimensions
+  , worldShape :: !WorldShape
+  }
+  deriving (Eq, Show, Generic)
+
+instance Default World where
+  def = World (0.6, 0.3) Rectangle
+
+instance ToJSON World where
+  toJSON World{..} =
+    object
+      [ "dimensions" .= worldDimensions
+      , "shape" .= worldShape
+      ]
+
+instance FromJSON World where
+  parseJSON = withObject "Word" $ \o -> do
+    worldDimensions <- o .: "dimensions"
+    worldShape <- o .:? "shape" .!= Rectangle
+    pure World{..}

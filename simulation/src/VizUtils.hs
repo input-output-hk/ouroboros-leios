@@ -2,9 +2,8 @@
 
 module VizUtils where
 
-import qualified Graphics.Rendering.Cairo as Cairo
-
 import Data.Word (Word8)
+import qualified Graphics.Rendering.Cairo as Cairo
 import SimTypes (Point (..))
 import System.Random (StdGen, uniform)
 

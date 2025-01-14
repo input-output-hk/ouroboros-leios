@@ -77,7 +77,12 @@ export const useHandlers = () => {
       context.fillStyle = node.data.stake ? "#DC53DE" : "blue";
       context.stroke();
       context.lineWidth = Math.min((0.5 / canvasScale) * 6, 0.5);
-      context.strokeStyle = "black";
+
+      if (aggregatedData.lastNodesUpdated.includes(node.id.toString())) {
+        context.strokeStyle = "red";
+      } else {
+        context.strokeStyle = "black";
+      }
 
       if (currentNode === node.id.toString()) {
         context.fillStyle = "blue";

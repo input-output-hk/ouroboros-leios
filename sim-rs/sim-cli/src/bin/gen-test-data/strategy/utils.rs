@@ -1,10 +1,10 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     time::Duration,
 };
 
 use anyhow::Result;
-use sim_core::config::RawLinkConfig;
+use sim_core::config::{DistributionConfig, RawConfig, RawLinkConfig, RawNodeConfig};
 use statrs::distribution::{Beta, ContinuousCDF as _};
 
 #[derive(Default)]
@@ -29,6 +29,18 @@ impl LinkTracker {
         self.connections.entry(from).or_default().insert(to);
         self.connections.entry(to).or_default().insert(from);
     }
+    pub fn count(&self, from: usize) -> usize {
+        self.connections
+            .get(&from)
+            .map(|c| c.len())
+            .unwrap_or_default()
+    }
+    pub fn exists(&self, from: usize, to: usize) -> bool {
+        self.connections
+            .get(&from)
+            .map(|c| c.contains(&to))
+            .unwrap_or_default()
+    }
 }
 
 pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {
@@ -47,7 +59,52 @@ pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {
 
 pub fn distance((lat1, long1): (f64, f64), (lat2, long2): (f64, f64)) -> f64 {
     // euclidean distance probably good enough
-    let dist_x = (lat2 - lat1).rem_euclid(180.0);
-    let dist_y = (long2 - long1).rem_euclid(180.0);
-    (dist_x.powi(2) + dist_y.powi(2)).sqrt()
+    let dist_lat = (lat2 - lat1).abs();
+    let dist_long = (long2 - long1).abs().min((long2 - long1 + 180.0).abs());
+    (dist_lat.powi(2) + dist_long.powi(2)).sqrt()
+}
+
+pub fn generate_full_config(nodes: Vec<RawNodeConfig>, links: Vec<RawLinkConfig>) -> RawConfig {
+    let vote_probability = 500.0;
+    let vote_threshold = 150;
+
+    RawConfig {
+        seed: None,
+        timescale: None,
+        slots: None,
+        nodes,
+        trace_nodes: HashSet::new(),
+        links,
+        block_generation_probability: 0.05,
+        ib_generation_probability: 5.0,
+        eb_generation_probability: 5.0,
+        vote_probability,
+        vote_threshold,
+        ib_shards: 8,
+        max_block_size: 90112,
+        stage_length: 2,
+        max_ib_requests_per_peer: 1,
+        one_vote_per_vrf: true,
+        max_ib_size: 327680,
+        max_tx_size: 16384,
+        tx_validation_cpu_time_ms: 1.5,
+        block_generation_cpu_time_ms: 300.0,
+        block_validation_cpu_time_ms: 100.0,
+        certificate_generation_cpu_time_ms: 200.0,
+        certificate_validation_cpu_time_ms: 200.0,
+        ib_generation_cpu_time_ms: 300.0,
+        ib_validation_cpu_time_ms: 100.0,
+        eb_generation_cpu_time_ms: 300.0,
+        eb_validation_cpu_time_ms: 100.0,
+        vote_generation_cpu_time_ms: 2.0,
+        vote_validation_cpu_time_ms: 3.0,
+        transaction_frequency_ms: DistributionConfig::Exp {
+            lambda: 0.85,
+            scale: Some(1000.0),
+        },
+        transaction_size_bytes: DistributionConfig::LogNormal {
+            mu: 6.833,
+            sigma: 1.127,
+        },
+    }
 }
