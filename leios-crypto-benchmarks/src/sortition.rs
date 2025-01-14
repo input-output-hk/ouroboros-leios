@@ -7,6 +7,10 @@ pub fn into_quad(x : f64) -> Quad {
   IeeeFloat::convert(y, loses_info).value
 }
 
+fn add(x : Quad, y : Quad) -> Quad {
+  (x + y).value
+}
+
 fn sub(x : Quad, y : Quad) -> Quad {
   (x - y).value
 }
@@ -20,26 +24,93 @@ fn div(x : Quad, y : Quad) -> Quad {
 }
 
 pub fn ln_1_minus(f : Quad) -> Quad {
-  let one : Quad = Quad::from_i128(1).value;
-  let next = | (acc, prev), i | {
-    let ii: Quad = Quad::from_i128(i).value;
+  let mut acc : Quad = Quad::ZERO;
+  let mut prev : Quad = Quad::from_i128(1).value;
+  let mut i : i128 = 1;
+  loop {
     let term : Quad = mul(prev, f);
-    (sub(acc, div(term, ii)), term)
-  };
-  (1..30).fold((Quad::ZERO, one), next).0
-}
-
-pub fn leader_value(ln1f : Quad, s : Quad) -> Quad {
-  let one : Quad = Quad::from_i128(1).value;
-  let t0 : Quad = mul(s, ln1f);
-  let next = | (acc, prev), i | {
-    let ii: Quad = Quad::from_i128(i).value;
-    let term : Quad = div(mul(prev, t0), ii);
-    (sub(acc, term), term)
-  };
-  (1..7).fold((Quad::ZERO, one), next).0
+    let acc1 : Quad = sub(acc, div(term, Quad::from_i128(i).value));
+    if acc == acc1 {
+      break acc;
+    }
+    prev = term;
+    acc = acc1;
+    i += 1;
+  }
 }
 
 pub fn leader_check(ln1f : Quad, s : Quad, p : Quad) -> bool {
-  p < leader_value(ln1f, s)
+  let t0 : Quad = mul(s, ln1f);
+  let mut acc : Quad = Quad::ZERO;
+  let mut prev : Quad = Quad::from_i128(1).value;
+  let mut i : i128 = 1;
+  loop {
+    let term : Quad = div(mul(prev, t0), Quad::from_i128(i).value);
+    let err : Quad = term.abs();
+    let acc1 : Quad = sub(acc, term);
+    if p < sub(acc1, err) {
+      break true;
+    } else if p > add(acc1, err){
+      break false;
+    }
+    prev = term;
+    acc = acc1;
+    i += 1;
+  }
+}
+
+pub fn leader_value(ln1f : Quad, s : Quad) -> Quad {
+  let x : Quad = mul(ln1f, s);
+  let mut acc : Quad = Quad::ZERO;
+  let mut prev : Quad = Quad::from_i128(1).value;
+  let mut i : i128 = 1;
+  loop {
+    let term : Quad = div(mul(prev, x), Quad::from_i128(i).value);
+    let acc1 : Quad = sub(acc, term);
+    // FIXME: This could be terminated sooner if we do a careful analysis of errors.
+    if acc == acc1 {
+      break acc;
+    }
+    prev = term;
+    acc = acc1;
+    i += 1;
+  }
+}
+
+fn exp(x : Quad) -> Quad {
+  let mut prev : Quad = Quad::from_i128(1).value;
+  let mut acc : Quad = prev;
+  let mut i : i128 = 1;
+  loop {
+    let term : Quad = div(mul(prev, x), Quad::from_i128(i).value);
+    let acc1 : Quad = add(acc, term);
+    // FIXME: This could be terminated sooner if we do a careful analysis of errors.
+    if acc == acc1 {
+      break acc;
+    }
+    prev = term;
+    acc = acc1;
+    i += 1;
+  }
+}
+
+pub fn voter_check(votes : Quad, s : Quad, p : Quad) -> i128 {
+  let x : Quad = mul(votes, s);
+  let v : Quad = div(p, exp(mul(Quad::from_i128(-1).value, x)));
+  let mut i : i128 = 0;
+  let mut prev : Quad = Quad::from_i128(1).value;
+  let mut acc : Quad = prev;
+  loop {
+    if v <= acc || i > 10 {
+      break i;
+    }
+    i += 1;
+    let ii : Quad = Quad::from_i128(i).value;
+    if ii == votes {
+      break i;
+    }
+    let term : Quad = div(mul(prev, x), ii);
+    acc = add(acc, term);
+    prev = term;
+  }
 }
