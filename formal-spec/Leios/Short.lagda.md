@@ -68,7 +68,8 @@ module Protocol where
             ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
-
+```
+```agda
     EB-Role : let open LeiosState s renaming (FFDState to ffds)
                   LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                   h = mkEB slot id π sk-EB LI []
@@ -78,7 +79,8 @@ module Protocol where
             ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
-
+```
+```agda
     V-Role : let open LeiosState s renaming (FFDState to ffds)
                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                  votes = map (vote sk-V ∘ hash) EBs'
@@ -96,19 +98,22 @@ module Protocol where
             ∙ ¬ canProduceIB slot sk-IB (stake s) π
             ─────────────────────────────────────────────
             s ↝ addUpkeep s IB-Role
-
+```
+```agda
     No-EB-Role : let open LeiosState s in
             ∙ needsUpkeep EB-Role
             ∙ ¬ canProduceEB slot sk-EB (stake s) π
             ─────────────────────────────────────────────
             s ↝ addUpkeep s EB-Role
-
+```
+```agda
     No-V-Role : let open LeiosState s in
             ∙ needsUpkeep V-Role
             ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
             s ↝ addUpkeep s V-Role
 ```
+### Uniform short-pipeline
 ```agda
   data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
@@ -134,7 +139,8 @@ module Protocol where
              ; slot      = suc slot
              ; Upkeep    = ∅
              } ↑ L.filter isValid? msgs
-
+```
+```agda
     Ftch :
          ────────────────────────────────────────────────────────
          just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
@@ -148,7 +154,8 @@ Note: Submitted data to the base chain is only taken into account
     Base₁   :
             ───────────────────────────────────────────────────────────────────
             just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
-
+```
+```agda
     Base₂a  : let open LeiosState s renaming (BaseState to bs) in
             ∙ needsUpkeep Base
             ∙ eb ∈ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
