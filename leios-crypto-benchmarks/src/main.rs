@@ -1,5 +1,6 @@
 
 use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::vrf::*;
 use rustc_apfloat::ieee::Quad;
 
 
@@ -25,4 +26,15 @@ fn main() {
       }
       println!("{} {}", pv, voter_check(votes, s, pv))
     }
+
+    let sk = sk_random();
+    let pk = sk_to_pk_point(&sk);
+    let input = b"The VRF input.";
+    let dst = b"Praos RB";
+    let (gamma, c, s) = vrf_prove(&sk, input, dst);
+    println!("{:?}", gamma);
+    println!("{:?}", c);
+    println!("{:?}", s);
+    println!("{}", vrf_verify(&pk, input, dst, &gamma, &c, &s));  
+  
 }
