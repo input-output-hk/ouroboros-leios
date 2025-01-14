@@ -1,0 +1,12 @@
+[package]
+name = "leios_crypto_benchmarks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+criterion = "0.5.1"
+rustc_apfloat = "0.2.2"
+
+[[bench]]
+name = "sortition_bench"
+harness = false
