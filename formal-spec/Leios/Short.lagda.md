@@ -1,7 +1,10 @@
 ## Short-Pipeline Leios
+<!--
 ```agda
 {-# OPTIONS --safe #-}
-
+```
+-->
+```agda
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -53,7 +56,9 @@ module Protocol where
 ```
 ```agda
   data _↝_ : LeiosState → LeiosState → Type where
-
+```
+#### Block/Vote production rules
+```agda
     IB-Role : let open LeiosState s renaming (FFDState to ffds)
                   b = ibBody (record { txs = ToPropose })
                   h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
@@ -83,7 +88,9 @@ module Protocol where
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             s ↝ addUpkeep record s { FFDState = ffds' } V-Role
-
+```
+#### Negative Block/Vote production rules
+```agda
     No-IB-Role : let open LeiosState s in
             ∙ needsUpkeep IB-Role
             ∙ ¬ canProduceIB slot sk-IB (stake s) π
