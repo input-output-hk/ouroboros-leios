@@ -1,28 +1,41 @@
+## Short-Pipeline Leios
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 open import Data.Fin.Patterns
+```
+Uniform Short Pipeline:
 
-module Leios.UniformShort (⋯ : SpecStructure 1)
+1. If elected, propose IB
+2. Wait
+3. Wait
+4. If elected, propose EB
+5. If elected, vote
+   If elected, propose RB
+```agda
+module Leios.Short (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
-
+```
+```agda
 data SlotUpkeep : Type where
   Base IB-Role EB-Role V-Role : SlotUpkeep
 
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V-Role ∷ [])
-
+```
+```agda
 open import Leios.Protocol (⋯) SlotUpkeep public
-
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 
 isVoteCertified : LeiosState → EndorserBlock → Type
 isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
-
+```
+```agda
 module Protocol where
 
   private variable s s'   : LeiosState
@@ -37,16 +50,8 @@ module Protocol where
                    V      : VTy
                    SD     : StakeDistr
                    pks    : List PubKey
-
-  -- Uniform Short Pipeline:
-  --
-  -- 1. If elected, propose IB
-  -- 2. Wait
-  -- 3. Wait
-  -- 4. If elected, propose EB
-  -- 5. If elected, vote
-  --    If elected, propose RB
-
+```
+```agda
   data _↝_ : LeiosState → LeiosState → Type where
 
     IB-Role : let open LeiosState s renaming (FFDState to ffds)
@@ -96,19 +101,20 @@ module Protocol where
             ∙ ¬ canProduceV slot sk-V (stake s)
             ─────────────────────────────────────────────
             s ↝ addUpkeep s V-Role
-
+```
+```agda
   data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
-
-    -- Initialization
-
+```
+#### Initialization
+```agda
     Init :
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
          ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
          ────────────────────────────────────────────────────────────────
          nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
-
-    -- Network and Ledger
-
+```
+#### Network and Ledger
+```agda
     Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs) in
          ∙ Upkeep ≡ᵉ allUpkeep
          ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
@@ -125,13 +131,13 @@ module Protocol where
     Ftch :
          ────────────────────────────────────────────────────────
          just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
+```
+#### Base chain
 
-    -- Base chain
-    --
-    -- Note: Submitted data to the base chain is only taken into account
-    --       if the party submitting is the block producer on the base chain
-    --       for the given slot
-
+Note: Submitted data to the base chain is only taken into account
+      if the party submitting is the block producer on the base chain
+      for the given slot
+```agda
     Base₁   :
             ───────────────────────────────────────────────────────────────────
             just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
@@ -149,9 +155,10 @@ module Protocol where
             ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
             ───────────────────────────────────────────────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
-
-    -- Protocol rules
-
+```
+#### Protocol rules
+```agda
     Roles : ∙ s ↝ s'
             ─────────────────────────────
             just s -⟦ SLOT / EMPTY ⟧⇀ s'
+```
