@@ -13,7 +13,9 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Topology where
 
@@ -35,6 +37,7 @@ import qualified Data.GraphViz.Attributes.Complete as GV
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.Kind (Type)
 import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as M
@@ -71,28 +74,32 @@ newtype NodeName = NodeName {unNodeName :: Text}
   deriving newtype (SQLite.ToField)
   deriving newtype (PrintfArg)
 
+newtype ClusterName = ClusterName {unClusterName :: Text}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
 newtype LatencyMs = LatencyMs {unLatencyMs :: Double}
   deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
 
 topologyOptions :: Options
 topologyOptions = defaultOptions{unwrapUnaryRecords = False}
 
-data Node = Node
+data Node (location :: Type) = Node
   { stake :: !Word
-  , location :: !(Maybe Point)
+  , location :: !location
   , producers :: !(Map NodeName Link)
   }
   deriving stock (Show, Eq, Generic)
 
-instance ToJSON Node where
-  toJSON :: Node -> Value
+instance ToJSON location => ToJSON (Node location) where
+  toJSON :: Node location -> Value
   toJSON = genericToJSON topologyOptions
 
-  toEncoding :: Node -> Encoding
+  toEncoding :: Node location -> Encoding
   toEncoding = genericToEncoding topologyOptions
 
-instance FromJSON Node where
-  parseJSON :: Value -> Parser Node
+instance FromJSON location => FromJSON (Node location) where
+  parseJSON :: Value -> Parser (Node location)
   parseJSON = genericParseJSON topologyOptions
 
 newtype Link = Link
@@ -111,150 +118,21 @@ instance FromJSON Link where
   parseJSON :: Value -> Parser Link
   parseJSON = genericParseJSON topologyOptions
 
-newtype Topology = Topology
-  { nodes :: Map NodeName Node
+newtype Topology location = Topology
+  { nodes :: Map NodeName (Node location)
   }
   deriving stock (Show, Eq, Generic)
 
-instance ToJSON Topology where
-  toJSON :: Topology -> Value
+instance ToJSON location => ToJSON (Topology location) where
+  toJSON :: Topology location -> Value
   toJSON = genericToJSON topologyOptions
 
-  toEncoding :: Topology -> Encoding
+  toEncoding :: Topology location -> Encoding
   toEncoding = genericToEncoding topologyOptions
 
-instance FromJSON Topology where
-  parseJSON :: Value -> Parser Topology
+instance FromJSON location => FromJSON (Topology location) where
+  parseJSON :: Value -> Parser (Topology location)
   parseJSON = genericParseJSON topologyOptions
-
---------------------------------------------------------------------------------
--- BenchTopology Topology
---
--- As provided in 'data/BenchTopology/topology-dense-52.json'.
---------------------------------------------------------------------------------
-
-newtype OrgName = OrgName {unOrgName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
-newtype RegionName = RegionName {unRegionName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
-data BenchTopologyNode
-  = BenchTopologyNode
-  { name :: !NodeName
-  , nodeId :: !NodeId
-  , org :: !(Maybe OrgName)
-  , pools :: !(Maybe Int)
-  , producers :: !(Vector NodeName)
-  , region :: !(Maybe RegionName)
-  , stakePool :: !(Maybe Bool)
-  }
-  deriving (Eq, Show, Generic)
-
-benchTopologyOptions :: Options
-benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
-
-instance ToJSON BenchTopologyNode where
-  toEncoding = genericToEncoding benchTopologyOptions
-
-instance FromJSON BenchTopologyNode
-
-newtype BenchTopology = BenchTopology
-  { coreNodes :: Vector BenchTopologyNode
-  }
-  deriving (Eq, Show, Generic)
-
-instance ToJSON BenchTopology where
-  toEncoding = genericToEncoding benchTopologyOptions
-
-instance FromJSON BenchTopology where
-  parseJSON = genericParseJSON benchTopologyOptions
-
-readBenchTopology :: FilePath -> IO BenchTopology
-readBenchTopology = throwDecode <=< BSL.readFile
-
--- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
-sortBenchTopology :: BenchTopology -> BenchTopology
-sortBenchTopology benchTopology =
-  BenchTopology
-    { coreNodes = V.fromList . sortBy (compare `on` (.name)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
-    }
- where
-  sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
-  sortBenchTopologyNode BenchTopologyNode{..} =
-    BenchTopologyNode
-      { producers = V.fromList . sort . V.toList $ producers
-      , ..
-      }
-
--- | Helper for testing. Forgets fields that are not represented by `SimpleTopology`.
-forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
-forgetUnusedFieldsInBenchTopology benchTopology =
-  BenchTopology
-    { coreNodes = forgetUnusedFieldsInBenchTopologyNode <$> benchTopology.coreNodes
-    }
- where
-  forgetUnusedFieldsInBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
-  forgetUnusedFieldsInBenchTopologyNode BenchTopologyNode{..} =
-    BenchTopologyNode
-      { org = Nothing
-      , pools = Nothing
-      , stakePool = Nothing
-      , ..
-      }
-
---------------------------------------------------------------------------------
--- BenchTopology Latencies
---
--- As provided in 'data/BenchTopology/latency.sqlite3.gz'.
---------------------------------------------------------------------------------
-
-type LatenciesMs = Map NodeName (Map NodeName LatencyMs)
-
-readLatencies :: BenchTopology -> FilePath -> IO LatenciesMs
-readLatencies topology latencyFile =
-  case takeExtensions latencyFile of
-    ".sqlite3" ->
-      readLatenciesSqlite3 topology latencyFile
-    ".sqlite3.gz" ->
-      readLatenciesSqlite3Gz topology latencyFile
-    _otherwise ->
-      error $ printf "unknown latency file format %s" (takeFileName latencyFile)
-
-readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesMs
-readLatenciesSqlite3Gz topology latencySqliteGzFile =
-  assert (takeExtension latencySqliteGzFile == ".gz") $ do
-    let latencySqliteDirectory = takeDirectory latencySqliteGzFile
-    let latencySqliteFileName = takeFileName (dropExtension latencySqliteGzFile)
-    withTempFile latencySqliteDirectory latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
-      latencySqliteGzContent <- BSL.readFile latencySqliteGzFile
-      let latencySqliteContent = GZip.decompress latencySqliteGzContent
-      BSL.hPut latencySqliteHandle latencySqliteContent
-      hClose latencySqliteHandle
-      readLatencies topology latencySqliteFile
-
-readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
-readLatenciesSqlite3 topology latencySqliteFile = do
-  let queryAvgTime =
-        "select avg(time) from ping \
-        \where source = :consumer and dest = :producer \
-        \or    source = :producer and dest = :consumer"
-  latenciesRef <- newIORef mempty
-  conn <- SQLlite.open latencySqliteFile
-  forM_ topology.coreNodes $ \consumer -> do
-    atomicModifyIORef' latenciesRef $ \latencies ->
-      (M.insert consumer.name M.empty latencies, ())
-    forM_ consumer.producers $ \producerName -> do
-      SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
-        [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
-        [[latencyInMiliseconds :: Double]] ->
-          atomicModifyIORef' latenciesRef $ \latencies ->
-            let latency = LatencyMs latencyInMiliseconds
-             in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
-        _otherwise -> error "impossible: SQL query for average returned multiple rows"
-  readIORef latenciesRef
 
 --------------------------------------------------------------------------------
 -- Simple Topology
@@ -262,10 +140,6 @@ readLatenciesSqlite3 topology latencySqliteFile = do
 -- Combines the graph structure from Bench Topology with the average connection
 -- latency from Latencies.
 --------------------------------------------------------------------------------
-
-newtype ClusterName = ClusterName {unClusterName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
 
 data SimpleNode
   = SimpleNode
@@ -620,3 +494,130 @@ readP2PTopographyFromBenchTopologyAndLatency params world@World{..} benchTopolog
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
   pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition
+
+--------------------------------------------------------------------------------
+-- BenchTopology - Topology & Latencies
+--
+-- As provided in
+--
+--   * data/BenchTopology/topology-dense-52.json
+--   * data/BenchTopology/latency.sqlite3.gz
+--
+--------------------------------------------------------------------------------
+
+newtype OrgName = OrgName {unOrgName :: Text}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+newtype RegionName = RegionName {unRegionName :: Text}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+data BenchTopologyNode
+  = BenchTopologyNode
+  { name :: !NodeName
+  , nodeId :: !NodeId
+  , org :: !(Maybe OrgName)
+  , pools :: !(Maybe Int)
+  , producers :: !(Vector NodeName)
+  , region :: !(Maybe RegionName)
+  , stakePool :: !(Maybe Bool)
+  }
+  deriving (Eq, Show, Generic)
+
+benchTopologyOptions :: Options
+benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
+
+instance ToJSON BenchTopologyNode where
+  toEncoding = genericToEncoding benchTopologyOptions
+
+instance FromJSON BenchTopologyNode
+
+newtype BenchTopology = BenchTopology
+  { coreNodes :: Vector BenchTopologyNode
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON BenchTopology where
+  toEncoding = genericToEncoding benchTopologyOptions
+
+instance FromJSON BenchTopology where
+  parseJSON = genericParseJSON benchTopologyOptions
+
+readBenchTopology :: FilePath -> IO BenchTopology
+readBenchTopology = throwDecode <=< BSL.readFile
+
+-- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
+sortBenchTopology :: BenchTopology -> BenchTopology
+sortBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = V.fromList . sortBy (compare `on` (.name)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
+    }
+ where
+  sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  sortBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { producers = V.fromList . sort . V.toList $ producers
+      , ..
+      }
+
+-- | Helper for testing. Forgets fields that are not represented by `SimpleTopology`.
+forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
+forgetUnusedFieldsInBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = forgetUnusedFieldsInBenchTopologyNode <$> benchTopology.coreNodes
+    }
+ where
+  forgetUnusedFieldsInBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  forgetUnusedFieldsInBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { org = Nothing
+      , pools = Nothing
+      , stakePool = Nothing
+      , ..
+      }
+
+type LatenciesMs = Map NodeName (Map NodeName LatencyMs)
+
+readLatencies :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatencies topology latencyFile =
+  case takeExtensions latencyFile of
+    ".sqlite3" ->
+      readLatenciesSqlite3 topology latencyFile
+    ".sqlite3.gz" ->
+      readLatenciesSqlite3Gz topology latencyFile
+    _otherwise ->
+      error $ printf "unknown latency file format %s" (takeFileName latencyFile)
+
+readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatenciesSqlite3Gz topology latencySqliteGzFile =
+  assert (takeExtension latencySqliteGzFile == ".gz") $ do
+    let latencySqliteDirectory = takeDirectory latencySqliteGzFile
+    let latencySqliteFileName = takeFileName (dropExtension latencySqliteGzFile)
+    withTempFile latencySqliteDirectory latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
+      latencySqliteGzContent <- BSL.readFile latencySqliteGzFile
+      let latencySqliteContent = GZip.decompress latencySqliteGzContent
+      BSL.hPut latencySqliteHandle latencySqliteContent
+      hClose latencySqliteHandle
+      readLatencies topology latencySqliteFile
+
+readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatenciesSqlite3 topology latencySqliteFile = do
+  let queryAvgTime =
+        "select avg(time) from ping \
+        \where source = :consumer and dest = :producer \
+        \or    source = :producer and dest = :consumer"
+  latenciesRef <- newIORef mempty
+  conn <- SQLlite.open latencySqliteFile
+  forM_ topology.coreNodes $ \consumer -> do
+    atomicModifyIORef' latenciesRef $ \latencies ->
+      (M.insert consumer.name M.empty latencies, ())
+    forM_ consumer.producers $ \producerName -> do
+      SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
+        [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
+        [[latencyInMiliseconds :: Double]] ->
+          atomicModifyIORef' latenciesRef $ \latencies ->
+            let latency = LatencyMs latencyInMiliseconds
+             in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
+        _otherwise -> error "impossible: SQL query for average returned multiple rows"
+  readIORef latenciesRef
