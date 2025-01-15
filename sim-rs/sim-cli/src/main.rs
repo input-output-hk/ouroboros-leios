@@ -117,3 +117,29 @@ async fn main() -> Result<()> {
     monitor.await??;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use std::fs;
+
+    use crate::{read_config, Args};
+
+    #[test]
+    fn should_parse_topologies() -> Result<()> {
+        let topology_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../test_data");
+        for topology in fs::read_dir(topology_dir)? {
+            let args = Args {
+                topology: topology?.path(),
+                output: None,
+                parameters: vec![],
+                format: None,
+                timescale: None,
+                trace_node: vec![],
+                slots: None,
+            };
+            read_config(&args)?;
+        }
+        Ok(())
+    }
+}
