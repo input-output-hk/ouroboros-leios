@@ -10,10 +10,14 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 rustc_apfloat = "0.2.2"
 
-[[bench]]
-name = "sortition_bench"
-harness = false
+#[[bench]]
+#name = "sortition_bench"
+#harness = false
+#
+#[[bench]]
+#name = "vrf_bench"
+#harness = false
 
 [[bench]]
-name = "vrf_bench"
+name = "vote_bench"
 harness = false

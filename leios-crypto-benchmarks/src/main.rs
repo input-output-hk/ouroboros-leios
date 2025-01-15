@@ -1,8 +1,10 @@
 
 use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::vote::*;
 use leios_crypto_benchmarks::vrf::*;
 use rustc_apfloat::ieee::Quad;
-
+use blst::min_sig::SecretKey;
+use blst::min_sig::PublicKey;
 
 fn main() {
 
@@ -37,4 +39,17 @@ fn main() {
     println!("{:?}", s);
     println!("{}", vrf_verify(&pk, input, dst, &gamma, &c, &s));  
   
-}
+     {
+      let sks : Vec<SecretKey> = [1..300].iter().map(|_| gen_key()).collect();
+      let pks : Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
+      let pk_refs : Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
+      let eid = b"Election ID";
+      let m : [u8; 500] = [0; 500];
+      let vss : Vec<VoteSignature> = sks.iter().map(|sk| gen_vote(&sk, eid, &m)).collect();
+      let vs_refs : Vec<&VoteSignature> = vss.iter().map(|vs| vs).collect();
+      let cs: CertSignature = gen_cert(&vs_refs).unwrap();
+      println!("{:?}", cs.sigma_tilde_eid);
+      println!("{}", verify_cert(&pk_refs, eid, &m, &cs));
+   }
+
+   }
