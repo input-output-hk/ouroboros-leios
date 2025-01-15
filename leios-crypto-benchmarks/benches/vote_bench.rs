@@ -19,7 +19,7 @@ fn benchmark_verify_vote(c: &mut Criterion) {
 }
 
 fn benchmark_gen_cert(c: &mut Criterion) {
-  let sks : Vec<SecretKey> = [1..300].iter().map(|_| gen_key()).collect();
+  let sks : Vec<SecretKey> = (0..300).map(|_| gen_key()).collect();
   let eid = b"Election ID";
   let m : [u8; 500] = [0; 500];
   let vss : Vec<VoteSignature> = sks.iter().map(|sk| gen_vote(&sk, eid, &m)).collect();
@@ -28,7 +28,7 @@ fn benchmark_gen_cert(c: &mut Criterion) {
 }
 
 fn benchmark_verify_cert(c: &mut Criterion) {
-  let sks : Vec<SecretKey> = [1..300].iter().map(|_| gen_key()).collect();
+  let sks : Vec<SecretKey> = (0..300).map(|_| gen_key()).collect();
   let pks : Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
   let pk_refs : Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
   let eid = b"Election ID";
@@ -36,7 +36,7 @@ fn benchmark_verify_cert(c: &mut Criterion) {
   let vss : Vec<VoteSignature> = sks.iter().map(|sk| gen_vote(&sk, eid, &m)).collect();
   let vs_refs : Vec<&VoteSignature> = vss.iter().map(|vs| vs).collect();
   let cs: CertSignature = gen_cert(&vs_refs).unwrap();
-  c.bench_function("VerifyCert", | b | b.iter(|| verify_cert(&pk_refs, eid, &m, &cs)));
+  c.bench_function("VerifyCert", | b | b.iter(|| verify_cert(&pk_refs, eid, &m, &vs_refs, &cs)));
 }
 
 criterion_group!(benches,
