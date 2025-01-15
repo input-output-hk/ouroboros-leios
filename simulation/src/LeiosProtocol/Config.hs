@@ -31,9 +31,6 @@ newtype SizeBytes = SizeBytes {unSizeBytes :: Word}
 newtype DurationMs = DurationMs {unDurationMs :: Double}
   deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
 
-newtype LatencyMs = LatencyMs {unLatencyMs :: Double}
-  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
-
 -- | Probability distributions.
 data Distribution
   = Normal {mean :: Double, std_dev :: Double}

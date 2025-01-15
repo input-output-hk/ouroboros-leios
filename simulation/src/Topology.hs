@@ -5,6 +5,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -20,9 +21,9 @@ import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (assert)
 import Control.Monad (forM_, (<=<))
-import Data.Aeson (encode)
+import Data.Aeson (encode, genericToJSON)
 import Data.Aeson.Decoding (throwDecode)
-import Data.Aeson.Types (FromJSON (..), FromJSONKey, Options (..), ToJSON (..), ToJSONKey, defaultOptions, genericParseJSON, genericToEncoding)
+import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, Options (..), Parser, ToJSON (..), ToJSONKey, Value, defaultOptions, genericParseJSON, genericToEncoding)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Coerce (coerce)
 import Data.Function (on)
@@ -58,27 +59,85 @@ import System.IO.Temp (withTempFile)
 import Text.Printf (PrintfArg, printf)
 
 --------------------------------------------------------------------------------
--- Bench Topology
+-- Topology
 --
--- As provided in 'data/BenchTopology/topology-dense-52.json'.
+-- As provided in 'data/simulation/topology-dense-52.json'.
 --------------------------------------------------------------------------------
 
 newtype NodeName = NodeName {unNodeName :: Text}
-  deriving stock (Show, Eq, Ord)
+  deriving newtype (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON, FromJSONKey, ToJSONKey)
   deriving newtype (GVT.PrintDot)
   deriving newtype (SQLite.ToField)
   deriving newtype (PrintfArg)
+
+newtype LatencyMs = LatencyMs {unLatencyMs :: Double}
+  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
+
+topologyOptions :: Options
+topologyOptions = defaultOptions{unwrapUnaryRecords = False}
+
+data Node = Node
+  { stake :: !Word
+  , location :: !(Maybe Point)
+  , producers :: !(Map NodeName Link)
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON Node where
+  toJSON :: Node -> Value
+  toJSON = genericToJSON topologyOptions
+
+  toEncoding :: Node -> Encoding
+  toEncoding = genericToEncoding topologyOptions
+
+instance FromJSON Node where
+  parseJSON :: Value -> Parser Node
+  parseJSON = genericParseJSON topologyOptions
+
+newtype Link = Link
+  { latency :: LatencyMs
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON Link where
+  toJSON :: Link -> Value
+  toJSON = genericToJSON topologyOptions
+
+  toEncoding :: Link -> Encoding
+  toEncoding = genericToEncoding topologyOptions
+
+instance FromJSON Link where
+  parseJSON :: Value -> Parser Link
+  parseJSON = genericParseJSON topologyOptions
+
+newtype Topology = Topology
+  { nodes :: Map NodeName Node
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON Topology where
+  toJSON :: Topology -> Value
+  toJSON = genericToJSON topologyOptions
+
+  toEncoding :: Topology -> Encoding
+  toEncoding = genericToEncoding topologyOptions
+
+instance FromJSON Topology where
+  parseJSON :: Value -> Parser Topology
+  parseJSON = genericParseJSON topologyOptions
+
+--------------------------------------------------------------------------------
+-- BenchTopology Topology
+--
+-- As provided in 'data/BenchTopology/topology-dense-52.json'.
+--------------------------------------------------------------------------------
 
 newtype OrgName = OrgName {unOrgName :: Text}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
 newtype RegionName = RegionName {unRegionName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
-newtype LatencyInMiliseconds = LatencyInMiliseconds {unLatencyInMiliseconds :: Double}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
@@ -147,14 +206,14 @@ forgetUnusedFieldsInBenchTopology benchTopology =
       }
 
 --------------------------------------------------------------------------------
--- Latencies
+-- BenchTopology Latencies
 --
 -- As provided in 'data/BenchTopology/latency.sqlite3.gz'.
 --------------------------------------------------------------------------------
 
-type LatenciesInMiliseconds = Map NodeName (Map NodeName LatencyInMiliseconds)
+type LatenciesMs = Map NodeName (Map NodeName LatencyMs)
 
-readLatencies :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
+readLatencies :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatencies topology latencyFile =
   case takeExtensions latencyFile of
     ".sqlite3" ->
@@ -164,7 +223,7 @@ readLatencies topology latencyFile =
     _otherwise ->
       error $ printf "unknown latency file format %s" (takeFileName latencyFile)
 
-readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
+readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatenciesSqlite3Gz topology latencySqliteGzFile =
   assert (takeExtension latencySqliteGzFile == ".gz") $ do
     let latencySqliteDirectory = takeDirectory latencySqliteGzFile
@@ -176,7 +235,7 @@ readLatenciesSqlite3Gz topology latencySqliteGzFile =
       hClose latencySqliteHandle
       readLatencies topology latencySqliteFile
 
-readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
+readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatenciesSqlite3 topology latencySqliteFile = do
   let queryAvgTime =
         "select avg(time) from ping \
@@ -192,7 +251,7 @@ readLatenciesSqlite3 topology latencySqliteFile = do
         [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
         [[latencyInMiliseconds :: Double]] ->
           atomicModifyIORef' latenciesRef $ \latencies ->
-            let latency = LatencyInMiliseconds latencyInMiliseconds
+            let latency = LatencyMs latencyInMiliseconds
              in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
@@ -212,7 +271,7 @@ data SimpleNode
   = SimpleNode
   { name :: !NodeName
   , nodeId :: !NodeId
-  , producers :: !(Map NodeName LatencyInMiliseconds)
+  , producers :: !(Map NodeName LatencyMs)
   , clusterName :: !(Maybe ClusterName)
   }
   deriving (Eq, Show, Generic)
@@ -239,7 +298,7 @@ instance FromJSON SimpleTopology where
   parseJSON = genericParseJSON simpleNodeOptions
 
 -- | Convert a 'BenchTopology' to a 'SimpleTopology' using the 'Latencies' read from the latency database.
-benchTopologyToSimpleTopology :: LatenciesInMiliseconds -> BenchTopology -> SimpleTopology
+benchTopologyToSimpleTopology :: LatenciesMs -> BenchTopology -> SimpleTopology
 benchTopologyToSimpleTopology latencies benchTopology =
   SimpleTopology{nodes = benchTopologyNodeToSimpleNode <$> benchTopology.coreNodes}
  where
@@ -313,7 +372,7 @@ data SimpleNodeInfo = SimpleNodeInfo
 -- | Convert a 'SimpleTopology' to an FGL 'Gr'.
 simpleTopologyToGr ::
   SimpleTopology ->
-  Gr SimpleNodeInfo LatencyInMiliseconds
+  Gr SimpleNodeInfo LatencyMs
 simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
  where
   nameToIdMap =
@@ -335,7 +394,7 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
 
 -- | Helper for testing. Convert an an FGL 'Gr' to a 'SimpleTopology'.
 grToSimpleTopology ::
-  Gr SimpleNodeInfo LatencyInMiliseconds ->
+  Gr SimpleNodeInfo LatencyMs ->
   SimpleTopology
 grToSimpleTopology gr = SimpleTopology{nodes}
  where
@@ -346,7 +405,7 @@ grToSimpleTopology gr = SimpleTopology{nodes}
       , let nodeId = nodeToNodeId node
       , let producers = M.findWithDefault M.empty name producersMap
       ]
-  producersMap :: Map NodeName (Map NodeName LatencyInMiliseconds)
+  producersMap :: Map NodeName (Map NodeName LatencyMs)
   producersMap =
     M.unionsWith (<>) $
       [ M.singleton consumerName (M.singleton producerName latency)
@@ -488,15 +547,15 @@ forgetSimpleNodeInfo = G.nemap snd id
 
 latencyFromSecondsToMiliseconds ::
   Gr a Latency ->
-  Gr a LatencyInMiliseconds
+  Gr a LatencyMs
 latencyFromSecondsToMiliseconds =
-  G.emap (LatencyInMiliseconds . (* 1000.0))
+  G.emap (LatencyMs . (* 1000.0))
 
 latencyFromMilisecondsToSeconds ::
-  Gr a LatencyInMiliseconds ->
+  Gr a LatencyMs ->
   Gr a Latency
 latencyFromMilisecondsToSeconds =
-  G.emap ((/ 1000.0) . unLatencyInMiliseconds)
+  G.emap ((/ 1000.0) . unLatencyMs)
 
 grToP2PTopography ::
   World ->
@@ -540,7 +599,7 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     ]
 
 readP2PTopography ::
-  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyMs ClusterName SimpleNodeInfo ->
   World ->
   FilePath ->
   IO P2PTopography
@@ -551,7 +610,7 @@ readP2PTopography params world@World{..} simpleTopologyFile = do
   pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition
 
 readP2PTopographyFromBenchTopologyAndLatency ::
-  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyMs ClusterName SimpleNodeInfo ->
   World ->
   FilePath ->
   FilePath ->
