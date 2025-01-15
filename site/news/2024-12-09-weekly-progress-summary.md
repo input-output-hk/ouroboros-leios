@@ -1,23 +1,21 @@
 ---
-title: Weekly Progress Summary - December 9, 2024
+title: Weekly progress summary – December 9, 2024
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
-## Discussion with IOG SRE for Nodes
+## Node discussions with IOG site reliability engineering
 
-- Discussed cloud engineering aspects of Cardano node deployments relevant to
-  Leios.
-- Recommendations for updating the cost calculator with predefined cost
-  defaults.
+- Discussed the cloud engineering aspects of Cardano node deployments relevant to Leios
+- Received recommendations for updating the cost calculator with predefined cost defaults.
 
-## Threat Model
+## Threat model analysis
 
-- Drafted a section on the Leios threat model detailing 25 hypothetical threats.
+- Drafted a section on the Leios threat model analysis, detailing 25 hypothetical threats
 - Discussed potential impacts and mitigations.
 
-## Rust Simulation
+## Rust simulation
 
 - Generated new test data set to match the geographical distribution of mainnet
   nodes.
