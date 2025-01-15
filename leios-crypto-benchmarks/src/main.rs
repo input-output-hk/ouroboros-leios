@@ -57,6 +57,9 @@ fn main() {
       let cs: CertSignature = gen_cert(&vs_refs).unwrap();
       println!("{:?}", cs.sigma_tilde_eid);
       println!("{}", verify_cert(&pk_refs, eid, &m, &vs_refs, &cs));
+
+      let (mu1, mu2) = make_pop(&sks[0]);
+      println!("pop = {}", check_pop(&pks[0], &mu1, &mu2));
    }
 
    }
