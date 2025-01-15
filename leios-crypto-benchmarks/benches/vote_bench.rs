@@ -2,6 +2,13 @@ use blst::{min_sig::PublicKey, min_sig::SecretKey};
 use criterion::{criterion_group, criterion_main, Criterion};
 use leios_crypto_benchmarks::vote::*;
 
+fn benchmark_check_pop(c: &mut Criterion) {
+  let sk : SecretKey = gen_key();
+  let pk : PublicKey = sk.sk_to_pk();
+  let (mu1, mu2) = make_pop(&sk);
+  c.bench_function("CheckPOP", | b | b.iter(|| check_pop(&pk, &mu1, &mu2)));
+}
+
 fn benchmark_gen_vote(c: &mut Criterion) {
   let sk : SecretKey = gen_key();
   let eid = b"Election ID";
@@ -40,6 +47,7 @@ fn benchmark_verify_cert(c: &mut Criterion) {
 }
 
 criterion_group!(benches,
+  benchmark_check_pop,
   benchmark_gen_vote,
   benchmark_verify_vote,
   benchmark_gen_cert,
