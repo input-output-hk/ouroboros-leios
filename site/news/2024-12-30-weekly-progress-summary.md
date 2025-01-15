@@ -1,28 +1,27 @@
 ---
-title: Weekly Progress Summary - December 30, 2024
+title: Weekly progress summary – December 30, 2024
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
-## Rust Simulation
+## Rust simulation
 
-- Abandoned Waxman graph generation in favor of a simpler distance-weighted
-  approach for better control over graph connectivity.
+- Abandoned Waxman graph generation favoring a more straightforward distance-weighted approach to better control graph connectivity.
 
-## Haskell Simulation
+## Haskell simulation
 
-- Added support for bounded and unbounded parallelism to Leios node.
-- Fixed Relay protocol messages to ensure ordered delivery.
+- Added support for bounded and unbounded parallelism to the Leios node
+- Fixed relay protocol messages to ensure ordered delivery
 - Next steps include loading protocol configuration from disk and investigating
-  EB inclusion rates.
+  endorser block (EB) inclusion rates.
 
-## Revised Analysis of Votes and Certificates
+## Revised analysis of votes and certificates
 
-- Continued research on cryptographic options for Leios votes and certificates.
-- BLS identified as the most viable option.
+- Continued research on cryptographic options for Leios votes and certificates
+- BLS was identified as the most viable option.
 
-## Jupyter Support for DeltaQ
+## Jupyter support for DeltaQ
 
 - Introduced new high-performance Haskell packages for DeltaQ with comprehensive
   test suites.
