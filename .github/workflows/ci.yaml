@@ -65,7 +65,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-14]
+        os:
+          - macos-13
+          - macos-14
+          - ubuntu-22.04
         ghc-version: ["9.8"]
 
     steps:
