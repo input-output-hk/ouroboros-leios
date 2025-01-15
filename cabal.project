@@ -46,7 +46,3 @@ source-repository-package
     subdir:
       io-sim
       io-classes
-
--- Try and build on Windows
-allow-newer:
-  network-mux:contra-tracer
