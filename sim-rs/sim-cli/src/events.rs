@@ -57,7 +57,7 @@ impl EventMonitor {
             .filter_map(|p| if p.stake > 0 { Some(p.id) } else { None })
             .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
+        let maximum_ib_age = stage_length * 3;
         Self {
             node_ids,
             pool_ids,

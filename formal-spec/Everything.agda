@@ -1,7 +1,5 @@
-{-# OPTIONS --erasure #-}
-
 module Everything where
 
 open import Leios.Simplified
-open import Leios.UniformShort
+open import Leios.Short
 open import Leios.Network

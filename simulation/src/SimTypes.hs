@@ -2,17 +2,20 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module SimTypes where
 
-import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericToEncoding, object, typeMismatch, withObject, (.!=), (.:), (.:?))
+import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), Parser, ToJSON (..), ToJSONKey, Value (..), object, typeMismatch, withObject, (.!=), (.:), (.:?))
 import Data.Default (Default (..))
 import Data.Hashable
 import Data.Ix (Ix)
 import Data.Text (Text)
+import qualified Data.Vector as V
 import GHC.Generics (Generic)
 import TimeCompat
 
@@ -32,15 +35,27 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 data Point = Point {_1 :: !Double, _2 :: !Double}
   deriving (Eq, Show, Generic)
 
+instance ToJSON Point where
+  toJSON :: Point -> Value
+  toJSON (Point x y) = toJSON [x, y]
+
+instance FromJSON Point where
+  parseJSON :: Value -> Parser Point
+  parseJSON = withTuple "Point" $ \(x, y) ->
+    Point <$> parseJSON x <*> parseJSON y
+   where
+    withTuple :: String -> ((Value, Value) -> Parser a) -> Value -> Parser a
+    withTuple _expected k (toTuple -> Just xy) = k xy
+    withTuple expected _k v = typeMismatch expected v
+
+    toTuple :: Value -> Maybe (Value, Value)
+    toTuple (Array v) | V.length v == 2 = Just (v V.! 0, v V.! 1)
+    toTuple _ = Nothing
+
 -- | Path in simulation world
 newtype Path = Path [Point]
   deriving (Eq, Show, Generic)
   deriving newtype (Semigroup, Monoid)
-
-instance ToJSON Point where
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Point
 
 type WorldDimensions = (Double, Double)
 
