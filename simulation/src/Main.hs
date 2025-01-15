@@ -1,12 +1,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
 
+import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.Maybe (fromMaybe)
@@ -49,7 +51,7 @@ import Options.Applicative (
   (<**>),
  )
 import Options.Applicative.Types (ReadM)
-import P2P (P2PTopography, P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
@@ -57,7 +59,7 @@ import qualified PraosProtocol.VizSimPraos as VizPraos
 import SimTypes (World (..), WorldDimensions, WorldShape (..))
 import qualified System.Random as Random
 import TimeCompat
-import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
+import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, triangleInequalityCheck, writeSimpleTopology)
 import Viz
 
 main :: IO ()
@@ -479,20 +481,30 @@ parserCliConvertBenchTopology =
 --------------------------------------------------------------------------------
 
 execTopographyOptions :: Random.RandomGen g => g -> TopographyOptions -> IO P2PTopography
-execTopographyOptions rng = \case
-  SimpleTopologyFile simpleTopologyFile -> do
-    -- TODO: infer world size from latencies
-    let world = World (1200, 1000) Rectangle
-    readP2PTopography defaultParams world simpleTopologyFile
-  TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
-    eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
-    case eitherP2PTopographyCharacteristics of
-      Right p2pTopographyCharacteristics ->
-        pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
-      Left errorMessage ->
-        fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
-  TopographyCharacteristics p2pTopographyCharacteristics -> do
-    pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+execTopographyOptions rng =
+  (checkTopography =<<) . \case
+    SimpleTopologyFile simpleTopologyFile -> do
+      -- TODO: infer world size from latencies
+      let world = World (1200, 1000) Rectangle
+      readP2PTopography defaultParams world simpleTopologyFile
+    TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
+      eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
+      case eitherP2PTopographyCharacteristics of
+        Right p2pTopographyCharacteristics ->
+          pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+        Left errorMessage ->
+          fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
+    TopographyCharacteristics p2pTopographyCharacteristics -> do
+      pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+ where
+  checkTopography top@P2PTopography{p2pLinks} = do
+    let node_triplets = triangleInequalityCheck p2pLinks
+    unless (null node_triplets) $ do
+      putStr $
+        unlines $
+          ["Latencies do not respect triangle inequalities for these nodes:"]
+            ++ map show node_triplets
+    return top
 
 data TopographyOptions
   = SimpleTopologyFile FilePath
