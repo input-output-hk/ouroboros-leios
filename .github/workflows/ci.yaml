@@ -60,12 +60,12 @@ jobs:
   ################################################################################
 
   simulation-test:
-    name: "simulation: Test with GHC ${{ matrix.ghc-version }} on ${{ matrix.os }}"
+    name: "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [macos-13, macos-14, ubuntu-22.04]
         ghc-version: ["9.8"]
 
     steps:
@@ -81,8 +81,13 @@ jobs:
           cabal-version: "latest"
           cabal-update: true
 
-      - name: 🛠️ Install system dependencies
+      - name: 🛠️ Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get install -y graphviz libpango1.0-dev libgtk-3-dev
+
+      - name: 🛠️ Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install graphviz gtk+3 pango
 
       - name: 🛠️ Configure
         run: |

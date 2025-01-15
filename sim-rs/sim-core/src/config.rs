@@ -27,8 +27,8 @@ impl NodeId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "distribution", rename_all = "snake_case")]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "distribution", rename_all = "kebab-case")]
 pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
     Exp { lambda: f64, scale: Option<f64> },
@@ -48,185 +48,71 @@ impl From<DistributionConfig> for FloatDistribution {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RawConfig {
-    pub seed: Option<u64>,
-    pub timescale: Option<f64>,
-    pub slots: Option<u64>,
-    #[serde(default, skip_serializing_if = "HashSet::is_empty")]
-    pub trace_nodes: HashSet<NodeId>,
-    pub nodes: Vec<RawNodeConfig>,
-    pub links: Vec<RawLinkConfig>,
-    pub block_generation_probability: f64,
-    pub ib_generation_probability: f64,
-    pub eb_generation_probability: f64,
-    pub vote_probability: f64,
-    pub vote_threshold: u64,
-    pub max_block_size: u64,
-    pub max_tx_size: u64,
-    pub stage_length: u64,
-    pub deliver_stage_count: u64,
-    pub uniform_ib_generation: bool,
-    pub max_ib_size: u64,
-    pub max_ib_requests_per_peer: usize,
-    pub ib_shards: u64,
-    pub one_vote_per_vrf: bool,
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawParameters {
+    pub leios_stage_length_slots: u64,
+    pub leios_stage_active_voting_slots: u64,
+
+    pub tx_generation_distribution: DistributionConfig,
+    pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
-    pub block_generation_cpu_time_ms: f64,
-    pub block_validation_cpu_time_ms: f64,
-    pub certificate_generation_cpu_time_ms: f64,
-    pub certificate_validation_cpu_time_ms: f64,
+    pub tx_max_size_bytes: u64,
+
+    pub rb_generation_probability: f64,
+    pub rb_generation_cpu_time_ms: f64,
+    pub rb_head_validation_cpu_time_ms: f64,
+    pub rb_head_size_bytes: u64,
+    pub rb_body_max_size_bytes: u64,
+
+    pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
+    pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
+
+    pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
-    pub ib_validation_cpu_time_ms: f64,
+    pub ib_head_size_bytes: u64,
+    pub ib_head_validation_cpu_time_ms: f64,
+    pub ib_body_validation_cpu_time_ms_constant: f64,
+    pub ib_body_validation_cpu_time_ms_per_byte: f64,
+    pub ib_body_max_size_bytes: u64,
+    #[serde(default = "u64::one")]
+    pub ib_shards: u64,
+
+    pub eb_generation_probability: f64,
     pub eb_generation_cpu_time_ms: f64,
     pub eb_validation_cpu_time_ms: f64,
-    pub vote_generation_cpu_time_ms: f64,
+    pub eb_size_bytes_constant: u64,
+    pub eb_size_bytes_per_ib: u64,
+
+    pub vote_generation_probability: f64,
+    pub vote_generation_cpu_time_ms_constant: f64,
+    pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
-    pub transaction_frequency_ms: DistributionConfig,
-    pub transaction_size_bytes: DistributionConfig,
+    pub vote_threshold: u64,
+    pub vote_one_eb_per_vrf_win: bool,
+    pub vote_size_bytes_constant: u64,
+    pub vote_size_bytes_per_node: u64,
+
+    pub cert_generation_cpu_time_ms_constant: f64,
+    pub cert_generation_cpu_time_ms_per_node: f64,
+    pub cert_validation_cpu_time_ms_constant: f64,
+    pub cert_validation_cpu_time_ms_per_node: f64,
+    pub cert_size_bytes_constant: u64,
+    pub cert_size_bytes_per_node: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawNodeConfig {
-    pub location: (f64, f64),
-    pub stake: Option<u64>,
-    pub region: Option<String>,
-    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
-    pub cpu_multiplier: f64,
-    #[serde(default)]
-    pub cores: Option<u64>,
+pub struct RawTopology {
+    pub nodes: Vec<RawNodeConfig>,
+    pub links: Vec<RawLinkConfig>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RawLinkConfig {
-    pub nodes: (usize, usize),
-    pub latency_ms: Option<u64>,
-}
-
-impl From<RawConfig> for SimConfiguration {
-    fn from(value: RawConfig) -> Self {
-        let timescale = value.timescale.unwrap_or(1.0);
-        let mut nodes: Vec<NodeConfiguration> = value
-            .nodes
-            .into_iter()
-            .enumerate()
-            .map(|(index, raw)| NodeConfiguration {
-                id: NodeId::new(index),
-                location: to_netsim_location(raw.location),
-                stake: raw.stake.unwrap_or_default(),
-                cpu_multiplier: raw.cpu_multiplier,
-                cores: raw.cores,
-                peers: vec![],
-            })
-            .collect();
-        let mut links = vec![];
-        for link in value.links {
-            let (id1, id2) = link.nodes;
-            nodes[id1].peers.push(NodeId::new(id2));
-            nodes[id2].peers.push(NodeId::new(id1));
-            links.push(LinkConfiguration {
-                nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
-            });
-        }
-        Self {
-            seed: value.seed.unwrap_or_default(),
-            timescale,
-            slots: value.slots,
-            nodes,
-            trace_nodes: value.trace_nodes,
-            links,
-            block_generation_probability: value.block_generation_probability,
-            ib_generation_probability: value.ib_generation_probability,
-            eb_generation_probability: value.eb_generation_probability,
-            vote_probability: value.vote_probability,
-            vote_threshold: value.vote_threshold,
-            max_block_size: value.max_block_size,
-            max_tx_size: value.max_tx_size,
-            stage_length: value.stage_length,
-            deliver_stage_count: value.deliver_stage_count,
-            uniform_ib_generation: value.uniform_ib_generation,
-            max_ib_size: value.max_ib_size,
-            max_ib_requests_per_peer: value.max_ib_requests_per_peer,
-            ib_shards: value.ib_shards,
-            one_vote_per_vrf: value.one_vote_per_vrf,
-            tx_validation_cpu_time: Duration::from_secs_f64(
-                value.tx_validation_cpu_time_ms / 1000.0,
-            ),
-            block_generation_cpu_time: Duration::from_secs_f64(
-                value.block_generation_cpu_time_ms / 1000.0,
-            ),
-            block_validation_cpu_time: Duration::from_secs_f64(
-                value.block_validation_cpu_time_ms / 1000.0,
-            ),
-            certificate_generation_cpu_time: Duration::from_secs_f64(
-                value.certificate_generation_cpu_time_ms / 1000.0,
-            ),
-            certificate_validation_cpu_time: Duration::from_secs_f64(
-                value.certificate_validation_cpu_time_ms / 1000.0,
-            ),
-            ib_generation_cpu_time: Duration::from_secs_f64(
-                value.ib_generation_cpu_time_ms / 1000.0,
-            ),
-            ib_validation_cpu_time: Duration::from_secs_f64(
-                value.ib_validation_cpu_time_ms / 1000.0,
-            ),
-            eb_generation_cpu_time: Duration::from_secs_f64(
-                value.eb_generation_cpu_time_ms / 1000.0,
-            ),
-            eb_validation_cpu_time: Duration::from_secs_f64(
-                value.eb_validation_cpu_time_ms / 1000.0,
-            ),
-            vote_generation_cpu_time: Duration::from_secs_f64(
-                value.vote_generation_cpu_time_ms / 1000.0,
-            ),
-            vote_validation_cpu_time: Duration::from_secs_f64(
-                value.vote_validation_cpu_time_ms / 1000.0,
-            ),
-            transaction_frequency_ms: value.transaction_frequency_ms.into(),
-            transaction_size_bytes: value.transaction_size_bytes.into(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SimConfiguration {
-    pub seed: u64,
-    pub slots: Option<u64>,
-    pub timescale: f64,
-    pub trace_nodes: HashSet<NodeId>,
+pub struct Topology {
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
-    pub block_generation_probability: f64,
-    pub ib_generation_probability: f64,
-    pub eb_generation_probability: f64,
-    pub vote_probability: f64,
-    pub vote_threshold: u64,
-    pub max_block_size: u64,
-    pub max_tx_size: u64,
-    pub stage_length: u64,
-    pub deliver_stage_count: u64,
-    pub uniform_ib_generation: bool,
-    pub max_ib_size: u64,
-    pub max_ib_requests_per_peer: usize,
-    pub ib_shards: u64,
-    pub one_vote_per_vrf: bool,
-    pub tx_validation_cpu_time: Duration,
-    pub block_generation_cpu_time: Duration,
-    pub block_validation_cpu_time: Duration,
-    pub certificate_generation_cpu_time: Duration,
-    pub certificate_validation_cpu_time: Duration,
-    pub ib_generation_cpu_time: Duration,
-    pub ib_validation_cpu_time: Duration,
-    pub eb_generation_cpu_time: Duration,
-    pub eb_validation_cpu_time: Duration,
-    pub vote_generation_cpu_time: Duration,
-    pub vote_validation_cpu_time: Duration,
-    pub transaction_frequency_ms: FloatDistribution,
-    pub transaction_size_bytes: FloatDistribution,
 }
 
-impl SimConfiguration {
+impl Topology {
     pub fn validate(&self) -> Result<()> {
         // The graph must be nonempty and fully connected,
         // and every link must be between two nodes which exist
@@ -263,6 +149,135 @@ impl SimConfiguration {
         }
         Ok(())
     }
+}
+
+impl From<RawTopology> for Topology {
+    fn from(value: RawTopology) -> Self {
+        let mut nodes: Vec<NodeConfiguration> = value
+            .nodes
+            .into_iter()
+            .enumerate()
+            .map(|(index, raw)| NodeConfiguration {
+                id: NodeId::new(index),
+                location: to_netsim_location(raw.location),
+                stake: raw.stake.unwrap_or_default(),
+                cpu_multiplier: raw.cpu_multiplier,
+                cores: raw.cores,
+                peers: vec![],
+            })
+            .collect();
+        let mut links = vec![];
+        for link in value.links {
+            let (id1, id2) = link.nodes;
+            nodes[id1].peers.push(NodeId::new(id2));
+            nodes[id2].peers.push(NodeId::new(id1));
+            links.push(LinkConfiguration {
+                nodes: (NodeId::new(id1), NodeId::new(id2)),
+                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
+            });
+        }
+        Self { nodes, links }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RawNodeConfig {
+    pub location: (f64, f64),
+    pub stake: Option<u64>,
+    pub region: Option<String>,
+    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
+    pub cpu_multiplier: f64,
+    #[serde(default)]
+    pub cores: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RawLinkConfig {
+    pub nodes: (usize, usize),
+    pub latency_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SimConfiguration {
+    pub seed: u64,
+    pub slots: Option<u64>,
+    pub timescale: f64,
+    pub trace_nodes: HashSet<NodeId>,
+    pub nodes: Vec<NodeConfiguration>,
+    pub links: Vec<LinkConfiguration>,
+    pub block_generation_probability: f64,
+    pub ib_generation_probability: f64,
+    pub eb_generation_probability: f64,
+    pub vote_probability: f64,
+    pub vote_threshold: u64,
+    pub max_block_size: u64,
+    pub max_tx_size: u64,
+    pub stage_length: u64,
+    pub max_ib_size: u64,
+    pub max_ib_requests_per_peer: usize,
+    pub ib_shards: u64,
+    pub one_vote_per_vrf: bool,
+    pub tx_validation_cpu_time: Duration,
+    pub block_generation_cpu_time: Duration,
+    pub block_validation_cpu_time: Duration,
+    pub certificate_generation_cpu_time: Duration,
+    pub certificate_validation_cpu_time: Duration,
+    pub ib_generation_cpu_time: Duration,
+    pub ib_validation_cpu_time: Duration,
+    pub eb_generation_cpu_time: Duration,
+    pub eb_validation_cpu_time: Duration,
+    pub vote_generation_cpu_time: Duration,
+    pub vote_validation_cpu_time: Duration,
+    pub transaction_frequency_ms: FloatDistribution,
+    pub transaction_size_bytes: FloatDistribution,
+}
+
+impl SimConfiguration {
+    pub fn build(params: RawParameters, topology: Topology) -> Self {
+        Self {
+            seed: 0,
+            timescale: 1.0,
+            slots: None,
+            nodes: topology.nodes,
+            trace_nodes: HashSet::new(),
+            links: topology.links,
+            block_generation_probability: params.rb_generation_probability,
+            ib_generation_probability: params.ib_generation_probability,
+            eb_generation_probability: params.eb_generation_probability,
+            vote_probability: params.vote_generation_probability,
+            vote_threshold: params.vote_threshold,
+            max_block_size: params.rb_body_max_size_bytes,
+            max_tx_size: params.tx_max_size_bytes,
+            stage_length: params.leios_stage_length_slots,
+            max_ib_size: params.ib_body_max_size_bytes,
+            max_ib_requests_per_peer: 1,
+            ib_shards: params.ib_shards,
+            one_vote_per_vrf: params.vote_one_eb_per_vrf_win,
+            tx_validation_cpu_time: duration_ms(params.tx_validation_cpu_time_ms),
+            block_generation_cpu_time: duration_ms(params.rb_generation_cpu_time_ms),
+            block_validation_cpu_time: duration_ms(
+                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+            ),
+            certificate_generation_cpu_time: duration_ms(
+                params.cert_generation_cpu_time_ms_constant,
+            ),
+            certificate_validation_cpu_time: duration_ms(
+                params.cert_validation_cpu_time_ms_constant,
+            ),
+            ib_generation_cpu_time: duration_ms(params.ib_generation_cpu_time_ms),
+            ib_validation_cpu_time: duration_ms(params.ib_body_validation_cpu_time_ms_constant),
+            eb_generation_cpu_time: duration_ms(params.eb_generation_cpu_time_ms),
+            eb_validation_cpu_time: duration_ms(params.eb_validation_cpu_time_ms),
+            vote_generation_cpu_time: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_validation_cpu_time: duration_ms(params.vote_validation_cpu_time_ms),
+            transaction_frequency_ms: params.tx_generation_distribution.into(),
+            transaction_size_bytes: params.tx_size_bytes_distribution.into(),
+        }
+    }
+}
+
+fn duration_ms(ms: f64) -> Duration {
+    Duration::from_secs_f64(ms / 1000.0)
 }
 
 fn to_netsim_location((lat, long): (f64, f64)) -> Location {

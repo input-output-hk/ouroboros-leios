@@ -57,7 +57,7 @@ impl EventMonitor {
             .filter_map(|p| if p.stake > 0 { Some(p.id) } else { None })
             .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
+        let maximum_ib_age = stage_length * 3;
         Self {
             node_ids,
             pool_ids,
@@ -295,12 +295,12 @@ impl EventMonitor {
                     eb_messages.received += 1;
                 }
                 Event::VoteLotteryWon { .. } => {}
-                Event::VotesGenerated { id, ebs } => {
-                    for eb in ebs {
-                        total_votes += 1;
-                        *votes_per_bundle.entry(id).or_default() += 1.0;
-                        *eb_votes.entry(eb).or_default() += 1.0;
-                        *votes_per_pool.entry(id.producer).or_default() += 1.0;
+                Event::VotesGenerated { id, votes } => {
+                    for (eb, count) in votes.0 {
+                        total_votes += count as u64;
+                        *votes_per_bundle.entry(id).or_default() += count as f64;
+                        *eb_votes.entry(eb).or_default() += count as f64;
+                        *votes_per_pool.entry(id.producer).or_default() += count as f64;
                     }
                 }
                 Event::NoVote { .. } => {}

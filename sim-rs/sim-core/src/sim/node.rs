@@ -415,13 +415,8 @@ impl Node {
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         for next_p in vrf_probabilities(self.sim_config.ib_generation_probability) {
             if let Some(vrf) = self.run_vrf(next_p) {
-                let vrf_slot = if self.sim_config.uniform_ib_generation {
-                    // IBs are generated at the start of any slot within this stage
-                    slot + self.rng.gen_range(0..self.sim_config.stage_length)
-                } else {
-                    // IBs are generated at the start of the first slot of this stage
-                    slot
-                };
+                // IBs are generated at the start of any slot within this stage
+                let vrf_slot = slot + self.rng.gen_range(0..self.sim_config.stage_length);
                 slot_vrfs.entry(vrf_slot).or_default().push(vrf);
             }
         }
@@ -497,12 +492,16 @@ impl Node {
             // For every VRF lottery you won, you can vote for every EB
             vrf_wins * ebs.len()
         };
+        let mut eb_counts = BTreeMap::new();
+        for eb in ebs.iter().cycle().take(votes_allowed) {
+            *eb_counts.entry(*eb).or_default() += 1;
+        }
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,
                 producer: self.id,
             },
-            ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
+            ebs: eb_counts,
         };
         if !votes.ebs.is_empty() {
             self.tracker.track_vote_lottery_won(&votes);
@@ -906,12 +905,12 @@ impl Node {
         {
             return Ok(());
         }
-        for eb in votes.ebs.iter() {
+        for (eb, count) in votes.ebs.iter() {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
@@ -968,10 +967,7 @@ impl Node {
 
     fn try_filling_eb(&mut self, eb: &mut EndorserBlock) {
         let config = &self.sim_config;
-        let Some(earliest_slot) = eb
-            .slot
-            .checked_sub(config.stage_length * (config.deliver_stage_count + 1))
-        else {
+        let Some(earliest_slot) = eb.slot.checked_sub(config.stage_length * 3) else {
             return;
         };
         for slot in earliest_slot..(earliest_slot + config.stage_length) {
@@ -997,9 +993,8 @@ impl Node {
 
     fn should_vote_for(&self, slot: u64, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
         let stage_length = self.sim_config.stage_length;
-        let deliver_stage_count = self.sim_config.deliver_stage_count;
 
-        let Some(ib_slot_start) = slot.checked_sub(stage_length * (deliver_stage_count + 2)) else {
+        let Some(ib_slot_start) = slot.checked_sub(stage_length * 4) else {
             // The IBs for this EB were "generated" before the sim began.
             // It's valid iff there are no IBs.
             return if eb.ibs.is_empty() {
@@ -1039,12 +1034,12 @@ impl Node {
 
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
-        for eb in &votes.ebs {
+        for (eb, count) in &votes.ebs {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         let votes = Arc::new(votes);
         self.leios

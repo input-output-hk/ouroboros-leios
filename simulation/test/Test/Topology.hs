@@ -11,15 +11,16 @@ import Data.Graph.Inductive.Arbitrary (NoLoops (..), NoMultipleEdges (..), Simpl
 import qualified Data.Text as T
 import P2P (Latency, P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import Paths_ouroboros_leios_sim (getDataFileName)
-import SimTypes (WorldDimensions, WorldShape (..))
+import SimTypes (World (..), WorldDimensions, WorldShape (..))
 import System.Directory (doesFileExist)
 import Test.QuickCheck (Arbitrary (..), Gen, NonNegative (..), Positive (..), Property, ioProperty)
+import Test.QuickCheck.Arbitrary (arbitraryBoundedEnum)
 import Test.QuickCheck.Gen (Gen (..))
 import Test.QuickCheck.Random (QCGen (..))
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, testCase)
 import Test.Tasty.QuickCheck (Small (..), testProperty)
-import Topology (ClusterName (..), LatencyInMiliseconds (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, readSimpleTopologyFromBenchTopologyAndLatency, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
+import Topology (ClusterName (..), LatencyMs (..), NodeName (..), addNodeNames, augmentWithPosition, benchTopologyToSimpleTopology, defaultParams, forgetPaths, forgetPoints, forgetPosition, forgetSimpleNodeInfo, forgetUnusedFieldsInBenchTopology, grToP2PTopography, grToSimpleTopology, p2pTopologyToGr, readBenchTopology, readLatenciesSqlite3Gz, readSimpleTopologyFromBenchTopologyAndLatency, simpleTopologyToBenchTopology, simpleTopologyToGr, sortBenchTopology)
 
 tests :: TestTree
 tests =
@@ -82,7 +83,7 @@ test_benchTopologyIsConnected = do
 --------------------------------------------------------------------------------
 
 -- | Test that the conversion between SimpleTopology and FGL Graphs preserves the topology.
-prop_grToSimpleTopologyPreservesTopology :: SimpleGraph Gr (Maybe ClusterName) LatencyInMiliseconds -> Bool
+prop_grToSimpleTopologyPreservesTopology :: SimpleGraph Gr (Maybe ClusterName) LatencyMs -> Bool
 prop_grToSimpleTopologyPreservesTopology gr = do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
   let gr2 = simpleTopologyToGr . grToSimpleTopology $ gr1
@@ -94,7 +95,7 @@ prop_grToSimpleTopologyPreservesTopology gr = do
 
 prop_augmentWithPositionPreservesTopology ::
   WorldDimensions ->
-  SimpleGraph Gr (Maybe ClusterName) LatencyInMiliseconds ->
+  SimpleGraph Gr (Maybe ClusterName) LatencyMs ->
   Property
 prop_augmentWithPositionPreservesTopology wordDimensions gr = ioProperty $ do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
@@ -108,13 +109,13 @@ prop_augmentWithPositionPreservesTopology wordDimensions gr = ioProperty $ do
 
 -- | Test that the conversion between SimpleTopology and FGL Graphs preserves the topology.
 prop_grToP2PTopographyPreservesTopology ::
-  WorldShape ->
+  World ->
   SimpleGraph Gr (Maybe ClusterName) Latency ->
   Property
-prop_grToP2PTopographyPreservesTopology worldShape@WorldShape{..} gr = ioProperty $ do
+prop_grToP2PTopographyPreservesTopology world@World{..} gr = ioProperty $ do
   let gr1 = addNodeNames . nmeGraph . looplessGraph $ gr
   gr2 <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition defaultParams worldDimensions gr1
-  let gr3 = grToP2PTopography worldShape gr2
+  let gr3 = grToP2PTopography world gr2
   let gr4 = p2pTopologyToGr gr3
   let forgetPoints = G.nmap (const ())
   pure $ forgetPoints gr2 == forgetPoints gr4
@@ -125,7 +126,7 @@ prop_p2pTopographyToGrPreservesTopology ::
   Bool
 prop_p2pTopographyToGrPreservesTopology gr1@P2PTopography{..} = do
   let gr2 = p2pTopologyToGr gr1
-  let gr3 = grToP2PTopography p2pWorldShape gr2
+  let gr3 = grToP2PTopography p2pWorld gr2
   gr1 == gr3
 
 --------------------------------------------------------------------------------
@@ -136,21 +137,25 @@ instance Arbitrary ClusterName where
   arbitrary :: Gen ClusterName
   arbitrary = ClusterName . T.pack . ("cluster-" <>) . show @Int . getSmall . getNonNegative <$> arbitrary
 
-instance Arbitrary LatencyInMiliseconds where
-  arbitrary :: Gen LatencyInMiliseconds
-  arbitrary = LatencyInMiliseconds . getPositive <$> arbitrary
+instance Arbitrary LatencyMs where
+  arbitrary :: Gen LatencyMs
+  arbitrary = LatencyMs . getPositive <$> arbitrary
+
+instance Arbitrary World where
+  arbitrary :: Gen World
+  arbitrary = do
+    worldDimensions <- bimap getPositive getPositive <$> arbitrary
+    worldShape <- arbitrary
+    pure $ World{..}
 
 instance Arbitrary WorldShape where
   arbitrary :: Gen WorldShape
-  arbitrary = do
-    worldDimensions <- bimap getPositive getPositive <$> arbitrary
-    worldIsCylinder <- arbitrary
-    pure $ WorldShape{..}
+  arbitrary = arbitraryBoundedEnum
 
 instance Arbitrary P2PTopographyCharacteristics where
   arbitrary :: Gen P2PTopographyCharacteristics
   arbitrary = do
-    p2pWorldShape <- arbitrary
+    p2pWorld <- arbitrary
     p2pNumNodes <- getPositive <$> arbitrary
     p2pNodeLinksClose <- getSmall . getPositive <$> arbitrary
     p2pNodeLinksRandom <- getSmall . getPositive <$> arbitrary

@@ -18,7 +18,7 @@ import TimeCompat
 import ModelTCP (TcpMsgForecast (..), segmentSize)
 import P2P
 import SimRelay (TestBlock, TestBlockRelayMessage)
-import SimTypes (Point (..), WorldShape (..))
+import SimTypes (Point (..), World (..))
 import Viz
 import VizChart
 import VizSim
@@ -66,7 +66,7 @@ relayP2PSimVizRenderModel
   ( SimVizModel
       _events
       RelaySimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizMsgsInTransit

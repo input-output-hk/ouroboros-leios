@@ -36,7 +36,7 @@ tracePraosP2P
   P2PTopography
     { p2pNodes
     , p2pLinks
-    , p2pWorldShape
+    , p2pWorld
     }
   tcpprops
   praosConfig =
@@ -45,7 +45,7 @@ tracePraosP2P
         slotConfig <- slotConfigFromNow
         traceWith tracer $
           PraosEventSetup
-            p2pWorldShape
+            p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
         tcplinks <-

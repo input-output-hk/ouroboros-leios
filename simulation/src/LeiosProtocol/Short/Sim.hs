@@ -2,15 +2,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module LeiosProtocol.Short.Sim where
 
+import ChanDriver
 import ChanMux
 import ChanTCP
+import Control.Exception (assert)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
@@ -19,13 +23,21 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
+import Data.Aeson
+import Data.Coerce
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import GHC.Records
 import LeiosProtocol.Common hiding (Point)
+import LeiosProtocol.Relay (Message (..), RelayMessage)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
+import ModelTCP
+import Network.TypedProtocol
+import PraosProtocol.BlockFetch (Message (..))
+import PraosProtocol.PraosNode (PraosMessage (..))
 import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
@@ -35,7 +47,7 @@ type LeiosTrace = [(Time, LeiosEvent)]
 data LeiosEvent
   = -- | Declare the nodes and links
     LeiosEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -43,6 +55,82 @@ data LeiosEvent
   | -- | An event on a tcp link between two nodes
     LeiosEventTcp (LabelLink (TcpEvent LeiosMessage))
   deriving (Show)
+
+logLeiosEvent :: LeiosEvent -> Maybe Encoding
+logLeiosEvent e = case e of
+  LeiosEventSetup{} -> Nothing
+  LeiosEventNode (LabelNode nid x) -> do
+    pairs <$> logNode nid x
+  LeiosEventTcp (LabelLink from to (TcpSendMsg msg _ _)) -> do
+    ps <- logMsg msg
+    pure $ pairs $ "tag" .= asString "Sent" <> "sender" .= from <> "receipient" .= to <> ps
+ where
+  ibKind = "kind" .= asString "IB"
+  ebKind = "kind" .= asString "EB"
+  vtKind = "kind" .= asString "VT"
+  rbKind = "kind" .= asString "RB"
+  cpuTag = "tag" .= asString "Cpu"
+  logNode nid (PraosNodeEvent x) = logPraos nid x
+  logNode nid (LeiosNodeEventCPU CPUTask{..}) =
+    Just $
+      mconcat
+        [ cpuTag
+        , "node" .= nid
+        , "duration_s" .= cpuTaskDuration
+        , "task_label" .= cpuTaskLabel
+        ]
+  logNode nid (LeiosNodeEvent blkE blk) = Just $ "tag" .= tag <> kindAndId <> extra <> "node" .= nid
+   where
+    extra
+      | Generate <- blkE = case blk of
+          EventIB ib -> mconcat ["slot" .= ib.header.slot, "payload_bytes" .= fromBytes ib.body.size]
+          EventEB eb -> mconcat ["slot" .= eb.slot, "input_blocks" .= map stringId eb.inputBlocks]
+          EventVote vt ->
+            mconcat
+              [ "slot" .= vt.slot
+              , "votes" .= vt.votes
+              , "endorse_blocks" .= map stringId vt.endorseBlocks
+              ]
+      | otherwise = mempty
+    tag = asString $ case blkE of
+      Generate -> "generated"
+      Received -> "received"
+      EnterState -> "enteredstate"
+    kindAndId = case blk of
+      EventIB ib -> mconcat [ibKind, "id" .= stringId ib.id]
+      EventEB eb -> mconcat [ebKind, "id" .= stringId eb.id]
+      EventVote vt -> mconcat [vtKind, "id" .= stringId vt.id]
+  stringId :: (HasField "node" a NodeId, HasField "num" a Int) => a -> String
+  stringId x = concat [show (coerce @_ @Int x.node), "-", show x.num]
+  logPraos nid (PraosNodeEventGenerate blk) =
+    Just $
+      mconcat
+        ["tag" .= asString "generated", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+  logPraos nid (PraosNodeEventReceived blk) =
+    Just $
+      mconcat
+        ["tag" .= asString "received", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+  logPraos nid (PraosNodeEventEnterState blk) =
+    Just $
+      mconcat
+        ["tag" .= asString "enteredstate", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+  logPraos nid (PraosNodeEventCPU task) =
+    assert False $
+      Just $
+        mconcat
+          [cpuTag, "node" .= nid, "task" .= task]
+  logPraos _ (PraosNodeEventNewTip _chain) = Nothing
+  logMsg (RelayIB msg) = (ibKind <>) <$> logRelay msg
+  logMsg (RelayEB msg) = (ebKind <>) <$> logRelay msg
+  logMsg (RelayVote msg) = (vtKind <>) <$> logRelay msg
+  logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
+    Just $ rbKind <> "id" .= show (coerce @_ @Int hash)
+  logMsg (PraosMsg (PraosMessage _)) = Nothing
+  logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => RelayMessage id h b -> Maybe Series
+  logRelay (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
+    Just $ "ids" .= map (stringId . fst) xs
+  logRelay _ = Nothing
+  asString x = x :: String
 
 messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
 messages trace = [(t, LabelLink x y msg) | (t, LeiosEventTcp (LabelLink x y (TcpSendMsg msg _ _))) <- trace]
@@ -58,9 +146,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         LeiosEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (nodeA, Point 50 100)

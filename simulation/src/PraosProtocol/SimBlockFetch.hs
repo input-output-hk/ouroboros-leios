@@ -31,7 +31,7 @@ type BlockFetchTrace = [(Time, BlockFetchEvent)]
 data BlockFetchEvent
   = -- | Declare the nodes and links
     BlockFetchEventSetup
-      !WorldShape
+      !World
       !(Map NodeId Point) -- nodes and locations
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
@@ -55,9 +55,9 @@ traceRelayLink1 tcpprops =
     runSimTrace $ do
       traceWith tracer $
         BlockFetchEventSetup
-          WorldShape
+          World
             { worldDimensions = (500, 500)
-            , worldIsCylinder = False
+            , worldShape = Rectangle
             }
           ( Map.fromList
               [ (NodeId 0, Point 50 100)

@@ -194,7 +194,7 @@ $$
 Hence the probability for the next EB not coming before the next RB is
 
 $$
-p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s \lt n L \lt \infty} (1 - f_\text{EB})^{n-1} f_\text{EB} (1 - f_\text{RB})^{s-1} f_\text{RB}
+p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s < n L < \infty} (1 - f_\text{EB})^{n-1} f_\text{EB} (1 - f_\text{RB})^{s-1} f_\text{RB}
  = \frac{1 - [f_\text{RB} (f_\text{EB} - 1) + 1] (1 - f_\text{RB})^{L-1}}{1 - (1 - f_\text{EB}) (1 - f_\text{RB})^L}
 $$
 
@@ -220,10 +220,10 @@ where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes
 | Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                             |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                  |
-| 1               | $1 \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
-| 2               | $1 + \sigma \cdot f_\text{vote} \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
-| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
-| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m \lt v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
+| 1               | $1 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
+| 2               | $1 + \sigma \cdot f_\text{vote} < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
+| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
+| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m < v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
 
 ![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
 

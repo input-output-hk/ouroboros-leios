@@ -1,0 +1,5 @@
+# Generate 10x more transactions than default
+tx-generation-distribution:
+  distribution: exp
+  lambda: 0.85
+  scale: 100.0

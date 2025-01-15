@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::warn;
@@ -112,11 +114,13 @@ pub enum Event {
         recipient: NodeId,
     },
     VoteLotteryWon {
+        #[serde(flatten)]
         id: VoteBundleId,
     },
     VotesGenerated {
+        #[serde(flatten)]
         id: VoteBundleId,
-        ebs: Vec<EndorserBlockId>,
+        votes: Votes,
     },
     NoVote {
         slot: u64,
@@ -125,15 +129,29 @@ pub enum Event {
         reason: NoVoteReason,
     },
     VotesSent {
+        #[serde(flatten)]
         id: VoteBundleId,
         sender: NodeId,
         recipient: NodeId,
     },
     VotesReceived {
+        #[serde(flatten)]
         id: VoteBundleId,
         sender: NodeId,
         recipient: NodeId,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct Votes(pub BTreeMap<EndorserBlockId, usize>);
+
+impl Serialize for Votes {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_map(self.0.iter().map(|(k, v)| (k.to_string(), *v)))
+    }
 }
 
 #[derive(Clone)]
@@ -295,7 +313,7 @@ impl EventTracker {
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VotesGenerated {
             id: votes.id,
-            ebs: votes.ebs.clone(),
+            votes: Votes(votes.ebs.clone()),
         });
     }
 

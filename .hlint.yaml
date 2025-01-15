@@ -7,7 +7,9 @@
 
 # Specify additional command line arguments
 #
-# - arguments: [--color, --cpp-simple, -XQuasiQuotes]
+#
+# included default-extensions from simulation/ouroboros-leios-sim.cabal
+- arguments: [-XDisambiguateRecordFields, -XOverloadedRecordDot, -XScopedTypeVariables]
 
 # Control which extensions/flags/modules/functions can be used
 #

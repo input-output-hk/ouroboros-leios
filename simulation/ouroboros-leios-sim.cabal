@@ -50,6 +50,7 @@ library
     ExamplesRelayP2P
     ExamplesTCP
     LeiosProtocol.Common
+    LeiosProtocol.Config
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.Short
@@ -115,6 +116,7 @@ library
     , colour
     , containers
     , contra-tracer
+    , data-default
     , deepseq
     , diagrams-cairo
     , diagrams-core
@@ -148,6 +150,7 @@ library
     , time
     , typed-protocols            >=0.3
     , vector
+    , yaml
     , zlib
 
   hs-source-dirs:     src
@@ -166,9 +169,12 @@ executable ols
 
   main-is:          src/Main.hs
   build-depends:
+    , aeson
     , base
+    , data-default
     , optparse-applicative
     , ouroboros-leios-sim
+    , random
 
   default-language: Haskell2010
   ghc-options:      -Wall

@@ -76,10 +76,10 @@ example1 =
   p2pNumNodes = 100
   p2pTopographyCharacteristics =
     P2PTopographyCharacteristics
-      { p2pWorldShape =
-          WorldShape
+      { p2pWorld =
+          World
             { worldDimensions = (0.600, 0.300)
-            , worldIsCylinder = True
+            , worldShape = Cylinder
             }
       , p2pNumNodes
       , p2pNodeLinksClose = 5
@@ -133,9 +133,9 @@ example2 =
   model1 =
     model
       p2pTopographyCharacteristicsCommon
-        { p2pWorldShape =
-            p2pWorldShape
-              { worldIsCylinder = False
+        { p2pWorld =
+            p2pWorld
+              { worldShape = Cylinder
               }
         }
   model2 = model p2pTopographyCharacteristicsCommon
@@ -165,14 +165,14 @@ example2 =
 
   rng0 = mkStdGen 4 -- TODO: make a param
   p2pNumNodes = 100
-  p2pWorldShape =
-    WorldShape
+  p2pWorld =
+    World
       { worldDimensions = (0.600, 0.300)
-      , worldIsCylinder = True
+      , worldShape = Cylinder
       }
   p2pTopographyCharacteristicsCommon =
     P2PTopographyCharacteristics
-      { p2pWorldShape
+      { p2pWorld
       , p2pNumNodes
       , p2pNodeLinksClose = 5
       , p2pNodeLinksRandom = 5

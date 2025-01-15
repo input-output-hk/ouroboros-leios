@@ -65,7 +65,7 @@ examplesPraosSimVizConfig = PraosVizConfig{..}
     BlockFetchMessage body ->
     (Double, Double, Double)
   blockFetchMessageColor (ProtocolMessage (SomeMessage msg)) = case msg of
-    MsgBlock blk -> blockBodyColor blk
+    MsgBlock _ blk -> blockBodyColor blk
     _otherwise -> (1, 0, 0)
 
   blockFetchMessageText ::
@@ -86,7 +86,7 @@ type PraosSimVizModel =
 -- | The vizualisation state within the data model for the relay simulation
 data PraosSimVizState
   = PraosSimVizState
-  { vizWorldShape :: !WorldShape
+  { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
@@ -173,7 +173,7 @@ praosSimVizModel =
  where
   initVizState =
     PraosSimVizState
-      { vizWorldShape = WorldShape (0, 0) False
+      { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
@@ -195,7 +195,7 @@ praosSimVizModel =
     PraosSimVizState
   accumEventVizState _now (PraosEventSetup shape nodes links) vs =
     vs
-      { vizWorldShape = shape
+      { vizWorld = shape
       , vizNodePos = nodes
       , vizNodeLinks =
           Map.fromSet
@@ -313,12 +313,12 @@ praosSimVizModel =
 -- considered to be a cylinder.
 --
 -- These points are computed in normalised (unit square) coordinates
-linkPoints :: WorldShape -> Point -> Point -> LinkPoints
+linkPoints :: World -> Point -> Point -> LinkPoints
 linkPoints
-  WorldShape{worldDimensions = (widthSeconds, _), worldIsCylinder}
+  World{worldDimensions = (widthSeconds, _), worldShape}
   p1@(Point x1 y1)
   p2@(Point x2 y2)
-    | not worldIsCylinder || d2 < d2' =
+    | worldShape == Rectangle || d2 < d2' =
         LinkPointsNoWrap (Point x1 y1) (Point x2 y2)
     | x1 <= x2 =
         LinkPointsWrap
@@ -392,7 +392,7 @@ praosSimVizRenderModel
   ( SimVizModel
       _events
       PraosSimVizState
-        { vizWorldShape = WorldShape{worldDimensions}
+        { vizWorld = World{worldDimensions}
         , vizNodePos
         , vizNodeLinks
         , vizMsgsInTransit

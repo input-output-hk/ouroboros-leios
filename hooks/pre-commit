@@ -21,6 +21,22 @@ if [ ! "${fourmolu_installed_version}" = "${fourmolu_required_version}" ]; then
     exit 1
 fi
 
+# Check for HLint
+hlint_required_version="3.8"
+hlint="$(which HLint-3.8)"
+if [ "${hlint}" = "" ]; then
+    hlint="$(which hlint)"
+    if [ "${hlint}" = "" ]; then
+        echo "pre-commit: Requires HLint version ${hlint_required_version}; no version found"
+        exit 1
+    fi
+fi
+hlint_installed_version="$(${hlint} --version | head -n 1 | cut -d' ' -f 2 | sed -E 's/v(.*),/\1/')"
+if [ ! "${hlint_installed_version}" = "${hlint_required_version}" ]; then
+    echo "pre-commit: Requires HLint version ${hlint_required_version}; found version ${hlint_installed_version}"
+    exit 1
+fi
+
 # Check for unstaged Haskell files
 unstaged_haskell_files="$(git ls-files --exclude-standard --no-deleted --deduplicate --modified '*.hs')"
 if [ ! "${unstaged_haskell_files}" = "" ]; then
@@ -35,3 +51,7 @@ if ! git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -
     git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L 1 "${fourmolu}" --mode=inplace --quiet
     exit 1
 fi
+
+# Check Haskell files with HLint
+echo "Linting Haskell source files with HLint version ${fourmolu_required_version}"
+git ls-files --exclude-standard --no-deleted --deduplicate '*.hs' | xargs -L50 ${hlint}
