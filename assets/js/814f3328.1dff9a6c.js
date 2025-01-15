@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[472],{5513:e=>{e.exports=JSON.parse('{"title":"Latest News","items":[{"title":"Community Round-Table on Leios","permalink":"/news/2024/06/18/community-space","unlisted":false}]}')}}]);
