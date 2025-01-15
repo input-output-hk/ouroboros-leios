@@ -4,87 +4,10 @@
         <title>Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Leios Blog</description>
-        <lastBuildDate>Tue, 07 Jan 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 06 Jan 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
-        <item>
-            <title><![CDATA[Weekly Progress Summary - January 7, 2025]]></title>
-            <link>https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary</guid>
-            <pubDate>Tue, 07 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[Weekly Overview]]></description>
-            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="weekly-overview">Weekly Overview<a class="hash-link" aria-label="Direct link to Weekly Overview" title="Direct link to Weekly Overview" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#weekly-overview">​</a></h2>
-<p>Last week, the Leios team focused on advancing Rust simulations, particularly in
-simulating network and processing behaviors similar to those on the Cardano
-mainnet. This involved enhancing central processing unit (CPU) event logging and
-experimenting with how block and vote diffusion change with different protocol
-parameters. They also updated the cost dashboard with revised parameters and
-computations, aligning these with empirical data and preparing for further
-calibration.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust Simulation<a class="hash-link" aria-label="Direct link to Rust Simulation" title="Direct link to Rust Simulation" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Simulated infinite CPUs and output CPU events in logs.</li>
-<li>Enhancements include:<!-- -->
-<ul>
-<li>Added basic simulation of CPU usage/latency.</li>
-<li>Introduced "lottery won" events to identify the start of CPU processing.</li>
-<li>Configured each node with four simulated cores for CPU-bound tasks.</li>
-<li>Transaction validation and ranking block/input block/endorser block
-generation/validation each take one CPU task.</li>
-<li>All virtual CPU costs were copied from the cost estimator.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq">DeltaQ<a class="hash-link" aria-label="Direct link to DeltaQ" title="Direct link to DeltaQ" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#deltaq">​</a></h2>
-<ul>
-<li>Added MIN/MAX combinators for best- and worst-case simulation results.</li>
-<li>The Rust simulation best case does not match the analytically best behavior.</li>
-<li>The Haskell simulation best case is too fast; the ΔQ expression must assume
-more than 200 peers per node.</li>
-<li>Concluded that this workstream has failed due to discrepancies in simulation
-results.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="summary-of-december-17-qa-discussion">Summary of December 17 Q&amp;A Discussion<a class="hash-link" aria-label="Direct link to Summary of December 17 Q&amp;A Discussion" title="Direct link to Summary of December 17 Q&amp;A Discussion" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#summary-of-december-17-qa-discussion">​</a></h2>
-<ul>
-<li>Discussed the throughput dashboard and its potential as a formal website.</li>
-<li>Explored the impact of Leios on ledger changes, data structures, and the
-ecosystem.</li>
-<li>Considered using Mithril for proofs of equivocation.</li>
-<li>Discussed the elasticity and adaptability of nodes.</li>
-<li>Explored interactions between emerging Hydra protocols and layer 1.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cost-dashboard-updates">Cost Dashboard Updates<a class="hash-link" aria-label="Direct link to Cost Dashboard Updates" title="Direct link to Cost Dashboard Updates" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#cost-dashboard-updates">​</a></h2>
-<ul>
-<li>Updated the dashboard with improved parameters and computations:<!-- -->
-<ul>
-<li>Lengthened phases and reduced the endorser block rate based on technical
-report analysis.</li>
-<li>Revised CPU costs for votes and certificates according to the technical
-report.</li>
-<li>Updated input/output operations per second (IOPS) values using empirical
-Cardano node production data.</li>
-<li>Aligned and cross-validated Agda code with the web interface.</li>
-<li>Future updates are pending calibration data from Haskell/Rust simulations.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="summarized-update-for-the-essential-cardano-report">Summarized Update for the Essential Cardano Report<a class="hash-link" aria-label="Direct link to Summarized Update for the Essential Cardano Report" title="Direct link to Summarized Update for the Essential Cardano Report" href="https://leios.cardano-scaling.org/news/2025/01/07/weekly-progress-summary#summarized-update-for-the-essential-cardano-report">​</a></h2>
-<p>Ouroboros Leios is another research and development project that the IO teams
-are working on. Leios aims to increase Cardano’s throughput by optimizing
-available network resources and enabling faster transaction processing and
-confirmation.</p>
-<p>Last week, the Leios team worked on enhancing Rust simulations and refining
-central processing unit (CPU) event logging. Key updates included simulating
-infinite CPUs, adding basic CPU usage/latency simulations, and configuring nodes
-with four simulated cores. The team also worked on improving the DeltaQ work
-stream, introducing MIN/MAX combinators for best- and worst-case simulation
-results. However, discrepancies between Rust and Haskell simulation results led
-to the conclusion that the DeltaQ workstream did not meet the expected outcomes.</p>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-        </item>
         <item>
             <title><![CDATA[Weekly Progress Summary - January 6, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary</link>
