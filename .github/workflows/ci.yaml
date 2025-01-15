@@ -69,6 +69,7 @@ jobs:
           - macos-13
           - macos-14
           - ubuntu-22.04
+          - windows-2022
         ghc-version: ["9.8"]
 
     steps:
@@ -91,6 +92,13 @@ jobs:
       - name: 🛠️ Install system dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install graphviz gtk+3 pango
+
+      - name: 🛠️ Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:PATH = "C:\msys64\usr\bin;$env:PATH"
+          pacman -v --noconfirm -S mingw-w64-x86_64-graphviz mingw-w64-x86_64-gtk3 mingw-w64-x86_64-pango
+          echo "C:\msys64\mingw64\bin" | Out-File -FilePath "$env:GITHUB_PATH" -Append
 
       - name: 🛠️ Configure
         run: |
