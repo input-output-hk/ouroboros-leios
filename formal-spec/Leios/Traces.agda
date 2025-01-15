@@ -5,7 +5,7 @@ open import Leios.SpecStructure
 
 import Leios.Protocol
 
-module Leios.Traces (⋯ : SpecStructure) {u : Type} (let open Leios.Protocol ⋯ u)
+module Leios.Traces {n} (⋯ : SpecStructure n) {u : Type} (let open Leios.Protocol ⋯ u)
   (_-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type)
   where
 
