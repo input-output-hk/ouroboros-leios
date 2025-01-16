@@ -605,9 +605,10 @@ readLatenciesSqlite3Gz topology latencySqliteGzFile =
 readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatenciesSqlite3 topology latencySqliteFile = do
   let queryAvgTime =
-        "select avg(time) from ping \
+        "select avg(time)/2 from ping \
         \where source = :consumer and dest = :producer \
-        \or    source = :producer and dest = :consumer"
+        \or    source = :producer and dest = :consumer \
+        \and   size = 64"
   latenciesRef <- newIORef mempty
   conn <- SQLlite.open latencySqliteFile
   forM_ topology.coreNodes $ \consumer -> do
