@@ -635,5 +635,5 @@ triangleInequalityCheck mls = do
   guard (s' == s)
   Just mt <- pure $ Map.lookup (middle, t) mls
   let l3 = ((middle, t), mt)
-  guard (not $ st <= sm + mt)
+  guard (st > (sm + mt))
   return (l1, l2, l3)

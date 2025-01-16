@@ -481,8 +481,9 @@ parserCliConvertBenchTopology =
 --------------------------------------------------------------------------------
 
 execTopographyOptions :: Random.RandomGen g => g -> TopographyOptions -> IO P2PTopography
-execTopographyOptions rng =
-  (checkTopography =<<) . \case
+execTopographyOptions rng = checkTopography <=< go
+ where
+  go = \case
     SimpleTopologyFile simpleTopologyFile -> do
       -- TODO: infer world size from latencies
       let world = World (1200, 1000) Rectangle
@@ -496,14 +497,12 @@ execTopographyOptions rng =
           fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
     TopographyCharacteristics p2pTopographyCharacteristics -> do
       pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
- where
   checkTopography top@P2PTopography{p2pLinks} = do
     let node_triplets = triangleInequalityCheck p2pLinks
     unless (null node_triplets) $ do
       putStr $
         unlines $
-          ["Latencies do not respect triangle inequalities for these nodes:"]
-            ++ map show node_triplets
+          "Latencies do not respect triangle inequalities for these nodes:" : map show node_triplets
     return top
 
 data TopographyOptions
