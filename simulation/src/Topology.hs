@@ -5,6 +5,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -12,17 +13,19 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Topology where
 
 import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (assert)
-import Control.Monad (forM_, (<=<))
-import Data.Aeson (encode)
+import Control.Monad (forM_, guard, (<=<))
+import Data.Aeson (encode, genericToJSON)
 import Data.Aeson.Decoding (throwDecode)
-import Data.Aeson.Types (FromJSON (..), FromJSONKey, Options (..), ToJSON (..), ToJSONKey, defaultOptions, genericParseJSON, genericToEncoding)
+import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, Options (..), Parser, ToJSON (..), ToJSONKey, Value, defaultOptions, genericParseJSON, genericToEncoding)
 import qualified Data.ByteString.Lazy as BSL
 import Data.Coerce (coerce)
 import Data.Function (on)
@@ -34,8 +37,10 @@ import qualified Data.GraphViz.Attributes.Complete as GV
 import qualified Data.GraphViz.Types as GVT (PrintDot)
 import qualified Data.GraphViz.Types.Generalised as GVTG
 import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.Kind (Type)
 import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Set (Set)
@@ -58,144 +63,77 @@ import System.IO.Temp (withTempFile)
 import Text.Printf (PrintfArg, printf)
 
 --------------------------------------------------------------------------------
--- Bench Topology
+-- Topology
 --
--- As provided in 'data/BenchTopology/topology-dense-52.json'.
+-- As provided in 'data/simulation/topology-dense-52.json'.
 --------------------------------------------------------------------------------
 
 newtype NodeName = NodeName {unNodeName :: Text}
-  deriving stock (Show, Eq, Ord)
+  deriving newtype (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON, FromJSONKey, ToJSONKey)
   deriving newtype (GVT.PrintDot)
   deriving newtype (SQLite.ToField)
   deriving newtype (PrintfArg)
 
-newtype OrgName = OrgName {unOrgName :: Text}
+newtype ClusterName = ClusterName {unClusterName :: Text}
   deriving stock (Show, Eq, Ord)
   deriving newtype (FromJSON, ToJSON)
 
-newtype RegionName = RegionName {unRegionName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
+newtype LatencyMs = LatencyMs {unLatencyMs :: Double}
+  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
 
-newtype LatencyInMiliseconds = LatencyInMiliseconds {unLatencyInMiliseconds :: Double}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
+topologyOptions :: Options
+topologyOptions = defaultOptions{unwrapUnaryRecords = False}
 
-data BenchTopologyNode
-  = BenchTopologyNode
-  { name :: !NodeName
-  , nodeId :: !NodeId
-  , org :: !(Maybe OrgName)
-  , pools :: !(Maybe Int)
-  , producers :: !(Vector NodeName)
-  , region :: !(Maybe RegionName)
-  , stakePool :: !(Maybe Bool)
+data Node (location :: Type) = Node
+  { stake :: !Word
+  , location :: !location
+  , producers :: !(Map NodeName Link)
   }
-  deriving (Eq, Show, Generic)
+  deriving stock (Show, Eq, Generic)
 
-benchTopologyOptions :: Options
-benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
+instance ToJSON location => ToJSON (Node location) where
+  toJSON :: Node location -> Value
+  toJSON = genericToJSON topologyOptions
 
-instance ToJSON BenchTopologyNode where
-  toEncoding = genericToEncoding benchTopologyOptions
+  toEncoding :: Node location -> Encoding
+  toEncoding = genericToEncoding topologyOptions
 
-instance FromJSON BenchTopologyNode
+instance FromJSON location => FromJSON (Node location) where
+  parseJSON :: Value -> Parser (Node location)
+  parseJSON = genericParseJSON topologyOptions
 
-newtype BenchTopology = BenchTopology
-  { coreNodes :: Vector BenchTopologyNode
+newtype Link = Link
+  { latency :: LatencyMs
   }
-  deriving (Eq, Show, Generic)
+  deriving stock (Show, Eq, Generic)
 
-instance ToJSON BenchTopology where
-  toEncoding = genericToEncoding benchTopologyOptions
+instance ToJSON Link where
+  toJSON :: Link -> Value
+  toJSON = genericToJSON topologyOptions
 
-instance FromJSON BenchTopology where
-  parseJSON = genericParseJSON benchTopologyOptions
+  toEncoding :: Link -> Encoding
+  toEncoding = genericToEncoding topologyOptions
 
-readBenchTopology :: FilePath -> IO BenchTopology
-readBenchTopology = throwDecode <=< BSL.readFile
+instance FromJSON Link where
+  parseJSON :: Value -> Parser Link
+  parseJSON = genericParseJSON topologyOptions
 
--- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
-sortBenchTopology :: BenchTopology -> BenchTopology
-sortBenchTopology benchTopology =
-  BenchTopology
-    { coreNodes = V.fromList . sortBy (compare `on` (.name)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
-    }
- where
-  sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
-  sortBenchTopologyNode BenchTopologyNode{..} =
-    BenchTopologyNode
-      { producers = V.fromList . sort . V.toList $ producers
-      , ..
-      }
+newtype Topology location = Topology
+  { nodes :: Map NodeName (Node location)
+  }
+  deriving stock (Show, Eq, Generic)
 
--- | Helper for testing. Forgets fields that are not represented by `SimpleTopology`.
-forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
-forgetUnusedFieldsInBenchTopology benchTopology =
-  BenchTopology
-    { coreNodes = forgetUnusedFieldsInBenchTopologyNode <$> benchTopology.coreNodes
-    }
- where
-  forgetUnusedFieldsInBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
-  forgetUnusedFieldsInBenchTopologyNode BenchTopologyNode{..} =
-    BenchTopologyNode
-      { org = Nothing
-      , pools = Nothing
-      , stakePool = Nothing
-      , ..
-      }
+instance ToJSON location => ToJSON (Topology location) where
+  toJSON :: Topology location -> Value
+  toJSON = genericToJSON topologyOptions
 
---------------------------------------------------------------------------------
--- Latencies
---
--- As provided in 'data/BenchTopology/latency.sqlite3.gz'.
---------------------------------------------------------------------------------
+  toEncoding :: Topology location -> Encoding
+  toEncoding = genericToEncoding topologyOptions
 
-type LatenciesInMiliseconds = Map NodeName (Map NodeName LatencyInMiliseconds)
-
-readLatencies :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
-readLatencies topology latencyFile =
-  case takeExtensions latencyFile of
-    ".sqlite3" ->
-      readLatenciesSqlite3 topology latencyFile
-    ".sqlite3.gz" ->
-      readLatenciesSqlite3Gz topology latencyFile
-    _otherwise ->
-      error $ printf "unknown latency file format %s" (takeFileName latencyFile)
-
-readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
-readLatenciesSqlite3Gz topology latencySqliteGzFile =
-  assert (takeExtension latencySqliteGzFile == ".gz") $ do
-    let latencySqliteDirectory = takeDirectory latencySqliteGzFile
-    let latencySqliteFileName = takeFileName (dropExtension latencySqliteGzFile)
-    withTempFile latencySqliteDirectory latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
-      latencySqliteGzContent <- BSL.readFile latencySqliteGzFile
-      let latencySqliteContent = GZip.decompress latencySqliteGzContent
-      BSL.hPut latencySqliteHandle latencySqliteContent
-      hClose latencySqliteHandle
-      readLatencies topology latencySqliteFile
-
-readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesInMiliseconds
-readLatenciesSqlite3 topology latencySqliteFile = do
-  let queryAvgTime =
-        "select avg(time) from ping \
-        \where source = :consumer and dest = :producer \
-        \or    source = :producer and dest = :consumer"
-  latenciesRef <- newIORef mempty
-  conn <- SQLlite.open latencySqliteFile
-  forM_ topology.coreNodes $ \consumer -> do
-    atomicModifyIORef' latenciesRef $ \latencies ->
-      (M.insert consumer.name M.empty latencies, ())
-    forM_ consumer.producers $ \producerName -> do
-      SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
-        [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
-        [[latencyInMiliseconds :: Double]] ->
-          atomicModifyIORef' latenciesRef $ \latencies ->
-            let latency = LatencyInMiliseconds latencyInMiliseconds
-             in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
-        _otherwise -> error "impossible: SQL query for average returned multiple rows"
-  readIORef latenciesRef
+instance FromJSON location => FromJSON (Topology location) where
+  parseJSON :: Value -> Parser (Topology location)
+  parseJSON = genericParseJSON topologyOptions
 
 --------------------------------------------------------------------------------
 -- Simple Topology
@@ -204,15 +142,11 @@ readLatenciesSqlite3 topology latencySqliteFile = do
 -- latency from Latencies.
 --------------------------------------------------------------------------------
 
-newtype ClusterName = ClusterName {unClusterName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
 data SimpleNode
   = SimpleNode
   { name :: !NodeName
   , nodeId :: !NodeId
-  , producers :: !(Map NodeName LatencyInMiliseconds)
+  , producers :: !(Map NodeName LatencyMs)
   , clusterName :: !(Maybe ClusterName)
   }
   deriving (Eq, Show, Generic)
@@ -239,7 +173,7 @@ instance FromJSON SimpleTopology where
   parseJSON = genericParseJSON simpleNodeOptions
 
 -- | Convert a 'BenchTopology' to a 'SimpleTopology' using the 'Latencies' read from the latency database.
-benchTopologyToSimpleTopology :: LatenciesInMiliseconds -> BenchTopology -> SimpleTopology
+benchTopologyToSimpleTopology :: LatenciesMs -> BenchTopology -> SimpleTopology
 benchTopologyToSimpleTopology latencies benchTopology =
   SimpleTopology{nodes = benchTopologyNodeToSimpleNode <$> benchTopology.coreNodes}
  where
@@ -313,7 +247,7 @@ data SimpleNodeInfo = SimpleNodeInfo
 -- | Convert a 'SimpleTopology' to an FGL 'Gr'.
 simpleTopologyToGr ::
   SimpleTopology ->
-  Gr SimpleNodeInfo LatencyInMiliseconds
+  Gr SimpleNodeInfo LatencyMs
 simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
  where
   nameToIdMap =
@@ -335,7 +269,7 @@ simpleTopologyToGr topology = G.mkGraph graphNodes graphEdges
 
 -- | Helper for testing. Convert an an FGL 'Gr' to a 'SimpleTopology'.
 grToSimpleTopology ::
-  Gr SimpleNodeInfo LatencyInMiliseconds ->
+  Gr SimpleNodeInfo LatencyMs ->
   SimpleTopology
 grToSimpleTopology gr = SimpleTopology{nodes}
  where
@@ -346,7 +280,7 @@ grToSimpleTopology gr = SimpleTopology{nodes}
       , let nodeId = nodeToNodeId node
       , let producers = M.findWithDefault M.empty name producersMap
       ]
-  producersMap :: Map NodeName (Map NodeName LatencyInMiliseconds)
+  producersMap :: Map NodeName (Map NodeName LatencyMs)
   producersMap =
     M.unionsWith (<>) $
       [ M.singleton consumerName (M.singleton producerName latency)
@@ -488,15 +422,15 @@ forgetSimpleNodeInfo = G.nemap snd id
 
 latencyFromSecondsToMiliseconds ::
   Gr a Latency ->
-  Gr a LatencyInMiliseconds
+  Gr a LatencyMs
 latencyFromSecondsToMiliseconds =
-  G.emap (LatencyInMiliseconds . (* 1000.0))
+  G.emap (LatencyMs . (* 1000.0))
 
 latencyFromMilisecondsToSeconds ::
-  Gr a LatencyInMiliseconds ->
+  Gr a LatencyMs ->
   Gr a Latency
 latencyFromMilisecondsToSeconds =
-  G.emap ((/ 1000.0) . unLatencyInMiliseconds)
+  G.emap ((/ 1000.0) . unLatencyMs)
 
 grToP2PTopography ::
   World ->
@@ -540,7 +474,7 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     ]
 
 readP2PTopography ::
-  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyMs ClusterName SimpleNodeInfo ->
   World ->
   FilePath ->
   IO P2PTopography
@@ -551,7 +485,7 @@ readP2PTopography params world@World{..} simpleTopologyFile = do
   pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition
 
 readP2PTopographyFromBenchTopologyAndLatency ::
-  GraphvizParams G.Node SimpleNodeInfo LatencyInMiliseconds ClusterName SimpleNodeInfo ->
+  GraphvizParams G.Node SimpleNodeInfo LatencyMs ClusterName SimpleNodeInfo ->
   World ->
   FilePath ->
   FilePath ->
@@ -561,3 +495,145 @@ readP2PTopographyFromBenchTopologyAndLatency params world@World{..} benchTopolog
   let gr = simpleTopologyToGr simpleTopology
   grWithPosition <- forgetSimpleNodeInfo . forgetPaths <$> augmentWithPosition params worldDimensions gr
   pure $ grToP2PTopography world . latencyFromMilisecondsToSeconds $ grWithPosition
+
+--------------------------------------------------------------------------------
+-- BenchTopology - Topology & Latencies
+--
+-- As provided in
+--
+--   * data/BenchTopology/topology-dense-52.json
+--   * data/BenchTopology/latency.sqlite3.gz
+--
+--------------------------------------------------------------------------------
+
+newtype OrgName = OrgName {unOrgName :: Text}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+newtype RegionName = RegionName {unRegionName :: Text}
+  deriving stock (Show, Eq, Ord)
+  deriving newtype (FromJSON, ToJSON)
+
+data BenchTopologyNode
+  = BenchTopologyNode
+  { name :: !NodeName
+  , nodeId :: !NodeId
+  , org :: !(Maybe OrgName)
+  , pools :: !(Maybe Int)
+  , producers :: !(Vector NodeName)
+  , region :: !(Maybe RegionName)
+  , stakePool :: !(Maybe Bool)
+  }
+  deriving (Eq, Show, Generic)
+
+benchTopologyOptions :: Options
+benchTopologyOptions = defaultOptions{unwrapUnaryRecords = False}
+
+instance ToJSON BenchTopologyNode where
+  toEncoding = genericToEncoding benchTopologyOptions
+
+instance FromJSON BenchTopologyNode
+
+newtype BenchTopology = BenchTopology
+  { coreNodes :: Vector BenchTopologyNode
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON BenchTopology where
+  toEncoding = genericToEncoding benchTopologyOptions
+
+instance FromJSON BenchTopology where
+  parseJSON = genericParseJSON benchTopologyOptions
+
+readBenchTopology :: FilePath -> IO BenchTopology
+readBenchTopology = throwDecode <=< BSL.readFile
+
+-- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
+sortBenchTopology :: BenchTopology -> BenchTopology
+sortBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = V.fromList . sortBy (compare `on` (.name)) . V.toList . fmap sortBenchTopologyNode $ benchTopology.coreNodes
+    }
+ where
+  sortBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  sortBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { producers = V.fromList . sort . V.toList $ producers
+      , ..
+      }
+
+-- | Helper for testing. Forgets fields that are not represented by `SimpleTopology`.
+forgetUnusedFieldsInBenchTopology :: BenchTopology -> BenchTopology
+forgetUnusedFieldsInBenchTopology benchTopology =
+  BenchTopology
+    { coreNodes = forgetUnusedFieldsInBenchTopologyNode <$> benchTopology.coreNodes
+    }
+ where
+  forgetUnusedFieldsInBenchTopologyNode :: BenchTopologyNode -> BenchTopologyNode
+  forgetUnusedFieldsInBenchTopologyNode BenchTopologyNode{..} =
+    BenchTopologyNode
+      { org = Nothing
+      , pools = Nothing
+      , stakePool = Nothing
+      , ..
+      }
+
+type LatenciesMs = Map NodeName (Map NodeName LatencyMs)
+
+readLatencies :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatencies topology latencyFile =
+  case takeExtensions latencyFile of
+    ".sqlite3" ->
+      readLatenciesSqlite3 topology latencyFile
+    ".sqlite3.gz" ->
+      readLatenciesSqlite3Gz topology latencyFile
+    _otherwise ->
+      error $ printf "unknown latency file format %s" (takeFileName latencyFile)
+
+readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatenciesSqlite3Gz topology latencySqliteGzFile =
+  assert (takeExtension latencySqliteGzFile == ".gz") $ do
+    let latencySqliteDirectory = takeDirectory latencySqliteGzFile
+    let latencySqliteFileName = takeFileName (dropExtension latencySqliteGzFile)
+    withTempFile latencySqliteDirectory latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
+      latencySqliteGzContent <- BSL.readFile latencySqliteGzFile
+      let latencySqliteContent = GZip.decompress latencySqliteGzContent
+      BSL.hPut latencySqliteHandle latencySqliteContent
+      hClose latencySqliteHandle
+      readLatencies topology latencySqliteFile
+
+readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
+readLatenciesSqlite3 topology latencySqliteFile = do
+  let queryAvgTime =
+        "select avg(time)/2 from ping \
+        \where source = :consumer and dest = :producer \
+        \or    source = :producer and dest = :consumer \
+        \and   size = 64"
+  latenciesRef <- newIORef mempty
+  conn <- SQLlite.open latencySqliteFile
+  forM_ topology.coreNodes $ \consumer -> do
+    atomicModifyIORef' latenciesRef $ \latencies ->
+      (M.insert consumer.name M.empty latencies, ())
+    forM_ consumer.producers $ \producerName -> do
+      SQLlite.queryNamed conn queryAvgTime [":consumer" := consumer.name, ":producer" := producerName] >>= \case
+        [] -> error $ printf "missing latency for connection between %s and %s" consumer.name producerName
+        [[latencyInMiliseconds :: Double]] ->
+          atomicModifyIORef' latenciesRef $ \latencies ->
+            let latency = LatencyMs latencyInMiliseconds
+             in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
+        _otherwise -> error "impossible: SQL query for average returned multiple rows"
+  readIORef latenciesRef
+
+type LinkLatency = ((NodeId, NodeId), Latency)
+
+-- | Returns nodes failing the expected triangle inequality for latencies.
+triangleInequalityCheck :: Map (NodeId, NodeId) Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
+triangleInequalityCheck mls = do
+  let ls = Map.toList mls
+  l1@((s, t), st) <- ls
+  l2@((s', middle), sm) <- ls
+  guard (s' == s)
+  Just mt <- pure $ Map.lookup (middle, t) mls
+  let l3 = ((middle, t), mt)
+  guard (st > (sm + mt))
+  return (l1, l2, l3)

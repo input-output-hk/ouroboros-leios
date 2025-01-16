@@ -7,9 +7,9 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::{RawConfig, RawNodeConfig};
+use sim_core::config::{RawNodeConfig, RawTopology};
 
-use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, LinkTracker};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
@@ -81,7 +81,7 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     results
 }
 
-pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
+pub fn globe(args: &GlobeArgs) -> Result<RawTopology> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -182,7 +182,10 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
         }
     }
 
-    Ok(generate_full_config(nodes, links.links))
+    Ok(RawTopology {
+        nodes,
+        links: links.links,
+    })
 }
 
 fn track_connections(
@@ -202,7 +205,7 @@ fn track_connections(
 
 #[cfg(test)]
 mod tests {
-    use sim_core::config::SimConfiguration;
+    use sim_core::config::Topology;
 
     use super::{globe, GlobeArgs};
 
@@ -217,8 +220,8 @@ mod tests {
             distribution: path.into(),
         };
 
-        let raw_config = globe(&args).unwrap();
-        let config: SimConfiguration = raw_config.into();
-        config.validate().unwrap();
+        let raw = globe(&args).unwrap();
+        let topology: Topology = raw.into();
+        topology.validate().unwrap();
     }
 }

@@ -6,9 +6,9 @@ module Sample where
 
 import Control.Monad
 import Data.Aeson
-import Data.Aeson.Text (encodeToLazyText)
+import Data.Aeson.Encoding
+import qualified Data.ByteString.Lazy as BSL
 import Data.List (foldl')
-import qualified Data.Text.Lazy.IO as T
 import GHC.Generics
 import System.IO (IOMode (WriteMode), hFlush, stdout, withFile)
 import TimeCompat
@@ -31,7 +31,17 @@ runSampleModel ::
   Time ->
   [(Time, event)] ->
   IO ()
-runSampleModel traceFile logEvent (SampleModel s0 accum render) stop =
+runSampleModel traceFile logEvent =
+  runSampleModel' traceFile (fmap toEncoding . logEvent)
+
+runSampleModel' ::
+  FilePath ->
+  (event -> Maybe Encoding) ->
+  SampleModel event state ->
+  Time ->
+  [(Time, event)] ->
+  IO ()
+runSampleModel' traceFile logEvent (SampleModel s0 accum render) stop =
   process . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
  where
   process m = withFile traceFile WriteMode (`go` m)
@@ -47,7 +57,9 @@ runSampleModel traceFile logEvent (SampleModel s0 accum render) stop =
       render s
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
-  writeEvents h es = forM_ es $ \(t, e) ->
+  writeEvents h es = forM_ es $ \(Time t, e) ->
     case logEvent e of
       Nothing -> return ()
-      Just x -> T.hPutStrLn h (encodeToLazyText (SampleEvent t x))
+      Just x -> do
+        BSL.hPutStr h (encodingToLazyByteString (pairs $ "time_s" .= t <> pair "event" x))
+        BSL.hPutStr h "\n"

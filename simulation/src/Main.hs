@@ -1,12 +1,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
 
+import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.Maybe (fromMaybe)
@@ -49,7 +51,7 @@ import Options.Applicative (
   (<**>),
  )
 import Options.Applicative.Types (ReadM)
-import P2P (P2PTopography, P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
@@ -57,7 +59,7 @@ import qualified PraosProtocol.VizSimPraos as VizPraos
 import SimTypes (World (..), WorldDimensions, WorldShape (..))
 import qualified System.Random as Random
 import TimeCompat
-import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, writeSimpleTopology)
+import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, triangleInequalityCheck, writeSimpleTopology)
 import Viz
 
 main :: IO ()
@@ -180,13 +182,13 @@ data VizSubCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topologyOptions :: TopographyOptions}
+  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topographyOptions :: TopographyOptions}
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, maybeTopologyFile :: Maybe FilePath, numCores :: NumCores}
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, topographyOptions :: TopographyOptions, numCores :: NumCores}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -272,14 +274,7 @@ parserShortLeiosP2P1 =
           <> help "The interval at which ranking blocks are generated."
           <> value 5
       )
-    <*> optional
-      ( option
-          str
-          ( long "topology"
-              <> metavar "FILE"
-              <> help "The file describing the network topology."
-          )
-      )
+    <*> parserTopographyOptions
     <*> option
       readCores
       ( short 'N'
@@ -312,7 +307,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPraosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pTopography <- execTopographyOptions rng1 topologyOptions
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
     pure $ VizPraosP2P.example1 rng2 blockInterval p2pTopography
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
@@ -320,9 +315,10 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizRelayTest3 -> pure VizSimTestRelay.example3
   VizShortLeios1 -> pure VizShortLeios.example1
   VizShortLeiosP2P1{..} -> do
-    let world = World (1200, 1000) Cylinder
-    maybeP2PTopography <- traverse (readP2PTopography defaultParams world) maybeTopologyFile
-    pure $ VizShortLeiosP2P.example2 seed sliceLength maybeP2PTopography numCores
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
+    pure $ VizShortLeiosP2P.example2 rng2 sliceLength p2pTopography numCores
 
 type VizSize = (Int, Int)
 
@@ -357,11 +353,14 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimShortLeios -> do
     -- TODO: read from parameter file
-    let seed = 42
-    let sliceLength = 5
-    let maybeP2PTopography = Nothing
+    let sliceLength = 20 -- matching mainnet ranking block interval
     let numCores = Infinite
-    VizShortLeiosP2P.exampleSim seed sliceLength maybeP2PTopography numCores simOutputSeconds simOutputFile
+    let seed = 42
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 100 5 5
+    p2pTopography <- execTopographyOptions rng1 topographyOptions
+    VizShortLeiosP2P.exampleSim rng2 sliceLength p2pTopography numCores simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -482,20 +481,29 @@ parserCliConvertBenchTopology =
 --------------------------------------------------------------------------------
 
 execTopographyOptions :: Random.RandomGen g => g -> TopographyOptions -> IO P2PTopography
-execTopographyOptions rng = \case
-  SimpleTopologyFile simpleTopologyFile -> do
-    -- TODO: infer world size from latencies
-    let world = World (1200, 1000) Rectangle
-    readP2PTopography defaultParams world simpleTopologyFile
-  TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
-    eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
-    case eitherP2PTopographyCharacteristics of
-      Right p2pTopographyCharacteristics ->
-        pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
-      Left errorMessage ->
-        fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
-  TopographyCharacteristics p2pTopographyCharacteristics -> do
-    pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+execTopographyOptions rng = checkTopography <=< go
+ where
+  go = \case
+    SimpleTopologyFile simpleTopologyFile -> do
+      -- TODO: infer world size from latencies
+      let world = World (1200, 1000) Rectangle
+      readP2PTopography defaultParams world simpleTopologyFile
+    TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
+      eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
+      case eitherP2PTopographyCharacteristics of
+        Right p2pTopographyCharacteristics ->
+          pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+        Left errorMessage ->
+          fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
+    TopographyCharacteristics p2pTopographyCharacteristics -> do
+      pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+  checkTopography top@P2PTopography{p2pLinks} = do
+    let node_triplets = triangleInequalityCheck p2pLinks
+    unless (null node_triplets) $ do
+      putStr $
+        unlines $
+          "Latencies do not respect triangle inequalities for these nodes:" : map show node_triplets
+    return top
 
 data TopographyOptions
   = SimpleTopologyFile FilePath

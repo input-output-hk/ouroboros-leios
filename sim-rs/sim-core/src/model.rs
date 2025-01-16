@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, sync::Arc};
 
 use crate::{clock::Timestamp, config::NodeId};
 use serde::{ser::SerializeStruct, Serialize};
@@ -163,7 +163,7 @@ impl Serialize for VoteBundleId {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VoteBundle {
     pub id: VoteBundleId,
-    pub ebs: Vec<EndorserBlockId>, // contains duplicates
+    pub ebs: BTreeMap<EndorserBlockId, usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]

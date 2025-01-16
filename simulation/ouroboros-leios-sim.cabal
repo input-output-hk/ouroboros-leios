@@ -50,6 +50,7 @@ library
     ExamplesRelayP2P
     ExamplesTCP
     LeiosProtocol.Common
+    LeiosProtocol.Config
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.Short
@@ -149,6 +150,7 @@ library
     , time
     , typed-protocols            >=0.3
     , vector
+    , yaml
     , zlib
 
   hs-source-dirs:     src
