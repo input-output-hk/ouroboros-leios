@@ -1,5 +1,19 @@
 # Leios logbook
 
+## 2025-01-16
+
+### Rust simulation
+
+Use more granular CPU simulation times. Still need to update the actual values to match latest estimates.
+
+Fixed a race condition in the simulated clock.
+
+## 2025-01-15
+
+### Rust simulation
+
+Start consuming the new shared configuration file format. Topologies are still stored in yaml for now.
+
 ## 2025-01-13
 
 ### Haskell and Rust simulations
