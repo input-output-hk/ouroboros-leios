@@ -45,7 +45,7 @@ rb-body-legacy-praos-payload-avg-size-bytes: 0
 # Input Block Configuration
 ################################################################################
 
-ib-generation-probability: 0.5
+ib-generation-probability: 5.0
 ib-generation-cpu-time-ms: 300.0
 ib-head-size-bytes: 32
 ib-head-validation-cpu-time-ms: 1.0
