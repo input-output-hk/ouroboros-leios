@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Distribution": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/NormalDistribution"
+        },
+        {
+          "$ref": "#/definitions/ExpDistribution"
+        },
+        {
+          "$ref": "#/definitions/LogNormalDistribution"
+        }
+      ]
+    },
+    "ExpDistribution": {
+      "properties": {
+        "distribution": {
+          "const": "exp",
+          "type": "string"
+        },
+        "lambda": {
+          "type": "number"
+        },
+        "scale": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "LogNormalDistribution": {
+      "properties": {
+        "distribution": {
+          "const": "log-normal",
+          "type": "string"
+        },
+        "mu": {
+          "type": "number"
+        },
+        "sigma": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "NormalDistribution": {
+      "properties": {
+        "distribution": {
+          "const": "normal",
+          "type": "string"
+        },
+        "mean": {
+          "type": "number"
+        },
+        "std_dev": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "description": "A configuration for a Leios simulation.",
+  "properties": {
+    "cert-generation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "cert-generation-cpu-time-ms-per-node": {
+      "type": "number"
+    },
+    "cert-size-bytes-constant": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "cert-size-bytes-per-node": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "cert-validation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "cert-validation-cpu-time-ms-per-node": {
+      "type": "number"
+    },
+    "eb-generation-cpu-time-ms": {
+      "type": "number"
+    },
+    "eb-generation-probability": {
+      "type": "number"
+    },
+    "eb-size-bytes-constant": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "eb-size-bytes-per-ib": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "eb-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "ib-body-avg-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "ib-body-max-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "ib-body-validation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "ib-body-validation-cpu-time-ms-per-byte": {
+      "type": "number"
+    },
+    "ib-generation-cpu-time-ms": {
+      "type": "number"
+    },
+    "ib-generation-probability": {
+      "type": "number"
+    },
+    "ib-head-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "ib-head-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "leios-stage-active-voting-slots": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "leios-stage-length-slots": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "rb-body-legacy-praos-payload-avg-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": {
+      "type": "number"
+    },
+    "rb-body-max-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "rb-generation-cpu-time-ms": {
+      "type": "number"
+    },
+    "rb-generation-probability": {
+      "type": "number"
+    },
+    "rb-head-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "rb-head-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "tx-generation-distribution": {
+      "$ref": "#/definitions/Distribution"
+    },
+    "tx-max-size-bytes": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "tx-size-bytes-distribution": {
+      "$ref": "#/definitions/Distribution"
+    },
+    "tx-validation-cpu-time-ms": {
+      "type": "number"
+    },
+    "vote-generation-cpu-time-ms-constant": {
+      "type": "number"
+    },
+    "vote-generation-cpu-time-ms-per-ib": {
+      "type": "number"
+    },
+    "vote-generation-probability": {
+      "type": "number"
+    },
+    "vote-one-eb-per-vrf-win": {
+      "type": "boolean"
+    },
+    "vote-size-bytes-constant": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-size-bytes-per-node": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-threshold": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-validation-cpu-time-ms": {
+      "type": "number"
+    }
+  },
+  "type": "object"
+}
