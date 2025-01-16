@@ -180,7 +180,7 @@ s₁ = let open LeiosState t₄ in
     }
 
 stake≡1 : stake s₀ ≡ 1
-stake≡1 = {!!}
+stake≡1 = ?
 
 ib-step : s₀ ⇉ t₁
 ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
@@ -229,11 +229,12 @@ base-step = (SLOT , EMPTY) , Base₂b uk refl tt
     uk : Base ∉ ((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵
     uk = lem1 (lem1 (lem2 (lem3 λ ())) (lem3 λ ())) (lem3 λ ())
 
+
+open import Relation.Binary.Structures
+open IsEquivalence (≡ᵉ-isEquivalence {SlotUpkeep}) renaming (refl to ≡ᵉ-refl)
+
 slot-step : t₄ ⇉ s₁
-slot-step = (SLOT , EMPTY) , Slot {rbs = []} {msgs = []} uk tt tt
-  where
-    uk : (((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵) ∪ ❴ Base ❵ ≡ᵉ allUpkeep
-    uk = {!!}
+slot-step = (SLOT , EMPTY) , Slot {rbs = []} {msgs = []} ≡ᵉ-refl tt tt
 
 slot-transition-trace : s₀ ⇉⋆ s₁
 slot-transition-trace = 5
