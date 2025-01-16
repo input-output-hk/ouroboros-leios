@@ -185,17 +185,31 @@ stake≡1 = {!!}
 ib-step : s₀ ⇉ t₁
 ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
   where
-    uk : LeiosState.needsUpkeep s₀ IB-Role
+    uk : IB-Role ∉ LeiosState.Upkeep s₀
     uk = λ x → ∉-∅ x
 
     π-IB : canProduceIB (LeiosState.slot s₀) tt (stake s₀) tt
     π-IB rewrite stake≡1 = s≤s z≤n , refl
 
+open Equivalence
+
+open import Function.Related.TypeIsomorphisms
+import Data.Sum
+
+lem1 : ∀ {A} {a : A} {B C : ℙ A} → a ∉ B → a ∉ C → a ∉ B ∪ C
+lem1 {_} {_} {B} {C} x y = Data.Sum.[ x , y ] ∘ ∈-∪⁻ {X = B} {Y = C}
+
+lem2 : ∀ {A} {a : A} {B : ℙ A} → a ∉ B → a ∉ ∅ ∪ B
+lem2 {_} {_} {B} = lem1 {B = ∅} {C = B} ∉-∅
+
+lem3 : ∀ {A} {a b : A} → a ≢ b → a ∉ singleton b
+lem3 = to (¬-cong-⇔ ∈-singleton)
+
 eb-step : t₁ ⇉ t₂
 eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB tt)
   where
-    uk : EB-Role ∉ (LeiosState.Upkeep t₁)
-    uk = {!!}
+    uk : EB-Role ∉ ∅ ∪ ❴ IB-Role ❵
+    uk = lem2 (lem3 (λ ()))
 
     π-EB : canProduceEB (LeiosState.slot s₀) tt (stake s₀) tt
     π-EB rewrite stake≡1 = s≤s z≤n , refl
@@ -203,8 +217,8 @@ eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB tt)
 v-step : t₂ ⇉ t₃
 v-step = (SLOT , EMPTY) , Roles (V-Role uk π-V tt)
   where
-    uk : LeiosState.needsUpkeep t₂ V-Role
-    uk = {!!}
+    uk : V-Role ∉ (∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵
+    uk = lem1 (lem2 (lem3 λ ())) (lem3 λ ())
 
     π-V : canProduceV (LeiosState.slot s₀) tt (stake s₀)
     π-V rewrite stake≡1 = s≤s z≤n
@@ -212,13 +226,13 @@ v-step = (SLOT , EMPTY) , Roles (V-Role uk π-V tt)
 base-step : t₃ ⇉ t₄
 base-step = (SLOT , EMPTY) , Base₂b uk refl tt
   where
-    uk : LeiosState.needsUpkeep t₃ Base
-    uk = {!!}
+    uk : Base ∉ ((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵
+    uk = lem1 (lem1 (lem2 (lem3 λ ())) (lem3 λ ())) (lem3 λ ())
 
 slot-step : t₄ ⇉ s₁
 slot-step = (SLOT , EMPTY) , Slot {rbs = []} {msgs = []} uk tt tt
   where
-    uk : LeiosState.Upkeep t₄ ≡ᵉ allUpkeep
+    uk : (((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵) ∪ ❴ Base ❵ ≡ᵉ allUpkeep
     uk = {!!}
 
 slot-transition-trace : s₀ ⇉⋆ s₁
@@ -226,6 +240,6 @@ slot-transition-trace = 5
   , t₁ , ib-step
   , t₂ , eb-step
   , t₃ , v-step
-  , t₄ , base-step 
+  , t₄ , base-step
   , s₁ , slot-step
   , refl
