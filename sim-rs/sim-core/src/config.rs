@@ -51,54 +51,61 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
+    // Leios protocol configuration
     pub leios_stage_length_slots: u64,
     pub leios_stage_active_voting_slots: u64,
 
+    // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
 
+    // Ranking block configuration
     pub rb_generation_probability: f64,
     pub rb_generation_cpu_time_ms: f64,
     pub rb_head_validation_cpu_time_ms: f64,
-    pub rb_head_size_bytes: u64,
+    // pub rb_head_size_bytes: u64,
     pub rb_body_max_size_bytes: u64,
 
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
-    pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
+    // pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
 
+    // Input block configuration
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
-    pub ib_head_size_bytes: u64,
-    pub ib_head_validation_cpu_time_ms: f64,
+    // pub ib_head_size_bytes: u64,
+    // pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
-    pub ib_body_validation_cpu_time_ms_per_byte: f64,
+    // pub ib_body_validation_cpu_time_ms_per_byte: f64,
     pub ib_body_max_size_bytes: u64,
     #[serde(default = "u64::one")]
     pub ib_shards: u64,
 
+    // Endorsement block configuration
     pub eb_generation_probability: f64,
     pub eb_generation_cpu_time_ms: f64,
     pub eb_validation_cpu_time_ms: f64,
-    pub eb_size_bytes_constant: u64,
-    pub eb_size_bytes_per_ib: u64,
+    // pub eb_size_bytes_constant: u64,
+    // pub eb_size_bytes_per_ib: u64,
 
+    // Vote configuration
     pub vote_generation_probability: f64,
     pub vote_generation_cpu_time_ms_constant: f64,
-    pub vote_generation_cpu_time_ms_per_ib: f64,
+    // pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
     pub vote_one_eb_per_vrf_win: bool,
-    pub vote_size_bytes_constant: u64,
-    pub vote_size_bytes_per_node: u64,
+    // pub vote_size_bytes_constant: u64,
+    // pub vote_size_bytes_per_node: u64,
 
+    // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
-    pub cert_generation_cpu_time_ms_per_node: f64,
+    // pub cert_generation_cpu_time_ms_per_node: f64,
     pub cert_validation_cpu_time_ms_constant: f64,
-    pub cert_validation_cpu_time_ms_per_node: f64,
-    pub cert_size_bytes_constant: u64,
-    pub cert_size_bytes_per_node: u64,
+    // pub cert_validation_cpu_time_ms_per_node: f64,
+    // pub cert_size_bytes_constant: u64,
+    // pub cert_size_bytes_per_node: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -210,6 +217,7 @@ pub struct SimConfiguration {
     pub eb_generation_probability: f64,
     pub vote_probability: f64,
     pub vote_threshold: u64,
+    pub vote_slot_length: u64,
     pub max_block_size: u64,
     pub max_tx_size: u64,
     pub stage_length: u64,
@@ -246,6 +254,7 @@ impl SimConfiguration {
             eb_generation_probability: params.eb_generation_probability,
             vote_probability: params.vote_generation_probability,
             vote_threshold: params.vote_threshold,
+            vote_slot_length: params.leios_stage_active_voting_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_tx_size: params.tx_max_size_bytes,
             stage_length: params.leios_stage_length_slots,
@@ -256,7 +265,8 @@ impl SimConfiguration {
             tx_validation_cpu_time: duration_ms(params.tx_validation_cpu_time_ms),
             block_generation_cpu_time: duration_ms(params.rb_generation_cpu_time_ms),
             block_validation_cpu_time: duration_ms(
-                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+                params.rb_head_validation_cpu_time_ms
+                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
             ),
             certificate_generation_cpu_time: duration_ms(
                 params.cert_generation_cpu_time_ms_constant,

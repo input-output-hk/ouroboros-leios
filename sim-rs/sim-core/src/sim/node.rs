@@ -149,6 +149,7 @@ struct NodeLeiosState {
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
+    votes_to_generate: BTreeMap<u64, usize>,
     votes_by_eb: BTreeMap<EndorserBlockId, Vec<NodeId>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
 }
@@ -388,8 +389,8 @@ impl Node {
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
 
-            // Vote for any EBs which satisfy all requirements.
-            self.vote_for_endorser_blocks(slot);
+            // Decide how many votes to generate in each slot
+            self.schedule_endorser_block_votes(slot);
 
             // Generate any EBs we're allowed to in this slot.
             self.generate_endorser_blocks(slot);
@@ -397,6 +398,9 @@ impl Node {
             // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
         }
+
+        // Vote for any EBs which satisfy all requirements.
+        self.vote_for_endorser_blocks(slot);
 
         // Generate any IBs scheduled for this slot.
         self.generate_input_blocks(slot);
@@ -458,20 +462,39 @@ impl Node {
         }
     }
 
-    fn vote_for_endorser_blocks(&mut self, slot: u64) {
-        let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
-            return;
-        };
-        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
-            return;
-        };
-        let mut ebs = ebs.clone();
+    fn schedule_endorser_block_votes(&mut self, slot: u64) {
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
         if vrf_wins == 0 {
             return;
         }
+        // Each node chooses a slot at random in which to produce all its votes.
+        // Randomness spreads out vote generation across the whole network to make traffic less spiky,
+        // but each node generates all votes for a pipeline at once to minimize overall traffic.
+        let new_slot = slot + self.rng.gen_range(0..self.sim_config.vote_slot_length);
+        self.tracker.track_vote_lottery_won(VoteBundleId {
+            slot: new_slot,
+            producer: self.id,
+        });
+        self.leios.votes_to_generate.insert(new_slot, vrf_wins);
+    }
+
+    fn vote_for_endorser_blocks(&mut self, slot: u64) {
+        let Some(vote_count) = self.leios.votes_to_generate.remove(&slot) else {
+            return;
+        };
+        // When we vote, we vote for EBs which were sent at the start of the prior stage.
+        let eb_slot = match slot.checked_sub(self.sim_config.stage_length) {
+            Some(s) => s - (s % self.sim_config.stage_length),
+            None => {
+                return;
+            }
+        };
+        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
+            return;
+        };
+        let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
             let eb = self.leios.ebs.get(eb_id).unwrap();
             match self.should_vote_for(slot, eb) {
@@ -487,10 +510,10 @@ impl Node {
         }
         let votes_allowed = if self.sim_config.one_vote_per_vrf {
             // For every VRF lottery you won, you can vote for one EB
-            vrf_wins
+            vote_count
         } else {
             // For every VRF lottery you won, you can vote for every EB
-            vrf_wins * ebs.len()
+            vote_count * ebs.len()
         };
         let mut eb_counts = BTreeMap::new();
         for eb in ebs.iter().cycle().take(votes_allowed) {
@@ -504,7 +527,6 @@ impl Node {
             ebs: eb_counts,
         };
         if !votes.ebs.is_empty() {
-            self.tracker.track_vote_lottery_won(&votes);
             self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));
         }
     }
