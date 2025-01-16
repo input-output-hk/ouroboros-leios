@@ -69,15 +69,15 @@ pub struct RawParameters {
     pub rb_body_max_size_bytes: u64,
 
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
-    // pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
+    pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
 
     // Input block configuration
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
     // pub ib_head_size_bytes: u64,
-    // pub ib_head_validation_cpu_time_ms: f64,
+    pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
-    // pub ib_body_validation_cpu_time_ms_per_byte: f64,
+    pub ib_body_validation_cpu_time_ms_per_byte: f64,
     pub ib_body_max_size_bytes: u64,
     #[serde(default = "u64::one")]
     pub ib_shards: u64,
@@ -92,7 +92,7 @@ pub struct RawParameters {
     // Vote configuration
     pub vote_generation_probability: f64,
     pub vote_generation_cpu_time_ms_constant: f64,
-    // pub vote_generation_cpu_time_ms_per_ib: f64,
+    pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
     pub vote_one_eb_per_vrf_win: bool,
@@ -101,9 +101,9 @@ pub struct RawParameters {
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
-    // pub cert_generation_cpu_time_ms_per_node: f64,
+    pub cert_generation_cpu_time_ms_per_node: f64,
     pub cert_validation_cpu_time_ms_constant: f64,
-    // pub cert_validation_cpu_time_ms_per_node: f64,
+    pub cert_validation_cpu_time_ms_per_node: f64,
     // pub cert_size_bytes_constant: u64,
     // pub cert_size_bytes_per_node: u64,
 }
@@ -205,46 +205,87 @@ pub struct RawLinkConfig {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct CpuTimeConfig {
+    pub tx_validation: Duration,
+    pub rb_generation: Duration,
+    pub rb_validation_constant: Duration,
+    pub rb_validation_per_byte: Duration,
+    pub ib_generation: Duration,
+    pub ib_head_validation: Duration,
+    pub ib_body_validation_constant: Duration,
+    pub ib_body_validation_per_byte: Duration,
+    pub eb_generation: Duration,
+    pub eb_validation: Duration,
+    pub vote_generation_constant: Duration,
+    pub vote_generation_per_ib: Duration,
+    pub vote_validation: Duration,
+    pub cert_generation_constant: Duration,
+    pub cert_generation_per_node: Duration,
+    pub cert_validation_constant: Duration,
+    pub cert_validation_per_node: Duration,
+}
+impl CpuTimeConfig {
+    fn new(params: &RawParameters) -> Self {
+        Self {
+            tx_validation: duration_ms(params.tx_validation_cpu_time_ms),
+            rb_generation: duration_ms(params.rb_generation_cpu_time_ms),
+            rb_validation_constant: duration_ms(
+                params.rb_head_validation_cpu_time_ms
+                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
+            ),
+            rb_validation_per_byte: duration_ms(
+                params.rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte,
+            ),
+            ib_generation: duration_ms(params.ib_generation_cpu_time_ms),
+            ib_head_validation: duration_ms(params.ib_head_validation_cpu_time_ms),
+            ib_body_validation_constant: duration_ms(
+                params.ib_body_validation_cpu_time_ms_constant,
+            ),
+            ib_body_validation_per_byte: duration_ms(
+                params.ib_body_validation_cpu_time_ms_per_byte,
+            ),
+            eb_generation: duration_ms(params.eb_generation_cpu_time_ms),
+            eb_validation: duration_ms(params.eb_validation_cpu_time_ms),
+            vote_generation_constant: duration_ms(params.vote_generation_cpu_time_ms_constant),
+            vote_generation_per_ib: duration_ms(params.vote_generation_cpu_time_ms_per_ib),
+            vote_validation: duration_ms(params.vote_validation_cpu_time_ms),
+            cert_generation_constant: duration_ms(params.cert_generation_cpu_time_ms_constant),
+            cert_generation_per_node: duration_ms(params.cert_generation_cpu_time_ms_per_node),
+            cert_validation_constant: duration_ms(params.cert_validation_cpu_time_ms_constant),
+            cert_validation_per_node: duration_ms(params.cert_validation_cpu_time_ms_per_node),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
-    pub timescale: f64,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
-    pub block_generation_probability: f64,
-    pub ib_generation_probability: f64,
-    pub eb_generation_probability: f64,
-    pub vote_probability: f64,
-    pub vote_threshold: u64,
-    pub vote_slot_length: u64,
-    pub max_block_size: u64,
-    pub max_tx_size: u64,
     pub stage_length: u64,
-    pub max_ib_size: u64,
-    pub max_ib_requests_per_peer: usize,
-    pub ib_shards: u64,
-    pub one_vote_per_vrf: bool,
-    pub tx_validation_cpu_time: Duration,
-    pub block_generation_cpu_time: Duration,
-    pub block_validation_cpu_time: Duration,
-    pub certificate_generation_cpu_time: Duration,
-    pub certificate_validation_cpu_time: Duration,
-    pub ib_generation_cpu_time: Duration,
-    pub ib_validation_cpu_time: Duration,
-    pub eb_generation_cpu_time: Duration,
-    pub eb_validation_cpu_time: Duration,
-    pub vote_generation_cpu_time: Duration,
-    pub vote_validation_cpu_time: Duration,
-    pub transaction_frequency_ms: FloatDistribution,
-    pub transaction_size_bytes: FloatDistribution,
+    pub(crate) block_generation_probability: f64,
+    pub(crate) ib_generation_probability: f64,
+    pub(crate) eb_generation_probability: f64,
+    pub(crate) vote_probability: f64,
+    pub(crate) vote_threshold: u64,
+    pub(crate) vote_slot_length: u64,
+    pub(crate) max_block_size: u64,
+    pub(crate) max_tx_size: u64,
+    pub(crate) max_ib_size: u64,
+    pub(crate) max_ib_requests_per_peer: usize,
+    pub(crate) ib_shards: u64,
+    pub(crate) one_vote_per_vrf: bool,
+    pub(crate) cpu_times: CpuTimeConfig,
+    pub(crate) transaction_frequency_ms: FloatDistribution,
+    pub(crate) transaction_size_bytes: FloatDistribution,
 }
 
 impl SimConfiguration {
     pub fn build(params: RawParameters, topology: Topology) -> Self {
         Self {
             seed: 0,
-            timescale: 1.0,
             slots: None,
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
@@ -262,24 +303,7 @@ impl SimConfiguration {
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
             one_vote_per_vrf: params.vote_one_eb_per_vrf_win,
-            tx_validation_cpu_time: duration_ms(params.tx_validation_cpu_time_ms),
-            block_generation_cpu_time: duration_ms(params.rb_generation_cpu_time_ms),
-            block_validation_cpu_time: duration_ms(
-                params.rb_head_validation_cpu_time_ms
-                    + params.rb_body_legacy_praos_payload_validation_cpu_time_ms_constant,
-            ),
-            certificate_generation_cpu_time: duration_ms(
-                params.cert_generation_cpu_time_ms_constant,
-            ),
-            certificate_validation_cpu_time: duration_ms(
-                params.cert_validation_cpu_time_ms_constant,
-            ),
-            ib_generation_cpu_time: duration_ms(params.ib_generation_cpu_time_ms),
-            ib_validation_cpu_time: duration_ms(params.ib_body_validation_cpu_time_ms_constant),
-            eb_generation_cpu_time: duration_ms(params.eb_generation_cpu_time_ms),
-            eb_validation_cpu_time: duration_ms(params.eb_validation_cpu_time_ms),
-            vote_generation_cpu_time: duration_ms(params.vote_generation_cpu_time_ms_constant),
-            vote_validation_cpu_time: duration_ms(params.vote_validation_cpu_time_ms),
+            cpu_times: CpuTimeConfig::new(&params),
             transaction_frequency_ms: params.tx_generation_distribution.into(),
             transaction_size_bytes: params.tx_size_bytes_distribution.into(),
         }

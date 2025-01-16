@@ -69,37 +69,6 @@ impl CpuTask {
         }
         .to_string()
     }
-    fn cpu_times(&self, config: &SimConfiguration) -> Vec<Duration> {
-        match self {
-            Self::TransactionValidated(_, _) => vec![config.tx_validation_cpu_time],
-            Self::PraosBlockGenerated(block) => {
-                let base_time = config.block_generation_cpu_time;
-                if block.endorsement.is_some() {
-                    vec![base_time + config.certificate_generation_cpu_time]
-                } else {
-                    vec![base_time]
-                }
-            }
-            Self::PraosBlockValidated(_, block) => {
-                let base_time = config.block_validation_cpu_time;
-                if block.endorsement.is_some() {
-                    vec![base_time + config.certificate_validation_cpu_time]
-                } else {
-                    vec![base_time]
-                }
-            }
-            Self::InputBlockGenerated(_) => vec![config.ib_generation_cpu_time],
-            Self::InputBlockValidated(_, _) => vec![config.ib_validation_cpu_time],
-            Self::EndorserBlockGenerated(_) => vec![config.eb_generation_cpu_time],
-            Self::EndorserBlockValidated(_, _) => vec![config.eb_validation_cpu_time],
-            Self::VoteBundleGenerated(votes) => {
-                vec![config.vote_generation_cpu_time; votes.ebs.len()]
-            }
-            Self::VoteBundleValidated(_, votes) => {
-                vec![config.vote_validation_cpu_time; votes.ebs.len()]
-            }
-        }
-    }
 }
 
 /// Things that can happen next for a node
@@ -229,7 +198,7 @@ impl Node {
     }
 
     fn schedule_cpu_task(&mut self, task: CpuTask) {
-        let cpu_times = task.cpu_times(&self.sim_config);
+        let cpu_times = self.task_cpu_times(&task);
         let task_type = task.task_type();
         let subtask_count = cpu_times.len();
         let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
@@ -252,6 +221,67 @@ impl Node {
             timestamp,
             NodeEvent::CpuSubtaskCompleted(subtask),
         ))
+    }
+
+    fn task_cpu_times(&self, task: &CpuTask) -> Vec<Duration> {
+        let cpu_times = &self.sim_config.cpu_times;
+        match task {
+            CpuTask::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
+            CpuTask::PraosBlockGenerated(block) => {
+                let mut time = cpu_times.rb_generation;
+                if let Some(endorsement) = &block.endorsement {
+                    let nodes = endorsement
+                        .votes
+                        .iter()
+                        .copied()
+                        .collect::<HashSet<_>>()
+                        .len();
+                    time += cpu_times.cert_generation_constant
+                        + (cpu_times.cert_generation_per_node * nodes as u32)
+                }
+                vec![time]
+            }
+            CpuTask::PraosBlockValidated(_, rb) => {
+                let mut time = cpu_times.rb_validation_constant;
+                let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
+                time += cpu_times.rb_validation_per_byte * (bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement
+                        .votes
+                        .iter()
+                        .copied()
+                        .collect::<HashSet<_>>()
+                        .len();
+                    time += cpu_times.cert_validation_constant
+                        + (cpu_times.cert_validation_per_node * nodes as u32)
+                }
+                vec![time]
+            }
+            CpuTask::InputBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTask::InputBlockValidated(_, ib) => vec![
+                cpu_times.ib_head_validation
+                    + cpu_times.ib_body_validation_constant
+                    + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
+            ],
+            CpuTask::EndorserBlockGenerated(_) => vec![cpu_times.eb_generation],
+            CpuTask::EndorserBlockValidated(_, _) => vec![cpu_times.eb_validation],
+            CpuTask::VoteBundleGenerated(votes) => votes
+                .ebs
+                .keys()
+                .map(|eb_id| {
+                    let eb = self
+                        .leios
+                        .ebs
+                        .get(eb_id)
+                        .expect("node tried voting for an unknown EB");
+                    cpu_times.vote_generation_constant
+                        + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
+                })
+                .collect(),
+            CpuTask::VoteBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
+                .take(votes.ebs.len())
+                .collect(),
+        }
     }
 
     pub async fn run(mut self) -> Result<()> {

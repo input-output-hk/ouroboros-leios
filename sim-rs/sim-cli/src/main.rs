@@ -58,9 +58,6 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     if let Some(slots) = args.slots {
         config.slots = Some(slots);
     }
-    if let Some(ts) = args.timescale {
-        config.timescale = ts;
-    }
     for id in &args.trace_node {
         config.trace_nodes.insert(NodeId::new(*id));
     }
