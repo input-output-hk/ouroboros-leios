@@ -75,7 +75,7 @@ traceRelayLink1 tcpprops =
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+  bchain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()

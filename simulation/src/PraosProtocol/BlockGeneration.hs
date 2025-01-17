@@ -5,11 +5,11 @@
 module PraosProtocol.BlockGeneration where
 
 import Cardano.Slotting.Slot (WithOrigin (..))
-import ChanTCP (Bytes)
 import Control.Monad (forever)
 import Control.Tracer
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BS8
+import Data.Function (fix)
 import Data.Word (Word64)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
@@ -25,23 +25,25 @@ type SlotGap = Word64
 
 data PacketGenerationPattern
   = NoPacketGeneration
-  | UniformGenerationPattern Bytes SlotGap
-  | PoissonGenerationPattern Bytes StdGen Double
+  | UniformGenerationPattern SlotGap
+  | PoissonGenerationPattern StdGen Double
 
-mkBody :: Bytes -> ByteString -> SlotNo -> BlockBody
-mkBody _sz prefix (SlotNo w) = BlockBody $ pad $ BS.append prefix $ BS8.pack (show w)
- where
-  -- MessageSize for BlockBody is fixed, so we do not need padding.
-  pad s = s
+mkBody :: PraosConfig BlockBody -> ByteString -> SlotNo -> BlockBody
+mkBody cfg prefix (SlotNo w) = fix $ \b ->
+  BlockBody
+    { bodyTag = BS.append prefix $ BS8.pack (show w)
+    , bodyMessageSize = cfg.bodySize b
+    }
 
 mkNextBlock ::
   forall m.
   MonadSTM m =>
+  PraosConfig BlockBody ->
   PacketGenerationPattern ->
   ByteString ->
   m (Maybe (m (SlotNo, BlockBody)))
-mkNextBlock NoPacketGeneration _ = return Nothing
-mkNextBlock (UniformGenerationPattern sz gap) prefix = do
+mkNextBlock _cfg NoPacketGeneration _ = return Nothing
+mkNextBlock cfg (UniformGenerationPattern gap) prefix = do
   stVar <- newTVarIO (SlotNo 0)
   let
     go = atomically $ do
@@ -49,10 +51,10 @@ mkNextBlock (UniformGenerationPattern sz gap) prefix = do
       let
         !sl = SlotNo (unSlotNo last_sl + gap :: Word64)
       writeTVar stVar sl
-      let body = mkBody sz prefix sl
+      let body = mkBody cfg prefix sl
       return (sl, body)
   return $ Just go
-mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
+mkNextBlock cfg (PoissonGenerationPattern rng0 lambda) prefix = do
   stVar <- newTVarIO (SlotNo 0, rng0)
   let go = atomically $ do
         (last_sl, rng) <- readTVar stVar
@@ -62,7 +64,7 @@ mkNextBlock (PoissonGenerationPattern sz rng0 lambda) prefix = do
 
         let !sl' = SlotNo $ unSlotNo last_sl + gap
         writeTVar stVar (sl', rng')
-        let body = mkBody sz prefix sl'
+        let body = mkBody cfg prefix sl'
         return (sl', body)
   return $ Just go
 
@@ -82,7 +84,8 @@ blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever g
     waitForSlot sl
     mblk <- atomically $ do
       chain <- chainState <$> readTVar cpsVar
-      let block = mkBlock chain sl body
+      let block = case mkBlock chain sl body of
+            Block h b -> Block (h{headerMessageSize = praosConfig.headerSize}) b
       if Chain.headSlot chain <= At sl
         then addBlockSt block >> return (Just (block, chain))
         else return Nothing

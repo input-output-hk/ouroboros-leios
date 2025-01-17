@@ -188,7 +188,7 @@ praosNode ::
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
   praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers
-  nextBlock <- mkNextBlock cfg.blockGeneration cfg.blockMarker
+  nextBlock <- mkNextBlock cfg.praosConfig cfg.blockGeneration cfg.blockMarker
   let generationThread =
         blockGenerator
           tracer

@@ -550,7 +550,7 @@ generator tracer cfg st = do
         SomeAction Generate.Base rb0 -> (GenRB,) $ do
           rb <- atomically $ do
             ha <- Chain.headAnchor <$> PraosNode.preferredChain st.praosState
-            let rb = fixupBlock ha rb0
+            let rb = fixSize cfg.leios $ fixupBlock ha rb0
             addProducedBlock st.praosState.blockFetchControllerState rb
             return rb
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))

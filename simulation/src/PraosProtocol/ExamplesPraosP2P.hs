@@ -218,7 +218,6 @@ example1Trace rng0 blockInterval p2pTopography =
         PraosNodeConfig
           { blockGeneration =
               PoissonGenerationPattern
-                (kilobytes 96)
                 rng
                 -- average seconds between blocks:
                 (realToFrac blockInterval * fromIntegral p2pNumNodes)
@@ -296,7 +295,6 @@ example2 =
             PraosNodeConfig
               { blockGeneration =
                   PoissonGenerationPattern
-                    (kilobytes 96)
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)

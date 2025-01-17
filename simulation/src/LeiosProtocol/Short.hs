@@ -20,6 +20,7 @@ import Data.Maybe (
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
+import PraosProtocol.Common (Block (..))
 import Prelude hiding (id)
 
 -- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
@@ -94,12 +95,16 @@ instance FixSize VoteMsg where
       , ..
       }
 
+instance FixSize RankingBlockHeader where
+  fixSize cfg rh = rh{headerMessageSize = cfg.praos.headerSize}
 instance FixSize RankingBlockBody where
   fixSize cfg rb@RankingBlockBody{..} =
     RankingBlockBody
       { size = cfg.praos.bodySize rb
       , ..
       }
+instance FixSize body => FixSize (Block body) where
+  fixSize cfg (Block h b) = Block (fixSize cfg h) (fixSize cfg b)
 
 -----------------------------------------------------------
 ---- Stages

@@ -93,7 +93,7 @@ traceRelayLink1 tcpprops =
     let nullTracer = Tracer $ const $ return ()
     runChainConsumer nullTracer cfg chan st
   producerNode chan = do
-    let chain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+    let chain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
     st <- newTVarIO cps
     runChainProducer chan fId st

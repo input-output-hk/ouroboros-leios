@@ -54,10 +54,10 @@ import TimeCompat
 --------------------------------
 
 instance MessageSize BlockBody where
-  messageSizeBytes _ = kilobytes 95
+  messageSizeBytes b = b.bodyMessageSize
 
 instance MessageSize BlockHeader where
-  messageSizeBytes _ = kilobytes 1
+  messageSizeBytes h = h.headerMessageSize
 
 instance MessageSize SlotNo where
   messageSizeBytes _ = 8
