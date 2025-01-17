@@ -313,9 +313,9 @@ evenly among 1000 nodes and the right plot shows when it is divided among 2500
 nodes according to a non-uniform stake distribution similar to that of
 epoch 500.
 
-| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |     |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------- | --- |
-| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |     |
+| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- | - |
+| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |   |
 
 For the case of realistic, non-uniform stake the follow plot shows the expected
 number of EBs are proportioned among honest and adversarial parties. Ensuring
@@ -364,45 +364,6 @@ appear before the next EB.
 > in the specification for the case when several EBs are waiting for an RB:
 > presumably, the "freshest first" rule would be applied here, so the newest EB
 > would go into the RB. We might need simulation for this analysis.
-
-### Votes
-
-The sortition for voting differs from that for blocks because, in principle, a
-node may win several votes in the lottery.
-
-$$
-\mathcal{P}(n \text{ votes given stake } s) = {s \choose n} {f_\text{vote}^\prime}^n (1 - f_\text{vote}^\prime)^{s-n} \approx \frac{(f_\text{vote} \cdot \sigma)^n \cdot e^{- f_\text{vote} \cdot \sigma}}{n!}
-$$
-
-where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes
-in the lottery and the stake is very large relative to the number of votes
-$n \ll s$. Note that even in this approximation the probabilities sum to one.
-The formula above and this approximation may be sufficient for use with a VRF to
-determine the number of votes that a node is entitled to. The table below show
-the VRF conditions for determining the number of votes in this approximation,
-which can be expressed as a Taylor series involving operations only on rational
-numbers. The Cardano mainnet decentralization parameter is current 500, so if we
-consider the case where the mean number of votes is 500 and a node has 1/500th
-of the stake, then $f_\text{vote} \cdot \sigma =1$ in this computations,
-corresponding to the right edge in the plot below: any pool with more stake
-would be oversaturated. Even in the worst-case scenario of a fully saturated
-pool, the probability of more than three votes is about 1.90%.
-
-| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                           |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                |
-| 1               | $1 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
-| 2               | $1 + \sigma \cdot f_\text{vote} < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
-| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
-| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m < v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
-
-![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
-
-Limiting nodes to a maximum of one vote would likely be safe if the mean number
-of votes is no larger than the effective decentralizations (i.e., the number of
-nodes with appreciable stake) would likely be safe, though it might result is
-larger concentrations of stake having smaller voting rewards, and it would
-greatly simplify the computation of sortition.
 
 ### Insights regarding sortition
 
@@ -1348,12 +1309,12 @@ expensive amounts of CPU power would be required to successfully conduct a grind
 attack on Praos. Nevertheless, additional research and development are underway
 to further harden Praos.
 
-|   # | Actor    | Method                             | Effect                           | Resources   | Mitigation                         | Notes                      |
-| --: | -------- | ---------------------------------- | -------------------------------- | ----------- | ---------------------------------- | -------------------------- |
-|   1 | Varies   | Threat to Praos                    | Leios is only as secure as Praos | -           | Varies                             | Already mitigated in Praos |
-|   2 | Producer | Grinding VRF on voting eligibility | Increased probability of voting  | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
-|   3 | Producer | Grinding VRF on IB eligibility     | Increased probability of IB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
-|   4 | Producer | Grinding VRF on EB eligibility     | Increased probability of EB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|  # | Actor    | Method                             | Effect                           | Resources   | Mitigation                         | Notes                      |
+| -: | -------- | ---------------------------------- | -------------------------------- | ----------- | ---------------------------------- | -------------------------- |
+|  1 | Varies   | Threat to Praos                    | Leios is only as secure as Praos | -           | Varies                             | Already mitigated in Praos |
+|  2 | Producer | Grinding VRF on voting eligibility | Increased probability of voting  | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|  3 | Producer | Grinding VRF on IB eligibility     | Increased probability of IB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
+|  4 | Producer | Grinding VRF on EB eligibility     | Increased probability of EB      | CPU & stake | Epoch nonce resistance to grinding | R&D underway               |
 
 ### Equivocation
 
@@ -1367,11 +1328,11 @@ protocol. The
 mitigates this situation explicitly by identifying nodes that misbehave in this
 manner and notifying downstream peers in a controlled manner.
 
-|   # | Actor    | Method           | Effect                               | Resources | Mitigation      | Notes             |
-| --: | -------- | ---------------- | ------------------------------------ | --------- | --------------- | ----------------- |
-|   5 | Producer | Equivocated IB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
-|   6 | Producer | Equivocated EB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
-|   7 | Producer | Equivocated vote | Interferes with certificate creation | stake     | See Leios paper | Already mitigated |
+|  # | Actor    | Method           | Effect                               | Resources | Mitigation      | Notes             |
+| -: | -------- | ---------------- | ------------------------------------ | --------- | --------------- | ----------------- |
+|  5 | Producer | Equivocated IB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|  6 | Producer | Equivocated EB   | Resource burden on nodes             | stake     | See Leios paper | Already mitigated |
+|  7 | Producer | Equivocated vote | Interferes with certificate creation | stake     | See Leios paper | Already mitigated |
 
 ### Inaction and nuisance
 
@@ -1386,18 +1347,18 @@ Presumably, the loss of rewards would not compensate for the small disruption
 they create. The cryptographic aspects of Leios quickly catch invalid blocks or
 votes, of course.
 
-|   # | Actor    | Method                                            | Effect                                                   | Resources   | Mitigation                                         | Notes             |
-| --: | -------- | ------------------------------------------------- | -------------------------------------------------------- | ----------- | -------------------------------------------------- | ----------------- |
-|   8 | Producer | Decline to create IB                              | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
-|   9 | Producer | Decline to create EB                              | Lowers throughput                                        | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
-|  10 | Producer | Decline to vote                                   | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
-|  11 | Producer | Create invalid IB                                 | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
-|  12 | Producer | Create invalid EB                                 | Resource burden on nodes; lowers throughput              | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
-|  13 | Producer | Create invalid vote                               | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
-|  14 | Producer | Include invalid txs in IB                         | Resource burden on nodes; lowers throughput              | stake       | Tx verification                                    | Already mitigated |
-|  15 | Producer | Include invalid IBs in EB                         | Resource burden on nodes; lowers throughput              | stake       | IB verification                                    | Already mitigated |
-|  16 | Producer | Include invalid certificate in RB                 | Lowers throughput; resource burden on nodes              | stake       | Certificate verification                           | Already mitigated |
-|  17 | Producer | Create valid certificate without sufficient votes | Manipulates inclusion of txs and hence dapps and oracles | CPU & stake | Strong cryptography for certificates               | R&D underway      |
+|  # | Actor    | Method                                            | Effect                                                   | Resources   | Mitigation                                         | Notes             |
+| -: | -------- | ------------------------------------------------- | -------------------------------------------------------- | ----------- | -------------------------------------------------- | ----------------- |
+|  8 | Producer | Decline to create IB                              | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+|  9 | Producer | Decline to create EB                              | Lowers throughput                                        | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+| 10 | Producer | Decline to vote                                   | Lowers throughput                                        | stake       | Lessened rewards for attacker                      | R&D underway      |
+| 11 | Producer | Create invalid IB                                 | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+| 12 | Producer | Create invalid EB                                 | Resource burden on nodes; lowers throughput              | stake       | Mitigated by voter check specified in Leios design | Already mitigated |
+| 13 | Producer | Create invalid vote                               | Resource burden on nodes; lowers throughput              | stake       | Lessened rewards for attacker                      | R&D underway      |
+| 14 | Producer | Include invalid txs in IB                         | Resource burden on nodes; lowers throughput              | stake       | Tx verification                                    | Already mitigated |
+| 15 | Producer | Include invalid IBs in EB                         | Resource burden on nodes; lowers throughput              | stake       | IB verification                                    | Already mitigated |
+| 16 | Producer | Include invalid certificate in RB                 | Lowers throughput; resource burden on nodes              | stake       | Certificate verification                           | Already mitigated |
+| 17 | Producer | Create valid certificate without sufficient votes | Manipulates inclusion of txs and hence dapps and oracles | CPU & stake | Strong cryptography for certificates               | R&D underway      |
 
 ### Omission and manipulation
 
@@ -1409,11 +1370,11 @@ transactions reside elsewhere in the memory pool and will soon be included in
 subsequent honest blocks. Reordering IBs when an EB is created is not an option
 for an attacker because the Leios paper specifies a fixed ordering.
 
-|   # | Actor    | Method                       | Effect                                                                                               | Resources | Mitigation                          | Notes                            |
-| --: | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------- |
-|  18 | Producer | Omit txs when creating IB    | Lowers throughput; increases propagation speed of malicious IB; manipulate Dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
-|  19 | Producer | Omit IBs when creating EB    | Lowers throughput; increases propagation speed of malicious EB; manipulate dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
-|  20 | Producer | Reorder IBs when creating EB | Manipulate dapps                                                                                     | stake     | Impose canonical order of IBs in EB | Already mitigated in Leios paper |
+|  # | Actor    | Method                       | Effect                                                                                               | Resources | Mitigation                          | Notes                            |
+| -: | -------- | ---------------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ----------------------------------- | -------------------------------- |
+| 18 | Producer | Omit txs when creating IB    | Lowers throughput; increases propagation speed of malicious IB; manipulate Dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+| 19 | Producer | Omit IBs when creating EB    | Lowers throughput; increases propagation speed of malicious EB; manipulate dapps; manipulate oracles | stake     | Memory pool                         | Inherent in mempool design       |
+| 20 | Producer | Reorder IBs when creating EB | Manipulate dapps                                                                                     | stake     | Impose canonical order of IBs in EB | Already mitigated in Leios paper |
 
 ### Network interference
 
@@ -1423,12 +1384,12 @@ protocol will quickly avoid by preferring efficient and honest nodes. Large
 numbers of malicious relays would be needed to impinge on efficiency even in a
 small degree.
 
-|   # | Actor | Method                       | Effect                                             | Resources | Mitigation              | Notes             |
-| --: | ----- | ---------------------------- | -------------------------------------------------- | --------- | ----------------------- | ----------------- |
-|  21 | Relay | Abuse sync protocol          | Resource burden on nodes; introduces latency       | -         | Design of sync protocol | Already mitigated |
-|  22 | Relay | Delay diffusion of valid IBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
-|  23 | Relay | Delay diffusion of valid EBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
-|  24 | Relay | Delay diffusion of votes     | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+|  # | Actor | Method                       | Effect                                             | Resources | Mitigation              | Notes             |
+| -: | ----- | ---------------------------- | -------------------------------------------------- | --------- | ----------------------- | ----------------- |
+| 21 | Relay | Abuse sync protocol          | Resource burden on nodes; introduces latency       | -         | Design of sync protocol | Already mitigated |
+| 22 | Relay | Delay diffusion of valid IBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+| 23 | Relay | Delay diffusion of valid EBs | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
+| 24 | Relay | Delay diffusion of votes     | Introduces latency; shifts resource usage on nodes | -         | See Leios paper         | Already mitigated |
 
 ### Denial of service
 
@@ -1445,9 +1406,9 @@ transactions from reaching IBs and the fee structure will enforce payment for
 intentionally conflicted transactions, even though only one of the transactions
 would make it onto the ledger.
 
-|   # | Actor  | Method                                                 | Effect                                                                                          | Resources | Mitigation | Notes             |
-| --: | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------- | ---------- | ----------------- |
-|  25 | Client | Submit invalid, duplicate, or conflicting transactions | Fills memory pool; increases tx duplication in RBs; lowers throughput; resource burden on nodes | ada       | Sharding   | Research underway |
+|  # | Actor  | Method                                                 | Effect                                                                                          | Resources | Mitigation | Notes             |
+| -: | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------- | ---------- | ----------------- |
+| 25 | Client | Submit invalid, duplicate, or conflicting transactions | Fills memory pool; increases tx duplication in RBs; lowers throughput; resource burden on nodes | ada       | Sharding   | Research underway |
 
 ### Insights regarding threats
 
