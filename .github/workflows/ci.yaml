@@ -16,7 +16,6 @@ jobs:
   ################################################################################
   # Formal Specification in Agda - under /formal-spec/
   ################################################################################
-
   formal-spec-typecheck:
     name: "formal-spec: Typecheck"
     runs-on: ubuntu-22.04
@@ -185,21 +184,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 2 # Needed to get previous commit for comparison
 
       - name: Install D2
         run: |
           curl -fsSL https://d2lang.com/install.sh | sh -s --
           d2 --version
 
-      - name: Generate PNG files
+      - name: Generate PNG files for changed D2 files
         run: |
-          find . -name "*.d2" -type f -exec sh -c '
-            for file do
+          # Get list of changed .d2 files
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '\.d2$' || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No .d2 files were changed"
+            exit 0
+          fi
+
+          echo "Changed .d2 files:"
+          echo "$CHANGED_FILES"
+
+          # Process each changed file
+          echo "$CHANGED_FILES" | while read -r file; do
+            if [ -f "$file" ]; then
               output_file="${file%.d2}.png"
               echo "Converting $file to $output_file"
               d2 "$file" "$output_file"
-            done
-          ' sh {} +
+            fi
+          done
 
       - name: Check for changes
         id: changes
