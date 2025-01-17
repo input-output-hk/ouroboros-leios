@@ -72,7 +72,7 @@ data LeiosConfig = LeiosConfig
 
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  assert (not $ disk.voteOneEbPerVrfWin) $
+  assert (not disk.voteOneEbPerVrfWin) $
     LeiosConfig
       { praos
       , sliceLength = fromIntegral disk.leiosStageLengthSlots
@@ -88,12 +88,12 @@ convertConfig disk =
   praos =
     PraosConfig
       { blockFrequencyPerSlot = disk.rbGenerationProbability
-      , headerSize = fromIntegral $ disk.ibHeadSizeBytes
+      , headerSize = fromIntegral disk.ibHeadSizeBytes
       , bodySize = \body ->
           1
             + sum (map (certificateSize . snd) body.endorseBlocks)
             + body.payload
-      , bodyMaxSize = fromIntegral $ disk.rbBodyMaxSizeBytes
+      , bodyMaxSize = fromIntegral disk.rbBodyMaxSizeBytes
       , blockValidationDelay = \(Block _ body) ->
           let legacy
                 | body.payload > 0 =
@@ -102,7 +102,7 @@ convertConfig disk =
                 | otherwise = 0
            in legacy
                 + sum (map (certificateValidation . snd) body.endorseBlocks)
-      , headerValidationDelay = const $ durationMsToDiffTime $ disk.ibHeadValidationCpuTimeMs
+      , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
       , blockGenerationDelay = \(Block _ body) ->
           durationMsToDiffTime disk.rbGenerationCpuTimeMs + sum (map (certificateGeneration . snd) body.endorseBlocks)
       }
@@ -128,13 +128,13 @@ convertConfig disk =
   delays =
     LeiosDelays
       { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
-      , inputBlockHeaderValidation = const $ durationMsToDiffTime $ disk.ibHeadValidationCpuTimeMs
+      , inputBlockHeaderValidation = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
       , inputBlockValidation = \ib ->
           durationMsToDiffTime $
             disk.ibBodyValidationCpuTimeMsConstant
               + fromIntegral ib.body.size * disk.ibBodyValidationCpuTimeMsPerByte
-      , endorseBlockGeneration = const $ durationMsToDiffTime $ disk.ebGenerationCpuTimeMs
-      , endorseBlockValidation = const $ durationMsToDiffTime $ disk.ebValidationCpuTimeMs
+      , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
+      , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
       , -- TODO: can parallelize?
         voteMsgGeneration = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteGenerationCpuTimeMsConstant -- TODO: voteGenerationCpuTimeMsPerIb -- needs EBs info.
       , voteMsgValidation = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteValidationCpuTimeMs
