@@ -71,18 +71,17 @@ data LeiosConfig = LeiosConfig
 
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  assert (not disk.voteOneEbPerVrfWin) $
-    LeiosConfig
-      { praos
-      , sliceLength = fromIntegral disk.leiosStageLengthSlots
-      , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-      , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-      , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-      , votingFrequencyPerStage = disk.voteGenerationProbability
-      , votesForCertificate = fromIntegral disk.voteThreshold
-      , sizes
-      , delays
-      }
+  LeiosConfig
+    { praos
+    , sliceLength = fromIntegral disk.leiosStageLengthSlots
+    , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+    , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+    , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+    , votingFrequencyPerStage = disk.voteGenerationProbability
+    , votesForCertificate = fromIntegral disk.voteThreshold
+    , sizes
+    , delays
+    }
  where
   praos =
     PraosConfig
