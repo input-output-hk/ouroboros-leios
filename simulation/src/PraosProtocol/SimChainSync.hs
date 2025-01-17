@@ -81,7 +81,7 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
-      praosConfig <- defaultPraosConfig
+      let praosConfig = defaultPraosConfig
       concurrently_
         (consumerNode praosConfig inChan)
         (producerNode outChan)

@@ -73,12 +73,13 @@ blockGenerator ::
   (IsBody body, MonadSTM m, MonadDelay m, MonadTime m) =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
+  SlotConfig ->
   TVar m (ChainProducerState (Block body)) ->
   (Block body -> STM m ()) ->
   Maybe (m (SlotNo, body)) ->
   m ()
-blockGenerator _tracer _praosConfig _cpsVar _addBlockSt Nothing = return ()
-blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever go
+blockGenerator _tracer _praosConfig _ _cpsVar _addBlockSt Nothing = return ()
+blockGenerator tracer praosConfig slotConfig cpsVar addBlockSt (Just nextBlock) = forever go
  where
   go = do
     (sl, body) <- nextBlock
@@ -98,6 +99,6 @@ blockGenerator tracer praosConfig cpsVar addBlockSt (Just nextBlock) = forever g
         traceWith tracer (PraosNodeEventGenerate blk)
         traceWith tracer (PraosNodeEventNewTip (chain Chain.:> blk))
   waitForSlot sl = do
-    let tgt = slotTime praosConfig.slotConfig sl
+    let tgt = slotTime slotConfig sl
     now <- getCurrentTime
     threadDelayNDT (tgt `diffUTCTime` now)

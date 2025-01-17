@@ -70,8 +70,8 @@ data LeiosConfig = LeiosConfig
   , delays :: LeiosDelays
   }
 
-convertConfig :: SlotConfig -> OnDisk.Config -> LeiosConfig
-convertConfig slotConfig disk =
+convertConfig :: OnDisk.Config -> LeiosConfig
+convertConfig disk =
   assert (not $ disk.voteOneEbPerVrfWin) $
     LeiosConfig
       { praos
@@ -87,10 +87,11 @@ convertConfig slotConfig disk =
  where
   praos =
     PraosConfig
-      { slotConfig
+      { blockFrequencyPerSlot = disk.rbGenerationProbability
       , headerSize = fromIntegral $ disk.ibHeadSizeBytes
       , bodySize = \body ->
-          sum (map (certificateSize . snd) body.endorseBlocks)
+          1
+            + sum (map (certificateSize . snd) body.endorseBlocks)
             + body.payload
       , bodyMaxSize = fromIntegral $ disk.rbBodyMaxSizeBytes
       , blockValidationDelay = \(Block _ body) ->
@@ -229,7 +230,7 @@ isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
 ----------------------------------------------------------------------------------------------
 
 mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) rb
+mkRankingBlockBody cfg nodeId ebs payload = rb
  where
   rb =
     fixSize cfg $

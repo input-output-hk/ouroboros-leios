@@ -169,6 +169,7 @@ setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers =
 
 data PraosNodeConfig = PraosNodeConfig
   { praosConfig :: PraosConfig BlockBody
+  , slotConfig :: SlotConfig
   , blockGeneration :: PacketGenerationPattern
   , chain :: Chain (Block BlockBody)
   , blockMarker :: ByteString
@@ -193,6 +194,7 @@ praosNode tracer cfg followers peers = do
         blockGenerator
           tracer
           cfg.praosConfig
+          cfg.slotConfig
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
           nextBlock

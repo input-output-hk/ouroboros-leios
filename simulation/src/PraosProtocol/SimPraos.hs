@@ -65,7 +65,7 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
-      praosConfig <- defaultPraosConfig
+      let praosConfig = defaultPraosConfig
       let chainA =
             mkChainSimple $
               [ fix $ \b -> BlockBody (BS.singleton word) (praosConfig.bodySize b)

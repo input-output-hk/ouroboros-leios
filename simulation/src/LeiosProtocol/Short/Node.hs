@@ -77,7 +77,7 @@ data LeiosNodeEvent
 
 data LeiosNodeConfig = LeiosNodeConfig
   { leios :: !LeiosConfig
-  , rankingBlockFrequencyPerSlot :: !Double
+  , slotConfig :: !SlotConfig
   , nodeId :: !NodeId
   , stake :: !StakeFraction
   , rng :: !StdGen
@@ -605,7 +605,7 @@ mkBuffersView cfg st = BuffersView{..}
             $ buffer
         receivedByCheck slot =
           filter
-            ( maybe False (<= slotTime cfg.leios.praos.slotConfig slot)
+            ( maybe False (<= slotTime cfg.slotConfig slot)
                 . flip Map.lookup times
             )
         validInputBlocks q = receivedByCheck q.receivedBy $ generatedCheck q.generatedBetween
@@ -625,5 +625,5 @@ mkSchedule cfg = mkScheduler cfg.rng rates
       [ (SomeRole Generate.Propose, inputBlockRate cfg.leios slot)
       , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios slot)
       , (SomeRole Generate.Vote, votingRate cfg.leios slot)
-      , (SomeRole Generate.Base, [NetworkRate cfg.rankingBlockFrequencyPerSlot])
+      , (SomeRole Generate.Base, [NetworkRate cfg.leios.praos.blockFrequencyPerSlot])
       ]

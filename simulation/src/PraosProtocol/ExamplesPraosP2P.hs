@@ -221,7 +221,8 @@ example1Trace rng0 blockInterval p2pTopography =
                 rng
                 -- average seconds between blocks:
                 (realToFrac blockInterval * fromIntegral p2pNumNodes)
-          , praosConfig = defaultPraosConfig' slotConfig
+          , slotConfig
+          , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 1 / realToFrac blockInterval}
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
           }
@@ -298,7 +299,8 @@ example2 =
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)
-              , praosConfig = defaultPraosConfig' slotConfig
+              , praosConfig = defaultPraosConfig
+              , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
               }

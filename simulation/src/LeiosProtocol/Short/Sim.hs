@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -158,7 +159,8 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
-      praosConfig <- defaultPraosConfig
+      slotConfig <- slotConfigFromNow
+      let praosConfig = defaultPraosConfig
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
@@ -200,7 +202,7 @@ traceRelayLink1 tcpprops =
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig
               { leios = leiosConfig
-              , rankingBlockFrequencyPerSlot = 1 / fromIntegral leiosConfig.sliceLength -- every 5 seconds
+              , slotConfig
               , stake = StakeFraction 0.5 -- just two nodes!
               , rng = mkStdGen i
               , -- \^ for block generation

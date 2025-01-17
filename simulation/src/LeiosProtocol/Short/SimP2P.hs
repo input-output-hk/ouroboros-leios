@@ -21,6 +21,7 @@ import Data.List (unfoldr)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import LeiosProtocol.Common
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
@@ -109,8 +110,11 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
-exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
+exampleTrace2 :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 rng = exampleTrace2' rng . convertConfig
+
+exampleTrace2' :: StdGen -> LeiosConfig -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2' rng0 leios p2pTopography@P2PTopography{..} processingCores =
   traceLeiosP2P
     rng0
     p2pTopography
@@ -122,18 +126,16 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
     LeiosNodeConfig
       { stake = StakeFraction $ 1 / p2pNumNodes
       , baseChain = Genesis
+      , slotConfig
       , leios
-      , rankingBlockFrequencyPerSlot = 1 / fromIntegral leios.sliceLength
       , processingQueueBound = 100
       , processingCores
       , nodeId
       , rng
       }
-   where
-    leios = exampleLeiosConfig sliceLength slotConfig
 
-exampleLeiosConfig :: Int -> SlotConfig -> LeiosConfig
-exampleLeiosConfig sliceLength slotConfig = leios
+exampleLeiosConfig :: Int -> LeiosConfig
+exampleLeiosConfig sliceLength = leios
  where
   -- TODO: review voting numbers, these might not make sense.
   leios =
@@ -175,4 +177,4 @@ exampleLeiosConfig sliceLength slotConfig = leios
       }
 
   -- TODO: body validation should depend on certificate/payload
-  praos = defaultPraosConfig' slotConfig
+  praos = defaultPraosConfig

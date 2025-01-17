@@ -29,7 +29,6 @@ module PraosProtocol.Common (
   kilobytes,
   module TimeCompat,
   defaultPraosConfig,
-  defaultPraosConfig',
   CPUTask (..),
   hashToColor,
 ) where
@@ -135,7 +134,7 @@ data PraosNodeEvent body
   deriving (Show)
 
 data PraosConfig body = PraosConfig
-  { slotConfig :: !SlotConfig
+  { blockFrequencyPerSlot :: !Double
   , blockValidationDelay :: !(Block body -> DiffTime)
   , headerValidationDelay :: !(BlockHeader -> DiffTime)
   , blockGenerationDelay :: !(Block body -> DiffTime)
@@ -144,10 +143,10 @@ data PraosConfig body = PraosConfig
   , bodyMaxSize :: !Bytes
   }
 
-defaultPraosConfig' :: SlotConfig -> PraosConfig body
-defaultPraosConfig' slotConfig =
+defaultPraosConfig :: PraosConfig body
+defaultPraosConfig =
   PraosConfig
-    { slotConfig
+    { blockFrequencyPerSlot = 0.2
     , blockValidationDelay = const 0.1
     , headerValidationDelay = const 0.005
     , blockGenerationDelay = const 0
@@ -155,6 +154,3 @@ defaultPraosConfig' slotConfig =
     , bodySize = const $ kilobytes 95
     , bodyMaxSize = kilobytes 96
     }
-
-defaultPraosConfig :: MonadTime m => m (PraosConfig body)
-defaultPraosConfig = defaultPraosConfig' <$> slotConfigFromNow
