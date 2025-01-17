@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
     time::Duration,
 };
@@ -108,9 +108,38 @@ pub struct RawParameters {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawTopology {
+pub struct RawLegacyTopology {
     pub nodes: Vec<RawNodeConfig>,
     pub links: Vec<RawLinkConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawTopology {
+    pub nodes: BTreeMap<String, RawNode>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawNode {
+    stake: Option<u64>,
+    location: RawNodeLocation,
+    cpu_core_count: Option<u64>,
+    producers: BTreeMap<String, RawLinkInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case", untagged)]
+pub enum RawNodeLocation {
+    Cluster { cluster: String },
+    Coords((f64, f64)),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RawLinkInfo {
+    latency_ms: f64,
+    // bandwidth_bytes_per_second: Option<u64>,
 }
 
 pub struct Topology {
@@ -157,15 +186,15 @@ impl Topology {
     }
 }
 
-impl From<RawTopology> for Topology {
-    fn from(value: RawTopology) -> Self {
+impl From<RawLegacyTopology> for Topology {
+    fn from(value: RawLegacyTopology) -> Self {
         let mut nodes: Vec<NodeConfiguration> = value
             .nodes
             .into_iter()
             .enumerate()
             .map(|(index, raw)| NodeConfiguration {
                 id: NodeId::new(index),
-                location: to_netsim_location(raw.location),
+                location: Some(to_netsim_location(raw.location)),
                 stake: raw.stake.unwrap_or_default(),
                 cpu_multiplier: raw.cpu_multiplier,
                 cores: raw.cores,
@@ -182,6 +211,53 @@ impl From<RawTopology> for Topology {
                 latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
             });
         }
+        Self { nodes, links }
+    }
+}
+
+impl From<RawTopology> for Topology {
+    fn from(value: RawTopology) -> Self {
+        let mut node_ids = BTreeMap::new();
+        for (id, name) in value.nodes.keys().enumerate() {
+            node_ids.insert(name.clone(), NodeId::new(id));
+        }
+        let mut nodes = vec![];
+        let mut links = BTreeMap::new();
+        for (name, raw_node) in value.nodes.into_iter() {
+            let id = *node_ids.get(&name).unwrap();
+            let location = if let RawNodeLocation::Coords(coords) = raw_node.location {
+                Some(to_netsim_location(coords))
+            } else {
+                None
+            };
+            let mut node = NodeConfiguration {
+                id,
+                location,
+                stake: raw_node.stake.unwrap_or_default(),
+                cpu_multiplier: 1.0,
+                cores: raw_node.cpu_core_count,
+                peers: vec![],
+            };
+            for (peer_name, peer_info) in raw_node.producers {
+                let peer_id = *node_ids.get(&peer_name).unwrap();
+                node.peers.push(peer_id);
+                let mut ids = [id, peer_id];
+                ids.sort();
+                links.insert(
+                    ids,
+                    LinkConfiguration {
+                        nodes: (ids[0], ids[1]),
+                        latency: duration_ms(peer_info.latency_ms),
+                    },
+                );
+            }
+            nodes.push(node);
+        }
+        for [from, to] in links.keys() {
+            nodes[from.to_inner()].peers.push(*to);
+            nodes[to.to_inner()].peers.push(*from);
+        }
+        let links = links.into_values().collect();
         Self { nodes, links }
     }
 }
@@ -315,21 +391,28 @@ fn to_netsim_location((lat, long): (f64, f64)) -> Location {
     ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
-fn compute_latency(loc1: Location, loc2: Location, explicit: Option<u64>) -> Duration {
+fn compute_latency(
+    loc1: Option<Location>,
+    loc2: Option<Location>,
+    explicit: Option<u64>,
+) -> Duration {
     if let Some(ms) = explicit {
         return Duration::from_millis(ms);
     }
-    let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
-        .map(|l| l.to_duration())
-        .unwrap_or(Duration::ZERO);
-    let extra_latency = Duration::from_millis(5);
-    geo_latency + extra_latency
+    if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
+        let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
+            .map(|l| l.to_duration())
+            .unwrap_or(Duration::ZERO);
+        let extra_latency = Duration::from_millis(5);
+        return geo_latency + extra_latency;
+    }
+    panic!("not enough information to decide link latency");
 }
 
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
     pub id: NodeId,
-    pub location: Location,
+    pub location: Option<Location>,
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
