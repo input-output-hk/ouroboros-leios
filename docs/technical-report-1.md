@@ -400,6 +400,34 @@ appear before the next EB.
 
 ## Voting and certificates
 
+The Leios protocols requires a subset of SPO nodes to vote on certifying each
+EB. The EB can only be certified if a threshold (a "quorum") of votes are cast
+by the eligible votes. Note that a single SPO may be eligible to cast more than
+one vote in an election: thus we have weighted voting. Also note that we
+distinguish "SPOs" from "SPO nodes" because a single SPO might operate several
+nodes: for the purposes of Leios it is only the nodes that matter, not the
+incidental fact that a single owner may operate several of the nodes. Thus we
+have a four-level hierarchy:
+
+- The SPOs, some of which control stake spread over several block-producing
+  nodes.
+- The approximately 2500 _SPO nodes_, each of which is eligible to be selected
+  (via the _sortition_ discussed below) as a voter for a particular Leios
+  _election_.
+- The _committee_ of voters (perhaps 500 nodes) selected as eligible voters for
+  a particular election.
+- The subset of the committee that forms a _quorum_ (perhaps a 60% _threshold_
+  of votes in agreement) casting votes for the EB under consideration for
+  _certification_.
+
+The attainment of a quorum in an election is memorialized as a _certificate_
+that is soon included in a Praos block (an RB). The quorum requirement is
+necessary because some of the committee nodes might be offline or misconfigured,
+being unable to vote, or there may be adversarial nodes that attempt to subvert
+the Leios protocol by _abstaining_ from voting. The quorum is based on the
+number of votes, not the number of unique voters, because a single voter might
+be eligible to cast several votes in a given election.
+
 Leios voting involves numerous decisions about cryptographic matters and
 protocol parameters.
 
@@ -409,6 +437,8 @@ protocol parameters.
 - Will committee members with a large amount of stake be allowed multiple votes?
 - What quorum of votes will be required to certify an EB?
 - What type of certificate will attest to a quorum of votes?
+- Will there be a different committee chosen for each election? or will the same
+  committee cast votes in several consecutive (on non-consecutive) elections?
 
 These decisions affect security, efficiency, and cost.
 
@@ -426,6 +456,7 @@ different aspects separate.
 
 Conceptually, a Leios vote contains the following information:
 
+- The election identifier.
 - The hash of the EB being voted for.
 - The identifier for the pipeline.
   - This could be omitted because it can be inferred from the EB.
@@ -445,7 +476,7 @@ bytes of core information, not counting the hash of the EB.
 - _Compressed BLS12-381 signature:_ 96 bytes
 
 The above assumes that the keys for verifying the signature and the proof of
-possession have already been transmitted. These would need to be registered on
+membership have already been transmitted. These would need to be registered on
 the chain, presumably on the Praos chain.
 
 Instead of ephemeral keys, if the signature were a full KES signature, then it
@@ -500,11 +531,15 @@ Let $p$ be the probability that a unit of stake (i.e., one lovelace in Cardano)
 will be selected in the voting lottery and let $S$ be the total staked. Let $n$
 be the desired mean number of votes in the lottery. Hence $p = n / S$. A
 candidate node $i$ with $s_i$ staked to it has a binomially distributed number
-of votes, with mean $p \cdot s_i$. The probability is
-$v_i = 1 - \left( 1 - p \right)^{s_i}$ that the node has any votes at all.
+of votes, with mean $p \cdot s_i$. Thus $(1 - p)$ is the probability that a coin
+is not selected and $(1 - p)^{s_i}$ is the probability that no lovelace of node
+$i$ were selected: the probability $v_i = 1 - \left( 1 - p \right)^{s_i}$ is the
+probability that at least a lovelace and that the node $i$ can vote (at least
+once).
 
-If the random variable $\mathbf{V}_i$ is distributed according to the Bernoulli
-trial with probability $v_i$, then $\mathbf{V} = \sum_i \mathbf{V}_i$ is the
+We denote the random variable $\mathbf{V}_i$ to be the number of votes that node
+$i$ has and to be distributed according to a Bernoulli trial with probability
+$v_i$: then $\mathbf{V} = \sum_i \mathbf{V}_i$ is a random variable for the
 committee size. This will differ from the number of votes because some nodes
 might have multiple votes. It is feasible to numerically sample $\mathbf{V}$,
 but simply computing its mean and standard deviation is insightful. The mean is
@@ -541,7 +576,7 @@ voters would be the number of votes.
 
 The combinatorics associated with obtaining a quorum of voters from a mixture of
 honest and dishonest parties set fundamental limits on the safe size for voting
-quorums in Leios. (However, the specific choice of certificate scheme my
+quorums in Leios. (However, the specific choice of certificate scheme may be
 imposing additional limits and security considerations.) We are concerned about
 both the probability that a quorum of honest votes is reached and the
 probability that dishonest voters form their own quorum. For Leios, the
@@ -550,32 +585,28 @@ is not equivalent to having a dishonest quorum, though it may cause
 inefficiencies when EBs with duplicate or clashing transactions are later
 included in RBs. The table below shows situations that may be encountered.
 
-> [!CAUTION]
->
-> Is it the second-to-last sentence in the previous paragraph really true?
+| Quorum of honest votes? | Quorum of adversarial votes? | Description        | Implications                                                             |
+| ----------------------- | ---------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| Yes                     | No                           | Honest quorum      | Protocol operates normally, with successful endorsement of input blocks. |
+| No                      | No                           | No quorum          | Protocol operates normally, but without endorsement of input blocks.     |
+| No                      | Yes                          | Adversarial quorum | Adversary controls the endorsement.                                      |
+| Yes                     | Yes                          | Multiple quora     | Adversary can create conflicting endorsements.                           |
 
-| Quorum of honest votes? | Quorum of adversial votes? | Description        | Implications                                                             |
-| ----------------------- | -------------------------- | ------------------ | ------------------------------------------------------------------------ |
-| Yes                     | No                         | Honest quorum      | Protocol operates normally, with successful endorsement of input blocks. |
-| No                      | No                         | No quorum          | Protocol operates normally, but without endorsement of input blocks.     |
-| No                      | Yes                        | Adversarial quorum | Adversary controls the endorsement.                                      |
-| Yes                     | Yes                        | Multiple quora     | Adversary can create conflicting endorsements.                           |
-
-We can estimate the probability of not having an honest quorum. Let $\beta$ be
-the probability that a unit of stake is selected for voting-committee
-membership, let $n$ be the mean number of votes, and let $\tau \cdot n$ be the
-number of votes required for a quorum. Let $S$ be the total stake and
+We can estimate the probability of not having an honest quorum. Let $p$ be the
+probability that a unit of stake is selected for voting-committee membership,
+let $n$ be the mean number of votes, and let $\tau \cdot n$ be the number of
+votes required for a quorum. Let $S$ be the total stake and
 $H = (1 - f) \cdot S$ be the honest stake, with $f$ being the fraction of
 adversarial stake. Assuming the total stake is large, we can approximate the
 binomial distribution by a normal one and express the probability of not having
-an an honest quorum as follows:
+an honest quorum as follows:
 
 $$
-P = \mathbf{P}_\text{binom} (\lfloor \tau \cdot n \rfloor, H, \beta) \approx \mathbf{P}_\text{normal} \left( \tau \cdot n, H \cdot \beta, \sqrt{H \cdot \beta \cdot (1 - \beta)} \right) \approx \mathbf{P}_\text{normal} \left( \tau \cdot n, H \cdot \beta, \sqrt{H \cdot \beta} \right)
+P = \mathbf{P}_\text{binom} (\lfloor \tau \cdot n \rfloor, H, p) \approx \mathbf{P}_\text{normal} \left( \tau \cdot n, H \cdot p, \sqrt{H \cdot p \cdot (1 - p)} \right) \approx \mathbf{P}_\text{normal} \left( \tau \cdot n, H \cdot p, \sqrt{H \cdot p} \right)
 $$
 
-Using $n \approx S \cdot \beta$, we have a simpler approximate expression and an
-R function for performing the computation.
+Using $n \approx S \cdot p$, we have a simpler approximate expression and an R
+function for performing the computation.
 
 $$
 P \approx \mathbf{P}_\text{normal} \left( f , 1 - \tau , \sqrt{\frac{1 - f}{n}} \right)
@@ -588,17 +619,13 @@ function(f, tau, n)
 
 The plots below show how the probability of obtaining or not obtaining an honest
 quorum varies with the quorum size and committee size. We do not consider
-committees smaller than the decentralization parameter $k = 500$.
+committees smaller than the decentralization parameter $k = 500$ because having
+fewer SPOs that would result in some stakepools being oversaturated and loosing
+rewards.
 
 ![Approximate probability of no honest quorum](../analysis/no-honest-quorum.svg)
 
 ![Approximate probability of honest quorum](../analysis/honest-quorum.svg)
-
-> [!CAUTION]
->
-> Should we do the exact computation for the above plots and table or is the
-> normal approximation okay? The CDF computations might be slow, and we'd also
-> have to make an assumption about the number of lovelace staked.
 
 Conversely, using the same method we can estimate the probability of adversarial
 parties creating their own quorum.
@@ -616,21 +643,23 @@ and the quorum requirement:
    honest quorum.
 
 For Leios the third criterion above is critical, so we need to avoid at all
-costs a chance of an adversarial quorum. The first and third criteria are
+costs a chance of an adversarial quorum. The first and second criteria are
 important only in that they affect the cost of running Leios nodes. The fourth
 criterion is less important because it only creates inefficiency leading to
 lower throughput.
 
 Given the above analysis, we consider a 60% quorum for a committee of 500 votes
-to be the most efficient and least costly that still maintains security. This
-implies a low probability of an adversarial quorum even for a strong adversary
-and a high probability of an honest quorum even for a modestly strong adversary.
-Note that even at 50% adversarial stake, the security of voting is much stronger
-than the underlying Praos security, though it would be very hard to have a
-successful honest quorum. At 45% adversarial stake honest quora would be
-frequent enough for the chain to function inefficiently. It might be possible to
-lower the quorum requirement to 55%, which would give a 1.29e-3 probability of
-an adversarial certificate at 45% adversarial stake and a 50% probability of an
+to be the most efficient and least costly that still maintains security. (We
+have a committee with such stake that they would be expected to generate 500
+votes, and we require 60% of the latter to generate a certificate.) This implies
+a low probability of an adversarial quorum even for a strong adversary and a
+high probability of an honest quorum even for a modestly strong adversary. Note
+that even at 50% adversarial stake, the security of voting is much stronger than
+the underlying Praos security, though it would be very hard to have a successful
+honest quorum. At 45% adversarial stake honest quora would be frequent enough
+for the chain to function inefficiently. It might be possible to lower the
+quorum requirement to 55%, which would give a 1.29e-3 probability of an
+adversarial certificate at 45% adversarial stake and a 50% probability of an
 honest quorum.
 
 | Adversarial stake, $f$ | Probability of adversarial quorum | Probability of honest quorum |
@@ -650,11 +679,15 @@ honest quorum.
 > quorum. I'm certain that the Leios probabilities are lower than the Praos ones
 > if $\tau = 0.60$, but I'm not so certain about the situation if $\tau = 0.55$.
 
-> [!CAUTION]
->
-> The above analysis might not hold when the clumpiness of the stake
-> distribution is accounted for. For example, do the probabilities change if a
-> couple of large stakepools are selected in the lottery?
+Finally, the fraction of adversarial stake in a committee will differ from the
+fraction of adversarial stake in the whole due to statistical fluctuations. For
+uniformly distributed stake, these fluctuations follow a binomial distribution,
+so the standard deviation of that fraction is $\sqrt{f \cdot (1 - f) / n}$. For
+a committee of 500 voters, this amounts to a 1.34% fluctuation. Such
+fluctuations should be accounted for when interpreting the adversarial fractions
+presented in this report.
+
+![Fluctuation of adversarial fraction in voting committee](../images/adversary-fluctuation.svg)
 
 ### Certificate scheme
 
@@ -715,58 +748,71 @@ vote size small may translate into smaller certificates.
 
 #### ALBA certificate
 
-> [!WARNING]
->
-> This section needs thorough review, and it does not distinguish ALBA variants.
->
-> - [ ] Check the typesetting of the equations.
+ALBA is a protocol to generate a proof of knowledge of lower bound of the size
+of a dataset of unique elements. It can be easily be applied to our case to
+generate a certificate showing a quorum of votes has been gathered. For a
+dataset $S_p$ of size $|S_p|$, ALBA certificates are parameterized by four
+parameters ($n_f$, $n_p$, $\ell_\text{rel}$, and $\ell_\text{sec}$) where $n_f$
+is the strict lower bound we want to demonstrate, $n_p$ a parameter such that
+$|S_p| \geq n_p > n_f$ and the $\ell$s are security parameters. Let $n$ be the
+number of votes the certifier has access to. The _completeness_ property of ALBA
+ensures that one is able to honestly create a proof with probability
+$p_{rel} = 1 - 2^{-\ell_\text{rel}}$ provided
+$\left| S_p \right| \geq n \geq n_p$. The _soundness_ property of ALBA ensures
+that one is not able to create a proof with lower than $n<n_f$ elements with
+probability $p_{sec} = 1 - 2^{-\ell_\text{sec}}$ provided
+$\left| S_p \right| \geq n \geq n_p$. If the aggregator does not receive enough
+elements, that is $n < n_p$, the probability to generate a certificate decreases
+significantly.
 
-ALBA certificates are parameterized by three parameters ($n_f$, $n_p$, and
-$\ell_\text{sec}$). Let $\left| S_p \right|$ be the number of honest votes the
-certifier has access to. The _completeness_ property of ALBA ensures that one is
-not able to create a proof with probability $p = 2^{-\ell_\text{sec}}$ provided
-$\left| S_p \right| \geq n_p$. If $\left| S_p \right| < n_p$, then the
-probability of optimistically failing to create a proof is
+In the centralized prehashed ALBA scheme, the number of votes included in the
+proof is
 
 $$
-p = 2 \cdot \log 12 \cdot \lceil \ell_\text{sec} \rceil \cdot \left( \frac{\left| S_p \right|}{n_p} \right)^u
+u = \left\lceil \frac{ \ell_\text{sec} + \log_2 \ell_\text{rel} + 5 - \log_2 (\log_2 e) } { \log_2(\frac{n_p}{n_f}) } \right\rceil
 $$
 
-where the number of votes included in the proof is
-
-$$
-u = \left\lceil \frac{ \ell_\text{sec} + \log_2 \ell_\text{sec} + 5 - \log_2 (\log_2 e) } { \log_2(\frac{n_p}{n_f}) } \right\rceil
-$$
-
-The plots below show how it is more probable to build a certificate with more
-votes or lower $n_p$ and how higher $n_p$ requires fewer items (votes) be
-included in the certificate. We need a low enough $n_p$ so that a certifier can
-easily build a certificate of honest votes and a low enough $n_p$ so that the
-resulting certificate will fit in a Praos block.
+As votes can be duplicated in a certificate, its size can be lowered by using a
+different format where we only include the unique votes and their indices in the
+proof. The certificate's size can further be reduced by separating the common
+elements in the votes, such as the EB hash from the unique ones, such as the
+signatures and verification keys. The parameter $n_p$ can be delicate to set as
+it both influences the minimum number of votes to gather to guarantee the
+generation of a certificate and the size of it. The lower $n_p$ is, the fewer
+votes we need to generate a certificate, but the larger it becomes. The plots
+below show this behaviour, how it is more probable to build a certificate with
+more votes or lower $n_p$ and how higher $n_p$ requires fewer items (votes) be
+included in the certificate. On the one hand, we need a low enough $n_p$ so that
+a certifier can quickly and easily build a certificate of honest votes and, on
+the other hand, a large enough $n_p$ so that the resulting certificate will fit
+in a Praos block.
 
 |                                                                        |                                                             |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
 | ![Probability of creating an ALBA proof](../analysis/alba-success.svg) | ![Number of items in ALBA proof](../analysis/alba-size.svg) |
 
 For the sake of argument, assume that we want the votes included in the
-certificate to occupy no more than 75 kB. We set
-$\ell_\text{sec} = \ell_\text{rel} = 80$, $n_f = 0.6$, and $n = 500$. The table
-below indicates that votes no larger than 200 bytes would provide a reasonable
+certificate to occupy no more than 75 kB and that the certificate is just a
+collection of votes. We set the number of votes to 500
+($n=500), $\ell_\text{sec} = \ell_\text{rel} = 80$, $n_f = 0.6 \cdot n$. (Note
+that a naive aggregator, just outputting 60% of the votes, would require votes
+of maximum size 250 bytes for them to fit in a certificate.) The table below
+indicates that votes no larger than 200 bytes would provide a reasonable
 requirement for the number of honest votes needed for certification. Note that
 our analysis of quorum size resulted in a constraint of 60% of the votes being
-honest. ALBA, however, raised that constraint the to values in the table because
+honest. ALBA, however, raised that constraint to the values in the table because
 ALBA needs more than 60% of the votes to build a compact certificate: this means
 that weaker adversaries can prevent the achievement of a quorum.
 
-| Vote size | Votes fitting into 75 kB | Minimum allowable $n_p$ | Fraction of honest votes needed, $n_p/n$ | Adversarial stake needed to prevent quorum |
-| --------: | -----------------------: | ----------------------: | ---------------------------------------: | -----------------------------------------: |
-|     200 B |                      375 |                     355 |                                   71.0 % |                                      29.0% |
-|     250 B |                      300 |                     371 |                                   74.2 % |                                      25.8% |
-|     300 B |                      250 |                     386 |                                   77.2 % |                                      22.8% |
-|     350 B |                      214 |                     403 |                                   80.6 % |                                      19.4% |
-|     400 B |                      187 |                     421 |                                   84.2 % |                                      15.8% |
-|     450 B |                      166 |                     439 |                                   87.8 % |                                      12.2% |
-|     500 B |                      150 |                     457 |                                   91.4 % |                                       8.6% |
+| Vote size | Maximum number of votes fitting into 75 kB | Minimum allowable $n_p$ | Fraction of votes needed, $n_p/n$ | Minimum number of dishonest votes needed to prevent quorum |
+| --------: | -----------------------------------------: | ----------------------: | --------------------------------: | ---------------------------------------------------------: |
+|     200 B |                                        375 |                     355 |                            71.0 % |                                                      29.0% |
+|     250 B |                                        300 |                     371 |                            74.2 % |                                                      25.8% |
+|     300 B |                                        250 |                     386 |                            77.2 % |                                                      22.8% |
+|     350 B |                                        214 |                     403 |                            80.6 % |                                                      19.4% |
+|     400 B |                                        187 |                     421 |                            84.2 % |                                                      15.8% |
+|     450 B |                                        166 |                     439 |                            87.8 % |                                                      12.2% |
+|     500 B |                                        150 |                     457 |                            91.4 % |                                                       8.6% |
 
 Using the previously mentioned ALBA parameters and setting $n_p / n = 0.9$, we
 show below measurements for the unoptimized "centralized telescope" version of
@@ -780,14 +826,21 @@ certificate in this example.
 
 ![Proof and verification times for ALBA certificates relevant to Leios](../images/leios-alba.svg)
 
-#### BLS certificate
+#### Mithril certificates
 
-The BLS certificate describe in the Leios paper does not compress votes the way
-that ALBA does, so votes must be fully stored in the certificate. However, only
-a quorum of votes, not all of them, need to be stored, which affords a type of
-compression. Additionally, two aggregate signature must also be stored. A
-certificate for a quorum of votes attested by ephemeral keys would fit in a
-Praos block, but a certificate attested by KES keys is about 50% too large.
+The BLS certificate describe in the Leios paper rely on Mithril threshold
+multisignatures. The aggregation there is different from ALBA, instead of
+running a random walk on $u$ elements, we perform a high number of lotteries
+($m$) and require a smaller number, $k$ of them, to be won to generate a
+certificate. As such, we do not have the same requirement to receive a greater
+number of votes than the adversarial stake (c.f. the $n_p$ discussion and table
+in the Alba section). Mithril uses different compression methods to reduce the
+certificate size, including only the unique signatures and relying on the
+Octopus algorithm to reduce the Merkle proof's total size. To fasten the
+signature verification, Mithril relies on BLS homomorphic properties and
+verifies up to two additional aggregate signatures instead. A certificate for a
+quorum of votes attested by ephemeral keys would fit in a Praos block, but a
+certificate attested by KES keys is about 50% too large.
 
 | Method        | Common to all votes | Specific to individual vote | Aggregation | Number of votes | Certificate of all votes | Quorum | Certificate of quorum |
 | ------------- | ------------------: | --------------------------: | ----------: | --------------: | -----------------------: | -----: | --------------------: |
@@ -795,10 +848,10 @@ Praos block, but a certificate attested by KES keys is about 50% too large.
 | KES key       |                64 B |                       529 B |       192 B |             500 |                   265 kB |    60% |                159 kB |
 
 Also recall that any ephemeral keys would have to be registered on-chain,
-consuming additional precious space and complicating bookkeeping: that would
-only provide benefit if the keys were reused for many votes. It might also be
-possible to only store the Merkle proof for the KES key only at the start of the
-KES period (e.g., every 36 hours).
+consuming additional precious space and complicating bookkeeping and extra work:
+that would only provide benefit if the keys were reused for many votes. It might
+also be possible to only store the Merkle proof for the KES key only at the
+start of the KES period (e.g., every 36 hours).
 
 The construction and verification times below are based on benchmarking using
 the Rust [bls-signatures](https://lib.rs/crates/bls-signatures) package.
@@ -825,12 +878,14 @@ However, these measurements are not consistent with the experience of Mithril:
 [MUSEN](https://iohk.io/en/research/library/papers/musen-aggregatable-key-evolving-verifiable-random-functions-and-applications/)
 ("MUlti-Stage key-Evolving verifiable random fuNctions.") builds upon the
 concept of VRFs by introducing a key-evolving feature and allowing for
-aggregating VRF outputs. The aggregation capability promises to result in small
-certificates attesting to the Leios votes, MUSEN suffers from the need to record
-all of the verification keys (e.g., in a Merkle tree). MUSEN signature are
-approximately the same size as KES signatures. However, verification times may
-be too long for Leios. Overall, the benefit of MUSEN's key evolution is minor
-and its other resource costs may be greater than plain BLS.
+aggregating VRF outputs, combining in a way Mithril signatures, KES keys and
+VRFs. The aggregation capability promises to result in small certificates
+attesting to the Leios votes, with MUSEN signature approximately being the same
+size as a single KES signatures. However, verification times may be too long for
+Leios, as it would require hundreds of milliseconds, MUSEN also suffers from the
+need to record all of the verification keys (e.g., in a Merkle tree). Overall,
+the benefit of MUSEN's key evolution is minor and its other resource costs may
+be greater than plain BLS.
 
 ### Insights regarding voting and certificates
 
@@ -843,19 +898,26 @@ and its other resource costs may be greater than plain BLS.
       spanning 1.5 days on the Cardano mainnet, persist for many Leios voting
       cycles.
    4. Using ephemeral keys would make votes smaller, but then a key registration
-      layer would have to be added to the protocol.
+      layer would have to be added to the protocol similarly to KES key reuse
+      mentionned beforehand.
 2. Neither ALBA, BLS, MUSEN, or their ZK variants are clear winners for the best
    choice of certificate scheme for Leios.
    1. Each has at least one strength and one drawback related to certificate
       size, proof time, or verification time.
    2. ALBA is close to being viable if vote size can reduced or if quorum
-      disruption by adversaries with 10% of stake is acceptable.
+      disruption by adversaries with 10% of stake is acceptable. (Note that the
+      10% is approximate because the adversarial fraction for the committee
+      differs from the fraction of the whole due to fluctuations, but these are
+      small for a committee of 500: see
+      [Committee size and quorum requirement](#committee-size-and-quorum-requirement).)
    3. An ALBA security setting of $\ell_\text{sec} = \ell_\text{rel} = 80$
-      (i.e., eighty-bit security) seems sufficient for Leios voting.
-   4. BLS is viable if ephemeral keys are used, but those would require
+      (i.e., eighty-bit security) seems sufficient for Leios voting but the
+      lower security may be not acceptable.
+   4. Mithril is viable if ephemeral keys are used, but those would require
       pre-registration.
-   5. BLS with KES keys could work if oversized Praos blocks (~160 kB) are
-      allowed.
+   5. A Mithril variant with KES keys could work if oversized Praos blocks (~160
+      kB) are allowed but would increase significantly increase the verification
+      time.
    6. ZK variants would result in small certificates but long proving times.
 3. At least 500 votes and a 60% quorum will be needed.
    1. These parameters ensure voting security at least as strong as Praos
@@ -869,7 +931,7 @@ and its other resource costs may be greater than plain BLS.
    work on estimating CPU resources needed will require detailed implementation
    of the prospective voting and certificate schemes. For the time being, the
    following values can be used in simulation studies.
-   1. Number of votes: 600
+   1. Number of votes: 500
    2. Quorum: 60%
    3. Vote size: 250 B / vote
    4. Certificate size: 75 kB / vote
