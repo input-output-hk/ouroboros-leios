@@ -174,11 +174,11 @@ traceRelayLink1 tcpprops =
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig
-                    { producerId = 4
-                    , vrfProof = 32
-                    , signature_ = 32
-                    , reference = 32
-                    , voteCrypto = 64
+                    { inputBlockHeader = kilobytes 1
+                    , inputBlockBodyAvgSize = kilobytes 95
+                    , inputBlockBodyMaxSize = kilobytes 100
+                    , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
+                    , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
                     , certificate = const (50 * 1024)
                     }
               , delays =
@@ -189,7 +189,11 @@ traceRelayLink1 tcpprops =
                     , -- \^ hash matching and payload validation (incl. tx scripts)
                       endorseBlockValidation = const 0.005
                     , voteMsgValidation = const 0.005
-                    , certificateCreation = const 0.050
+                    , certificateGeneration = const 0.050
+                    , inputBlockGeneration = const 0
+                    , endorseBlockGeneration = const 0
+                    , voteMsgGeneration = const 0
+                    , certificateValidation = const 0
                     }
               }
       let leiosNodeConfig nodeId@(NodeId i) =

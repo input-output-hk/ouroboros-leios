@@ -16,6 +16,7 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
+import Data.Coerce (coerce)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -23,6 +24,7 @@ import LeiosProtocol.Common
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
+import ModelTCP (Bytes (..))
 import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
@@ -151,25 +153,27 @@ exampleLeiosConfig sliceLength slotConfig = leios
   -- TODO: realistic sizes
   sizes =
     SizesConfig
-      { producerId = 4
-      , vrfProof = 32
-      , signature_ = 32
-      , reference = 32
-      , voteCrypto = 64
+      { inputBlockHeader = kilobytes 1
+      , inputBlockBodyAvgSize = kilobytes 95
+      , inputBlockBodyMaxSize = kilobytes 100
+      , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
+      , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
       , certificate = const (50 * 1024)
       }
   delays =
     LeiosDelays
       { inputBlockHeaderValidation = const 0.005
-      , inputBlockValidation = const 0.1
-      , endorseBlockValidation = const 0.005
+      , -- \^ vrf and signature
+        inputBlockValidation = const 0.1
+      , -- \^ hash matching and payload validation (incl. tx scripts)
+        endorseBlockValidation = const 0.005
       , voteMsgValidation = const 0.005
-      , certificateCreation = const 0.050
+      , certificateGeneration = const 0.050
+      , inputBlockGeneration = const 0
+      , endorseBlockGeneration = const 0
+      , voteMsgGeneration = const 0
+      , certificateValidation = const 0
       }
 
-  praos =
-    PraosConfig
-      { slotConfig
-      , blockValidationDelay = const 0.1 -- 100ms --TODO: should depend on certificate/payload
-      , headerValidationDelay = const 0.005 -- 5ms
-      }
+  -- TODO: body validation should depend on certificate/payload
+  praos = defaultPraosConfig' slotConfig

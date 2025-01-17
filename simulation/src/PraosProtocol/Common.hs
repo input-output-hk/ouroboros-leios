@@ -29,11 +29,12 @@ module PraosProtocol.Common (
   kilobytes,
   module TimeCompat,
   defaultPraosConfig,
+  defaultPraosConfig',
   CPUTask (..),
   hashToColor,
 ) where
 
-import ChanTCP (MessageSize (..))
+import ChanTCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Data.Coerce (coerce)
 import Data.Map.Strict (Map)
@@ -137,14 +138,23 @@ data PraosConfig body = PraosConfig
   { slotConfig :: !SlotConfig
   , blockValidationDelay :: !(Block body -> DiffTime)
   , headerValidationDelay :: !(BlockHeader -> DiffTime)
+  , blockGenerationDelay :: !(Block body -> DiffTime)
+  , headerSize :: !Bytes
+  , bodySize :: !(body -> Bytes)
+  , bodyMaxSize :: !Bytes
   }
 
+defaultPraosConfig' :: SlotConfig -> PraosConfig body
+defaultPraosConfig' slotConfig =
+  PraosConfig
+    { slotConfig
+    , blockValidationDelay = const 0.1
+    , headerValidationDelay = const 0.005
+    , blockGenerationDelay = const 0
+    , headerSize = kilobytes 1
+    , bodySize = const $ kilobytes 95
+    , bodyMaxSize = kilobytes 96
+    }
+
 defaultPraosConfig :: MonadTime m => m (PraosConfig body)
-defaultPraosConfig = do
-  slotConfig <- slotConfigFromNow
-  return
-    PraosConfig
-      { slotConfig
-      , blockValidationDelay = const 0.1
-      , headerValidationDelay = const 0.005
-      }
+defaultPraosConfig = defaultPraosConfig' <$> slotConfigFromNow

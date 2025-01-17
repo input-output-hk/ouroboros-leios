@@ -18,30 +18,35 @@ import Data.Maybe (
   maybeToList,
  )
 import LeiosProtocol.Common
+import LeiosProtocol.Config as OnDisk
 import ModelTCP
 import Prelude hiding (id)
 
+-- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
 data SizesConfig = SizesConfig
-  { producerId :: Bytes
-  , vrfProof :: Bytes
-  , signature_ :: Bytes
-  , reference :: Bytes
-  -- ^ size of a block reference, presumably hash
-  , voteCrypto :: Bytes
-  -- ^ voting is in flux, we stay flexible (atm it's two signatures)
-  , certificate :: Certificate -> Bytes
-  -- ^ certificate size might depend on number of votes.
+  { inputBlockHeader :: !Bytes
+  , inputBlockBodyAvgSize :: !Bytes
+  -- ^ as we do not model transactions we just use a fixed size for bodies.
+  , inputBlockBodyMaxSize :: !Bytes
+  , endorseBlock :: !(EndorseBlock -> Bytes)
+  , voteMsg :: !(VoteMsg -> Bytes)
+  , certificate :: !(Certificate -> Bytes)
+  -- ^ certificate size depends on number of votes, contributes to RB block body sizes.
   }
 
 -- Note: ranking block validation delays are in the PraosConfig, covers certificate validation.
 data LeiosDelays = LeiosDelays
-  { inputBlockHeaderValidation :: InputBlockHeader -> DiffTime
+  { inputBlockGeneration :: !(InputBlock -> DiffTime)
+  , inputBlockHeaderValidation :: !(InputBlockHeader -> DiffTime)
   -- ^ vrf and signature
-  , inputBlockValidation :: InputBlock -> DiffTime
+  , inputBlockValidation :: !(InputBlock -> DiffTime)
   -- ^ hash matching and payload validation (incl. tx scripts)
-  , endorseBlockValidation :: EndorseBlock -> DiffTime
-  , voteMsgValidation :: VoteMsg -> DiffTime
-  , certificateCreation :: Certificate -> DiffTime
+  , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
+  , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
+  , voteMsgGeneration :: !(VoteMsg -> DiffTime)
+  , voteMsgValidation :: !(VoteMsg -> DiffTime)
+  , certificateGeneration :: !(Certificate -> DiffTime)
+  , certificateValidation :: !(Certificate -> DiffTime)
   }
 
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
@@ -60,67 +65,39 @@ data LeiosConfig = LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
-  -- TODO?: max size parameters.
   }
+
+convertConfig :: OnDisk.Config -> LeiosConfig
+convertConfig = error "TBD"
 
 class FixSize a where
   fixSize :: LeiosConfig -> a -> a
 
 instance FixSize InputBlockHeader where
-  fixSize cfg ib@InputBlockHeader{..} =
+  fixSize cfg InputBlockHeader{..} =
     InputBlockHeader
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes ib.slot
-            + subSlotSize
-            + cfg.sizes.reference {- ib.rankingBlock -}
-            + 32 {- hash of body -}
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.inputBlockHeader
       , ..
       }
-   where
-    subSlotSize =
-      if cfg.inputBlockFrequencyPerSlot > 1
-        then messageSizeBytes ib.subSlot
-        else
-          0
 
 instance FixSize EndorseBlock where
   fixSize cfg eb@EndorseBlock{..} =
     EndorseBlock
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes eb.slot
-            + cfg.sizes.reference
-              * fromIntegral
-                ( length eb.inputBlocks
-                    + length eb.endorseBlocksEarlierStage
-                    + length eb.endorseBlocksEarlierPipeline
-                )
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.endorseBlock eb
       , ..
       }
 
 instance FixSize VoteMsg where
   fixSize cfg v@VoteMsg{..} =
     VoteMsg
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes v.slot
-            + 64 {- votes -}
-            + sum (map (const cfg.sizes.reference {- EB ref -}) endorseBlocks)
-            + cfg.sizes.voteCrypto
+      { size = cfg.sizes.voteMsg v
       , ..
       }
 
 instance FixSize RankingBlockBody where
   fixSize cfg rb@RankingBlockBody{..} =
     RankingBlockBody
-      { size =
-          sum [cfg.sizes.reference + cfg.sizes.certificate cert | (_, cert) <- rb.endorseBlocks]
-            + rb.payload
+      { size = cfg.praos.bodySize rb
       , ..
       }
 
