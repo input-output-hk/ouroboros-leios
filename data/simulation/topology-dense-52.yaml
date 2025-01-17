@@ -1,12 +1,13 @@
-# cluster topology (where location is {cluster: string})
+# yaml-language-server: $schema=./topology.schema.json
+
 nodes:
   node-0:
     location:
       cluster: eu-central-1
     producers:
       node-1:
-        bandwidth-bytes-per-second: null # or whole number
-        cpu-core-count: null # or whole number
+        # cpu-core-count: number
+        # bandwidth-bytes-per-second: number
         latency-ms: 45.24048611111111
       node-18:
         latency-ms: 0.17364513888888888

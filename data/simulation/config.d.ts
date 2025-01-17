@@ -80,33 +80,3 @@ export interface LogNormalDistribution {
   mu: number;
   sigma: number;
 }
-
-/** A topology for a Leios simulation. */
-export interface Topology<lk extends LocationKind> {
-  nodes: Partial<Record<NodeName, Node<lk>>>;
-}
-
-/** A node. */
-export interface Node<lk extends LocationKind> {
-  stake?: bigint;
-  location: Location<lk>;
-  producers: Partial<Record<NodeName, LinkInfo>>;
-}
-
-/** Link information. */
-export interface LinkInfo {
-  "latency-ms": number;
-  "bandwidth-bytes-per-second": bigint;
-  "cpu-core-count": bigint;
-}
-
-/** Node location. */
-export type Location<lk extends LocationKind> = lk extends "CLUSTER"
-  ? { cluster: string }
-  : lk extends "COORD2D"
-  ? [number, number]
-  : undefined;
-
-export type LocationKind = "CLUSTER" | "COORD2D";
-
-export type NodeName = string;
