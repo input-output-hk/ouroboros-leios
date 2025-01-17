@@ -16,13 +16,16 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
+import Data.Coerce (coerce)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import LeiosProtocol.Common
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
+import ModelTCP (Bytes (..))
 import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
@@ -107,8 +110,11 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
-exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
+exampleTrace2 :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 rng = exampleTrace2' rng . convertConfig
+
+exampleTrace2' :: StdGen -> LeiosConfig -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2' rng0 leios p2pTopography@P2PTopography{..} processingCores =
   traceLeiosP2P
     rng0
     p2pTopography
@@ -120,20 +126,16 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
     LeiosNodeConfig
       { stake = StakeFraction $ 1 / p2pNumNodes
       , baseChain = Genesis
+      , slotConfig
       , leios
-      , rankingBlockFrequencyPerSlot = 1 / fromIntegral leios.sliceLength
-      , rankingBlockPayload = 0
-      , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
       , processingCores
       , nodeId
       , rng
       }
-   where
-    leios = exampleLeiosConfig sliceLength slotConfig
 
-exampleLeiosConfig :: Int -> SlotConfig -> LeiosConfig
-exampleLeiosConfig sliceLength slotConfig = leios
+exampleLeiosConfig :: Int -> LeiosConfig
+exampleLeiosConfig sliceLength = leios
  where
   -- TODO: review voting numbers, these might not make sense.
   leios =
@@ -151,25 +153,28 @@ exampleLeiosConfig sliceLength slotConfig = leios
   -- TODO: realistic sizes
   sizes =
     SizesConfig
-      { producerId = 4
-      , vrfProof = 32
-      , signature_ = 32
-      , reference = 32
-      , voteCrypto = 64
+      { inputBlockHeader = kilobytes 1
+      , inputBlockBodyAvgSize = kilobytes 95
+      , inputBlockBodyMaxSize = kilobytes 100
+      , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
+      , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
       , certificate = const (50 * 1024)
+      , rankingBlockLegacyPraosPayloadAvgSize = 0
       }
   delays =
     LeiosDelays
       { inputBlockHeaderValidation = const 0.005
-      , inputBlockValidation = const 0.1
-      , endorseBlockValidation = const 0.005
+      , -- \^ vrf and signature
+        inputBlockValidation = const 0.1
+      , -- \^ hash matching and payload validation (incl. tx scripts)
+        endorseBlockValidation = const 0.005
       , voteMsgValidation = const 0.005
-      , certificateCreation = const 0.050
+      , certificateGeneration = const 0.050
+      , inputBlockGeneration = const 0
+      , endorseBlockGeneration = const 0
+      , voteMsgGeneration = const 0
+      , certificateValidation = const 0
       }
 
-  praos =
-    PraosConfig
-      { slotConfig
-      , blockValidationDelay = const 0.1 -- 100ms --TODO: should depend on certificate/payload
-      , headerValidationDelay = const 0.005 -- 5ms
-      }
+  -- TODO: body validation should depend on certificate/payload
+  praos = defaultPraosConfig

@@ -538,17 +538,9 @@ impl Node {
         if ebs.is_empty() {
             return;
         }
-        let votes_allowed = if self.sim_config.one_vote_per_vrf {
-            // For every VRF lottery you won, you can vote for one EB
-            vote_count
-        } else {
-            // For every VRF lottery you won, you can vote for every EB
-            vote_count * ebs.len()
-        };
-        let mut eb_counts = BTreeMap::new();
-        for eb in ebs.iter().cycle().take(votes_allowed) {
-            *eb_counts.entry(*eb).or_default() += 1;
-        }
+        // For every VRF lottery you won, you can vote for every EB
+        let votes_allowed = vote_count * ebs.len();
+        let eb_counts = ebs.into_iter().map(|eb| (eb, votes_allowed)).collect();
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,

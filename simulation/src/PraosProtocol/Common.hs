@@ -33,7 +33,7 @@ module PraosProtocol.Common (
   hashToColor,
 ) where
 
-import ChanTCP (MessageSize (..))
+import ChanTCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Data.Coerce (coerce)
 import Data.Map.Strict (Map)
@@ -53,10 +53,10 @@ import TimeCompat
 --------------------------------
 
 instance MessageSize BlockBody where
-  messageSizeBytes _ = kilobytes 95
+  messageSizeBytes b = b.bodyMessageSize
 
 instance MessageSize BlockHeader where
-  messageSizeBytes _ = kilobytes 1
+  messageSizeBytes h = h.headerMessageSize
 
 instance MessageSize SlotNo where
   messageSizeBytes _ = 8
@@ -134,17 +134,23 @@ data PraosNodeEvent body
   deriving (Show)
 
 data PraosConfig body = PraosConfig
-  { slotConfig :: !SlotConfig
+  { blockFrequencyPerSlot :: !Double
   , blockValidationDelay :: !(Block body -> DiffTime)
   , headerValidationDelay :: !(BlockHeader -> DiffTime)
+  , blockGenerationDelay :: !(Block body -> DiffTime)
+  , headerSize :: !Bytes
+  , bodySize :: !(body -> Bytes)
+  , bodyMaxSize :: !Bytes
   }
 
-defaultPraosConfig :: MonadTime m => m (PraosConfig body)
-defaultPraosConfig = do
-  slotConfig <- slotConfigFromNow
-  return
-    PraosConfig
-      { slotConfig
-      , blockValidationDelay = const 0.1
-      , headerValidationDelay = const 0.005
-      }
+defaultPraosConfig :: PraosConfig body
+defaultPraosConfig =
+  PraosConfig
+    { blockFrequencyPerSlot = 0.2
+    , blockValidationDelay = const 0.1
+    , headerValidationDelay = const 0.005
+    , blockGenerationDelay = const 0
+    , headerSize = kilobytes 1
+    , bodySize = const $ kilobytes 95
+    , bodyMaxSize = kilobytes 96
+    }

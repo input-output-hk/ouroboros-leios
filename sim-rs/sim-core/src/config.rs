@@ -95,7 +95,6 @@ pub struct RawParameters {
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
-    pub vote_one_eb_per_vrf_win: bool,
     // pub vote_size_bytes_constant: u64,
     // pub vote_size_bytes_per_node: u64,
 
@@ -276,7 +275,6 @@ pub struct SimConfiguration {
     pub(crate) max_ib_size: u64,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
-    pub(crate) one_vote_per_vrf: bool,
     pub(crate) cpu_times: CpuTimeConfig,
     pub(crate) transaction_frequency_ms: FloatDistribution,
     pub(crate) transaction_size_bytes: FloatDistribution,
@@ -302,7 +300,6 @@ impl SimConfiguration {
             max_ib_size: params.ib_body_max_size_bytes,
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
-            one_vote_per_vrf: params.vote_one_eb_per_vrf_win,
             cpu_times: CpuTimeConfig::new(&params),
             transaction_frequency_ms: params.tx_generation_distribution.into(),
             transaction_size_bytes: params.tx_size_bytes_distribution.into(),

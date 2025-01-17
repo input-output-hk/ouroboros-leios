@@ -29,6 +29,7 @@ import qualified Diagrams.TwoD.Adjust as Dia
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 import LeiosProtocol.Common hiding (Point)
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -154,19 +155,19 @@ leiosGenCountRender =
     let ebs = st.ebMsgs.numMsgsGenerated
     let votes = st.voteMsgs.numMsgsGenerated
     let IBsInRBsReport{..} = totalIBsInRBs st.ibsInRBs
-    Cairo.showText $
-      intercalate
+    Cairo.showText
+      $ intercalate
         ";  "
-        [ "Blocks generated: "
+      $ [ "Blocks generated: "
             ++ intercalate
               ",  "
               [ printf "%s: %i (%.2f %s/s)" lbl n (perSec n) lbl
               | (n, lbl) <- [(rbs, "RB"), (ibs, "IB"), (ebs, "EB"), (votes, "Vote")]
               ]
-        , printf "IBs in RBs: %i (%i%%)" ibsInRBsNum ((ibsInRBsNum * 100) `div` ibs)
-        , printf "IBs in EBs: %i (%i%%)" ibsInEBsNum ((ibsInEBsNum * 100) `div` ibs)
-        , printf "EBs in RBs: %i (%i%%)" ebsInRBsNum ((ebsInRBsNum * 100) `div` ibs)
         ]
+        ++ [printf "IBs in RBs: %i (%i%%)" ibsInRBsNum ((ibsInRBsNum * 100) `div` ibs) | ibs > 0]
+        ++ [printf "IBs in EBs: %i (%i%%)" ibsInEBsNum ((ibsInEBsNum * 100) `div` ibs) | ibs > 0]
+        ++ [printf "EBs in RBs: %i (%i%%)" ebsInRBsNum ((ebsInRBsNum * 100) `div` ebs) | ebs > 0]
 
 leiosP2PSimVizRenderModel ::
   LeiosP2PSimVizConfig ->
@@ -755,8 +756,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: StdGen -> Int -> P2PTopography -> NumCores -> Visualization
-example2 rng sliceLength p2pTopography processingCores =
+example2 :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> Visualization
+example2 rng onDiskConfig p2pTopography processingCores =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -795,11 +796,11 @@ example2 rng sliceLength p2pTopography processingCores =
  where
   config = defaultVizConfig 5 processingCores
   modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng sliceLength p2pTopography processingCores)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pTopography processingCores)
 
-exampleSim :: StdGen -> Int -> P2PTopography -> NumCores -> Time -> FilePath -> IO ()
-exampleSim seed sliceLength p2pTopography processingCores stop fp = do
-  let trace = exampleTrace2 seed sliceLength p2pTopography processingCores
+exampleSim :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> Time -> FilePath -> IO ()
+exampleSim seed config p2pTopography processingCores stop fp = do
+  let trace = exampleTrace2 seed config p2pTopography processingCores
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
   runSampleModel' traceFile logLeiosEvent sampleModel stop trace
  where

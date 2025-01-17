@@ -169,6 +169,7 @@ setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers =
 
 data PraosNodeConfig = PraosNodeConfig
   { praosConfig :: PraosConfig BlockBody
+  , slotConfig :: SlotConfig
   , blockGeneration :: PacketGenerationPattern
   , chain :: Chain (Block BlockBody)
   , blockMarker :: ByteString
@@ -188,11 +189,12 @@ praosNode ::
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
   praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers
-  nextBlock <- mkNextBlock cfg.blockGeneration cfg.blockMarker
+  nextBlock <- mkNextBlock cfg.praosConfig cfg.blockGeneration cfg.blockMarker
   let generationThread =
         blockGenerator
           tracer
           cfg.praosConfig
+          cfg.slotConfig
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
           nextBlock

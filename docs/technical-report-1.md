@@ -100,48 +100,103 @@ understanding of blockchain concepts and the Cardano ecosystem.
 ## Sortition
 
 In Leios stake-based sortition occurs for the selection of the producers of IBs,
-EBs, and votes. The selection of the producers of IBs and EBs occurs similarly
-to Praos and the selection of the votes occurs similarly to Mithril. We define
-two functions for the probability of being elected as a producer or vote in the
-Bernoulli trials for each unit of stake (i.e., one lottery for each lovelace).
-Consider the situation where there is a total stake $S$ and a Leios node has $s$
-stake delegated to it. Let $f^\prime$ be the probability that a single lovelace
-wins the lottery and $f$ be the probability that any of the $S$ lovelace win it:
+EBs, and votes. The selection of the producers of IBs, EBs, and votes occurs
+similarly to Praos except that a node may win the lottery multiple times. (In
+Praos, winning multiple times still only results in being allowed to forge one
+new block.) We define two functions for the probability of being elected as a
+producer or vote in the Bernoulli trials for each unit of stake (i.e., one
+lottery for each lovelace). Consider the situation where there is a total stake
+$S$ and a Leios node has $s$ stake delegated to it. Let $f^\prime$ be the
+probability that a single lovelace wins the lottery and $f$ be the probability
+that any of the $S$ lovelace win it:
 
 $$
 f = 1 - (1 - f^\prime)^S \approx S \cdot f^\prime
 $$
 
-where the approximation holds for the very large total stake $S$, which is
-greater than $10^{16}$ on the Cardano mainnet. The probability that the node
-with $s$ stake delegated to it wins any of the lotteries is
+where the approximation holds for small enough $f^\prime$ and for very large
+total stake $S$, which is greater than $10^{16}$ on the Cardano mainnet. The
+probability that the node with $s$ stake delegated to it wins any of the
+lotteries is
 
 $$
 \psi_{f^\prime}(s) = 1 - (1 - f^\prime)^s
 $$
 
-which can be simplified with the relative stake $\sigma = s / S$ to
+which can be simplified in that same approximate with the relative stake
+$\sigma = s / S$ to
 
 $$
 \phi_f(\sigma) = \psi_{f^\prime}(\sigma \cdot S) = 1 - (1 - f)^\sigma
 $$
 
-Sortition reuses the Praos VRF, but prepending a string such as `Leios-IB`,
-`Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order to remove
-correlations between the uses of the VRF. The resulting VRF value `v` is
-compared to the probability (in the case of IBs and EBs) or the cumulative
-probability (in the case of votes) for winning the sortition lottery. This is
-equivalent to the eligibility checks in the Leios paper.
+Sortition reuses the Praos VRF, but prepending a domain-separation string such
+as `Leios-IB`, `Leios-EB`, or `Leios-Vote` to the bytes being hashed, in order
+to remove correlations between the uses of the VRF. Figures 6, 7, and 8 of the
+Leios paper describe the eligibility computations. The Leios paper proposes
+using the signature $\sigma_\text{eid} = \mathsf{BLS.Sign}(sk, eid)$ as the VRF
+for voting, but the Praos VRF procedure could also be used. In the end, the
+resulting eligibility value $v \in [0,1]$ is compared to the cumulative
+probability for winning the sortition lottery.
 
-### Advantage gained by splitting stake among nodes
+It is also important to note the any floating-point computations must be
+specified so different machines arrive at the same result. This can be done
+using a predefined, sufficient number of terms of a Taylor-series expansion and
+employing rational-number arithmetic for the calculations.
 
-Note that this formulation encourages the splitting of stake among many nodes:
-by pooling stake at a single node the stake has only one chance to build an RB,
-IB, or EB, but by splitting the stake among many nodes there is a chance for
-multiple RBs, IBs, or EBs in the same lottery. We can quantify this effect by
-comparing the expected number of lottery wins when splitting $\sigma$ into two
-$\frac{1}{2}\sigma$ pieces. The expected number of lottery wins for split stake
-minus combined stake is always positive for $\sigma > 0$.
+### Votes
+
+The sortition for voting allows a node may win several votes in the lottery.
+
+$$
+\mathcal{P}(n \text{ votes given stake } s) = {s \choose n} {f_\text{vote}^\prime}^n (1 - f_\text{vote}^\prime)^{s-n} \approx \frac{(f_\text{vote} \cdot \sigma)^n \cdot e^{- f_\text{vote} \cdot \sigma}}{n!}
+$$
+
+where $f_\text{vote} = f_\text{vote}^\prime \cdot S$ is the mean number of votes
+in the lottery and the stake is very large relative to the number of votes
+$n \ll s$. Note that even in this approximation the probabilities sum to one.
+The formula above and this approximation may be sufficient for use with a VRF to
+determine the number of votes that a node is entitled to. The table below show
+the VRF conditions for determining the number of votes in this approximation,
+which can be expressed as a Taylor series involving operations only on rational
+numbers. The Cardano mainnet decentralization parameter is current 500, so if we
+consider the case where the mean number of votes is 500 and a node has 1/500th
+of the stake, then $f_\text{vote} \cdot \sigma =1$ in this computations,
+corresponding to the right edge in the plot below: any pool with more stake
+would be oversaturated. Even in the worst-case scenario of a fully saturated
+pool, the probability of more than three votes is about 1.90%.
+
+| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                |
+| 1               | $1 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
+| 2               | $1 + \sigma \cdot f_\text{vote} < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
+| 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
+| $n$             | $\sum_{m=0}^{n-1} \frac{1}{m!} (\sigma \cdot f_\text{vote})^m < v \cdot \exp(f_\text{vote} \cdot\sigma) \le \sum_{m=0}^n \frac{1}{m!} (\sigma \cdot f_\text{vote})^m$                                                                                |
+
+![Probability of number of votes given a stake fraction](../images/prob-leios-vote.svg)
+
+Limiting nodes to a maximum of one vote would likely be safe if the mean number
+of votes is no larger than the effective decentralizations (i.e., the number of
+nodes with appreciable stake) would likely be safe, though it might result is
+larger concentrations of stake having smaller voting rewards, and it would
+greatly simplify the computation of sortition. However, limiting nodes to a
+maximum of one vote would provide a voting advantage if the stake were split
+among multiple nodes.
+
+### Regarding the advantage gained by splitting stake among nodes
+
+Note that using $\phi_f(\sigma)$ instead of $\psi^\prime_f(s)$ would encourage
+the splitting of stake among many nodes: by pooling stake at a single node the
+stake has only one chance to build an RB, IB, or EB, but by splitting the stake
+among many nodes there is a chance for multiple RBs, IBs, or EBs in the same
+lottery. No advantage exists if $\psi^\prime_f(s)$ is used and multiple wins are
+allowed.
+
+We can quantify this effect by comparing the expected number of lottery wins
+when splitting $\sigma$ into two $\frac{1}{2}\sigma$ pieces. The expected number
+of lottery wins for split stake minus combined stake is always positive for
+$\sigma > 0$.
 
 $$
 \delta = 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) + 1 \cdot \phi_f\left(\frac{\sigma}{2}\right) - 1 \cdot \phi_f(\sigma) = 2 \left[ 1 - (1 - f)^{\sigma/2} \right] - \left[ 1 - (1 - f)^\sigma \right] = \left[ 1 - (1 - f)^{\sigma/2} \right]^2 = \left[ \phi_f\left(\frac{\sigma}{2}\right) \right]^2 > 0
@@ -186,6 +241,10 @@ little stake delegated to them.
 
 ### Input blocks
 
+If Leios is limited to allowing a node to produce only one IB per slot, then the
+approximation $\phi_{f_\text{IB}}(\sigma)$ can be used to simplify sortition.
+Otherwise, the voting-like sortition described above must be used.
+
 In Leios, even if a node wins the IB lottery several times, it is only allowed
 to build a single block. This is identical to the sortition rule in Praos. Let
 $f_\text{IB}$ be the protocol parameter specifying the per-slot probability of a
@@ -204,7 +263,7 @@ during that phase. The probability of none of the $i$ nodes with stake
 $\sigma_i$ winning the lottery in a slot is
 
 $$
-\prod_i \left( 1 - \phi_{f_\text{IB}}(\sigma_i) \right) = \prod_i (1 - f_\text{IB})^{\sigma_i} = (1 - f_\text{IB})^{\sum_i \sigma_i} = 1 - f_\text{IB}
+\prod_i e^{- f_\text{IB}(\sigma_i)} = e^{- f_\text{IB}}
 $$
 
 where $\sum_i \sigma_i = 1$ because the individual stakes sum to the total
@@ -212,14 +271,10 @@ stake, $S \equiv \sum_i s_i$. Hence the probability of no nodes winning the
 lottery in any slot of the phase is
 
 $$
-q_\text{IB} = (1 - f_\text{IB})^L
+q_\text{IB} = e^{- f_\text{IB} \cdot L}
 $$
 
-and the expected number of IBs in the phase is
-
-$$
-n_\text{IB} = f_\text{IB} \cdot L
-$$
+and the expected number of IBs in the phase is $f_\text{IB}$.
 
 The figure below illustrates the relationship between $f_\text{IB}$ and
 $q_\text{IB}$. Understandably, short phases can result in appreciable
@@ -229,22 +284,8 @@ probabilities of no having an input block in the pipeline.
 
 ### Endorser blocks
 
-The sortition for EBs occurs per phase, not per slot. The previous section's
-analysis for input blocks holds with minor modification: The probability that a
-node with stake $\sigma$ wins the EB lottery for a pipeline is
-
-$$
-p_\text{EB} = \phi_{f_\text{EB}}(\sigma) = 1 - (1 - f_\text{EB})^\sigma
-$$
-
-If $v_\text{EB} \in [0,1]$ is the node's EB VRF value for the current phase,
-then the node's eligibility condition is $v_\text{EB} \leq p_\text{EB}$.
-
-> [!IMPORTANT]
->
-> This formulation makes it likely (probability = 1 - f) that some pipelines
-> will have no EBs. Should there be two or more lotteries instead of just one?
-> Or do we just need to accept this as part of Short Leios?
+The sortition for EBs occurs per phase, not per slot, but is otherwise the same
+as vote and IB sortition.
 
 In Short Leios it is critically important that at least one EB be produced in
 the pipeline because, otherwise, the pipeline's IBs will not be referenced in
@@ -253,18 +294,16 @@ have to wait for another IB. There are four situations of interest for EB
 production in a particular pipeline:
 
 1. No EB is produced:
-   $(1 - p_\text{hon}) \cdot (1 - p_\text{adv}) = 1 - f_\text{EB}$.
+   $(1 - p_\text{hon}) \cdot (1 - p_\text{adv}) = e^{- f_\text{EB}}$.
 2. Only honest parties produce EBs: $p_\text{hon} \cdot (1 - p_\text{adv})$.
 3. Only adversarial parties produce EBs:
    $(1 - p_\text{hon}) \cdot p_\text{adv}$.
 4. Both honest and adversarial parties produce EBs:
    $p_\text{hon} \cdot p_\text{adv}$.
 
-where $p_\text{hon} = \phi_{f_\text{EB}}(\sigma_\text{hon})$,
-$p_\text{adv} = \phi_{f_\text{EB}}(\sigma_\text{adv})$, and
-$\sigma_\text{hon} + \sigma_\text{adv} = 1$. For this analysis we ignore the
-splitting of stake because the analysis of it in a previous section indicated
-that it is inconsequential even in the worst case.
+where $p_\text{hon} = 1 - e^{- f_\text{EB} \cdot \sigma_\text{hon}}$,
+$p_\text{adv} = e^{- f_\text{EB} \cdot \sigma_\text{adv}}$, and
+$\sigma_\text{hon} + \sigma_\text{adv} = 1$.
 
 ![Probability of no EB in phase](../images/prob-no-eb.svg)
 
@@ -274,15 +313,15 @@ evenly among 1000 nodes and the right plot shows when it is divided among 2500
 nodes according to a non-uniform stake distribution similar to that of
 epoch 500.
 
-| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |
+| Uniform stake among 1000 nodes                                     | Realistic non-uniform stake among 2500 nodes                           |   |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------- | - |
+| ![EB production with uniform stake](../images/prob-no-eb-1000.svg) | ![EB production with non-uniform stake](../images/prob-no-eb-2500.svg) |   |
 
-> [!CAUTION]
->
-> - [ ] Is there a theoretical argument (like the law of large numbers) why
->       splitting the stake doesn't make a visible difference?
-> - [ ] Is it pointless to include such repetitive plots?
+For the case of realistic, non-uniform stake the follow plot shows the expected
+number of EBs are proportioned among honest and adversarial parties. Ensuring
+that there is an honest EB might also open the possibility of adversarial EBs.
+
+![Number of EBs expected](../images/expected-ebs-2500.svg)
 
 Short Leios also relies on the EB being included in an RB before another EB is
 produced: endorser blocks are not allowed to queue awaiting RBs or to reference
@@ -295,7 +334,7 @@ discarded because the second EB is included in the new RB. The distribution of
 waiting times for the next EB and next RB are
 
 $$
-\mathcal{P}(\text{next EB at phase } n) = (1 - f_\text{EB})^{n-1} f_\text{EB}
+\mathcal{P}(\text{next EB at phase } n) = e^{- f_\text{EB} \cdot ({n-1})} (1 - e^{- f_\text{EB}})
 $$
 
 and
@@ -307,8 +346,8 @@ $$
 Hence the probability for the next EB not coming before the next RB is
 
 $$
-p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s < n L < \infty} (1 - f_\text{EB})^{n-1} f_\text{EB} (1 - f_\text{RB})^{s-1} f_\text{RB}
- = \frac{1 - [f_\text{RB} (f_\text{EB} - 1) + 1] (1 - f_\text{RB})^{L-1}}{1 - (1 - f_\text{EB}) (1 - f_\text{RB})^L}
+p_\text{included} = 1 - p_\text{discarded} = 1 - \sum_{1 \le s < n L < \infty} e^{- f_\text{EB} \cdot ({n-1})} (1 - e^{- f_\text{EB}}) (1 - f_\text{RB})^{s-1} f_\text{RB}
+ = \frac{1 - (f_\text{RB} \cdot e^{- f_\text{EB}} + 1) (1 - f_\text{RB})^{L-1}}{1 - e^{- f_\text{EB}} \cdot (1 - f_\text{RB})^L}
 $$
 
 The plots below indicate that the phase length $L$ should be several times
@@ -349,9 +388,9 @@ corresponding to the right edge in the plot below: any pool with more stake
 would be oversaturated. Even in the worst-case scenario of a fully saturated
 pool, the probability of more than three votes is about 1.90%.
 
-| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                  |
+| Number of votes | Condition of VRF value $v$                                                                                                                                                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0               | $0 \le v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1$                                                                                                                                                                                                |
 | 1               | $1 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote}$                                                                                                                                                                     |
 | 2               | $1 + \sigma \cdot f_\text{vote} < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2$                                                                                           |
 | 3               | $1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 < v \cdot \exp(f_\text{vote} \cdot\sigma) \le 1 + \sigma \cdot f_\text{vote} + \frac{1}{2} (\sigma \cdot f_\text{vote})^2 + \frac{1}{6} (\sigma \cdot f_\text{vote})^3$ |
@@ -365,19 +404,22 @@ nodes with appreciable stake) would likely be safe, though it might result is
 larger concentrations of stake having smaller voting rewards, and it would
 greatly simplify the computation of sortition.
 
+=======
+
+>>>>>>> 87f8279 (Review of sortition sections of tech report (#119))
+
 ### Insights regarding sortition
 
 - All of the sortition is based on Bernoulli trials for each stake of lovelace.
-- A probabilistic analysis shows that splitting stake among many nodes only
-  provides a minor benefit in winning the lottery more times.
-- The IB lottery is per-slot and limits a node to building a maximum of one IB
-  per slot.
+- The IB lottery is per-slot and optionally limits a node to building a maximum
+  of one IB per slot.
   - Careful selection of protocol parameters ensures a high probability of at
     least one IB in each pipeline.
-- The EB lottery is per-pipeline and limits a node to building a maximum of one
-  EB per pipeline.
-  - The formulation of the EB lottery implies that there will always be a
-    significant chance that a pipeline contains no EB.
+  - A probabilistic analysis of the case where a node is limited to one IB per
+    slot shows that splitting stake among many nodes only provides a minor
+    benefit in winning the lottery more times.
+- The EB lottery is per-pipeline and optionally limits a node to building a
+  maximum of one EB per pipeline.
   - Setting protocol parameters so that there is a high probability of an EB in
     a pipeline makes the protocol more susceptible to influence by adversaries
     with significant stake.

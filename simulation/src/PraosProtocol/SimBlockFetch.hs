@@ -68,14 +68,14 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
-      praosConfig <- defaultPraosConfig
+      let praosConfig = defaultPraosConfig
       concurrently_
         (nodeA praosConfig outChan)
         (nodeB inChan)
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+  bchain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
