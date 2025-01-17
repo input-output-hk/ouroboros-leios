@@ -33,6 +33,8 @@ data SizesConfig = SizesConfig
   , voteMsg :: !(VoteMsg -> Bytes)
   , certificate :: !(Certificate -> Bytes)
   -- ^ certificate size depends on number of votes, contributes to RB block body sizes.
+  , rankingBlockLegacyPraosPayloadAvgSize :: !Bytes
+  -- ^ txs possibly included.
   }
 
 -- Note: ranking block validation delays are in the PraosConfig, covers certificate validation.

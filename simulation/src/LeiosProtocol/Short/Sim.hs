@@ -180,6 +180,7 @@ traceRelayLink1 tcpprops =
                     , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
                     , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
                     , certificate = const (50 * 1024)
+                    , rankingBlockLegacyPraosPayloadAvgSize = 0
                     }
               , delays =
                   LeiosDelays
@@ -204,9 +205,6 @@ traceRelayLink1 tcpprops =
               , rng = mkStdGen i
               , -- \^ for block generation
                 baseChain = Genesis
-              , rankingBlockPayload = 0
-              , -- \^ overall size of txs to include in RBs
-                inputBlockPayload = 96 * 1024
               , -- \^ overall size of txs to include in IBs
                 processingQueueBound = 100
               , processingCores = Infinite

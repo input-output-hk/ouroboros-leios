@@ -40,7 +40,6 @@ import LeiosProtocol.Short
 import LeiosProtocol.Short.Generate
 import qualified LeiosProtocol.Short.Generate as Generate
 import LeiosProtocol.TaskMultiQueue
-import ModelTCP
 import Numeric.Natural (Natural)
 import PraosProtocol.BlockFetch (
   BlockFetchControllerState (blocksVar),
@@ -84,10 +83,6 @@ data LeiosNodeConfig = LeiosNodeConfig
   , rng :: !StdGen
   -- ^ for block generation
   , baseChain :: !(Chain RankingBlock)
-  , rankingBlockPayload :: !Bytes
-  -- ^ overall size of txs to include in RBs
-  , inputBlockPayload :: !Bytes
-  -- ^ overall size of txs to include in IBs
   , processingQueueBound :: !Natural
   , processingCores :: NumCores
   }
@@ -590,14 +585,14 @@ mkBuffersView cfg st = BuffersView{..}
     return $
       NewRankingBlockData
         { freshestCertifiedEB
-        , txsPayload = cfg.rankingBlockPayload
+        , txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize
         }
   newIBData = do
     ledgerState <- readTVar st.ledgerStateVar
     referenceRankingBlock <-
       Chain.headHash . Chain.dropUntil (flip Map.member ledgerState . blockHash)
         <$> PraosNode.preferredChain st.praosState
-    let txsPayload = cfg.inputBlockPayload
+    let txsPayload = cfg.leios.sizes.inputBlockBodyAvgSize
     return $ NewInputBlockData{referenceRankingBlock, txsPayload}
   ibs = do
     buffer <- readTVar st.relayIBState.relayBufferVar

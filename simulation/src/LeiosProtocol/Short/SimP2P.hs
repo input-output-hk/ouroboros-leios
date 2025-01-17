@@ -124,8 +124,6 @@ exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
       , baseChain = Genesis
       , leios
       , rankingBlockFrequencyPerSlot = 1 / fromIntegral leios.sliceLength
-      , rankingBlockPayload = 0
-      , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
       , processingCores
       , nodeId
@@ -159,6 +157,7 @@ exampleLeiosConfig sliceLength slotConfig = leios
       , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
       , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
       , certificate = const (50 * 1024)
+      , rankingBlockLegacyPraosPayloadAvgSize = 0
       }
   delays =
     LeiosDelays
