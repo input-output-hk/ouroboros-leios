@@ -70,8 +70,76 @@ data LeiosConfig = LeiosConfig
   , delays :: LeiosDelays
   }
 
-convertConfig :: OnDisk.Config -> LeiosConfig
-convertConfig = error "TBD"
+convertConfig :: SlotConfig -> OnDisk.Config -> LeiosConfig
+convertConfig slotConfig disk =
+  assert (not $ disk.voteOneEbPerVrfWin) $
+    LeiosConfig
+      { praos
+      , sliceLength = fromIntegral disk.leiosStageLengthSlots
+      , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+      , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+      , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+      , votingFrequencyPerStage = disk.voteGenerationProbability
+      , votesForCertificate = fromIntegral disk.voteThreshold
+      , sizes
+      , delays
+      }
+ where
+  praos =
+    PraosConfig
+      { slotConfig
+      , headerSize = fromIntegral $ disk.ibHeadSizeBytes
+      , bodySize = \body ->
+          sum (map (certificateSize . snd) body.endorseBlocks)
+            + body.payload
+      , bodyMaxSize = fromIntegral $ disk.rbBodyMaxSizeBytes
+      , blockValidationDelay = \(Block _ body) ->
+          let legacy
+                | body.payload > 0 =
+                    durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
+                      + durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral body.payload
+                | otherwise = 0
+           in legacy
+                + sum (map (certificateValidation . snd) body.endorseBlocks)
+      , headerValidationDelay = const $ durationMsToDiffTime $ disk.ibHeadValidationCpuTimeMs
+      , blockGenerationDelay = \(Block _ body) ->
+          durationMsToDiffTime disk.rbGenerationCpuTimeMs + sum (map (certificateGeneration . snd) body.endorseBlocks)
+      }
+  certificateSize (Certificate xs) =
+    fromIntegral $
+      disk.certSizeBytesConstant
+        + fromIntegral (Map.size xs) * disk.certSizeBytesPerNode
+  sizes =
+    SizesConfig
+      { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
+      , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
+      , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
+      , endorseBlock = \eb -> fromIntegral $ disk.ebSizeBytesConstant + fromIntegral (length eb.inputBlocks) * disk.ebSizeBytesPerIb
+      , voteMsg = \_vt -> fromIntegral disk.voteSizeBytesConstant -- TODO: include a per-eb factor.
+      , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
+      , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
+      }
+  durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
+  certificateGeneration (Certificate xs) =
+    durationMsToDiffTime $ disk.certGenerationCpuTimeMsConstant + fromIntegral (length xs) * disk.certGenerationCpuTimeMsPerNode
+  certificateValidation (Certificate xs) =
+    durationMsToDiffTime $ disk.certValidationCpuTimeMsConstant + fromIntegral (length xs) * disk.certValidationCpuTimeMsPerNode
+  delays =
+    LeiosDelays
+      { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
+      , inputBlockHeaderValidation = const $ durationMsToDiffTime $ disk.ibHeadValidationCpuTimeMs
+      , inputBlockValidation = \ib ->
+          durationMsToDiffTime $
+            disk.ibBodyValidationCpuTimeMsConstant
+              + fromIntegral ib.body.size * disk.ibBodyValidationCpuTimeMsPerByte
+      , endorseBlockGeneration = const $ durationMsToDiffTime $ disk.ebGenerationCpuTimeMs
+      , endorseBlockValidation = const $ durationMsToDiffTime $ disk.ebValidationCpuTimeMs
+      , -- TODO: can parallelize?
+        voteMsgGeneration = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteGenerationCpuTimeMsConstant -- TODO: voteGenerationCpuTimeMsPerIb -- needs EBs info.
+      , voteMsgValidation = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteValidationCpuTimeMs
+      , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
+      , certificateValidation = const $ error "certificateValidation delay included in RB validation"
+      }
 
 class FixSize a where
   fixSize :: LeiosConfig -> a -> a
