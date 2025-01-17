@@ -11,7 +11,6 @@ module LeiosProtocol.Short.VizSimP2P where
 
 import ChanDriver
 import Control.Arrow ((&&&))
-import Control.Exception (assert)
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import Data.Bifunctor (second)
 import qualified Data.Colour.SRGB as Colour
