@@ -541,10 +541,9 @@ generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
   let
-    withDelay Nothing (_lbl, m) = m
-    withDelay (Just d) (lbl, m) = atomically $ writeTMQueue st.taskQueue lbl (d, m)
+    withDelay d (lbl, m) = atomically $ writeTMQueue st.taskQueue lbl (d, m)
   let
-    submitOne :: (Maybe CPUTask, SomeAction) -> m ()
+    submitOne :: (CPUTask, SomeAction) -> m ()
     submitOne (delay, x) = withDelay delay $
       case x of
         SomeAction Generate.Base rb0 -> (GenRB,) $ do
@@ -554,7 +553,7 @@ generator tracer cfg st = do
             addProducedBlock st.praosState.blockFetchControllerState rb
             return rb
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
-        SomeAction Generate.Propose ibs -> (GenIB,) $ forM_ ibs $ \ib -> do
+        SomeAction Generate.Propose ib -> (GenIB,) $ do
           atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
