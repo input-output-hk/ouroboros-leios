@@ -13,35 +13,42 @@ import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (
   fromMaybe,
-  isNothing,
   mapMaybe,
   maybeToList,
  )
 import LeiosProtocol.Common
+import LeiosProtocol.Config as OnDisk
 import ModelTCP
+import PraosProtocol.Common.ConcreteBlock (Block (..))
 import Prelude hiding (id)
 
+-- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
 data SizesConfig = SizesConfig
-  { producerId :: Bytes
-  , vrfProof :: Bytes
-  , signature_ :: Bytes
-  , reference :: Bytes
-  -- ^ size of a block reference, presumably hash
-  , voteCrypto :: Bytes
-  -- ^ voting is in flux, we stay flexible (atm it's two signatures)
-  , certificate :: Certificate -> Bytes
-  -- ^ certificate size might depend on number of votes.
+  { inputBlockHeader :: !Bytes
+  , inputBlockBodyAvgSize :: !Bytes
+  -- ^ as we do not model transactions we just use a fixed size for bodies.
+  , inputBlockBodyMaxSize :: !Bytes
+  , endorseBlock :: !(EndorseBlock -> Bytes)
+  , voteMsg :: !(VoteMsg -> Bytes)
+  , certificate :: !(Certificate -> Bytes)
+  -- ^ certificate size depends on number of votes, contributes to RB block body sizes.
+  , rankingBlockLegacyPraosPayloadAvgSize :: !Bytes
+  -- ^ txs possibly included.
   }
 
 -- Note: ranking block validation delays are in the PraosConfig, covers certificate validation.
 data LeiosDelays = LeiosDelays
-  { inputBlockHeaderValidation :: InputBlockHeader -> DiffTime
+  { inputBlockGeneration :: !(InputBlock -> DiffTime)
+  , inputBlockHeaderValidation :: !(InputBlockHeader -> DiffTime)
   -- ^ vrf and signature
-  , inputBlockValidation :: InputBlock -> DiffTime
+  , inputBlockValidation :: !(InputBlock -> DiffTime)
   -- ^ hash matching and payload validation (incl. tx scripts)
-  , endorseBlockValidation :: EndorseBlock -> DiffTime
-  , voteMsgValidation :: VoteMsg -> DiffTime
-  , certificateCreation :: Certificate -> DiffTime
+  , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
+  , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
+  , voteMsgGeneration :: !(VoteMsg -> DiffTime)
+  , voteMsgValidation :: !(VoteMsg -> DiffTime)
+  , certificateGeneration :: !(Certificate -> DiffTime)
+  , certificateValidation :: !(Certificate -> DiffTime)
   }
 
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
@@ -60,69 +67,113 @@ data LeiosConfig = LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
-  -- TODO?: max size parameters.
   }
+
+convertConfig :: OnDisk.Config -> LeiosConfig
+convertConfig disk =
+  LeiosConfig
+    { praos
+    , sliceLength = fromIntegral disk.leiosStageLengthSlots
+    , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+    , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+    , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+    , votingFrequencyPerStage = disk.voteGenerationProbability
+    , votesForCertificate = fromIntegral disk.voteThreshold
+    , sizes
+    , delays
+    }
+ where
+  praos =
+    PraosConfig
+      { blockFrequencyPerSlot = disk.rbGenerationProbability
+      , headerSize = fromIntegral disk.ibHeadSizeBytes
+      , bodySize = \body ->
+          1
+            + sum (map (certificateSize . snd) body.endorseBlocks)
+            + body.payload
+      , bodyMaxSize = fromIntegral disk.rbBodyMaxSizeBytes
+      , blockValidationDelay = \(Block _ body) ->
+          let legacy
+                | body.payload > 0 =
+                    durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
+                      + durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral body.payload
+                | otherwise = 0
+           in legacy
+                + sum (map (certificateValidation . snd) body.endorseBlocks)
+      , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , blockGenerationDelay = \(Block _ body) ->
+          durationMsToDiffTime disk.rbGenerationCpuTimeMs + sum (map (certificateGeneration . snd) body.endorseBlocks)
+      }
+  certificateSize (Certificate xs) =
+    fromIntegral $
+      disk.certSizeBytesConstant
+        + fromIntegral (Map.size xs) * disk.certSizeBytesPerNode
+  sizes =
+    SizesConfig
+      { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
+      , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
+      , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
+      , endorseBlock = \eb -> fromIntegral $ disk.ebSizeBytesConstant + fromIntegral (length eb.inputBlocks) * disk.ebSizeBytesPerIb
+      , voteMsg = \_vt -> fromIntegral disk.voteSizeBytesConstant -- TODO: include a per-eb factor.
+      , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
+      , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
+      }
+  durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
+  certificateGeneration (Certificate xs) =
+    durationMsToDiffTime $ disk.certGenerationCpuTimeMsConstant + fromIntegral (length xs) * disk.certGenerationCpuTimeMsPerNode
+  certificateValidation (Certificate xs) =
+    durationMsToDiffTime $ disk.certValidationCpuTimeMsConstant + fromIntegral (length xs) * disk.certValidationCpuTimeMsPerNode
+  delays =
+    LeiosDelays
+      { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
+      , inputBlockHeaderValidation = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , inputBlockValidation = \ib ->
+          durationMsToDiffTime $
+            disk.ibBodyValidationCpuTimeMsConstant
+              + fromIntegral ib.body.size * disk.ibBodyValidationCpuTimeMsPerByte
+      , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
+      , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
+      , -- TODO: can parallelize?
+        voteMsgGeneration = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteGenerationCpuTimeMsConstant -- TODO: voteGenerationCpuTimeMsPerIb -- needs EBs info.
+      , voteMsgValidation = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteValidationCpuTimeMs
+      , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
+      , certificateValidation = const $ error "certificateValidation delay included in RB validation"
+      }
 
 class FixSize a where
   fixSize :: LeiosConfig -> a -> a
 
 instance FixSize InputBlockHeader where
-  fixSize cfg ib@InputBlockHeader{..} =
+  fixSize cfg InputBlockHeader{..} =
     InputBlockHeader
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes ib.slot
-            + subSlotSize
-            + cfg.sizes.reference {- ib.rankingBlock -}
-            + 32 {- hash of body -}
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.inputBlockHeader
       , ..
       }
-   where
-    subSlotSize =
-      if cfg.inputBlockFrequencyPerSlot > 1
-        then messageSizeBytes ib.subSlot
-        else
-          0
 
 instance FixSize EndorseBlock where
   fixSize cfg eb@EndorseBlock{..} =
     EndorseBlock
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes eb.slot
-            + cfg.sizes.reference
-              * fromIntegral
-                ( length eb.inputBlocks
-                    + length eb.endorseBlocksEarlierStage
-                    + length eb.endorseBlocksEarlierPipeline
-                )
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.endorseBlock eb
       , ..
       }
 
 instance FixSize VoteMsg where
   fixSize cfg v@VoteMsg{..} =
     VoteMsg
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes v.slot
-            + 64 {- votes -}
-            + sum (map (const cfg.sizes.reference {- EB ref -}) endorseBlocks)
-            + cfg.sizes.voteCrypto
+      { size = cfg.sizes.voteMsg v
       , ..
       }
 
+instance FixSize RankingBlockHeader where
+  fixSize cfg rh = rh{headerMessageSize = cfg.praos.headerSize}
 instance FixSize RankingBlockBody where
   fixSize cfg rb@RankingBlockBody{..} =
     RankingBlockBody
-      { size =
-          sum [cfg.sizes.reference + cfg.sizes.certificate cert | (_, cert) <- rb.endorseBlocks]
-            + rb.payload
+      { size = cfg.praos.bodySize rb
       , ..
       }
+instance FixSize body => FixSize (Block body) where
+  fixSize cfg (Block h b) = Block (fixSize cfg h) (fixSize cfg b)
 
 -----------------------------------------------------------
 ---- Stages
@@ -177,7 +228,7 @@ isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
 ----------------------------------------------------------------------------------------------
 
 mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) rb
+mkRankingBlockBody cfg nodeId ebs payload = rb
  where
   rb =
     fixSize cfg $

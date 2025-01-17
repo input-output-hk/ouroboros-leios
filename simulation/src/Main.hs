@@ -15,6 +15,7 @@ import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short.Node (NumCores (..))
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
@@ -318,7 +319,16 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     p2pTopography <- execTopographyOptions rng1 topographyOptions
-    pure $ VizShortLeiosP2P.example2 rng2 sliceLength p2pTopography numCores
+    let config =
+          def
+            { OnDisk.leiosStageLengthSlots = fromIntegral sliceLength
+            , OnDisk.rbGenerationProbability = 0.2
+            , OnDisk.ibGenerationProbability = 5
+            , OnDisk.ebGenerationProbability = 1.5
+            , OnDisk.voteGenerationProbability = 500
+            , OnDisk.voteThreshold = 150
+            }
+    pure $ VizShortLeiosP2P.example2 rng2 config p2pTopography numCores
 
 type VizSize = (Int, Int)
 
@@ -353,14 +363,22 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimShortLeios -> do
     -- TODO: read from parameter file
-    let sliceLength = 20 -- matching mainnet ranking block interval
     let numCores = Infinite
+    let config =
+          def
+            { OnDisk.leiosStageLengthSlots = 20
+            , OnDisk.rbGenerationProbability = 1 / 20
+            , OnDisk.ibGenerationProbability = 5
+            , OnDisk.ebGenerationProbability = 1.5
+            , OnDisk.voteGenerationProbability = 500
+            , OnDisk.voteThreshold = 150
+            }
     let seed = 42
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 100 5 5
     p2pTopography <- execTopographyOptions rng1 topographyOptions
-    VizShortLeiosP2P.exampleSim rng2 sliceLength p2pTopography numCores simOutputSeconds simOutputFile
+    VizShortLeiosP2P.exampleSim rng2 config p2pTopography numCores simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand

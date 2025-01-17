@@ -218,16 +218,11 @@ example1Trace rng0 blockInterval p2pTopography =
         PraosNodeConfig
           { blockGeneration =
               PoissonGenerationPattern
-                (kilobytes 96)
                 rng
                 -- average seconds between blocks:
                 (realToFrac blockInterval * fromIntegral p2pNumNodes)
-          , praosConfig =
-              PraosConfig
-                { slotConfig
-                , blockValidationDelay = const 0.1 -- 100ms
-                , headerValidationDelay = const 0.005 -- 5ms
-                }
+          , slotConfig
+          , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 1 / realToFrac blockInterval}
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
           }
@@ -301,16 +296,11 @@ example2 =
             PraosNodeConfig
               { blockGeneration =
                   PoissonGenerationPattern
-                    (kilobytes 96)
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)
-              , praosConfig =
-                  PraosConfig
-                    { slotConfig
-                    , blockValidationDelay = const 0.1 -- 100ms
-                    , headerValidationDelay = const 0.005 -- 5ms
-                    }
+              , praosConfig = defaultPraosConfig
+              , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
               }

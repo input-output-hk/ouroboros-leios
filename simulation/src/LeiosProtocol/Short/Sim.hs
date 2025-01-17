@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -158,7 +159,8 @@ traceRelayLink1 tcpprops =
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
-      praosConfig <- defaultPraosConfig
+      slotConfig <- slotConfigFromNow
+      let praosConfig = defaultPraosConfig
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
@@ -174,12 +176,13 @@ traceRelayLink1 tcpprops =
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig
-                    { producerId = 4
-                    , vrfProof = 32
-                    , signature_ = 32
-                    , reference = 32
-                    , voteCrypto = 64
+                    { inputBlockHeader = kilobytes 1
+                    , inputBlockBodyAvgSize = kilobytes 95
+                    , inputBlockBodyMaxSize = kilobytes 100
+                    , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
+                    , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
                     , certificate = const (50 * 1024)
+                    , rankingBlockLegacyPraosPayloadAvgSize = 0
                     }
               , delays =
                   LeiosDelays
@@ -189,20 +192,21 @@ traceRelayLink1 tcpprops =
                     , -- \^ hash matching and payload validation (incl. tx scripts)
                       endorseBlockValidation = const 0.005
                     , voteMsgValidation = const 0.005
-                    , certificateCreation = const 0.050
+                    , certificateGeneration = const 0.050
+                    , inputBlockGeneration = const 0
+                    , endorseBlockGeneration = const 0
+                    , voteMsgGeneration = const 0
+                    , certificateValidation = const 0
                     }
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig
               { leios = leiosConfig
-              , rankingBlockFrequencyPerSlot = 1 / fromIntegral leiosConfig.sliceLength -- every 5 seconds
+              , slotConfig
               , stake = StakeFraction 0.5 -- just two nodes!
               , rng = mkStdGen i
               , -- \^ for block generation
                 baseChain = Genesis
-              , rankingBlockPayload = 0
-              , -- \^ overall size of txs to include in RBs
-                inputBlockPayload = 96 * 1024
               , -- \^ overall size of txs to include in IBs
                 processingQueueBound = 100
               , processingCores = Infinite
