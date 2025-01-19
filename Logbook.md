@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-01-19
+
+### Haskell Simulation
+
+- In preliminary results, diffusion latency of praos blocks is closely
+  comparable to data obtained from the benchmark cluster. Validation
+  times are inferred from closely related timings in the report.
+- Short Leios node implementation integrated simulation parameters
+  agreed upon with the rust team.
+- Reviewed previous PI goal and completed it by including total data
+  transmitted per node in the visualization.
+
 ## 2025-01-17
 
 ### Cryptography benchmarking and progress
