@@ -5,6 +5,9 @@ open import Leios.Abstract
 open import Leios.SpecStructure
 
 open import Axiom.Set.Properties th
+open import Data.Fin
+
+open Equivalence
 
 module Leios.Trace where
 
@@ -16,7 +19,7 @@ d-Abstract : LeiosAbstract
 d-Abstract =
   record
     { Tx = ⊤
-    ; PoolID = ℕ
+    ; PoolID = Fin 1
     ; BodyHash = ⊤
     ; VrfPf = ⊤
     ; PrivKey = ⊤
@@ -81,7 +84,7 @@ instance
   isb =
     record
       { slotNumber = λ _ → 0
-      ; producerID = λ _ → 1
+      ; producerID = λ _ → zero
       ; lotteryPf = λ _ → tt
       }
 
@@ -114,7 +117,7 @@ d-VotingAbstract =
 st : SpecStructure 1
 st = record
       { a = d-Abstract
-      ; id = 1
+      ; id = zero
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
       ; sk-IB = tt
@@ -137,8 +140,21 @@ open import Leios.Short st
 
 open Protocol
 
+sd : TotalMap (Fin 1) ℕ
+sd = record
+  { rel = singleton (zero , 1)
+  ; left-unique-rel = λ x y →
+      let a = cong proj₂ (from ∈-singleton x)
+          b = cong proj₂ (from ∈-singleton y)
+      in trans a (sym b)
+  ; total-rel = total-rel-helper
+  }
+  where
+    total-rel-helper : ∀ {a : Fin 1} → a ∈ dom (singleton (zero , 1))
+    total-rel-helper {zero} = to dom∈ (1 , (to ∈-singleton refl))
+
 s₀ : LeiosState
-s₀ = initLeiosState tt (singletonᵐ 1 1) tt
+s₀ = initLeiosState tt sd tt
 
 open import Leios.Traces st _-⟦_/_⟧⇀_
 
@@ -179,8 +195,10 @@ s₁ = let open LeiosState t₄ in
     ; Upkeep = ∅
     }
 
-stake≡1 : stake s₀ ≡ 1
-stake≡1 = ?
+open TotalMap
+
+stake≡1 : TotalMap.lookup (LeiosState.SD s₀) (SpecStructure.id st) ≡ 1
+stake≡1 = ∈-rel⇒lookup-≡ (LeiosState.SD s₀) {a = zero} {b = 1} (to ∈-singleton refl)
 
 ib-step : s₀ ⇉ t₁
 ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
@@ -190,8 +208,6 @@ ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
 
     π-IB : canProduceIB (LeiosState.slot s₀) tt (stake s₀) tt
     π-IB rewrite stake≡1 = s≤s z≤n , refl
-
-open Equivalence
 
 open import Function.Related.TypeIsomorphisms
 import Data.Sum
