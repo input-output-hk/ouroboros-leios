@@ -1,4 +1,6 @@
-use crate::analysis::{analyze_network_stats, check_triangle_inequality};
+use crate::analysis::{
+    analyze_network_stats, analyze_stake_distribution, check_triangle_inequality,
+};
 use crate::models::{Severity, Topology};
 
 pub fn generate_report(topology: &Topology, source_file: &str) -> String {
@@ -7,6 +9,7 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
 
     // Run analyses
     let network_stats = analyze_network_stats(topology);
+    let stake_stats = analyze_stake_distribution(topology);
     issues.extend(check_triangle_inequality(topology));
 
     // Sort issues by severity and node id
@@ -59,6 +62,25 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
         "| Maximum latency | {:.2} ms |\n\n",
         network_stats.max_latency_ms
     ));
+
+    // Add stake distribution section
+    report.push_str("## Stake Distribution\n\n");
+    report.push_str("| Metric | Value |\n");
+    report.push_str("|--------|-------|\n");
+    report.push_str(&format!("| Total stake | {} |\n", stake_stats.total_stake));
+    report.push_str(&format!(
+        "| Gini coefficient | {:.3} |\n\n",
+        stake_stats.gini_coefficient
+    ));
+
+    report.push_str("### Top 5 Stake Holders\n\n");
+    report.push_str("| Node | Stake | % of Total |\n");
+    report.push_str("|------|--------|------------|\n");
+    for (node, stake) in stake_stats.top_stake_holders {
+        let percentage = (stake as f64 / stake_stats.total_stake as f64) * 100.0;
+        report.push_str(&format!("| {} | {} | {:.2}% |\n", node, stake, percentage));
+    }
+    report.push_str("\n");
 
     // Add geographic validation section
     report.push_str("## Geographic Validation\n\n");
