@@ -82,6 +82,17 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
     }
     report.push_str("\n");
 
+    report.push_str("### Geographic Stake Distribution\n\n");
+    report.push_str("| Region | Nodes | Total Stake | % of Network |\n");
+    report.push_str("|---------|--------|-------------|-------------|\n");
+    for (region, stats) in stake_stats.geographic_distribution {
+        report.push_str(&format!(
+            "| {} | {} | {} | {:.2}% |\n",
+            region, stats.node_count, stats.total_stake, stats.percentage
+        ));
+    }
+    report.push_str("\n");
+
     // Add geographic validation section
     report.push_str("## Geographic Validation\n\n");
     let geo_issues: Vec<_> = issues

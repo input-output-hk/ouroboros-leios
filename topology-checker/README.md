@@ -32,11 +32,12 @@ detailed information.
 
 ### Stake Distribution Analysis
 
-| Metric                                           | Description                          |
-| ------------------------------------------------ | ------------------------------------ |
-| [Total Stake](#stake-distribution-metrics)       | Sum of stake across all nodes        |
-| [Gini Coefficient](#stake-distribution-metrics)  | Stake distribution equality measure  |
-| [Top Stake Holders](#stake-distribution-metrics) | Highest stake concentration analysis |
+| Metric                                                 | Description                           |
+| ------------------------------------------------------ | ------------------------------------- |
+| [Total Stake](#stake-distribution-metrics)             | Sum of stake across all nodes         |
+| [Gini Coefficient](#stake-distribution-metrics)        | Stake distribution equality measure   |
+| [Top Stake Holders](#stake-distribution-metrics)       | Highest stake concentration analysis  |
+| [Geographic Distribution](#stake-distribution-metrics) | Regional stake concentration analysis |
 
 ### Connectivity Analysis
 
@@ -106,6 +107,14 @@ Source topology: ../data/simulation/topology-dense-52.yaml
 | node-3 | 100   | 1.92%      |
 | node-4 | 100   | 1.92%      |
 
+### Geographic Stake Distribution
+
+| Region         | Nodes | Total Stake | % of Network |
+| -------------- | ----- | ----------- | ------------ |
+| ap-southeast-2 | 17    | 1700        | 32.69%       |
+| eu-central-1   | 18    | 1800        | 34.62%       |
+| us-east-1      | 17    | 1700        | 32.69%       |
+
 ## Geographic Validation
 
 ✅ No geographic violations found
@@ -145,6 +154,13 @@ Source topology: ../data/simulation/topology-dense-52.yaml
   - Lists nodes with highest stake
   - Shows percentage of total network stake
   - Helps identify potential centralization
+
+- **Geographic Distribution**: Analysis of stake distribution across
+  regions/clusters.
+  - Shows stake concentration by region
+  - Indicates regional node density
+  - Helps identify geographic centralization risks
+  - Important for network resilience against regional outages
 
 ### Connectivity Metrics
 
