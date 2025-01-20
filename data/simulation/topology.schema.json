@@ -13,13 +13,6 @@
             "description": "Link information.",
             "properties": {
                 "bandwidth-bytes-per-second": {
-                    "additionalProperties": false,
-                    "properties": {},
-                    "type": "number"
-                },
-                "cpu-core-count": {
-                    "additionalProperties": false,
-                    "properties": {},
                     "type": "number"
                 },
                 "latency-ms": {
@@ -41,8 +34,9 @@
                     "type": "object"
                 },
                 "stake": {
-                    "additionalProperties": false,
-                    "properties": {},
+                    "type": "number"
+                },
+                "cpu-core-count": {
                     "type": "number"
                 }
             },
@@ -71,8 +65,9 @@
                     "type": "object"
                 },
                 "stake": {
-                    "additionalProperties": false,
-                    "properties": {},
+                    "type": "number"
+                },
+                "cpu-core-count": {
                     "type": "number"
                 }
             },
