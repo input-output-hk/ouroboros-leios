@@ -3,9 +3,13 @@
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.SpecStructure
-
 open import Axiom.Set.Properties th
+
 open import Data.Fin
+open import Function.Related.TypeIsomorphisms
+open import Relation.Binary.Structures
+
+import Data.Sum
 
 open Equivalence
 
@@ -104,7 +108,6 @@ d-FFDFunctionality =
     }
 
 open import Leios.Voting
-open import Data.Fin using (Fin)
 
 d-VotingAbstract : VotingAbstract (Fin 1 × EndorserBlock)
 d-VotingAbstract =
@@ -209,9 +212,6 @@ ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
     π-IB : canProduceIB (LeiosState.slot s₀) tt (stake s₀) tt
     π-IB rewrite stake≡1 = s≤s z≤n , refl
 
-open import Function.Related.TypeIsomorphisms
-import Data.Sum
-
 lem1 : ∀ {A} {a : A} {B C : ℙ A} → a ∉ B → a ∉ C → a ∉ B ∪ C
 lem1 {_} {_} {B} {C} x y = Data.Sum.[ x , y ] ∘ ∈-∪⁻ {X = B} {Y = C}
 
@@ -245,8 +245,6 @@ base-step = (SLOT , EMPTY) , Base₂b uk refl tt
     uk : Base ∉ ((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵
     uk = lem1 (lem1 (lem2 (lem3 λ ())) (lem3 λ ())) (lem3 λ ())
 
-
-open import Relation.Binary.Structures
 open IsEquivalence (≡ᵉ-isEquivalence {SlotUpkeep}) renaming (refl to ≡ᵉ-refl)
 
 slot-step : t₄ ⇉ s₁
