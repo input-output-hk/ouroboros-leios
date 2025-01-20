@@ -236,11 +236,29 @@ jobs:
   docs-build:
     name: "docs: Build"
     runs-on: ubuntu-22.04
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for site changes
+        id: check_changes
+        run: |
+          SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
+          if [ -z "$SITE_CHANGES" ]; then
+            echo "No changes in site directory"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in site directory:"
+            echo "$SITE_CHANGES"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: 🛠️ Setup Node.js
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -248,15 +266,18 @@ jobs:
           cache-dependency-path: site/yarn.lock
 
       - name: 📦 Install dependencies
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: yarn install
 
       - name: 🏗️ Build Docusaurus site
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: |
           yarn build
 
       - name: 🚀 Publish Docusaurus build
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: docusaurus-build
@@ -266,7 +287,10 @@ jobs:
 
   docs-publish:
     name: "docs: Publish"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.docs-build.outputs.has_changes == 'true'
     runs-on: ubuntu-22.04
     needs: docs-build
     steps:
