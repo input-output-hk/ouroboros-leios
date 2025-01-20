@@ -30,10 +30,6 @@ pub struct Producer {
     #[serde(default)]
     #[allow(dead_code)]
     pub bandwidth_bytes_per_second: Option<u64>,
-    #[serde(rename = "cpu-core-count")]
-    #[serde(default)]
-    #[allow(dead_code)]
-    pub cpu_core_count: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +40,9 @@ pub struct Node {
     pub producers: IndexMap<String, Producer>,
     #[serde(default)]
     pub stake: u64,
+    #[serde(rename = "cpu-core-count")]
+    #[serde(default)]
+    pub cpu_core_count: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

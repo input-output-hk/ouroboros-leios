@@ -279,7 +279,6 @@ mod tests {
             Producer {
                 latency_ms: 10.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
         node1_producers.insert(
@@ -287,7 +286,6 @@ mod tests {
             Producer {
                 latency_ms: 20.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -297,7 +295,6 @@ mod tests {
             Producer {
                 latency_ms: 5.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -307,7 +304,6 @@ mod tests {
             Producer {
                 latency_ms: 15.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -319,6 +315,7 @@ mod tests {
                 },
                 stake: 100,
                 producers: node1_producers,
+                cpu_core_count: Some(8),
             },
         );
 
@@ -330,6 +327,7 @@ mod tests {
                 },
                 stake: 0,
                 producers: node2_producers,
+                cpu_core_count: Some(4),
             },
         );
 
@@ -341,6 +339,7 @@ mod tests {
                 },
                 stake: 200,
                 producers: node3_producers,
+                cpu_core_count: Some(16),
             },
         );
 
@@ -352,6 +351,7 @@ mod tests {
                 },
                 stake: 0,
                 producers: IndexMap::new(),
+                cpu_core_count: Some(4),
             },
         );
 
