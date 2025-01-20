@@ -35,7 +35,9 @@ jobs:
   formal-spec-typecheck:
     name: "formal-spec: Typecheck"
     if: |
-      github.event_name == 'push' ||
+      github.event_name == 'push' &&
+      contains(github.event.commits.*.modified, 'formal-spec/') ||
+      github.event_name == 'pull_request' &&
       contains(github.event.pull_request.files.*.path, 'formal-spec/')
     runs-on: ubuntu-22.04
     steps:
@@ -80,10 +82,14 @@ jobs:
   simulation-test:
     name: "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
     if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/') ||
-      contains(github.event.pull_request.files.*.path, 'cabal.project')
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -151,10 +157,14 @@ jobs:
   simulation-hlint:
     name: "simulation: Check with HLint"
     if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/') ||
-      contains(github.event.pull_request.files.*.path, 'cabal.project')
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -172,10 +182,14 @@ jobs:
   simulation-fourmolu:
     name: "simulation: Check with fourmolu"
     if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/') ||
-      contains(github.event.pull_request.files.*.path, 'cabal.project')
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -193,9 +207,12 @@ jobs:
   sim-rs-check:
     name: "sim-rs: Test"
     if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.files.*.path, 'sim-rs/') ||
-      contains(github.event.pull_request.files.*.path, 'data/')
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'sim-rs/') ||
+      contains(github.event.commits.*.modified, 'data/')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'sim-rs/') ||
+      contains(github.event.pull_request.files.*.path, 'data/'))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -215,7 +232,9 @@ jobs:
   docs-generate-d2-diagrams:
     name: "docs: Generate D2 Diagrams"
     if: |
-      github.event_name == 'push' ||
+      github.event_name == 'push' &&
+      endsWith(github.event.commits.*.modified, '.d2') ||
+      github.event_name == 'pull_request' &&
       endsWith(github.event.pull_request.files.*.path, '.d2')
     runs-on: ubuntu-22.04
     permissions:
@@ -277,7 +296,9 @@ jobs:
   docs-build:
     name: "docs: Build"
     if: |
-      github.event_name == 'push' ||
+      github.event_name == 'push' &&
+      contains(github.event.commits.*.modified, 'site/') ||
+      github.event_name == 'pull_request' &&
       contains(github.event.pull_request.files.*.path, 'site/')
     runs-on: ubuntu-22.04
     outputs:
