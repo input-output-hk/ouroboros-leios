@@ -13,6 +13,8 @@ pub struct NetworkStats {
     pub max_latency_ms: f64,
     pub bidirectional_connections: usize,
     pub asymmetry_ratio: f64,
+    pub stake_weighted_latency_ms: f64,
+    pub critical_nodes: Vec<StakeIsolation>,
 }
 
 fn calculate_clustering_coefficient(topology: &Topology) -> f64 {
@@ -114,6 +116,85 @@ fn calculate_latency_stats(topology: &Topology) -> (f64, f64) {
     (avg_latency, max_latency)
 }
 
+fn calculate_stake_weighted_latency(topology: &Topology) -> f64 {
+    let mut weighted_sum = 0.0;
+    let mut weight_sum = 0.0;
+
+    for (_source_name, source) in &topology.nodes {
+        for (dest_name, link) in &source.producers {
+            let dest = &topology.nodes[dest_name];
+            let weight = source.stake as f64 * dest.stake as f64;
+            weighted_sum += link.latency_ms * weight;
+            weight_sum += weight;
+        }
+    }
+
+    if weight_sum > 0.0 {
+        weighted_sum / weight_sum
+    } else {
+        0.0
+    }
+}
+
+#[derive(Debug)]
+pub struct StakeIsolation {
+    pub node: String,
+    pub isolated_stake: u64,
+    pub percentage_of_total: f64,
+}
+
+fn find_critical_stake_nodes(topology: &Topology) -> Vec<StakeIsolation> {
+    let total_stake: u64 = topology.nodes.values().map(|n| n.stake).sum();
+    let mut critical_nodes = Vec::new();
+
+    // For each node, simulate its failure and calculate isolated stake
+    for (node_name, _) in &topology.nodes {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        // Start BFS from a random node that isn't the failed one
+        if let Some(start) = topology.nodes.keys().find(|&n| n != node_name) {
+            queue.push_back(start);
+            visited.insert(start);
+        }
+
+        // BFS to find all reachable nodes
+        while let Some(current) = queue.pop_front() {
+            for dest in topology.nodes[current].producers.keys() {
+                if dest != node_name && !visited.contains(dest) {
+                    visited.insert(dest);
+                    queue.push_back(dest);
+                }
+            }
+        }
+
+        // Calculate isolated stake
+        let mut isolated_stake = 0;
+        for (name, node) in &topology.nodes {
+            if !visited.contains(&name) && name != node_name {
+                isolated_stake += node.stake;
+            }
+        }
+
+        if isolated_stake > 0 {
+            let percentage = (isolated_stake as f64 / total_stake as f64) * 100.0;
+            critical_nodes.push(StakeIsolation {
+                node: node_name.clone(),
+                isolated_stake,
+                percentage_of_total: percentage,
+            });
+        }
+    }
+
+    // Sort by percentage of stake isolated
+    critical_nodes.sort_by(|a, b| {
+        b.percentage_of_total
+            .partial_cmp(&a.percentage_of_total)
+            .unwrap()
+    });
+    critical_nodes
+}
+
 pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     let total_nodes = topology.nodes.len();
     let total_connections: usize = topology
@@ -127,6 +208,8 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     let block_producers = topology.nodes.values().filter(|n| n.stake > 0).count();
     let relay_nodes = total_nodes - block_producers;
     let (avg_latency, max_latency) = calculate_latency_stats(topology);
+    let stake_weighted_latency = calculate_stake_weighted_latency(topology);
+    let critical_nodes = find_critical_stake_nodes(topology);
 
     // Calculate asymmetry metrics
     let mut bidirectional_count = 0;
@@ -172,6 +255,8 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
         max_latency_ms: max_latency,
         bidirectional_connections: bidirectional_count,
         asymmetry_ratio,
+        stake_weighted_latency_ms: stake_weighted_latency,
+        critical_nodes,
     }
 }
 

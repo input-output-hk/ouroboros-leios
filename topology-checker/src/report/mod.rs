@@ -63,6 +63,10 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
         network_stats.max_latency_ms
     ));
     report.push_str(&format!(
+        "| Stake-weighted latency | {:.2} ms |\n",
+        network_stats.stake_weighted_latency_ms
+    ));
+    report.push_str(&format!(
         "| Bidirectional connections | {} |\n",
         network_stats.bidirectional_connections
     ));
@@ -100,6 +104,21 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
         ));
     }
     report.push_str("\n");
+
+    // Add network reliability section
+    if !network_stats.critical_nodes.is_empty() {
+        report.push_str("## Network Reliability\n\n");
+        report.push_str("The following nodes, if removed, would isolate significant stake:\n\n");
+        report.push_str("| Node | Isolated Stake | % of Total Stake |\n");
+        report.push_str("|------|----------------|------------------|\n");
+        for node in &network_stats.critical_nodes {
+            report.push_str(&format!(
+                "| {} | {} | {:.2}% |\n",
+                node.node, node.isolated_stake, node.percentage_of_total
+            ));
+        }
+        report.push_str("\n");
+    }
 
     // Add geographic validation section
     report.push_str("## Geographic Validation\n\n");

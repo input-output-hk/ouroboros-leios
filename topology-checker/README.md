@@ -30,6 +30,7 @@ detailed information.
 | [Clustering Coefficient](#network-metrics) | Local interconnectedness measure          |
 | [Latency Statistics](#network-metrics)     | Network delay measurements                |
 | [Connection Symmetry](#network-metrics)    | Analysis of bidirectional connections     |
+| [Stake-Weighted Metrics](#network-metrics) | Impact of topology on high-stake nodes    |
 
 ### Stake Distribution Analysis
 
@@ -90,9 +91,20 @@ Source topology: ../data/simulation/topology-dense-52.yaml
 | Clustering coefficient       | 0.284     |
 | Average latency              | 31.41 ms  |
 | Maximum latency              | 138.44 ms |
+| Stake-weighted latency       | 35.62 ms  |
 | Bidirectional connections    | 156       |
 | Asymmetric connections       | 68        |
 | Asymmetry ratio              | 21.79%    |
+
+## Network Reliability
+
+The following nodes, if removed, would isolate significant stake:
+
+| Node    | Isolated Stake | % of Total Stake |
+| ------- | -------------- | ---------------- |
+| node-12 | 800            | 15.38%           |
+| node-45 | 600            | 11.54%           |
+| node-31 | 400            | 7.69%            |
 
 ## Stake Distribution
 
@@ -149,6 +161,19 @@ Source topology: ../data/simulation/topology-dense-52.yaml
   - Average latency: Mean delay across all connections
   - Maximum latency: Worst-case delay in the network
   - High latencies can impact block propagation and consensus
+
+- **Stake-Weighted Metrics**: Analysis of network properties weighted by stake.
+  - Stake-Weighted Latency: Average latency weighted by stake importance
+    - For each connection, weight = (stake of connecting node) × (stake of
+      producer node)
+    - Higher weights make latencies between high-stake nodes more significant
+    - Lower values indicate better connectivity between important nodes
+    - Higher values suggest high-stake nodes might have suboptimal connections
+  - Network Reliability: Analysis of stake isolation risk
+    - Lists nodes whose failure would disconnect portions of stake from the
+      network
+    - Shows percentage of total stake that would be isolated
+    - Helps identify critical nodes for network resilience
 
 ### Stake Distribution Metrics
 
