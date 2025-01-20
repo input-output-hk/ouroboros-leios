@@ -1,5 +1,6 @@
 use crate::analysis::{
     analyze_network_stats, analyze_stake_distribution, check_triangle_inequality,
+    ConnectionAnomalyType,
 };
 use crate::models::{Severity, Topology};
 
@@ -115,6 +116,30 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
             report.push_str(&format!(
                 "| {} | {} | {:.2}% |\n",
                 node.node, node.isolated_stake, node.percentage_of_total
+            ));
+        }
+        report.push_str("\n");
+    }
+
+    // Add connection anomalies section
+    if !network_stats.connection_anomalies.is_empty() {
+        report.push_str("## Connection Property Anomalies\n\n");
+        report.push_str("The following bidirectional connections have mismatched properties:\n\n");
+        report.push_str("| Nodes | Property | A → B | B → A |\n");
+        report.push_str("|-------|----------|-------|-------|\n");
+
+        for anomaly in &network_stats.connection_anomalies {
+            let property = match anomaly.anomaly_type {
+                ConnectionAnomalyType::LatencyMismatch => "Latency",
+                ConnectionAnomalyType::BandwidthMismatch => "Bandwidth",
+            };
+            report.push_str(&format!(
+                "| {} ↔ {} | {} | {} | {} |\n",
+                anomaly.node_a,
+                anomaly.node_b,
+                property,
+                anomaly.value_a_to_b,
+                anomaly.value_b_to_a
             ));
         }
         report.push_str("\n");

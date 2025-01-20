@@ -15,6 +15,7 @@ pub struct NetworkStats {
     pub asymmetry_ratio: f64,
     pub stake_weighted_latency_ms: f64,
     pub critical_nodes: Vec<StakeIsolation>,
+    pub connection_anomalies: Vec<ConnectionAnomaly>,
 }
 
 fn calculate_clustering_coefficient(topology: &Topology) -> f64 {
@@ -195,6 +196,74 @@ fn find_critical_stake_nodes(topology: &Topology) -> Vec<StakeIsolation> {
     critical_nodes
 }
 
+#[derive(Debug)]
+pub struct ConnectionAnomaly {
+    pub node_a: String,
+    pub node_b: String,
+    pub anomaly_type: ConnectionAnomalyType,
+    pub value_a_to_b: String,
+    pub value_b_to_a: String,
+}
+
+#[derive(Debug)]
+pub enum ConnectionAnomalyType {
+    LatencyMismatch,
+    BandwidthMismatch,
+}
+
+fn check_connection_properties(topology: &Topology) -> Vec<ConnectionAnomaly> {
+    let mut anomalies = Vec::new();
+    let mut checked_pairs = HashSet::new();
+
+    for (node_a, node) in &topology.nodes {
+        for (node_b, link_a_to_b) in &node.producers {
+            // Skip if we've already checked this pair
+            let pair = if node_a < node_b {
+                (node_a.clone(), node_b.clone())
+            } else {
+                (node_b.clone(), node_a.clone())
+            };
+            if checked_pairs.contains(&pair) {
+                continue;
+            }
+            checked_pairs.insert(pair);
+
+            // Check if there's a reverse connection
+            if let Some(link_b_to_a) = topology.nodes[node_b].producers.get(node_a) {
+                // Check latency (allow small difference due to floating point)
+                if (link_a_to_b.latency_ms - link_b_to_a.latency_ms).abs() > 0.001 {
+                    anomalies.push(ConnectionAnomaly {
+                        node_a: node_a.clone(),
+                        node_b: node_b.clone(),
+                        anomaly_type: ConnectionAnomalyType::LatencyMismatch,
+                        value_a_to_b: format!("{:.2} ms", link_a_to_b.latency_ms),
+                        value_b_to_a: format!("{:.2} ms", link_b_to_a.latency_ms),
+                    });
+                }
+
+                // Check bandwidth if specified
+                match (
+                    &link_a_to_b.bandwidth_bytes_per_second,
+                    &link_b_to_a.bandwidth_bytes_per_second,
+                ) {
+                    (Some(bw_a_to_b), Some(bw_b_to_a)) if bw_a_to_b != bw_b_to_a => {
+                        anomalies.push(ConnectionAnomaly {
+                            node_a: node_a.clone(),
+                            node_b: node_b.clone(),
+                            anomaly_type: ConnectionAnomalyType::BandwidthMismatch,
+                            value_a_to_b: format!("{} B/s", bw_a_to_b),
+                            value_b_to_a: format!("{} B/s", bw_b_to_a),
+                        });
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    anomalies
+}
+
 pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     let total_nodes = topology.nodes.len();
     let total_connections: usize = topology
@@ -210,6 +279,7 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     let (avg_latency, max_latency) = calculate_latency_stats(topology);
     let stake_weighted_latency = calculate_stake_weighted_latency(topology);
     let critical_nodes = find_critical_stake_nodes(topology);
+    let connection_anomalies = check_connection_properties(topology);
 
     // Calculate asymmetry metrics
     let mut bidirectional_count = 0;
@@ -257,6 +327,7 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
         asymmetry_ratio,
         stake_weighted_latency_ms: stake_weighted_latency,
         critical_nodes,
+        connection_anomalies,
     }
 }
 
