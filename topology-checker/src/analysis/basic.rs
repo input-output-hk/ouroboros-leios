@@ -1,5 +1,5 @@
 use crate::models::Topology;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct NetworkStats {
     pub total_nodes: usize,
@@ -11,6 +11,8 @@ pub struct NetworkStats {
     pub network_diameter: usize,
     pub avg_latency_ms: f64,
     pub max_latency_ms: f64,
+    pub bidirectional_connections: usize,
+    pub asymmetry_ratio: f64,
 }
 
 fn calculate_clustering_coefficient(topology: &Topology) -> f64 {
@@ -126,6 +128,38 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     let relay_nodes = total_nodes - block_producers;
     let (avg_latency, max_latency) = calculate_latency_stats(topology);
 
+    // Calculate asymmetry metrics
+    let mut bidirectional_count = 0;
+    let mut seen_pairs = HashSet::new();
+
+    for (node_name, node) in &topology.nodes {
+        for producer_name in node.producers.keys() {
+            let pair = if node_name < producer_name {
+                (node_name.clone(), producer_name.clone())
+            } else {
+                (producer_name.clone(), node_name.clone())
+            };
+
+            if seen_pairs.contains(&pair) {
+                continue;
+            }
+            seen_pairs.insert(pair);
+
+            let is_bidirectional = topology.nodes[producer_name]
+                .producers
+                .contains_key(node_name);
+            if is_bidirectional {
+                bidirectional_count += 1;
+            }
+        }
+    }
+
+    let asymmetry_ratio = if total_connections > 0 {
+        1.0 - (2.0 * bidirectional_count as f64 / total_connections as f64)
+    } else {
+        0.0
+    };
+
     NetworkStats {
         total_nodes,
         block_producers,
@@ -136,6 +170,8 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
         network_diameter,
         avg_latency_ms: avg_latency,
         max_latency_ms: max_latency,
+        bidirectional_connections: bidirectional_count,
+        asymmetry_ratio,
     }
 }
 

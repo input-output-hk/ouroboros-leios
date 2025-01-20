@@ -59,8 +59,16 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
         network_stats.avg_latency_ms
     ));
     report.push_str(&format!(
-        "| Maximum latency | {:.2} ms |\n\n",
+        "| Maximum latency | {:.2} ms |\n",
         network_stats.max_latency_ms
+    ));
+    report.push_str(&format!(
+        "| Bidirectional connections | {} |\n",
+        network_stats.bidirectional_connections
+    ));
+    report.push_str(&format!(
+        "| Asymmetry ratio | {:.2}% |\n\n",
+        network_stats.asymmetry_ratio * 100.0
     ));
 
     // Add stake distribution section

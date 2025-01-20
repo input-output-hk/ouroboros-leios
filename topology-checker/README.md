@@ -29,6 +29,7 @@ detailed information.
 | [Network Diameter](#network-metrics)       | Maximum hops between any two nodes        |
 | [Clustering Coefficient](#network-metrics) | Local interconnectedness measure          |
 | [Latency Statistics](#network-metrics)     | Network delay measurements                |
+| [Connection Symmetry](#network-metrics)    | Analysis of bidirectional connections     |
 
 ### Stake Distribution Analysis
 
@@ -89,6 +90,9 @@ Source topology: ../data/simulation/topology-dense-52.yaml
 | Clustering coefficient       | 0.284     |
 | Average latency              | 31.41 ms  |
 | Maximum latency              | 138.44 ms |
+| Bidirectional connections    | 156       |
+| Asymmetric connections       | 68        |
+| Asymmetry ratio              | 21.79%    |
 
 ## Stake Distribution
 
@@ -127,6 +131,13 @@ Source topology: ../data/simulation/topology-dense-52.yaml
 - **Network Diameter**: The maximum number of hops needed to reach any node from
   any other node. A smaller diameter (e.g., 5 hops) indicates a well-connected
   network where information can propagate quickly.
+
+- **Connection Symmetry**: Analysis of bidirectional connectivity between nodes.
+  - Bidirectional Connections: Number of node pairs with connections in both
+    directions
+  - Asymmetric Connections: Number of one-way connections between nodes
+  - Asymmetry Ratio: Percentage of total connections that are asymmetric
+  - Important for understanding communication patterns and potential bottlenecks
 
 - **Clustering Coefficient** (0-1): Measures how well nodes are interconnected
   with their neighbors.
