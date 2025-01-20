@@ -13,7 +13,6 @@ let
       shell.withHoogle = false;
       inputMap = {
         "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
-        "https://input-output-hk.github.io/cardano-haskell-packages" = inputs.iogx.inputs.CHaP;
       };
       name = "ouroboros-leios";
       compiler-nix-name = lib.mkDefault "ghc96";
