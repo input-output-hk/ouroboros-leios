@@ -46,3 +46,13 @@ source-repository-package
     subdir:
       io-sim
       io-classes
+
+-- NOTE: This contains a workaround for the compile error with pango >=1.56.
+--       For discussion, see:
+--       https://input-output-rnd.slack.com/archives/C074AHSKJF7/p1737132491221259
+source-repository-package
+    type: git
+    location: https://github.com/wenkokke/gtk2hs.git
+    tag: ca7f98bd3e9462deac3661244dc76004a36fc8c3
+    subdir:
+      pango
