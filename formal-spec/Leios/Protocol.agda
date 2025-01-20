@@ -97,7 +97,7 @@ module _ (s : LeiosState) (eb : EndorserBlock) where
   allIBRefsKnown : Type
   allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
 
-stake : (s : LeiosState) → ℕ
+stake : LeiosState → ℕ
 stake record { SD = SD } = TotalMap.lookup SD id
 
 module _ (s : LeiosState) where
