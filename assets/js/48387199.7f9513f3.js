@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[248],{6655:e=>{e.exports=JSON.parse('{"tags":[{"label":"progress","permalink":"/news/tags/progress","count":14},{"label":"update","permalink":"/news/tags/update","count":14},{"label":"weekly","permalink":"/news/tags/weekly","count":14},{"label":"education","permalink":"/news/tags/education","count":1}]}')}}]);

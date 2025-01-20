@@ -2,11 +2,80 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Leios Blog</title>
-    <updated>2025-01-06T00:00:00.000Z</updated>
+    <updated>2025-01-13T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly progress summary – January 13, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary"/>
+        <updated>2025-01-13T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Cryptography Benchmarks]]></summary>
+        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-benchmarks">Cryptography Benchmarks<a class="hash-link" aria-label="Direct link to Cryptography Benchmarks" title="Direct link to Cryptography Benchmarks" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#cryptography-benchmarks">​</a></h2>
+<ul>
+<li>Implemented and benchmarked complete Leios cryptography suite in the
+<code>leios_crypto_benchmarks</code> Rust crate</li>
+<li>Key VRF performance metrics:<!-- -->
+<ul>
+<li>Proving: 240 µs</li>
+<li>Verifying: 390 µs</li>
+</ul>
+</li>
+<li>Sortition performance (excluding VRF):<!-- -->
+<ul>
+<li>Leadership checks (RB/IB/EB): 0.17 µs per slot/pipeline</li>
+<li>Vote number calculation: 3.8 µs per pipeline</li>
+</ul>
+</li>
+<li>BLS operations benchmarked:<!-- -->
+<ul>
+<li>Key possession proof verification: 1.5 ms per key</li>
+<li>Vote generation/verification: 280 µs / 1.4 ms per vote</li>
+<li>Certificate operations (300-vote quorum): 50 ms generation, 90 ms
+verification</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-design-progress">Cryptography Design Progress<a class="hash-link" aria-label="Direct link to Cryptography Design Progress" title="Direct link to Cryptography Design Progress" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#cryptography-design-progress">​</a></h2>
+<ul>
+<li>Optimized vote signature size to potentially as small as 192 bytes</li>
+<li>Determined that 500-vote committee certificates (60% quorum) would fit within
+Praos blocks at ~58 kB</li>
+<li>Explored potential synergies with KES rotation and Praos VRF BLS keys</li>
+<li>Completed cryptography sections for first technical report</li>
+<li>Decision made to freeze current report content and move new findings to future
+documents</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-development">Simulation Development<a class="hash-link" aria-label="Direct link to Simulation Development" title="Direct link to Simulation Development" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#simulation-development">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell Simulation<a class="hash-link" aria-label="Direct link to Haskell Simulation" title="Direct link to Haskell Simulation" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#haskell-simulation">​</a></h3>
+<ul>
+<li>Achieved diffusion latency comparable to benchmark cluster data for Praos
+blocks</li>
+<li>Integrated agreed-upon simulation parameters with Rust team</li>
+<li>Added event log output functionality with JSON support</li>
+<li>Implemented 'short-leios' simulation variant matching mainnet ranking block
+interval</li>
+<li>Fixed coordination issues in Relay mini-protocol consumers</li>
+<li>Completed PI goal by adding total data transmitted per node visualization</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust Simulation<a class="hash-link" aria-label="Direct link to Rust Simulation" title="Direct link to Rust Simulation" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#rust-simulation">​</a></h3>
+<ul>
+<li>Implemented more granular CPU simulation times</li>
+<li>Fixed race condition in simulated clock</li>
+<li>Started consuming new shared configuration file format</li>
+<li>Established shared configuration format with default parameters in
+<code>data/simulation/default.yaml</code></li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly progress summary – January 6, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary</id>
