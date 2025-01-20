@@ -15,6 +15,7 @@ on:
       - "data/**"
       - "site/**"
       - "docs/**"
+      - "cabal.project"
   push:
     branches:
       - main
@@ -25,6 +26,7 @@ on:
       - "data/**"
       - "site/**"
       - "docs/**"
+      - "cabal.project"
 
 jobs:
   ################################################################################
@@ -80,7 +82,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
-      contains(github.event.pull_request.files.*.path, 'data/')
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -150,7 +153,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
-      contains(github.event.pull_request.files.*.path, 'data/')
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project')
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -170,7 +174,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
-      contains(github.event.pull_request.files.*.path, 'data/')
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project')
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
