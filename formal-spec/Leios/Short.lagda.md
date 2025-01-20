@@ -27,7 +27,7 @@ data SlotUpkeep : Type where
   Base IB-Role EB-Role V-Role : SlotUpkeep
 
 allUpkeep : ℙ SlotUpkeep
-allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V-Role ∷ [])
+allUpkeep = (((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵) ∪ ❴ Base ❵
 ```
 ```agda
 open import Leios.Protocol (⋯) SlotUpkeep public
