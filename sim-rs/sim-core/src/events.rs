@@ -306,8 +306,8 @@ impl EventTracker {
         });
     }
 
-    pub fn track_vote_lottery_won(&self, votes: &VoteBundle) {
-        self.send(Event::VoteLotteryWon { id: votes.id });
+    pub fn track_vote_lottery_won(&self, id: VoteBundleId) {
+        self.send(Event::VoteLotteryWon { id });
     }
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {

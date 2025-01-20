@@ -22,7 +22,7 @@ module Topology where
 import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (assert)
-import Control.Monad (forM_, (<=<))
+import Control.Monad (forM_, guard, (<=<))
 import Data.Aeson (encode, genericToJSON)
 import Data.Aeson.Decoding (throwDecode)
 import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, Options (..), Parser, ToJSON (..), ToJSONKey, Value, defaultOptions, genericParseJSON, genericToEncoding)
@@ -40,6 +40,7 @@ import Data.IORef (atomicModifyIORef', newIORef, readIORef)
 import Data.Kind (Type)
 import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
+import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Set (Set)
@@ -604,9 +605,10 @@ readLatenciesSqlite3Gz topology latencySqliteGzFile =
 readLatenciesSqlite3 :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatenciesSqlite3 topology latencySqliteFile = do
   let queryAvgTime =
-        "select avg(time) from ping \
+        "select avg(time)/2 from ping \
         \where source = :consumer and dest = :producer \
-        \or    source = :producer and dest = :consumer"
+        \or    source = :producer and dest = :consumer \
+        \and   size = 64"
   latenciesRef <- newIORef mempty
   conn <- SQLlite.open latencySqliteFile
   forM_ topology.coreNodes $ \consumer -> do
@@ -621,3 +623,17 @@ readLatenciesSqlite3 topology latencySqliteFile = do
              in (M.adjust (M.insert producerName latency) consumer.name latencies, ())
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
+
+type LinkLatency = ((NodeId, NodeId), Latency)
+
+-- | Returns nodes failing the expected triangle inequality for latencies.
+triangleInequalityCheck :: Map (NodeId, NodeId) Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
+triangleInequalityCheck mls = do
+  let ls = Map.toList mls
+  l1@((s, t), st) <- ls
+  l2@((s', middle), sm) <- ls
+  guard (s' == s)
+  Just mt <- pure $ Map.lookup (middle, t) mls
+  let l3 = ((middle, t), mt)
+  guard (st > (sm + mt))
+  return (l1, l2, l3)

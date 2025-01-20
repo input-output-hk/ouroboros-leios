@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::{RawNodeConfig, RawTopology};
+use sim_core::config::{RawLegacyTopology, RawNodeConfig};
 
 use super::utils::{distribute_stake, LinkTracker};
 
@@ -40,7 +40,7 @@ const SHORT_HOP: Duration = Duration::from_millis(12);
 const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
-pub fn simplified(args: &SimplifiedArgs) -> Result<RawTopology> {
+pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
     let mut rng = thread_rng();
 
     let mut nodes = vec![];
@@ -122,7 +122,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawTopology> {
         }
     }
 
-    Ok(RawTopology {
+    Ok(RawLegacyTopology {
         nodes,
         links: links.links,
     })

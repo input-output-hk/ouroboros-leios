@@ -1,0 +1,23 @@
+[package]
+name = "leios_crypto_benchmarks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+blst = "0.3.13"
+criterion = "0.5.1"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+rustc_apfloat = "0.2.2"
+
+[[bench]]
+name = "sortition_bench"
+harness = false
+
+[[bench]]
+name = "vrf_bench"
+harness = false
+
+[[bench]]
+name = "vote_bench"
+harness = false

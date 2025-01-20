@@ -40,7 +40,6 @@ import LeiosProtocol.Short
 import LeiosProtocol.Short.Generate
 import qualified LeiosProtocol.Short.Generate as Generate
 import LeiosProtocol.TaskMultiQueue
-import ModelTCP
 import Numeric.Natural (Natural)
 import PraosProtocol.BlockFetch (
   BlockFetchControllerState (blocksVar),
@@ -78,16 +77,12 @@ data LeiosNodeEvent
 
 data LeiosNodeConfig = LeiosNodeConfig
   { leios :: !LeiosConfig
-  , rankingBlockFrequencyPerSlot :: !Double
+  , slotConfig :: !SlotConfig
   , nodeId :: !NodeId
   , stake :: !StakeFraction
   , rng :: !StdGen
   -- ^ for block generation
   , baseChain :: !(Chain RankingBlock)
-  , rankingBlockPayload :: !Bytes
-  -- ^ overall size of txs to include in RBs
-  , inputBlockPayload :: !Bytes
-  -- ^ overall size of txs to include in IBs
   , processingQueueBound :: !Natural
   , processingCores :: NumCores
   }
@@ -541,20 +536,19 @@ generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
   let
-    withDelay Nothing (_lbl, m) = m
-    withDelay (Just d) (lbl, m) = atomically $ writeTMQueue st.taskQueue lbl (d, m)
+    withDelay d (lbl, m) = atomically $ writeTMQueue st.taskQueue lbl (d, m)
   let
-    submitOne :: (Maybe CPUTask, SomeAction) -> m ()
+    submitOne :: (CPUTask, SomeAction) -> m ()
     submitOne (delay, x) = withDelay delay $
       case x of
         SomeAction Generate.Base rb0 -> (GenRB,) $ do
           rb <- atomically $ do
             ha <- Chain.headAnchor <$> PraosNode.preferredChain st.praosState
-            let rb = fixupBlock ha rb0
+            let rb = fixSize cfg.leios $ fixupBlock ha rb0
             addProducedBlock st.praosState.blockFetchControllerState rb
             return rb
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
-        SomeAction Generate.Propose ibs -> (GenIB,) $ forM_ ibs $ \ib -> do
+        SomeAction Generate.Propose ib -> (GenIB,) $ do
           atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
@@ -591,14 +585,14 @@ mkBuffersView cfg st = BuffersView{..}
     return $
       NewRankingBlockData
         { freshestCertifiedEB
-        , txsPayload = cfg.rankingBlockPayload
+        , txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize
         }
   newIBData = do
     ledgerState <- readTVar st.ledgerStateVar
     referenceRankingBlock <-
       Chain.headHash . Chain.dropUntil (flip Map.member ledgerState . blockHash)
         <$> PraosNode.preferredChain st.praosState
-    let txsPayload = cfg.inputBlockPayload
+    let txsPayload = cfg.leios.sizes.inputBlockBodyAvgSize
     return $ NewInputBlockData{referenceRankingBlock, txsPayload}
   ibs = do
     buffer <- readTVar st.relayIBState.relayBufferVar
@@ -611,7 +605,7 @@ mkBuffersView cfg st = BuffersView{..}
             $ buffer
         receivedByCheck slot =
           filter
-            ( maybe False (<= slotTime cfg.leios.praos.slotConfig slot)
+            ( maybe False (<= slotTime cfg.slotConfig slot)
                 . flip Map.lookup times
             )
         validInputBlocks q = receivedByCheck q.receivedBy $ generatedCheck q.generatedBetween
@@ -631,5 +625,5 @@ mkSchedule cfg = mkScheduler cfg.rng rates
       [ (SomeRole Generate.Propose, inputBlockRate cfg.leios slot)
       , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios slot)
       , (SomeRole Generate.Vote, votingRate cfg.leios slot)
-      , (SomeRole Generate.Base, [NetworkRate cfg.rankingBlockFrequencyPerSlot])
+      , (SomeRole Generate.Base, [NetworkRate cfg.leios.praos.blockFrequencyPerSlot])
       ]
