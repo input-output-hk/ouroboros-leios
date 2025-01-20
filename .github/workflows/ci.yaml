@@ -8,17 +8,33 @@ env:
 
 on:
   pull_request:
+    paths:
+      - "formal-spec/**"
+      - "simulation/**"
+      - "sim-rs/**"
+      - "data/**"
+      - "site/**"
+      - "docs/**"
   push:
     branches:
       - main
+    paths:
+      - "formal-spec/**"
+      - "simulation/**"
+      - "sim-rs/**"
+      - "data/**"
+      - "site/**"
+      - "docs/**"
 
 jobs:
   ################################################################################
   # Formal Specification in Agda - under /formal-spec/
   ################################################################################
-
   formal-spec-typecheck:
     name: "formal-spec: Typecheck"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'formal-spec/')
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -61,6 +77,10 @@ jobs:
 
   simulation-test:
     name: "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -127,6 +147,10 @@ jobs:
 
   simulation-hlint:
     name: "simulation: Check with HLint"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/')
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -143,6 +167,10 @@ jobs:
 
   simulation-fourmolu:
     name: "simulation: Check with fourmolu"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/')
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -159,6 +187,10 @@ jobs:
 
   sim-rs-check:
     name: "sim-rs: Test"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'sim-rs/') ||
+      contains(github.event.pull_request.files.*.path, 'data/')
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -177,6 +209,9 @@ jobs:
 
   docs-generate-d2-diagrams:
     name: "docs: Generate D2 Diagrams"
+    if: |
+      github.event_name == 'push' ||
+      endsWith(github.event.pull_request.files.*.path, '.d2')
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -185,21 +220,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 2 # Needed to get previous commit for comparison
 
       - name: Install D2
         run: |
           curl -fsSL https://d2lang.com/install.sh | sh -s --
           d2 --version
 
-      - name: Generate PNG files
+      - name: Generate PNG files for changed D2 files
         run: |
-          find . -name "*.d2" -type f -exec sh -c '
-            for file do
+          # Get list of changed .d2 files
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '\.d2$' || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No .d2 files were changed"
+            exit 0
+          fi
+
+          echo "Changed .d2 files:"
+          echo "$CHANGED_FILES"
+
+          # Process each changed file
+          echo "$CHANGED_FILES" | while read -r file; do
+            if [ -f "$file" ]; then
               output_file="${file%.d2}.png"
               echo "Converting $file to $output_file"
               d2 "$file" "$output_file"
-            done
-          ' sh {} +
+            fi
+          done
 
       - name: Check for changes
         id: changes
@@ -223,12 +271,33 @@ jobs:
 
   docs-build:
     name: "docs: Build"
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.files.*.path, 'site/')
     runs-on: ubuntu-22.04
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.has_changes }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for site changes
+        id: check_changes
+        run: |
+          SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
+          if [ -z "$SITE_CHANGES" ]; then
+            echo "No changes in site directory"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in site directory:"
+            echo "$SITE_CHANGES"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: 🛠️ Setup Node.js
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -236,15 +305,18 @@ jobs:
           cache-dependency-path: site/yarn.lock
 
       - name: 📦 Install dependencies
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: yarn install
 
       - name: 🏗️ Build Docusaurus site
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: |
           yarn build
 
       - name: 🚀 Publish Docusaurus build
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: docusaurus-build
@@ -254,7 +326,9 @@ jobs:
 
   docs-publish:
     name: "docs: Publish"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.docs-build.outputs.has_changes == 'true'
     runs-on: ubuntu-22.04
     needs: docs-build
     steps:
