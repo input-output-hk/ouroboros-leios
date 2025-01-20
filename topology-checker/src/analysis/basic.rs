@@ -17,11 +17,8 @@ fn calculate_clustering_coefficient(topology: &Topology) -> f64 {
     let mut total_coefficient = 0.0;
     let mut nodes_with_neighbors = 0;
 
-    // For each node
     for (_node_id, node) in &topology.nodes {
-        // Get all neighbors (both producers and nodes that have this node as a producer)
         let mut neighbors = node.producers.keys().collect::<Vec<_>>();
-        // Add nodes that have this node as a producer
         for (other_id, other_node) in &topology.nodes {
             if other_node.producers.contains_key(_node_id) && !neighbors.contains(&other_id) {
                 neighbors.push(other_id);
@@ -34,12 +31,15 @@ fn calculate_clustering_coefficient(topology: &Topology) -> f64 {
 
         let mut connections = 0;
         // Check connections between neighbors
+        // We count a connection if either node has the other as a producer
         for (i, &n1) in neighbors.iter().enumerate() {
             for &n2 in neighbors.iter().skip(i + 1) {
-                // Check both directions for connection
-                if topology.nodes[n1].producers.contains_key(n2)
-                    || topology.nodes[n2].producers.contains_key(n1)
-                {
+                // Check both directions since connections can be asymmetric
+                // Each direction counts as a separate connection
+                if topology.nodes[n1].producers.contains_key(n2) {
+                    connections += 1;
+                }
+                if topology.nodes[n2].producers.contains_key(n1) {
                     connections += 1;
                 }
             }
