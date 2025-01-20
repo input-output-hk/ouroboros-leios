@@ -15,6 +15,10 @@ on:
       - "data/**"
       - "site/**"
       - "docs/**"
+<<<<<<< HEAD
+      - "cabal.project"
+=======
+>>>>>>> main
   push:
     branches:
       - main
@@ -25,6 +29,10 @@ on:
       - "data/**"
       - "site/**"
       - "docs/**"
+<<<<<<< HEAD
+      - "cabal.project"
+=======
+>>>>>>> main
 
 jobs:
   ################################################################################
@@ -33,7 +41,13 @@ jobs:
   formal-spec-typecheck:
     name: "formal-spec: Typecheck"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      contains(github.event.commits.*.modified, 'formal-spec/') ||
+      github.event_name == 'pull_request' &&
+=======
       github.event_name == 'push' ||
+>>>>>>> main
       contains(github.event.pull_request.files.*.path, 'formal-spec/')
     runs-on: ubuntu-22.04
     steps:
@@ -78,9 +92,20 @@ jobs:
   simulation-test:
     name: "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
+=======
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/')
+>>>>>>> main
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -148,9 +173,20 @@ jobs:
   simulation-hlint:
     name: "simulation: Check with HLint"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
+=======
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/')
+>>>>>>> main
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -168,9 +204,20 @@ jobs:
   simulation-fourmolu:
     name: "simulation: Check with fourmolu"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'simulation/') ||
+      contains(github.event.commits.*.modified, 'data/') ||
+      contains(github.event.commits.*.modified, 'cabal.project')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
+      contains(github.event.pull_request.files.*.path, 'data/') ||
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))
+=======
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/')
+>>>>>>> main
     runs-on: ubuntu-22.04
     steps:
       - name: 📥 Checkout repository
@@ -188,9 +235,18 @@ jobs:
   sim-rs-check:
     name: "sim-rs: Test"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'sim-rs/') ||
+      contains(github.event.commits.*.modified, 'data/')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'sim-rs/') ||
+      contains(github.event.pull_request.files.*.path, 'data/'))
+=======
       github.event_name == 'push' ||
       contains(github.event.pull_request.files.*.path, 'sim-rs/') ||
       contains(github.event.pull_request.files.*.path, 'data/')
+>>>>>>> main
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -210,7 +266,13 @@ jobs:
   docs-generate-d2-diagrams:
     name: "docs: Generate D2 Diagrams"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      endsWith(github.event.commits.*.modified, '.d2') ||
+      github.event_name == 'pull_request' &&
+=======
       github.event_name == 'push' ||
+>>>>>>> main
       endsWith(github.event.pull_request.files.*.path, '.d2')
     runs-on: ubuntu-22.04
     permissions:
@@ -272,7 +334,13 @@ jobs:
   docs-build:
     name: "docs: Build"
     if: |
+<<<<<<< HEAD
+      github.event_name == 'push' &&
+      contains(github.event.commits.*.modified, 'site/') ||
+      github.event_name == 'pull_request' &&
+=======
       github.event_name == 'push' ||
+>>>>>>> main
       contains(github.event.pull_request.files.*.path, 'site/')
     runs-on: ubuntu-22.04
     outputs:
