@@ -9,7 +9,7 @@ use figment::{
 };
 use sim_core::{
     clock::ClockCoordinator,
-    config::{NodeId, RawParameters, RawTopology, SimConfiguration, Topology},
+    config::{NodeId, RawLegacyTopology, RawParameters, RawTopology, SimConfiguration, Topology},
     events::EventTracker,
     sim::Simulation,
 };
@@ -41,8 +41,14 @@ struct Args {
 
 fn read_config(args: &Args) -> Result<SimConfiguration> {
     let topology_str = fs::read_to_string(&args.topology)?;
-    let raw_topology: RawTopology = toml::from_str(&topology_str)?;
-    let topology: Topology = raw_topology.into();
+    let topology_ext = args.topology.extension().and_then(|ext| ext.to_str());
+    let topology: Topology = if topology_ext == Some("toml") {
+        let raw_topology: RawLegacyTopology = toml::from_str(&topology_str)?;
+        raw_topology.into()
+    } else {
+        let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
+        raw_topology.into()
+    };
     topology.validate()?;
 
     let mut raw_params = Figment::new().merge(Yaml::string(include_str!(

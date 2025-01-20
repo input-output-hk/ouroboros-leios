@@ -36,6 +36,7 @@ import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
+  DataTransmitted (..),
   IBsInRBsReport (..),
   LeiosModelConfig (..),
   LeiosSimVizModel,
@@ -49,7 +50,7 @@ import LeiosProtocol.Short.VizSim (
   totalIBsInRBs,
  )
 import Linear.V2
-import ModelTCP (TcpMsgForecast (..))
+import ModelTCP (Bytes, TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
@@ -609,6 +610,49 @@ chartCPUUsage LeiosModelConfig{numCores} =
                 ]
             }
 
+chartDataTransmitted :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartDataTransmitted LeiosModelConfig{maxBandwidthPerNode} =
+  chartVizRender 25 $
+    \(Time now)
+     _
+     ( SimVizModel
+        _
+        vs
+      ) ->
+        let
+          numNodes = Map.size vs.vizNodePos
+          toMiB = (/ 1e6)
+          maxChart = toMiB . fromIntegral $ maxBandwidthPerNode
+          toBps (ILMap.ClosedInterval s e, bytes) = realToFrac $ fromIntegral bytes / (e - s) :: Double
+          toBps _ = error "internal: non-closed-interval"
+          values =
+            [ (nid, [(n, "")])
+            | (NodeId nid, m) <- map (second (.messagesTransmitted)) $ Map.toList vs.dataTransmittedPerNode
+            , let n = toMiB . sum . map toBps . ILMap.toList . flip ILMap.containing now $ m
+            ]
+         in
+          (Chart.def :: Chart.Layout Double Double)
+            { Chart._layout_title = "Instantaneous Data Transmitted per Node"
+            , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
+            , Chart._layout_x_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis
+                        Chart.defaultIntAxis{Chart._la_nLabels = 10}
+                        (0, numNodes - 1)
+                  , Chart._laxis_title = "Node #"
+                  }
+            , Chart._layout_y_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledAxis Chart.def (0, maxChart)
+                  , Chart._laxis_title = "Mbps"
+                  }
+            , Chart._layout_plots =
+                [ Chart.plotBars (Chart.def{Chart._plot_bars_values_with_labels = values})
+                ]
+            }
+
 chartLinkUtilisation :: VizRender LeiosSimVizModel
 chartLinkUtilisation =
   chartVizRender 25 $
@@ -687,15 +731,15 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> NumCores -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength numCores =
+defaultVizConfig :: Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
+defaultVizConfig stageLength numCores maxBandwidthPerNode =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
     , voteColor = toSRGB . voteColor
     , ebColor = toSRGB . ebColor
     , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
-    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores}
+    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores, maxBandwidthPerNode}
     }
  where
   testPtclMessageColor ::
@@ -781,20 +825,23 @@ example2 rng onDiskConfig p2pTopography processingCores =
                     tag <- [IB, EB, VT, RB]
                     ]
                 , LayoutAbove
-                    [ LayoutReqSize 350 300 $
+                    [ LayoutReqSize 350 150 $
                         Layout $
                           chartBandwidth modelConfig
-                    , LayoutReqSize 350 300 $
+                    , LayoutReqSize 350 200 $
+                        Layout $
+                          chartDataTransmitted modelConfig
+                    , LayoutReqSize 350 200 $
                         Layout $
                           chartCPUUsage modelConfig
-                    , LayoutReqSize 350 300 $
+                    , LayoutReqSize 350 150 $
                         Layout chartLinkUtilisation
                     ]
                 ]
             ]
         ]
  where
-  config = defaultVizConfig 5 processingCores
+  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: read from topography when it includes bandwidth
   modelConfig = config.model
   model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pTopography processingCores)
 
