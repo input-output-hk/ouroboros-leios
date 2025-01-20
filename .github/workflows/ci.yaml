@@ -224,6 +224,33 @@ jobs:
             echo "Cargo test failed"
             exit 1
           fi
+  ################################################################################
+  # Tools - Topology checker
+  ################################################################################
+
+  topology-checker-check:
+    name: "topology-checker: Check and Test"
+    if: |
+      github.event_name == 'push' &&
+      (contains(github.event.commits.*.modified, 'topology-checker/') ||
+      contains(github.event.commits.*.modified, 'data/simulation/topology*.yaml') ||
+      contains(github.event.commits.*.modified, 'data/simulation/topology*.json')) ||
+      github.event_name == 'pull_request' &&
+      (contains(github.event.pull_request.files.*.path, 'topology-checker/') ||
+      contains(github.event.pull_request.files.*.path, 'data/simulation/topology*.yaml') ||
+      contains(github.event.pull_request.files.*.path, 'data/simulation/topology*.json'))
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check and test topology checker
+        working-directory: topology-checker
+        run: |
+          cargo check
+          cargo test
+          if [ $? -ne 0 ]; then
+            echo "Topology checker tests failed"
+            exit 1
+          fi
 
   ################################################################################
   # Documentation - under various directories
