@@ -47,7 +47,6 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Lazy (LazyText)
 import qualified Data.Text.Lazy as TL
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -319,7 +318,7 @@ clusterByClusterName node@(_, nodeInfo) = case nodeInfo.clusterName of
   Nothing -> GV.N node
   Just nodeClusterName -> GV.C nodeClusterName (GV.N node)
 
-clusterNameToLazyText :: ClusterName -> LazyText
+clusterNameToLazyText :: ClusterName -> TL.Text
 clusterNameToLazyText = TL.fromStrict . unClusterName
 
 clusterNameToGraphID :: ClusterName -> GVTG.GraphID
