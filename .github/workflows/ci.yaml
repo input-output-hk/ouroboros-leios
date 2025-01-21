@@ -86,15 +86,6 @@ jobs:
   simulation-test:
     name:
       "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
-    if:
-      ${{ (github.event_name == 'push' &&
-      (contains(github.event.commits.*.modified, 'simulation/') ||
-      contains(github.event.commits.*.modified, 'data/') ||
-      contains(github.event.commits.*.modified, 'cabal.project'))) ||
-      (github.event_name == 'pull_request' &&
-      (contains(github.event.pull_request.files.*.path, 'simulation/') ||
-      contains(github.event.pull_request.files.*.path, 'data/') ||
-      contains(github.event.pull_request.files.*.path, 'cabal.project'))) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
