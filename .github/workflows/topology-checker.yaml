@@ -1,0 +1,27 @@
+name: topology-checker
+
+on:
+  pull_request:
+    paths:
+      - "topology-checker/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "topology-checker/**"
+
+jobs:
+  topology-checker-check:
+    name: "Test"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test topology checker
+        working-directory: topology-checker
+        run: |
+          cargo check
+          cargo test
+          if [ $? -ne 0 ]; then
+            echo "Topology checker tests failed"
+            exit 1
+          fi
