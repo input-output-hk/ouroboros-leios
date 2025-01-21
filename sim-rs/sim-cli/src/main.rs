@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
 
     let clock_coordinator = ClockCoordinator::new();
     let clock = clock_coordinator.clock();
-    let tracker = EventTracker::new(events_sink, clock.clone());
+    let tracker = EventTracker::new(events_sink, clock.clone(), &config.nodes);
     let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;
 
     select! {
