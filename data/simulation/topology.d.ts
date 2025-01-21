@@ -19,7 +19,8 @@ export interface Topology {
 
 /** A node. */
 export interface Node<Location> {
-  stake?: bigint;
+  stake?: bigint | null;
+  "cpu-core-count"?: bigint | null;
   location: Location;
   producers: { [producer: NodeName]: LinkInfo };
 }
@@ -28,7 +29,6 @@ export interface Node<Location> {
 export interface LinkInfo {
   "latency-ms": number;
   "bandwidth-bytes-per-second"?: bigint | null;
-  "cpu-core-count"?: bigint | null;
 }
 
 export type NodeName = string;
