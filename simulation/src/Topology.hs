@@ -28,6 +28,7 @@ import Control.Exception (Exception (displayException), assert)
 import Control.Monad (forM_, guard, (<=<))
 import Data.Aeson (withObject)
 import Data.Aeson.Decoding (throwDecode)
+import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, KeyValue ((.=)), Options (..), Parser, ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, pairs, typeMismatch, (.:))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Coerce (Coercible, coerce)
@@ -154,6 +155,41 @@ instance FromJSON (Location 'COORD2D) where
 -- As provided in 'data/simulation/topology-dense-52.json'.
 --------------------------------------------------------------------------------
 
+data SLocationKind (lk :: LocationKind) where
+  SCLUSTER :: SLocationKind 'CLUSTER
+  SCOORD2D :: SLocationKind 'COORD2D
+
+data SomeTopology = forall lk. SomeTopology (SLocationKind lk) (Topology lk)
+
+instance ToJSON SomeTopology where
+  toJSON :: SomeTopology -> Value
+  toJSON (SomeTopology SCLUSTER clusterTopology) = toJSON clusterTopology
+  toJSON (SomeTopology SCOORD2D coord2DTopology) = toJSON coord2DTopology
+
+  toEncoding :: SomeTopology -> Encoding
+  toEncoding (SomeTopology SCLUSTER clusterTopology) = toEncoding clusterTopology
+  toEncoding (SomeTopology SCOORD2D coord2DTopology) = toEncoding coord2DTopology
+
+instance FromJSON SomeTopology where
+  parseJSON :: Value -> Parser SomeTopology
+  parseJSON v =
+    if isTopologyCoord2D v
+      then SomeTopology SCOORD2D <$> parseJSON v
+      else SomeTopology SCLUSTER <$> parseJSON v
+
+isTopologyCoord2D :: Value -> Bool
+isTopologyCoord2D v =
+  case v of
+    Object o ->
+      case KeyMap.lookup "nodes" o of
+        Just (Array nodes) ->
+          case V.uncons nodes of
+            Just (Object node, _nodes) ->
+              KeyMap.member "location" node
+            _otherwise -> False
+        _otherwise -> False
+    _otherwise -> False
+
 newtype Topology lk = Topology
   { nodes :: Map NodeName (Node lk)
   }
@@ -173,6 +209,10 @@ instance HasField "stake" (Node lk) Word where
   getField :: Node lk -> Word
   getField node = node.nodeInfo.stake
 
+instance HasField "cpuCoreCount" (Node lk) CpuCoreCount where
+  getField :: Node lk -> CpuCoreCount
+  getField node = node.nodeInfo.cpuCoreCount
+
 instance HasField "location" (Node lk) (Location lk) where
   getField :: Node lk -> Location lk
   getField node = node.nodeInfo.location
@@ -187,7 +227,8 @@ instance Default (Node 'CLUSTER) where
 
 data NodeInfo (lk :: LocationKind) = NodeInfo
   { stake :: {-# UNPACK #-} !Word
-  , location :: {-# UNPACK #-} !(Location lk)
+  , cpuCoreCount :: {-# UNPACK #-} !CpuCoreCount
+  , location :: !(Location lk)
   }
   deriving stock (Show, Eq, Generic)
 
@@ -200,13 +241,13 @@ instance Default (NodeInfo 'CLUSTER) where
   def =
     NodeInfo
       { stake = 0
+      , cpuCoreCount = Unbounded
       , location = LocCluster Nothing
       }
 
 data LinkInfo = LinkInfo
   { latencyMs :: !LatencyMs
   , bandwidthBytesPerSecond :: !BandwidthBps
-  , cpuCoreCount :: !CpuCoreCount
   }
   deriving stock (Show, Eq, Generic)
 
@@ -220,7 +261,6 @@ instance Default LinkInfo where
     LinkInfo
       { latencyMs = 0
       , bandwidthBytesPerSecond = Unbounded
-      , cpuCoreCount = Unbounded
       }
 
 topologyOptions :: Options
@@ -230,6 +270,7 @@ nodeToKVs :: (ToJSON (Location lk), KeyValue e kv) => Getter (Node lk) -> Node l
 nodeToKVs getter node =
   catMaybes
     [ get @"stake" getter node
+    , get @"cpuCoreCount" getter node
     , get @"location" getter node
     , get @"producers" getter node
     ]
@@ -252,6 +293,7 @@ instance FromJSON (Node 'CLUSTER) where
   parseJSON :: Value -> Parser (Node 'CLUSTER)
   parseJSON = withObject "Node" $ \obj -> do
     stake <- parseFieldOrDefault @(Node 'CLUSTER) @"stake" obj
+    cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
     location <- parseFieldOrDefault @(Node 'CLUSTER) @"location" obj
     producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
     pure Node{nodeInfo = NodeInfo{..}, ..}
@@ -263,6 +305,7 @@ instance FromJSON (Node 'COORD2D) where
     --       function uses the default instance for @NodeInfo 'CLUSTER@, which
     --       admittedly looks a bit shady.
     stake <- parseFieldOrDefault @(NodeInfo 'CLUSTER) @"stake" obj
+    cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
     location <- parseField @(Node 'COORD2D) @"location" obj
     producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
     pure Node{nodeInfo = NodeInfo{..}, ..}
@@ -272,7 +315,6 @@ linkInfoToKVs getter link =
   catMaybes
     [ get @"latencyMs" getter link
     , get @"bandwidthBytesPerSecond" getter link
-    , get @"cpuCoreCount" getter link
     ]
 
 instance ToJSON LinkInfo where
@@ -287,7 +329,6 @@ instance FromJSON LinkInfo where
   parseJSON = withObject "LinkInfo" $ \obj -> do
     latencyMs <- parseField @LinkInfo @"latencyMs" obj
     bandwidthBytesPerSecond <- parseFieldOrDefault @LinkInfo @"bandwidthBytesPerSecond" obj
-    cpuCoreCount <- parseFieldOrDefault @LinkInfo @"cpuCoreCount" obj
     pure LinkInfo{..}
 
 topologyToKVs :: (ToJSON (Node lk), KeyValue e kv) => Getter (Topology lk) -> Topology lk -> [kv]
@@ -335,8 +376,9 @@ benchTopologyToTopology benchTopology latencies stakeShareSize =
     Node
       { nodeInfo =
           NodeInfo
-            { location = LocCluster (regionNameToClusterName <$> benchTopologyNode.region)
-            , stake = maybe 0 (stakeShareSize *) benchTopologyNode.pools
+            { stake = maybe 0 (stakeShareSize *) benchTopologyNode.pools
+            , cpuCoreCount = Unbounded
+            , location = LocCluster (regionNameToClusterName <$> benchTopologyNode.region)
             }
       , producers =
           M.fromList
@@ -345,7 +387,6 @@ benchTopologyToTopology benchTopology latencies stakeShareSize =
             , producerName <- V.toList benchTopologyNode.producers
             , let latencyMs = (latencies M.! consumerName) M.! producerName
             , let bandwidthBytesPerSecond = Unbounded
-            , let cpuCoreCount = Unbounded
             ]
       }
 
@@ -356,12 +397,12 @@ clusterNameToRegionName :: ClusterName -> RegionName
 clusterNameToRegionName = RegionName . unClusterName
 
 -- | Create a 'Topology' from a file.
-readTopologyCluster :: FilePath -> IO (Either ParseException (Topology 'CLUSTER))
-readTopologyCluster = decodeFileEither
+readTopology :: FilePath -> IO (Either ParseException SomeTopology)
+readTopology = decodeFileEither
 
--- | Create a 'Topology' from a file.
-writeTopologyCluster :: FilePath -> Topology 'CLUSTER -> IO ()
-writeTopologyCluster = encodeFile
+-- | Write a 'Topology' to a file.
+writeTopology :: FilePath -> SomeTopology -> IO ()
+writeTopology = encodeFile
 
 -- | Create a 'Topology' from a 'BenchTopology', a 'Latencies' database, and a stake share size.
 readTopologyFromBenchTopology :: FilePath -> FilePath -> Word -> IO (Topology 'CLUSTER)
@@ -373,6 +414,15 @@ readTopologyFromBenchTopology benchTopologyFile latencyFile stakeShareSize = do
 --------------------------------------------------------------------------------
 -- Convert between Topology and FGL Graph
 --------------------------------------------------------------------------------
+
+-- | Convert 'SomeTopology' to an FGL 'Gr' with coordinates.
+someTopologyToGrCoord2D ::
+  GraphvizParams G.Node (NodeName, NodeInfo 'CLUSTER) LinkInfo ClusterName (NodeName, NodeInfo 'CLUSTER) ->
+  SomeTopology ->
+  IO (Gr (NodeName, NodeInfo 'COORD2D) LinkInfo)
+someTopologyToGrCoord2D params = \case
+  SomeTopology SCLUSTER topology -> layoutGr params $ topologyToGr topology
+  SomeTopology SCOORD2D topology -> pure $ topologyToGr topology
 
 -- | Convert 'Topology' to an FGL 'Gr'.
 topologyToGr :: Topology lk -> Gr (NodeName, NodeInfo lk) LinkInfo
@@ -581,20 +631,20 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     | ((NodeId grNode1, NodeId grNode2), latencyInSeconds) <- M.assocs p2pLinks
     ]
 
-readP2PTopographyFromTopologyCluster ::
+readP2PTopographyFromSomeTopology ::
   GraphvizParams G.Node (NodeName, NodeInfo 'CLUSTER) LinkInfo ClusterName (NodeName, NodeInfo 'CLUSTER) ->
   World ->
   FilePath ->
   IO P2PTopography
-readP2PTopographyFromTopologyCluster params p2pWorld topologyClusterFile = do
-  eitherErrorOrTopology <- readTopologyCluster topologyClusterFile
-  case eitherErrorOrTopology of
+readP2PTopographyFromSomeTopology params p2pWorld topologyFile = do
+  eitherErrorOrSomeTopology <- readTopology topologyFile
+  case eitherErrorOrSomeTopology of
     Left parseError -> do
       hPutStrLn stderr $ displayException parseError
       exitFailure
-    Right topology -> do
+    Right someTopology -> do
       grToP2PTopography p2pWorld . G.nemap ((.coord2D) . snd) (.latencyS)
-        <$> layoutGr params (topologyToGr topology)
+        <$> someTopologyToGrCoord2D params someTopology
 
 --------------------------------------------------------------------------------
 -- BenchTopology - Topology & Latencies
@@ -638,6 +688,10 @@ newtype BenchTopology = BenchTopology
   { coreNodes :: Vector BenchTopologyNode
   }
   deriving (Eq, Show, Generic)
+
+instance HasField "numNodes" BenchTopology Int where
+  getField :: BenchTopology -> Int
+  getField benchTopology = V.length benchTopology.coreNodes
 
 instance ToJSON BenchTopology where
   toEncoding = genericToEncoding benchTopologyOptions
