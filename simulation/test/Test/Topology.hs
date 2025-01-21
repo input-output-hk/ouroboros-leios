@@ -62,7 +62,7 @@ tests =
 test_benchTopologyIsConnected :: Assertion
 test_benchTopologyIsConnected = do
   -- Find test/data/BenchTopology/topology-dense-52.json
-  benchTopologyFile <- getDataFileName "test/data/simulation/topology-dense-52.yaml"
+  benchTopologyFile <- getDataFileName "test/data/BenchTopology/topology-dense-52.json"
   doesBenchTopologyFileExist <- doesFileExist benchTopologyFile
   assertBool "File data/BenchTopology/topology-dense-52.json does not exist" doesBenchTopologyFileExist
   -- Find test/data/BenchTopology/latency.sqlite3.gz

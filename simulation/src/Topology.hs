@@ -27,7 +27,7 @@ import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (Exception (displayException), assert)
 import Control.Monad (forM_, guard, (<=<))
 import Data.Aeson (withObject)
-import Data.Aeson.Decoding (throwDecode)
+import qualified Data.Aeson as Json
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, KeyValue ((.=)), Options (..), Parser, ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, pairs, typeMismatch, (.:))
 import qualified Data.ByteString.Lazy as BSL
@@ -52,7 +52,8 @@ import Data.Text.Lazy (LazyText)
 import qualified Data.Text.Lazy as TL
 import Data.Vector (Vector)
 import qualified Data.Vector as V
-import Data.Yaml (ParseException, decodeFileEither, encodeFile)
+import Data.Yaml (ParseException)
+import qualified Data.Yaml as Yaml
 import Database.SQLite.Simple (NamedParam (..))
 import qualified Database.SQLite.Simple as SQLlite
 import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
@@ -398,11 +399,11 @@ clusterNameToRegionName = RegionName . unClusterName
 
 -- | Create a 'Topology' from a file.
 readTopology :: FilePath -> IO (Either ParseException SomeTopology)
-readTopology = decodeFileEither
+readTopology = Yaml.decodeFileEither
 
 -- | Write a 'Topology' to a file.
 writeTopology :: FilePath -> SomeTopology -> IO ()
-writeTopology = encodeFile
+writeTopology = Yaml.encodeFile
 
 -- | Create a 'Topology' from a 'BenchTopology', a 'Latencies' database, and a stake share size.
 readTopologyFromBenchTopology :: FilePath -> FilePath -> Word -> IO (Topology 'CLUSTER)
@@ -710,7 +711,7 @@ instance FromJSON BenchTopology where
   parseJSON = genericParseJSON benchTopologyOptions
 
 readBenchTopology :: FilePath -> IO BenchTopology
-readBenchTopology = throwDecode <=< BSL.readFile
+readBenchTopology = Json.throwDecode <=< BSL.readFile
 
 -- | Helper for testing. Sorts the list of producers and the list of core nodes by node name.
 sortBenchTopology :: BenchTopology -> BenchTopology
