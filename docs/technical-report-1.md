@@ -99,6 +99,12 @@ understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Sortition
 
+> [!IMPORANT]
+> 
+> The sortition, voting, and certificate analyses in this report will be revised
+> as research proceeds and design details are settled. The material below is a
+> snapshot of the results from August through December 2024.
+
 In Leios stake-based sortition occurs for the selection of the producers of IBs,
 EBs, and votes. The selection of the producers of IBs, EBs, and votes occurs
 similarly to Praos except that a node may win the lottery multiple times. (In
@@ -399,6 +405,12 @@ appear before the next EB.
     rewards, and it would greatly simplify the computation of sortition.
 
 ## Voting and certificates
+
+> [!IMPORANT]
+> 
+> The sortition, voting, and certificate analyses in this report will be revised
+> as research proceeds and design details are settled. The material below is a
+> snapshot of the results from August through December 2024.
 
 The Leios protocols requires a subset of SPO nodes to vote on certifying each
 EB. The EB can only be certified if a threshold (a "quorum") of votes are cast
