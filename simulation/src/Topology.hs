@@ -60,7 +60,7 @@ import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
 import JSONCompat (Getter, always, get, omitDefault, parseField, parseFieldOrDefault)
 import P2P (Latency, P2PTopography (..))
-import SimTypes (NodeId (..), Path (..), Point (..), World, WorldDimensions)
+import SimTypes (NodeId (..), Path (..), Point (..), World (..), WorldDimensions)
 import System.Exit (exitFailure)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose, hPutStrLn, stderr)
@@ -522,17 +522,27 @@ splineToPath :: GV.Spline -> Path
 splineToPath (GV.Spline maybeEnd maybeStart points) =
   Path . map pointToPoint . concat $ [maybeToList maybeStart, points, maybeToList maybeEnd]
 
-rescaleGraph :: WorldDimensions -> Gr (node, Point) (link, Path) -> Gr (node, Point) (link, Path)
-rescaleGraph (w, h) gr = G.nmap (second rescalePoint) gr
+rescaleGraph :: WorldDimensions -> Gr (NodeName, NodeInfo 'COORD2D) LinkInfo -> Gr (NodeName, NodeInfo 'COORD2D) LinkInfo
+rescaleGraph (w, h) gr = G.nmap (second rescaleNodeInfo) gr
  where
+  rescaleNodeInfo :: NodeInfo 'COORD2D -> NodeInfo 'COORD2D
+  rescaleNodeInfo NodeInfo{location = LocCoord2D p, ..} =
+    NodeInfo{location = LocCoord2D (rescalePoint p), ..}
+
+  rescalePoint :: Point -> Point
   rescalePoint p = Point (rescaleX p._1) (rescaleY p._2)
    where
-    ps0 = fmap (snd . snd) (G.labNodes gr)
+    ps0 :: [Point]
+    ps0 = (.location.coord2D) . snd . snd <$> G.labNodes gr
+
+    rescaleX :: Double -> Double
     rescaleX x = xPad + (x - x0l) / w0 * (w - 2 * xPad)
      where
       xPad = 0.05 * w
       (x0l, x0u) = (minimum &&& maximum) (fmap _1 ps0)
       w0 = x0u - x0l
+
+    rescaleY :: Double -> Double
     rescaleY y = yPad + (y - y0l) / h0 * (h - 2 * yPad)
      where
       yPad = 0.05 * h
@@ -636,14 +646,14 @@ readP2PTopographyFromSomeTopology ::
   World ->
   FilePath ->
   IO P2PTopography
-readP2PTopographyFromSomeTopology params p2pWorld topologyFile = do
+readP2PTopographyFromSomeTopology params p2pWorld@(World{..}) topologyFile = do
   eitherErrorOrSomeTopology <- readTopology topologyFile
   case eitherErrorOrSomeTopology of
     Left parseError -> do
       hPutStrLn stderr $ displayException parseError
       exitFailure
     Right someTopology -> do
-      grToP2PTopography p2pWorld . G.nemap ((.coord2D) . snd) (.latencyS)
+      grToP2PTopography p2pWorld . G.nemap ((.coord2D) . snd) (.latencyS) . rescaleGraph worldDimensions
         <$> someTopologyToGrCoord2D params someTopology
 
 --------------------------------------------------------------------------------

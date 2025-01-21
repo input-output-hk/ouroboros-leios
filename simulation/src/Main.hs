@@ -573,7 +573,7 @@ parserTopographyOptions =
         ( short 't'
             <> long "topology-file"
             <> metavar "FILE"
-            <> help "A simple topology file describing the world topology."
+            <> help "A topology file describing the world topology."
         )
   parserTopographyCharacteristicsFile =
     TopographyCharacteristicsFile
