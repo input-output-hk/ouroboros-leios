@@ -8,6 +8,7 @@
 
 module Main where
 
+import Control.Exception (Exception (displayException))
 import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
@@ -58,9 +59,11 @@ import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
 import SimTypes (World (..), WorldDimensions, WorldShape (..))
+import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 import qualified System.Random as Random
 import TimeCompat
-import Topology (defaultParams, readP2PTopography, readSimpleTopologyFromBenchTopologyAndLatency, triangleInequalityCheck, writeSimpleTopology)
+import Topology
 import Viz
 
 main :: IO ()
@@ -93,7 +96,9 @@ parserOptions =
     , command "sim" . info (SimCommand <$> parserSimOptions <**> helper) $
         progDesc "Run a simulation. See 'ols sim -h' for details."
     , command "convert-bench-topology" . info (CliCommand <$> parserCliConvertBenchTopology <**> helper) $
-        progDesc "Convert merge benchmark topology and latency files into a simple topology file."
+        progDesc "Convert from a benchmark topology and a latency database to a topology with clusters."
+    , command "convert-cluster-topology" . info (CliCommand <$> parserCliLayoutTopology <**> helper) $
+        progDesc "Convert from a topology with clusters to a topology with location coordinates."
     ]
 
 --------------------------------------------------------------------------------
@@ -466,29 +471,57 @@ parserShortLeios = pure SimShortLeios
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
   CliConvertBenchTopology{..} -> do
-    simpleTopology <- readSimpleTopologyFromBenchTopologyAndLatency inputBenchTopology inputBenchLatencies
-    writeSimpleTopology outputSimpleTopology simpleTopology
+    topologyCluster <- readTopologyFromBenchTopology inputBenchTopologyFile inputBenchLatenciesFile 1
+    writeTopology outputTopologyFile (SomeTopology SCLUSTER topologyCluster)
+  CliLayoutTopology{..} -> do
+    readTopology inputTopologyFile >>= \case
+      Left errMsg -> do
+        hPutStrLn stderr (displayException errMsg)
+        exitFailure
+      Right (SomeTopology SCOORD2D _topology) -> do
+        hPutStrLn stderr . concat $ ["Topology already has coordinates: '", inputTopologyFile, "'"]
+        exitFailure
+      Right (SomeTopology SCLUSTER topologyCluster) -> do
+        topologyCoord2D <- layoutTopology defaultParams topologyCluster
+        writeTopology outputTopologyFile (SomeTopology SCOORD2D topologyCoord2D)
 
 data CliCommand
-  = CliConvertBenchTopology {inputBenchTopology :: FilePath, inputBenchLatencies :: FilePath, outputSimpleTopology :: FilePath}
+  = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
+  | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
   CliConvertBenchTopology
     <$> strOption
       ( long "input-bench-topology"
-          <> short 't'
+          <> long "ibt"
           <> metavar "FILE"
           <> help "The input topology file."
       )
     <*> strOption
       ( long "input-bench-latencies"
-          <> short 'l'
+          <> long "ibl"
           <> metavar "FILE"
           <> help "The input latencies database."
       )
     <*> strOption
-      ( long "output-simple-topology"
+      ( long "output-topology"
+          <> short 'o'
+          <> metavar "FILE"
+          <> help "The output topology file."
+      )
+
+parserCliLayoutTopology :: Parser CliCommand
+parserCliLayoutTopology =
+  CliLayoutTopology
+    <$> strOption
+      ( long "input-topology"
+          <> short 'i'
+          <> metavar "FILE"
+          <> help "The input topology file."
+      )
+    <*> strOption
+      ( long "output-latencies"
           <> short 'o'
           <> metavar "FILE"
           <> help "The output topology file."
@@ -505,7 +538,7 @@ execTopographyOptions rng = checkTopography <=< go
     SimpleTopologyFile simpleTopologyFile -> do
       -- TODO: infer world size from latencies
       let world = World (1200, 1000) Rectangle
-      readP2PTopography defaultParams world simpleTopologyFile
+      readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
     TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
       eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
       case eitherP2PTopographyCharacteristics of
@@ -540,7 +573,7 @@ parserTopographyOptions =
         ( short 't'
             <> long "topology-file"
             <> metavar "FILE"
-            <> help "A simple topology file describing the world topology."
+            <> help "A topology file describing the world topology."
         )
   parserTopographyCharacteristicsFile =
     TopographyCharacteristicsFile

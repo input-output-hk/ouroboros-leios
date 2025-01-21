@@ -15,15 +15,12 @@
 module LeiosProtocol.Config where
 
 import Data.Aeson.Encoding (pairs)
-import Data.Aeson.Key (fromString)
-import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Object, Parser, ToJSON (..), Value (..), object, typeMismatch, withObject, (.!=), (.:), (.:?))
-import Data.Char (isUpper, toLower, toUpper)
+import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Parser, ToJSON (..), Value (..), object, typeMismatch, withObject, (.:))
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import GHC.Records (HasField (..))
-import GHC.TypeLits (KnownSymbol (..), SSymbol, fromSSymbol)
+import JSONCompat (Getter, always, get, omitDefault, parseFieldOrDefault)
 
 newtype SizeBytes = SizeBytes {unSizeBytes :: Word}
   deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, Enum, Integral)
@@ -37,19 +34,6 @@ data Distribution
   | Exp {lambda :: Double, scale :: Maybe Double}
   | LogNormal {mu :: Double, sigma :: Double}
   deriving (Show, Eq, Generic)
-
-kebabToCamel :: String -> String
-kebabToCamel = go False
- where
-  go _ [] = []
-  go _ ('-' : cs) = go True cs
-  go b (c : cs) = (if b then toUpper c else c) : go False cs
-
-camelToKebab :: String -> String
-camelToKebab [] = []
-camelToKebab (c : cs)
-  | isUpper c = '-' : toLower c : camelToKebab cs
-  | otherwise = c : camelToKebab cs
 
 data Config = Config
   { leiosStageLengthSlots :: Word
@@ -143,24 +127,6 @@ instance Default Config where
       , certSizeBytesPerNode = 32
       }
 
-newtype Getter r = Getter {unGetter :: forall f v e kv. SSymbol f -> (HasField f r v, KeyValue e kv, ToJSON v, Eq v) => r -> Maybe kv}
-
-get :: forall fld obj e kv a. (KnownSymbol fld, HasField fld obj a, KeyValue e kv, ToJSON a, Eq a) => Getter obj -> obj -> Maybe kv
-get (Getter getter) = getter (symbolSing @fld)
-
-always :: Getter r
-always = Getter $ \(fld :: SSymbol fld) obj ->
-  let key = fromString (camelToKebab (fromSSymbol fld))
-      val = getField @fld obj
-   in Just (key .= val)
-
-omitDefault :: Default r => Getter r
-omitDefault = Getter $ \(fld :: SSymbol fld) obj ->
-  let key = fromString (camelToKebab (fromSSymbol fld))
-      getFld = getField @fld
-      val = getFld obj
-   in if val == getFld def then Nothing else Just (key .= val)
-
 configToJSONWith :: Getter Config -> Config -> Value
 configToJSONWith getter = object . configToKVsWith getter
 
@@ -230,53 +196,49 @@ instance ToJSON (OmitDefault Config) where
   toEncoding :: OmitDefault Config -> Encoding
   toEncoding (OmitDefault cfg) = configToEncodingWith omitDefault cfg
 
-parseFieldOrDefault :: forall fld a. (HasField fld Config a, KnownSymbol fld, FromJSON a) => Object -> Parser a
-parseFieldOrDefault obj =
-  obj .:? fromString (camelToKebab (fromSSymbol (symbolSing @fld))) .!= getField @fld (def :: Config)
-
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \obj -> do
-    leiosStageLengthSlots <- parseFieldOrDefault @"leiosStageLengthSlots" obj
-    leiosStageActiveVotingSlots <- parseFieldOrDefault @"leiosStageActiveVotingSlots" obj
-    txGenerationDistribution <- parseFieldOrDefault @"txGenerationDistribution" obj
-    txSizeBytesDistribution <- parseFieldOrDefault @"txSizeBytesDistribution" obj
-    txValidationCpuTimeMs <- parseFieldOrDefault @"txValidationCpuTimeMs" obj
-    txMaxSizeBytes <- parseFieldOrDefault @"txMaxSizeBytes" obj
-    rbGenerationProbability <- parseFieldOrDefault @"rbGenerationProbability" obj
-    rbGenerationCpuTimeMs <- parseFieldOrDefault @"rbGenerationCpuTimeMs" obj
-    rbHeadValidationCpuTimeMs <- parseFieldOrDefault @"rbHeadValidationCpuTimeMs" obj
-    rbHeadSizeBytes <- parseFieldOrDefault @"rbHeadSizeBytes" obj
-    rbBodyMaxSizeBytes <- parseFieldOrDefault @"rbBodyMaxSizeBytes" obj
-    rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant <- parseFieldOrDefault @"rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant" obj
-    rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte <- parseFieldOrDefault @"rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte" obj
-    rbBodyLegacyPraosPayloadAvgSizeBytes <- parseFieldOrDefault @"rbBodyLegacyPraosPayloadAvgSizeBytes" obj
-    ibGenerationProbability <- parseFieldOrDefault @"ibGenerationProbability" obj
-    ibGenerationCpuTimeMs <- parseFieldOrDefault @"ibGenerationCpuTimeMs" obj
-    ibHeadSizeBytes <- parseFieldOrDefault @"ibHeadSizeBytes" obj
-    ibHeadValidationCpuTimeMs <- parseFieldOrDefault @"ibHeadValidationCpuTimeMs" obj
-    ibBodyValidationCpuTimeMsConstant <- parseFieldOrDefault @"ibBodyValidationCpuTimeMsConstant" obj
-    ibBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @"ibBodyValidationCpuTimeMsPerByte" obj
-    ibBodyMaxSizeBytes <- parseFieldOrDefault @"ibBodyMaxSizeBytes" obj
-    ibBodyAvgSizeBytes <- parseFieldOrDefault @"ibBodyAvgSizeBytes" obj
-    ebGenerationProbability <- parseFieldOrDefault @"ebGenerationProbability" obj
-    ebGenerationCpuTimeMs <- parseFieldOrDefault @"ebGenerationCpuTimeMs" obj
-    ebValidationCpuTimeMs <- parseFieldOrDefault @"ebValidationCpuTimeMs" obj
-    ebSizeBytesConstant <- parseFieldOrDefault @"ebSizeBytesConstant" obj
-    ebSizeBytesPerIb <- parseFieldOrDefault @"ebSizeBytesPerIb" obj
-    voteGenerationProbability <- parseFieldOrDefault @"voteGenerationProbability" obj
-    voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @"voteGenerationCpuTimeMsConstant" obj
-    voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @"voteGenerationCpuTimeMsPerIb" obj
-    voteValidationCpuTimeMs <- parseFieldOrDefault @"voteValidationCpuTimeMs" obj
-    voteThreshold <- parseFieldOrDefault @"voteThreshold" obj
-    voteOneEbPerVrfWin <- parseFieldOrDefault @"voteOneEbPerVrfWin" obj
-    voteSizeBytesConstant <- parseFieldOrDefault @"voteSizeBytesConstant" obj
-    voteSizeBytesPerNode <- parseFieldOrDefault @"voteSizeBytesPerNode" obj
-    certGenerationCpuTimeMsConstant <- parseFieldOrDefault @"certGenerationCpuTimeMsConstant" obj
-    certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @"certGenerationCpuTimeMsPerNode" obj
-    certValidationCpuTimeMsConstant <- parseFieldOrDefault @"certValidationCpuTimeMsConstant" obj
-    certValidationCpuTimeMsPerNode <- parseFieldOrDefault @"certValidationCpuTimeMsPerNode" obj
-    certSizeBytesConstant <- parseFieldOrDefault @"certSizeBytesConstant" obj
-    certSizeBytesPerNode <- parseFieldOrDefault @"certSizeBytesPerNode" obj
+    leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
+    leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
+    txGenerationDistribution <- parseFieldOrDefault @Config @"txGenerationDistribution" obj
+    txSizeBytesDistribution <- parseFieldOrDefault @Config @"txSizeBytesDistribution" obj
+    txValidationCpuTimeMs <- parseFieldOrDefault @Config @"txValidationCpuTimeMs" obj
+    txMaxSizeBytes <- parseFieldOrDefault @Config @"txMaxSizeBytes" obj
+    rbGenerationProbability <- parseFieldOrDefault @Config @"rbGenerationProbability" obj
+    rbGenerationCpuTimeMs <- parseFieldOrDefault @Config @"rbGenerationCpuTimeMs" obj
+    rbHeadValidationCpuTimeMs <- parseFieldOrDefault @Config @"rbHeadValidationCpuTimeMs" obj
+    rbHeadSizeBytes <- parseFieldOrDefault @Config @"rbHeadSizeBytes" obj
+    rbBodyMaxSizeBytes <- parseFieldOrDefault @Config @"rbBodyMaxSizeBytes" obj
+    rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant" obj
+    rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte" obj
+    rbBodyLegacyPraosPayloadAvgSizeBytes <- parseFieldOrDefault @Config @"rbBodyLegacyPraosPayloadAvgSizeBytes" obj
+    ibGenerationProbability <- parseFieldOrDefault @Config @"ibGenerationProbability" obj
+    ibGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ibGenerationCpuTimeMs" obj
+    ibHeadSizeBytes <- parseFieldOrDefault @Config @"ibHeadSizeBytes" obj
+    ibHeadValidationCpuTimeMs <- parseFieldOrDefault @Config @"ibHeadValidationCpuTimeMs" obj
+    ibBodyValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"ibBodyValidationCpuTimeMsConstant" obj
+    ibBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"ibBodyValidationCpuTimeMsPerByte" obj
+    ibBodyMaxSizeBytes <- parseFieldOrDefault @Config @"ibBodyMaxSizeBytes" obj
+    ibBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ibBodyAvgSizeBytes" obj
+    ebGenerationProbability <- parseFieldOrDefault @Config @"ebGenerationProbability" obj
+    ebGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ebGenerationCpuTimeMs" obj
+    ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
+    ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
+    ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
+    voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
+    voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
+    voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
+    voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
+    voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
+    voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
+    voteSizeBytesConstant <- parseFieldOrDefault @Config @"voteSizeBytesConstant" obj
+    voteSizeBytesPerNode <- parseFieldOrDefault @Config @"voteSizeBytesPerNode" obj
+    certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
+    certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
+    certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj
+    certValidationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certValidationCpuTimeMsPerNode" obj
+    certSizeBytesConstant <- parseFieldOrDefault @Config @"certSizeBytesConstant" obj
+    certSizeBytesPerNode <- parseFieldOrDefault @Config @"certSizeBytesPerNode" obj
     pure Config{..}
 
 distributionToKVs :: KeyValue e kv => Distribution -> [kv]
