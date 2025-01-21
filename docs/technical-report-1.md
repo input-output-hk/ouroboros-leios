@@ -99,7 +99,7 @@ understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Sortition
 
-> [!IMPORANT]
+> [!IMPORTANT]
 > 
 > The sortition, voting, and certificate analyses in this report will be revised
 > as research proceeds and design details are settled. The material below is a
@@ -406,7 +406,7 @@ appear before the next EB.
 
 ## Voting and certificates
 
-> [!IMPORANT]
+> [!IMPORTANT]
 > 
 > The sortition, voting, and certificate analyses in this report will be revised
 > as research proceeds and design details are settled. The material below is a
