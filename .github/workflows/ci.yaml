@@ -3,7 +3,9 @@ name: CI
 # TODO: If these environment variables only affect Nix, should they be moved under the `formal-spec-check` job?
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
-  TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+  TRUSTED_PUBLIC_KEYS:
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
   SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io"
 
 on:
@@ -73,23 +75,26 @@ jobs:
 
       - name: ➤💾 Export Nix store cache
         if: "steps.nix-cache.outputs.cache-hit != 'true'"
-        run: "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') > /tmp/nixcache"
+        run:
+          "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') >
+          /tmp/nixcache"
 
   ################################################################################
   # Simulation and Prototype in Haskell - under /simulation/
   ################################################################################
 
   simulation-test:
-    name: "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
-    if: |
-      github.event_name == 'push' &&
+    name:
+      "simulation: Test on ${{ matrix.os }} with GHC ${{ matrix.ghc-version }}"
+    if:
+      ${{ (github.event_name == 'push' &&
       (contains(github.event.commits.*.modified, 'simulation/') ||
       contains(github.event.commits.*.modified, 'data/') ||
-      contains(github.event.commits.*.modified, 'cabal.project')) ||
-      github.event_name == 'pull_request' &&
+      contains(github.event.commits.*.modified, 'cabal.project'))) ||
+      (github.event_name == 'pull_request' &&
       (contains(github.event.pull_request.files.*.path, 'simulation/') ||
       contains(github.event.pull_request.files.*.path, 'data/') ||
-      contains(github.event.pull_request.files.*.path, 'cabal.project'))
+      contains(github.event.pull_request.files.*.path, 'cabal.project'))) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -128,10 +133,14 @@ jobs:
         uses: actions/cache/restore@v4
         id: cache
         env:
-          key: ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version }}-cabal-${{ steps.setup.outputs.cabal-version }}
+          key:
+            ${{ runner.os }}-ghc-${{ steps.setup.outputs.ghc-version
+            }}-cabal-${{ steps.setup.outputs.cabal-version }}
         with:
           path: ${{ steps.setup.outputs.cabal-store }}
-          key: ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json') }}
+          key:
+            ${{ env.key }}-plan-${{ hashFiles('dist-newstyle/cache/plan.json')
+            }}
           restore-keys: ${{ env.key }}-
 
       - name: 🛠️ Install Cabal dependencies
