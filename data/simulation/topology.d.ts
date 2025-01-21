@@ -10,11 +10,11 @@
 export interface Topology {
   nodes:
     | {
-        [name: NodeName]: Node<Cluster>;
-      }
+      [name: NodeName]: Node<Cluster>;
+    }
     | {
-        [name: NodeName]: Node<Coord2D>;
-      };
+      [name: NodeName]: Node<Coord2D>;
+    };
 }
 
 /** A node. */
@@ -22,13 +22,13 @@ export interface Node<Location> {
   stake?: bigint;
   location: Location;
   producers: { [producer: NodeName]: LinkInfo };
+  "cpu-core-count"?: bigint | null;
 }
 
 /** Link information. */
 export interface LinkInfo {
   "latency-ms": number;
   "bandwidth-bytes-per-second"?: bigint | null;
-  "cpu-core-count"?: bigint | null;
 }
 
 export type NodeName = string;

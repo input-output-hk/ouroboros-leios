@@ -13,6 +13,8 @@
             "description": "Link information.",
             "properties": {
                 "bandwidth-bytes-per-second": {
+                    "additionalProperties": false,
+                    "properties": {},
                     "type": "number"
                 },
                 "latency-ms": {
@@ -24,6 +26,11 @@
         "Node<Cluster>": {
             "description": "A node.",
             "properties": {
+                "cpu-core-count": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "number"
+                },
                 "location": {
                     "$ref": "#/definitions/Cluster"
                 },
@@ -34,9 +41,8 @@
                     "type": "object"
                 },
                 "stake": {
-                    "type": "number"
-                },
-                "cpu-core-count": {
+                    "additionalProperties": false,
+                    "properties": {},
                     "type": "number"
                 }
             },
@@ -45,6 +51,11 @@
         "Node<Coord2D>": {
             "description": "A node.",
             "properties": {
+                "cpu-core-count": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "number"
+                },
                 "location": {
                     "items": [
                         {
@@ -65,9 +76,8 @@
                     "type": "object"
                 },
                 "stake": {
-                    "type": "number"
-                },
-                "cpu-core-count": {
+                    "additionalProperties": false,
+                    "properties": {},
                     "type": "number"
                 }
             },
