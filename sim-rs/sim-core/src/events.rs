@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display, sync::Arc};
 
 use serde::Serialize;
 use tokio::sync::mpsc;
@@ -6,12 +6,52 @@ use tracing::warn;
 
 use crate::{
     clock::{Clock, Timestamp},
-    config::NodeId,
+    config::{NodeConfiguration, NodeId},
     model::{
-        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
-        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, CpuTaskId, Endorsement, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
+        TransactionId, VoteBundle, VoteBundleId,
     },
 };
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub id: NodeId,
+    pub name: Arc<String>,
+}
+
+impl Display for Node {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.name)
+    }
+}
+
+impl Serialize for Node {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.name)
+    }
+}
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.id.eq(&other.id)
+    }
+}
+impl Eq for Node {}
+
+impl PartialOrd for Node {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.id.cmp(&other.id))
+    }
+}
+
+impl Ord for Node {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.id.cmp(&other.id)
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
@@ -20,132 +60,132 @@ pub enum Event {
         number: u64,
     },
     CpuTaskScheduled {
-        task_id: String,
+        task: CpuTaskId<Node>,
         task_type: String,
         subtasks: usize,
     },
     CpuTaskFinished {
-        task_id: String,
+        task: CpuTaskId<Node>,
     },
     CpuSubtaskStarted {
-        task_id: String,
+        task: CpuTaskId<Node>,
         subtask_id: u64,
     },
     CpuSubtaskFinished {
-        task_id: String,
+        task: CpuTaskId<Node>,
         subtask_id: u64,
     },
     TransactionGenerated {
         id: TransactionId,
-        publisher: NodeId,
+        publisher: Node,
         bytes: u64,
     },
     TransactionSent {
         id: TransactionId,
-        sender: NodeId,
-        recipient: NodeId,
+        sender: Node,
+        recipient: Node,
     },
     TransactionReceived {
         id: TransactionId,
-        sender: NodeId,
-        recipient: NodeId,
+        sender: Node,
+        recipient: Node,
     },
     PraosBlockLotteryWon {
         slot: u64,
-        producer: NodeId,
+        producer: Node,
     },
     PraosBlockGenerated {
         slot: u64,
-        producer: NodeId,
+        producer: Node,
         vrf: u64,
-        endorsement: Option<Endorsement>,
+        endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
     PraosBlockSent {
         slot: u64,
-        sender: NodeId,
-        recipient: NodeId,
+        sender: Node,
+        recipient: Node,
     },
     PraosBlockReceived {
         slot: u64,
-        sender: NodeId,
-        recipient: NodeId,
+        sender: Node,
+        recipient: Node,
     },
     InputBlockLotteryWon {
         #[serde(flatten)]
-        id: InputBlockId,
+        id: InputBlockId<Node>,
     },
     InputBlockGenerated {
         #[serde(flatten)]
-        header: InputBlockHeader,
+        id: InputBlockId<Node>,
         transactions: Vec<TransactionId>,
     },
     InputBlockSent {
         #[serde(flatten)]
-        id: InputBlockId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: InputBlockId<Node>,
+        sender: Node,
+        recipient: Node,
     },
     InputBlockReceived {
         #[serde(flatten)]
-        id: InputBlockId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: InputBlockId<Node>,
+        sender: Node,
+        recipient: Node,
     },
     EndorserBlockLotteryWon {
         #[serde(flatten)]
-        id: EndorserBlockId,
+        id: EndorserBlockId<Node>,
     },
     EndorserBlockGenerated {
         #[serde(flatten)]
-        id: EndorserBlockId,
-        input_blocks: Vec<InputBlockId>,
+        id: EndorserBlockId<Node>,
+        input_blocks: Vec<InputBlockId<Node>>,
     },
     EndorserBlockSent {
         #[serde(flatten)]
-        id: EndorserBlockId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: EndorserBlockId<Node>,
+        sender: Node,
+        recipient: Node,
     },
     EndorserBlockReceived {
         #[serde(flatten)]
-        id: EndorserBlockId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: EndorserBlockId<Node>,
+        sender: Node,
+        recipient: Node,
     },
     VoteLotteryWon {
         #[serde(flatten)]
-        id: VoteBundleId,
+        id: VoteBundleId<Node>,
     },
     VotesGenerated {
         #[serde(flatten)]
-        id: VoteBundleId,
-        votes: Votes,
+        id: VoteBundleId<Node>,
+        votes: Votes<Node>,
     },
     NoVote {
         slot: u64,
-        producer: NodeId,
-        eb: EndorserBlockId,
+        producer: Node,
+        eb: EndorserBlockId<Node>,
         reason: NoVoteReason,
     },
     VotesSent {
         #[serde(flatten)]
-        id: VoteBundleId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: VoteBundleId<Node>,
+        sender: Node,
+        recipient: Node,
     },
     VotesReceived {
         #[serde(flatten)]
-        id: VoteBundleId,
-        sender: NodeId,
-        recipient: NodeId,
+        id: VoteBundleId<Node>,
+        sender: Node,
+        recipient: Node,
     },
 }
 
 #[derive(Debug, Clone)]
-pub struct Votes(pub BTreeMap<EndorserBlockId, usize>);
+pub struct Votes<Node>(pub BTreeMap<EndorserBlockId<Node>, usize>);
 
-impl Serialize for Votes {
+impl<Node: Display> Serialize for Votes<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -158,39 +198,54 @@ impl Serialize for Votes {
 pub struct EventTracker {
     sender: mpsc::UnboundedSender<(Event, Timestamp)>,
     clock: Clock,
+    node_names: BTreeMap<NodeId, Arc<String>>,
 }
 
 impl EventTracker {
-    pub fn new(sender: mpsc::UnboundedSender<(Event, Timestamp)>, clock: Clock) -> Self {
-        Self { sender, clock }
+    pub fn new(
+        sender: mpsc::UnboundedSender<(Event, Timestamp)>,
+        clock: Clock,
+        nodes: &[NodeConfiguration],
+    ) -> Self {
+        let node_names = nodes
+            .iter()
+            .map(|n| (n.id, Arc::new(n.name.clone())))
+            .collect();
+        Self {
+            sender,
+            clock,
+            node_names,
+        }
     }
 
     pub fn track_slot(&self, number: u64) {
         self.send(Event::Slot { number });
     }
 
-    pub fn track_cpu_task_scheduled(&self, task_id: String, task_type: String, subtasks: usize) {
+    pub fn track_cpu_task_scheduled(&self, task_id: CpuTaskId, task_type: String, subtasks: usize) {
         self.send(Event::CpuTaskScheduled {
-            task_id,
+            task: self.to_task(task_id),
             task_type,
             subtasks,
         });
     }
 
-    pub fn track_cpu_task_finished(&self, task_id: String) {
-        self.send(Event::CpuTaskFinished { task_id });
+    pub fn track_cpu_task_finished(&self, task_id: CpuTaskId) {
+        self.send(Event::CpuTaskFinished {
+            task: self.to_task(task_id),
+        });
     }
 
-    pub fn track_cpu_subtask_started(&self, task_id: String, subtask_id: u64) {
+    pub fn track_cpu_subtask_started(&self, task_id: CpuTaskId, subtask_id: u64) {
         self.send(Event::CpuSubtaskStarted {
-            task_id,
+            task: self.to_task(task_id),
             subtask_id,
         });
     }
 
-    pub fn track_cpu_subtask_finished(&self, task_id: String, subtask_id: u64) {
+    pub fn track_cpu_subtask_finished(&self, task_id: CpuTaskId, subtask_id: u64) {
         self.send(Event::CpuSubtaskFinished {
-            task_id,
+            task: self.to_task(task_id),
             subtask_id,
         });
     }
@@ -198,16 +253,19 @@ impl EventTracker {
     pub fn track_praos_block_lottery_won(&self, block: &Block) {
         self.send(Event::PraosBlockLotteryWon {
             slot: block.slot,
-            producer: block.producer,
+            producer: self.to_node(block.producer),
         });
     }
 
     pub fn track_praos_block_generated(&self, block: &Block) {
         self.send(Event::PraosBlockGenerated {
             slot: block.slot,
-            producer: block.producer,
+            producer: self.to_node(block.producer),
             vrf: block.vrf,
-            endorsement: block.endorsement.clone(),
+            endorsement: block.endorsement.as_ref().map(|e| Endorsement {
+                eb: self.to_endorser_block(e.eb),
+                votes: e.votes.iter().map(|n| self.to_node(*n)).collect(),
+            }),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }
@@ -215,23 +273,23 @@ impl EventTracker {
     pub fn track_praos_block_sent(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::PraosBlockSent {
             slot: block.slot,
-            sender,
-            recipient,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::PraosBlockReceived {
             slot: block.slot,
-            sender,
-            recipient,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_transaction_generated(&self, transaction: &Transaction, publisher: NodeId) {
         self.send(Event::TransactionGenerated {
             id: transaction.id,
-            publisher,
+            publisher: self.to_node(publisher),
             bytes: transaction.bytes,
         });
     }
@@ -239,81 +297,97 @@ impl EventTracker {
     pub fn track_transaction_sent(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
         self.send(Event::TransactionSent {
             id,
-            sender,
-            recipient,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_transaction_received(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
         self.send(Event::TransactionReceived {
             id,
-            sender,
-            recipient,
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_ib_lottery_won(&self, id: InputBlockId) {
-        self.send(Event::InputBlockLotteryWon { id });
+        self.send(Event::InputBlockLotteryWon {
+            id: self.to_input_block(id),
+        });
     }
 
-    pub fn track_ib_generated(&self, block: &InputBlock) {
+    pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
         self.send(Event::InputBlockGenerated {
-            header: block.header.clone(),
+            id: self.to_input_block(block.header.id),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }
 
     pub fn track_ib_sent(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::InputBlockSent {
-            id,
-            sender,
-            recipient,
+            id: self.to_input_block(id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_ib_received(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::InputBlockReceived {
-            id,
-            sender,
-            recipient,
+            id: self.to_input_block(id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_eb_lottery_won(&self, id: EndorserBlockId) {
-        self.send(Event::EndorserBlockLotteryWon { id });
+        self.send(Event::EndorserBlockLotteryWon {
+            id: self.to_endorser_block(id),
+        });
     }
 
-    pub fn track_eb_generated(&self, block: &EndorserBlock) {
+    pub fn track_eb_generated(&self, block: &crate::model::EndorserBlock) {
         self.send(Event::EndorserBlockGenerated {
-            id: block.id(),
-            input_blocks: block.ibs.clone(),
+            id: self.to_endorser_block(block.id()),
+            input_blocks: block
+                .ibs
+                .iter()
+                .map(|id| self.to_input_block(*id))
+                .collect(),
         });
     }
 
     pub fn track_eb_sent(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::EndorserBlockSent {
-            id,
-            sender,
-            recipient,
+            id: self.to_endorser_block(id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_eb_received(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::EndorserBlockReceived {
-            id,
-            sender,
-            recipient,
+            id: self.to_endorser_block(id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_vote_lottery_won(&self, id: VoteBundleId) {
-        self.send(Event::VoteLotteryWon { id });
+        self.send(Event::VoteLotteryWon {
+            id: self.to_vote_bundle(id),
+        });
     }
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VotesGenerated {
-            id: votes.id,
-            votes: Votes(votes.ebs.clone()),
+            id: self.to_vote_bundle(votes.id),
+            votes: Votes(
+                votes
+                    .ebs
+                    .iter()
+                    .map(|(node, count)| (self.to_endorser_block(*node), *count))
+                    .collect(),
+            ),
         });
     }
 
@@ -326,31 +400,67 @@ impl EventTracker {
     ) {
         self.send(Event::NoVote {
             slot,
-            producer,
-            eb,
+            producer: self.to_node(producer),
+            eb: self.to_endorser_block(eb),
             reason,
         });
     }
 
     pub fn track_votes_sent(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesSent {
-            id: votes.id,
-            sender,
-            recipient,
+            id: self.to_vote_bundle(votes.id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_votes_received(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VotesReceived {
-            id: votes.id,
-            sender,
-            recipient,
+            id: self.to_vote_bundle(votes.id),
+            sender: self.to_node(sender),
+            recipient: self.to_node(recipient),
         });
     }
 
     fn send(&self, event: Event) {
         if self.sender.send((event, self.clock.now())).is_err() {
             warn!("tried sending event after aggregator finished");
+        }
+    }
+
+    fn to_task(&self, id: CpuTaskId) -> CpuTaskId<Node> {
+        CpuTaskId {
+            node: self.to_node(id.node),
+            index: id.index,
+        }
+    }
+
+    fn to_input_block(&self, id: InputBlockId) -> InputBlockId<Node> {
+        InputBlockId {
+            slot: id.slot,
+            producer: self.to_node(id.producer),
+            index: id.index,
+        }
+    }
+
+    fn to_endorser_block(&self, id: EndorserBlockId) -> EndorserBlockId<Node> {
+        EndorserBlockId {
+            slot: id.slot,
+            producer: self.to_node(id.producer),
+        }
+    }
+
+    fn to_vote_bundle(&self, id: VoteBundleId) -> VoteBundleId<Node> {
+        VoteBundleId {
+            slot: id.slot,
+            producer: self.to_node(id.producer),
+        }
+    }
+
+    fn to_node(&self, id: NodeId) -> Node {
+        Node {
+            id,
+            name: self.node_names.get(&id).unwrap().clone(),
         }
     }
 }

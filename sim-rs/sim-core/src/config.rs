@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
 impl Display for NodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -194,6 +194,7 @@ impl From<RawLegacyTopology> for Topology {
             .enumerate()
             .map(|(index, raw)| NodeConfiguration {
                 id: NodeId::new(index),
+                name: format!("node-{index}"),
                 location: Some(to_netsim_location(raw.location)),
                 stake: raw.stake.unwrap_or_default(),
                 cpu_multiplier: raw.cpu_multiplier,
@@ -232,6 +233,7 @@ impl From<RawTopology> for Topology {
             };
             let mut node = NodeConfiguration {
                 id,
+                name,
                 location,
                 stake: raw_node.stake.unwrap_or_default(),
                 cpu_multiplier: 1.0,
@@ -412,6 +414,7 @@ fn compute_latency(
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
     pub id: NodeId,
+    pub name: String,
     pub location: Option<Location>,
     pub stake: u64,
     pub cpu_multiplier: f64,

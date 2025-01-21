@@ -17,8 +17,9 @@ use crate::{
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
-        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
-        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
+        InputBlockHeader, InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle,
+        VoteBundleId,
     },
     network::{NetworkSink, NetworkSource},
 };
@@ -82,7 +83,8 @@ enum NodeEvent {
 }
 
 pub struct Node {
-    pub id: NodeId,
+    id: NodeId,
+    name: String,
     trace: bool,
     sim_config: Arc<SimConfiguration>,
     msg_source: Option<NetworkSource<SimulationMessage>>,
@@ -171,6 +173,7 @@ impl Node {
 
         Self {
             id,
+            name: config.name.clone(),
             trace: sim_config.trace_nodes.contains(&id),
             sim_config,
             msg_source: Some(msg_source),
@@ -203,7 +206,10 @@ impl Node {
         let subtask_count = cpu_times.len();
         let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
         self.tracker.track_cpu_task_scheduled(
-            format!("{}-{}", self.id, task_id),
+            CpuTaskId {
+                node: self.id,
+                index: task_id,
+            },
             task_type,
             subtask_count,
         );
@@ -213,7 +219,10 @@ impl Node {
     }
 
     fn start_cpu_subtask(&mut self, subtask: Subtask) {
-        let task_id = format!("{}-{}", self.id, subtask.task_id);
+        let task_id = CpuTaskId {
+            node: self.id,
+            index: subtask.task_id,
+        };
         self.tracker
             .track_cpu_subtask_started(task_id, subtask.subtask_id);
         let timestamp = self.clock.now() + subtask.duration;
@@ -312,7 +321,7 @@ impl Node {
                         NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
                         NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
-                            let task_id = format!("{}-{}", self.id, subtask.task_id);
+                            let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
                             self.tracker.track_cpu_subtask_finished(task_id.clone(), subtask.subtask_id);
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
                             if let Some(subtask) = next_subtask {
@@ -711,7 +720,7 @@ impl Node {
     fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
         if self.trace {
-            info!("node {} saw tx {id}", self.id);
+            info!("node {} saw tx {id}", self.name);
         }
         self.txs.insert(id, TransactionView::Received(tx.clone()));
         self.praos.mempool.insert(tx.id, tx.clone());
@@ -1110,7 +1119,7 @@ impl Node {
         if self.trace {
             trace!(
                 "node {} sent msg of size {} to node {to}",
-                self.id,
+                self.name,
                 msg.bytes_size()
             );
         }
