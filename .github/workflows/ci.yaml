@@ -89,7 +89,7 @@ jobs:
     if:
       contains(github.event.commits.*.modified, 'simulation/') ||
       contains(github.event.commits.*.modified, 'data/') ||
-      contains(github.event.commits.*.modified, 'cabal.project'))
+      contains(github.event.commits.*.modified, 'cabal.project')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
