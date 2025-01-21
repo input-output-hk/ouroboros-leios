@@ -50,7 +50,6 @@ import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Lazy (LazyText)
 import qualified Data.Text.Lazy as TL
 import Data.Vector (Vector)
 import qualified Data.Vector as V
@@ -570,7 +569,7 @@ clusterByClusterName :: G.LNode (NodeName, NodeInfo 'CLUSTER) -> GV.NodeCluster 
 clusterByClusterName node@(_, (_, NodeInfo{location = LocCluster maybeClusterName})) =
   maybe (GV.N node) (\clusterName -> GV.C clusterName (GV.N node)) maybeClusterName
 
-clusterNameToLazyText :: ClusterName -> LazyText
+clusterNameToLazyText :: ClusterName -> TL.Text
 clusterNameToLazyText = TL.fromStrict . unClusterName
 
 clusterNameToGraphID :: ClusterName -> GVTG.GraphID
