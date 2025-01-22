@@ -127,7 +127,7 @@ export const processMessage = (
   } else if (message.type === EMessageType.VotesGenerated) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
-      message.id.id.toString(),
+      message.id.toString(),
       "votesGenerated",
     );
   } else if (message.type === EMessageType.VotesSent) {

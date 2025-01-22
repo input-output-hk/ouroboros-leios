@@ -182,13 +182,10 @@ export interface IEndorserBlockSent {
 
 export interface IVotesGenerated {
   type: EMessageType.VotesGenerated;
-  id: {
-    id: string;
-    slot: number;
-    producer: number;
-  };
+  id: string;
   slot: number;
-  ebs: any[] // @todo
+  producer: string;
+  votes: any[] // @todo
 }
 
 export interface IVotesReceived {
