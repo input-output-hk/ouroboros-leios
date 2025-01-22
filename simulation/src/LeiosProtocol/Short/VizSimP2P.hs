@@ -16,7 +16,7 @@ import Data.Bifunctor (second)
 import qualified Data.Colour.SRGB as Colour
 import Data.Hashable (hash)
 import qualified Data.IntervalMap.Strict as ILMap
-import Data.List (intercalate, sortOn)
+import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, maybeToList)
 import Data.Monoid (Any)
