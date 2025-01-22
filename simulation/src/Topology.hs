@@ -636,6 +636,32 @@ grToP2PNetwork p2pWorld gr = P2PNetwork{..}
   p2pLinks = flip Map.map edgeInfoMap $ \link ->
     (link.latencyS, fromIntegral <$> unBandwidthBps link.bandwidthBytesPerSecond)
 
+p2pNetworkToGr :: Word -> P2PNetwork -> Gr (NodeName, NodeInfo COORD2D) LinkInfo
+p2pNetworkToGr totalStake P2PNetwork{..} = G.mkGraph grNodes grLinks
+ where
+  grNodes =
+    [ (coerce nId, (nodeName, NodeInfo{..}))
+    | (nId, point) <- M.toList p2pNodes
+    , let nodeName = NodeName $ p2pNodeNames M.! nId
+    , let stake = round $ fromIntegral totalStake * coerce @_ @Double (p2pNodeStakes M.! nId)
+    , let cpuCoreCount = CpuCoreCount $ case p2pNodeCores M.! nId of
+            Infinite -> Nothing
+            Finite n -> Just $ fromIntegral n
+    , let location = LocCoord2D point
+    ]
+  grLinks =
+    [ (coerce n, coerce m, linkInfo)
+    | ((n, m), (latency, bw)) <- M.toList p2pLinks
+    , let linkInfo =
+            LinkInfo
+              { latencyMs = LatencyMs $ latency * 1000
+              , bandwidthBytesPerSecond = BandwidthBps $ fmap fromIntegral bw
+              }
+    ]
+
+p2pNetworkToSomeTopology :: Word -> P2PNetwork -> SomeTopology
+p2pNetworkToSomeTopology totalStake = SomeTopology SCOORD2D . grToTopology . p2pNetworkToGr totalStake
+
 networkToTopology :: P2PNetwork -> P2PTopography
 networkToTopology P2PNetwork{..} = P2PTopography{p2pLinks = Map.map fst p2pLinks, ..}
 

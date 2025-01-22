@@ -12,6 +12,7 @@ import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.List (find)
+import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
@@ -105,6 +106,8 @@ parserOptions =
         progDesc "Convert from a benchmark topology and a latency database to a topology with clusters."
     , command "convert-cluster-topology" . info (CliCommand <$> parserCliLayoutTopology <**> helper) $
         progDesc "Convert from a topology with clusters to a topology with location coordinates."
+    , command "generate-topology" . info (CliCommand <$> parserCliGenTopology <**> helper) $
+        progDesc "Generate a topology from a world shape and expected links. Other parameters are fixed and meant to be edited after the fact."
     ]
 
 --------------------------------------------------------------------------------
@@ -253,13 +256,7 @@ parserVizSubCommand =
 parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
   VizPraosP2P1
-    <$> option
-      auto
-      ( long "seed"
-          <> metavar "NUMBER"
-          <> help "The seed for the random number generator."
-          <> shownDefValue 0
-      )
+    <$> parserSeed
     <*> fmap
       (fromIntegral @Int)
       ( option
@@ -272,6 +269,16 @@ parserPraosP2P1 =
       )
     <*> parserTopographyOptions
     <*> parserOverrideUnlimited
+
+parserSeed :: Parser Int
+parserSeed =
+  option
+    auto
+    ( long "seed"
+        <> metavar "NUMBER"
+        <> help "The seed for the random number generator."
+        <> shownDefValue 0
+    )
 
 parserShortLeiosP2P1 :: Parser VizSubCommand
 parserShortLeiosP2P1 =
@@ -436,13 +443,7 @@ parserSimPraosDiffusion20 =
 parserShortLeios :: Parser SimCommand
 parserShortLeios =
   SimShortLeios
-    <$> option
-      auto
-      ( long "seed"
-          <> metavar "NUMBER"
-          <> help "The seed for the random number generator."
-          <> shownDefValue 42
-      )
+    <$> parserSeed
     <*> parserLeiosConfigFile
     <*> parserTopographyOptions
     <*> parserOverrideUnlimited
@@ -486,10 +487,22 @@ runCliOptions = \case
       Right (SomeTopology SCLUSTER topologyCluster) -> do
         topologyCoord2D <- layoutTopology defaultParams topologyCluster
         writeTopology outputTopologyFile (SomeTopology SCOORD2D topologyCoord2D)
+  CliGenTopology{..} -> do
+    let topographyOptions = either TopographyCharacteristicsFile TopographyCharacteristics inputCharacteristics
+    let rng = Random.mkStdGen seed
+    let bps = kilobytes 1000
+    p2pNetwork@P2PNetwork{p2pNodes} <- execTopographyOptions rng bps topographyOptions
+    let totalStake = fromIntegral $ 100 * Map.size p2pNodes
+    writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
 
 data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
+  | CliGenTopology
+      { seed :: Int
+      , inputCharacteristics :: Either FilePath P2PTopographyCharacteristics
+      , outputTopologyFile :: FilePath
+      }
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -524,6 +537,18 @@ parserCliLayoutTopology =
       )
     <*> strOption
       ( long "output-latencies"
+          <> short 'o'
+          <> metavar "FILE"
+          <> help "The output topology file."
+      )
+
+parserCliGenTopology :: Parser CliCommand
+parserCliGenTopology =
+  CliGenTopology
+    <$> parserSeed
+    <*> ((Left <$> parserTopographyCharacteristicsFile) <|> (Right <$> parserTopographyCharacteristics))
+    <*> strOption
+      ( long "output-topology"
           <> short 'o'
           <> metavar "FILE"
           <> help "The output topology file."
@@ -568,7 +593,7 @@ data TopographyOptions
 parserTopographyOptions :: Parser TopographyOptions
 parserTopographyOptions =
   parserSimpleTopologyFile
-    <|> parserTopographyCharacteristicsFile
+    <|> (TopographyCharacteristicsFile <$> parserTopographyCharacteristicsFile)
     <|> (TopographyCharacteristics <$> parserTopographyCharacteristics)
  where
   parserSimpleTopologyFile =
@@ -579,14 +604,15 @@ parserTopographyOptions =
             <> metavar "FILE"
             <> help "A topology file describing the world topology."
         )
-  parserTopographyCharacteristicsFile =
-    TopographyCharacteristicsFile
-      <$> strOption
-        ( long "tc"
-            <> long "topology-characteristics-file"
-            <> metavar "FILE"
-            <> help "A file describing the characteristics of the world topology."
-        )
+
+parserTopographyCharacteristicsFile :: Parser FilePath
+parserTopographyCharacteristicsFile =
+  strOption
+    ( long "tc"
+        <> long "topology-characteristics-file"
+        <> metavar "FILE"
+        <> help "A file describing the characteristics of the world topology."
+    )
 
 parserTopographyCharacteristics :: Parser P2PTopographyCharacteristics
 parserTopographyCharacteristics =

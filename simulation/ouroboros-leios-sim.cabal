@@ -173,6 +173,7 @@ executable ols
   build-depends:
     , aeson
     , base
+    , containers
     , data-default
     , optparse-applicative
     , ouroboros-leios-sim
