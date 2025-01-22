@@ -31,6 +31,7 @@ detailed information.
 | [Latency Statistics](#network-metrics)     | Network delay measurements                |
 | [Connection Symmetry](#network-metrics)    | Analysis of bidirectional connections     |
 | [Stake-Weighted Metrics](#network-metrics) | Impact of topology on high-stake nodes    |
+| [Hop Analysis](#hop-analysis)              | Per-hop reachability and latency analysis |
 
 ### Stake Distribution Analysis
 
@@ -53,13 +54,34 @@ detailed information.
 Run the topology checker with:
 
 ```bash
-cargo run -- -i <topology_file>
+cargo run -- -i <topology_file> [-o <output_file>] [-n <start_node>]
 ```
 
-Example using the dense topology:
+Options:
+
+- `-i, --input`: Input topology file (required)
+- `-o, --output`: Output report file (optional, prints to stdout if not
+  specified)
+- `-n, --start-node`: Starting node for hop analysis (optional)
+
+Examples:
+
+Basic analysis:
+
+```bash
+cargo run -- -i ../data/simulation/topology-dense-52.yaml
+```
+
+Save report to file:
 
 ```bash
 cargo run -- -i ../data/simulation/topology-dense-52.yaml -o report.md
+```
+
+Analyze hops from specific node:
+
+```bash
+cargo run -- -i ../data/simulation/topology-dense-52.yaml -n node-0
 ```
 
 The tool will analyze the topology and generate a report containing:
@@ -68,6 +90,7 @@ The tool will analyze the topology and generate a report containing:
 - Stake distribution analysis
 - Latency analysis
 - Connectivity issues and suggestions
+- Hop-by-hop analysis (if start node specified)
 
 ## Example Output
 
@@ -210,6 +233,38 @@ The following nodes, if removed, would isolate significant stake:
   - Identifies critical paths
   - Suggests redundancy improvements
   - Important for network reliability
+
+### Hop Analysis
+
+The hop analysis provides detailed information about network reachability and
+latency from a specified starting node:
+
+- **Hop Number**: Distance in hops from the start node
+- **Nodes Reached**: Number of nodes reachable at this hop distance
+- **Completion Ratio**: Percentage of total network nodes reached up to this hop
+- **Latency Distribution**: Min/Avg/Max latency to reach nodes at this hop level
+
+Example hop analysis output:
+
+```markdown
+## Hop-by-Hop Analysis
+
+Starting from node: node-0
+
+| Hop | Nodes Reached | Completion | Min Latency | Avg Latency | Max Latency |
+| --- | ------------- | ---------- | ----------- | ----------- | ----------- |
+| 0   | 1             | 1.9%       | 0.00 ms     | 0.00 ms     | 0.00 ms     |
+| 1   | 6             | 13.5%      | 0.17 ms     | 0.18 ms     | 0.45 ms     |
+| 2   | 24            | 59.6%      | 45.11 ms    | 45.24 ms    | 45.34 ms    |
+| 3   | 21            | 100.0%     | 99.67 ms    | 100.09 ms   | 100.50 ms   |
+```
+
+This analysis is useful for understanding:
+
+- Network coverage from any starting point
+- Latency distribution at different hop distances
+- How quickly information can propagate through the network
+- Potential bottlenecks or areas for optimization
 
 ## Requirements
 

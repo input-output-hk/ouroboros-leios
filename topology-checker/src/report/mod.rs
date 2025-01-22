@@ -1,9 +1,10 @@
 use crate::analysis::{
-    analyze_network_stats, analyze_stake_distribution, check_triangle_inequality,
+    analyze_network_stats, analyze_stake_distribution, basic::analyze_hop_stats,
+    check_triangle_inequality,
 };
 use crate::models::{Severity, Topology};
 
-pub fn generate_report(topology: &Topology, source_file: &str) -> String {
+pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&str>) -> String {
     let mut report = String::new();
     let mut issues = Vec::new();
 
@@ -17,10 +18,7 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
 
     // Generate report sections
     report.push_str("# Topology Analysis Report\n\n");
-    report.push_str(&format!(
-        "Source topology: [`{}`]({})\n\n",
-        source_file, source_file
-    ));
+    report.push_str(&format!("Analysis of: {}\n\n", filename));
 
     // Add network statistics section
     report.push_str("## Network Statistics\n\n");
@@ -134,6 +132,42 @@ pub fn generate_report(topology: &Topology, source_file: &str) -> String {
         for issue in geo_issues {
             report.push_str(&format!("❌ {}\n", issue.message));
             report.push_str(&format!("   Suggestion: {}\n\n", issue.suggestion));
+        }
+    }
+
+    // Add hop analysis section if a start node is provided
+    if let Some(node) = start_node {
+        let hop_stats = analyze_hop_stats(topology, node);
+
+        report.push_str("\n## Hop-by-Hop Analysis\n\n");
+        report.push_str(&format!("Starting from node: {}\n\n", node));
+        report.push_str(
+            "| Hop | Nodes Reached | Completion | Min Latency | Avg Latency | Max Latency |\n",
+        );
+        report.push_str(
+            "|-----|---------------|------------|-------------|-------------|-------------|\n",
+        );
+
+        for stats in &hop_stats {
+            report.push_str(&format!(
+                "| {} | {} | {:.1}% | {:.2} ms | {:.2} ms | {:.2} ms |\n",
+                stats.hop_number,
+                stats.nodes_reached.len(),
+                stats.completion_ratio * 100.0,
+                stats.min_latency_ms,
+                stats.avg_latency_ms,
+                stats.max_latency_ms
+            ));
+        }
+        report.push_str("\n");
+
+        // Add raw latencies for each hop
+        report.push_str("### Raw Latencies per Hop\n\n");
+        for stats in &hop_stats {
+            report.push_str(&format!("Hop {}:\n", stats.hop_number));
+            let latencies: Vec<String> = stats.latencies.iter().map(|l| l.to_string()).collect();
+            report.push_str(&latencies.join(" "));
+            report.push_str("\n\n");
         }
     }
 
