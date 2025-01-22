@@ -28,7 +28,7 @@ import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Relay (Message (MsgRespondBodies, MsgRespondHeaders), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), NumCores (Infinite), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol

@@ -28,6 +28,10 @@ module LeiosProtocol.Common (
   NodeId,
   SubSlotNo (..),
   Word64,
+  NetworkRate (..),
+  NodeRate (..),
+  StakeFraction (..),
+  NumCores (..),
 )
 where
 

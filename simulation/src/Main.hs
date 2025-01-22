@@ -17,10 +17,10 @@ import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
 import qualified LeiosProtocol.Config as OnDisk
-import LeiosProtocol.Short.Node (NumCores (..))
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
+import ModelTCP (Bytes (..))
 import Options.Applicative (
   Alternative ((<|>)),
   HasValue,
@@ -44,12 +44,10 @@ import Options.Applicative (
   optional,
   prefs,
   progDesc,
-  readerError,
   short,
   showDefault,
   showDefaultWith,
   showHelpOnEmpty,
-  str,
   strOption,
   subparser,
   switch,
@@ -62,7 +60,8 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTypes (World (..), WorldDimensions, WorldShape (..))
+import SimTCPLinks (kilobytes)
+import SimTypes
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 import qualified System.Random as Random
@@ -195,13 +194,13 @@ data VizSubCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topographyOptions :: TopographyOptions}
+  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, topographyOptions :: TopographyOptions, numCores :: NumCores}
+  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -272,6 +271,7 @@ parserPraosP2P1 =
           )
       )
     <*> parserTopographyOptions
+    <*> parserOverrideUnlimited
 
 parserShortLeiosP2P1 :: Parser VizSubCommand
 parserShortLeiosP2P1 =
@@ -291,26 +291,8 @@ parserShortLeiosP2P1 =
           <> shownDefValue 5
       )
     <*> parserTopographyOptions
-    <*> option
-      readCores
-      ( short 'N'
-          <> metavar "NUMBER"
-          <> value Infinite
-          <> showDefaultWith showCores
-          <> help "number of simulated cores for node parallesim, or 'unbounded'."
-      )
- where
-  unbounded_str = "unbounded"
-  readCores = unbounded <|> finite
-   where
-    unbounded = do
-      s <- str
-      if s == unbounded_str then pure Infinite else readerError "unrecognized"
-    finite = do
-      n <- auto
-      if n > 0 then pure (Finite n) else readerError "number of cores should be greater than 0"
-  showCores Infinite = unbounded_str
-  showCores (Finite n) = show n
+    <*> parserOverrideUnlimited
+
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizTCP1 -> pure ExamplesTCP.example1
@@ -326,8 +308,8 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPraosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pTopography <- execTopographyOptions rng1 topographyOptions
-    pure $ VizPraosP2P.example1 rng2 blockInterval p2pTopography
+    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
+    pure $ VizPraosP2P.example1 rng2 blockInterval p2pNetwork
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
   VizRelayTest2 -> pure VizSimTestRelay.example2
@@ -336,7 +318,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pTopography <- execTopographyOptions rng1 topographyOptions
+    p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
     let config =
           def
             { OnDisk.leiosStageLengthSlots = fromIntegral sliceLength
@@ -346,7 +328,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
             , OnDisk.voteGenerationProbability = 500
             , OnDisk.voteThreshold = 150
             }
-    pure $ VizShortLeiosP2P.example2 rng2 config p2pTopography numCores
+    pure $ VizShortLeiosP2P.example2 rng2 config p2pTopography
 
 type VizSize = (Int, Int)
 
@@ -379,9 +361,8 @@ runSimOptions SimOptions{..} = case simCommand of
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimPraosDiffusion20{..} ->
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
-  SimShortLeios -> do
+  SimShortLeios{..} -> do
     -- TODO: read from parameter file
-    let numCores = Infinite
     let config =
           def
             { OnDisk.leiosStageLengthSlots = 20
@@ -394,9 +375,8 @@ runSimOptions SimOptions{..} = case simCommand of
     let seed = 42
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    let topographyOptions = TopographyCharacteristics $ P2PTopographyCharacteristics def 100 5 5
-    p2pTopography <- execTopographyOptions rng1 topographyOptions
-    VizShortLeiosP2P.exampleSim rng2 config p2pTopography numCores simOutputSeconds simOutputFile
+    p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
+    VizShortLeiosP2P.exampleSim rng2 config p2pTopography simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -427,7 +407,7 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
   | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
-  | SimShortLeios
+  | SimShortLeios {topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
 
 parserSimCommand :: Parser SimCommand
 parserSimCommand =
@@ -478,7 +458,18 @@ parserSimPraosDiffusion20 =
       )
 
 parserShortLeios :: Parser SimCommand
-parserShortLeios = pure SimShortLeios
+parserShortLeios = SimShortLeios <$> parserTopographyOptions <*> parserOverrideUnlimited
+
+parserOverrideUnlimited :: Parser Bytes
+parserOverrideUnlimited =
+  Bytes
+    <$> option
+      auto
+      ( long "override-unlimited-bandwidth"
+          <> metavar "BYTESPERSEC"
+          <> help "Use this for link bandwidth instead of unlimited (which is not supported yet)."
+          <> shownDefValue (fromBytes $ kilobytes 1000)
+      )
 
 --------------------------------------------------------------------------------
 -- Utility Commands
@@ -547,30 +538,32 @@ parserCliLayoutTopology =
 -- Parsing Topography Options
 --------------------------------------------------------------------------------
 
-execTopographyOptions :: Random.RandomGen g => g -> TopographyOptions -> IO P2PTopography
-execTopographyOptions rng = checkTopography <=< go
+execTopographyOptions :: Random.RandomGen g => g -> Bytes -> TopographyOptions -> IO P2PNetwork
+execTopographyOptions rng bandwidth_bps = checkNetwork <=< go
  where
   go = \case
     SimpleTopologyFile simpleTopologyFile -> do
       -- TODO: infer world size from latencies
       let world = World (1200, 1000) Rectangle
-      readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
+      overrideUnlimitedBandwidth bandwidth_bps <$> readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
     TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
       eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
       case eitherP2PTopographyCharacteristics of
         Right p2pTopographyCharacteristics ->
-          pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+          pure $ topologyToNetwork (Just bandwidth_bps) $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
         Left errorMessage ->
           fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
     TopographyCharacteristics p2pTopographyCharacteristics -> do
-      pure $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
-  checkTopography top@P2PTopography{p2pLinks} = do
+      pure $ topologyToNetwork (Just bandwidth_bps) $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
+  checkNetwork net = do
     let node_triplets = triangleInequalityCheck p2pLinks
+         where
+          P2PTopography{p2pLinks} = networkToTopology net
     unless (null node_triplets) $ do
       putStr $
         unlines $
           "Latencies do not respect triangle inequalities for these nodes:" : map show node_triplets
-    return top
+    return net
 
 data TopographyOptions
   = SimpleTopologyFile FilePath

@@ -377,10 +377,6 @@ endorseBlocksToVoteFor cfg slot ibs ebs =
 ---- Expected generation rates in each slot.
 -----------------------------------------------------------------
 
-newtype NetworkRate = NetworkRate Double
-newtype NodeRate = NodeRate Double
-newtype StakeFraction = StakeFraction Double
-
 splitIntoSubSlots :: NetworkRate -> [NetworkRate]
 splitIntoSubSlots (NetworkRate r)
   | r <= 1 = [NetworkRate r]

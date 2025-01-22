@@ -87,8 +87,6 @@ data LeiosNodeConfig = LeiosNodeConfig
   , processingCores :: NumCores
   }
 
-data NumCores = Infinite | Finite Int
-
 --------------------------------------------------------------
 ---- Node State
 --------------------------------------------------------------

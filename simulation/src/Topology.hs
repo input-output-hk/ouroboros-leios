@@ -15,6 +15,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -48,6 +49,7 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Text.Lazy (LazyText)
 import qualified Data.Text.Lazy as TL
 import Data.Vector (Vector)
@@ -60,8 +62,9 @@ import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
 import JSONCompat (Getter, always, get, omitDefault, parseField, parseFieldOrDefault)
+import ModelTCP (Bytes)
 import P2P (Latency, P2PTopography (..))
-import SimTypes (NodeId (..), Path (..), Point (..), World (..), WorldDimensions)
+import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose, hPutStrLn, stderr)
@@ -589,6 +592,17 @@ forgetNodeInfo = G.nemap snd id
 -- Conversion between FGL Graph and P2PTopography
 --------------------------------------------------------------------------------
 
+type BandwidthPerSecond = Bytes
+data P2PNetwork = P2PNetwork
+  { p2pNodes :: !(Map NodeId Point)
+  , p2pNodeNames :: !(Map NodeId Text)
+  , p2pNodeCores :: !(Map NodeId NumCores)
+  , p2pNodeStakes :: !(Map NodeId StakeFraction)
+  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe Bytes))
+  , p2pWorld :: !World
+  }
+  deriving (Eq, Show, Generic)
+
 latencyFromSecondsToMiliseconds ::
   Gr a Latency ->
   Gr a LatencyMs
@@ -601,32 +615,40 @@ latencyFromMilisecondsToSeconds ::
 latencyFromMilisecondsToSeconds =
   G.emap ((/ 1000.0) . unLatencyMs)
 
-grToP2PTopography ::
-  World ->
-  Gr Point Latency ->
-  P2PTopography
-grToP2PTopography p2pWorld gr = P2PTopography{..}
+grToP2PNetwork :: World -> Gr (NodeName, NodeInfo COORD2D) LinkInfo -> P2PNetwork
+grToP2PNetwork p2pWorld gr = P2PNetwork{..}
  where
   nodeInfoMap =
     M.fromList
-      [ (grNode, point)
+      [ (NodeId grNode, point)
       | (grNode, point) <- G.labNodes gr
       ]
   edgeInfoMap =
     M.fromList
-      [ ((grNode1, grNode2), latency)
+      [ ((NodeId grNode1, NodeId grNode2), latency)
       | (grNode1, grNode2, latency) <- G.labEdges gr
       ]
-  p2pNodes =
-    M.fromList
-      [ (NodeId grNode, point)
-      | (grNode, point) <- M.assocs nodeInfoMap
-      ]
-  p2pLinks =
-    M.fromList
-      [ ((NodeId grNode1, NodeId grNode2), latency_s)
-      | ((grNode1, grNode2), latency_s) <- M.assocs edgeInfoMap
-      ]
+  p2pNodes = Map.map ((.coord2D) . snd) nodeInfoMap
+  p2pNodeNames = Map.map (coerce . fst) nodeInfoMap
+  p2pNodeCores = flip Map.map nodeInfoMap $ maybe Infinite (Finite . fromIntegral) . unCpuCoreCount . (.cpuCoreCount) . snd
+  p2pNodeStakes = flip Map.map nodeInfoMap $ StakeFraction . (/ totalStake) . fromIntegral . (.stake) . snd
+  totalStake = fromIntegral . sum $ map (fromIntegral @_ @Integer . (.stake) . snd) $ Map.elems nodeInfoMap
+  p2pLinks = flip Map.map edgeInfoMap $ \link ->
+    (link.latencyS, fromIntegral <$> unBandwidthBps link.bandwidthBytesPerSecond)
+
+networkToTopology :: P2PNetwork -> P2PTopography
+networkToTopology P2PNetwork{..} = P2PTopography{p2pLinks = Map.map fst p2pLinks, ..}
+
+topologyToNetwork :: Maybe Bytes -> P2PTopography -> P2PNetwork
+topologyToNetwork bw P2PTopography{..} = P2PNetwork{p2pLinks = Map.map (,bw) p2pLinks, ..}
+ where
+  p2pNodeNames = Map.mapWithKey (\(NodeId n) _ -> T.pack $ "node-" ++ show n) p2pNodes
+  p2pNodeCores = Map.map (const Infinite) p2pNodes
+  p2pNodeStakes = Map.map (const $ StakeFraction $ 1 / numNodes) p2pNodes
+  numNodes = fromIntegral $ Map.size p2pNodes
+
+overrideUnlimitedBandwidth :: Bytes -> P2PNetwork -> P2PNetwork
+overrideUnlimitedBandwidth x P2PNetwork{..} = P2PNetwork{p2pLinks = Map.map (second (maybe (Just x) Just)) p2pLinks, ..}
 
 p2pTopologyToGr ::
   P2PTopography ->
@@ -646,7 +668,7 @@ readP2PTopographyFromSomeTopology ::
   GraphvizParams G.Node (NodeName, NodeInfo 'CLUSTER) LinkInfo ClusterName (NodeName, NodeInfo 'CLUSTER) ->
   World ->
   FilePath ->
-  IO P2PTopography
+  IO P2PNetwork
 readP2PTopographyFromSomeTopology params p2pWorld@(World{..}) topologyFile = do
   eitherErrorOrSomeTopology <- readTopology topologyFile
   case eitherErrorOrSomeTopology of
@@ -654,7 +676,7 @@ readP2PTopographyFromSomeTopology params p2pWorld@(World{..}) topologyFile = do
       hPutStrLn stderr $ displayException parseError
       exitFailure
     Right someTopology -> do
-      grToP2PTopography p2pWorld . G.nemap ((.coord2D) . snd) (.latencyS) . rescaleGraph worldDimensions
+      grToP2PNetwork p2pWorld . rescaleGraph worldDimensions
         <$> someTopologyToGrCoord2D params someTopology
 
 --------------------------------------------------------------------------------

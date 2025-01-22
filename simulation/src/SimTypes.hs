@@ -102,3 +102,16 @@ instance FromJSON World where
     worldDimensions <- o .: "dimensions"
     worldShape <- o .:? "shape" .!= Rectangle
     pure World{..}
+
+newtype NetworkRate = NetworkRate Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+newtype NodeRate = NodeRate Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+newtype StakeFraction = StakeFraction Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+data NumCores = Infinite | Finite Int
+  deriving (Eq, Ord, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)

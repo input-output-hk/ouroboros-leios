@@ -18,28 +18,28 @@ import Control.Tracer as Tracer (
  )
 import Data.Coerce (coerce)
 import Data.List (unfoldr)
-import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
 import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
 import ModelTCP (Bytes (..))
-import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
+import Topology (P2PNetwork (..))
 
 traceLeiosP2P ::
   StdGen ->
-  P2PTopography ->
-  (DiffTime -> TcpConnProps) ->
+  P2PNetwork ->
+  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
   (SlotConfig -> NodeId -> StdGen -> LeiosNodeConfig) ->
   LeiosTrace
 traceLeiosP2P
   rng0
-  P2PTopography
+  P2PNetwork
     { p2pNodes
     , p2pLinks
     , p2pWorld
@@ -60,9 +60,9 @@ traceLeiosP2P
               (inChan, outChan) <-
                 newConnectionBundleTCP @Leios
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency))
+                  (tcpprops (realToFrac latency) bandwidth)
               return ((na, nb), (inChan, outChan))
-            | ((na, nb), latency) <- Map.toList p2pLinks
+            | ((na, nb), (latency, bandwidth)) <- Map.toList p2pLinks
             ]
         let tcplinksInChan =
               Map.fromListWith
@@ -110,26 +110,25 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> LeiosTrace
+exampleTrace2 :: StdGen -> OnDisk.Config -> P2PNetwork -> LeiosTrace
 exampleTrace2 rng = exampleTrace2' rng . convertConfig
 
-exampleTrace2' :: StdGen -> LeiosConfig -> P2PTopography -> NumCores -> LeiosTrace
-exampleTrace2' rng0 leios p2pTopography@P2PTopography{..} processingCores =
+exampleTrace2' :: StdGen -> LeiosConfig -> P2PNetwork -> LeiosTrace
+exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
   traceLeiosP2P
     rng0
     p2pTopography
-    (\latency -> mkTcpConnProps latency (kilobytes 1000))
+    (\l b -> mkTcpConnProps l (fromMaybe (error "Unlimited bandwidth: TBD") b))
     leiosNodeConfig
  where
-  p2pNumNodes = fromIntegral (M.size p2pNodes)
   leiosNodeConfig slotConfig nodeId rng =
     LeiosNodeConfig
-      { stake = StakeFraction $ 1 / p2pNumNodes
+      { stake = fromMaybe undefined $ Map.lookup nodeId p2pNodeStakes
       , baseChain = Genesis
       , slotConfig
       , leios
       , processingQueueBound = 100
-      , processingCores
+      , processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores
       , nodeId
       , rng
       }
