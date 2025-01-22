@@ -63,6 +63,6 @@ def print: . as $all | [
 
 read_log(limit(1000000; inputs);
   select(.event.tag=="generated")|[.event.kind, .event.id, .time_s];
-  select(.event.tag=="received")|[.event.kind, .event.id, .time_s])
+  select(.event.tag=="enteredstate")|[.event.kind, .event.id, .time_s])
 | map_values(min_max)
 | print
