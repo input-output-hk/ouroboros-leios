@@ -85,12 +85,12 @@ logLeiosEvent e = case e of
     extra
       | Generate <- blkE = case blk of
           EventIB ib -> mconcat ["slot" .= ib.header.slot, "payload_bytes" .= fromBytes ib.body.size]
-          EventEB eb -> mconcat ["slot" .= eb.slot, "input_blocks" .= map stringId eb.inputBlocks]
+          EventEB eb -> mconcat ["slot" .= eb.slot, "input_blocks" .= map mkStringId eb.inputBlocks]
           EventVote vt ->
             mconcat
               [ "slot" .= vt.slot
               , "votes" .= vt.votes
-              , "endorse_blocks" .= map stringId vt.endorseBlocks
+              , "endorse_blocks" .= map mkStringId vt.endorseBlocks
               ]
       | otherwise = mempty
     tag = asString $ case blkE of
@@ -98,11 +98,9 @@ logLeiosEvent e = case e of
       Received -> "received"
       EnterState -> "enteredstate"
     kindAndId = case blk of
-      EventIB ib -> mconcat [ibKind, "id" .= stringId ib.id]
-      EventEB eb -> mconcat [ebKind, "id" .= stringId eb.id]
-      EventVote vt -> mconcat [vtKind, "id" .= stringId vt.id]
-  stringId :: (HasField "node" a NodeId, HasField "num" a Int) => a -> String
-  stringId x = concat [show (coerce @_ @Int x.node), "-", show x.num]
+      EventIB ib -> mconcat [ibKind, "id" .= ib.stringId]
+      EventEB eb -> mconcat [ebKind, "id" .= eb.stringId]
+      EventVote vt -> mconcat [vtKind, "id" .= vt.stringId]
   logPraos nid (PraosNodeEventGenerate blk) =
     Just $
       mconcat
@@ -129,7 +127,7 @@ logLeiosEvent e = case e of
   logMsg (PraosMsg (PraosMessage _)) = Nothing
   logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => RelayMessage id h b -> Maybe Series
   logRelay (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
-    Just $ "ids" .= map (stringId . fst) xs
+    Just $ "ids" .= map (mkStringId . fst) xs
   logRelay _ = Nothing
   asString x = x :: String
 
