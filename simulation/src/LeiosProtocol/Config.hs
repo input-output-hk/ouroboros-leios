@@ -19,8 +19,13 @@ import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Parser, ToJSO
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
+import Data.Yaml (ParseException)
+import qualified Data.Yaml as Yaml
+import GHC.Exception (displayException)
 import GHC.Generics (Generic)
 import JSONCompat (Getter, always, get, omitDefault, parseFieldOrDefault)
+import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 
 newtype SizeBytes = SizeBytes {unSizeBytes :: Word}
   deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, Enum, Integral)
@@ -284,3 +289,20 @@ instance FromJSON Distribution where
           pure LogNormal{..}
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
+
+-- | Create a 'Config' from a file.
+readConfigEither :: FilePath -> IO (Either ParseException Config)
+readConfigEither = Yaml.decodeFileEither
+
+readConfig :: FilePath -> IO Config
+readConfig file = do
+  e <- readConfigEither file
+  case e of
+    Left parseError -> do
+      hPutStrLn stderr $ displayException parseError
+      exitFailure
+    Right config -> return config
+
+-- | Write a 'Config' to a file.
+writeConfig :: FilePath -> Config -> IO ()
+writeConfig = Yaml.encodeFile

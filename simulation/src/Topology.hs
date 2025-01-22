@@ -648,7 +648,11 @@ topologyToNetwork bw P2PTopography{..} = P2PNetwork{p2pLinks = Map.map (,bw) p2p
   numNodes = fromIntegral $ Map.size p2pNodes
 
 overrideUnlimitedBandwidth :: Bytes -> P2PNetwork -> P2PNetwork
-overrideUnlimitedBandwidth x P2PNetwork{..} = P2PNetwork{p2pLinks = Map.map (second (maybe (Just x) Just)) p2pLinks, ..}
+overrideUnlimitedBandwidth x P2PNetwork{..} =
+  P2PNetwork
+    { p2pLinks = Map.map (second (maybe (Just x) Just)) p2pLinks
+    , ..
+    }
 
 p2pTopologyToGr ::
   P2PTopography ->

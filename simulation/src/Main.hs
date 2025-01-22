@@ -200,7 +200,7 @@ data VizSubCommand
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, sliceLength :: Int, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
+  | VizShortLeiosP2P1 {seed :: Int, configFile :: FilePath, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -283,13 +283,7 @@ parserShortLeiosP2P1 =
           <> help "The seed for the random number generator."
           <> shownDefValue 0
       )
-    <*> option
-      (fmap (fromIntegral @Int) auto)
-      ( long "slice-length"
-          <> metavar "NUMBER"
-          <> help "The interval at which ranking blocks are generated."
-          <> shownDefValue 5
-      )
+    <*> parserLeiosConfigFile
     <*> parserTopographyOptions
     <*> parserOverrideUnlimited
 
@@ -319,15 +313,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    let config =
-          def
-            { OnDisk.leiosStageLengthSlots = fromIntegral sliceLength
-            , OnDisk.rbGenerationProbability = 0.2
-            , OnDisk.ibGenerationProbability = 5
-            , OnDisk.ebGenerationProbability = 1.5
-            , OnDisk.voteGenerationProbability = 500
-            , OnDisk.voteThreshold = 150
-            }
+    config <- OnDisk.readConfig configFile
     pure $ VizShortLeiosP2P.example2 rng2 config p2pTopography
 
 type VizSize = (Int, Int)
@@ -362,19 +348,9 @@ runSimOptions SimOptions{..} = case simCommand of
   SimPraosDiffusion20{..} ->
     VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
   SimShortLeios{..} -> do
-    -- TODO: read from parameter file
-    let config =
-          def
-            { OnDisk.leiosStageLengthSlots = 20
-            , OnDisk.rbGenerationProbability = 1 / 20
-            , OnDisk.ibGenerationProbability = 5
-            , OnDisk.ebGenerationProbability = 1.5
-            , OnDisk.voteGenerationProbability = 500
-            , OnDisk.voteThreshold = 150
-            }
-    let seed = 42
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
+    config <- OnDisk.readConfig configFile
     p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
     VizShortLeiosP2P.exampleSim rng2 config p2pTopography simOutputSeconds simOutputFile
 
@@ -407,7 +383,7 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
   | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
-  | SimShortLeios {topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
+  | SimShortLeios {seed :: Int, configFile :: FilePath, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
 
 parserSimCommand :: Parser SimCommand
 parserSimCommand =
@@ -458,7 +434,26 @@ parserSimPraosDiffusion20 =
       )
 
 parserShortLeios :: Parser SimCommand
-parserShortLeios = SimShortLeios <$> parserTopographyOptions <*> parserOverrideUnlimited
+parserShortLeios =
+  SimShortLeios
+    <$> option
+      auto
+      ( long "seed"
+          <> metavar "NUMBER"
+          <> help "The seed for the random number generator."
+          <> shownDefValue 42
+      )
+    <*> parserLeiosConfigFile
+    <*> parserTopographyOptions
+    <*> parserOverrideUnlimited
+
+parserLeiosConfigFile :: Parser FilePath
+parserLeiosConfigFile =
+  strOption $
+    short 'l'
+      <> long "leios-config-file"
+      <> metavar "FILE"
+      <> help "File containing the configuration values for the Leios simulation."
 
 parserOverrideUnlimited :: Parser Bytes
 parserOverrideUnlimited =
@@ -467,7 +462,7 @@ parserOverrideUnlimited =
       auto
       ( long "override-unlimited-bandwidth"
           <> metavar "BYTESPERSEC"
-          <> help "Use this for link bandwidth instead of unlimited (which is not supported yet)."
+          <> help "Values to use for link bandwidth instead of unlimited (which is not supported yet)."
           <> shownDefValue (fromBytes $ kilobytes 1000)
       )
 
