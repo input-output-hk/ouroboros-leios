@@ -38,6 +38,7 @@ import LeiosProtocol.Short.Node
 import ModelTCP
 import Network.TypedProtocol
 import PraosProtocol.BlockFetch (Message (..))
+import PraosProtocol.Common (Block (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
 import SimTCPLinks
 import SimTypes
@@ -84,13 +85,24 @@ logLeiosEvent e = case e of
    where
     extra
       | Generate <- blkE = case blk of
-          EventIB ib -> mconcat ["slot" .= ib.header.slot, "payload_bytes" .= fromBytes ib.body.size]
-          EventEB eb -> mconcat ["slot" .= eb.slot, "input_blocks" .= map mkStringId eb.inputBlocks]
+          EventIB ib ->
+            mconcat
+              [ "slot" .= ib.header.slot
+              , "payload_bytes" .= fromBytes ib.body.size
+              , "size_bytes" .= fromBytes (messageSizeBytes ib)
+              ]
+          EventEB eb ->
+            mconcat
+              [ "slot" .= eb.slot
+              , "input_blocks" .= map mkStringId eb.inputBlocks
+              , "size_bytes" .= fromBytes (messageSizeBytes eb)
+              ]
           EventVote vt ->
             mconcat
               [ "slot" .= vt.slot
               , "votes" .= vt.votes
               , "endorse_blocks" .= map mkStringId vt.endorseBlocks
+              , "size_bytes" .= fromBytes (messageSizeBytes vt)
               ]
       | otherwise = mempty
     tag = asString $ case blkE of
@@ -101,10 +113,15 @@ logLeiosEvent e = case e of
       EventIB ib -> mconcat [ibKind, "id" .= ib.stringId]
       EventEB eb -> mconcat [ebKind, "id" .= eb.stringId]
       EventVote vt -> mconcat [vtKind, "id" .= vt.stringId]
-  logPraos nid (PraosNodeEventGenerate blk) =
+  logPraos nid (PraosNodeEventGenerate blk@(Block h b)) =
     Just $
       mconcat
-        ["tag" .= asString "generated", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+        [ "tag" .= asString "generated"
+        , rbKind
+        , "id" .= show (coerce @_ @Int (blockHash blk))
+        , "size_bytes" .= fromBytes (messageSizeBytes h + messageSizeBytes b)
+        , "node" .= nid
+        ]
   logPraos nid (PraosNodeEventReceived blk) =
     Just $
       mconcat
@@ -119,6 +136,7 @@ logLeiosEvent e = case e of
         mconcat
           [cpuTag, "node" .= nid, "task" .= task]
   logPraos _ (PraosNodeEventNewTip _chain) = Nothing
+  logMsg :: LeiosMessage -> Maybe Series
   logMsg (RelayIB msg) = (ibKind <>) <$> logRelay msg
   logMsg (RelayEB msg) = (ebKind <>) <$> logRelay msg
   logMsg (RelayVote msg) = (vtKind <>) <$> logRelay msg
