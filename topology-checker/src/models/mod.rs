@@ -42,6 +42,7 @@ pub struct Node {
     pub stake: u64,
     #[serde(rename = "cpu-core-count")]
     #[serde(default)]
+    #[allow(dead_code)]
     pub cpu_core_count: Option<u32>,
 }
 

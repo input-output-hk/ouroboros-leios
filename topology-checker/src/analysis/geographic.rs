@@ -85,7 +85,6 @@ mod tests {
             Producer {
                 latency_ms: 100.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
         frankfurt_producers.insert(
@@ -93,7 +92,6 @@ mod tests {
             Producer {
                 latency_ms: 300.0, // This is too high, should be around 80ms
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -103,7 +101,6 @@ mod tests {
             Producer {
                 latency_ms: 100.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -113,7 +110,6 @@ mod tests {
             Producer {
                 latency_ms: 300.0,
                 bandwidth_bytes_per_second: None,
-                cpu_core_count: None,
             },
         );
 
@@ -123,6 +119,7 @@ mod tests {
                 location: Location::Coordinates([50.1109, 8.6821]),
                 stake: 100,
                 producers: frankfurt_producers,
+                cpu_core_count: Some(8),
             },
         );
 
@@ -132,6 +129,7 @@ mod tests {
                 location: Location::Coordinates([-33.8688, 151.2093]),
                 stake: 0,
                 producers: sydney_producers,
+                cpu_core_count: Some(4),
             },
         );
 
@@ -141,6 +139,7 @@ mod tests {
                 location: Location::Coordinates([39.0438, -77.4874]),
                 stake: 200,
                 producers: ashburn_producers,
+                cpu_core_count: Some(4),
             },
         );
 

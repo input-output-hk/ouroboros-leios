@@ -260,6 +260,84 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
     }
 }
 
+#[derive(Debug)]
+pub struct HopStats {
+    pub hop_number: usize,
+    pub nodes_reached: Vec<String>,
+    pub completion_ratio: f64,
+    pub min_latency_ms: f64,
+    pub max_latency_ms: f64,
+    pub avg_latency_ms: f64,
+    pub latencies: Vec<f64>, // All latencies for this hop
+}
+
+pub fn analyze_hop_stats(topology: &Topology, start_node: &str) -> Vec<HopStats> {
+    let mut hop_stats = Vec::new();
+    let total_nodes = topology.nodes.len();
+
+    // Track visited nodes and their distances/latencies from start
+    let mut visited = HashMap::new();
+    let mut latencies = HashMap::new();
+    let mut current_hop = 0;
+    let mut processed_nodes = HashSet::new();
+
+    // Initialize with start node
+    let mut current_level = vec![start_node.to_string()];
+    visited.insert(start_node.to_string(), 0);
+    latencies.insert(start_node.to_string(), 0.0);
+
+    while !current_level.is_empty() {
+        let mut next_level = Vec::new();
+
+        // Process all nodes at current hop level
+        for node in &current_level {
+            processed_nodes.insert(node.clone());
+            if let Some(node_data) = topology.nodes.get(node) {
+                // Check all neighbors
+                for (neighbor, producer) in &node_data.producers {
+                    if !visited.contains_key(neighbor) {
+                        visited.insert(neighbor.clone(), current_hop + 1);
+                        let total_latency = latencies[node] + producer.latency_ms;
+                        latencies.insert(neighbor.clone(), total_latency);
+                        next_level.push(neighbor.clone());
+                    }
+                }
+            }
+        }
+
+        // Create stats for current hop level
+        let nodes_at_hop = current_level;
+        if !nodes_at_hop.is_empty() {
+            let latencies_at_hop: Vec<f64> = nodes_at_hop.iter().map(|n| latencies[n]).collect();
+
+            let min_latency = latencies_at_hop
+                .iter()
+                .fold(f64::INFINITY, |a, &b| a.min(b));
+            let max_latency = latencies_at_hop.iter().fold(0.0, |a, &b| f64::max(a, b));
+            let avg_latency = latencies_at_hop.iter().sum::<f64>() / latencies_at_hop.len() as f64;
+
+            hop_stats.push(HopStats {
+                hop_number: current_hop,
+                nodes_reached: nodes_at_hop,
+                completion_ratio: processed_nodes.len() as f64 / total_nodes as f64,
+                min_latency_ms: min_latency,
+                max_latency_ms: max_latency,
+                avg_latency_ms: avg_latency,
+                latencies: latencies_at_hop,
+            });
+        }
+
+        if next_level.is_empty() {
+            break;
+        }
+
+        current_level = next_level;
+        current_hop += 1;
+    }
+
+    hop_stats
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -395,5 +473,183 @@ mod tests {
         // Node4 has 1 neighbor, so doesn't contribute
         // Average should be (1.0 + 1.0 + 0.33) / 3 ≈ 0.777
         assert!((coefficient - 0.777).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_hop_analysis() {
+        let topology = create_test_topology();
+        let hop_stats = analyze_hop_stats(&topology, "node1");
+
+        // Should have 3 hops total:
+        // Hop 0: node1
+        // Hop 1: node2, node3
+        // Hop 2: node4
+        assert_eq!(hop_stats.len(), 3);
+
+        // Check hop 0
+        let hop0 = &hop_stats[0];
+        assert_eq!(hop0.hop_number, 0);
+        assert_eq!(hop0.nodes_reached.len(), 1);
+        assert!(hop0.nodes_reached.contains(&"node1".to_string()));
+        assert_eq!(hop0.completion_ratio, 0.25); // 1/4 nodes
+        assert_eq!(hop0.min_latency_ms, 0.0);
+        assert_eq!(hop0.max_latency_ms, 0.0);
+        assert_eq!(hop0.avg_latency_ms, 0.0);
+
+        // Check hop 1
+        let hop1 = &hop_stats[1];
+        assert_eq!(hop1.hop_number, 1);
+        assert_eq!(hop1.nodes_reached.len(), 2);
+        assert!(hop1.nodes_reached.contains(&"node2".to_string()));
+        assert!(hop1.nodes_reached.contains(&"node3".to_string()));
+        assert_eq!(hop1.completion_ratio, 0.75); // 3/4 nodes
+        assert_eq!(hop1.min_latency_ms, 10.0); // node1->node2 latency
+        assert_eq!(hop1.max_latency_ms, 20.0); // node1->node3 latency
+        assert_eq!(hop1.avg_latency_ms, 15.0); // (10 + 20) / 2
+
+        // Check hop 2
+        let hop2 = &hop_stats[2];
+        assert_eq!(hop2.hop_number, 2);
+        assert_eq!(hop2.nodes_reached.len(), 1);
+        assert!(hop2.nodes_reached.contains(&"node4".to_string()));
+        assert_eq!(hop2.completion_ratio, 1.0); // 4/4 nodes
+        assert_eq!(hop2.min_latency_ms, 35.0); // node1->node3->node4 latency
+        assert_eq!(hop2.max_latency_ms, 35.0);
+        assert_eq!(hop2.avg_latency_ms, 35.0);
+    }
+
+    #[test]
+    fn test_hop_analysis_isolated_node() {
+        // Create a topology with an isolated node
+        let mut nodes = IndexMap::new();
+
+        nodes.insert(
+            "node1".to_string(),
+            Node {
+                location: Location::Cluster {
+                    cluster: Some("eu-central-1".to_string()),
+                },
+                stake: 100,
+                producers: IndexMap::new(), // No connections
+                cpu_core_count: Some(8),
+            },
+        );
+
+        nodes.insert(
+            "node2".to_string(),
+            Node {
+                location: Location::Cluster {
+                    cluster: Some("us-east-1".to_string()),
+                },
+                stake: 0,
+                producers: IndexMap::new(),
+                cpu_core_count: Some(4),
+            },
+        );
+
+        let topology = Topology { nodes };
+        let hop_stats = analyze_hop_stats(&topology, "node1");
+
+        // Should only have hop 0 with the start node
+        assert_eq!(hop_stats.len(), 1);
+        let hop0 = &hop_stats[0];
+        assert_eq!(hop0.hop_number, 0);
+        assert_eq!(hop0.nodes_reached.len(), 1);
+        assert_eq!(hop0.completion_ratio, 0.5); // 1/2 nodes
+        assert_eq!(hop0.min_latency_ms, 0.0);
+        assert_eq!(hop0.max_latency_ms, 0.0);
+        assert_eq!(hop0.avg_latency_ms, 0.0);
+    }
+
+    #[test]
+    fn test_hop_analysis_cycle() {
+        // Create a topology with a cycle: node1 -> node2 -> node3 -> node1
+        let mut nodes = IndexMap::new();
+
+        let mut node1_producers = IndexMap::new();
+        node1_producers.insert(
+            "node2".to_string(),
+            Producer {
+                latency_ms: 10.0,
+                bandwidth_bytes_per_second: None,
+            },
+        );
+
+        let mut node2_producers = IndexMap::new();
+        node2_producers.insert(
+            "node3".to_string(),
+            Producer {
+                latency_ms: 20.0,
+                bandwidth_bytes_per_second: None,
+            },
+        );
+
+        let mut node3_producers = IndexMap::new();
+        node3_producers.insert(
+            "node1".to_string(),
+            Producer {
+                latency_ms: 30.0,
+                bandwidth_bytes_per_second: None,
+            },
+        );
+
+        nodes.insert(
+            "node1".to_string(),
+            Node {
+                location: Location::Cluster {
+                    cluster: Some("eu-central-1".to_string()),
+                },
+                stake: 100,
+                producers: node1_producers,
+                cpu_core_count: Some(8),
+            },
+        );
+
+        nodes.insert(
+            "node2".to_string(),
+            Node {
+                location: Location::Cluster {
+                    cluster: Some("us-east-1".to_string()),
+                },
+                stake: 0,
+                producers: node2_producers,
+                cpu_core_count: Some(4),
+            },
+        );
+
+        nodes.insert(
+            "node3".to_string(),
+            Node {
+                location: Location::Cluster {
+                    cluster: Some("ap-southeast-2".to_string()),
+                },
+                stake: 0,
+                producers: node3_producers,
+                cpu_core_count: Some(4),
+            },
+        );
+
+        let topology = Topology { nodes };
+        let hop_stats = analyze_hop_stats(&topology, "node1");
+
+        // Should have 3 hops, visiting each node exactly once
+        assert_eq!(hop_stats.len(), 3);
+
+        // Check hop 0
+        let hop0 = &hop_stats[0];
+        assert_eq!(hop0.nodes_reached.len(), 1);
+        assert_eq!(hop0.completion_ratio, 1.0 / 3.0);
+
+        // Check hop 1
+        let hop1 = &hop_stats[1];
+        assert_eq!(hop1.nodes_reached.len(), 1);
+        assert_eq!(hop1.completion_ratio, 2.0 / 3.0);
+        assert_eq!(hop1.min_latency_ms, 10.0);
+
+        // Check hop 2
+        let hop2 = &hop_stats[2];
+        assert_eq!(hop2.nodes_reached.len(), 1);
+        assert_eq!(hop2.completion_ratio, 1.0);
+        assert_eq!(hop2.min_latency_ms, 30.0);
     }
 }
