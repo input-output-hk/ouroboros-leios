@@ -45,9 +45,11 @@ export interface Config {
   "vote-generation-cpu-time-ms-per-ib": number;
   "vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
-  "vote-one-eb-per-vrf-win": boolean;
   "vote-bundle-size-bytes-constant": bigint;
   "vote-bundle-size-bytes-per-eb": bigint;
+
+  // deprecated:
+  // "vote-one-eb-per-vrf-win": boolean;
 
   // Certificate Configuration
   "cert-generation-cpu-time-ms-constant": number;

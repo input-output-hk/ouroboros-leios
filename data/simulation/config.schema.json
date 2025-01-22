@@ -206,9 +206,6 @@
     "vote-generation-probability": {
       "type": "number"
     },
-    "vote-one-eb-per-vrf-win": {
-      "type": "boolean"
-    },
     "vote-threshold": {
       "additionalProperties": false,
       "properties": {},
