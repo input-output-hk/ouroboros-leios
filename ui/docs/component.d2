@@ -1,0 +1,90 @@
+title: {
+  label: "UI Web App - Component Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  subcomponent: {
+    style: {
+      stroke: "#666666"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
+}
+
+# Main Containers
+ui-app: {
+  class: container
+  label: "UI Web App"
+
+  frontend: {
+    class: component
+    label: "Frontend\n- React Components\n- State Management\n- UI Rendering"
+
+    components: {
+      class: subcomponent
+      label: "UI Components\n- Buttons\n- Charts\n- Tables"
+    }
+
+    state: {
+      class: subcomponent
+      label: "State Management\n- Redux\n- Context API"
+    }
+  }
+
+  backend: {
+    class: component
+    label: "Backend API\n- Data Fetching\n- Trace Processing"
+
+    api_routes: {
+      class: subcomponent
+      label: "API Routes\n- /api/messages\n- /api/trace"
+    }
+
+    data_processing: {
+      class: subcomponent
+      label: "Data Processing\n- JSON Parsing\n- Data Transformation"
+    }
+  }
+}
+
+external-systems: {
+  class: container
+  label: "Rust Simulation"
+
+  sim-rs: {
+    class: component
+    label: "sim-rs\n- Trace Generation\n- Simulation Engine"
+  }
+}
+
+# Relationships
+ui-app.frontend -> ui-app.backend: "Fetches data from"
+ui-app.backend -> external-systems.sim-rs: "Reads trace data from"
+ui-app.frontend.components -> ui-app.frontend.state: "Uses for state management"
+ui-app.backend.api_routes -> ui-app.backend.data_processing: "Processes data for"
