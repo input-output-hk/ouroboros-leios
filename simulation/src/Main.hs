@@ -312,9 +312,9 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
+    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
     config <- OnDisk.readConfig configFile
-    pure $ VizShortLeiosP2P.example2 rng2 config p2pTopography
+    pure $ VizShortLeiosP2P.example2 rng2 config p2pNetwork
 
 type VizSize = (Int, Int)
 
