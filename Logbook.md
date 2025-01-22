@@ -1,5 +1,20 @@
 # Leios logbook
 
+## 2025-01-22
+
+### DeltaQ Update
+
+- performed new comparison with Haskell simulation based on the JSONL event log (added over past two weeks)
+  - first verified transmission & validation latencies match parameters used in the config to validate the scripts
+  - then extracted IB diffusion timings using improved JQ scripts
+  - _et violá_: achieving a pretty good match with a reasonable ΔQ expression (see `delta_q/comparison_hs.txt`)
+- started new comparison with Rust simulation using realistic topology config
+  - 3000 nodes and all Leios stages generate a ton of JSONL (8GB to see first EB with IBs)
+  - filtered only for InputBlock* events
+  - added block ID information to `InputBlockGenerated` and `InputBlockValidated` events of type `CpuTaskFinished`
+  - used these to measure diffusion latencies
+  - current finding is that diffusion is _waaay_ quicker than in Haskell, completing in under 1sec for 3000 nodes ⟹ pending further investigation
+
 ## 2025-01-19
 
 ### Haskell Simulation
@@ -19,19 +34,19 @@
 We implemented and benchmarked all of the Leios cryptography, as a Rust crate [leios_crypto_benchmarks](crypto-benchmarks.rs/).
 
 - VRF (prerequisite to each sortition):
-    - VRF proving: 240 µs
-    - VRF verifying: 390 µs
+  - VRF proving: 240 µs
+  - VRF verifying: 390 µs
 - Sortition (not including the required VRF evaluation):
-    - RB leadership: 0.17 µs/slot
-    - IB leadership: 0.17 µs/slot
-    - EB leadership: 0.17 µs/pipeline
-    - Number of votes: 3.8 µs/pipeline
+  - RB leadership: 0.17 µs/slot
+  - IB leadership: 0.17 µs/slot
+  - EB leadership: 0.17 µs/pipeline
+  - Number of votes: 3.8 µs/pipeline
 - BLS
-    - Verify the proof of key possession: 1.5 ms/key
-    - Generate vote: 280 µs/vote
-    - Verify vote: 1.4 ms/vote
-    - Generate certificate for a 300-vote quorum: 50 ms/cert
-    - Verify certificate for a 300-vote quorum: 90 ms/cert
+  - Verify the proof of key possession: 1.5 ms/key
+  - Generate vote: 280 µs/vote
+  - Verify vote: 1.4 ms/vote
+  - Generate certificate for a 300-vote quorum: 50 ms/cert
+  - Verify certificate for a 300-vote quorum: 90 ms/cert
 
 Overall, we're in pretty good shape:
 
@@ -42,7 +57,7 @@ Overall, we're in pretty good shape:
 We also made significant progress on clarifying some of the decisions around vote contents, certificate size, and the framework for cryptographic keys.
 
 - If key management (rotation etc.) is handled outside of the vote data structure, then the vote signature could be as small as 192 bytes.
-    - If nodes with large amounts of stake were automatically (deterministically) included in the committee of voters, then it might be possible to further reduce the size of the vote signature.
+  - If nodes with large amounts of stake were automatically (deterministically) included in the committee of voters, then it might be possible to further reduce the size of the vote signature.
 - The content of the vote (aside from the signature) would be at least another 64 bytes, but that would be common to all votes in a given election.
 - With a 500-vote committee and a quorum of 60% agreement on certifying the EB, even a naive certificate aggregation would be 58 kB, which would easily fit in a Praos block.
 - It may be possible to coordinate key registration with the 36-hour KES rotation or the operational certificates.
