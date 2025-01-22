@@ -70,6 +70,20 @@ impl CpuTask {
         }
         .to_string()
     }
+
+    fn extra(&self) -> String {
+        match self {
+            Self::TransactionValidated(_, _) => "".to_string(),
+            Self::PraosBlockGenerated(_) => "".to_string(),
+            Self::PraosBlockValidated(_, _) => "".to_string(),
+            Self::InputBlockGenerated(id) => id.header.id.to_string(),
+            Self::InputBlockValidated(_, id) => id.header.id.to_string(),
+            Self::EndorserBlockGenerated(_) => "".to_string(),
+            Self::EndorserBlockValidated(_, _) => "".to_string(),
+            Self::VoteBundleGenerated(_) => "".to_string(),
+            Self::VoteBundleValidated(_, _) => "".to_string(),
+        }
+    }
 }
 
 /// Things that can happen next for a node
@@ -330,7 +344,7 @@ impl Node {
                             let Some(task) = finished_task else {
                                 continue;
                             };
-                            self.tracker.track_cpu_task_finished(task_id);
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), task.extra());
                             match task {
                                 CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
                                 CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,

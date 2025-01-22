@@ -66,6 +66,8 @@ pub enum Event {
     },
     CpuTaskFinished {
         task: CpuTaskId<Node>,
+        task_type: String,
+        extra: String,
     },
     CpuSubtaskStarted {
         task: CpuTaskId<Node>,
@@ -230,9 +232,11 @@ impl EventTracker {
         });
     }
 
-    pub fn track_cpu_task_finished(&self, task_id: CpuTaskId) {
+    pub fn track_cpu_task_finished(&self, task_id: CpuTaskId, task_type: String, extra: String) {
         self.send(Event::CpuTaskFinished {
             task: self.to_task(task_id),
+            task_type,
+            extra,
         });
     }
 

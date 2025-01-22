@@ -29,9 +29,9 @@ def read_log(in; gen; recv): reduce in as $in (
     .[$type][$id] |= . as [$t, $l] | [$t, $l + [$time - $t]];
   g // r // .
 ) | map_values(
-  (map(.[1]|length)|max) as $max |
+  (map(.[1]|length)|max|debug) as $max | 
   map_values(
-    .[1] | select(length == $max) | hist(10; 100; .[])
+    .[1] | select(length == $max) | hist(2; 100; .[])
   )
 );
 
@@ -61,8 +61,15 @@ def print: . as $all | [
   "\(join("_")) := \($all | getpath($path))"
 ] | join("\n");
 
-read_log(limit(1000000; inputs);
-  select(.event.tag=="generated")|[.event.kind, .event.id, .time_s];
-  select(.event.tag=="enteredstate")|[.event.kind, .event.id, .time_s])
+# for Haskell output
+#read_log(limit(1000000; inputs);
+#  select(.event.tag=="generated")|[.event.kind, .event.id, .time_s];
+#  select(.event.tag=="enteredstate")|[.event.kind, .event.id, .time_s])
+
+# for Rust output
+read_log(limit(10000000; inputs);
+  select(.message.type=="CpuTaskFinished" and .message.task_type=="InputBlockGenerated")|["IB", .message.extra, .time / 1000000000];
+  select(.message.type=="CpuTaskFinished" and .message.task_type=="InputBlockValidated")|["IB", .message.extra, .time / 1000000000])
+
 | map_values(min_max)
 | print
