@@ -1,6 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,6 +11,7 @@ import Control.Exception (Exception (displayException))
 import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
+import Data.List (find)
 import Data.Maybe (fromMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
@@ -23,6 +23,8 @@ import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import Options.Applicative (
   Alternative ((<|>)),
+  HasValue,
+  Mod,
   Parser,
   ParserInfo,
   ParserPrefs,
@@ -44,6 +46,8 @@ import Options.Applicative (
   progDesc,
   readerError,
   short,
+  showDefault,
+  showDefaultWith,
   showHelpOnEmpty,
   str,
   strOption,
@@ -72,6 +76,9 @@ main = do
     VizCommand opt -> runVizCommand opt
     SimCommand opt -> runSimOptions opt
     CliCommand opt -> runCliOptions opt
+
+shownDefValue :: (Show a, HasValue f) => a -> Mod f a
+shownDefValue a = value a <> showDefault
 
 parserPrefs :: ParserPrefs
 parserPrefs =
@@ -252,14 +259,17 @@ parserPraosP2P1 =
       ( long "seed"
           <> metavar "NUMBER"
           <> help "The seed for the random number generator."
-          <> value 0
+          <> shownDefValue 0
       )
-    <*> option
-      (fmap (fromIntegral @Int) auto)
-      ( long "block-interval"
-          <> metavar "NUMBER"
-          <> help "The interval at which blocks are generated."
-          <> value 5
+    <*> fmap
+      (fromIntegral @Int)
+      ( option
+          auto
+          ( long "block-interval"
+              <> metavar "NUMBER"
+              <> help "The interval at which blocks are generated."
+              <> shownDefValue 5
+          )
       )
     <*> parserTopographyOptions
 
@@ -271,14 +281,14 @@ parserShortLeiosP2P1 =
       ( long "seed"
           <> metavar "NUMBER"
           <> help "The seed for the random number generator."
-          <> value 0
+          <> shownDefValue 0
       )
     <*> option
       (fmap (fromIntegral @Int) auto)
       ( long "slice-length"
           <> metavar "NUMBER"
           <> help "The interval at which ranking blocks are generated."
-          <> value 5
+          <> shownDefValue 5
       )
     <*> parserTopographyOptions
     <*> option
@@ -286,18 +296,21 @@ parserShortLeiosP2P1 =
       ( short 'N'
           <> metavar "NUMBER"
           <> value Infinite
-          <> help "number of simulated cores for node parallesim, or 'unbounded' (the default)."
+          <> showDefaultWith showCores
+          <> help "number of simulated cores for node parallesim, or 'unbounded'."
       )
  where
+  unbounded_str = "unbounded"
   readCores = unbounded <|> finite
    where
     unbounded = do
       s <- str
-      if s == "unbounded" then pure Infinite else readerError "unrecognized"
+      if s == unbounded_str then pure Infinite else readerError "unrecognized"
     finite = do
       n <- auto
       if n > 0 then pure (Finite n) else readerError "number of cores should be greater than 0"
-
+  showCores Infinite = unbounded_str
+  showCores (Finite n) = show n
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizTCP1 -> pure ExamplesTCP.example1
@@ -395,12 +408,15 @@ parserSimOptions :: Parser SimOptions
 parserSimOptions =
   SimOptions
     <$> parserSimCommand
-    <*> option
-      (Time . fromIntegral @Int <$> auto)
-      ( long "output-seconds"
-          <> metavar "SECONDS"
-          <> help "Output N seconds of simulation."
-          <> value (Time $ fromIntegral @Int 40)
+    <*> fmap
+      (Time . fromIntegral @Int)
+      ( option
+          auto
+          ( long "output-seconds"
+              <> metavar "SECONDS"
+              <> help "Output N seconds of simulation."
+              <> shownDefValue 40
+          )
       )
     <*> strOption
       ( long "output-file"
@@ -417,11 +433,11 @@ parserSimCommand :: Parser SimCommand
 parserSimCommand =
   subparser . mconcat $
     [ commandGroup "Available simulations:"
-    , command "praos-diffusion-10" . info parserSimPraosDiffusion10 $
+    , command "praos-diffusion-10" . info (parserSimPraosDiffusion10 <**> helper) $
         progDesc ""
-    , command "praos-diffusion-20" . info parserSimPraosDiffusion20 $
+    , command "praos-diffusion-20" . info (parserSimPraosDiffusion20 <**> helper) $
         progDesc ""
-    , command "short-leios" . info parserShortLeios $
+    , command "short-leios" . info (parserShortLeios <**> helper) $
         progDesc ""
     ]
 
@@ -433,14 +449,14 @@ parserSimPraosDiffusion10 =
       ( long "num-close-links"
           <> metavar "NUMBER"
           <> help "The number of close-distance links."
-          <> value 5
+          <> shownDefValue 5
       )
     <*> option
       auto
       ( long "num-random-links"
           <> metavar "NUMBER"
           <> help "The number of random links."
-          <> value 5
+          <> shownDefValue 5
       )
 
 parserSimPraosDiffusion20 :: Parser SimCommand
@@ -451,14 +467,14 @@ parserSimPraosDiffusion20 =
       ( long "num-close-links"
           <> metavar "NUMBER"
           <> help "The number of close-distance links."
-          <> value 10
+          <> shownDefValue 10
       )
     <*> option
       auto
       ( long "num-random-links"
           <> metavar "NUMBER"
           <> help "The number of random links."
-          <> value 10
+          <> shownDefValue 10
       )
 
 parserShortLeios :: Parser SimCommand
@@ -593,21 +609,21 @@ parserTopographyCharacteristics =
       ( long "tc-num-nodes"
           <> metavar "NUMBER"
           <> help "The number of nodes."
-          <> value (p2pNumNodes def)
+          <> shownDefValue (p2pNumNodes def)
       )
     <*> option
       auto
       ( long "tc-num-links-close"
           <> metavar "NUMBER"
           <> help "The number of links to close peers for each node."
-          <> value (p2pNodeLinksClose def)
+          <> shownDefValue (p2pNodeLinksClose def)
       )
     <*> option
       auto
       ( long "tc-num-links-random"
           <> metavar "NUMBER"
           <> help "The number of links to random peers for each node."
-          <> value (p2pNodeLinksRandom def)
+          <> shownDefValue (p2pNodeLinksRandom def)
       )
 
 parserWorld :: Parser World
@@ -624,14 +640,22 @@ parserWorldShape =
         <> metavar "SHAPE"
         <> help "The shape of the generated world. Supported shapes are rectangle and cylinder."
         <> value def
+        <> showDefaultWith showWorldShape
     )
 
 readWorldShape :: ReadM WorldShape
 readWorldShape = eitherReader $ \txt ->
-  if
-    | txt == "rectangle" -> Right Rectangle
-    | txt == "cylinder" -> Right Cylinder
-    | otherwise -> Left ("Could not parse WorldShape '" <> txt <> "'")
+  case lookup txt worldShapeLabels of
+    Just s -> Right s
+    Nothing -> Left ("Could not parse WorldShape '" <> txt <> "'")
+
+showWorldShape :: WorldShape -> String
+showWorldShape s = case find ((== s) . snd) worldShapeLabels of
+  Just (txt, _) -> txt
+  Nothing -> "Error, Unknown worldshape: " ++ show s
+
+worldShapeLabels :: [(String, WorldShape)]
+worldShapeLabels = [("rectangle", Rectangle), ("cylinder", Cylinder)]
 
 parserWorldDimensions :: Parser WorldDimensions
 parserWorldDimensions =
@@ -641,12 +665,12 @@ parserWorldDimensions =
       ( long "tc-world-width"
           <> metavar "SECONDS"
           <> help "The east-west size of the generated world."
-          <> value (fst $ worldDimensions def)
+          <> shownDefValue (fst $ worldDimensions def)
       )
     <*> option
       auto
       ( long "tc-world-height"
           <> metavar "SECONDS"
           <> help "The north-south length of the generated world."
-          <> value (snd $ worldDimensions def)
+          <> shownDefValue (snd $ worldDimensions def)
       )
