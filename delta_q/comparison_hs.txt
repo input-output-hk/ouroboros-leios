@@ -1,4 +1,7 @@
-dq >= IB_max := send_near 1<>10 send_far ->- (CDF[(0, 1)] 1<>9 send_near ->- (CDF[(0, 1)] 5<>4 send_near))
+-- one near gossip is always needed, either before or after the far message send
+-- assuming 12 near nodes around any given node
+-- NOTE: the simulation includes further delays from TCP window that affect high-latency links
+dq >= IB_max := gossip_near 1<>7 send_far ->- (CDF[(0, 1)] 1<>7 gossip_near)
 
 send_far := send3far ->- CDF[(0.328, 1)] ->- validateIB
 send_near := send3near ->- CDF[(0.328, 1)] ->- validateIB
