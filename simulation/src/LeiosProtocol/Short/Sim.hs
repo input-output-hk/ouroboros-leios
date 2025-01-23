@@ -223,7 +223,7 @@ traceRelayLink1 tcpprops =
                     , certificateGeneration = const 0.050
                     , inputBlockGeneration = const 0
                     , endorseBlockGeneration = const 0
-                    , voteMsgGeneration = const 0
+                    , voteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
                     }
               }
