@@ -18,7 +18,7 @@ export const NodeStats: FC = () => {
   }, [currentNode, aggregatedData.nodes]);
 
   const currentNodeData = useMemo(
-    () => topography.nodes.get(Number(currentNode)),
+    () => currentNode ? topography.nodes.get(currentNode) : undefined,
     [currentNode, topography],
   );
   const { left, top } = useMemo(() => {
@@ -69,7 +69,7 @@ export const NodeStats: FC = () => {
       }}
     >
       <h2 className="flex items-center justify-between gap-4 font-bold uppercase mb-2">
-        Node Stats <span>ID: #{currentNode}</span>
+        Node Stats <span>{currentNode}</span>
       </h2>
       {currentNodeStats && (
         <>

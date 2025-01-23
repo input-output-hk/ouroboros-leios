@@ -56,7 +56,7 @@ export const useHandlers = () => {
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
       context.strokeStyle = "#ddd";
 
-      if (link.source === Number(currentNode) || link.target === Number(currentNode)) {
+      if (link.source === currentNode || link.target === currentNode) {
         context.strokeStyle = "black";
       }
 

@@ -30,7 +30,7 @@ export type TServerLink = {
 export type TServerNodeMap = TServerNode | TServerLink;
 
 export interface ITransformedNode {
-  id: number;
+  id: string;
   fx: number;
   fy: number;
   data: {
@@ -43,8 +43,8 @@ export interface ITransformedNode {
 export type TLinkMapId = string;
 
 export interface ITransformedNodeMap {
-  nodes: Map<number, ITransformedNode>;
-  links: Map<string, { source: number; target: number }>;
+  nodes: Map<string, ITransformedNode>;
+  links: Map<string, { source: string; target: string }>;
 }
 
 export enum EMessageType {
