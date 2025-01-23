@@ -19,7 +19,6 @@ import Data.Maybe (
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
-import PraosProtocol.Common.ConcreteBlock (Block (..))
 import Prelude hiding (id)
 
 -- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.

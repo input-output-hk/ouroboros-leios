@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -48,8 +47,7 @@ import Data.Map (Map)
 import Data.Word (Word64, Word8)
 import GHC.Generics
 import GHC.Records
-import PraosProtocol.Common hiding (Block, BlockHeader)
-import qualified PraosProtocol.Common as Praos (Block, BlockHeader)
+import PraosProtocol.Common
 import SimTypes
 
 {-
@@ -71,7 +69,7 @@ import SimTypes
 
 -}
 
-type RankingBlockHeader = Praos.BlockHeader
+type RankingBlockHeader = BlockHeader
 data RankingBlockBody = RankingBlockBody
   { endorseBlocks :: ![(EndorseBlockId, Certificate)]
   -- ^ at most one in short leios.
@@ -88,7 +86,7 @@ data RankingBlockBody = RankingBlockBody
 rankingBlockBodyInvariant :: RankingBlockBody -> Bool
 rankingBlockBodyInvariant rbb = rbb.payload <= rbb.size
 
-type RankingBlock = Praos.Block RankingBlockBody
+type RankingBlock = Block RankingBlockBody
 
 type RankingBlockId = HeaderHash RankingBlock
 

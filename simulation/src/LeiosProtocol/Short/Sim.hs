@@ -39,7 +39,6 @@ import LeiosProtocol.Short.Node
 import ModelTCP
 import Network.TypedProtocol
 import PraosProtocol.BlockFetch (Message (..))
-import PraosProtocol.Common (Block (..))
 import PraosProtocol.PraosNode (PraosMessage (..), praosMessageLabel)
 import SimTCPLinks
 import SimTypes
