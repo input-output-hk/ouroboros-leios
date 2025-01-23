@@ -76,8 +76,8 @@ vote-generation-cpu-time-ms-per-ib: 1.0
 vote-validation-cpu-time-ms: 3.0
 vote-threshold: 150
 vote-one-eb-per-vrf-win: false
-vote-size-bytes-constant: 32
-vote-size-bytes-per-eb: 32
+vote-bundle-size-bytes-constant: 32
+vote-bundle-size-bytes-per-eb: 32
 
 ################################################################################
 # Certificate Configuration

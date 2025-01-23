@@ -74,8 +74,8 @@ data Config = Config
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
   , voteOneEbPerVrfWin :: Bool
-  , voteSizeBytesConstant :: SizeBytes
-  , voteSizeBytesPerNode :: SizeBytes
+  , voteBundleSizeBytesConstant :: SizeBytes
+  , voteBundleSizeBytesPerEb :: SizeBytes
   , certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
@@ -122,8 +122,8 @@ instance Default Config where
       , voteValidationCpuTimeMs = 3.0
       , voteThreshold = 150
       , voteOneEbPerVrfWin = False
-      , voteSizeBytesConstant = 32
-      , voteSizeBytesPerNode = 32
+      , voteBundleSizeBytesConstant = 32
+      , voteBundleSizeBytesPerEb = 32
       , certGenerationCpuTimeMsConstant = 50.0
       , certGenerationCpuTimeMsPerNode = 1.0
       , certValidationCpuTimeMsConstant = 50.0
@@ -174,8 +174,8 @@ configToKVsWith getter cfg =
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
     , get @"voteOneEbPerVrfWin" getter cfg
-    , get @"voteSizeBytesConstant" getter cfg
-    , get @"voteSizeBytesPerNode" getter cfg
+    , get @"voteBundleSizeBytesConstant" getter cfg
+    , get @"voteBundleSizeBytesPerEb" getter cfg
     , get @"certGenerationCpuTimeMsConstant" getter cfg
     , get @"certGenerationCpuTimeMsPerNode" getter cfg
     , get @"certValidationCpuTimeMsConstant" getter cfg
@@ -236,8 +236,8 @@ instance FromJSON Config where
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
     voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
-    voteSizeBytesConstant <- parseFieldOrDefault @Config @"voteSizeBytesConstant" obj
-    voteSizeBytesPerNode <- parseFieldOrDefault @Config @"voteSizeBytesPerNode" obj
+    voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
+    voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
     certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
     certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
     certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj
