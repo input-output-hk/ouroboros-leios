@@ -138,8 +138,8 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
       ebs <- buffers.ebs
       pure $ endorseBlocksToVoteFor leios slot ibs ebs
     i <- nextBlkId VoteId
-    let voteMsg = mkVoteMsg leios i slot nodeId votes votingFor
-    let !task = leios.delays.voteMsgGeneration voteMsg
+    let voteMsg = mkVoteMsg leios i slot nodeId votes (map (.id) votingFor)
+    let !task = leios.delays.voteMsgGeneration voteMsg votingFor
     return [(task, voteMsg)]
   nextBlkId :: (NodeId -> Int -> a) -> StateT Int m a
   nextBlkId f = do

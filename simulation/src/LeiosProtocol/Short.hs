@@ -45,7 +45,7 @@ data LeiosDelays = LeiosDelays
   -- ^ hash matching and payload validation (incl. tx scripts)
   , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
   , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
-  , voteMsgGeneration :: !(VoteMsg -> DiffTime)
+  , voteMsgGeneration :: !(VoteMsg -> [EndorseBlock] -> DiffTime)
   , voteMsgValidation :: !(VoteMsg -> DiffTime)
   , certificateGeneration :: !(Certificate -> DiffTime)
   , certificateValidation :: !(Certificate -> DiffTime)
@@ -134,7 +134,14 @@ convertConfig disk =
       , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
       , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
       , -- TODO: can parallelize?
-        voteMsgGeneration = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteGenerationCpuTimeMsConstant -- TODO: voteGenerationCpuTimeMsPerIb -- needs EBs info.
+        voteMsgGeneration = \vm ebs ->
+          assert (vm.endorseBlocks == map (.id) ebs) $
+            durationMsToDiffTime $
+              sum
+                [ disk.voteGenerationCpuTimeMsConstant
+                  + disk.voteGenerationCpuTimeMsPerIb * fromIntegral (length eb.inputBlocks)
+                | eb <- ebs
+                ]
       , voteMsgValidation = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteValidationCpuTimeMs
       , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
       , certificateValidation = const $ error "certificateValidation delay included in RB validation"
@@ -367,10 +374,10 @@ endorseBlocksToVoteFor ::
   SlotNo ->
   InputBlocksSnapshot ->
   EndorseBlocksSnapshot ->
-  [EndorseBlockId]
+  [EndorseBlock]
 endorseBlocksToVoteFor cfg slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
-   in map (.id) . filter cond $
+   in filter cond $
         maybe [] ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
 
 -----------------------------------------------------------------
