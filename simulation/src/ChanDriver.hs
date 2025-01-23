@@ -31,6 +31,9 @@ data ProtocolMessage ps where
     SomeMessage st ->
     ProtocolMessage ps
 
+protocolMessage :: (forall st st'. Message ps st st' -> a) -> ProtocolMessage ps -> a
+protocolMessage f (ProtocolMessage (SomeMessage msg)) = f msg
+
 instance forall ps. (forall st st'. Show (Message ps st st')) => Show (ProtocolMessage ps) where
   show (ProtocolMessage (SomeMessage msg)) = show msg
 

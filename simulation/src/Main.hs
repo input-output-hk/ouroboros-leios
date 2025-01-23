@@ -358,8 +358,8 @@ runSimOptions SimOptions{..} = case simCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     config <- OnDisk.readConfig configFile
-    p2pTopography <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    VizShortLeiosP2P.exampleSim rng2 config p2pTopography simOutputSeconds simOutputFile
+    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
+    VizShortLeiosP2P.exampleSim rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -390,7 +390,13 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
   | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
-  | SimShortLeios {seed :: Int, configFile :: FilePath, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
+  | SimShortLeios
+      { seed :: Int
+      , configFile :: FilePath
+      , topographyOptions :: TopographyOptions
+      , overrideUnlimitedBps :: Bytes
+      , emitControl :: Bool
+      }
 
 parserSimCommand :: Parser SimCommand
 parserSimCommand =
@@ -447,6 +453,7 @@ parserShortLeios =
     <*> parserLeiosConfigFile
     <*> parserTopographyOptions
     <*> parserOverrideUnlimited
+    <*> switch (long "log-control" <> help "Include control messages in log.")
 
 parserLeiosConfigFile :: Parser FilePath
 parserLeiosConfigFile =

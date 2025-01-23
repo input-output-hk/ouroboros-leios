@@ -30,16 +30,17 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import GHC.Records
 import LeiosProtocol.Common hiding (Point)
-import LeiosProtocol.Relay (Message (..), RelayMessage)
+import LeiosProtocol.Relay (Message (..), RelayMessage, relayMessageLabel)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import ModelTCP
 import Network.TypedProtocol
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.Common (Block (..))
-import PraosProtocol.PraosNode (PraosMessage (..))
+import PraosProtocol.PraosNode (PraosMessage (..), praosMessageLabel)
 import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
@@ -58,15 +59,22 @@ data LeiosEvent
     LeiosEventTcp (LabelLink (TcpEvent LeiosMessage))
   deriving (Show)
 
-logLeiosEvent :: LeiosEvent -> Maybe Encoding
-logLeiosEvent e = case e of
+logLeiosEvent :: Map NodeId T.Text -> Bool -> LeiosEvent -> Maybe Encoding
+logLeiosEvent nodeNames emitControl e = case e of
   LeiosEventSetup{} -> Nothing
   LeiosEventNode (LabelNode nid x) -> do
     pairs <$> logNode nid x
   LeiosEventTcp (LabelLink from to (TcpSendMsg msg _ _)) -> do
     ps <- logMsg msg
-    pure $ pairs $ "tag" .= asString "Sent" <> "sender" .= from <> "receipient" .= to <> ps
+    pure $
+      pairs $
+        "tag" .= asString "Sent"
+          <> "sender" .= from
+          <> "receipient" .= to
+          <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
+          <> ps
  where
+  node nid = "node" .= nid <> "node_name" .= nodeNames Map.! nid
   ibKind = "kind" .= asString "IB"
   ebKind = "kind" .= asString "EB"
   vtKind = "kind" .= asString "VT"
@@ -77,11 +85,11 @@ logLeiosEvent e = case e of
     Just $
       mconcat
         [ cpuTag
-        , "node" .= nid
+        , node nid
         , "duration_s" .= cpuTaskDuration
         , "task_label" .= cpuTaskLabel
         ]
-  logNode nid (LeiosNodeEvent blkE blk) = Just $ "tag" .= tag <> kindAndId <> extra <> "node" .= nid
+  logNode nid (LeiosNodeEvent blkE blk) = Just $ "tag" .= tag <> kindAndId <> extra <> node nid
    where
     extra
       | Generate <- blkE = case blk of
@@ -120,21 +128,21 @@ logLeiosEvent e = case e of
         , rbKind
         , "id" .= show (coerce @_ @Int (blockHash blk))
         , "size_bytes" .= fromBytes (messageSizeBytes h + messageSizeBytes b)
-        , "node" .= nid
+        , node nid
         ]
   logPraos nid (PraosNodeEventReceived blk) =
     Just $
       mconcat
-        ["tag" .= asString "received", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+        ["tag" .= asString "received", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), node nid]
   logPraos nid (PraosNodeEventEnterState blk) =
     Just $
       mconcat
-        ["tag" .= asString "enteredstate", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), "node" .= nid]
+        ["tag" .= asString "enteredstate", rbKind, "id" .= show (coerce @_ @Int (blockHash blk)), node nid]
   logPraos nid (PraosNodeEventCPU task) =
     assert False $
       Just $
         mconcat
-          [cpuTag, "node" .= nid, "task" .= task]
+          [cpuTag, node nid, "task" .= task]
   logPraos _ (PraosNodeEventNewTip _chain) = Nothing
   logMsg :: LeiosMessage -> Maybe Series
   logMsg (RelayIB msg) = (ibKind <>) <$> logRelay msg
@@ -142,11 +150,15 @@ logLeiosEvent e = case e of
   logMsg (RelayVote msg) = (vtKind <>) <$> logRelay msg
   logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
     Just $ rbKind <> "id" .= show (coerce @_ @Int hash)
-  logMsg (PraosMsg (PraosMessage _)) = Nothing
+  logMsg (PraosMsg msg)
+    | emitControl = Just $ mconcat ["id" .= asString "control", "label" .= praosMessageLabel msg]
+    | otherwise = Nothing
   logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => RelayMessage id h b -> Maybe Series
   logRelay (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
     Just $ "ids" .= map (mkStringId . fst) xs
-  logRelay _ = Nothing
+  logRelay (ProtocolMessage (SomeMessage msg))
+    | emitControl = Just $ "id" .= asString "control" <> "label" .= relayMessageLabel msg
+    | otherwise = Nothing
   asString x = x :: String
 
 messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
