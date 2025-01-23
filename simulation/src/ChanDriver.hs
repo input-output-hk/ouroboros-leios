@@ -4,7 +4,6 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeAbstractions #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -30,6 +29,9 @@ data ProtocolMessage ps where
     forall ps (st :: ps).
     SomeMessage st ->
     ProtocolMessage ps
+
+protocolMessage :: (forall st st'. Message ps st st' -> a) -> ProtocolMessage ps -> a
+protocolMessage f (ProtocolMessage (SomeMessage msg)) = f msg
 
 instance forall ps. (forall st st'. Show (Message ps st st')) => Show (ProtocolMessage ps) where
   show (ProtocolMessage (SomeMessage msg)) = show msg
@@ -70,6 +72,6 @@ chanDriver cmp ch =
   recvMessage _prf () = do
     ProtocolMessage smsg <- readChan ch
     case smsg of
-      SomeMessage @_ @st' msg -> case cmp @st @st' of
+      SomeMessage (msg :: Message ps st' st1) -> case cmp @st @st' of
         Just Refl -> pure (SomeMessage msg, ())
         Nothing -> error "recvMessage: read message state does not match expected state"

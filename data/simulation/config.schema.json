@@ -187,6 +187,16 @@
     "tx-validation-cpu-time-ms": {
       "type": "number"
     },
+    "vote-bundle-size-bytes-constant": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-bundle-size-bytes-per-eb": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
     "vote-generation-cpu-time-ms-constant": {
       "type": "number"
     },
@@ -194,19 +204,6 @@
       "type": "number"
     },
     "vote-generation-probability": {
-      "type": "number"
-    },
-    "vote-one-eb-per-vrf-win": {
-      "type": "boolean"
-    },
-    "vote-size-bytes-constant": {
-      "additionalProperties": false,
-      "properties": {},
-      "type": "number"
-    },
-    "vote-size-bytes-per-node": {
-      "additionalProperties": false,
-      "properties": {},
       "type": "number"
     },
     "vote-threshold": {

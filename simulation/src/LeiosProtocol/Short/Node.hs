@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -49,6 +50,7 @@ import PraosProtocol.BlockFetch (
 import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
+import SimTypes (cpuTask)
 import System.Random
 import WorkerPool
 
@@ -86,8 +88,6 @@ data LeiosNodeConfig = LeiosNodeConfig
   , processingQueueBound :: !Natural
   , processingCores :: NumCores
   }
-
-data NumCores = Infinite | Finite Int
 
 --------------------------------------------------------------
 ---- Node State
@@ -329,10 +329,10 @@ leiosNode tracer cfg followers peers = do
         traceReceived xs EventEB
         dispatch $! ValidateEBS xs $ completion . map (\eb -> (eb.id, eb))
   let valHeaderIB =
-        queueAndWait leiosState ValIH . map (flip CPUTask "ValIH" . cfg.leios.delays.inputBlockHeaderValidation)
+        queueAndWait leiosState ValIH . map (cpuTask "ValIH" cfg.leios.delays.inputBlockHeaderValidation)
   let valHeaderRB h = do
-        let !delay = cfg.leios.praos.headerValidationDelay h
-        queueAndWait leiosState ValRH [CPUTask delay "ValRH"]
+        let !task = cpuTask "ValRH" cfg.leios.praos.headerValidationDelay h
+        queueAndWait leiosState ValRH [task]
 
   praosThreads <-
     PraosNode.setupPraosThreads'
@@ -458,13 +458,13 @@ dispatchValidation tracer cfg leiosState req =
   atomically $ mapM_ (uncurry $ writeTMQueue leiosState.taskQueue) =<< go req
  where
   queue = atomically . mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
-  labelTask (tag, (f, m)) = (tag, (f (T.pack (show tag)), m))
+  labelTask (tag, (f, m)) = let !task = f (show tag) in (tag, (task, m))
   valRB rb m = do
-    let !delay = cfg.leios.praos.blockValidationDelay rb
-    labelTask (ValRB, (CPUTask delay, m))
+    let task prefix = cpuTask prefix cfg.leios.praos.blockValidationDelay rb
+    labelTask (ValRB, (task, m))
   valIB x deliveryTime completion =
     let
-      !delay = CPUTask $ cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
+      delay prefix = cpuTask prefix cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
       task = atomically $ do
         completion [x]
 
@@ -477,14 +477,14 @@ dispatchValidation tracer cfg leiosState req =
         modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete (fst x).id))
      in
       labelTask (ValIB, (delay, task >> traceEnterState [uncurry InputBlock x] EventIB))
-  valEB eb completion = labelTask . (ValEB,) . (CPUTask $ cfg.leios.delays.endorseBlockValidation eb,) $ do
+  valEB eb completion = labelTask . (ValEB,) . (\p -> cpuTask p cfg.leios.delays.endorseBlockValidation eb,) $ do
     atomically $ do
       completion [eb]
       ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
       let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
       modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
     traceEnterState [eb] EventEB
-  valVote v completion = labelTask . (ValVote,) . (CPUTask $ cfg.leios.delays.voteMsgValidation v,) $ do
+  valVote v completion = labelTask . (ValVote,) . (\p -> cpuTask p cfg.leios.delays.voteMsgValidation v,) $ do
     atomically $ completion [v]
     traceEnterState [v] EventVote
 
@@ -536,9 +536,13 @@ generator tracer cfg st = do
   schedule <- mkSchedule cfg
   let buffers = mkBuffersView cfg st
   let
-    withDelay d (lbl, m) = atomically $ writeTMQueue st.taskQueue lbl (d, m)
+    withDelay d (lbl, m) = do
+      -- cannot print id of generated RB until after it's generated,
+      -- the id of the generated block can be found in the generated event emitted at the time the task ends.
+      let !c = CPUTask d (T.pack $ show lbl)
+      atomically $ writeTMQueue st.taskQueue lbl (c, m)
   let
-    submitOne :: (CPUTask, SomeAction) -> m ()
+    submitOne :: (DiffTime, SomeAction) -> m ()
     submitOne (delay, x) = withDelay delay $
       case x of
         SomeAction Generate.Base rb0 -> (GenRB,) $ do

@@ -19,8 +19,13 @@ import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Parser, ToJSO
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
+import Data.Yaml (ParseException)
+import qualified Data.Yaml as Yaml
+import GHC.Exception (displayException)
 import GHC.Generics (Generic)
 import JSONCompat (Getter, always, get, omitDefault, parseFieldOrDefault)
+import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 
 newtype SizeBytes = SizeBytes {unSizeBytes :: Word}
   deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, Enum, Integral)
@@ -69,8 +74,8 @@ data Config = Config
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
   , voteOneEbPerVrfWin :: Bool
-  , voteSizeBytesConstant :: SizeBytes
-  , voteSizeBytesPerNode :: SizeBytes
+  , voteBundleSizeBytesConstant :: SizeBytes
+  , voteBundleSizeBytesPerEb :: SizeBytes
   , certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
@@ -117,8 +122,8 @@ instance Default Config where
       , voteValidationCpuTimeMs = 3.0
       , voteThreshold = 150
       , voteOneEbPerVrfWin = False
-      , voteSizeBytesConstant = 32
-      , voteSizeBytesPerNode = 32
+      , voteBundleSizeBytesConstant = 32
+      , voteBundleSizeBytesPerEb = 32
       , certGenerationCpuTimeMsConstant = 50.0
       , certGenerationCpuTimeMsPerNode = 1.0
       , certValidationCpuTimeMsConstant = 50.0
@@ -169,8 +174,8 @@ configToKVsWith getter cfg =
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
     , get @"voteOneEbPerVrfWin" getter cfg
-    , get @"voteSizeBytesConstant" getter cfg
-    , get @"voteSizeBytesPerNode" getter cfg
+    , get @"voteBundleSizeBytesConstant" getter cfg
+    , get @"voteBundleSizeBytesPerEb" getter cfg
     , get @"certGenerationCpuTimeMsConstant" getter cfg
     , get @"certGenerationCpuTimeMsPerNode" getter cfg
     , get @"certValidationCpuTimeMsConstant" getter cfg
@@ -231,8 +236,8 @@ instance FromJSON Config where
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
     voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
-    voteSizeBytesConstant <- parseFieldOrDefault @Config @"voteSizeBytesConstant" obj
-    voteSizeBytesPerNode <- parseFieldOrDefault @Config @"voteSizeBytesPerNode" obj
+    voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
+    voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
     certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
     certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
     certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj
@@ -284,3 +289,20 @@ instance FromJSON Distribution where
           pure LogNormal{..}
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
+
+-- | Create a 'Config' from a file.
+readConfigEither :: FilePath -> IO (Either ParseException Config)
+readConfigEither = Yaml.decodeFileEither
+
+readConfig :: FilePath -> IO Config
+readConfig file = do
+  e <- readConfigEither file
+  case e of
+    Left parseError -> do
+      hPutStrLn stderr $ displayException parseError
+      exitFailure
+    Right config -> return config
+
+-- | Write a 'Config' to a file.
+writeConfig :: FilePath -> Config -> IO ()
+writeConfig = Yaml.encodeFile

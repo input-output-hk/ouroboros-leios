@@ -61,6 +61,7 @@ import System.FilePath (dropExtension, (<.>))
 import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
+import Topology
 import Viz
 import VizChart
 import VizSim
@@ -428,11 +429,11 @@ chartDiffusionImperfection ::
   LeiosP2PSimVizConfig ->
   VizRender LeiosSimVizModel
 chartDiffusionImperfection
-  p2ptopography
+  p2ptopography@P2PTopography{p2pNodes}
   processingDelay
   serialisationDelay
   LeiosP2PSimVizConfig{nodeMessageColor}
-    | Map.size (p2pNodes p2ptopography) > 100 =
+    | Map.size p2pNodes > 100 =
         nullVizRender
     | otherwise =
         chartVizRender 25 $
@@ -800,8 +801,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> Visualization
-example2 rng onDiskConfig p2pTopography processingCores =
+example2 :: StdGen -> OnDisk.Config -> P2PNetwork -> Visualization
+example2 rng onDiskConfig p2pNetwork@P2PNetwork{p2pNodeCores} =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -841,14 +842,15 @@ example2 rng onDiskConfig p2pTopography processingCores =
             ]
         ]
  where
-  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: read from topography when it includes bandwidth
+  processingCores = maximum $ Map.elems p2pNodeCores
+  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
   modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pTopography processingCores)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pNetwork)
 
-exampleSim :: StdGen -> OnDisk.Config -> P2PTopography -> NumCores -> Time -> FilePath -> IO ()
-exampleSim seed config p2pTopography processingCores stop fp = do
-  let trace = exampleTrace2 seed config p2pTopography processingCores
+exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
+exampleSim seed config p2pNetwork@P2PNetwork{..} emitControl stop fp = do
+  let trace = exampleTrace2 seed config p2pNetwork
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
-  runSampleModel' traceFile logLeiosEvent sampleModel stop trace
+  runSampleModel' traceFile (logLeiosEvent p2pNodeNames emitControl) sampleModel stop trace
  where
   traceFile = dropExtension fp <.> "log"

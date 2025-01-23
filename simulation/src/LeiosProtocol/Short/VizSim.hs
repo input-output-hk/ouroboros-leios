@@ -27,8 +27,8 @@ import qualified Data.Set as Set
 import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
-import LeiosProtocol.Relay (Message (MsgRespondBodies, MsgRespondHeaders), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), NumCores (Infinite), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Relay (Message (MsgRespondBodies, MsgRespondHeaders), RelayMessage, RelayState, relayMessageLabel)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
@@ -466,6 +466,10 @@ accumDataTransmitted msg forecast DataTransmitted{..} =
   _accumPayloadAndBlocksTransmitted (payload0, blocks0) =
     (maybe id (ILMap.insert interval) payload payload0, maybe id (ILMap.insert interval) block blocks0)
    where
+    payloadIB ::
+      HasField "size" body Bytes =>
+      ProtocolMessage (RelayState id header body) ->
+      Maybe Bytes
     payloadIB (ProtocolMessage (SomeMessage rmsg)) =
       case rmsg of
         MsgRespondBodies xs -> Just $ sum $ map ((.size) . snd) xs

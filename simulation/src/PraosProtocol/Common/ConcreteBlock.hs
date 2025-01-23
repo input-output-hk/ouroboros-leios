@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -6,6 +7,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -49,10 +51,12 @@ module PraosProtocol.Common.ConcreteBlock (
 
 import ChanTCP (Bytes)
 import Data.ByteString (ByteString)
+import Data.Coerce
 import Data.Function (fix)
 import Data.Hashable (Hashable (hash))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import GHC.Records
 import NoThunks.Class (NoThunks)
 import Ouroboros.Network.Block
 import Ouroboros.Network.Point (withOrigin)
@@ -76,7 +80,8 @@ data Block body = Block
   }
   deriving (Show, Eq, Generic)
 
--- instance ShowProxy (Block body)
+instance Typeable a => HasField "stringId" (Block a) String where
+  getField = (.stringId) . blockHeader
 
 data BlockBody = BlockBody
   { bodyTag :: !ByteString
@@ -111,6 +116,9 @@ data BlockHeader = BlockHeader
   deriving (Show, Eq, Generic)
 
 instance ShowProxy BlockHeader
+
+instance HasField "stringId" BlockHeader String where
+  getField = show . coerce @_ @Int . blockHash
 
 -- | Compute the 'HeaderHash' of the 'BlockHeader'.
 hashHeader :: BlockHeader -> ConcreteHeaderHash
