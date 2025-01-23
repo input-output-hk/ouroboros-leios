@@ -1,10 +1,12 @@
 -- one near gossip is always needed, either before or after the far message send
 -- assuming 12 near nodes around any given node
 -- NOTE: the simulation includes further delays from TCP window that affect high-latency links
-dq >= IB_max := gossip_near 1<>7 send_far ->- (CDF[(0, 1)] 1<>7 gossip_near)
+dq >= IB_max := gossip_near 1<>7 gossip_far ->- (CDF[(0, 1)] 1<>7 gossip_near)
 
 send_far := send3far ->- CDF[(0.328, 1)] ->- validateIB
+gossip_far := send_far ->- (CDF[(0, 1)] 1<>1 send_far)
 send_near := send3near ->- CDF[(0.328, 1)] ->- validateIB
+gossip_near := send_near ->- (CDF[(0, 1)] 1<>1 send_near)
 validateIB := CDF[(0.08, 1)]
 
 -- the following are extracted from Haskell simulation log output

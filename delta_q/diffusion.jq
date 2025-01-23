@@ -31,7 +31,7 @@ def read_log(in; gen; recv): reduce in as $in (
 ) | map_values(
   (map(.[1]|length)|max|debug) as $max | 
   map_values(
-    .[1] | select(length == $max) | hist(2; 100; .[])
+    .[1] | select(length == $max) | hist(10; 100; .[])
   )
 );
 

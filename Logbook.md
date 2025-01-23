@@ -14,6 +14,13 @@ In order to start answering the question "How much 'heart surgery' will Leios en
 
 The extent of the downstream impacts strongly depends upon the APIs that the node and middleware services provide to consuming services and applications, and the extent to which those services and applications must interact or choose to interact with Leios's physical layer. Further analyses and collaborations with stakeholders will begin to quantify the assessment of downstream effects.
 
+### DeltaQ Update
+
+- thanks to the Haskell simulation CLI now supporting to export the generated topology, plus the Rust simulation being able to read that same topology format, we can now run both simulations on the same topology
+  (it would be even nicer if `cabal ols -- sim` could read a topology file as well)
+- now my current ΔQ model for IB diffusion does match (well enough) to both of them! Yeehah!
+- note that the Rust simulation does not include bandwidth effects while Haskell does, which incurs an additional 328ms network delay at each hop (at 1MB/s allocated bandwidth)
+
 ## 2025-01-22
 
 ### DeltaQ Update
