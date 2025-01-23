@@ -164,10 +164,36 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
         // Add raw latencies for each hop
         report.push_str("### Raw Latencies per Hop\n\n");
         for stats in &hop_stats {
-            report.push_str(&format!("Hop {}:\n", stats.hop_number));
-            let latencies: Vec<String> = stats.latencies.iter().map(|l| l.to_string()).collect();
-            report.push_str(&latencies.join(" "));
-            report.push_str("\n\n");
+            report.push_str(&format!("Hop {}: CDF[", stats.hop_number));
+            let scale = 1.0 / stats.latencies.len() as f64;
+            let mut steps = stats
+                .latencies
+                .iter()
+                .enumerate()
+                .map(|(y_idx, x)| {
+                    (
+                        format!("{:.3}", x),
+                        format!("{:.3}", (y_idx + 1) as f64 * scale),
+                    )
+                })
+                .collect::<Vec<_>>();
+            steps.reverse();
+            let mut prev_x = "-1".to_owned();
+            steps.retain(|(x, _y)| {
+                if *x != prev_x {
+                    prev_x = x.clone();
+                    true
+                } else {
+                    false
+                }
+            });
+            for (idx, (x, y)) in steps.iter().rev().enumerate() {
+                if idx > 0 {
+                    report.push_str(",");
+                }
+                report.push_str(&format!("({}, {})", x, y));
+            }
+            report.push_str("]\n\n");
         }
     }
 

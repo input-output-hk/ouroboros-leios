@@ -308,12 +308,12 @@ pub fn analyze_hop_stats(topology: &Topology, start_node: &str) -> Vec<HopStats>
         // Create stats for current hop level
         let nodes_at_hop = current_level;
         if !nodes_at_hop.is_empty() {
-            let latencies_at_hop: Vec<f64> = nodes_at_hop.iter().map(|n| latencies[n]).collect();
+            let mut latencies_at_hop: Vec<f64> =
+                nodes_at_hop.iter().map(|n| latencies[n]).collect();
+            latencies_at_hop.sort_by(|a, b| a.total_cmp(b));
 
-            let min_latency = latencies_at_hop
-                .iter()
-                .fold(f64::INFINITY, |a, &b| a.min(b));
-            let max_latency = latencies_at_hop.iter().fold(0.0, |a, &b| f64::max(a, b));
+            let min_latency = *latencies_at_hop.first().unwrap_or(&f64::INFINITY);
+            let max_latency = *latencies_at_hop.last().unwrap_or(&0.0);
             let avg_latency = latencies_at_hop.iter().sum::<f64>() / latencies_at_hop.len() as f64;
 
             hop_stats.push(HopStats {
