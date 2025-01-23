@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
-use netsim_async::geo::{self, Location};
 use num_traits::One as _;
 use serde::{Deserialize, Serialize};
 
@@ -123,7 +122,7 @@ pub struct RawTopology {
 #[serde(rename_all = "kebab-case")]
 pub struct RawNode {
     stake: Option<u64>,
-    location: RawNodeLocation,
+    // location: RawNodeLocation,
     cpu_core_count: Option<u64>,
     producers: BTreeMap<String, RawLinkInfo>,
 }
@@ -195,7 +194,6 @@ impl From<RawLegacyTopology> for Topology {
             .map(|(index, raw)| NodeConfiguration {
                 id: NodeId::new(index),
                 name: format!("node-{index}"),
-                location: Some(to_netsim_location(raw.location)),
                 stake: raw.stake.unwrap_or_default(),
                 cpu_multiplier: raw.cpu_multiplier,
                 cores: raw.cores,
@@ -209,7 +207,7 @@ impl From<RawLegacyTopology> for Topology {
             nodes[id2].peers.push(NodeId::new(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: compute_latency(nodes[id1].location, nodes[id2].location, link.latency_ms),
+                latency: Duration::from_millis(link.latency_ms),
             });
         }
         Self { nodes, links }
@@ -226,15 +224,9 @@ impl From<RawTopology> for Topology {
         let mut links = BTreeMap::new();
         for (name, raw_node) in value.nodes.into_iter() {
             let id = *node_ids.get(&name).unwrap();
-            let location = if let RawNodeLocation::Coords(coords) = raw_node.location {
-                Some(to_netsim_location(coords))
-            } else {
-                None
-            };
             let mut node = NodeConfiguration {
                 id,
                 name,
-                location,
                 stake: raw_node.stake.unwrap_or_default(),
                 cpu_multiplier: 1.0,
                 cores: raw_node.cpu_core_count,
@@ -278,7 +270,7 @@ pub struct RawNodeConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RawLinkConfig {
     pub nodes: (usize, usize),
-    pub latency_ms: Option<u64>,
+    pub latency_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -389,33 +381,10 @@ fn duration_ms(ms: f64) -> Duration {
     Duration::from_secs_f64(ms / 1000.0)
 }
 
-fn to_netsim_location((lat, long): (f64, f64)) -> Location {
-    ((lat * 10000.) as i64, (long * 10000.) as u64)
-}
-
-fn compute_latency(
-    loc1: Option<Location>,
-    loc2: Option<Location>,
-    explicit: Option<u64>,
-) -> Duration {
-    if let Some(ms) = explicit {
-        return Duration::from_millis(ms);
-    }
-    if let (Some(loc1), Some(loc2)) = (loc1, loc2) {
-        let geo_latency = geo::latency_between_locations(loc1, loc2, 1.)
-            .map(|l| l.to_duration())
-            .unwrap_or(Duration::ZERO);
-        let extra_latency = Duration::from_millis(5);
-        return geo_latency + extra_latency;
-    }
-    panic!("not enough information to decide link latency");
-}
-
 #[derive(Debug, Clone)]
 pub struct NodeConfiguration {
     pub id: NodeId,
     pub name: String,
-    pub location: Option<Location>,
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,

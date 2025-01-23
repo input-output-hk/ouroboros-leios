@@ -15,89 +15,87 @@ nodes = [
     { location = [-30, 140] },
     { location = [-70, 100] },
 ]
-links = [
-    { nodes = [
-        0,
-        5,
-    ] },
-    { nodes = [
-        1,
-        6,
-    ] },
-    { nodes = [
-        2,
-        7,
-    ] },
-    { nodes = [
-        2,
-        8,
-    ] },
-    { nodes = [
-        3,
-        9,
-    ] },
-    { nodes = [
-        4,
-        11,
-    ] },
-    { nodes = [
-        5,
-        6,
-    ] },
-    { nodes = [
-        5,
-        11,
-    ] },
-    { nodes = [
-        5,
-        12,
-    ] },
-    { nodes = [
-        6,
-        8,
-    ] },
-    { nodes = [
-        6,
-        9,
-    ] },
-    { nodes = [
-        6,
-        10,
-    ] },
-    { nodes = [
-        6,
-        12,
-    ] },
-    { nodes = [
-        7,
-        9,
-    ] },
-    { nodes = [
-        7,
-        11,
-    ] },
-    { nodes = [
-        8,
-        9,
-    ] },
-    { nodes = [
-        8,
-        12,
-    ] },
-    { nodes = [
-        9,
-        10,
-    ] },
-    { nodes = [
-        9,
-        11,
-    ] },
-    { nodes = [
-        10,
-        11,
-    ] },
-    { nodes = [
-        11,
-        12,
-    ] },
-]
+
+[[links]]
+nodes = [0, 5]
+latency_ms = 11
+
+[[links]]
+nodes = [1, 6]
+latency_ms = 10
+
+[[links]]
+nodes = [2, 7]
+latency_ms = 17
+
+[[links]]
+nodes = [2, 8]
+latency_ms = 13
+
+[[links]]
+nodes = [3, 9]
+latency_ms = 13
+
+[[links]]
+nodes = [4, 11]
+latency_ms = 13
+
+[[links]]
+nodes = [5, 6]
+latency_ms = 34
+
+[[links]]
+nodes = [5, 11]
+latency_ms = 32
+
+[[links]]
+nodes = [5, 12]
+latency_ms = 10
+
+[[links]]
+nodes = [6, 8]
+latency_ms = 32
+
+[[links]]
+nodes = [6, 9]
+latency_ms = 39
+
+[[links]]
+nodes = [6, 10]
+latency_ms = 57
+
+[[links]]
+nodes = [6, 12]
+latency_ms = 44
+
+[[links]]
+nodes = [7, 9]
+latency_ms = 13
+
+[[links]]
+nodes = [7, 11]
+latency_ms = 54
+
+[[links]]
+nodes = [8, 9]
+latency_ms = 7
+
+[[links]]
+nodes = [8, 12]
+latency_ms = 65
+
+[[links]]
+nodes = [9, 10]
+latency_ms = 23
+
+[[links]]
+nodes = [9, 11]
+latency_ms = 51
+
+[[links]]
+nodes = [10, 11]
+latency_ms = 32
+
+[[links]]
+nodes = [11, 12]
+latency_ms = 24

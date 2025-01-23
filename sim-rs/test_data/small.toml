@@ -170,549 +170,732 @@ location = [-6.480783445127173, 172.52068670644027]
 
 [[links]]
 nodes = [0, 32]
+latency_ms = 43
 
 [[links]]
 nodes = [0, 48]
+latency_ms = 16
 
 [[links]]
 nodes = [0, 27]
+latency_ms = 38
 
 [[links]]
 nodes = [0, 23]
+latency_ms = 11
 
 [[links]]
 nodes = [0, 28]
+latency_ms = 43
 
 [[links]]
 nodes = [1, 47]
+latency_ms = 23
 
 [[links]]
 nodes = [1, 25]
+latency_ms = 31
 
 [[links]]
 nodes = [1, 39]
+latency_ms = 31
 
 [[links]]
 nodes = [1, 48]
+latency_ms = 3
 
 [[links]]
 nodes = [1, 20]
+latency_ms = 17
 
 [[links]]
 nodes = [1, 44]
+latency_ms = 26
 
 [[links]]
 nodes = [1, 21]
+latency_ms = 20
 
 [[links]]
 nodes = [1, 38]
+latency_ms = 43
 
 [[links]]
 nodes = [1, 30]
+latency_ms = 37
 
 [[links]]
 nodes = [2, 29]
+latency_ms = 10
 
 [[links]]
 nodes = [2, 47]
+latency_ms = 25
 
 [[links]]
 nodes = [2, 25]
+latency_ms = 12
 
 [[links]]
 nodes = [2, 34]
+latency_ms = 44
 
 [[links]]
 nodes = [2, 32]
+latency_ms = 80
 
 [[links]]
 nodes = [3, 45]
+latency_ms = 76
 
 [[links]]
 nodes = [3, 20]
+latency_ms = 32
 
 [[links]]
 nodes = [3, 22]
+latency_ms = 4
 
 [[links]]
 nodes = [3, 31]
+latency_ms = 76
 
 [[links]]
 nodes = [3, 44]
+latency_ms = 21
 
 [[links]]
 nodes = [3, 35]
+latency_ms = 77
 
 [[links]]
 nodes = [3, 46]
+latency_ms = 25
 
 [[links]]
 nodes = [4, 39]
+latency_ms = 12
 
 [[links]]
 nodes = [4, 23]
+latency_ms = 12
 
 [[links]]
 nodes = [4, 25]
+latency_ms = 38
 
 [[links]]
 nodes = [4, 20]
+latency_ms = 41
 
 [[links]]
 nodes = [4, 40]
+latency_ms = 42
 
 [[links]]
 nodes = [5, 32]
+latency_ms = 87
 
 [[links]]
 nodes = [5, 37]
+latency_ms = 21
 
 [[links]]
 nodes = [5, 29]
+latency_ms = 28
 
 [[links]]
 nodes = [5, 44]
+latency_ms = 28
 
 [[links]]
 nodes = [5, 20]
+latency_ms = 32
 
 [[links]]
 nodes = [6, 24]
+latency_ms = 48
 
 [[links]]
 nodes = [6, 47]
+latency_ms = 32
 
 [[links]]
 nodes = [6, 44]
+latency_ms = 23
 
 [[links]]
 nodes = [6, 22]
+latency_ms = 3
 
 [[links]]
 nodes = [6, 26]
+latency_ms = 71
 
 [[links]]
 nodes = [6, 23]
+latency_ms = 43
 
 [[links]]
 nodes = [6, 29]
+latency_ms = 13
 
 [[links]]
 nodes = [6, 36]
+latency_ms = 34
 
 [[links]]
 nodes = [6, 38]
+latency_ms = 87
 
 [[links]]
 nodes = [7, 40]
+latency_ms = 32
 
 [[links]]
 nodes = [7, 37]
+latency_ms = 77
 
 [[links]]
 nodes = [7, 39]
+latency_ms = 3
 
 [[links]]
 nodes = [7, 41]
+latency_ms = 16
 
 [[links]]
 nodes = [7, 23]
+latency_ms = 6
 
 [[links]]
 nodes = [7, 30]
+latency_ms = 10
 
 [[links]]
 nodes = [7, 24]
+latency_ms = 2
 
 [[links]]
 nodes = [7, 34]
+latency_ms = 70
 
 [[links]]
 nodes = [8, 35]
+latency_ms = 22
 
 [[links]]
 nodes = [8, 39]
+latency_ms = 18
 
 [[links]]
 nodes = [8, 46]
+latency_ms = 66
 
 [[links]]
 nodes = [8, 23]
+latency_ms = 18
 
 [[links]]
 nodes = [8, 41]
+latency_ms = 9
 
 [[links]]
 nodes = [9, 41]
+latency_ms = 35
 
 [[links]]
 nodes = [9, 39]
+latency_ms = 21
 
 [[links]]
 nodes = [9, 21]
+latency_ms = 55
 
 [[links]]
 nodes = [9, 22]
+latency_ms = 28
 
 [[links]]
 nodes = [9, 44]
+latency_ms = 39
 
 [[links]]
 nodes = [9, 48]
+latency_ms = 43
 
 [[links]]
 nodes = [10, 32]
+latency_ms = 41
 
 [[links]]
 nodes = [10, 46]
+latency_ms = 51
 
 [[links]]
 nodes = [10, 38]
+latency_ms = 28
 
 [[links]]
 nodes = [10, 39]
+latency_ms = 61
 
 [[links]]
 nodes = [10, 43]
+latency_ms = 14
 
 [[links]]
 nodes = [10, 31]
+latency_ms = 17
 
 [[links]]
 nodes = [10, 27]
+latency_ms = 16
 
 [[links]]
 nodes = [10, 34]
+latency_ms = 20
 
 [[links]]
 nodes = [10, 26]
+latency_ms = 32
 
 [[links]]
 nodes = [11, 25]
+latency_ms = 8
 
 [[links]]
 nodes = [11, 31]
+latency_ms = 72
 
 [[links]]
 nodes = [11, 44]
+latency_ms = 14
 
 [[links]]
 nodes = [11, 20]
+latency_ms = 25
 
 [[links]]
 nodes = [11, 46]
+latency_ms = 13
 
 [[links]]
 nodes = [11, 29]
+latency_ms = 7
 
 [[links]]
 nodes = [11, 22]
+latency_ms = 8
 
 [[links]]
 nodes = [11, 41]
+latency_ms = 64
 
 [[links]]
 nodes = [11, 28]
+latency_ms = 13
 
 [[links]]
 nodes = [12, 35]
+latency_ms = 3
 
 [[links]]
 nodes = [12, 40]
+latency_ms = 18
 
 [[links]]
 nodes = [12, 26]
+latency_ms = 10
 
 [[links]]
 nodes = [12, 38]
+latency_ms = 6
 
 [[links]]
 nodes = [12, 34]
+latency_ms = 50
 
 [[links]]
 nodes = [13, 24]
+latency_ms = 16
 
 [[links]]
 nodes = [13, 26]
+latency_ms = 9
 
 [[links]]
 nodes = [13, 48]
+latency_ms = 27
 
 [[links]]
 nodes = [13, 34]
+latency_ms = 56
 
 [[links]]
 nodes = [13, 39]
+latency_ms = 19
 
 [[links]]
 nodes = [13, 28]
+latency_ms = 67
 
 [[links]]
 nodes = [13, 35]
+latency_ms = 21
 
 [[links]]
 nodes = [13, 41]
+latency_ms = 9
 
 [[links]]
 nodes = [13, 27]
+latency_ms = 28
 
 [[links]]
 nodes = [14, 44]
+latency_ms = 38
 
 [[links]]
 nodes = [14, 41]
+latency_ms = 17
 
 [[links]]
 nodes = [14, 40]
+latency_ms = 25
 
 [[links]]
 nodes = [14, 36]
+latency_ms = 37
 
 [[links]]
 nodes = [14, 26]
+latency_ms = 24
 
 [[links]]
 nodes = [15, 34]
+latency_ms = 63
 
 [[links]]
 nodes = [15, 24]
+latency_ms = 4
 
 [[links]]
 nodes = [15, 30]
+latency_ms = 15
 
 [[links]]
 nodes = [15, 23]
+latency_ms = 7
 
 [[links]]
 nodes = [15, 35]
+latency_ms = 33
 
 [[links]]
 nodes = [15, 40]
+latency_ms = 25
 
 [[links]]
 nodes = [15, 43]
+latency_ms = 48
 
 [[links]]
 nodes = [16, 20]
+latency_ms = 5
 
 [[links]]
 nodes = [16, 44]
+latency_ms = 7
 
 [[links]]
 nodes = [16, 41]
+latency_ms = 50
 
 [[links]]
 nodes = [16, 25]
+latency_ms = 13
 
 [[links]]
 nodes = [16, 29]
+latency_ms = 16
 
 [[links]]
 nodes = [16, 48]
+latency_ms = 16
 
 [[links]]
 nodes = [16, 30]
+latency_ms = 50
 
 [[links]]
 nodes = [16, 24]
+latency_ms = 39
 
 [[links]]
 nodes = [17, 30]
+latency_ms = 13
 
 [[links]]
 nodes = [17, 35]
+latency_ms = 48
 
 [[links]]
 nodes = [17, 44]
+latency_ms = 47
 
 [[links]]
 nodes = [17, 23]
+latency_ms = 20
 
 [[links]]
 nodes = [17, 25]
+latency_ms = 45
 
 [[links]]
 nodes = [17, 24]
+latency_ms = 18
 
 [[links]]
 nodes = [17, 39]
+latency_ms = 14
 
 [[links]]
 nodes = [18, 26]
+latency_ms = 73
 
 [[links]]
 nodes = [18, 21]
+latency_ms = 60
 
 [[links]]
 nodes = [18, 28]
+latency_ms = 8
 
 [[links]]
 nodes = [18, 23]
+latency_ms = 63
 
 [[links]]
 nodes = [18, 24]
+latency_ms = 70
 
 [[links]]
 nodes = [18, 42]
+latency_ms = 77
 
 [[links]]
 nodes = [18, 22]
+latency_ms = 28
 
 [[links]]
 nodes = [18, 43]
+latency_ms = 61
 
 [[links]]
 nodes = [18, 46]
+latency_ms = 9
 
 [[links]]
 nodes = [19, 25]
+latency_ms = 51
 
 [[links]]
 nodes = [19, 49]
+latency_ms = 4
 
 [[links]]
 nodes = [19, 26]
+latency_ms = 44
 
 [[links]]
 nodes = [19, 30]
+latency_ms = 74
 
 [[links]]
 nodes = [19, 24]
+latency_ms = 68
 
 [[links]]
 nodes = [19, 34]
+latency_ms = 10
 
 [[links]]
 nodes = [20, 36]
+latency_ms = 1
 
 [[links]]
 nodes = [20, 39]
+latency_ms = 45
 
 [[links]]
 nodes = [20, 47]
+latency_ms = 5
 
 [[links]]
 nodes = [21, 31]
+latency_ms = 15
 
 [[links]]
 nodes = [21, 41]
+latency_ms = 27
 
 [[links]]
 nodes = [21, 38]
+latency_ms = 25
 
 [[links]]
 nodes = [21, 40]
+latency_ms = 3
 
 [[links]]
 nodes = [22, 45]
+latency_ms = 79
 
 [[links]]
 nodes = [22, 48]
+latency_ms = 41
 
 [[links]]
 nodes = [25, 29]
+latency_ms = 4
 
 [[links]]
 nodes = [25, 44]
+latency_ms = 5
 
 [[links]]
 nodes = [27, 49]
+latency_ms = 30
 
 [[links]]
 nodes = [27, 48]
+latency_ms = 23
 
 [[links]]
 nodes = [27, 39]
+latency_ms = 46
 
 [[links]]
 nodes = [27, 36]
+latency_ms = 31
 
 [[links]]
 nodes = [27, 35]
+latency_ms = 27
 
 [[links]]
 nodes = [27, 40]
+latency_ms = 14
 
 [[links]]
 nodes = [28, 34]
+latency_ms = 31
 
 [[links]]
 nodes = [28, 47]
+latency_ms = 20
 
 [[links]]
 nodes = [31, 38]
+latency_ms = 13
 
 [[links]]
 nodes = [31, 37]
+latency_ms = 42
 
 [[links]]
 nodes = [31, 40]
+latency_ms = 15
 
 [[links]]
 nodes = [32, 36]
+latency_ms = 61
 
 [[links]]
 nodes = [33, 40]
+latency_ms = 56
 
 [[links]]
 nodes = [33, 49]
+latency_ms = 43
 
 [[links]]
 nodes = [33, 45]
+latency_ms = 73
 
 [[links]]
 nodes = [33, 44]
+latency_ms = 12
 
 [[links]]
 nodes = [33, 34]
+latency_ms = 35
 
 [[links]]
 nodes = [33, 46]
+latency_ms = 5
 
 [[links]]
 nodes = [33, 36]
+latency_ms = 20
 
 [[links]]
 nodes = [37, 43]
+latency_ms = 38
 
 [[links]]
 nodes = [37, 49]
+latency_ms = 9
 
 [[links]]
 nodes = [37, 39]
+latency_ms = 79
 
 [[links]]
 nodes = [37, 44]
+latency_ms = 40
 
 [[links]]
 nodes = [37, 41]
+latency_ms = 72
 
 [[links]]
 nodes = [38, 48]
+latency_ms = 45
 
 [[links]]
 nodes = [38, 45]
+latency_ms = 5
 
 [[links]]
 nodes = [42, 45]
+latency_ms = 10
 
 [[links]]
 nodes = [42, 43]
+latency_ms = 16
 
 [[links]]
 nodes = [42, 44]
+latency_ms = 73
 
 [[links]]
 nodes = [42, 46]
+latency_ms = 82
 
 [[links]]
 nodes = [42, 47]
+latency_ms = 66
 
 [[links]]
 nodes = [45, 47]
+latency_ms = 57
 
 [[links]]
 nodes = [46, 48]
+latency_ms = 39
 
 [[links]]
 nodes = [46, 49]
+latency_ms = 39

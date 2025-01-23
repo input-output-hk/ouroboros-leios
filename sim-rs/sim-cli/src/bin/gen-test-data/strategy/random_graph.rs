@@ -5,7 +5,7 @@ use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use sim_core::config::{RawLegacyTopology, RawNodeConfig};
 
-use crate::strategy::utils::{distance, distribute_stake, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
@@ -23,13 +23,12 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
     let stake = distribute_stake(args.stake_pool_count)?;
     let mut rng = thread_rng();
 
-    let mut nodes = vec![];
-    let mut links = LinkTracker::new();
+    let mut graph = GraphBuilder::new();
 
     println!("generating nodes...");
     for id in 0..args.node_count {
         let stake = stake.get(id).cloned();
-        nodes.push(RawNodeConfig {
+        graph.add(RawNodeConfig {
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
             region: None,
             stake,
@@ -49,17 +48,17 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
         };
 
         let mut candidates: Vec<_> = (first_candidate_connection..args.node_count)
-            .filter(|c| *c != from && !links.exists(from, *c))
+            .filter(|c| *c != from && !graph.exists(from, *c))
             .map(|c| {
                 (
                     c,
-                    (max_distance / distance(nodes[from].location, nodes[c].location)) as u64,
+                    (max_distance / distance(graph.location_of(from), graph.location_of(c))) as u64,
                 )
             })
             .collect();
         let mut total_weight: u64 = candidates.iter().map(|(_, weight)| *weight).sum();
         let conn_count = rng.gen_range(args.min_connections..args.max_connections);
-        while links.count(from) < conn_count && !candidates.is_empty() {
+        while graph.count(from) < conn_count && !candidates.is_empty() {
             let next = rng.gen_range(0..total_weight);
             let Some(to_index) = candidates
                 .iter()
@@ -72,21 +71,21 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
                 break;
             };
             let (to, to_weight) = candidates.remove(to_index);
-            links.add(from, to, None);
+            graph.link(from, to, None);
             total_weight -= to_weight;
         }
     }
 
     // Every node must connect to at least one other node
     for from in 0..args.node_count {
-        if !links.connections.contains_key(&from) {
+        if !graph.connections.contains_key(&from) {
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
                 (0..args.node_count).filter(|&to| to != from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
-            links.add(from, to, None);
+            graph.link(from, to, None);
         }
     }
 
@@ -94,7 +93,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
     let mut connected_nodes = BTreeSet::new();
     track_connections(
         &mut connected_nodes,
-        &links.connections,
+        &graph.connections,
         args.stake_pool_count,
     );
 
@@ -103,16 +102,13 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
         if !connected_nodes.contains(&relay) {
             let from = last_conn;
             let to = relay;
-            links.add(from, to, None);
-            track_connections(&mut connected_nodes, &links.connections, relay);
+            graph.link(from, to, None);
+            track_connections(&mut connected_nodes, &graph.connections, relay);
             last_conn = relay;
         }
     }
 
-    Ok(RawLegacyTopology {
-        nodes,
-        links: links.links,
-    })
+    Ok(graph.into_topology())
 }
 
 fn track_connections(
