@@ -82,6 +82,9 @@ convertConfig disk =
     , delays
     }
  where
+  forEach n xs = n * fromIntegral (length xs)
+  forEachKey n m = n * fromIntegral (Map.size m)
+  durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
   praos =
     PraosConfig
       { blockFrequencyPerSlot = disk.rbGenerationProbability
@@ -94,34 +97,45 @@ convertConfig disk =
       , blockValidationDelay = \(Block _ body) ->
           let legacy
                 | body.payload > 0 =
-                    durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
-                      + durationMsToDiffTime disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral body.payload
+                    durationMsToDiffTime $
+                      disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
+                        + disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral body.payload
                 | otherwise = 0
            in legacy
                 + sum (map (certificateValidation . snd) body.endorseBlocks)
       , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
       , blockGenerationDelay = \(Block _ body) ->
-          durationMsToDiffTime disk.rbGenerationCpuTimeMs + sum (map (certificateGeneration . snd) body.endorseBlocks)
+          durationMsToDiffTime disk.rbGenerationCpuTimeMs
+            + sum (map (certificateGeneration . snd) body.endorseBlocks)
       }
-  certificateSize (Certificate xs) =
+  certificateSize (Certificate votesMap) =
     fromIntegral $
       disk.certSizeBytesConstant
-        + fromIntegral (Map.size xs) * disk.certSizeBytesPerNode
+        + disk.certSizeBytesPerNode `forEachKey` votesMap
   sizes =
     SizesConfig
       { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
       , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
       , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
-      , endorseBlock = \eb -> fromIntegral $ disk.ebSizeBytesConstant + fromIntegral (length eb.inputBlocks) * disk.ebSizeBytesPerIb
-      , voteMsg = \_vt -> fromIntegral disk.voteSizeBytesConstant -- TODO: include a per-eb factor.
+      , endorseBlock = \eb ->
+          fromIntegral $
+            disk.ebSizeBytesConstant
+              + disk.ebSizeBytesPerIb `forEach` eb.inputBlocks
+      , voteMsg = \vt ->
+          fromIntegral $
+            disk.voteBundleSizeBytesConstant
+              + disk.voteBundleSizeBytesPerEb `forEach` vt.endorseBlocks
       , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
       , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
       }
-  durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
-  certificateGeneration (Certificate xs) =
-    durationMsToDiffTime $ disk.certGenerationCpuTimeMsConstant + fromIntegral (length xs) * disk.certGenerationCpuTimeMsPerNode
-  certificateValidation (Certificate xs) =
-    durationMsToDiffTime $ disk.certValidationCpuTimeMsConstant + fromIntegral (length xs) * disk.certValidationCpuTimeMsPerNode
+  certificateGeneration (Certificate votesMap) =
+    durationMsToDiffTime $
+      disk.certGenerationCpuTimeMsConstant
+        + disk.certGenerationCpuTimeMsPerNode `forEachKey` votesMap
+  certificateValidation (Certificate votesMap) =
+    durationMsToDiffTime $
+      disk.certValidationCpuTimeMsConstant
+        + disk.certValidationCpuTimeMsPerNode `forEachKey` votesMap
   delays =
     LeiosDelays
       { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
@@ -129,7 +143,7 @@ convertConfig disk =
       , inputBlockValidation = \ib ->
           durationMsToDiffTime $
             disk.ibBodyValidationCpuTimeMsConstant
-              + fromIntegral ib.body.size * disk.ibBodyValidationCpuTimeMsPerByte
+              + disk.ibBodyValidationCpuTimeMsPerByte * fromIntegral ib.body.size
       , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
       , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
       , -- TODO: can parallelize?
@@ -138,10 +152,12 @@ convertConfig disk =
             durationMsToDiffTime $
               sum
                 [ disk.voteGenerationCpuTimeMsConstant
-                  + disk.voteGenerationCpuTimeMsPerIb * fromIntegral (length eb.inputBlocks)
+                  + disk.voteGenerationCpuTimeMsPerIb `forEach` eb.inputBlocks
                 | eb <- ebs
                 ]
-      , voteMsgValidation = \vm -> durationMsToDiffTime $ fromIntegral (length vm.endorseBlocks) * disk.voteValidationCpuTimeMs
+      , voteMsgValidation = \vm ->
+          durationMsToDiffTime $
+            disk.voteValidationCpuTimeMs `forEach` vm.endorseBlocks
       , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
       , certificateValidation = const $ error "certificateValidation delay included in RB validation"
       }
