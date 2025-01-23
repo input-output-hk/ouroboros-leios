@@ -50,17 +50,15 @@ data SomeRole :: Type where
 data SomeAction :: Type where
   SomeAction :: Role a -> a -> SomeAction
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(SomeRole, [NodeRate])]) -> m (SlotNo -> m [(SomeRole, Word64)])
+mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(a, Maybe (Double -> Word64))]) -> m (SlotNo -> m [(a, Word64)])
 mkScheduler rng0 rates = do
-  let sampleRate (NodeRate lambda) = do
-        (sample, rng') <- gets $ uniformR (0, 1)
-        put $! rng'
-        -- TODO: check poisson dist. math.
-        let prob = lambda * exp (-lambda)
-        pure $ sample <= prob
-      sampleRates (role, rs) = do
-        wins <- fromIntegral . length . filter id <$> mapM sampleRate rs
-        return [(role, wins) | wins >= 1]
+  let
+    sampleRates (_role, Nothing) = return []
+    sampleRates (role, Just f) = do
+      (sample, rng') <- gets $ uniformR (0, 1)
+      put $! rng'
+      let wins = f sample
+      return [(role, wins) | wins >= 1]
   rngVar <- newTVarIO rng0
   let sched slot = atomically $ do
         rng <- readTVar rngVar

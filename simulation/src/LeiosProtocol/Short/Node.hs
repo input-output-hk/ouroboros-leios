@@ -22,7 +22,6 @@ import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
 import Control.Tracer
-import Data.Bifunctor
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.Ix (Ix, range)
@@ -621,13 +620,13 @@ mkBuffersView cfg st = BuffersView{..}
     return EndorseBlocksSnapshot{..}
 
 mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
-mkSchedule cfg = mkScheduler cfg.rng rates
+mkSchedule cfg = mkScheduler cfg.rng (\slot -> map (fmap ($ slot)) rates)
  where
-  rates slot =
-    (map . second . map)
-      (nodeRate cfg.stake)
-      [ (SomeRole Generate.Propose, inputBlockRate cfg.leios slot)
-      , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios slot)
-      , (SomeRole Generate.Vote, votingRate cfg.leios slot)
-      , (SomeRole Generate.Base, [NetworkRate cfg.leios.praos.blockFrequencyPerSlot])
-      ]
+  calcWins rate = Just $ \sample ->
+    if sample <= coerce (nodeRate cfg.stake rate) then 1 else 0
+  rates =
+    [ (SomeRole Generate.Propose, inputBlockRate cfg.leios cfg.stake)
+    , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
+    , (SomeRole Generate.Vote, votingRate cfg.leios cfg.stake)
+    , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
+    ]
