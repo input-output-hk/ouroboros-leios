@@ -847,10 +847,10 @@ example2 rng onDiskConfig p2pNetwork@P2PNetwork{p2pNodeCores} =
   modelConfig = config.model
   model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pNetwork)
 
-exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> Time -> FilePath -> IO ()
-exampleSim seed config p2pTopography stop fp = do
-  let trace = exampleTrace2 seed config p2pTopography
+exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
+exampleSim seed config p2pNetwork@P2PNetwork{..} emitControl stop fp = do
+  let trace = exampleTrace2 seed config p2pNetwork
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
-  runSampleModel' traceFile logLeiosEvent sampleModel stop trace
+  runSampleModel' traceFile (logLeiosEvent p2pNodeNames emitControl) sampleModel stop trace
  where
   traceFile = dropExtension fp <.> "log"

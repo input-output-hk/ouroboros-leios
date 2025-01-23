@@ -16,7 +16,6 @@ import Control.Tracer as Tracer (
   Tracer,
   traceWith,
  )
-import Data.Coerce (coerce)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
@@ -25,7 +24,6 @@ import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import ModelTCP (Bytes (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
@@ -132,48 +130,3 @@ exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
       , nodeId
       , rng
       }
-
-exampleLeiosConfig :: Int -> LeiosConfig
-exampleLeiosConfig sliceLength = leios
- where
-  -- TODO: review voting numbers, these might not make sense.
-  leios =
-    LeiosConfig
-      { praos
-      , sliceLength = sliceLength -- matching the interval between RBs
-      , inputBlockFrequencyPerSlot = 5
-      , endorseBlockFrequencyPerStage = 1.5
-      , activeVotingStageLength = 1
-      , votingFrequencyPerStage = 500
-      , votesForCertificate = 150
-      , sizes
-      , delays
-      }
-  -- TODO: realistic sizes
-  sizes =
-    SizesConfig
-      { inputBlockHeader = kilobytes 1
-      , inputBlockBodyAvgSize = kilobytes 95
-      , inputBlockBodyMaxSize = kilobytes 100
-      , endorseBlock = \eb -> coerce (length eb.inputBlocks) * 32 + 32 + 128
-      , voteMsg = \v -> fromIntegral v.votes * 32 + 32 + 128
-      , certificate = const (50 * 1024)
-      , rankingBlockLegacyPraosPayloadAvgSize = 0
-      }
-  delays =
-    LeiosDelays
-      { inputBlockHeaderValidation = const 0.005
-      , -- \^ vrf and signature
-        inputBlockValidation = const 0.1
-      , -- \^ hash matching and payload validation (incl. tx scripts)
-        endorseBlockValidation = const 0.005
-      , voteMsgValidation = const 0.005
-      , certificateGeneration = const 0.050
-      , inputBlockGeneration = const 0
-      , endorseBlockGeneration = const 0
-      , voteMsgGeneration = const 0
-      , certificateValidation = const 0
-      }
-
-  -- TODO: body validation should depend on certificate/payload
-  praos = defaultPraosConfig

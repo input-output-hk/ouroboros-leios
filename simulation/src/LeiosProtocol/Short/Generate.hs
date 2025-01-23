@@ -93,7 +93,7 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   , nodeId :: NodeId
   , buffers :: BuffersView m
   , schedule :: SlotNo -> m [(SomeRole, Word64)]
-  , submit :: [(CPUTask, SomeAction)] -> m ()
+  , submit :: [(DiffTime, SomeAction)] -> m ()
   }
 
 blockGenerator ::
@@ -110,13 +110,13 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
     submit actions
     go (blkId', slot + 1)
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ (map . second) (SomeAction r) <$> execute' slot r wins
-  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(CPUTask, a)]
+  execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(DiffTime, a)]
   execute' slot Base _wins = do
     rbData <- lift $ atomically buffers.newRBData
     let meb = rbData.freshestCertifiedEB
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
     let !rb = mkPartialBlock slot body
-    let !task = CPUTask (leios.praos.blockGenerationDelay rb) "RB generation"
+    let !task = leios.praos.blockGenerationDelay rb
     return [(task, rb)]
   execute' slot Propose wins = do
     ibData <- lift $ atomically buffers.newIBData
@@ -124,13 +124,13 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
       i <- nextBlkId InputBlockId
       let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
       let !ib = mkInputBlock leios header ibData.txsPayload
-      let !task = CPUTask (leios.delays.inputBlockGeneration ib) "IB generation"
+      let !task = leios.delays.inputBlockGeneration ib
       return (task, ib)
   execute' slot Endorse _wins = do
     i <- nextBlkId EndorseBlockId
     ibs <- lift $ atomically buffers.ibs
     let !eb = mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
-    let !task = CPUTask (leios.delays.endorseBlockGeneration eb) "EB generation"
+    let !task = leios.delays.endorseBlockGeneration eb
     return [(task, eb)]
   execute' slot Vote votes = do
     votingFor <- lift $ atomically $ do
@@ -138,8 +138,8 @@ blockGenerator BlockGeneratorConfig{..} = go (0, 0)
       ebs <- buffers.ebs
       pure $ endorseBlocksToVoteFor leios slot ibs ebs
     i <- nextBlkId VoteId
-    let voteMsg = mkVoteMsg leios i slot nodeId votes votingFor
-    let !task = CPUTask (leios.delays.voteMsgGeneration voteMsg) "VT generation"
+    let voteMsg = mkVoteMsg leios i slot nodeId votes (map (.id) votingFor)
+    let !task = leios.delays.voteMsgGeneration voteMsg votingFor
     return [(task, voteMsg)]
   nextBlkId :: (NodeId -> Int -> a) -> StateT Int m a
   nextBlkId f = do
