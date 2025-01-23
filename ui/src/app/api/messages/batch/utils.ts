@@ -6,7 +6,7 @@ import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
   ISimulationIntermediateDataState,
-} from "@/contexts/GraphContext/types";
+} from "@/contexts/SimContext/types";
 
 export const incrementNodeAggregationData = (
   aggregationNodeDataRef: ISimulationAggregatedDataState["nodes"],

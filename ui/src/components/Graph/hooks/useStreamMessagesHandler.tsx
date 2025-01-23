@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
-import { ISimulationAggregatedDataState } from "@/contexts/GraphContext/types";
+import { useSimContext } from "@/contexts/SimContext/context";
+import { ISimulationAggregatedDataState } from "@/contexts/SimContext/types";
 
 export const useStreamMessagesHandler = () => {
   const {
@@ -9,7 +9,7 @@ export const useStreamMessagesHandler = () => {
       batchSize
     },
     dispatch
-  } = useGraphContext();
+  } = useSimContext();
   const eventSource = useRef<EventSource>();
   const [streaming, setStreaming] = useState(false);
 

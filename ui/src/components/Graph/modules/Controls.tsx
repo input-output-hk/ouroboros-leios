@@ -1,11 +1,11 @@
 import { FC, memo, useCallback } from "react";
 
-import { defaultAggregatedData, useGraphContext } from "@/contexts/GraphContext/context";
+import { defaultAggregatedData, useSimContext } from "@/contexts/SimContext/context";
 import { useHandlers } from "../hooks/useHandlers";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 
 export const Controls: FC = memo(() => {
-  const { dispatch } = useGraphContext();
+  const { state, dispatch } = useSimContext();
   const { handleResetSim } = useHandlers();
   const { startStream, streaming, stopStream } = useStreamMessagesHandler();
 
@@ -14,11 +14,14 @@ export const Controls: FC = memo(() => {
     dispatch({
       type: "BATCH_UPDATE",
       payload: {
-        currentNode: undefined,
+        graph: {
+          ...state.graph,
+          currentNode: undefined,
+        },
         aggregatedData: defaultAggregatedData,
       },
     });
-  }, [stopStream, dispatch])
+  }, [stopStream, state, dispatch])
 
   return (
     <div className="min-w-[200px] flex items-center justify-end gap-4">

@@ -1,15 +1,15 @@
 import { FC } from "react";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedTotalData,
-} from "@/contexts/GraphContext/types";
+} from "@/contexts/SimContext/types";
 
 export const Stats: FC = () => {
   const {
     state: { aggregatedData },
-  } = useGraphContext();
+  } = useSimContext();
 
   const totals = [...aggregatedData.nodes].reduce(
     (total, [_id, data]) => {

@@ -1,7 +1,7 @@
 "use client";
 import { DEFAULT_SCALE } from "@/app/constants";
 import { Context, createContext, useContext } from "react";
-import { IGraphContext, IGraphContextState, ISimulationAggregatedDataState } from "./types";
+import { ISimContext, ISimContextState, ISimulationAggregatedDataState } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
   progress: 0,
@@ -13,20 +13,22 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
   lastNodesUpdated: []
 };
 
-export const defaultState: IGraphContextState = {
+export const defaultState: ISimContextState = {
+  graph: {
+    canvasRef: { current: null },
+    canvasOffsetX: 0,
+    canvasOffsetY: 0,
+    canvasScale: DEFAULT_SCALE,
+  },
   batchSize: 5000,
-  canvasRef: { current: null },
-  canvasOffsetX: 0,
-  canvasOffsetY: 0,
-  canvasScale: DEFAULT_SCALE,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   topography: { links: new Map(), nodes: new Map() },
   topographyLoaded: false,
 }
 
-export const GraphContext: Context<IGraphContext> = createContext({
+export const SimContext: Context<ISimContext> = createContext({
   state: defaultState,
   dispatch: (_val) => { }
 });
-export const useGraphContext = () => useContext(GraphContext);
+export const useSimContext = () => useContext(SimContext);

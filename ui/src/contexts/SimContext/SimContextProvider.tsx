@@ -11,10 +11,10 @@ import { IGraphWrapperProps } from "@/components/Graph/GraphWapper";
 import {
   ITransformedNodeMap
 } from "@/components/Graph/types";
-import { defaultState, GraphContext } from "./context";
+import { defaultState, SimContext } from "./context";
 import { reducer } from "./reducer";
 
-export const GraphContextProvider: FC<
+export const SimContextProvider: FC<
   PropsWithChildren<IGraphWrapperProps>
 > = ({ children, topography, maxTime }) => {
   const defaultSyncedState = useMemo(() => {
@@ -51,18 +51,21 @@ export const GraphContextProvider: FC<
 
   const [state, dispatch] = useReducer(reducer, defaultSyncedState);
 
-  const canvasRef = useRef<HTMLCanvasElement>(defaultState.canvasRef.current);
+  const canvasRef = useRef<HTMLCanvasElement>(defaultState.graph.canvasRef.current);
   const resolvedState = useMemo(
     () => ({
       ...state,
-      canvasRef,
+      graph: {
+        ...state.graph,
+        canvasRef,
+      }
     }),
     [state],
   );
 
   return (
-    <GraphContext.Provider value={{ state: resolvedState, dispatch }}>
+    <SimContext.Provider value={{ state: resolvedState, dispatch }}>
       {children}
-    </GraphContext.Provider>
+    </SimContext.Provider>
   );
 };

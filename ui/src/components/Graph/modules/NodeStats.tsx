@@ -1,17 +1,19 @@
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useMemo, useRef } from "react";
 
 export const NodeStats: FC = () => {
   const {
     state: {
       aggregatedData,
-      currentNode,
       topography,
-      canvasOffsetX,
-      canvasOffsetY,
-      canvasScale,
+      graph: {
+        currentNode,
+        canvasOffsetX,
+        canvasOffsetY,
+        canvasScale,
+      }
     },
-  } = useGraphContext();
+  } = useSimContext();
   const ref = useRef<HTMLDivElement>(null);
   const currentNodeStats = useMemo(() => {
     return currentNode ? aggregatedData.nodes.get(currentNode) : undefined;

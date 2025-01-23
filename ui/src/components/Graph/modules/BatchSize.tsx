@@ -1,4 +1,4 @@
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import { FC } from "react";
 import { useStreamMessagesHandler } from "../hooks/useStreamMessagesHandler";
 
@@ -6,7 +6,7 @@ export const BatchSize: FC = () => {
   const {
     state: { batchSize },
     dispatch,
-  } = useGraphContext();
+  } = useSimContext();
   const { streaming } = useStreamMessagesHandler();
 
   return (

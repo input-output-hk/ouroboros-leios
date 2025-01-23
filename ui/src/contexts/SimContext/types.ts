@@ -65,6 +65,10 @@ export interface IGraphContextState {
   canvasOffsetX: number;
   canvasOffsetY: number;
   currentNode?: string;
+}
+
+export interface ISimContextState {
+  graph: IGraphContextState;
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
   topography: ITransformedNodeMap;
@@ -72,7 +76,7 @@ export interface IGraphContextState {
   batchSize: number;
 }
 
-export type TGraphContextActions =
+export type TSimContextActions =
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "SET_BATCH_SIZE"; payload: number }
   | {
@@ -85,11 +89,11 @@ export type TGraphContextActions =
   | { type: "SET_AGGREGATED_DATA"; payload: ISimulationAggregatedDataState }
   | {
     type: "BATCH_UPDATE";
-    payload: Partial<IGraphContextState>;
+    payload: Partial<ISimContextState>;
   }
   | { type: "RESET_STATE" };
 
-export interface IGraphContext {
-  state: IGraphContextState;
-  dispatch: Dispatch<TGraphContextActions>;
+export interface ISimContext {
+  state: ISimContextState;
+  dispatch: Dispatch<TSimContextActions>;
 }

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import readline from "readline";
 
 import { EMessageType, IServerMessage } from "@/components/Graph/types";
-import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/GraphContext/types";
+import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/SimContext/types";
 import { messagesPath } from "../../utils";
 import { processMessage } from "./utils";
 

@@ -16,7 +16,7 @@ import {
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 
 const CustomTooltip = ({
   active,
@@ -37,7 +37,7 @@ const CustomTooltip = ({
 export const ChartTransactionsSent: FC = () => {
   const {
     state: { maxTime, sentTxs },
-  } = useGraphContext();
+  } = useSimContext();
 
   const data = useMemo(() => {
     return sentTxs.sort((a, b) => a - b).map((v, index) => ({

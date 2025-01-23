@@ -1,6 +1,6 @@
 "use client";
 
-import { GraphContextProvider } from "@/contexts/GraphContext/GraphContextProvider";
+import { SimContextProvider } from "@/contexts/SimContext/SimContextProvider";
 import { FC } from "react";
 import { BatchSize } from "./modules/BatchSize";
 import { Canvas } from "./modules/Canvas";
@@ -20,7 +20,7 @@ export const GraphWrapper: FC<IGraphWrapperProps> = ({
   topography,
 }) => {
   return (
-    <GraphContextProvider maxTime={maxTime} topography={topography}>
+    <SimContextProvider maxTime={maxTime} topography={topography}>
       <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
         <Stats />
       </div>
@@ -39,6 +39,6 @@ export const GraphWrapper: FC<IGraphWrapperProps> = ({
           </div>
         </div>
       </div>
-    </GraphContextProvider>
+    </SimContextProvider>
   );
 };

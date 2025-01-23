@@ -1,10 +1,10 @@
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import { type FC } from "react";
 
 export const Progress: FC = () => {
   const {
     state: { aggregatedData, maxTime },
-  } = useGraphContext();
+  } = useSimContext();
 
   const percent = (aggregatedData.progress / maxTime) * 100;
 

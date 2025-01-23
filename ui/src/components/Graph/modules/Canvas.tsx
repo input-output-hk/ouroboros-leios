@@ -1,6 +1,6 @@
 "use client";
 
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import debounce from "debounce";
 import { FC, useCallback, useEffect, useRef } from "react";
 import { useHandlers } from "../hooks/useHandlers";
@@ -10,15 +10,17 @@ export const Canvas: FC = () => {
   const { drawTopography } = useHandlers();
   const {
     state: {
-      canvasRef,
-      canvasOffsetX,
-      canvasOffsetY,
-      canvasScale,
+      graph: {
+        canvasOffsetX,
+        canvasOffsetY,
+        canvasRef,
+        canvasScale,
+        currentNode,
+      },
       topography,
-      currentNode,
     },
     dispatch,
-  } = useGraphContext();
+  } = useSimContext();
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const pointerCapture = useRef<number>();
