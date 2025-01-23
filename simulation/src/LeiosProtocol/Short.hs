@@ -1,9 +1,13 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoFieldSelectors #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module LeiosProtocol.Short where
 
@@ -409,28 +413,66 @@ splitIntoSubSlots (NetworkRate r)
        in
         replicate q fq
 
-inputBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} slot =
-  assert (isStage cfg Propose slot) $
-    splitIntoSubSlots $
-      NetworkRate inputBlockFrequencyPerSlot
+inputBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} stake = \slot ->
+  assert (isStage cfg Propose slot) $ Just f
+ where
+  !(Sortition f) = sortition stake $ NetworkRate inputBlockFrequencyPerSlot
 
-endorseBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-endorseBlockRate cfg slot = fromMaybe [] $ do
+endorseBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+endorseBlockRate cfg stake = \slot -> do
   guard $ isStage cfg Endorse slot
   startEndorse <- stageStart cfg Endorse slot Endorse
   guard $ startEndorse == slot
-  return $ splitIntoSubSlots $ NetworkRate cfg.endorseBlockFrequencyPerStage
+  return $ min 1 . f
+ where
+  !(Sortition f) = sortition stake $ NetworkRate cfg.endorseBlockFrequencyPerStage
 
--- TODO: double check with technical report section on voting when ready.
-votingRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-votingRate cfg slot = fromMaybe [] $ do
+votingRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+votingRate cfg stake = \slot -> do
   guard $ isStage cfg Vote slot
   range <- stageRange cfg Vote slot Vote
   guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
-  let votingFrequencyPerSlot = cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
-  return $ splitIntoSubSlots $ NetworkRate votingFrequencyPerSlot
+  return f
+ where
+  !(Sortition f) = sortition stake votingFrequencyPerSlot
+  votingFrequencyPerSlot = NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
 
--- mostly here to showcase the types.
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
 nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)
+
+-- | Returns a cache of thresholds for being awarded some number of wins.
+--   Keys are calculated to match the accumulator values from `voter_check` in `crypto-benchmarks.rs`.
+--
+--   Note: We compute the keys using `Rational` for extra precision, then convert to Double to avoid memory issues.
+--         We should be doing this with a quadruple precision floating point type to match the Rust code, but support for that is lacking.
+sortitionTable ::
+  StakeFraction ->
+  NetworkRate ->
+  Map Double Word64
+sortitionTable (StakeFraction s) (NetworkRate votes) = Map.fromAscList $ zip (map realToFrac $ scanl (+) 0 foos) [0 .. floor votes]
+ where
+  foos = 1 : zipWith (\ii prev -> prev * x / ii) [1 ..] foos
+  x = realToFrac s * realToFrac votes :: Rational
+
+numWins ::
+  Num a =>
+  StakeFraction ->
+  NetworkRate ->
+  Map Double a ->
+  -- | VRF value
+  Double ->
+  a
+numWins (StakeFraction sigma) (NetworkRate rate) m p =
+  maybe 0 snd $ Map.lookupLT (realToFrac p / realToFrac (exp $ negate (rate * sigma))) m
+
+-- | Datatype used to mark a sortition closure that should be kept and reused across slots.
+--   `data` rather than `newtype` so setup computations can be triggered by matching.
+data Sortition = Sortition (Double -> Word64)
+
+sortition :: StakeFraction -> NetworkRate -> Sortition
+sortition stake rate =
+  let
+    !table = sortitionTable stake rate
+   in
+    Sortition (numWins stake rate table)
