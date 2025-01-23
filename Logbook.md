@@ -1,5 +1,19 @@
 # Leios logbook
 
+## 2025-01-23
+
+### First analysis of downstream impacts of Leios
+
+In order to start answering the question "How much 'heart surgery' will Leios entail?", we've started assessing the impacts of Leios on downstream ecosystem, infrastructure, and technical dependencies.
+
+- Logical changes to the ledger and physical changes to node data structures will likely affect most indexers, explorers, SDKs, and APIs.
+- Leios fees and memory-pool sharding will impact transaction construction and serialization by dapps and wallets.
+- Although the physical changes such as Input Blocks, Endorser Blocks, votes, and certificates may be invisbible to some dapps and wallets, the more complex and sophisticated use cases may need to query the physical layer or might choose to do so for reasons of performance optimization.
+- Conditions of very high throughput (i.e., many transactions per second) may necessitate more efficient filtering of ledger events by downstream services and applications.
+- Applications will need to be aware that a transaction's journey from the memory pool to its becoming referenced (as per Leios, via IBs and EBs) by a Praos block might be longer than a "pure Praos" journey from the memory pool directly into a Praos block.
+
+The extent of the downstream impacts strongly depends upon the APIs that the node and middleware services provide to consuming services and applications, and the extent to which those services and applications must interact or choose to interact with Leios's physical layer. Further analyses and collaborations with stakeholders will begin to quantify the assessment of downstream effects.
+
 ## 2025-01-22
 
 ### DeltaQ Update
