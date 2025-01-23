@@ -299,9 +299,10 @@ pub fn analyze_hop_stats(topology: &Topology, start_node: &str) -> Vec<HopStats>
             }
         }
 
-        // If we found any new nodes, add their latencies as a new hop
+        // If we found any new nodes, sort and add their latencies as a new hop
         if !current_hop_latencies.is_empty() {
             current_hop += 1;
+            current_hop_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
             hop_stats.push(HopStats {
                 hop_number: current_hop,
                 latencies: current_hop_latencies,
@@ -461,9 +462,9 @@ mod tests {
         let hop_stats = analyze_hop_stats(&topology, "node1");
 
         // Should have 3 hops total:
-        // Hop 0: node1
-        // Hop 1: node2, node3
-        // Hop 2: node4
+        // Hop 0: node1 (0ms)
+        // Hop 1: direct connections from node1 to node2 (10ms) and node3 (20ms)
+        // Hop 2: connection from node3 to node4 (15ms)
         assert_eq!(hop_stats.len(), 3);
 
         // Check hop 0
@@ -472,18 +473,18 @@ mod tests {
         assert_eq!(hop0.latencies.len(), 1);
         assert_eq!(hop0.latencies[0], 0.0);
 
-        // Check hop 1
+        // Check hop 1 - direct latencies from node1
         let hop1 = &hop_stats[1];
         assert_eq!(hop1.hop_number, 1);
         assert_eq!(hop1.latencies.len(), 2);
-        assert_eq!(hop1.latencies[0], 10.0);
-        assert_eq!(hop1.latencies[1], 20.0);
+        assert_eq!(hop1.latencies[0], 10.0); // node1 -> node2
+        assert_eq!(hop1.latencies[1], 20.0); // node1 -> node3
 
-        // Check hop 2
+        // Check hop 2 - direct latency from node3 to node4
         let hop2 = &hop_stats[2];
         assert_eq!(hop2.hop_number, 2);
         assert_eq!(hop2.latencies.len(), 1);
-        assert_eq!(hop2.latencies[0], 35.0);
+        assert_eq!(hop2.latencies[0], 15.0); // node3 -> node4
     }
 
     #[test]
@@ -597,7 +598,10 @@ mod tests {
         let topology = Topology { nodes };
         let hop_stats = analyze_hop_stats(&topology, "node1");
 
-        // Should have 3 hops, visiting each node exactly once
+        // Should have 3 hops:
+        // Hop 0: node1 (0ms)
+        // Hop 1: direct connection from node1 to node2 (10ms)
+        // Hop 2: direct connection from node2 to node3 (20ms)
         assert_eq!(hop_stats.len(), 3);
 
         // Check hop 0
@@ -606,16 +610,16 @@ mod tests {
         assert_eq!(hop0.latencies.len(), 1);
         assert_eq!(hop0.latencies[0], 0.0);
 
-        // Check hop 1
+        // Check hop 1 - direct latency from node1 to node2
         let hop1 = &hop_stats[1];
         assert_eq!(hop1.hop_number, 1);
         assert_eq!(hop1.latencies.len(), 1);
         assert_eq!(hop1.latencies[0], 10.0);
 
-        // Check hop 2
+        // Check hop 2 - direct latency from node2 to node3
         let hop2 = &hop_stats[2];
         assert_eq!(hop2.hop_number, 2);
         assert_eq!(hop2.latencies.len(), 1);
-        assert_eq!(hop2.latencies[0], 30.0);
+        assert_eq!(hop2.latencies[0], 20.0);
     }
 }
