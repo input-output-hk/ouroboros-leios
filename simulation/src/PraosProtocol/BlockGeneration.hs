@@ -1,33 +1,29 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 
 module PraosProtocol.BlockGeneration where
 
 import Cardano.Slotting.Slot (WithOrigin (..))
-import Control.Monad (forever)
+import Control.Monad.Trans
 import Control.Tracer
 import Data.ByteString as BS
 import Data.ByteString.Char8 as BS8
+import Data.Foldable (forM_)
 import Data.Function (fix)
-import Data.Word (Word64)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
 import STMCompat
-import System.Random (StdGen, uniformR)
+import System.Random (StdGen)
 
 -- | Returns a block that can extend the chain.
 --   PRECONDITION: the SlotNo is ahead of the chain tip.
 mkBlock :: IsBody body => Chain (Block body) -> SlotNo -> body -> Block body
 mkBlock c sl body = fixupBlock (Chain.headAnchor c) (mkPartialBlock sl body)
-
-type SlotGap = Word64
-
-data PacketGenerationPattern
-  = NoPacketGeneration
-  | UniformGenerationPattern SlotGap
-  | PoissonGenerationPattern StdGen Double
 
 mkBody :: PraosConfig BlockBody -> ByteString -> SlotNo -> BlockBody
 mkBody cfg prefix (SlotNo w) = fix $ \b ->
@@ -36,70 +32,38 @@ mkBody cfg prefix (SlotNo w) = fix $ \b ->
     , bodyMessageSize = cfg.bodySize b
     }
 
-mkNextBlock ::
-  forall m.
-  MonadSTM m =>
-  PraosConfig BlockBody ->
-  PacketGenerationPattern ->
-  ByteString ->
-  m (Maybe (m (SlotNo, BlockBody)))
-mkNextBlock _cfg NoPacketGeneration _ = return Nothing
-mkNextBlock cfg (UniformGenerationPattern gap) prefix = do
-  stVar <- newTVarIO (SlotNo 0)
-  let
-    go = atomically $ do
-      last_sl <- readTVar stVar
-      let
-        !sl = SlotNo (unSlotNo last_sl + gap :: Word64)
-      writeTVar stVar sl
-      let body = mkBody cfg prefix sl
-      return (sl, body)
-  return $ Just go
-mkNextBlock cfg (PoissonGenerationPattern rng0 lambda) prefix = do
-  stVar <- newTVarIO (SlotNo 0, rng0)
-  let go = atomically $ do
-        (last_sl, rng) <- readTVar stVar
-
-        let (u, !rng') = uniformR (0, 1) rng
-            gap = round ((-log u) * lambda :: Double) :: Word64
-
-        let !sl' = SlotNo $ unSlotNo last_sl + gap
-        writeTVar stVar (sl', rng')
-        let body = mkBody cfg prefix sl'
-        return (sl', body)
-  return $ Just go
-
-blockGenerator ::
-  (IsBody body, MonadSTM m, MonadDelay m, MonadTime m) =>
+praosBlockGenerator ::
+  (IsBody body, MonadSTM m, MonadDelay m, MonadTime m, body ~ BlockBody) =>
+  StdGen ->
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   SlotConfig ->
+  ByteString ->
   TVar m (ChainProducerState (Block body)) ->
   (Block body -> STM m ()) ->
-  Maybe (m (SlotNo, body)) ->
+  ((CPUTask, m ()) -> m ()) ->
   m ()
-blockGenerator _tracer _praosConfig _ _cpsVar _addBlockSt Nothing = return ()
-blockGenerator tracer praosConfig slotConfig cpsVar addBlockSt (Just nextBlock) = forever go
+praosBlockGenerator rng tracer praosConfig slotConfig prefix cpsVar addBlockSt queue = do
+  sched <- mkScheduler rng (const [((), Just $ \p -> if p <= praosConfig.blockFrequencyPerSlot then 1 else 0)])
+  blockGenerator
+    BlockGeneratorConfig{slotConfig, execute = execute sched}
  where
-  go = do
-    (sl, body) <- nextBlock
-    waitForSlot sl
-    let !delay = praosConfig.blockGenerationDelay $ mkPartialBlock sl body
-    traceWith tracer (PraosNodeEventCPU $ CPUTask delay "Block generation")
-    threadDelay delay
-    mblk <- atomically $ do
-      chain <- chainState <$> readTVar cpsVar
-      let block = case mkBlock chain sl body of
-            Block h b -> Block (h{headerMessageSize = praosConfig.headerSize}) b
-      if Chain.headSlot chain <= At sl
-        then addBlockSt block >> return (Just (block, chain))
-        else return Nothing
-    case mblk of
-      Nothing -> return ()
-      Just (blk, chain) -> do
-        traceWith tracer (PraosNodeEventGenerate blk)
-        traceWith tracer (PraosNodeEventNewTip (chain Chain.:> blk))
-  waitForSlot sl = do
-    let tgt = slotTime slotConfig sl
-    now <- getCurrentTime
-    threadDelayNDT (tgt `diffUTCTime` now)
+  execute sched sl = lift $ do
+    wins <- sched sl
+    forM_ wins $ \_ -> do
+      let body = mkBody praosConfig prefix sl
+      let !delay = praosConfig.blockGenerationDelay $ mkPartialBlock sl body
+      let !cpuTask = CPUTask delay "Block generation"
+      curry queue cpuTask $ do
+        mblk <- atomically $ do
+          chain <- chainState <$> readTVar cpsVar
+          let block = case mkBlock chain sl body of
+                Block h b -> Block (h{headerMessageSize = praosConfig.headerSize}) b
+          if Chain.headSlot chain <= At sl
+            then addBlockSt block >> return (Just (block, chain))
+            else return Nothing
+        case mblk of
+          Nothing -> return ()
+          Just (blk, chain) -> do
+            traceWith tracer (PraosNodeEventGenerate blk)
+            traceWith tracer (PraosNodeEventNewTip (chain Chain.:> blk))

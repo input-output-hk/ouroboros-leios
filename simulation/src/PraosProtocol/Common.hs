@@ -1,7 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module PraosProtocol.Common (
@@ -31,22 +33,29 @@ module PraosProtocol.Common (
   defaultPraosConfig,
   CPUTask (..),
   hashToColor,
+  blockGenerator,
+  BlockGeneratorConfig (..),
+  waitNextSlot,
+  mkScheduler,
 ) where
 
 import ChanTCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
+import Control.Monad.State
 import Data.Coerce (coerce)
 import Data.Default
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
+import GHC.Word (Word64)
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
 import PraosProtocol.Common.ConcreteBlock as ConcreteBlock
+import STMCompat
 import SimTCPLinks (kilobytes)
 import SimTypes (CPUTask (..))
-import System.Random (mkStdGen, uniform)
+import System.Random (StdGen, mkStdGen, uniform, uniformR)
 import TimeCompat
 
 --------------------------------
@@ -158,3 +167,55 @@ defaultPraosConfig =
 
 instance Default (PraosConfig body) where
   def = defaultPraosConfig
+
+data BlockGeneratorConfig m = BlockGeneratorConfig
+  { slotConfig :: SlotConfig
+  , execute :: SlotNo -> StateT Int m ()
+  }
+
+blockGenerator ::
+  forall m.
+  (MonadSTM m, MonadDelay m, MonadTime m) =>
+  BlockGeneratorConfig m ->
+  m ()
+blockGenerator BlockGeneratorConfig{..} = go (0, 0)
+ where
+  go (!blkId, !tgtSlot) = do
+    slot <- waitNextSlot slotConfig tgtSlot
+    blkId' <- execStateT (execute slot) blkId
+    go (blkId', slot + 1)
+
+-- | @waitNextSlot cfg targetSlot@ waits until the beginning of
+-- @targetSlot@ if that's now or in the future, otherwise the closest slot.
+waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => SlotConfig -> SlotNo -> m SlotNo
+waitNextSlot slotConfig targetSlot = do
+  now <- getCurrentTime
+  let targetSlotTime = slotTime slotConfig targetSlot
+  let slot
+        | now <= targetSlotTime = targetSlot
+        | otherwise = assert (nextSlotIndex >= 0) $ toEnum nextSlotIndex
+       where
+        nextSlotIndex =
+          assert (slotConfig.duration == 1) $
+            ceiling $
+              now `diffUTCTime` slotConfig.start
+  let tgt = slotTime slotConfig slot
+  threadDelayNDT (tgt `diffUTCTime` now)
+  return slot
+
+mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(a, Maybe (Double -> Word64))]) -> m (SlotNo -> m [(a, Word64)])
+mkScheduler rng0 rates = do
+  let
+    sampleRates (_role, Nothing) = return []
+    sampleRates (role, Just f) = do
+      (sample, rng') <- gets $ uniformR (0, 1)
+      put $! rng'
+      let wins = f sample
+      return [(role, wins) | wins >= 1]
+  rngVar <- newTVarIO rng0
+  let sched slot = atomically $ do
+        rng <- readTVar rngVar
+        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
+        writeTVar rngVar rng1
+        return acts
+  return sched

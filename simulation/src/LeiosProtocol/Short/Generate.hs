@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -14,16 +15,13 @@ import Control.Monad (forM)
 import Control.Monad.State (
   MonadState (get, put),
   MonadTrans (lift),
-  StateT (runStateT),
-  gets,
-  runState,
+  StateT,
  )
 import Data.Bifunctor (Bifunctor (..))
 import Data.Kind (Type)
 import LeiosProtocol.Common
 import LeiosProtocol.Short hiding (Stage (..))
 import STMCompat
-import System.Random (StdGen, uniformR)
 
 --------------------------------------------------------------------------------
 
@@ -50,42 +48,7 @@ data SomeRole :: Type where
 data SomeAction :: Type where
   SomeAction :: Role a -> a -> SomeAction
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(a, Maybe (Double -> Word64))]) -> m (SlotNo -> m [(a, Word64)])
-mkScheduler rng0 rates = do
-  let
-    sampleRates (_role, Nothing) = return []
-    sampleRates (role, Just f) = do
-      (sample, rng') <- gets $ uniformR (0, 1)
-      put $! rng'
-      let wins = f sample
-      return [(role, wins) | wins >= 1]
-  rngVar <- newTVarIO rng0
-  let sched slot = atomically $ do
-        rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
-        writeTVar rngVar rng1
-        return acts
-  return sched
-
--- | @waitNextSlot cfg targetSlot@ waits until the beginning of
--- @targetSlot@ if that's now or in the future, otherwise the closest slot.
-waitNextSlot :: (Monad m, MonadTime m, MonadDelay m) => SlotConfig -> SlotNo -> m SlotNo
-waitNextSlot slotConfig targetSlot = do
-  now <- getCurrentTime
-  let targetSlotTime = slotTime slotConfig targetSlot
-  let slot
-        | now <= targetSlotTime = targetSlot
-        | otherwise = assert (nextSlotIndex >= 0) $ toEnum nextSlotIndex
-       where
-        nextSlotIndex =
-          assert (slotConfig.duration == 1) $
-            ceiling $
-              now `diffUTCTime` slotConfig.start
-  let tgt = slotTime slotConfig slot
-  threadDelayNDT (tgt `diffUTCTime` now)
-  return slot
-
-data BlockGeneratorConfig m = BlockGeneratorConfig
+data LeiosGeneratorConfig m = LeiosGeneratorConfig
   { leios :: LeiosConfig
   , slotConfig :: SlotConfig
   , nodeId :: NodeId
@@ -94,19 +57,21 @@ data BlockGeneratorConfig m = BlockGeneratorConfig
   , submit :: [(DiffTime, SomeAction)] -> m ()
   }
 
-blockGenerator ::
+leiosBlockGenerator ::
   forall m.
   (MonadSTM m, MonadDelay m, MonadTime m) =>
-  BlockGeneratorConfig m ->
+  LeiosGeneratorConfig m ->
   m ()
-blockGenerator BlockGeneratorConfig{..} = go (0, 0)
+leiosBlockGenerator LeiosGeneratorConfig{..} =
+  blockGenerator $
+    BlockGeneratorConfig
+      { execute = \slot -> do
+          roles <- lift $ schedule slot
+          actions <- concat <$> mapM (execute slot) roles
+          lift $ submit actions
+      , slotConfig
+      }
  where
-  go (!blkId, !tgtSlot) = do
-    slot <- waitNextSlot slotConfig tgtSlot
-    roles <- schedule slot
-    (actions, blkId') <- runStateT (concat <$> mapM (execute slot) roles) blkId
-    submit actions
-    go (blkId', slot + 1)
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ (map . second) (SomeAction r) <$> execute' slot r wins
   execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(DiffTime, a)]
   execute' slot Base _wins = do

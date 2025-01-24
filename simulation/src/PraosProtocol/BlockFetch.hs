@@ -26,9 +26,8 @@ import Chan (Chan)
 import ChanDriver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
-import Control.Tracer (Contravariant (contramap), Tracer, traceWith)
+import Control.Tracer (Tracer, traceWith)
 import Data.Bifunctor (second)
-import Data.Foldable (forM_)
 import Data.Kind (Type)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
@@ -47,7 +46,6 @@ import Network.TypedProtocol (
 import Network.TypedProtocol.Driver (runPeerWithDriver)
 import qualified Network.TypedProtocol.Peer.Client as TC
 import qualified Network.TypedProtocol.Peer.Server as TS
-import Numeric.Natural (Natural)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.AnchoredFragment as AnchoredFragment
 import qualified PraosProtocol.Common.Chain as Chain
@@ -602,82 +600,30 @@ initBlockFetchConsumerStateForPeerId tracer peerId blockFetchControllerState sub
 
 setupValidatorThreads ::
   (MonadSTM m, MonadDelay m) =>
-  Tracer m (PraosNodeEvent BlockBody) ->
   PraosConfig BlockBody ->
   BlockFetchControllerState BlockBody m ->
-  -- | bound on queue length.
-  Natural ->
+  ((CPUTask, m ()) -> STM m ()) ->
   m ([m ()], Block BlockBody -> m () -> m ())
-setupValidatorThreads tracer cfg st n = do
-  queue <- newTBQueueIO n
-  (waitingVar, processWaitingThread) <- setupProcessWaitingThread (contramap PraosNodeEventCPU tracer) (Just 1) st.blocksVar
-  let doTask (cpuTask, m) = do
-        traceWith tracer . PraosNodeEventCPU $ cpuTask
-        threadDelay cpuTask.cpuTaskDuration
-        m
+setupValidatorThreads cfg st queue = do
+  waitingVar <- newTVarIO Map.empty
+  let processWaitingThread = processWaiting' st.blocksVar waitingVar
 
-  -- if we have the previous block, we process the task sequentially to provide back pressure on the queue.
-  let waitForPrev block task = case blockPrevHash block of
-        GenesisHash -> doTask task
+  let waitForPrev block task = atomically $ case blockPrevHash block of
+        GenesisHash -> queue task
         BlockHash prev -> do
-          havePrev <- Map.member prev <$> readTVarIO st.blocksVar
-          -- Note: for pure praos this also means we have the ledger state.
-          if havePrev
-            then doTask task
-            else atomically $ modifyTVar' waitingVar (Map.insertWith (++) prev [task])
-      fetch = forever $ do
-        (block, completion) <- atomically $ readTBQueue queue
+          modifyTVar' waitingVar (Map.insertWith (++) prev [queue task])
+      add block completion = do
         assert (blockInvariant block) $ do
           waitForPrev block $
             let !cpuTask = CPUTask (cfg.blockValidationDelay block) (T.pack $ "Validate " ++ show (blockHash block))
              in (cpuTask, completion)
-      add block completion = atomically $ writeTBQueue queue (block, completion)
-  return ([fetch, processWaitingThread], add)
-
-setupProcessWaitingThread ::
-  forall m a b.
-  (MonadSTM m, MonadDelay m) =>
-  Tracer m CPUTask ->
-  -- | how many waiting to process in parallel
-  Maybe Int ->
-  TVar m (Map ConcreteHeaderHash a) ->
-  m (TVar m (Map ConcreteHeaderHash [(CPUTask, m b)]), m ())
-setupProcessWaitingThread tracer npar blocksVar = do
-  waitingVar <- newTVarIO Map.empty
-  return (waitingVar, processWaiting tracer npar blocksVar waitingVar)
-
-processWaiting ::
-  forall m a b.
-  (MonadSTM m, MonadDelay m) =>
-  Tracer m CPUTask ->
-  -- | how many waiting to process in parallel
-  Maybe Int ->
-  TVar m (Map ConcreteHeaderHash a) ->
-  TVar m (Map ConcreteHeaderHash [(CPUTask, m b)]) ->
-  m ()
-processWaiting tracer npar blocksVar waitingVar = go
- where
-  parallelDelay xs = do
-    let !d = maximum $ map (cpuTaskDuration . fst) xs
-    forM_ xs $ traceWith tracer . fst
-    threadDelay d
-    mapM_ snd xs
-  go = forever $ join $ atomically $ do
-    waiting <- readTVar waitingVar
-    when (Map.null waiting) retry
-    blocks <- readTVar blocksVar
-    let toValidate = Map.intersection waiting blocks
-    when (Map.null toValidate) retry
-    writeTVar waitingVar $! waiting Map.\\ toValidate
-    let chunks Nothing xs = [xs]
-        chunks (Just m) xs = map (take m) . takeWhile (not . null) . iterate (drop m) $ xs
-    return . mapM_ parallelDelay . chunks npar . concat . Map.elems $ toValidate
+  return ([processWaitingThread], add)
 
 processWaiting' ::
   forall m a b.
   (MonadSTM m, MonadDelay m) =>
   TVar m (Map ConcreteHeaderHash a) ->
-  TVar m (Map ConcreteHeaderHash [m b]) ->
+  TVar m (Map ConcreteHeaderHash [STM m b]) ->
   m ()
 processWaiting' blocksVar waitingVar = go
  where
@@ -688,4 +634,4 @@ processWaiting' blocksVar waitingVar = go
     let toValidate = Map.intersection waiting blocks
     when (Map.null toValidate) retry
     writeTVar waitingVar $! waiting Map.\\ toValidate
-    return . sequence_ . concat . Map.elems $ toValidate
+    return . mapM_ atomically . concat . Map.elems $ toValidate
