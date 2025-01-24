@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-01-24
+
+### Analysis of "Fiat Accompli" sortition
+
+The ["Fiat Accompli" sortition scheme](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/) creates a hybrid committee containing a static, deterministic set of votes having large stake with a randomized, non-deterministic set of voters with smaller stake. We analyzed the FA1<sup>F</sub> and wFA schemes, based on the actual `mainnet` stake distribution for Epoch 535.
+
+| Unique, deterministic voters                                | Votes cast by deterministic voters                        |
+|-------------------------------------------------------------|-----------------------------------------------------------|
+| ![Fait accompli voters](../images/fiat-accompli-voters.svt) | ![Fiat accompli votes](../images/fiat-accompli-votes.svg) |
+
+Having deterministically-chosen voters significantly reduces the size of Leios certificates because the $\sigma_\text{eid}$ signature (96 bytes each) do not need to be stored in the certificate for these voters. For example, for the recommended minimum Leios committee size of 500 votes, under scheme wFA the 406 block-producing nodes with the largest stake would always be included in the voting committee; approximately 88 voters would be selected at random to complete each voting committee.
+
 ## 2025-01-23
 
 ### First analysis of downstream impacts of Leios
