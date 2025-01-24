@@ -10,6 +10,7 @@ module PraosProtocol.PraosNode (
 )
 where
 
+import ChanDriver (protocolMessage)
 import ChanMux
 import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
@@ -23,7 +24,7 @@ import qualified Data.Text as T
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
-import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
+import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, chainSyncMessageLabel, runChainConsumer, runChainProducer)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
 import STMCompat
@@ -35,6 +36,13 @@ data Praos body f = Praos
 
 newtype PraosMessage body = PraosMessage (Either ChainSyncMessage (BlockFetchMessage body))
   deriving (Show)
+
+praosMessageLabel :: PraosMessage body -> String
+praosMessageLabel (PraosMessage d) =
+  either
+    (protocolMessage chainSyncMessageLabel)
+    (protocolMessage BlockFetch.blockFetchMessageLabel)
+    d
 
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
@@ -169,6 +177,7 @@ setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers =
 
 data PraosNodeConfig = PraosNodeConfig
   { praosConfig :: PraosConfig BlockBody
+  , slotConfig :: SlotConfig
   , blockGeneration :: PacketGenerationPattern
   , chain :: Chain (Block BlockBody)
   , blockMarker :: ByteString
@@ -188,11 +197,12 @@ praosNode ::
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
   praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers
-  nextBlock <- mkNextBlock cfg.blockGeneration cfg.blockMarker
+  nextBlock <- mkNextBlock cfg.praosConfig cfg.blockGeneration cfg.blockMarker
   let generationThread =
         blockGenerator
           tracer
           cfg.praosConfig
+          cfg.slotConfig
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
           nextBlock

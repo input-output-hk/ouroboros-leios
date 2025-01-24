@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -6,6 +7,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -47,20 +49,14 @@ module PraosProtocol.Common.ConcreteBlock (
   fixupAnchoredFragmentFrom,
 ) where
 
-import Codec.CBOR.Decoding (
-  decodeBytes,
-  decodeInt,
-  decodeListLenOf,
-  decodeWord64,
- )
-import Codec.CBOR.Encoding (encodeBytes, encodeInt, encodeListLen, encodeWord64)
-import Codec.Serialise (Serialise (..))
+import ChanTCP (Bytes)
 import Data.ByteString (ByteString)
+import Data.Coerce
 import Data.Function (fix)
 import Data.Hashable (Hashable (hash))
-import Data.String (IsString)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
+import GHC.Records
 import NoThunks.Class (NoThunks)
 import Ouroboros.Network.Block
 import Ouroboros.Network.Point (withOrigin)
@@ -84,13 +80,19 @@ data Block body = Block
   }
   deriving (Show, Eq, Generic)
 
--- instance ShowProxy (Block body)
+instance Typeable a => HasField "stringId" (Block a) String where
+  getField = (.stringId) . blockHeader
 
-newtype BlockBody = BlockBody ByteString
-  deriving (Show, Eq, Ord, IsString, Generic)
+data BlockBody = BlockBody
+  { bodyTag :: !ByteString
+  -- ^ hash uniqueness and debugging
+  , bodyMessageSize :: Bytes
+  -- ^ MessageSize instance, determined by config.
+  }
+  deriving (Show, Eq, Ord, Generic)
 
 instance Hashable BlockBody where
-  hash (BlockBody body) = hash body
+  hash (BlockBody body _) = hash body
 
 hashBody :: Hashable body => body -> BodyHash
 hashBody body = BodyHash (hash body)
@@ -108,14 +110,19 @@ data BlockHeader = BlockHeader
   -- ^ The block index from the Genesis
   , headerBodyHash :: BodyHash
   -- ^ The hash of the corresponding block body
+  , headerMessageSize :: Bytes
+  -- ^ for MessageSize instance, determined by config.
   }
   deriving (Show, Eq, Generic)
 
 instance ShowProxy BlockHeader
 
+instance HasField "stringId" BlockHeader String where
+  getField = show . coerce @_ @Int . blockHash
+
 -- | Compute the 'HeaderHash' of the 'BlockHeader'.
 hashHeader :: BlockHeader -> ConcreteHeaderHash
-hashHeader (BlockHeader _ b c d e) = HeaderHash (hash (b, c, d, e))
+hashHeader (BlockHeader _ b c d e _) = HeaderHash (hash (b, c, d, e))
 
 deriving instance Hashable SlotNo
 deriving instance Hashable BlockNo
@@ -221,6 +228,7 @@ mkPartialBlockHeader sl body =
     , headerPrevHash = partialField "headerPrevHash"
     , headerBlockNo = partialField "headerBlockNo"
     , headerBodyHash = hashBody body
+    , headerMessageSize = partialField "headerMessageSize"
     }
  where
   partialField n = error ("mkPartialBlockHeader: you didn't fill in field " ++ n)
@@ -316,55 +324,3 @@ fixupAnchoredFragmentFrom anchor =
     (AnchoredFragment.:>)
     (AnchoredFragment.Empty anchor)
     anchor
-
-{-------------------------------------------------------------------------------
-  Serialisation
--------------------------------------------------------------------------------}
-
-instance Serialise ConcreteHeaderHash where
-  encode (HeaderHash h) = encodeInt h
-  decode = HeaderHash <$> decodeInt
-
-instance Serialise BodyHash where
-  encode (BodyHash h) = encodeInt h
-  decode = BodyHash <$> decodeInt
-
-instance Serialise body => Serialise (Block body) where
-  encode Block{blockHeader, blockBody} =
-    encodeListLen 2
-      <> encode blockHeader
-      <> encode blockBody
-
-  decode = do
-    decodeListLenOf 2
-    Block <$> decode <*> decode
-
-instance Serialise BlockHeader where
-  encode
-    BlockHeader
-      { headerHash = headerHash
-      , headerPrevHash = headerPrevHash
-      , headerSlot = SlotNo headerSlot
-      , headerBlockNo = BlockNo headerBlockNo
-      , headerBodyHash = BodyHash headerBodyHash
-      } =
-      encodeListLen 5
-        <> encode headerHash
-        <> encode headerPrevHash
-        <> encodeWord64 headerSlot
-        <> encodeWord64 headerBlockNo
-        <> encodeInt headerBodyHash
-
-  decode = do
-    decodeListLenOf 5
-    BlockHeader
-      <$> decode
-      <*> decode
-      <*> (SlotNo <$> decodeWord64)
-      <*> (BlockNo <$> decodeWord64)
-      <*> (BodyHash <$> decodeInt)
-
-instance Serialise BlockBody where
-  encode (BlockBody b) = encodeBytes b
-
-  decode = BlockBody <$> decodeBytes

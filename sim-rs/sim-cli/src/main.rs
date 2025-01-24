@@ -3,9 +3,13 @@ use std::{fs, path::PathBuf, process};
 use anyhow::Result;
 use clap::Parser;
 use events::{EventMonitor, OutputFormat};
+use figment::{
+    providers::{Format as _, Yaml},
+    Figment,
+};
 use sim_core::{
     clock::ClockCoordinator,
-    config::{NodeId, RawConfig, SimConfiguration},
+    config::{NodeId, RawLegacyTopology, RawParameters, RawTopology, SimConfiguration, Topology},
     events::EventTracker,
     sim::Simulation,
 };
@@ -21,8 +25,10 @@ mod events;
 
 #[derive(Parser)]
 struct Args {
-    filename: PathBuf,
+    topology: PathBuf,
     output: Option<PathBuf>,
+    #[clap(short, long)]
+    parameters: Vec<PathBuf>,
     #[clap(short, long)]
     format: Option<OutputFormat>,
     #[clap(short, long)]
@@ -34,19 +40,33 @@ struct Args {
 }
 
 fn read_config(args: &Args) -> Result<SimConfiguration> {
-    let file = fs::read_to_string(&args.filename)?;
-    let mut raw_config: RawConfig = toml::from_str(&file)?;
-    if let Some(slots) = args.slots {
-        raw_config.slots = Some(slots);
+    let topology_str = fs::read_to_string(&args.topology)?;
+    let topology_ext = args.topology.extension().and_then(|ext| ext.to_str());
+    let topology: Topology = if topology_ext == Some("toml") {
+        let raw_topology: RawLegacyTopology = toml::from_str(&topology_str)?;
+        raw_topology.into()
+    } else {
+        let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
+        raw_topology.into()
+    };
+    topology.validate()?;
+
+    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
+        "../../../data/simulation/config.default.yaml"
+    )));
+
+    for params_file in &args.parameters {
+        raw_params = raw_params.merge(Yaml::file_exact(params_file));
     }
-    if let Some(ts) = args.timescale {
-        raw_config.timescale = Some(ts);
+
+    let params: RawParameters = raw_params.extract()?;
+    let mut config = SimConfiguration::build(params, topology);
+    if let Some(slots) = args.slots {
+        config.slots = Some(slots);
     }
     for id in &args.trace_node {
-        raw_config.trace_nodes.insert(NodeId::new(*id));
+        config.trace_nodes.insert(NodeId::new(*id));
     }
-    let config: SimConfiguration = raw_config.into();
-    config.validate()?;
     Ok(config)
 }
 
@@ -87,7 +107,7 @@ async fn main() -> Result<()> {
 
     let clock_coordinator = ClockCoordinator::new();
     let clock = clock_coordinator.clock();
-    let tracker = EventTracker::new(events_sink, clock.clone());
+    let tracker = EventTracker::new(events_sink, clock.clone(), &config.nodes);
     let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;
 
     select! {
@@ -99,4 +119,30 @@ async fn main() -> Result<()> {
     simulation.shutdown()?;
     monitor.await??;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use std::fs;
+
+    use crate::{read_config, Args};
+
+    #[test]
+    fn should_parse_topologies() -> Result<()> {
+        let topology_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../test_data");
+        for topology in fs::read_dir(topology_dir)? {
+            let args = Args {
+                topology: topology?.path(),
+                output: None,
+                parameters: vec![],
+                format: None,
+                timescale: None,
+                trace_node: vec![],
+                slots: None,
+            };
+            read_config(&args)?;
+        }
+        Ok(())
+    }
 }

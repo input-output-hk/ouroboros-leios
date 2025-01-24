@@ -1,0 +1,28 @@
+name: "sim-rs"
+
+on:
+  pull_request:
+    paths:
+      - "data/**"
+      - "sim-rs/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "data/**"
+      - "sim-rs/**"
+
+jobs:
+  sim-rs-check:
+    name: "Test"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Rust packages
+        working-directory: sim-rs
+        run: |
+          cargo test
+          if [ $? -ne 0 ]; then
+            echo "Cargo test failed"
+            exit 1
+          fi

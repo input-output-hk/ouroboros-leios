@@ -39,11 +39,17 @@ import SimTCPLinks (mkTcpConnProps)
 import SimTypes
 import System.FilePath
 import System.Random (StdGen, mkStdGen)
+import qualified Topology as P2P
 import Viz
 
-example1 :: StdGen -> DiffTime -> P2PTopography -> Visualization
-example1 rng0 blockInterval p2pTopography =
-  Viz (praosSimVizModel (example1Trace rng0 blockInterval p2pTopography)) $
+example1 :: StdGen -> DiffTime -> P2P.P2PNetwork -> Visualization
+example1 _rng0 _blockInterval _p2pNetwork@P2P.P2PNetwork{p2pLinks, p2pNodeStakes}
+  | not $ null [bw | (_, Just bw) <- Map.elems p2pLinks, bw /= kilobytes 1000] =
+      error "Only bandwidth of 1000 kBs supported for this vizualization"
+  | length (List.group $ Map.elems p2pNodeStakes) /= 1 =
+      error "Only uniform stake supported for this vizualization"
+example1 rng0 blockInterval p2pNetwork =
+  Viz (praosSimVizModel (example1Trace rng0 blockInterval $ P2P.networkToTopology p2pNetwork)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -58,7 +64,7 @@ example1 rng0 blockInterval p2pTopography =
                   , LayoutReqSize 350 300 $
                       Layout $
                         chartDiffusionImperfection
-                          p2pTopography
+                          (P2P.networkToTopology p2pNetwork)
                           0.1
                           (96 / 1000)
                           config
@@ -218,16 +224,11 @@ example1Trace rng0 blockInterval p2pTopography =
         PraosNodeConfig
           { blockGeneration =
               PoissonGenerationPattern
-                (kilobytes 96)
                 rng
                 -- average seconds between blocks:
                 (realToFrac blockInterval * fromIntegral p2pNumNodes)
-          , praosConfig =
-              PraosConfig
-                { slotConfig
-                , blockValidationDelay = const 0.1 -- 100ms
-                , headerValidationDelay = const 0.005 -- 5ms
-                }
+          , slotConfig
+          , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 1 / realToFrac blockInterval}
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
           }
@@ -301,16 +302,11 @@ example2 =
             PraosNodeConfig
               { blockGeneration =
                   PoissonGenerationPattern
-                    (kilobytes 96)
                     rng
                     -- average seconds between blocks:
                     (5 * fromIntegral p2pNumNodes)
-              , praosConfig =
-                  PraosConfig
-                    { slotConfig
-                    , blockValidationDelay = const 0.1 -- 100ms
-                    , headerValidationDelay = const 0.005 -- 5ms
-                    }
+              , praosConfig = defaultPraosConfig
+              , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
               }

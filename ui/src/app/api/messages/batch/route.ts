@@ -2,8 +2,8 @@ import { createReadStream } from "fs";
 import { NextResponse } from "next/server";
 import readline from "readline";
 
-import { EMessageType, IServerMessage } from "@/components/Graph/types";
-import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/GraphContext/types";
+import { EMessageType, IServerMessage } from "@/components/Sim/types";
+import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from "@/contexts/SimContext/types";
 import { messagesPath } from "../../utils";
 import { processMessage } from "./utils";
 
@@ -101,6 +101,7 @@ export async function GET(req: Request, res: Response) {
             praosTxOnChain: 0,
             leiosTxOnChain: 0,
           },
+          blocks: [],
           lastNodesUpdated: [],
         };
         const intermediate: ISimulationIntermediateDataState = {

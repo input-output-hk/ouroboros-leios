@@ -92,10 +92,7 @@ initLeiosState V SD bs pks = record
   }
 
 stake' : PoolID → LeiosState → ℕ
-stake' pid s = let open LeiosState s in
-  case lookupᵐ? SD pid of λ where
-    (just s) → s
-    nothing  → 0
+stake' pid record { SD = SD } = TotalMap.lookup SD pid
 
 stake'' : PubKey → LeiosState → ℕ
 stake'' pk = stake' (poolID pk)

@@ -1,0 +1,74 @@
+title: {
+  label: "UI Web App - Container Diagram"
+  near: top-center
+  shape: text
+  style.font-size: 24
+  style.bold: true
+}
+
+# Styles
+classes: {
+  container: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#f5f5f5"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  component: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#ffffff"
+      font-color: "#2a2a2a"
+      border-radius: 10
+      shadow: true
+    }
+  }
+  external: {
+    style: {
+      stroke: "#666666"
+      fill: "#e0e0e0"
+      font-color: "#2a2a2a"
+      border-radius: 5
+      shadow: false
+    }
+  }
+}
+
+# Main Containers
+ui-web-app: {
+  class: container
+  label: "UI Web App"
+
+  browser: {
+    class: component
+    label: "Web Browser\n- User Interface\n- Data Visualization"
+  }
+
+  server: {
+    class: component
+    label: "Backend Server\n- API Endpoints\n- Data Processing"
+  }
+}
+
+external-systems: {
+  class: container
+  label: "Rust Simulation"
+
+  sim-rs: {
+    class: external
+    label: "sim-rs\n- Trace Generation"
+  }
+
+  trace-file: {
+    class: external
+    label: "Trace File\n- messages.jsonl"
+  }
+}
+
+# Relationships
+ui-web-app.browser -> ui-web-app.server: "Requests data from"
+ui-web-app.server -> external-systems.trace-file: "Reads data from"
+external-systems.sim-rs -> external-systems.trace-file: "Generates"

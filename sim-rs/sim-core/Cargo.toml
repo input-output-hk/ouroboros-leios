@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "1"
 async-stream = "0.3"
 futures = "0.3"
-netsim-async = { git = "https://github.com/SupernaviX/ce-netsim.git", rev = "535ae49" }
+netsim-async = { git = "https://github.com/input-output-hk/ce-netsim.git", rev = "9d1e26c" }
 num-traits = "0.2"
 priority-queue = "2"
 rand = "0.8"
@@ -17,3 +17,6 @@ serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["macros"] }
 tokio-util = "0.7"
 tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

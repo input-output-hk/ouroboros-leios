@@ -1,9 +1,13 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoFieldSelectors #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Use newtype instead of data" #-}
 
 module LeiosProtocol.Short where
 
@@ -13,35 +17,41 @@ import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (
   fromMaybe,
-  isNothing,
   mapMaybe,
   maybeToList,
  )
 import LeiosProtocol.Common
+import LeiosProtocol.Config as OnDisk
 import ModelTCP
 import Prelude hiding (id)
 
+-- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
 data SizesConfig = SizesConfig
-  { producerId :: Bytes
-  , vrfProof :: Bytes
-  , signature_ :: Bytes
-  , reference :: Bytes
-  -- ^ size of a block reference, presumably hash
-  , voteCrypto :: Bytes
-  -- ^ voting is in flux, we stay flexible (atm it's two signatures)
-  , certificate :: Certificate -> Bytes
-  -- ^ certificate size might depend on number of votes.
+  { inputBlockHeader :: !Bytes
+  , inputBlockBodyAvgSize :: !Bytes
+  -- ^ as we do not model transactions we just use a fixed size for bodies.
+  , inputBlockBodyMaxSize :: !Bytes
+  , endorseBlock :: !(EndorseBlock -> Bytes)
+  , voteMsg :: !(VoteMsg -> Bytes)
+  , certificate :: !(Certificate -> Bytes)
+  -- ^ certificate size depends on number of votes, contributes to RB block body sizes.
+  , rankingBlockLegacyPraosPayloadAvgSize :: !Bytes
+  -- ^ txs possibly included.
   }
 
 -- Note: ranking block validation delays are in the PraosConfig, covers certificate validation.
 data LeiosDelays = LeiosDelays
-  { inputBlockHeaderValidation :: InputBlockHeader -> DiffTime
+  { inputBlockGeneration :: !(InputBlock -> DiffTime)
+  , inputBlockHeaderValidation :: !(InputBlockHeader -> DiffTime)
   -- ^ vrf and signature
-  , inputBlockValidation :: InputBlock -> DiffTime
+  , inputBlockValidation :: !(InputBlock -> DiffTime)
   -- ^ hash matching and payload validation (incl. tx scripts)
-  , endorseBlockValidation :: EndorseBlock -> DiffTime
-  , voteMsgValidation :: VoteMsg -> DiffTime
-  , certificateCreation :: Certificate -> DiffTime
+  , endorseBlockGeneration :: !(EndorseBlock -> DiffTime)
+  , endorseBlockValidation :: !(EndorseBlock -> DiffTime)
+  , voteMsgGeneration :: !(VoteMsg -> [EndorseBlock] -> DiffTime)
+  , voteMsgValidation :: !(VoteMsg -> DiffTime)
+  , certificateGeneration :: !(Certificate -> DiffTime)
+  , certificateValidation :: !(Certificate -> DiffTime)
   }
 
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
@@ -60,69 +70,136 @@ data LeiosConfig = LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
-  -- TODO?: max size parameters.
   }
+
+convertConfig :: OnDisk.Config -> LeiosConfig
+convertConfig disk =
+  LeiosConfig
+    { praos
+    , sliceLength = fromIntegral disk.leiosStageLengthSlots
+    , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+    , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+    , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+    , votingFrequencyPerStage = disk.voteGenerationProbability
+    , votesForCertificate = fromIntegral disk.voteThreshold
+    , sizes
+    , delays
+    }
+ where
+  forEach n xs = n * fromIntegral (length xs)
+  forEachKey n m = n * fromIntegral (Map.size m)
+  durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
+  praos =
+    PraosConfig
+      { blockFrequencyPerSlot = disk.rbGenerationProbability
+      , headerSize = fromIntegral disk.ibHeadSizeBytes
+      , bodySize = \body ->
+          1
+            + sum (map (certificateSize . snd) body.endorseBlocks)
+            + body.payload
+      , bodyMaxSize = fromIntegral disk.rbBodyMaxSizeBytes
+      , blockValidationDelay = \(Block _ body) ->
+          let legacy
+                | body.payload > 0 =
+                    durationMsToDiffTime $
+                      disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
+                        + disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral body.payload
+                | otherwise = 0
+           in legacy
+                + sum (map (certificateValidation . snd) body.endorseBlocks)
+      , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , blockGenerationDelay = \(Block _ body) ->
+          durationMsToDiffTime disk.rbGenerationCpuTimeMs
+            + sum (map (certificateGeneration . snd) body.endorseBlocks)
+      }
+  certificateSize (Certificate votesMap) =
+    fromIntegral $
+      disk.certSizeBytesConstant
+        + disk.certSizeBytesPerNode `forEachKey` votesMap
+  sizes =
+    SizesConfig
+      { inputBlockHeader = fromIntegral disk.ibHeadSizeBytes
+      , inputBlockBodyAvgSize = fromIntegral disk.ibBodyAvgSizeBytes
+      , inputBlockBodyMaxSize = fromIntegral disk.ibBodyMaxSizeBytes
+      , endorseBlock = \eb ->
+          fromIntegral $
+            disk.ebSizeBytesConstant
+              + disk.ebSizeBytesPerIb `forEach` eb.inputBlocks
+      , voteMsg = \vt ->
+          fromIntegral $
+            disk.voteBundleSizeBytesConstant
+              + disk.voteBundleSizeBytesPerEb `forEach` vt.endorseBlocks
+      , certificate = const $ error "certificate size config already included in PraosConfig{bodySize}"
+      , rankingBlockLegacyPraosPayloadAvgSize = fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
+      }
+  certificateGeneration (Certificate votesMap) =
+    durationMsToDiffTime $
+      disk.certGenerationCpuTimeMsConstant
+        + disk.certGenerationCpuTimeMsPerNode `forEachKey` votesMap
+  certificateValidation (Certificate votesMap) =
+    durationMsToDiffTime $
+      disk.certValidationCpuTimeMsConstant
+        + disk.certValidationCpuTimeMsPerNode `forEachKey` votesMap
+  delays =
+    LeiosDelays
+      { inputBlockGeneration = const $ durationMsToDiffTime disk.ibGenerationCpuTimeMs
+      , inputBlockHeaderValidation = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , inputBlockValidation = \ib ->
+          durationMsToDiffTime $
+            disk.ibBodyValidationCpuTimeMsConstant
+              + disk.ibBodyValidationCpuTimeMsPerByte * fromIntegral ib.body.size
+      , endorseBlockGeneration = const $ durationMsToDiffTime disk.ebGenerationCpuTimeMs
+      , endorseBlockValidation = const $ durationMsToDiffTime disk.ebValidationCpuTimeMs
+      , -- TODO: can parallelize?
+        voteMsgGeneration = \vm ebs ->
+          assert (vm.endorseBlocks == map (.id) ebs) $
+            durationMsToDiffTime $
+              sum
+                [ disk.voteGenerationCpuTimeMsConstant
+                  + disk.voteGenerationCpuTimeMsPerIb `forEach` eb.inputBlocks
+                | eb <- ebs
+                ]
+      , voteMsgValidation = \vm ->
+          durationMsToDiffTime $
+            disk.voteValidationCpuTimeMs `forEach` vm.endorseBlocks
+      , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
+      , certificateValidation = const $ error "certificateValidation delay included in RB validation"
+      }
 
 class FixSize a where
   fixSize :: LeiosConfig -> a -> a
 
 instance FixSize InputBlockHeader where
-  fixSize cfg ib@InputBlockHeader{..} =
+  fixSize cfg InputBlockHeader{..} =
     InputBlockHeader
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes ib.slot
-            + subSlotSize
-            + cfg.sizes.reference {- ib.rankingBlock -}
-            + 32 {- hash of body -}
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.inputBlockHeader
       , ..
       }
-   where
-    subSlotSize =
-      if cfg.inputBlockFrequencyPerSlot > 1
-        then messageSizeBytes ib.subSlot
-        else
-          0
 
 instance FixSize EndorseBlock where
   fixSize cfg eb@EndorseBlock{..} =
     EndorseBlock
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes eb.slot
-            + cfg.sizes.reference
-              * fromIntegral
-                ( length eb.inputBlocks
-                    + length eb.endorseBlocksEarlierStage
-                    + length eb.endorseBlocksEarlierPipeline
-                )
-            + cfg.sizes.vrfProof
-            + cfg.sizes.signature_
+      { size = cfg.sizes.endorseBlock eb
       , ..
       }
 
 instance FixSize VoteMsg where
   fixSize cfg v@VoteMsg{..} =
     VoteMsg
-      { size =
-          cfg.sizes.producerId
-            + messageSizeBytes v.slot
-            + 64 {- votes -}
-            + sum (map (const cfg.sizes.reference {- EB ref -}) endorseBlocks)
-            + cfg.sizes.voteCrypto
+      { size = cfg.sizes.voteMsg v
       , ..
       }
 
+instance FixSize RankingBlockHeader where
+  fixSize cfg rh = rh{headerMessageSize = cfg.praos.headerSize}
 instance FixSize RankingBlockBody where
   fixSize cfg rb@RankingBlockBody{..} =
     RankingBlockBody
-      { size =
-          sum [cfg.sizes.reference + cfg.sizes.certificate cert | (_, cert) <- rb.endorseBlocks]
-            + rb.payload
+      { size = cfg.praos.bodySize rb
       , ..
       }
+instance FixSize body => FixSize (Block body) where
+  fixSize cfg (Block h b) = Block (fixSize cfg h) (fixSize cfg b)
 
 -----------------------------------------------------------
 ---- Stages
@@ -177,7 +254,7 @@ isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
 ----------------------------------------------------------------------------------------------
 
 mkRankingBlockBody :: LeiosConfig -> NodeId -> Maybe (EndorseBlockId, Certificate) -> Bytes -> RankingBlockBody
-mkRankingBlockBody cfg nodeId ebs payload = assert (isNothing ebs || messageSizeBytes rb >= segmentSize) rb
+mkRankingBlockBody cfg nodeId ebs payload = rb
  where
   rb =
     fixSize cfg $
@@ -316,19 +393,15 @@ endorseBlocksToVoteFor ::
   SlotNo ->
   InputBlocksSnapshot ->
   EndorseBlocksSnapshot ->
-  [EndorseBlockId]
+  [EndorseBlock]
 endorseBlocksToVoteFor cfg slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
-   in map (.id) . filter cond $
+   in filter cond $
         maybe [] ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.
 -----------------------------------------------------------------
-
-newtype NetworkRate = NetworkRate Double
-newtype NodeRate = NodeRate Double
-newtype StakeFraction = StakeFraction Double
 
 splitIntoSubSlots :: NetworkRate -> [NetworkRate]
 splitIntoSubSlots (NetworkRate r)
@@ -340,28 +413,66 @@ splitIntoSubSlots (NetworkRate r)
        in
         replicate q fq
 
-inputBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} slot =
-  assert (isStage cfg Propose slot) $
-    splitIntoSubSlots $
-      NetworkRate inputBlockFrequencyPerSlot
+inputBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} stake = \slot ->
+  assert (isStage cfg Propose slot) $ Just f
+ where
+  !(Sortition f) = sortition stake $ NetworkRate inputBlockFrequencyPerSlot
 
-endorseBlockRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-endorseBlockRate cfg slot = fromMaybe [] $ do
+endorseBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+endorseBlockRate cfg stake = \slot -> do
   guard $ isStage cfg Endorse slot
   startEndorse <- stageStart cfg Endorse slot Endorse
   guard $ startEndorse == slot
-  return $ splitIntoSubSlots $ NetworkRate cfg.endorseBlockFrequencyPerStage
+  return $ min 1 . f
+ where
+  !(Sortition f) = sortition stake $ NetworkRate cfg.endorseBlockFrequencyPerStage
 
--- TODO: double check with technical report section on voting when ready.
-votingRate :: LeiosConfig -> SlotNo -> [NetworkRate]
-votingRate cfg slot = fromMaybe [] $ do
+votingRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
+votingRate cfg stake = \slot -> do
   guard $ isStage cfg Vote slot
   range <- stageRange cfg Vote slot Vote
   guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
-  let votingFrequencyPerSlot = cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
-  return $ splitIntoSubSlots $ NetworkRate votingFrequencyPerSlot
+  return f
+ where
+  !(Sortition f) = sortition stake votingFrequencyPerSlot
+  votingFrequencyPerSlot = NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
 
--- mostly here to showcase the types.
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
 nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)
+
+-- | Returns a cache of thresholds for being awarded some number of wins.
+--   Keys are calculated to match the accumulator values from `voter_check` in `crypto-benchmarks.rs`.
+--
+--   Note: We compute the keys using `Rational` for extra precision, then convert to Double to avoid memory issues.
+--         We should be doing this with a quadruple precision floating point type to match the Rust code, but support for that is lacking.
+sortitionTable ::
+  StakeFraction ->
+  NetworkRate ->
+  Map Double Word64
+sortitionTable (StakeFraction s) (NetworkRate votes) = Map.fromAscList $ zip (map realToFrac $ scanl (+) 0 foos) [0 .. floor votes]
+ where
+  foos = 1 : zipWith (\ii prev -> prev * x / ii) [1 ..] foos
+  x = realToFrac s * realToFrac votes :: Rational
+
+numWins ::
+  Num a =>
+  StakeFraction ->
+  NetworkRate ->
+  Map Double a ->
+  -- | VRF value
+  Double ->
+  a
+numWins (StakeFraction sigma) (NetworkRate rate) m p =
+  maybe 0 snd $ Map.lookupLT (realToFrac p / realToFrac (exp $ negate (rate * sigma))) m
+
+-- | Datatype used to mark a sortition closure that should be kept and reused across slots.
+--   `data` rather than `newtype` so setup computations can be triggered by matching.
+data Sortition = Sortition (Double -> Word64)
+
+sortition :: StakeFraction -> NetworkRate -> Sortition
+sortition stake rate =
+  let
+    !table = sortitionTable stake rate
+   in
+    Sortition (numWins stake rate table)
