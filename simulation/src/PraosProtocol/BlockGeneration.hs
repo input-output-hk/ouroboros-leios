@@ -86,6 +86,7 @@ blockGenerator tracer praosConfig slotConfig cpsVar addBlockSt (Just nextBlock) 
     waitForSlot sl
     let !delay = praosConfig.blockGenerationDelay $ mkPartialBlock sl body
     traceWith tracer (PraosNodeEventCPU $ CPUTask delay "Block generation")
+    threadDelay delay
     mblk <- atomically $ do
       chain <- chainState <$> readTVar cpsVar
       let block = case mkBlock chain sl body of
