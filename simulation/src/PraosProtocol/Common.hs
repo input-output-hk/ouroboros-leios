@@ -36,6 +36,7 @@ module PraosProtocol.Common (
 import ChanTCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Data.Coerce (coerce)
+import Data.Default
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
@@ -154,3 +155,6 @@ defaultPraosConfig =
     , bodySize = const $ kilobytes 95
     , bodyMaxSize = kilobytes 96
     }
+
+instance Default (PraosConfig body) where
+  def = defaultPraosConfig

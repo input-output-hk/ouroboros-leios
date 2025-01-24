@@ -17,23 +17,23 @@ import Control.Tracer as Tracer (
  )
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
-import P2P (P2PTopography (..))
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
+import Topology
 
 tracePraosP2P ::
   StdGen ->
-  P2PTopography ->
-  (DiffTime -> TcpConnProps) ->
+  P2PNetwork ->
+  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
   (SlotConfig -> NodeId -> StdGen -> PraosNodeConfig) ->
   PraosTrace
 tracePraosP2P
   rng0
-  P2PTopography
+  P2PNetwork
     { p2pNodes
     , p2pLinks
     , p2pWorld
@@ -54,9 +54,9 @@ tracePraosP2P
               (inChan, outChan) <-
                 newConnectionBundleTCP @(Praos BlockBody)
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency))
+                  (tcpprops (realToFrac latency) bw)
               return ((na, nb), (inChan, outChan))
-            | ((na, nb), latency) <- Map.toList p2pLinks
+            | ((na, nb), (latency, bw)) <- Map.toList p2pLinks
             ]
         let tcplinksInChan =
               Map.fromListWith

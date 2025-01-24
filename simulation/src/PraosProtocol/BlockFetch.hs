@@ -155,6 +155,16 @@ resolveRange ::
   STM m (Maybe [Block body])
 resolveRange st start end = do
   blocks <- readReadOnlyTVar st.blocksVar
+  return $ resolveRange' blocks start end
+
+resolveRange' ::
+  forall body.
+  IsBody body =>
+  Blocks body ->
+  Point (Block body) ->
+  Point (Block body) ->
+  (Maybe [Block body])
+resolveRange' blocks start end =
   let resolveRangeAcc :: [Block body] -> Point (Block body) -> Maybe [Block body]
       resolveRangeAcc _acc bpoint | pointSlot start > pointSlot bpoint = Nothing
       resolveRangeAcc acc GenesisPoint = assert (start == GenesisPoint) (Just acc)
@@ -165,7 +175,7 @@ resolveRange st start end = do
         if start == bpoint
           then Just acc'
           else resolveRangeAcc acc' =<< blockPrevPoint blocks blockHeader
-  return $ resolveRangeAcc [] end
+   in resolveRangeAcc [] end
 
 blockFetchProducer ::
   forall body m.

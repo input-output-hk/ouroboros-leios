@@ -14,6 +14,7 @@ import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import qualified Data.Traversable as Traversable
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
@@ -197,7 +198,12 @@ data VizSubCommand
   | VizPCS1
   | VizPBF1
   | VizPraos1
-  | VizPraosP2P1 {seed :: Int, blockInterval :: DiffTime, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
+  | VizPraosP2P1
+      { seed :: Int
+      , optionalConfigFile :: Maybe FilePath
+      , topographyOptions :: TopographyOptions
+      , overrideUnlimitedBps :: Bytes
+      }
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
@@ -257,16 +263,7 @@ parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
   VizPraosP2P1
     <$> parserSeed
-    <*> fmap
-      (fromIntegral @Int)
-      ( option
-          auto
-          ( long "block-interval"
-              <> metavar "NUMBER"
-              <> help "The interval at which blocks are generated."
-              <> shownDefValue 5
-          )
-      )
+    <*> optional parserLeiosConfigFile
     <*> parserTopographyOptions
     <*> parserOverrideUnlimited
 
@@ -310,7 +307,8 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    pure $ VizPraosP2P.example1 rng2 blockInterval p2pNetwork
+    cfg <- fromMaybe def <$> traverse (fmap VizPraosP2P.convertConfig . OnDisk.readConfig) optionalConfigFile
+    pure $ VizPraosP2P.example1 rng2 cfg p2pNetwork
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
   VizRelayTest2 -> pure VizSimTestRelay.example2
@@ -350,10 +348,13 @@ vizSizeOptions =
 
 runSimOptions :: SimOptions -> IO ()
 runSimOptions SimOptions{..} = case simCommand of
-  SimPraosDiffusion10{..} ->
-    VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
-  SimPraosDiffusion20{..} ->
-    VizPraosP2P.example1000Diffusion numCloseLinks numRandomLinks simOutputSeconds simOutputFile
+  SimPraosDiffusion{..} -> do
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    mconfig <- Traversable.traverse OnDisk.readConfig optionalConfigFile
+    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
+    -- let bandwidth = 10 * 125_000_000 :: Bytes -- 10 Gbps TODO: set in config
+    VizPraosP2P.example1000Diffusion rng2 mconfig p2pNetwork simOutputSeconds simOutputFile
   SimShortLeios{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
@@ -388,8 +389,12 @@ parserSimOptions =
       )
 
 data SimCommand
-  = SimPraosDiffusion10 {numCloseLinks :: Int, numRandomLinks :: Int}
-  | SimPraosDiffusion20 {numCloseLinks :: Int, numRandomLinks :: Int}
+  = SimPraosDiffusion
+      { seed :: Int
+      , optionalConfigFile :: Maybe FilePath
+      , topographyOptions :: TopographyOptions
+      , overrideUnlimitedBps :: Bytes
+      }
   | SimShortLeios
       { seed :: Int
       , configFile :: FilePath
@@ -402,49 +407,19 @@ parserSimCommand :: Parser SimCommand
 parserSimCommand =
   subparser . mconcat $
     [ commandGroup "Available simulations:"
-    , command "praos-diffusion-10" . info (parserSimPraosDiffusion10 <**> helper) $
-        progDesc ""
-    , command "praos-diffusion-20" . info (parserSimPraosDiffusion20 <**> helper) $
+    , command "praos-diffusion" . info (parserSimPraosDiffusion <**> helper) $
         progDesc ""
     , command "short-leios" . info (parserShortLeios <**> helper) $
         progDesc ""
     ]
 
-parserSimPraosDiffusion10 :: Parser SimCommand
-parserSimPraosDiffusion10 =
-  SimPraosDiffusion10
-    <$> option
-      auto
-      ( long "num-close-links"
-          <> metavar "NUMBER"
-          <> help "The number of close-distance links."
-          <> shownDefValue 5
-      )
-    <*> option
-      auto
-      ( long "num-random-links"
-          <> metavar "NUMBER"
-          <> help "The number of random links."
-          <> shownDefValue 5
-      )
-
-parserSimPraosDiffusion20 :: Parser SimCommand
-parserSimPraosDiffusion20 =
-  SimPraosDiffusion20
-    <$> option
-      auto
-      ( long "num-close-links"
-          <> metavar "NUMBER"
-          <> help "The number of close-distance links."
-          <> shownDefValue 10
-      )
-    <*> option
-      auto
-      ( long "num-random-links"
-          <> metavar "NUMBER"
-          <> help "The number of random links."
-          <> shownDefValue 10
-      )
+parserSimPraosDiffusion :: Parser SimCommand
+parserSimPraosDiffusion =
+  SimPraosDiffusion
+    <$> parserSeed
+    <*> optional parserLeiosConfigFile
+    <*> parserTopographyOptions
+    <*> parserOverrideUnlimited
 
 parserShortLeios :: Parser SimCommand
 parserShortLeios =

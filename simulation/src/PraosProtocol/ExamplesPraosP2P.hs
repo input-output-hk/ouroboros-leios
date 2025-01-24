@@ -13,18 +13,22 @@
 module PraosProtocol.ExamplesPraosP2P where
 
 import ChanDriver
+import ChanTCP
 import Control.Monad
 import Data.Aeson
+import Data.Aeson.Types
 import qualified Data.ByteString.Char8 as BS8
 import Data.Coerce (coerce)
+import Data.Fixed
 import Data.Functor.Contravariant (Contravariant (contramap))
 import qualified Data.IntMap.Strict as IMap
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, listToMaybe)
-import GHC.Generics
+import GHC.Generics (Generic)
+import qualified LeiosProtocol.Config as OnDisk
 import Network.TypedProtocol
-import P2P (P2PTopography (p2pNodes), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (P2PTopography, P2PTopographyCharacteristics (..), genArbitraryP2PTopography, p2pNodes)
 import PraosProtocol.BlockFetch
 import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
 import PraosProtocol.Common
@@ -42,14 +46,14 @@ import System.Random (StdGen, mkStdGen)
 import qualified Topology as P2P
 import Viz
 
-example1 :: StdGen -> DiffTime -> P2P.P2PNetwork -> Visualization
-example1 _rng0 _blockInterval _p2pNetwork@P2P.P2PNetwork{p2pLinks, p2pNodeStakes}
-  | not $ null [bw | (_, Just bw) <- Map.elems p2pLinks, bw /= kilobytes 1000] =
-      error "Only bandwidth of 1000 kBs supported for this vizualization"
+example1 :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> Visualization
+example1 _rng0 _cfg _p2pNetwork@P2P.P2PNetwork{p2pLinks, p2pNodeStakes}
+  | not $ null [() | (_, Nothing) <- Map.elems p2pLinks] =
+      error "Only finite bandwidth for this vizualization"
   | length (List.group $ Map.elems p2pNodeStakes) /= 1 =
       error "Only uniform stake supported for this vizualization"
-example1 rng0 blockInterval p2pNetwork =
-  Viz (praosSimVizModel (example1Trace rng0 blockInterval $ P2P.networkToTopology p2pNetwork)) $
+example1 rng0 cfg p2pNetwork =
+  Viz (praosSimVizModel (example1Trace rng0 cfg p2pNetwork)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -94,12 +98,12 @@ data LatencyPerStake = LatencyPerStake
   deriving (Generic, ToJSON, FromJSON)
 
 data DiffusionData = DiffusionData
-  { topography :: P2PTopographyCharacteristics
-  , topography_details :: P2PTopography
+  { topography_details :: P2PTopography
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
   , stable_chain_hashes :: [Int]
   , cpuTasks :: Map.Map NodeId [(DiffTime, CPUTask)]
+  , average_latencies :: Map.Map Double DiffTime
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -110,26 +114,32 @@ diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
     , latencies = bin $ diffusionLatencyPerStakeFraction nnodes (Time created) (map Time arrivals)
     }
  where
-  bins = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
+  bins = [0.50, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
   bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) bins
 
 data DiffusionLatencyState = DiffusionLatencyState
   { chains :: !ChainsMap
   , diffusions :: !DiffusionLatencyMap
   , cpuTasks :: !(Map.Map NodeId [(DiffTime, CPUTask)])
+  , fetchRequests :: !(Map.Map NodeId (Map.Map (HeaderHash (Block BlockBody)) [DiffTime]))
+  , receivedBodies :: !(Map.Map NodeId (Map.Map (HeaderHash (Block BlockBody)) [DiffTime]))
+  , blocks :: !(Blocks BlockBody)
   }
 
-diffusionSampleModel :: P2PTopographyCharacteristics -> P2PTopography -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
-diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp = SampleModel initState accum render
+diffusionSampleModel :: P2PTopography -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
+diffusionSampleModel p2pTopography fp = SampleModel initState accum render
  where
-  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty
+  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty
   accum t e DiffusionLatencyState{..} =
     DiffusionLatencyState
       { chains = accumChains t e chains
       , diffusions = accumDiffusionLatency t e diffusions
       , cpuTasks = accumCPUTasks t e cpuTasks
+      , fetchRequests = accumFetchRequests blocks t e fetchRequests
+      , receivedBodies = accumReceived t e receivedBodies
+      , blocks = accumBlocks e blocks
       }
-  nnodes = p2pNumNodes p2pTopographyCharacteristics
+  nnodes = Map.size $ p2pNodes p2pTopography
   render DiffusionLatencyState{..} = do
     let stable_chain = fromMaybe Genesis $ do
           guard $ not $ IMap.null chains
@@ -147,43 +157,119 @@ diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp = SampleModel
             }
           | (hash', (_, i, t, ts)) <- Map.toList diffusions
           ]
+    let latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
+    let avg ts = sum ts / fromIntegral (length ts)
+    let average_latencies =
+          Map.map avg $
+            Map.fromListWith
+              (++)
+              [ (p, [d])
+              | l <- latency_per_stake
+              , (Just d, p) <- l.latencies
+              ]
+    let timesDiff [t0] [t1] = (realToFrac t1 - realToFrac t0 :: Pico)
+        timesDiff _ _ = undefined
+    let durations =
+          Map.intersectionWith
+            ( Map.intersectionWith timesDiff
+            )
+            fetchRequests
+            receivedBodies
+    let average_block_fetch_duration =
+          avg $
+            concatMap Map.elems $
+              Map.elems $
+                durations ::
+            Pico
     let diffusionData =
           DiffusionData
-            { topography = p2pTopographyCharacteristics
-            , topography_details = p2pTopography
+            { topography_details = p2pTopography
             , entries
-            , latency_per_stake = map (diffusionEntryToLatencyPerStake nnodes) entries
+            , latency_per_stake
             , stable_chain_hashes
             , cpuTasks
+            , average_latencies
             }
 
     encodeFile fp diffusionData
     putStrLn $ "Diffusion data written to " ++ fp
-
     let arrived98 = unzip [(l.hash, d) | l <- diffusionData.latency_per_stake, (Just d, p) <- l.latencies, p == 0.98]
     let missing = filter (not . (`elem` fst arrived98)) diffusionData.stable_chain_hashes
     putStrLn $ "Number of blocks that reached 98% stake: " ++ show (length $ fst arrived98)
-    putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ snd arrived98)
+    putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ 0 : snd arrived98)
     putStrLn $ "Blocks in longest common prefix that did not reach 98% stake: " ++ show missing
+    putStrLn $ "Average latencies by percentile"
+    putStrLn $ unlines $ map show $ Map.toList average_latencies
+    putStrLn $ "Average block fetch duration: " ++ show average_block_fetch_duration
+
+accumFetchRequests :: Map.Map ConcreteHeaderHash (Block BlockBody) -> Time -> PraosEvent -> Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime]) -> Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime])
+accumFetchRequests blocks (Time t) (PraosEventTcp (LabelLink from _to (TcpSendMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgRequestRange start end))))) _ _))) =
+  let
+    blks = fromMaybe undefined $ resolveRange' blocks start end
+   in
+    Map.insertWith
+      (Map.unionWith (++))
+      from
+      (Map.fromList $ map (\blk -> (blockHash @(Block BlockBody) blk, [t])) $ blks)
+accumFetchRequests _ _ _ = id
+
+accumReceived ::
+  Time ->
+  PraosEvent ->
+  Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime]) ->
+  Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime])
+accumReceived (Time t) (PraosEventNode (LabelNode nid (PraosNodeEventReceived block))) =
+  let
+    blks = [block]
+   in
+    Map.insertWith
+      (Map.unionWith (++))
+      nid
+      (Map.fromList $ map (\blk -> (blockHash @(Block BlockBody) blk, [t])) $ blks)
+accumReceived _ _ = id
+
+accumBlocks :: PraosEvent -> Blocks BlockBody -> Blocks BlockBody
+accumBlocks (PraosEventNode (LabelNode _nid (PraosNodeEventGenerate block))) = Map.insert (blockHash block) block
+accumBlocks _ = id
 
 accumCPUTasks :: Time -> PraosEvent -> Map.Map NodeId [(DiffTime, CPUTask)] -> Map.Map NodeId [(DiffTime, CPUTask)]
 accumCPUTasks (Time t) (PraosEventNode (LabelNode nId (PraosNodeEventCPU task))) = Map.insertWith (++) nId [(t, task)]
 accumCPUTasks _ _ = id
 
+convertConfig :: MessageSize body => OnDisk.Config -> PraosConfig body
+convertConfig disk = praos
+ where
+  durationMsToDiffTime (OnDisk.DurationMs d) = secondsToDiffTime $ d / 1000
+  praos =
+    PraosConfig
+      { blockFrequencyPerSlot = disk.rbGenerationProbability
+      , headerSize = fromIntegral disk.ibHeadSizeBytes
+      , bodySize = \_ -> fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
+      , bodyMaxSize = fromIntegral disk.rbBodyMaxSizeBytes
+      , blockValidationDelay = \(Block _ body) ->
+          durationMsToDiffTime $
+            disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant
+              + disk.rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte * fromIntegral (messageSizeBytes body)
+      , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , blockGenerationDelay = \_ ->
+          durationMsToDiffTime disk.rbGenerationCpuTimeMs
+      }
+
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
-  -- | number of close links
-  Int ->
-  -- | number of random links
-  Int ->
+  StdGen ->
+  Maybe OnDisk.Config ->
+  P2P.P2PNetwork ->
   -- | when to stop simulation.
   Time ->
   -- | file to write data to.
   FilePath ->
   IO ()
-example1000Diffusion clinks rlinks stop fp =
-  runSampleModel traceFile logEvent (diffusionSampleModel p2pTopographyCharacteristics p2pTopography fp) stop $
-    example1Trace rng 20 p2pTopography
+example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodes, p2pNodeStakes} stop fp
+  | length (List.group (Map.elems p2pNodeStakes)) /= 1 = error "Only uniform stake distribution supported for this sim."
+  | otherwise =
+      runSampleModel traceFile logEvent (diffusionSampleModel (P2P.networkToTopology p2pNetwork) fp) stop $
+        trace
  where
   asString x = x :: String
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventGenerate blk))) =
@@ -198,28 +284,49 @@ example1000Diffusion clinks rlinks stop fp =
   logEvent (PraosEventNode (LabelNode nid (PraosNodeEventCPU task))) =
     Just $
       object ["nid" .= nid, "tag" .= asString "cpu", "task" .= task]
+  logEvent (PraosEventTcp (LabelLink from to (TcpSendMsg msg _ _))) = do
+    ps <- logMsg msg
+    pure $ object $ ["tag" .= asString "Sent", "sender" .= from, "receipient" .= to] <> ps
   logEvent _ = Nothing
-  traceFile = dropExtension fp <.> "log"
-  rng = mkStdGen 42
-  p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng
-  p2pTopographyCharacteristics =
-    P2PTopographyCharacteristics
-      { p2pWorld =
-          World
-            { worldDimensions = (0.600, 0.300)
-            , worldShape = Cylinder
-            }
-      , p2pNumNodes = 1000
-      , p2pNodeLinksClose = clinks
-      , p2pNodeLinksRandom = rlinks
-      }
+  logMsg :: PraosMessage BlockBody -> Maybe [Pair]
+  logMsg ((PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
+    Just $ ["id" .= show (coerce @_ @Int hash)]
+  logMsg ((PraosMessage _)) = Nothing
 
-example1Trace :: StdGen -> DiffTime -> P2P.P2PTopography -> PraosTrace
-example1Trace rng0 blockInterval p2pTopography =
+  traceFile = dropExtension fp <.> "log"
+  blockInterval = 1 / praosConfig.blockFrequencyPerSlot
+  praosConfig = maybe defaultPraosConfig convertConfig cfg
+  -- PraosConfig
+  --               { headerValidationDelay = const 0.00141 -- benchmark data: noticed to fetch request
+  --               , blockValidationDelay = const 0.04453 -- benchmark data: fetched to sending
+  --               --                , blockValidationDelay = const 0.08589  -- benchmark data: fetched to adopted
+  --               }
+  p2pNumNodes = Map.size $ p2pNodes
+  trace =
+    tracePraosP2P
+      rng0
+      p2pNetwork
+      (\latency -> mkTcpConnProps latency . fromMaybe (error "Only finite bandwidth supported for this sim."))
+      ( \slotConfig nid rng ->
+          PraosNodeConfig
+            { blockGeneration =
+                PoissonGenerationPattern
+                  rng
+                  -- average seconds between blocks:
+                  (realToFrac blockInterval * fromIntegral p2pNumNodes)
+            , praosConfig
+            , blockMarker = BS8.pack $ show nid ++ ": "
+            , chain = Genesis
+            , slotConfig
+            }
+      )
+
+example1Trace :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> PraosTrace
+example1Trace rng0 praosConfig p2pNetwork@P2P.P2PNetwork{p2pNodes} =
   tracePraosP2P
     rng0
-    p2pTopography
-    (\latency -> mkTcpConnProps latency (kilobytes 1000))
+    p2pNetwork
+    (\latency -> mkTcpConnProps latency . fromMaybe undefined)
     ( \slotConfig nid rng ->
         PraosNodeConfig
           { blockGeneration =
@@ -228,13 +335,14 @@ example1Trace rng0 blockInterval p2pTopography =
                 -- average seconds between blocks:
                 (realToFrac blockInterval * fromIntegral p2pNumNodes)
           , slotConfig
-          , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 1 / realToFrac blockInterval}
+          , praosConfig
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
           }
     )
  where
-  p2pNumNodes = Map.size $ p2pNodes p2pTopography
+  blockInterval = 1 / praosConfig.blockFrequencyPerSlot
+  p2pNumNodes = Map.size p2pNodes
 
 example2 :: Visualization
 example2 =
@@ -296,8 +404,8 @@ example2 =
     trace =
       tracePraosP2P
         rng0
-        p2pTopography
-        (\latency -> mkTcpConnProps latency (kilobytes 1000))
+        (P2P.topologyToNetwork (Just (kilobytes 1000)) p2pTopography)
+        (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \slotConfig nid rng ->
             PraosNodeConfig
               { blockGeneration =
