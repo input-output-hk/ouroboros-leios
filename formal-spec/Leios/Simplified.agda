@@ -132,7 +132,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
-       nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
+       nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
 
   -- Network and Ledger
 
@@ -147,7 +147,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
            ; slot      = suc slot
            ; Upkeep    = ∅
            ; BaseState = bs'
-           } ↑ L.filter isValid? msgs
+           } ↑ L.filter (isValid? s) msgs
 
   Ftch :
        ────────────────────────────────────────────────────────

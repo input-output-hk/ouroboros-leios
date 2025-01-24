@@ -12,6 +12,7 @@ record IsBlock (B : Type) : Type where
   field slotNumber : B → ℕ
         producerID : B → PoolID
         lotteryPf  : B → VrfPf
+        signature  : B → Sig
 
   infix 4 _∈ᴮ_
 
@@ -51,7 +52,7 @@ record InputBlock : Type where
   open IBHeaderOSig header public
 
 instance
-  IsBlock-IBHeaderOSig : ∀ {b} → IsBlock (IBHeaderOSig b)
+  IsBlock-IBHeaderOSig : IsBlock IBHeader
   IsBlock-IBHeaderOSig = record { IBHeaderOSig }
 
   Hashable-IBBody : Hashable IBBody Hash
@@ -74,22 +75,6 @@ mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHea
 getIBRef : ⦃ Hashable IBHeader Hash ⦄ → InputBlock → IBRef
 getIBRef = hash ∘ InputBlock.header
 
--- TODO
-record ibHeaderValid (h : IBHeader) : Type where
-record ibBodyValid (b : IBBody) : Type where
-
-ibHeaderValid? : (h : IBHeader) → Dec (ibHeaderValid h)
-ibHeaderValid? _ = yes record {}
-
-ibBodyValid? : (b : IBBody) → Dec (ibBodyValid b)
-ibBodyValid? _ = yes record {}
-
-ibValid : InputBlock → Type
-ibValid record { header = h ; body = b } = ibHeaderValid h × ibBodyValid b
-
-ibValid? : (ib : InputBlock) → Dec (ibValid ib)
-ibValid? record { header = h ; body = b } = ibHeaderValid? h ×-dec ibBodyValid? b
-
 --------------------------------------------------------------------------------
 -- Endorser Blocks
 --------------------------------------------------------------------------------
@@ -110,8 +95,8 @@ instance
   Hashable-EndorserBlock .hash b = hash {T = PreEndorserBlock}
     record { EndorserBlockOSig b hiding (signature) ; signature = _ }
 
-  IsBlock-EndorserBlockOSig : ∀ {b} → IsBlock (EndorserBlockOSig b)
-  IsBlock-EndorserBlockOSig {b} = record { EndorserBlockOSig }
+  IsBlock-EndorserBlockOSig : IsBlock EndorserBlock
+  IsBlock-EndorserBlockOSig = record { EndorserBlockOSig }
 
 mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List IBRef → List EBRef → EndorserBlock
 mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
@@ -128,25 +113,11 @@ mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserB
 getEBRef : ⦃ Hashable PreEndorserBlock Hash ⦄ → EndorserBlock → EBRef
 getEBRef = hash
 
--- TODO
-record ebValid (eb : EndorserBlock) : Type where
---   field lotteryPfValid : {!!}
---         signatureValid : {!!}
---         ibRefsValid : {!!}
---         ebRefsValid : {!!}
-
-ebValid? : (eb : EndorserBlock) → Dec (ebValid eb)
-ebValid? _ = yes record {}
-
 --------------------------------------------------------------------------------
 -- Votes
 --------------------------------------------------------------------------------
 
--- TODO
-record vsValid (vs : List Vote) : Type where
 
-vsValid? : (vs : List Vote) → Dec (vsValid vs)
-vsValid? _ = yes record {}
 
 --------------------------------------------------------------------------------
 -- FFD for Leios Blocks
@@ -175,30 +146,6 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   match : Header → Body → Type
   match (ibHeader h) (ibBody b) = matchIB h b
   match _ _ = ⊥
-
-  headerValid : Header → Type
-  headerValid (ibHeader h) = ibHeaderValid h
-  headerValid (ebHeader h) = ebValid h
-  headerValid (vHeader h)  = vsValid h
-
-  headerValid? : (h : Header) → Dec (headerValid h)
-  headerValid? (ibHeader h) = ibHeaderValid? h
-  headerValid? (ebHeader h) = ebValid? h
-  headerValid? (vHeader h)  = vsValid? h
-
-  bodyValid : Body → Type
-  bodyValid (ibBody b) = ibBodyValid b
-
-  bodyValid? : (b : Body) → Dec (bodyValid b)
-  bodyValid? (ibBody b) = ibBodyValid? b
-
-  isValid : Header ⊎ Body → Type
-  isValid (inj₁ h) = headerValid h
-  isValid (inj₂ b) = bodyValid b
-
-  isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
-  isValid? (inj₁ h) = headerValid? h
-  isValid? (inj₂ b) = bodyValid? b
 
   -- can we express uniqueness wrt pipelines as a property?
   msgID : Header → ID

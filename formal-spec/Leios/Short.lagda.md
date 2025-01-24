@@ -85,7 +85,6 @@ module Protocol where
                   EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                   votes = map (vote sk-V ∘ hash) EBs'
             in
-            ∙ needsUpkeep V-Role
             ∙ canProduceV slot sk-V (stake s)
             ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
@@ -123,7 +122,7 @@ module Protocol where
          ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
          ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
          ────────────────────────────────────────────────────────────────
-         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs'
+         nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
 ```
 #### Network and Ledger
 ```agda
@@ -138,7 +137,7 @@ module Protocol where
              ; Ledger    = constructLedger rbs
              ; slot      = suc slot
              ; Upkeep    = ∅
-             } ↑ L.filter isValid? msgs
+             } ↑ L.filter (isValid? s) msgs
 ```
 ```agda
     Ftch :
