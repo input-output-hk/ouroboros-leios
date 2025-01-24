@@ -101,8 +101,8 @@ data DiffusionData = DiffusionData
   { topography_details :: P2PTopography
   , entries :: [DiffusionEntry]
   , latency_per_stake :: [LatencyPerStake]
+  -- ^ adoption latency, counted from slot start.
   , stable_chain_hashes :: [Int]
-  , cpuTasks :: Map.Map NodeId [(DiffTime, CPUTask)]
   , average_latencies :: Map.Map Double DiffTime
   }
   deriving (Generic, ToJSON, FromJSON)
@@ -111,16 +111,16 @@ diffusionEntryToLatencyPerStake :: Int -> DiffusionEntry -> LatencyPerStake
 diffusionEntryToLatencyPerStake nnodes DiffusionEntry{..} =
   LatencyPerStake
     { hash
-    , latencies = bin $ diffusionLatencyPerStakeFraction nnodes (Time created) (map Time arrivals)
+    , latencies = bin $ diffusionLatencyPerStakeFraction nnodes slotStart (map Time arrivals)
     }
  where
+  slotStart = Time $ fromIntegral @Integer $ floor created
   bins = [0.50, 0.8, 0.9, 0.92, 0.94, 0.96, 0.98, 1]
   bin xs = map (\b -> (,b) $ fst <$> listToMaybe (dropWhile (\(_, x) -> x < b) xs)) bins
 
 data DiffusionLatencyState = DiffusionLatencyState
   { chains :: !ChainsMap
   , diffusions :: !DiffusionLatencyMap
-  , cpuTasks :: !(Map.Map NodeId [(DiffTime, CPUTask)])
   , fetchRequests :: !(Map.Map NodeId (Map.Map (HeaderHash (Block BlockBody)) [DiffTime]))
   , receivedBodies :: !(Map.Map NodeId (Map.Map (HeaderHash (Block BlockBody)) [DiffTime]))
   , blocks :: !(Blocks BlockBody)
@@ -129,12 +129,11 @@ data DiffusionLatencyState = DiffusionLatencyState
 diffusionSampleModel :: P2PTopography -> FilePath -> SampleModel PraosEvent DiffusionLatencyState
 diffusionSampleModel p2pTopography fp = SampleModel initState accum render
  where
-  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+  initState = DiffusionLatencyState IMap.empty Map.empty Map.empty Map.empty Map.empty
   accum t e DiffusionLatencyState{..} =
     DiffusionLatencyState
       { chains = accumChains t e chains
       , diffusions = accumDiffusionLatency t e diffusions
-      , cpuTasks = accumCPUTasks t e cpuTasks
       , fetchRequests = accumFetchRequests blocks t e fetchRequests
       , receivedBodies = accumReceived t e receivedBodies
       , blocks = accumBlocks e blocks
@@ -187,7 +186,6 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
             , entries
             , latency_per_stake
             , stable_chain_hashes
-            , cpuTasks
             , average_latencies
             }
 
@@ -296,11 +294,6 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodes, p2pNodeStakes}
   traceFile = dropExtension fp <.> "log"
   blockInterval = 1 / praosConfig.blockFrequencyPerSlot
   praosConfig = maybe defaultPraosConfig convertConfig cfg
-  -- PraosConfig
-  --               { headerValidationDelay = const 0.00141 -- benchmark data: noticed to fetch request
-  --               , blockValidationDelay = const 0.04453 -- benchmark data: fetched to sending
-  --               --                , blockValidationDelay = const 0.08589  -- benchmark data: fetched to adopted
-  --               }
   p2pNumNodes = Map.size $ p2pNodes
   trace =
     tracePraosP2P
