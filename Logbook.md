@@ -12,6 +12,12 @@ The ["Fiat Accompli" sortition scheme](https://iohk.io/en/research/library/paper
 
 Having deterministically-chosen voters significantly reduces the size of Leios certificates because the $\sigma_\text{eid}$ signature (96 bytes each) do not need to be stored in the certificate for these voters. For example, for the recommended minimum Leios committee size of 500 votes, under scheme wFA the 406 block-producing nodes with the largest stake would always be included in the voting committee; approximately 88 voters would be selected at random to complete each voting committee.
 
+## 2025-01-24
+
+### Rust Simulation
+
+First pass of block-level visualization complete.
+
 ## 2025-01-23
 
 ### First analysis of downstream impacts of Leios
