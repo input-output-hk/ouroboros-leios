@@ -21,6 +21,11 @@ The extent of the downstream impacts strongly depends upon the APIs that the nod
 - now my current ΔQ model for IB diffusion does match (well enough) to both of them! Yeehah!
 - note that the Rust simulation does not include bandwidth effects while Haskell does, which incurs an additional 328ms network delay at each hop (at 1MB/s allocated bandwidth)
 
+### Rust Simulation
+
+- Updated existing topology files to bake latencies in, instead of computing on the fly based on locations.
+- Began putting together a block-level visualization in (addition to the graph view). This will be able to show the relationships between the different types of blocks (IBs/EBs/RBs), and demonstrate the benefits of Leios.
+
 ## 2025-01-22
 
 ### DeltaQ Update
@@ -35,6 +40,12 @@ The extent of the downstream impacts strongly depends upon the APIs that the nod
   - added block ID information to `InputBlockGenerated` and `InputBlockValidated` events of type `CpuTaskFinished`
   - used these to measure diffusion latencies
   - current finding is that diffusion is _waaay_ quicker than in Haskell, completing in under 1sec for 3000 nodes ⟹ pending further investigation
+
+## 2025-01-21
+
+### Rust Simulation
+
+Update simulation output to use "human readable" names from shared topology format. This should make it easier to compare output from different simulations, as now we can use common ids.
 
 ## 2025-01-19
 
