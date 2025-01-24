@@ -30,7 +30,6 @@ import qualified LeiosProtocol.Config as OnDisk
 import Network.TypedProtocol
 import P2P (P2PTopography, P2PTopographyCharacteristics (..), genArbitraryP2PTopography, p2pNodes)
 import PraosProtocol.BlockFetch
-import PraosProtocol.BlockGeneration (PacketGenerationPattern (..))
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode
@@ -263,7 +262,7 @@ example1000Diffusion ::
   -- | file to write data to.
   FilePath ->
   IO ()
-example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodes, p2pNodeStakes} stop fp
+example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCores} stop fp
   | length (List.group (Map.elems p2pNodeStakes)) /= 1 = error "Only uniform stake distribution supported for this sim."
   | otherwise =
       runSampleModel traceFile logEvent (diffusionSampleModel (P2P.networkToTopology p2pNetwork) fp) stop $
@@ -292,9 +291,8 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodes, p2pNodeStakes}
   logMsg ((PraosMessage _)) = Nothing
 
   traceFile = dropExtension fp <.> "log"
-  blockInterval = 1 / praosConfig.blockFrequencyPerSlot
   praosConfig = maybe defaultPraosConfig convertConfig cfg
-  p2pNumNodes = Map.size $ p2pNodes
+  stake nid = maybe undefined coerce $ Map.lookup nid p2pNodeStakes
   trace =
     tracePraosP2P
       rng0
@@ -302,40 +300,33 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodes, p2pNodeStakes}
       (\latency -> mkTcpConnProps latency . fromMaybe (error "Only finite bandwidth supported for this sim."))
       ( \slotConfig nid rng ->
           PraosNodeConfig
-            { blockGeneration =
-                PoissonGenerationPattern
-                  rng
-                  -- average seconds between blocks:
-                  (realToFrac blockInterval * fromIntegral p2pNumNodes)
-            , praosConfig
+            { rng
+            , praosConfig = praosConfig{blockFrequencyPerSlot = praosConfig.blockFrequencyPerSlot * stake nid}
             , blockMarker = BS8.pack $ show nid ++ ": "
             , chain = Genesis
             , slotConfig
+            , processingCores = fromMaybe undefined $ Map.lookup nid p2pNodeCores
             }
       )
 
 example1Trace :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> PraosTrace
-example1Trace rng0 praosConfig p2pNetwork@P2P.P2PNetwork{p2pNodes} =
+example1Trace rng0 praosConfig p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCores} =
   tracePraosP2P
     rng0
     p2pNetwork
     (\latency -> mkTcpConnProps latency . fromMaybe undefined)
     ( \slotConfig nid rng ->
         PraosNodeConfig
-          { blockGeneration =
-              PoissonGenerationPattern
-                rng
-                -- average seconds between blocks:
-                (realToFrac blockInterval * fromIntegral p2pNumNodes)
+          { rng
           , slotConfig
-          , praosConfig
+          , praosConfig = praosConfig{blockFrequencyPerSlot = praosConfig.blockFrequencyPerSlot * stake nid}
           , blockMarker = BS8.pack $ show nid ++ ": "
           , chain = Genesis
+          , processingCores = fromMaybe undefined $ Map.lookup nid p2pNodeCores
           }
     )
  where
-  blockInterval = 1 / praosConfig.blockFrequencyPerSlot
-  p2pNumNodes = Map.size p2pNodes
+  stake nid = maybe undefined coerce $ Map.lookup nid p2pNodeStakes
 
 example2 :: Visualization
 example2 =
@@ -401,15 +392,12 @@ example2 =
         (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \slotConfig nid rng ->
             PraosNodeConfig
-              { blockGeneration =
-                  PoissonGenerationPattern
-                    rng
-                    -- average seconds between blocks:
-                    (5 * fromIntegral p2pNumNodes)
-              , praosConfig = defaultPraosConfig
+              { rng
+              , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 5 / fromIntegral p2pNumNodes}
               , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "
+              , processingCores = Finite 1
               }
         )
     p2pTopography =

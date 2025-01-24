@@ -4,16 +4,20 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module LeiosProtocol.TaskMultiQueue where
+module TaskMultiQueue where
 
 import Control.Monad
+import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
+import Control.Monad.Class.MonadThrow
 import Control.Tracer
 import Data.Array
 import qualified Data.Map.Strict as Map
 import GHC.Natural
-import LeiosProtocol.Common
 import STMCompat
+import SimTypes
+import TimeCompat
+import WorkerPool
 
 type IsLabel lbl = (Ix lbl, Bounded lbl)
 
@@ -23,7 +27,7 @@ newTaskMultiQueue' :: (MonadSTM m, Ix l) => (l, l) -> Natural -> STM m (TaskMult
 newTaskMultiQueue' (a, b) n =
   TaskMultiQueue . listArray (a, b) <$> mapM (const $ newTBQueue n) (range (a, b))
 
-newTaskMultiQueue :: (MonadSTM m, IsLabel l) => Natural -> STM m (TaskMultiQueue l m)
+newTaskMultiQueue :: forall l m. (MonadSTM m, IsLabel l) => Natural -> STM m (TaskMultiQueue l m)
 newTaskMultiQueue = newTaskMultiQueue' (minBound, maxBound)
 
 writeTMQueue :: (MonadSTM m, IsLabel l) => TaskMultiQueue l m -> l -> (CPUTask, m ()) -> STM m ()
@@ -58,3 +62,22 @@ runInfParallelBlocking tracer mq = do
     forM_ (Map.toAscList tasksByEnd) $ \(end, ms) -> do
       waitUntil end
       sequence_ ms
+
+processCPUTasks ::
+  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m, MonadFork m, MonadAsync m, MonadCatch m, IsLabel lbl) =>
+  NumCores ->
+  Tracer m CPUTask ->
+  TaskMultiQueue lbl m ->
+  m ()
+processCPUTasks Infinite tracer queue = forever $ runInfParallelBlocking tracer queue
+processCPUTasks (Finite n) tracer queue = newBoundedWorkerPool n [taskSource l | l <- range (minBound, maxBound)]
+ where
+  taskSource l = do
+    (cpu, m) <- readTMQueue queue l
+    var <- newEmptyTMVar
+    let action = do
+          traceWith tracer cpu
+          threadDelay (cpuTaskDuration cpu)
+          m
+    -- TODO: read from var and log exception.
+    return $ Task action var

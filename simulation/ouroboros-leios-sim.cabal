@@ -61,7 +61,6 @@ library
     LeiosProtocol.Short.VizSim
     LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
-    LeiosProtocol.TaskMultiQueue
     LeiosProtocol.VizSimTestRelay
     ModelTCP
     JSONCompat
@@ -91,6 +90,7 @@ library
     STMCompat
     SimTCPLinks
     SimTypes
+    TaskMultiQueue
     TimeCompat
     Topology
     Viz
