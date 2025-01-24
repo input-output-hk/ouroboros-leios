@@ -185,13 +185,22 @@ isTopologyCoord2D v =
   case v of
     Object o ->
       case KeyMap.lookup "nodes" o of
-        Just (Array nodes) ->
-          case V.uncons nodes of
-            Just (Object node, _nodes) ->
-              KeyMap.member "location" node
-            _otherwise -> False
-        _otherwise -> False
-    _otherwise -> False
+        Just (Object nodes) ->
+          case KeyMap.elems nodes of
+            (Object node : _nodes) ->
+              case KeyMap.lookup "location" node of
+                Just loc
+                  | Json.Success{} <- Json.fromJSON @(Location 'COORD2D) loc ->
+                      True
+                Just loc
+                  | Json.Success{} <- Json.fromJSON @(Location 'CLUSTER) loc ->
+                      False
+                _otherwise ->
+                  error "Unrecognized location"
+            [] -> False
+            _otherwise -> error "Unrecognized topology.nodes contents"
+        _otherwise -> error "Unrecognized topology.nodes"
+    _otherwise -> error "Unrecognized topology"
 
 newtype Topology lk = Topology
   { nodes :: Map NodeName (Node lk)
