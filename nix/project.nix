@@ -9,42 +9,14 @@ let
       isCross = pkgs.stdenv.hostPlatform != pkgs.stdenv.buildPlatform;
     in
     {
-      src = ./dummy-project;
-
+      src = ../.;
       shell.withHoogle = false;
-
       inputMap = {
         "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
       };
-
       name = "ouroboros-leios";
-
       compiler-nix-name = lib.mkDefault "ghc96";
-
-      # flake.variants.profiled = {
-      #   modules = [{
-      #     enableProfiling = true;
-      #     enableLibraryProfiling = true;
-      #   }];
-      # };
-
-      # flake.variants.ghc928 = {
-      #   compiler-nix-name = "ghc928";
-      # };
-
-      # flake.variants.ghc8107 = {
-      #   compiler-nix-name = "ghc8107";
-      # };
-
-      modules =
-        [
-          {
-            packages = { };
-          }
-          {
-            packages = { };
-          }
-        ];
+      # modules = [{ packages = { }; } { packages = { }; } ];
     });
 
 
