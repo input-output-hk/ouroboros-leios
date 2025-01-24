@@ -1,4 +1,4 @@
-import { EMessageType, IServerMessage } from "@/components/Graph/types";
+import { EMessageType, IServerMessage } from "@/components/Sim/types";
 import { createReadStream, statSync } from "fs";
 import readline from "readline";
 
@@ -85,11 +85,19 @@ export const processMessage = (
       message.producer.toString(),
       "pbGenerated",
     );
-    aggregatedData.global.praosTxOnChain += message.transactions.length;
+    const praosTx = message.transactions.length;
+    let leiosTx = 0;
     if (message.endorsement != null) {
       let eb = message.endorsement.eb.id;
-      aggregatedData.global.leiosTxOnChain += intermediate.txsPerEb.get(eb) ?? 0;
+      leiosTx += intermediate.txsPerEb.get(eb) ?? 0;
     }
+    aggregatedData.global.praosTxOnChain += praosTx;
+    aggregatedData.global.leiosTxOnChain += leiosTx;
+    aggregatedData.blocks.push({
+      slot: message.slot,
+      praosTx,
+      leiosTx,
+    });
   } else if (message.type === EMessageType.PraosBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,

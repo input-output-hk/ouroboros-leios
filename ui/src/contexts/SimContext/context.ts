@@ -10,6 +10,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
     praosTxOnChain: 0,
     leiosTxOnChain: 0,
   },
+  blocks: [],
   lastNodesUpdated: []
 };
 

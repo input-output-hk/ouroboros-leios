@@ -7,15 +7,15 @@ import {
   useRef
 } from "react";
 
-import { IGraphWrapperProps } from "@/components/Graph/GraphWapper";
+import { ISimWrapperProps } from "@/components/Sim/SimWrapper";
 import {
   ITransformedNodeMap
-} from "@/components/Graph/types";
+} from "@/components/Sim/types";
 import { defaultState, SimContext } from "./context";
 import { reducer } from "./reducer";
 
 export const SimContextProvider: FC<
-  PropsWithChildren<IGraphWrapperProps>
+  PropsWithChildren<ISimWrapperProps>
 > = ({ children, topography, maxTime }) => {
   const defaultSyncedState = useMemo(() => {
     const transformedTopography: ITransformedNodeMap = {

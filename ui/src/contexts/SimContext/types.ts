@@ -1,6 +1,6 @@
 import {
   ITransformedNodeMap
-} from "@/components/Graph/types";
+} from "@/components/Sim/types";
 import { Dispatch, RefObject } from "react";
 
 export enum ESpeedOptions {
@@ -47,10 +47,17 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
+export interface ISimulationBlock {
+  slot: number;
+  praosTx: number;
+  leiosTx: number;
+}
+
 export interface ISimulationAggregatedDataState {
   progress: number;
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
+  blocks: ISimulationBlock[],
   lastNodesUpdated: string[];
 }
 
