@@ -7,15 +7,20 @@ import {
   useRef
 } from "react";
 
-import { ISimWrapperProps } from "@/components/Sim/SimWrapper";
 import {
+  IServerNodeMap,
   ITransformedNodeMap
 } from "@/components/Sim/types";
 import { defaultState, SimContext } from "./context";
 import { reducer } from "./reducer";
 
+export interface ISimContextProviderProps {
+  topography: IServerNodeMap;
+  maxTime: number;
+}
+
 export const SimContextProvider: FC<
-  PropsWithChildren<ISimWrapperProps>
+  PropsWithChildren<ISimContextProviderProps>
 > = ({ children, topography, maxTime }) => {
   const defaultSyncedState = useMemo(() => {
     const transformedTopography: ITransformedNodeMap = {

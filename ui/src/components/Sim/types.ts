@@ -157,7 +157,7 @@ export interface IEndorserBlockGenerated {
   id: string;
   slot: number;
   producer: number;
-  input_blocks: IInputBlock[] // @todo
+  input_blocks: IInputBlock[]
 }
 
 export interface IInputBlock {

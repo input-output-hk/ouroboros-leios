@@ -18,6 +18,10 @@ export const Controls: FC = memo(() => {
           ...state.graph,
           currentNode: undefined,
         },
+        blocks: {
+          ...state.blocks,
+          currentBlock: undefined,
+        },
         aggregatedData: defaultAggregatedData,
       },
     });

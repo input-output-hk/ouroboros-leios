@@ -1,7 +1,7 @@
 "use client";
 import { DEFAULT_SCALE } from "@/app/constants";
 import { Context, createContext, useContext } from "react";
-import { ISimContext, ISimContextState, ISimulationAggregatedDataState } from "./types";
+import { ISimContext, ISimContextState, ISimulationAggregatedDataState, Tab } from "./types";
 
 export const defaultAggregatedData: ISimulationAggregatedDataState = {
   progress: 0,
@@ -21,6 +21,8 @@ export const defaultState: ISimContextState = {
     canvasOffsetY: 0,
     canvasScale: DEFAULT_SCALE,
   },
+  blocks: {},
+  activeTab: Tab.Graph,
   batchSize: 5000,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,

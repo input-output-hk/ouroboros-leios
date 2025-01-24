@@ -109,12 +109,9 @@ export const useHandlers = () => {
 
   const handleResetSim = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
 
-    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
-    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
+    const width = canvas?.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas?.parentElement?.getBoundingClientRect().height || 800;
     const { offsetX, offsetY } = getOffsetCoordinates(
       topography,
       width,
@@ -132,6 +129,9 @@ export const useHandlers = () => {
           canvasOffsetX: offsetX,
           canvasOffsetY: offsetY,
           canvasScale: DEFAULT_SCALE,
+        },
+        blocks: {
+          currentBlock: undefined,
         }
       },
     });

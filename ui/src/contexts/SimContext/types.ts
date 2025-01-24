@@ -47,10 +47,25 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
+export interface ISimulationTransaction {
+  id: number;
+  bytes: number;
+}
+
+export interface ISimulationInputBlock {
+  id: string;
+  txs: ISimulationTransaction[];
+}
+
+export interface ISimulationEndorsementBlock {
+  id: string;
+  ibs: ISimulationInputBlock[];
+}
+
 export interface ISimulationBlock {
   slot: number;
-  praosTx: number;
-  leiosTx: number;
+  txs: ISimulationTransaction[];
+  endorsement: ISimulationEndorsementBlock | null;
 }
 
 export interface ISimulationAggregatedDataState {
@@ -62,8 +77,9 @@ export interface ISimulationAggregatedDataState {
 }
 
 export interface ISimulationIntermediateDataState {
-  txsPerIb: Map<string, number>;
-  txsPerEb: Map<string, number>;
+  txs: ISimulationTransaction[];
+  ibTxs: Map<string, number[]>;
+  ebIbs: Map<string, string[]>;
 }
 
 export interface IGraphContextState {
@@ -74,8 +90,19 @@ export interface IGraphContextState {
   currentNode?: string;
 }
 
+export interface IBlocksContextState {
+  currentBlock?: number;
+}
+
+export enum Tab {
+  Graph,
+  Blocks,
+}
+
 export interface ISimContextState {
   graph: IGraphContextState;
+  blocks: IBlocksContextState;
+  activeTab: Tab;
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
   topography: ITransformedNodeMap;
@@ -84,7 +111,9 @@ export interface ISimContextState {
 }
 
 export type TSimContextActions =
+  | { type: "SET_ACTIVE_TAB"; payload: Tab }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
+  | { type: "SET_CURRENT_BLOCK"; payload: number | undefined }
   | { type: "SET_BATCH_SIZE"; payload: number }
   | {
     type: "SET_CANVAS_PROPS"; payload: Partial<{

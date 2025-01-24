@@ -1,24 +1,14 @@
 "use client";
 
-import { SimContextProvider } from "@/contexts/SimContext/SimContextProvider";
-import { FC, useState } from "react";
+import { useSimContext } from "@/contexts/SimContext/context";
+import { Tab } from "@/contexts/SimContext/types";
+import { FC, useCallback } from "react";
 import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
 import { BatchSize } from "./modules/BatchSize";
 import { Controls } from "./modules/Controls";
 import { Progress } from "./modules/Slider";
 import { Stats } from "./modules/Stats";
-import { IServerNodeMap } from "./types";
-
-export interface ISimWrapperProps {
-  topography: IServerNodeMap;
-  maxTime: number;
-}
-
-enum Tab {
-  Graph,
-  Blocks,
-}
 
 interface ITabButtonProps {
   name: string;
@@ -31,13 +21,20 @@ const TabButton: FC<ITabButtonProps> = ({ name, active, onClick }) => {
   return <button className={`${color} text-white rounded-md px-4 py-2`} onClick={onClick}>{name}</button>
 }
 
-export const SimWrapper: FC<ISimWrapperProps> = ({
-  maxTime,
-  topography,
+export const SimWrapper: FC = ({
 }) => {
-  const [activeTab, setActiveTab] = useState(Tab.Graph);
+  const {
+    state: {
+      activeTab,
+      blocks: {
+        currentBlock,
+      }
+    },
+    dispatch
+  } = useSimContext();
+  const setActiveTab = useCallback((tab: Tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }), [dispatch]);
   return (
-    <SimContextProvider maxTime={maxTime} topography={topography}>
+    <>
       <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
         <Stats />
       </div>
@@ -47,7 +44,7 @@ export const SimWrapper: FC<ISimWrapperProps> = ({
         <div className="absolute top-10 w-full">
           <div className="flex justify-center gap-4 min-w-[200px]">
             <TabButton name="Graph" active={activeTab == Tab.Graph} onClick={() => setActiveTab(Tab.Graph)} />
-            <TabButton name="Blocks" active={activeTab == Tab.Blocks} onClick={() => setActiveTab(Tab.Blocks)} />
+            <TabButton name="Blocks" active={activeTab == Tab.Blocks && currentBlock === undefined} onClick={() => setActiveTab(Tab.Blocks)} />
           </div>
         </div>
         <div className="absolute bottom-12 w-full">
@@ -60,6 +57,6 @@ export const SimWrapper: FC<ISimWrapperProps> = ({
           </div>
         </div>
       </div>
-    </SimContextProvider>
+    </>
   );
 };

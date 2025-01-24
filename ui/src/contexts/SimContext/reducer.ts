@@ -6,12 +6,31 @@ export const reducer = (
   action: TSimContextActions,
 ): ISimContextState => {
   switch (action.type) {
+    case "SET_ACTIVE_TAB": {
+      return {
+        ...state,
+        activeTab: action.payload,
+        blocks: {
+          currentBlock: undefined
+        }
+      }
+    }
+
     case "SET_CURRENT_NODE": {
       return {
         ...state, graph: {
           ...state.graph,
           currentNode: action.payload
         },
+      }
+    }
+
+    case "SET_CURRENT_BLOCK": {
+      return {
+        ...state, blocks: {
+          ...state.blocks,
+          currentBlock: action.payload
+        }
       }
     }
 

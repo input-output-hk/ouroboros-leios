@@ -105,8 +105,9 @@ export async function GET(req: Request, res: Response) {
           lastNodesUpdated: [],
         };
         const intermediate: ISimulationIntermediateDataState = {
-          txsPerIb: new Map(),
-          txsPerEb: new Map(),
+          txs: [],
+          ibTxs: new Map(),
+          ebIbs: new Map(),
         };
 
         interval = setInterval(() => {

@@ -5,6 +5,7 @@ import readline from "readline";
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
+  ISimulationBlock,
   ISimulationIntermediateDataState,
 } from "@/contexts/SimContext/types";
 
@@ -48,6 +49,7 @@ export const processMessage = (
       message.publisher.toString(),
       "txGenerated",
     );
+    intermediate.txs.push({ id: Number(message.id), bytes: message.bytes });
   } else if (message.type === EMessageType.TransactionSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -66,7 +68,7 @@ export const processMessage = (
       message.producer.toString(),
       "ibGenerated",
     );
-    intermediate.txsPerIb.set(message.id, message.transactions.length);
+    intermediate.ibTxs.set(message.id, message.transactions);
   } else if (message.type === EMessageType.InputBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -85,19 +87,33 @@ export const processMessage = (
       message.producer.toString(),
       "pbGenerated",
     );
+    const block: ISimulationBlock = {
+      slot: message.slot,
+      txs: message.transactions.map(id => intermediate.txs[id]),
+      endorsement: null,
+    };
     const praosTx = message.transactions.length;
     let leiosTx = 0;
     if (message.endorsement != null) {
-      let eb = message.endorsement.eb.id;
-      leiosTx += intermediate.txsPerEb.get(eb) ?? 0;
+      const eb = message.endorsement.eb.id;
+      const ibIds = intermediate.ebIbs.get(eb) ?? [];
+      const ibs = ibIds.map(id => {
+        const txIds = intermediate.ibTxs.get(id) ?? [];
+        leiosTx += txIds.length;
+        const txs = txIds.map(tx => intermediate.txs[tx]);
+        return {
+          id,
+          txs,
+        };
+      })
+      block.endorsement = {
+        id: eb,
+        ibs,
+      }
     }
     aggregatedData.global.praosTxOnChain += praosTx;
     aggregatedData.global.leiosTxOnChain += leiosTx;
-    aggregatedData.blocks.push({
-      slot: message.slot,
-      praosTx,
-      leiosTx,
-    });
+    aggregatedData.blocks.push(block);
   } else if (message.type === EMessageType.PraosBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -116,10 +132,8 @@ export const processMessage = (
       message.producer.toString(),
       "ebGenerated",
     );
-    const txs = message.input_blocks
-      .map(ib => intermediate.txsPerIb.get(ib.id) ?? 0)
-      .reduce((p, c) => p + c, 0);
-    intermediate.txsPerEb.set(message.id, txs);
+    const ibs = message.input_blocks.map(ib => ib.id);
+    intermediate.ebIbs.set(message.id, ibs);
   } else if (message.type === EMessageType.EndorserBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
