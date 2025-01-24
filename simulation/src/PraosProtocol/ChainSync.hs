@@ -152,7 +152,7 @@ data ChainConsumerState m = ChainConsumerState
   }
 
 runChainConsumer ::
-  (MonadSTM m, MonadDelay m) =>
+  MonadSTM m =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   Chan m ChainSyncMessage ->
@@ -165,7 +165,7 @@ type ChainConsumer st m a = TC.Client ChainSyncState 'NonPipelined st m a
 
 chainConsumer ::
   forall m body.
-  (MonadSTM m, MonadDelay m) =>
+  MonadSTM m =>
   Tracer m (PraosNodeEvent body) ->
   PraosConfig body ->
   ChainConsumerState m ->

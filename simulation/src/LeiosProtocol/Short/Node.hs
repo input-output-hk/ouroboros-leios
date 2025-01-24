@@ -24,7 +24,7 @@ import Control.Monad.Class.MonadThrow
 import Control.Tracer
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
-import Data.Ix (Ix, range)
+import Data.Ix (Ix)
 import Data.List (sort, sortOn)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -39,7 +39,6 @@ import qualified LeiosProtocol.RelayBuffer as RB
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Generate
 import qualified LeiosProtocol.Short.Generate as Generate
-import LeiosProtocol.TaskMultiQueue
 import Numeric.Natural (Natural)
 import PraosProtocol.BlockFetch (
   BlockFetchControllerState (blocksVar),
@@ -51,7 +50,7 @@ import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
 import SimTypes (cpuTask)
 import System.Random
-import WorkerPool
+import TaskMultiQueue
 
 --------------------------------------------------------------
 ---- Events
@@ -99,9 +98,9 @@ data LeiosNodeState m = LeiosNodeState
   , relayVoteState :: !(RelayVoteState m)
   , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId UTCTime))
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
-  , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [m ()]))
+  , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
   -- ^ waiting for RB block itself to be validated.
-  , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [m ()]))
+  , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
   -- ^ waiting for ledger state of RB block to be validated.
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
@@ -400,25 +399,6 @@ leiosNode tracer cfg followers peers = do
       , pruningThreads
       ]
 
-processCPUTasks ::
-  (MonadSTM m, MonadDelay m, MonadMonotonicTimeNSec m, MonadFork m, MonadAsync m, MonadCatch m) =>
-  NumCores ->
-  Tracer m CPUTask ->
-  TaskMultiQueue LeiosNodeTask m ->
-  m ()
-processCPUTasks Infinite tracer queue = forever $ runInfParallelBlocking tracer queue
-processCPUTasks (Finite n) tracer queue = newBoundedWorkerPool n [taskSource l | l <- range (minBound, maxBound)]
- where
-  taskSource l = do
-    (cpu, m) <- readTMQueue queue l
-    var <- newEmptyTMVar
-    let action = do
-          traceWith tracer cpu
-          threadDelay (cpuTaskDuration cpu)
-          m
-    -- TODO: read from var and log exception.
-    return $ Task action var
-
 computeLedgerStateThread ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -456,7 +436,7 @@ dispatchValidation ::
 dispatchValidation tracer cfg leiosState req =
   atomically $ mapM_ (uncurry $ writeTMQueue leiosState.taskQueue) =<< go req
  where
-  queue = atomically . mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
+  queue = mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
   labelTask (tag, (f, m)) = let !task = f (show tag) in (tag, (task, m))
   valRB rb m = do
     let task prefix = cpuTask prefix cfg.leios.praos.blockValidationDelay rb
@@ -561,7 +541,7 @@ generator tracer cfg st = do
           atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
-  blockGenerator $ BlockGeneratorConfig{submit = mapM_ submitOne, ..}
+  leiosBlockGenerator $ LeiosGeneratorConfig{submit = mapM_ submitOne, ..}
 
 mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> BuffersView m
 mkBuffersView cfg st = BuffersView{..}
