@@ -1,4 +1,6 @@
-use crate::models::Topology;
+use crate::models::{Node, Topology};
+use delta_q::CDF;
+use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct NetworkStats {
@@ -266,7 +268,47 @@ pub struct HopStats {
     pub latencies: Vec<f64>,
 }
 
-pub fn analyze_hop_stats(topology: &Topology, start_node: &str) -> Vec<HopStats> {
+pub struct ReversedTopology {
+    pub nodes: IndexMap<String, Node>,
+}
+
+/// Reverses the topology by swapping the source and destination of each connection
+pub fn reverse_topology(topology: &Topology) -> ReversedTopology {
+    // Start by creating reversed nodes with the same nodes but empty producers
+    let mut reversed_nodes: IndexMap<String, Node> = topology
+        .nodes
+        .iter()
+        .map(|(node_name, node)| {
+            (
+                node_name.clone(),
+                Node {
+                    location: node.location.clone(),
+                    stake: node.stake,
+                    cpu_core_count: node.cpu_core_count,
+                    producers: IndexMap::new(),
+                },
+            )
+        })
+        .collect();
+
+    // For each node in the original topology, reverse the edges
+    for (node_name, node) in &topology.nodes {
+        for (producer_name, producer) in &node.producers {
+            // In the reversed topology, add a connection from producer_name to node_name
+            reversed_nodes
+                .get_mut(producer_name)
+                .expect("Producer node doesn't exist in the topology")
+                .producers
+                .insert(node_name.clone(), producer.clone());
+        }
+    }
+
+    ReversedTopology {
+        nodes: reversed_nodes,
+    }
+}
+
+pub fn analyze_hop_stats(topology: &ReversedTopology, start_node: &str) -> Vec<HopStats> {
     let mut hop_stats = Vec::new();
     let mut visited = HashSet::new();
 
@@ -317,6 +359,87 @@ pub fn analyze_hop_stats(topology: &Topology, start_node: &str) -> Vec<HopStats>
     }
 
     hop_stats
+}
+
+#[derive(Debug)]
+pub struct AllPathStats {
+    pub reached_min: f32,
+    pub reached_avg: f32,
+    pub reached_max: f32,
+    pub latency_min: CDF,
+    pub latency_avg: CDF,
+    pub latency_max: CDF,
+    inputs: f32,
+    latencies: f32,
+}
+
+impl AllPathStats {
+    pub fn new_with_empty(n: usize) -> Self {
+        let reached_min = if n == 0 { f32::INFINITY } else { 0.0 };
+        Self {
+            reached_min,
+            reached_avg: 0.0,
+            reached_max: 0.0,
+            latency_min: CDF::top(),
+            latency_avg: CDF::default(),
+            latency_max: CDF::bottom(),
+            inputs: n as f32,
+            latencies: 0.0,
+        }
+    }
+
+    pub fn add_hop_stats(&mut self, mut hop_stats: HopStats) {
+        let reached = hop_stats.latencies.len() as f32;
+        hop_stats.latencies.sort_by(|a, b| a.total_cmp(b));
+        let scale = 1.0 / reached as f32;
+        let latency = hop_stats
+            .latencies
+            .into_iter()
+            .enumerate()
+            .map(|(i, l)| (l as f32, (i as f32 + 1.0) * scale))
+            .collect::<CDF>();
+
+        self.reached_min = f32::min(self.reached_min, reached);
+        self.reached_avg = (self.reached_avg * self.inputs + reached) / (self.inputs + 1.0);
+        self.reached_max = f32::max(self.reached_max, reached);
+        self.inputs += 1.0;
+
+        self.latency_min = self.latency_min.min(&latency);
+        self.latency_avg = self
+            .latency_avg
+            .choice(self.latencies / (self.latencies + 1.0), &latency)
+            .expect("Failed to add latency");
+        self.latency_max = self.latency_max.max(&latency);
+        self.latencies += 1.0;
+    }
+
+    pub fn add_hop_reached(&mut self, reached: f32) {
+        self.reached_min = f32::min(self.reached_min, reached);
+        self.reached_avg = (self.reached_avg * self.inputs + reached) / (self.inputs + 1.0);
+        self.reached_max = f32::max(self.reached_max, reached);
+        self.inputs += 1.0;
+    }
+}
+
+/// This function analyzes the topology by
+/// - getting the hop state for each node
+/// - folding the contained per-hop stats into an AllPathStats aggregation
+pub fn analyze_all_paths(topology: &Topology) -> Vec<AllPathStats> {
+    let reversed_topology = reverse_topology(topology);
+    let mut all_path_stats = Vec::<AllPathStats>::new();
+    for (idx, node) in reversed_topology.nodes.keys().enumerate() {
+        let hop_stats = analyze_hop_stats(&reversed_topology, node);
+        for idx in hop_stats.len()..all_path_stats.len() {
+            all_path_stats[idx].add_hop_reached(0.0);
+        }
+        for hop_stats in hop_stats {
+            if all_path_stats.len() <= hop_stats.hop_number {
+                all_path_stats.push(AllPathStats::new_with_empty(idx));
+            }
+            all_path_stats[hop_stats.hop_number].add_hop_stats(hop_stats);
+        }
+    }
+    all_path_stats
 }
 
 #[cfg(test)]
@@ -459,6 +582,10 @@ mod tests {
     #[test]
     fn test_hop_analysis() {
         let topology = create_test_topology();
+        // test topology is already reversed
+        let topology = ReversedTopology {
+            nodes: topology.nodes,
+        };
         let hop_stats = analyze_hop_stats(&topology, "node1");
 
         // Should have 3 hops total:
@@ -516,7 +643,7 @@ mod tests {
             },
         );
 
-        let topology = Topology { nodes };
+        let topology = ReversedTopology { nodes };
         let hop_stats = analyze_hop_stats(&topology, "node1");
 
         // Should only have hop 0 with the start node
@@ -595,7 +722,7 @@ mod tests {
             },
         );
 
-        let topology = Topology { nodes };
+        let topology = ReversedTopology { nodes };
         let hop_stats = analyze_hop_stats(&topology, "node1");
 
         // Should have 3 hops:

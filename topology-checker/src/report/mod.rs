@@ -1,9 +1,10 @@
+use crate::analysis::{analyze_all_paths, reverse_topology};
 use crate::analysis::{
     analyze_network_stats, analyze_stake_distribution, basic::analyze_hop_stats,
     check_triangle_inequality,
 };
 use crate::models::{Severity, Topology};
-
+use std::fmt::Write;
 pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&str>) -> String {
     let mut report = String::new();
     let mut issues = Vec::new();
@@ -137,7 +138,7 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
 
     // Add hop analysis section if a start node is provided
     if let Some(node) = start_node {
-        let hop_stats = analyze_hop_stats(topology, node);
+        let hop_stats = analyze_hop_stats(&reverse_topology(topology), node);
 
         report.push_str("\n### Raw Latencies per Hop\n\n");
         for stats in &hop_stats {
@@ -171,6 +172,23 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
                 report.push_str(&format!("({}, {})", x, y));
             }
             report.push_str("]\n\n");
+        }
+    } else {
+        let all_path_stats = analyze_all_paths(topology);
+        report.push_str("## All Paths Analysis\n\n");
+        report.push_str("| Hop |  Min  |  Avg  |  Max  |\n");
+        report.push_str("|-----|-------|-------|-------|\n");
+        for (idx, stats) in all_path_stats.iter().enumerate() {
+            report.push_str(&format!(
+                "| {:3} | {:5.2} | {:5.2} | {:5.2} |\n",
+                idx, stats.reached_min, stats.reached_avg, stats.reached_max
+            ));
+        }
+        report.push_str("\n");
+        for (idx, stats) in all_path_stats.iter().enumerate() {
+            writeln!(report, "hop{idx}_min := {}", stats.latency_min).ok();
+            writeln!(report, "hop{idx}_avg := {}", stats.latency_avg).ok();
+            writeln!(report, "hop{idx}_max := {}", stats.latency_max).ok();
         }
     }
 

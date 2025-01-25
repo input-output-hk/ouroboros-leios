@@ -14,7 +14,7 @@ pub struct Issue {
     pub suggestion: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 #[allow(dead_code)]
 pub enum Location {
@@ -22,7 +22,7 @@ pub enum Location {
     Coordinates([f64; 2]),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Producer {
     #[serde(rename = "latency-ms")]
     pub latency_ms: f64,
