@@ -103,6 +103,8 @@ data DiffusionData = DiffusionData
   -- ^ adoption latency, counted from slot start.
   , stable_chain_hashes :: [Int]
   , average_latencies :: Map.Map Double DiffTime
+  , average_block_fetch_duration :: DiffTime
+  -- ^ for comparison with benchmark cluster measurement.
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -165,7 +167,7 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
               | l <- latency_per_stake
               , (Just d, p) <- l.latencies
               ]
-    let timesDiff [t0] [t1] = (realToFrac t1 - realToFrac t0 :: Pico)
+    let timesDiff [t0] [t1] = realToFrac t1 - realToFrac t0 :: Pico
         timesDiff _ _ = undefined
     let durations =
           Map.intersectionWith
@@ -174,11 +176,11 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
             fetchRequests
             receivedBodies
     let average_block_fetch_duration =
-          avg $
-            concatMap Map.elems $
-              Map.elems $
-                durations ::
-            Pico
+          realToFrac $
+            avg $
+              concatMap Map.elems $
+                Map.elems $
+                  durations
     let diffusionData =
           DiffusionData
             { topography_details = p2pTopography
@@ -186,18 +188,21 @@ diffusionSampleModel p2pTopography fp = SampleModel initState accum render
             , latency_per_stake
             , stable_chain_hashes
             , average_latencies
+            , average_block_fetch_duration
             }
 
     encodeFile fp diffusionData
+    report diffusionData
+  report diffusionData = do
     putStrLn $ "Diffusion data written to " ++ fp
     let arrived98 = unzip [(l.hash, d) | l <- diffusionData.latency_per_stake, (Just d, p) <- l.latencies, p == 0.98]
     let missing = filter (not . (`elem` fst arrived98)) diffusionData.stable_chain_hashes
     putStrLn $ "Number of blocks that reached 98% stake: " ++ show (length $ fst arrived98)
-    putStrLn $ "with a maximum diffusion latency: " ++ show (maximum $ 0 : snd arrived98)
+    putStrLn $ "with a maximum diffusion latency (from slot start): " ++ show (maximum $ 0 : snd arrived98)
     putStrLn $ "Blocks in longest common prefix that did not reach 98% stake: " ++ show missing
-    putStrLn $ "Average latencies by percentile"
-    putStrLn $ unlines $ map show $ Map.toList average_latencies
-    putStrLn $ "Average block fetch duration: " ++ show average_block_fetch_duration
+    putStrLn $ "Average latencies (from slot start) by percentile"
+    putStrLn $ unlines $ map show $ Map.toList diffusionData.average_latencies
+    putStrLn $ "Average block fetch duration: " ++ show diffusionData.average_block_fetch_duration
 
 accumFetchRequests :: Map.Map ConcreteHeaderHash (Block BlockBody) -> Time -> PraosEvent -> Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime]) -> Map.Map NodeId (Map.Map ConcreteHeaderHash [DiffTime])
 accumFetchRequests blocks (Time t) (PraosEventTcp (LabelLink from _to (TcpSendMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgRequestRange start end))))) _ _))) =
