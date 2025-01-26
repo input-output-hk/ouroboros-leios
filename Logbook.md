@@ -1,5 +1,26 @@
 # Leios logbook
 
+## 2025-01-26
+
+### Haskell Simulation
+
+- Leios and praos simulations can now read parameters and topologies
+  from disk using the agreed upon formats.
+- Added `generate-topology` command to output randomly generated
+  topologies (given some characteristics).
+- Aligned leios sortition to algorithms in sortition benchmarks and
+  technical report.
+- Discussed IB diffusion protocol and analysis of topologies with DeltaQ team.
+- Drafted report on comparison between praos simulation and benchmark
+  cluster, average adoption times from simulation are slower but
+  within 10% of measured, see PR #171 for details. Note: a review of
+  the simulation parameters is still pending.
+
+Nest steps:
+- Generate topologies where block producers are behind relays.
+- Start work on comparison with idealized diffusion model.
+- Run leios simulations configured for higher thoughput.
+
 ## 2025-01-24
 
 ### Analysis of "Fiat Accompli" sortition
