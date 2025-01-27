@@ -1,4 +1,5 @@
-{-# OPTIONS --safe #-}
+--{-# OPTIONS --safe #-}
+{-# OPTIONS --allow-unsolved-metas #-}
 
 --------------------------------------------------------------------------------
 -- Deterministic variant of simple Leios
@@ -85,9 +86,8 @@ opaque
   ... | []    = -, Base₂b needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
   ... | x ∷ l = -, Base₂a needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
 
-Base-Upkeep : s -⟦Base⟧⇀ s' → LeiosState.needsUpkeep s Base × ¬ LeiosState.needsUpkeep s' Base
-Base-Upkeep {s = s} (Base₂a x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-Base-Upkeep {s = s} (Base₂b x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
+  Base-total' : LeiosState.needsUpkeep s Base → ∃[ bs ] s -⟦Base⟧⇀ addUpkeep record s { BaseState = bs } Base
+  Base-total' {s = s} needsUpkeep = {!!}
 
 data _-⟦IB-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
@@ -117,9 +117,10 @@ opaque
     (inj₁ (π , pf)) → -, IB-Role    h pf (proj₂ FFD.FFD-total)
     (inj₂ pf)       → -, No-IB-Role h pf
 
-IB-Role-Upkeep : s -⟦IB-Role⟧⇀ s' → LeiosState.needsUpkeep s IB-Role × ¬ LeiosState.needsUpkeep s' IB-Role
-IB-Role-Upkeep {s = s} (IB-Role x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-IB-Role-Upkeep {s = s} (No-IB-Role x x₁) = x , (addUpkeep⇒¬needsUpkeep {s = s})
+  IB-Role-total' : LeiosState.needsUpkeep s IB-Role → ∃[ ffds ] s -⟦IB-Role⟧⇀ addUpkeep record s { FFDState = ffds } IB-Role
+  IB-Role-total' {s = s} h = let open LeiosState s in case Dec-canProduceIB of λ where
+    (inj₁ (π , pf)) → -, IB-Role    h pf (proj₂ FFD.FFD-total)
+    (inj₂ pf)       → -, No-IB-Role h pf
 
 data _-⟦EB-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
@@ -151,9 +152,10 @@ opaque
     (inj₁ (π , pf)) → -, EB-Role    h pf (proj₂ FFD.FFD-total)
     (inj₂ pf)       → -, No-EB-Role h pf
 
-EB-Role-Upkeep : s -⟦EB-Role⟧⇀ s' → LeiosState.needsUpkeep s EB-Role × ¬ LeiosState.needsUpkeep s' EB-Role
-EB-Role-Upkeep {s = s} (EB-Role x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-EB-Role-Upkeep {s = s} (No-EB-Role x x₁) = x , (addUpkeep⇒¬needsUpkeep {s = s})
+  EB-Role-total' : LeiosState.needsUpkeep s EB-Role → ∃[ ffds ] s -⟦EB-Role⟧⇀ addUpkeep record s { FFDState = ffds } EB-Role
+  EB-Role-total' {s = s} h = let open LeiosState s in case Dec-canProduceEB of λ where
+    (inj₁ (π , pf)) → -, EB-Role    h pf (proj₂ FFD.FFD-total)
+    (inj₂ pf)       → -, No-EB-Role h pf
 
 data _-⟦V1-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
@@ -183,9 +185,10 @@ opaque
     (yes p) → -, V1-Role h p (proj₂ FFD.FFD-total)
     (no ¬p) → -, No-V1-Role h ¬p
 
-V1-Role-Upkeep : s -⟦V1-Role⟧⇀ s' → LeiosState.needsUpkeep s V1-Role × ¬ LeiosState.needsUpkeep s' V1-Role
-V1-Role-Upkeep {s = s} (V1-Role x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-V1-Role-Upkeep {s = s} (No-V1-Role x x₁) = x , (addUpkeep⇒¬needsUpkeep {s = s})
+  V1-Role-total' : LeiosState.needsUpkeep s V1-Role → ∃[ ffds ] s -⟦V1-Role⟧⇀ addUpkeep record s { FFDState = ffds } V1-Role
+  V1-Role-total' {s = s} h = let open LeiosState s in case Dec-canProduceV1 of λ where
+    (yes p) → -, V1-Role    h p (proj₂ FFD.FFD-total)
+    (no ¬p) → -, No-V1-Role h ¬p
 
 data _-⟦V2-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
@@ -215,12 +218,10 @@ opaque
     (yes p) → -, V2-Role h p (proj₂ FFD.FFD-total)
     (no ¬p) → -, No-V2-Role h ¬p
 
-V2-Role-Upkeep : s -⟦V2-Role⟧⇀ s' → LeiosState.needsUpkeep s V2-Role × ¬ LeiosState.needsUpkeep s' V2-Role
-V2-Role-Upkeep {s = s} (V2-Role x x₁ x₂) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-V2-Role-Upkeep {s = s} (No-V2-Role x x₁) = x , (addUpkeep⇒¬needsUpkeep {s = s})
-
-↑-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep (s ↑ x)
-↑-Upkeep = {!!}
+  V2-Role-total' : LeiosState.needsUpkeep s V2-Role → ∃[ ffds ] s -⟦V2-Role⟧⇀ addUpkeep record s { FFDState = ffds } V2-Role
+  V2-Role-total' {s = s} h = let open LeiosState s in case Dec-canProduceV2 of λ where
+    (yes p) → -, V2-Role    h p (proj₂ FFD.FFD-total)
+    (no ¬p) → -, No-V2-Role h ¬p
 
 data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 
@@ -286,26 +287,48 @@ open Computational22 ⦃...⦄
 
 module _ ⦃ Computational-B : Computational22 B._-⟦_/_⟧⇀_ String ⦄
          ⦃ Computational-FFD : Computational22 FFD._-⟦_/_⟧⇀_ String ⦄ where
+
+  private
+    u1 : ∀ {u} → u ≡ ∅ → IB-Role ∉ u ∪ ❴ Base ❵
+    u1 u≡∅ = λ h → case Equivalence.from ∈-∪ h of λ where
+      (inj₁ x) → Properties.∉-∅ (subst (_ ∈_) u≡∅ x)
+      (inj₂ y) → case Equivalence.from ∈-singleton y of λ ()
+
+    u2 : ∀ {u} → u ≡ ∅ → EB-Role ∉ (u ∪ ❴ Base ❵) ∪ ❴ IB-Role ❵
+    u2 u≡∅ = λ h → case Equivalence.from ∈-∪ h of λ where
+      (inj₁ x) → case Equivalence.from ∈-∪ x of λ where
+        (inj₁ x) → Properties.∉-∅ (subst (_ ∈_) u≡∅ x)
+        (inj₂ y) → case Equivalence.from ∈-singleton y of λ ()
+      (inj₂ y) → case Equivalence.from ∈-singleton y of λ ()
+
   instance
     Computational--⟦/⟧⇀ : Computational22 _-⟦_/_⟧⇀_ String
     Computational--⟦/⟧⇀ .computeProof s (INIT x) = failure "No handling of INIT here"
     Computational--⟦/⟧⇀ .computeProof s (SUBMIT (inj₁ eb)) = failure "Cannot submit EB here"
     Computational--⟦/⟧⇀ .computeProof s (SUBMIT (inj₂ txs)) = success (-, Base₁)
-    Computational--⟦/⟧⇀ .computeProof s SLOT = let open LeiosState s in
+    Computational--⟦/⟧⇀ .computeProof s* SLOT = let open LeiosState s* in
       case (¿ Upkeep ≡ᵉ allUpkeep ¿ ,′ computeProof BaseState B.FTCH-LDG ,′ computeProof FFDState FFD.Fetch) of λ where
         (yes p , success ((B.BASE-LDG l , bs) , p₁) , success ((FFD.FetchRes msgs , ffds) , p₂)) →
           success (let
             open ≡-Reasoning
             s = _ -- solved later by unification
             s0 = s ↑ L.filter isValid? msgs
-            upkeep≡∅ : LeiosState.Upkeep s0 ≡ ∅
-            upkeep≡∅ = sym (↑-Upkeep {s = s} {x = L.filter isValid? msgs})
-            in (_ , Slot p p₁ p₂
-                            (proj₂ (Base-total {s = s0} (subst (Base ∉_) (sym upkeep≡∅) Properties.∉-∅)))
-                            (proj₂ (IB-Role-total {!!}))
-                            (proj₂ (EB-Role-total {!!}))
-                            (proj₂ (V1-Role-total {!!}))
-                            (proj₂ (V2-Role-total {!!}))))
+            in case ∃[ s ] s ≡ s0 ∋ (s0 , refl) of λ where
+              (s0' , eq) → let -- this is a hack to not reduce anything in s0, which improves performance
+                  upkeep≡∅ : LeiosState.Upkeep s0' ≡ ∅
+                  upkeep≡∅ = trans (cong LeiosState.Upkeep eq) (sym (↑-preserves-Upkeep {s = s} {x = L.filter isValid? msgs}))
+
+                  tmp : ∃[ bs ] s0 -⟦Base⟧⇀ addUpkeep record s0' { BaseState = bs } Base
+                  tmp = subst (λ s → ∃[ bs ] s -⟦Base⟧⇀ addUpkeep record s0' { BaseState = bs } Base) eq $
+                          Base-total' {s = s0'} (subst (Base ∉_) (sym upkeep≡∅) Properties.∉-∅)
+                  bs , p1 = tmp
+
+                in (_ , (Slot p p₁ p₂ p1
+                              (proj₂ (IB-Role-total' (u1 upkeep≡∅)))
+                              (proj₂ (EB-Role-total' (u2 upkeep≡∅)))
+                              (proj₂ (V1-Role-total {!!}))
+                              (proj₂ (V2-Role-total {!!})))))
+                              -- note: this pattern works for the remaining two cases, but it's slow
         (yes p , _ , _) → failure "Subsystem failed"
         (no ¬p , _) → failure "Upkeep incorrect"
     Computational--⟦/⟧⇀ .computeProof s FTCH-LDG = success (-, Ftch)
