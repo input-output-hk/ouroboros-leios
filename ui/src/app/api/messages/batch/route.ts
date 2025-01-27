@@ -106,8 +106,8 @@ export async function GET(req: Request, res: Response) {
         };
         const intermediate: ISimulationIntermediateDataState = {
           txs: [],
-          ibTxs: new Map(),
-          ebIbs: new Map(),
+          ibs: new Map(),
+          ebs: new Map(),
         };
 
         interval = setInterval(() => {

@@ -54,11 +54,13 @@ export interface ISimulationTransaction {
 
 export interface ISimulationInputBlock {
   id: string;
+  slot: number;
   txs: ISimulationTransaction[];
 }
 
 export interface ISimulationEndorsementBlock {
   id: string;
+  slot: number;
   ibs: ISimulationInputBlock[];
 }
 
@@ -76,10 +78,20 @@ export interface ISimulationAggregatedDataState {
   lastNodesUpdated: string[];
 }
 
+export interface ISimulationIntermediateInputBlock {
+  slot: number;
+  txs: number[];
+}
+
+export interface ISimulationIntermediateEndorsementBlock {
+  slot: number;
+  ibs: string[];
+}
+
 export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
-  ibTxs: Map<string, number[]>;
-  ebIbs: Map<string, string[]>;
+  ibs: Map<string, ISimulationIntermediateInputBlock>;
+  ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
 }
 
 export interface IGraphContextState {

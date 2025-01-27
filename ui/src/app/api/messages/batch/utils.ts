@@ -68,7 +68,10 @@ export const processMessage = (
       message.producer.toString(),
       "ibGenerated",
     );
-    intermediate.ibTxs.set(message.id, message.transactions);
+    intermediate.ibs.set(message.id, {
+      slot: message.slot,
+      txs: message.transactions,
+    });
   } else if (message.type === EMessageType.InputBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -95,19 +98,21 @@ export const processMessage = (
     const praosTx = message.transactions.length;
     let leiosTx = 0;
     if (message.endorsement != null) {
-      const eb = message.endorsement.eb.id;
-      const ibIds = intermediate.ebIbs.get(eb) ?? [];
-      const ibs = ibIds.map(id => {
-        const txIds = intermediate.ibTxs.get(id) ?? [];
-        leiosTx += txIds.length;
-        const txs = txIds.map(tx => intermediate.txs[tx]);
+      const ebId = message.endorsement.eb.id;
+      const eb = intermediate.ebs.get(ebId)!;
+      const ibs = eb.ibs.map(id => {
+        const ib = intermediate.ibs.get(id)!;
+        leiosTx += ib.txs.length;
+        const txs = ib.txs.map(tx => intermediate.txs[tx]);
         return {
           id,
+          slot: ib.slot,
           txs,
         };
       })
       block.endorsement = {
-        id: eb,
+        id: ebId,
+        slot: eb.slot,
         ibs,
       }
     }
@@ -133,7 +138,10 @@ export const processMessage = (
       "ebGenerated",
     );
     const ibs = message.input_blocks.map(ib => ib.id);
-    intermediate.ebIbs.set(message.id, ibs);
+    intermediate.ebs.set(message.id, {
+      slot: message.slot,
+      ibs,
+    });
   } else if (message.type === EMessageType.EndorserBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,

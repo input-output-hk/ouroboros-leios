@@ -19,10 +19,10 @@ export const Progress: FC = () => {
       </p>
 
       <div
-        className="relative w-full mt-2"
+        className="relative w-full mt-4"
       >
         {/* Track */}
-        <div className="absolute top-1/2 left-0 w-full h-2 -mt-2 rounded-full bg-gray-200">
+        <div className="absolute top-1/2 left-0 w-full h-2 -mt-3 rounded-full bg-gray-200">
           {/* Filled portion */}
           <div
             className="absolute h-full rounded-full bg-blue-500"
