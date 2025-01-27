@@ -45,11 +45,14 @@ See `./graphs` for plots of the distributions.
 ## Controls
 * Average (body) block fetch duration is 0.3777s, close but around 6%
   slower than measured.
-  Note: Serialization time with the chosen body size and bandwidth
-  is around 0.0007s, so the majority of block fetch duration time is due to
-  latencies, at least 3 BlockFetch msgs (MsgRequestRange,
-  MsgStartBatch, MsgBlock) plus effects from congestion window and
-  multiplexing.
+
+  Note: Serialization time with the chosen body size and bandwidth is
+  around 0.0007s, so the majority of block fetch duration time should
+  be due to latencies (at least 3 messages, one roundtrip) plus
+  effects from congestion window and multiplexing. Could be
+  interesting to look deeper into the network logs and verify the
+  impacts of each factor mentioned above.
+
 * See `controls/` for number of cores and bandwidth variations topologies.
 
 ### Bandwidth/100 topology
