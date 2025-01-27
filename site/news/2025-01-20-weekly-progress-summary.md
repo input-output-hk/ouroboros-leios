@@ -5,7 +5,7 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## Simulation Improvements
+## Simulation Progress
 
 ### Haskell Implementation
 
@@ -17,10 +17,14 @@ tags: [progress, update, weekly]
 - Completed analysis comparing Praos simulation with benchmark cluster
   - Adoption times within 10% of measured values
   - Review of simulation parameters pending
+- Next steps identified:
+  - Generate topologies with block producers behind relays
+  - Begin comparison with idealized diffusion model
+  - Configure and run simulations for higher throughput
 
 ### Rust Implementation
 
-- Implemented block-level visualization to complement existing graph view
+- Completed first pass of block-level visualization
 - Updated topology files to include baked-in latencies
 - Improved output with human-readable names from shared topology format
 - Enhanced simulation output comparability across different simulations
@@ -29,8 +33,8 @@ tags: [progress, update, weekly]
 
 ### Sortition Analysis
 
-- Completed analysis of "Fiat Accompli" sortition scheme using mainnet stake
-  distribution
+- Completed detailed analysis of "Fiat Accompli" sortition scheme using mainnet
+  stake distribution (Epoch 535)
 - Key findings for 500-vote committees:
   - 406 largest stake block-producers would be deterministic voters
   - ~88 voters would be randomly selected
@@ -39,12 +43,15 @@ tags: [progress, update, weekly]
 
 ### Downstream Impact Assessment
 
-- Initiated comprehensive analysis of Leios's ecosystem impact
-- Key areas identified:
-  - Ledger and node data structure changes affecting indexers and explorers
-  - Transaction construction impacts on dapps and wallets
-  - Physical layer querying requirements for sophisticated use cases
-  - Event filtering optimization needs for high throughput scenarios
+Started comprehensive analysis of Leios's ecosystem impact:
+
+- Identified impacts on indexers, explorers, SDKs, and APIs due to ledger and
+  node changes
+- Transaction construction and memory-pool sharding effects on dapps and wallets
+- Physical layer visibility considerations for sophisticated use cases
+- High throughput implications for event filtering efficiency
+- Transaction journey time considerations from memory pool to Praos block
+  reference
 
 ### DeltaQ Analysis
 
@@ -54,39 +61,4 @@ tags: [progress, update, weekly]
   - Haskell simulation includes bandwidth effects (328ms network delay per hop
     at 1MB/s)
   - Rust simulation currently excludes bandwidth effects
-- Completed new comparisons using JSONL event logs
-- Investigating diffusion timing differences between implementations
-
-## Cryptography Performance
-
-- Completed comprehensive benchmarking of the Leios cryptography suite
-- Notable performance achievements:
-  - VRF operations: 240 µs for proving, 390 µs for verification
-  - Leadership checks efficiency: 0.17 µs per slot/pipeline
-  - Vote processing: 3.8 µs per pipeline calculation
-  - BLS operations: 1.5 ms for key verification, vote operations ranging 280 µs
-    to 1.4 ms
-
-## Design Optimizations
-
-- Successfully optimized vote signature size down to 192 bytes
-- Validated committee certificates (500 votes, 60% quorum) compatibility with
-  Praos blocks at ~58 kB
-- Explored integration possibilities with KES rotation and Praos VRF BLS keys
-- Finalized initial technical report cryptography sections
-
-## Simulation Progress
-
-### Multi-Platform Development
-
-- Haskell Implementation:
-  - Achieved target diffusion latency matching benchmark cluster data
-  - Added JSON-based event logging
-  - Implemented 'short-leios' variant for mainnet ranking
-  - Enhanced visualization for per-node data transmission
-
-- Rust Implementation:
-  - Improved CPU simulation granularity
-  - Resolved clock simulation race conditions
-  - Implemented shared configuration system with standardized parameter files
-  - Established default simulation parameters in YAML format
+- Enabled cross-simulation topology sharing for consistent testing
