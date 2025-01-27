@@ -39,8 +39,8 @@ export const BlockGraph: FC = ({ }) => {
         <YAxis />
         <Tooltip />
         <Legend />
-        <Bar dataKey="praosTx" name={"TXs in block"} fill="#8884d8" onClick={viewBlock} />
-        <Bar dataKey="leiosTx" name={"TXs from Leios"} fill="#82ca9d" onClick={viewBlock} />
+        <Bar dataKey="praosTx" stackId="a" name={"TXs in block"} fill="#8884d8" onClick={viewBlock} />
+        <Bar dataKey="leiosTx" stackId="a" name={"TXs from Leios"} fill="#82ca9d" onClick={viewBlock} />
       </BarChart>
     </div>
   )

@@ -51,8 +51,6 @@ export const SimWrapper: FC = ({
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 max-w-3xl mx-auto bg-white/80 backdrop-blur-sm">
             <Controls />
             <Progress />
-          </div>
-          <div className="flex items-end justify-center gap-4 my-4 max-w-sm mx-auto bg-white/80 backdrop-blur-sm">
             <BatchSize />
           </div>
         </div>

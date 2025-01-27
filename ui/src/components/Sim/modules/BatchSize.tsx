@@ -10,7 +10,7 @@ export const BatchSize: FC = () => {
   const { streaming } = useStreamMessagesHandler();
 
   return (
-    <div className="border-2 rounded-md p-4 border-gray-200">
+    <div className="-mb-1">
       <label htmlFor="batchSize" className="block text-xs text-gray-600">
         Batch Size
       </label>
