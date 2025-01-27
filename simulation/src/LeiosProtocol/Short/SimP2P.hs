@@ -125,8 +125,10 @@ exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
       , baseChain = Genesis
       , slotConfig
       , leios
-      , processingQueueBound = 100
-      , processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores
+      , processingQueueBound = defaultQueueBound processingCores
+      , processingCores
       , nodeId
       , rng
       }
+   where
+    processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores
