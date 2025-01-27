@@ -29,16 +29,17 @@ $ cabal run ols -- sim praos-diffusion --seed 42 -l config.yaml -t topology.yaml
 ```
 
 The average adoption times for different stake (equivalently node) percentile.
-stake% | adoption, s | delta%
------------------------------
-50     | 0.70426     | 3
-80     | 1.13167     | 8
-90     | 1.17377     | 10
-92     | 1.18070     | 10
-94     | 1.18712     | 10
-96     | 1.19231     | 10
-98     | 1.19632     | 8
-100    | 1.23190     | 6
+
+| stake% | adoption, s | delta% |
+|--------|-------------|--------|
+| 50     | 0.70426     | 3      |
+| 80     | 1.13167     | 8      |
+| 90     | 1.17377     | 10     |
+| 92     | 1.18070     | 10     |
+| 94     | 1.18712     | 10     |
+| 96     | 1.19231     | 10     |
+| 98     | 1.19632     | 8      |
+| 100    | 1.23190     | 6      |
 
 See `./graphs` for plots of the distributions.
 
