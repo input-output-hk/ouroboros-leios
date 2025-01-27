@@ -11,6 +11,7 @@
 
 module LeiosProtocol.Common (
   module PraosProtocol.Common,
+  module TaskMultiQueue,
   RankingBlockHeader,
   RankingBlockBody (..),
   RankingBlock,
@@ -49,6 +50,7 @@ import GHC.Generics
 import GHC.Records
 import PraosProtocol.Common
 import SimTypes
+import TaskMultiQueue
 
 {-
   Note [size of blocks/messages]: we add a `size` field to most
