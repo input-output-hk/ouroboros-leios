@@ -4,10 +4,87 @@
         <title>Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Leios Blog</description>
-        <lastBuildDate>Mon, 13 Jan 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 20 Jan 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly progress summary – January 20, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary</guid>
+            <pubDate>Mon, 20 Jan 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[Simulation Progress]]></description>
+            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation Progress<a class="hash-link" aria-label="Direct link to Simulation Progress" title="Direct link to Simulation Progress" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#simulation-progress">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-implementation">Haskell Implementation<a class="hash-link" aria-label="Direct link to Haskell Implementation" title="Direct link to Haskell Implementation" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#haskell-implementation">​</a></h3>
+<ul>
+<li>Enhanced parameter handling with support for reading configurations and
+topologies from disk</li>
+<li>Added new <code>generate-topology</code> command for random topology generation</li>
+<li>Aligned Leios sortition with algorithms from sortition benchmarks and
+technical report</li>
+<li>Completed analysis comparing Praos simulation with benchmark cluster<!-- -->
+<ul>
+<li>Adoption times within 10% of measured values</li>
+<li>Review of simulation parameters pending</li>
+</ul>
+</li>
+<li>Next steps identified:<!-- -->
+<ul>
+<li>Generate topologies with block producers behind relays</li>
+<li>Begin comparison with idealized diffusion model</li>
+<li>Configure and run simulations for higher throughput</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-implementation">Rust Implementation<a class="hash-link" aria-label="Direct link to Rust Implementation" title="Direct link to Rust Implementation" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#rust-implementation">​</a></h3>
+<ul>
+<li>Completed first pass of block-level visualization</li>
+<li>Updated topology files to include baked-in latencies</li>
+<li>Improved output with human-readable names from shared topology format</li>
+<li>Enhanced simulation output comparability across different simulations</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis--research">Analysis &amp; Research<a class="hash-link" aria-label="Direct link to Analysis &amp; Research" title="Direct link to Analysis &amp; Research" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#analysis--research">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="sortition-analysis">Sortition Analysis<a class="hash-link" aria-label="Direct link to Sortition Analysis" title="Direct link to Sortition Analysis" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#sortition-analysis">​</a></h3>
+<ul>
+<li>Completed detailed analysis of "Fiat Accompli" sortition scheme using mainnet
+stake distribution (Epoch 535)</li>
+<li>Key findings for 500-vote committees:<!-- -->
+<ul>
+<li>406 largest stake block-producers would be deterministic voters</li>
+<li>~88 voters would be randomly selected</li>
+<li>Significant certificate size reduction achieved through deterministic voter
+selection</li>
+</ul>
+</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="downstream-impact-assessment">Downstream Impact Assessment<a class="hash-link" aria-label="Direct link to Downstream Impact Assessment" title="Direct link to Downstream Impact Assessment" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#downstream-impact-assessment">​</a></h3>
+<p>Started comprehensive analysis of Leios's ecosystem impact:</p>
+<ul>
+<li>Identified impacts on indexers, explorers, SDKs, and APIs due to ledger and
+node changes</li>
+<li>Transaction construction and memory-pool sharding effects on dapps and wallets</li>
+<li>Physical layer visibility considerations for sophisticated use cases</li>
+<li>High throughput implications for event filtering efficiency</li>
+<li>Transaction journey time considerations from memory pool to Praos block
+reference</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-analysis">DeltaQ Analysis<a class="hash-link" aria-label="Direct link to DeltaQ Analysis" title="Direct link to DeltaQ Analysis" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#deltaq-analysis">​</a></h3>
+<ul>
+<li>Successfully matched ΔQ model for IB diffusion across both simulation
+implementations</li>
+<li>Identified key differences in simulation approaches:<!-- -->
+<ul>
+<li>Haskell simulation includes bandwidth effects (328ms network delay per hop
+at 1MB/s)</li>
+<li>Rust simulation currently excludes bandwidth effects</li>
+</ul>
+</li>
+<li>Enabled cross-simulation topology sharing for consistent testing</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly progress summary – January 13, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary</link>
