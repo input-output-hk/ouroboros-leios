@@ -74,14 +74,14 @@
 <text x='379.20' y='411.64' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='16.78px' lengthAdjust='spacingAndGlyphs'>750</text>
 <text x='483.51' y='411.64' text-anchor='middle' style='font-size: 8.80px;fill: #4D4D4D; font-family: "Arial";' textLength='22.38px' lengthAdjust='spacingAndGlyphs'>1000</text>
 <text x='275.10' y='424.23' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='87.15px' lengthAdjust='spacingAndGlyphs'>Committee Size</text>
-<text transform='translate(13.50,211.81) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='107.32px' lengthAdjust='spacingAndGlyphs'>Deterministic Votes</text>
+<text transform='translate(13.50,211.81) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='88.13px' lengthAdjust='spacingAndGlyphs'>Persistent Votes</text>
 <rect x='515.31' y='181.15' width='55.21' height='61.31' style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />
 <text x='520.79' y='195.80' style='font-size: 11.00px; font-family: "Arial";' textLength='44.25px' lengthAdjust='spacingAndGlyphs'>Scheme</text>
 <rect x='520.79' y='202.42' width='17.28' height='17.28' style='stroke-width: 1.07; stroke: none; fill: #F2F2F2;' />
 <line x1='522.52' y1='211.06' x2='536.34' y2='211.06' style='stroke-width: 1.07; stroke: #F8766D; stroke-linecap: butt;' />
 <rect x='520.79' y='219.70' width='17.28' height='17.28' style='stroke-width: 1.07; stroke: none; fill: #F2F2F2;' />
 <line x1='522.52' y1='228.34' x2='536.34' y2='228.34' style='stroke-width: 1.07; stroke: #00BFC4; stroke-linecap: butt;' />
-<text x='543.55' y='214.27' style='font-size: 8.80px; font-family: "Arial";' textLength='20.93px' lengthAdjust='spacingAndGlyphs'>FA1F</text>
+<text x='543.55' y='214.27' style='font-size: 8.80px; font-family: "Arial";' textLength='15.87px' lengthAdjust='spacingAndGlyphs'>FA1</text>
 <text x='543.55' y='231.55' style='font-size: 8.80px; font-family: "Arial";' textLength='17.47px' lengthAdjust='spacingAndGlyphs'>wFA</text>
 <text x='45.84' y='15.10' style='font-size: 13.20px; font-family: "Arial";' textLength='206.91px' lengthAdjust='spacingAndGlyphs'>Stake distribution of epoch 535</text>
 </g>
