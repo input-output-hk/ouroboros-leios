@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-01-27
+
+### Certificate size for "Fiat Accompli" sortition
+
+The Jupyter notebook [analysis/fiat-accompli.ipynb](analysis/fiat-accompli.ipynb) documents the certficate-size computation for the Fiat Accompli sortition scheme. This demonstrates that it is practical to achieve certificates smaller than 20 kB for Leios.
+
+![Fiat accompli certificate size](images/fiat-accompli-cert.svg)
+
 ## 2025-01-26
 
 ### Haskell Simulation
