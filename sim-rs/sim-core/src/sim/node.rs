@@ -687,8 +687,10 @@ impl Node {
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
-        // Do not remove TXs in these blocks from the leios mempool.
-        // Wait until we learn more about how praos and leios interact.
+        // Remove TXs in these blocks from the leios mempool.
+        for tx in &block.transactions {
+            self.leios.mempool.remove(&tx.id);
+        }
         for peer in &self.peers {
             if self
                 .praos
