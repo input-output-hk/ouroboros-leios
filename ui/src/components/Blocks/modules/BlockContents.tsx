@@ -17,9 +17,8 @@ interface IBoxProps extends PropsWithChildren {
 
 const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, className }) => {
   const color = selected ? "border-black" : "border-gray-400";
-  const cursor = onClick ? "cursor-pointer" : "";
   return (
-    <span onClick={onClick} className={cx(`border-2 border-solid ${color} w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center ${cursor}`, className)} style={{
+    <span onClick={onClick} className={cx("border-2 border-solid w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center", color, { 'cursor-pointer': !!onClick }, className)} style={{
       height: 32 * proportion
     }}>
       {children}
@@ -42,15 +41,19 @@ interface IStatsProps {
 
 const Stats: FC<IStatsProps> = ({ name, slot, txs, position: [left, top] }) => {
   const count = txs.length;
-  const size = txs.reduce((sum, tx) => sum + tx.bytes, 0);
+  const bytes = txs.reduce((sum, tx) => sum + tx.bytes, 0);
+  const size =
+    (bytes >= 1024 * 1024) ? `${(bytes / 1024 / 1024).toFixed(3)} MB` :
+      (bytes >= 1024) ? `${(bytes / 1024).toFixed(3)} KB` :
+        `${bytes} bytes`;
   return (
     <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
-      <div className={`flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]`}>
+      <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
         <div className="border-2 border-black rounded p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
           <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{count}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Total size (bytes): <span>{size}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Total size: <span>{size}</span></h4>
         </div>
       </div>
     </div>
@@ -65,7 +68,7 @@ interface SelectState {
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
-    result.set("block", { name: "L1 Block", slot: block.slot, txs: block.txs });
+    result.set("block", { name: "Block", slot: block.slot, txs: block.txs });
     if (block.endorsement) {
       for (const ib of block.endorsement.ibs) {
         result.set(ib.id, { name: "Input Block", slot: ib.slot, txs: ib.txs });
