@@ -37,7 +37,9 @@ d-Abstract =
     ; L = 5
     }
 
-open import Leios.VRF d-Abstract
+open LeiosAbstract d-Abstract public
+
+open import Leios.VRF d-Abstract public
 
 d-VRF : LeiosVRF
 d-VRF =
@@ -51,8 +53,10 @@ d-VRF =
     ; genV2Input = id
     }
 
-open import Leios.Blocks d-Abstract
-open import Leios.KeyRegistration d-Abstract d-VRF
+open LeiosVRF d-VRF public
+
+open import Leios.Blocks d-Abstract public
+open import Leios.KeyRegistration d-Abstract d-VRF public
 
 d-KeyRegistration : KeyRegistrationAbstract
 d-KeyRegistration = _
@@ -64,7 +68,7 @@ d-KeyRegistrationFunctionality =
     ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
     }
 
-open import Leios.Base d-Abstract d-VRF
+open import Leios.Base d-Abstract d-VRF public
 
 d-Base : BaseAbstract
 d-Base =
@@ -83,7 +87,7 @@ d-BaseFunctionality =
     ; SUBMIT-total = tt , tt
     }
 
-open import Leios.FFD
+open import Leios.FFD public
 
 instance
   isb : IsBlock (List ⊤)
@@ -109,7 +113,7 @@ d-FFDFunctionality =
     ; FFD-total = tt , tt
     }
 
-open import Leios.Voting
+open import Leios.Voting public
 
 d-VotingAbstract : VotingAbstract (Fin 1 × EndorserBlock)
 d-VotingAbstract =
@@ -139,11 +143,7 @@ st = record
       ; va = d-VotingAbstract
       }
 
-open SpecStructure st
-
-open import Leios.Short st
-
-open Protocol
+open import Leios.Short st public
 
 sd : TotalMap (Fin 1) ℕ
 sd = record
