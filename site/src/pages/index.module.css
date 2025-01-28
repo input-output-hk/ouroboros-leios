@@ -22,3 +22,40 @@
   align-items: center;
   justify-content: center;
 }
+
+.videoSection {
+    padding: 4rem 0;
+    position: relative;
+    border-top: 1px solid var(--ifm-color-emphasis-300);
+    margin-top: 2rem;
+}
+
+.videoSection h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.videoSection .subtitle {
+    color: var(--ifm-color-emphasis-700);
+    font-size: 1.2rem;
+    max-width: 600px;
+    margin: 0 auto 2rem;
+}
+
+.videoWrapper {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 aspect ratio */
+    height: 0;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
