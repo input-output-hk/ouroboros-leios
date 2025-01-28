@@ -1,0 +1,66 @@
+cabal-version:      2.4
+name:               leios-spec
+version:            0.1.0.0
+synopsis:
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            NONE
+author:             Yves Hauser
+maintainer:         yves.hauser@iohk.io
+
+-- A copyright notice.
+-- copyright:
+-- category:
+
+common globalOptions
+    default-language: Haskell2010
+    build-depends:
+        base
+    default-extensions:
+        PolyKinds EmptyDataDecls EmptyCase ExistentialQuantification
+        ScopedTypeVariables NoMonomorphismRestriction RankNTypes
+        PatternSynonyms DeriveGeneric
+    ghc-options:
+        -Wno-overlapping-patterns
+
+test-suite test
+    import: globalOptions
+    hs-source-dirs: test
+    main-is: Spec.hs
+    other-modules:
+        UtxowSpec
+    build-depends:
+        leios-spec,
+        hspec,
+        HUnit,
+        text
+    build-tool-depends: hspec-discover:hspec-discover
+    type: exitcode-stdio-1.0
+    ghc-options:
+        -Wall
+        -threaded -rtsopts -with-rtsopts=-N
+        -fno-warn-type-defaults
+
+executable leios-spec
+    import: globalOptions
+    hs-source-dirs: exe
+    main-is: Main.hs
+    build-depends:
+        text,
+        ieee,
+        leios-spec
+
+library
+    import: globalOptions
+    hs-source-dirs: src
+    exposed-modules:
+    build-depends:
+        text,
+        ieee
+-- This will be generated automatically when building with nix
+    other-modules:
