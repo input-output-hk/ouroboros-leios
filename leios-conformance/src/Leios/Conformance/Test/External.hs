@@ -44,7 +44,7 @@ import Test.QuickCheck.StateModel (
   RunModel (perform, postcondition),
   counterexamplePost,
   monitorPost,
-  runActions
+  runActions,
  )
 
 import Text.PrettyPrint (hang, vcat, (<+>))
@@ -96,17 +96,17 @@ data RunState = RunState
 
 callSUT :: RunState -> NodeRequest -> IO NodeResponse
 callSUT RunState{hReader, hWriter} req =
-  do LBS8.hPutStrLn hWriter $ A.encode req
-     either Failed id . A.eitherDecode' . LBS.fromStrict <$> BS8.hGetLine hReader
+  do
+    LBS8.hPutStrLn hWriter $ A.encode req
+    either Failed id . A.eitherDecode' . LBS.fromStrict <$> BS8.hGetLine hReader
 
 type Runtime = StateT RunState IO
 
 instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [EndorserBlock], [Vote]) => RunModel NetworkModel Runtime where
-
   perform net@NetworkModel{nodeModel = LeiosState{..}} (Step a) _ = case a of
     Tick -> do
       rs@RunState{..} <- get
-      modify $ \rs' -> rs' {unfetchedIBs = mempty, unfetchedEBs = mempty, unfetchedVotes = mempty}
+      modify $ \rs' -> rs'{unfetchedIBs = mempty, unfetchedEBs = mempty, unfetchedVotes = mempty}
       lift
         ( callSUT
             rs
@@ -134,19 +134,26 @@ instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [E
     let ok = (ibs, ebs) == (expectedIBs, expectedEBs)
     monitorPost . counterexample . show $ "  action $" <+> pPrint a
     when (a == Tick && slot s == slot s' + 1) $
-      monitorPost . counterexample $ "  -- new slot: " ++ show (slot s')
+      monitorPost . counterexample $
+        "  -- new slot: " ++ show (slot s')
     unless (null ibs) $
-      monitorPost . counterexample . show $ "  --      got InputBlocks:" <+> pPrint ibs
+      monitorPost . counterexample . show $
+        "  --      got InputBlocks:" <+> pPrint ibs
     when (ibs /= expectedIBs) $
-      counterexamplePost . show $ "  -- expected InputBlocks:" <+> pPrint expectedIBs
+      counterexamplePost . show $
+        "  -- expected InputBlocks:" <+> pPrint expectedIBs
     unless (null ebs) $
-      monitorPost . counterexample . show $ "  --      got EndorserBlocks:" <+> pPrint ebs
+      monitorPost . counterexample . show $
+        "  --      got EndorserBlocks:" <+> pPrint ebs
     when (ebs /= expectedEBs) $
-      counterexamplePost . show $ "  -- expected EndorserBlocks:" <+> pPrint expectedEBs
+      counterexamplePost . show $
+        "  -- expected EndorserBlocks:" <+> pPrint expectedEBs
     unless (null votes) $
-      monitorPost . counterexample . show $ "  --      got Votes:" <+> pPrint votes
+      monitorPost . counterexample . show $
+        "  --      got Votes:" <+> pPrint votes
     when (votes /= expectedVotes) $
-      counterexamplePost . show $ "  -- expected Votes:" <+> pPrint expectedVotes
+      counterexamplePost . show $
+        "  -- expected Votes:" <+> pPrint expectedVotes
     pure ok
 
 prop_node :: Handle -> Handle -> Blind (Actions NetworkModel) -> Property

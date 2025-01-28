@@ -11,7 +11,8 @@ module Leios.Conformance.Test where
 
 import Data.Maybe (isJust)
 import Test.QuickCheck (
-  frequency, Arbitrary (..)
+  Arbitrary (..),
+  frequency,
  )
 import Test.QuickCheck.DynamicLogic (DynLogicModel)
 import Test.QuickCheck.StateModel (
@@ -24,21 +25,21 @@ import Test.QuickCheck.StateModel (
     nextState,
     precondition,
     shrinkAction
-  )
+  ),
  )
 import Text.PrettyPrint ((<+>))
 import Text.PrettyPrint.HughesPJClass (
-  Pretty (pPrint)
+  Pretty (pPrint),
  )
 
 import Leios.Conformance.Model (
+  EndorserBlock (..),
   EnvAction (..),
-  NodeModel(..),
-  InputBlock(..),
-  EndorserBlock(..),
-  Vote(..),
+  InputBlock (..),
+  NodeModel (..),
+  Vote (..),
   initialModelState,
-  transition
+  transition,
  )
 
 data NetworkModel = NetworkModel
@@ -65,9 +66,9 @@ instance Pretty EnvAction where
   pPrint (NewEB eb) = "NewEB" <+> pPrint eb
   pPrint (NewVote v) = "NewVote" <+> pPrint v
 
-instance Arbitrary InputBlock where
+instance Arbitrary InputBlock
 
-instance Arbitrary EndorserBlock where
+instance Arbitrary EndorserBlock
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
@@ -80,10 +81,10 @@ instance StateModel NetworkModel where
       }
 
   arbitraryAction _ _ =
-        fmap (Some . Step) . frequency $
-          [(1, pure Tick)]
-            ++ fmap (1,) [NewIB <$> arbitrary]
-            ++ fmap (1,) [NewEB <$> arbitrary]
+    fmap (Some . Step) . frequency $
+      [(1, pure Tick)]
+        ++ fmap (1,) [NewIB <$> arbitrary]
+        ++ fmap (1,) [NewEB <$> arbitrary]
 
   shrinkAction _ _ (Step Tick) = []
   shrinkAction _ _ Step{} = [Some (Step Tick)]

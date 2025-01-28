@@ -1,8 +1,8 @@
 module Main where
 
 import Control.Monad (unless)
-import qualified Data.Aeson as A
-import qualified Data.ByteString.Lazy.Char8 as LBS8
+import Data.Aeson qualified as A
+import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.List (isPrefixOf, partition)
 import Leios.Conformance.ExternalSpec (spec)
 import Leios.Conformance.Test.External (NodeRequest (Stop))
