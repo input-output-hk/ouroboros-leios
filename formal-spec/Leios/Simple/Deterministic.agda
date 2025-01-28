@@ -86,8 +86,13 @@ opaque
   ... | []    = -, Base₂b needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
   ... | x ∷ l = -, Base₂a needsUpkeep (sym eq) (proj₂ B.SUBMIT-total)
 
-  Base-total' : LeiosState.needsUpkeep s Base → ∃[ bs ] s -⟦Base⟧⇀ addUpkeep record s { BaseState = bs } Base
-  Base-total' {s = s} needsUpkeep = {!!}
+  Base-total' : ⦃ Computational-B : Computational22 B._-⟦_/_⟧⇀_ String ⦄
+              → LeiosState.needsUpkeep s Base → ∃[ bs ] s -⟦Base⟧⇀ addUpkeep record s { BaseState = bs } Base
+  Base-total' {s = s} h = let open LeiosState s in
+    case ∃[ ebs ] ebs ≡ filter (λ eb → isVote2Certified s eb × eb ∈ᴮ slice L slot 2) EBs ∋ -, refl
+      of λ where
+        (eb ∷ _ , eq) → -, Base₂a h eq (proj₂ B.SUBMIT-total)
+        ([]     , eq) → -, Base₂b h eq (proj₂ B.SUBMIT-total)
 
 data _-⟦IB-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
