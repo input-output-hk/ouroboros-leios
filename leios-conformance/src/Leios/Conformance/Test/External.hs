@@ -133,8 +133,8 @@ instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [E
     let (expectedIBs, expectedEBs, expectedVotes) = maybe (mempty, mempty, mempty) fst $ transition s a
     let ok = (ibs, ebs) == (expectedIBs, expectedEBs)
     monitorPost . counterexample . show $ "  action $" <+> pPrint a
-    when (a == Tick && slot s == slot s' + 1) $
-      monitorPost . counterexample $ "  -- new slot: " ++ show (slot s')
+    when (a == Tick && currentSlot s == currentSlot s' + 1) $
+      monitorPost . counterexample $ "  -- new slot: " ++ show (currentSlot s')
     unless (null ibs) $
       monitorPost . counterexample . show $ "  --      got InputBlocks:" <+> pPrint ibs
     when (ibs /= expectedIBs) $

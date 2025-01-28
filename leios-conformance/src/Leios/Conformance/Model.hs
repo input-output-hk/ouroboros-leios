@@ -1,12 +1,20 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-module Leios.Conformance.Model where
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+module Leios.Conformance.Model
+  ( module Leios.Conformance.Model
+  , module Lib
+  ) where
 
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON(..), ToJSON(..))
 import Data.Maybe (maybeToList)
 import GHC.Generics (Generic)
 import Text.PrettyPrint.HughesPJClass (Pretty (pPrint))
+
+import Lib
 
 data EnvAction
   = Tick
@@ -15,14 +23,14 @@ data EnvAction
   | NewVote Vote
   deriving (Eq, Show)
 
--- TODO: use InputBlock extracted from Agda
-data InputBlock = InputBlock
-  deriving (Show, Eq, Generic)
+instance FromJSON InputBlock where
+  parseJSON = undefined
 
-instance FromJSON InputBlock
-instance ToJSON InputBlock
+instance ToJSON InputBlock where
+  toJSON = undefined
+
 instance Pretty InputBlock where
-  pPrint InputBlock = "InputBlock"
+  pPrint (InputBlock _ _) = "InputBlock"
 
 -- TODO: use EndorserBlock extracted from Agda
 data EndorserBlock = EndorserBlock
@@ -44,7 +52,7 @@ instance Pretty Vote where
 
 -- TODO: use LeiosState extracted from Agda
 data NodeModel = NodeModel
-  { slot :: Integer
+  { currentSlot :: Integer
   , ibs :: [InputBlock]
   , ebs :: [EndorserBlock]
   , votes :: [Vote]

@@ -11,7 +11,7 @@ module Leios.Conformance.Test where
 
 import Data.Maybe (isJust)
 import Test.QuickCheck (
-  frequency
+  frequency, Arbitrary (..)
  )
 import Test.QuickCheck.DynamicLogic (DynLogicModel)
 import Test.QuickCheck.StateModel (
@@ -65,6 +65,10 @@ instance Pretty EnvAction where
   pPrint (NewEB eb) = "NewEB" <+> pPrint eb
   pPrint (NewVote v) = "NewVote" <+> pPrint v
 
+instance Arbitrary InputBlock where
+
+instance Arbitrary EndorserBlock where
+
 instance StateModel NetworkModel where
   data Action NetworkModel a where
     Step :: EnvAction -> Action NetworkModel ([InputBlock], [EndorserBlock], [Vote])
@@ -78,8 +82,8 @@ instance StateModel NetworkModel where
   arbitraryAction _ _ =
         fmap (Some . Step) . frequency $
           [(1, pure Tick)]
-            ++ fmap (1,) (pure . NewIB <$> [InputBlock])
-            ++ fmap (1,) (pure . NewEB <$> [EndorserBlock])
+            ++ fmap (1,) [NewIB <$> arbitrary]
+            ++ fmap (1,) [NewEB <$> arbitrary]
 
   shrinkAction _ _ (Step Tick) = []
   shrinkAction _ _ Step{} = [Some (Step Tick)]

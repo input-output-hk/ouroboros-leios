@@ -27,38 +27,11 @@ common globalOptions
         PatternSynonyms DeriveGeneric
     ghc-options:
         -Wno-overlapping-patterns
-
-test-suite test
-    import: globalOptions
-    hs-source-dirs: test
-    main-is: Spec.hs
-    other-modules:
-        UtxowSpec
-    build-depends:
-        leios-spec,
-        hspec,
-        HUnit,
-        text
-    build-tool-depends: hspec-discover:hspec-discover
-    type: exitcode-stdio-1.0
-    ghc-options:
-        -Wall
-        -threaded -rtsopts -with-rtsopts=-N
-        -fno-warn-type-defaults
-
-executable leios-spec
-    import: globalOptions
-    hs-source-dirs: exe
-    main-is: Main.hs
-    build-depends:
-        text,
-        ieee,
-        leios-spec
-
 library
     import: globalOptions
     hs-source-dirs: src
     exposed-modules:
+        Lib
     build-depends:
         text,
         ieee

@@ -25,7 +25,8 @@ record IBHeaderHs : Type where
         producerID : Int
 
 {-# FOREIGN GHC
-data IBHeaderHs = IBHeaderHs Integer Integer 
+data IBHeaderHs = IBHeaderHs Integer Integer
+  deriving (Show, Eq, Generic)
 #-}
 
 {-# COMPILE GHC IBHeaderHs = data IBHeaderHs (IBHeaderHs) #-}
@@ -70,6 +71,7 @@ record EndorserBlockHs : Type where
         
 {-# FOREIGN GHC
 data EndorserBlockHs = EndorserBlockHs Integer Integer [Integer]
+  deriving (Show, Eq, Generic)
 #-}
 
 {-# COMPILE GHC EndorserBlockHs = data EndorserBlockHs (EndorserBlockHs) #-}
@@ -95,4 +97,3 @@ instance
 
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
-
