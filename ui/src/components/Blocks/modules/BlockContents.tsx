@@ -1,21 +1,25 @@
 import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/types';
+import cx from "classnames";
 import { FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
+
+import classes from "./styles.module.css";
 
 export interface IBlockContentsProps {
   block: ISimulationBlock;
 }
 
 interface IBoxProps extends PropsWithChildren {
+  className?: string;
   selected?: boolean;
   proportion?: number;
   onClick?: (e: MouseEvent) => void;
 }
 
-const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children }) => {
+const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, className }) => {
   const color = selected ? "border-black" : "border-gray-400";
   const cursor = onClick ? "cursor-pointer" : "";
   return (
-    <span onClick={onClick} className={`border-2 border-solid ${color} w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center ${cursor}`} style={{
+    <span onClick={onClick} className={cx(`border-2 border-solid ${color} w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center ${cursor}`, className)} style={{
       height: 32 * proportion
     }}>
       {children}
@@ -92,29 +96,37 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
 
       <div className='flex flex-col w-full h-3/5 items-center' onClick={selectBox(null)}>
         <h2 className='font-bold text-xl'>Block Transactions</h2>
-        <div className="flex w-full h-full gap-8 items-center justify-center">
+        <div className="flex w-full h-full items-center justify-center">
           {ibs.length ? (
-            <div className="flex flex-col gap-2">
-              {ibs.map(ib => {
-                const isSelected = selected?.key === ib.id;
-                const proportion = 2 * ib.txs.length / block.txs.length;
-                return (
-                  <Box key={ib.id} selected={isSelected} proportion={proportion} onClick={selectBox(ib.id)}>
-                    Input Block
-                    <span className="text-sm">Slot {ib.slot}, {ib.txs.length} TX</span>
-                  </Box>
-                );
-              })}
+            <div className={cx("pr-6 border-r-2 border-black")}>
+              <div className="flex flex-col gap-2">
+                {ibs.map(ib => {
+                  const isSelected = selected?.key === ib.id;
+                  const proportion = 2 * ib.txs.length / block.txs.length;
+                  return (
+                    <Box key={ib.id} selected={isSelected} proportion={proportion} onClick={selectBox(ib.id)} className={classes.input}>
+                      Input Block
+                      <span className="text-sm">Slot {ib.slot}, {ib.txs.length} TX</span>
+                    </Box>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
-          {eb && <Box proportion={1}>
-            Endorsement Block
-            <span className='text-sm'>Slot {eb.slot}</span>
-          </Box>}
-          <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
-            Block
-            <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
-          </Box>
+          {eb && (
+            <div className={cx('pr-4 pl-6', classes.endorser)}>
+              <Box proportion={1}>
+                Endorsement Block
+                <span className='text-sm'>Slot {eb.slot}</span>
+              </Box>
+            </div>
+          )}
+          <div className={cx('pl-4', classes.block)}>
+            <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
+              Block
+              <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
+            </Box>
+          </div>
         </div>
 
       </div>
