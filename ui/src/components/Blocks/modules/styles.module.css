@@ -2,7 +2,7 @@
   position: relative;
 }
 
-.endorser::before {
+.endorser.has-ibs::before {
   background: black;
   display: block;
   position: absolute;
@@ -17,7 +17,7 @@
   position: relative;
 }
 
-.block::before {
+.block.has-eb::before {
   background: black;
   display: block;
   position: absolute;

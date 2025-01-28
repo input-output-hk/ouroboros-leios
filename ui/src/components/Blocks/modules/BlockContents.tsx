@@ -114,14 +114,14 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
             </div>
           ) : null}
           {eb && (
-            <div className={cx('pr-4 pl-6', classes.endorser)}>
+            <div className={cx('pr-4 pl-6', classes.endorser, { [classes['has-ibs']]: ibs.length })}>
               <Box proportion={1}>
                 Endorsement Block
                 <span className='text-sm'>Slot {eb.slot}</span>
               </Box>
             </div>
           )}
-          <div className={cx('pl-4', classes.block)}>
+          <div className={cx('pl-4', classes.block, { [classes['has-eb']]: !!eb })}>
             <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
               Block
               <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
