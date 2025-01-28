@@ -10,10 +10,13 @@ module PraosProtocol.PraosNode (
 )
 where
 
+import ChanDriver (protocolMessage)
 import ChanMux
 import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
-import Control.Tracer (Tracer, traceWith)
+import Control.Monad.Class.MonadFork
+import Control.Monad.Class.MonadThrow
+import Control.Tracer (Tracer, contramap)
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 import Data.Either (fromLeft, fromRight)
@@ -23,10 +26,13 @@ import qualified Data.Text as T
 import PraosProtocol.BlockFetch (BlockFetchControllerState, BlockFetchMessage, BlockFetchProducerState (..), PeerId, blockFetchController, initBlockFetchConsumerStateForPeerId, newBlockFetchControllerState, runBlockFetchConsumer, runBlockFetchProducer)
 import qualified PraosProtocol.BlockFetch as BlockFetch
 import PraosProtocol.BlockGeneration
-import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, runChainConsumer, runChainProducer)
+import PraosProtocol.ChainSync (ChainConsumerState (..), ChainSyncMessage, chainSyncMessageLabel, runChainConsumer, runChainProducer)
 import PraosProtocol.Common
 import qualified PraosProtocol.Common.Chain as Chain (Chain (..))
 import STMCompat
+import SimTypes
+import System.Random (StdGen)
+import TaskMultiQueue
 
 data Praos body f = Praos
   { protocolChainSync :: f ChainSyncMessage
@@ -35,6 +41,13 @@ data Praos body f = Praos
 
 newtype PraosMessage body = PraosMessage (Either ChainSyncMessage (BlockFetchMessage body))
   deriving (Show)
+
+praosMessageLabel :: PraosMessage body -> String
+praosMessageLabel (PraosMessage d) =
+  either
+    (protocolMessage chainSyncMessageLabel)
+    (protocolMessage BlockFetch.blockFetchMessageLabel)
+    d
 
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
@@ -127,7 +140,9 @@ runPraosNode ::
   m ()
 runPraosNode tracer cfg chain followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
-  concurrentlyMany . map runConcurrently =<< setupPraosThreads tracer cfg st0 followers peers
+  taskQueue <- atomically $ newTaskMultiQueue @() 100
+  let queue = writeTMQueue taskQueue ()
+  concurrentlyMany . map runConcurrently =<< setupPraosThreads tracer cfg queue st0 followers peers
  where
   -- Nested children threads are slow with IOSim, this impl forks them all as direct children.
   concurrentlyMany :: MonadAsync m => [m ()] -> m ()
@@ -137,16 +152,20 @@ setupPraosThreads ::
   (MonadAsync m, MonadSTM m, MonadDelay m) =>
   Tracer m (PraosNodeEvent BlockBody) ->
   PraosConfig BlockBody ->
+  ((CPUTask, m ()) -> STM m ()) ->
   PraosNodeState BlockBody m ->
   [Praos BlockBody (Chan m)] ->
   [Praos BlockBody (Chan m)] ->
   m [Concurrently m ()]
-setupPraosThreads tracer cfg st0 followers peers = do
-  (ts, f) <- BlockFetch.setupValidatorThreads tracer cfg st0.blockFetchControllerState 1 -- TODO: parameter
+setupPraosThreads tracer cfg queue st0 followers peers = do
+  (ts, f) <- BlockFetch.setupValidatorThreads cfg st0.blockFetchControllerState queue
   let valHeader h = assert (blockInvariant h) $ do
         let !delay = cfg.headerValidationDelay h
-        traceWith tracer (PraosNodeEventCPU (CPUTask delay $ T.pack $ "ValidateHeader " ++ show (coerce @_ @Int $ blockHash h)))
-        threadDelay delay
+        atomically $
+          curry
+            queue
+            (CPUTask delay $ T.pack $ "ValidateHeader " ++ show (coerce @_ @Int $ blockHash h))
+            (return ())
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 
 setupPraosThreads' ::
@@ -169,17 +188,19 @@ setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers =
 
 data PraosNodeConfig = PraosNodeConfig
   { praosConfig :: PraosConfig BlockBody
-  , blockGeneration :: PacketGenerationPattern
+  , slotConfig :: SlotConfig
   , chain :: Chain (Block BlockBody)
   , blockMarker :: ByteString
   -- ^ bytes to include in block bodies.
+  , rng :: StdGen
+  , processingCores :: NumCores
   }
 
 newPraosNodeState :: MonadSTM m => Chain (Block body) -> m (PraosNodeState body m)
 newPraosNodeState chain = PraosNodeState <$> newBlockFetchControllerState chain <*> pure Map.empty
 
 praosNode ::
-  (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
+  (MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m, MonadCatch m, MonadFork m, MonadMonotonicTimeNSec m) =>
   Tracer m (PraosNodeEvent BlockBody) ->
   PraosNodeConfig ->
   [Praos BlockBody (Chan m)] ->
@@ -187,13 +208,18 @@ praosNode ::
   m [m ()]
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
-  praosThreads <- setupPraosThreads tracer cfg.praosConfig st0 followers peers
-  nextBlock <- mkNextBlock cfg.blockGeneration cfg.blockMarker
+  taskQueue <- atomically $ newTaskMultiQueue @() 100
+  let queue = writeTMQueue taskQueue ()
+  praosThreads <- setupPraosThreads tracer cfg.praosConfig queue st0 followers peers
+  let cpuTasksProcessors = processCPUTasks cfg.processingCores (contramap PraosNodeEventCPU tracer) taskQueue
   let generationThread =
-        blockGenerator
+        praosBlockGenerator
+          cfg.rng
           tracer
           cfg.praosConfig
+          cfg.slotConfig
+          cfg.blockMarker
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
-          nextBlock
-  return $ map runConcurrently $ Concurrently generationThread : praosThreads
+          (atomically . queue)
+  return $ cpuTasksProcessors : generationThread : map runConcurrently praosThreads

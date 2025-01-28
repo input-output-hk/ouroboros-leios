@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use sim_core::config::SimConfiguration;
+use sim_core::config::Topology;
 use strategy::{globe, random_graph, simplified, GlobeArgs, RandomGraphArgs, SimplifiedArgs};
 
 mod strategy;
@@ -24,16 +24,16 @@ enum Strategy {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let raw_config = match args.strategy {
+    let raw_topology = match args.strategy {
         Strategy::RandomGraph(args) => random_graph(&args)?,
         Strategy::Simplified(args) => simplified(&args)?,
         Strategy::Globe(args) => globe(&args)?,
     };
 
-    let serialized = toml::to_string_pretty(&raw_config)?;
+    let serialized = toml::to_string_pretty(&raw_topology)?;
 
-    let full_config: SimConfiguration = raw_config.into();
-    full_config.validate()?;
+    let topology: Topology = raw_topology.into();
+    topology.validate()?;
 
     fs::write(args.path, serialized)?;
 

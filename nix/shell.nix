@@ -21,6 +21,7 @@ in
   packages = [
     agda.agdaWithDeps
     emacsWithPackages
+    pkgs.nodePackages_latest.prettier
   ];
 
   # Agda environment variables.

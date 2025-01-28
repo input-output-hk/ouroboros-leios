@@ -3,7 +3,7 @@ import {
   ILink,
   INode,
   IServerMessage,
-} from "@/components/Graph/types";
+} from "@/components/Sim/types";
 import { parse } from "@iarna/toml";
 import { closeSync, createReadStream, openSync, readSync, statSync } from "fs";
 import path from "path";

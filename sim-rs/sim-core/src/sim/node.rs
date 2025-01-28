@@ -17,8 +17,9 @@ use crate::{
     config::{NodeConfiguration, NodeId, SimConfiguration},
     events::EventTracker,
     model::{
-        Block, Endorsement, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader,
-        InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
+        InputBlockHeader, InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle,
+        VoteBundleId,
     },
     network::{NetworkSink, NetworkSource},
 };
@@ -69,35 +70,18 @@ impl CpuTask {
         }
         .to_string()
     }
-    fn cpu_times(&self, config: &SimConfiguration) -> Vec<Duration> {
+
+    fn extra(&self) -> String {
         match self {
-            Self::TransactionValidated(_, _) => vec![config.tx_validation_cpu_time],
-            Self::PraosBlockGenerated(block) => {
-                let base_time = config.block_generation_cpu_time;
-                if block.endorsement.is_some() {
-                    vec![base_time + config.certificate_generation_cpu_time]
-                } else {
-                    vec![base_time]
-                }
-            }
-            Self::PraosBlockValidated(_, block) => {
-                let base_time = config.block_validation_cpu_time;
-                if block.endorsement.is_some() {
-                    vec![base_time + config.certificate_validation_cpu_time]
-                } else {
-                    vec![base_time]
-                }
-            }
-            Self::InputBlockGenerated(_) => vec![config.ib_generation_cpu_time],
-            Self::InputBlockValidated(_, _) => vec![config.ib_validation_cpu_time],
-            Self::EndorserBlockGenerated(_) => vec![config.eb_generation_cpu_time],
-            Self::EndorserBlockValidated(_, _) => vec![config.eb_validation_cpu_time],
-            Self::VoteBundleGenerated(votes) => {
-                vec![config.vote_generation_cpu_time; votes.ebs.len()]
-            }
-            Self::VoteBundleValidated(_, votes) => {
-                vec![config.vote_validation_cpu_time; votes.ebs.len()]
-            }
+            Self::TransactionValidated(_, _) => "".to_string(),
+            Self::PraosBlockGenerated(_) => "".to_string(),
+            Self::PraosBlockValidated(_, _) => "".to_string(),
+            Self::InputBlockGenerated(id) => id.header.id.to_string(),
+            Self::InputBlockValidated(_, id) => id.header.id.to_string(),
+            Self::EndorserBlockGenerated(_) => "".to_string(),
+            Self::EndorserBlockValidated(_, _) => "".to_string(),
+            Self::VoteBundleGenerated(_) => "".to_string(),
+            Self::VoteBundleValidated(_, _) => "".to_string(),
         }
     }
 }
@@ -113,7 +97,8 @@ enum NodeEvent {
 }
 
 pub struct Node {
-    pub id: NodeId,
+    id: NodeId,
+    name: String,
     trace: bool,
     sim_config: Arc<SimConfiguration>,
     msg_source: Option<NetworkSource<SimulationMessage>>,
@@ -149,6 +134,7 @@ struct NodeLeiosState {
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
+    votes_to_generate: BTreeMap<u64, usize>,
     votes_by_eb: BTreeMap<EndorserBlockId, Vec<NodeId>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
 }
@@ -201,6 +187,7 @@ impl Node {
 
         Self {
             id,
+            name: config.name.clone(),
             trace: sim_config.trace_nodes.contains(&id),
             sim_config,
             msg_source: Some(msg_source),
@@ -228,12 +215,15 @@ impl Node {
     }
 
     fn schedule_cpu_task(&mut self, task: CpuTask) {
-        let cpu_times = task.cpu_times(&self.sim_config);
+        let cpu_times = self.task_cpu_times(&task);
         let task_type = task.task_type();
         let subtask_count = cpu_times.len();
         let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
         self.tracker.track_cpu_task_scheduled(
-            format!("{}-{}", self.id, task_id),
+            CpuTaskId {
+                node: self.id,
+                index: task_id,
+            },
             task_type,
             subtask_count,
         );
@@ -243,7 +233,10 @@ impl Node {
     }
 
     fn start_cpu_subtask(&mut self, subtask: Subtask) {
-        let task_id = format!("{}-{}", self.id, subtask.task_id);
+        let task_id = CpuTaskId {
+            node: self.id,
+            index: subtask.task_id,
+        };
         self.tracker
             .track_cpu_subtask_started(task_id, subtask.subtask_id);
         let timestamp = self.clock.now() + subtask.duration;
@@ -251,6 +244,67 @@ impl Node {
             timestamp,
             NodeEvent::CpuSubtaskCompleted(subtask),
         ))
+    }
+
+    fn task_cpu_times(&self, task: &CpuTask) -> Vec<Duration> {
+        let cpu_times = &self.sim_config.cpu_times;
+        match task {
+            CpuTask::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
+            CpuTask::PraosBlockGenerated(block) => {
+                let mut time = cpu_times.rb_generation;
+                if let Some(endorsement) = &block.endorsement {
+                    let nodes = endorsement
+                        .votes
+                        .iter()
+                        .copied()
+                        .collect::<HashSet<_>>()
+                        .len();
+                    time += cpu_times.cert_generation_constant
+                        + (cpu_times.cert_generation_per_node * nodes as u32)
+                }
+                vec![time]
+            }
+            CpuTask::PraosBlockValidated(_, rb) => {
+                let mut time = cpu_times.rb_validation_constant;
+                let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
+                time += cpu_times.rb_validation_per_byte * (bytes as u32);
+                if let Some(endorsement) = &rb.endorsement {
+                    let nodes = endorsement
+                        .votes
+                        .iter()
+                        .copied()
+                        .collect::<HashSet<_>>()
+                        .len();
+                    time += cpu_times.cert_validation_constant
+                        + (cpu_times.cert_validation_per_node * nodes as u32)
+                }
+                vec![time]
+            }
+            CpuTask::InputBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTask::InputBlockValidated(_, ib) => vec![
+                cpu_times.ib_head_validation
+                    + cpu_times.ib_body_validation_constant
+                    + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
+            ],
+            CpuTask::EndorserBlockGenerated(_) => vec![cpu_times.eb_generation],
+            CpuTask::EndorserBlockValidated(_, _) => vec![cpu_times.eb_validation],
+            CpuTask::VoteBundleGenerated(votes) => votes
+                .ebs
+                .keys()
+                .map(|eb_id| {
+                    let eb = self
+                        .leios
+                        .ebs
+                        .get(eb_id)
+                        .expect("node tried voting for an unknown EB");
+                    cpu_times.vote_generation_constant
+                        + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
+                })
+                .collect(),
+            CpuTask::VoteBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
+                .take(votes.ebs.len())
+                .collect(),
+        }
     }
 
     pub async fn run(mut self) -> Result<()> {
@@ -281,7 +335,7 @@ impl Node {
                         NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
                         NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
-                            let task_id = format!("{}-{}", self.id, subtask.task_id);
+                            let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
                             self.tracker.track_cpu_subtask_finished(task_id.clone(), subtask.subtask_id);
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
                             if let Some(subtask) = next_subtask {
@@ -290,7 +344,7 @@ impl Node {
                             let Some(task) = finished_task else {
                                 continue;
                             };
-                            self.tracker.track_cpu_task_finished(task_id);
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), task.extra());
                             match task {
                                 CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
                                 CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
@@ -388,8 +442,8 @@ impl Node {
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
 
-            // Vote for any EBs which satisfy all requirements.
-            self.vote_for_endorser_blocks(slot);
+            // Decide how many votes to generate in each slot
+            self.schedule_endorser_block_votes(slot);
 
             // Generate any EBs we're allowed to in this slot.
             self.generate_endorser_blocks(slot);
@@ -397,6 +451,9 @@ impl Node {
             // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
         }
+
+        // Vote for any EBs which satisfy all requirements.
+        self.vote_for_endorser_blocks(slot);
 
         // Generate any IBs scheduled for this slot.
         self.generate_input_blocks(slot);
@@ -415,13 +472,8 @@ impl Node {
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         for next_p in vrf_probabilities(self.sim_config.ib_generation_probability) {
             if let Some(vrf) = self.run_vrf(next_p) {
-                let vrf_slot = if self.sim_config.uniform_ib_generation {
-                    // IBs are generated at the start of any slot within this stage
-                    slot + self.rng.gen_range(0..self.sim_config.stage_length)
-                } else {
-                    // IBs are generated at the start of the first slot of this stage
-                    slot
-                };
+                // IBs are generated at the start of any slot within this stage
+                let vrf_slot = slot + self.rng.gen_range(0..self.sim_config.stage_length);
                 slot_vrfs.entry(vrf_slot).or_default().push(vrf);
             }
         }
@@ -463,20 +515,39 @@ impl Node {
         }
     }
 
-    fn vote_for_endorser_blocks(&mut self, slot: u64) {
-        let Some(eb_slot) = slot.checked_sub(self.sim_config.stage_length) else {
-            return;
-        };
-        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
-            return;
-        };
-        let mut ebs = ebs.clone();
+    fn schedule_endorser_block_votes(&mut self, slot: u64) {
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();
         if vrf_wins == 0 {
             return;
         }
+        // Each node chooses a slot at random in which to produce all its votes.
+        // Randomness spreads out vote generation across the whole network to make traffic less spiky,
+        // but each node generates all votes for a pipeline at once to minimize overall traffic.
+        let new_slot = slot + self.rng.gen_range(0..self.sim_config.vote_slot_length);
+        self.tracker.track_vote_lottery_won(VoteBundleId {
+            slot: new_slot,
+            producer: self.id,
+        });
+        self.leios.votes_to_generate.insert(new_slot, vrf_wins);
+    }
+
+    fn vote_for_endorser_blocks(&mut self, slot: u64) {
+        let Some(vote_count) = self.leios.votes_to_generate.remove(&slot) else {
+            return;
+        };
+        // When we vote, we vote for EBs which were sent at the start of the prior stage.
+        let eb_slot = match slot.checked_sub(self.sim_config.stage_length) {
+            Some(s) => s - (s % self.sim_config.stage_length),
+            None => {
+                return;
+            }
+        };
+        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
+            return;
+        };
+        let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
             let eb = self.leios.ebs.get(eb_id).unwrap();
             match self.should_vote_for(slot, eb) {
@@ -490,22 +561,17 @@ impl Node {
         if ebs.is_empty() {
             return;
         }
-        let votes_allowed = if self.sim_config.one_vote_per_vrf {
-            // For every VRF lottery you won, you can vote for one EB
-            vrf_wins
-        } else {
-            // For every VRF lottery you won, you can vote for every EB
-            vrf_wins * ebs.len()
-        };
+        // For every VRF lottery you won, you can vote for every EB
+        let votes_allowed = vote_count * ebs.len();
+        let eb_counts = ebs.into_iter().map(|eb| (eb, votes_allowed)).collect();
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,
                 producer: self.id,
             },
-            ebs: ebs.iter().cloned().cycle().take(votes_allowed).collect(),
+            ebs: eb_counts,
         };
         if !votes.ebs.is_empty() {
-            self.tracker.track_vote_lottery_won(&votes);
             self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));
         }
     }
@@ -668,7 +734,7 @@ impl Node {
     fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
         if self.trace {
-            info!("node {} saw tx {id}", self.id);
+            info!("node {} saw tx {id}", self.name);
         }
         self.txs.insert(id, TransactionView::Received(tx.clone()));
         self.praos.mempool.insert(tx.id, tx.clone());
@@ -906,12 +972,12 @@ impl Node {
         {
             return Ok(());
         }
-        for eb in votes.ebs.iter() {
+        for (eb, count) in votes.ebs.iter() {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.peers {
@@ -968,10 +1034,7 @@ impl Node {
 
     fn try_filling_eb(&mut self, eb: &mut EndorserBlock) {
         let config = &self.sim_config;
-        let Some(earliest_slot) = eb
-            .slot
-            .checked_sub(config.stage_length * (config.deliver_stage_count + 1))
-        else {
+        let Some(earliest_slot) = eb.slot.checked_sub(config.stage_length * 3) else {
             return;
         };
         for slot in earliest_slot..(earliest_slot + config.stage_length) {
@@ -997,9 +1060,8 @@ impl Node {
 
     fn should_vote_for(&self, slot: u64, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
         let stage_length = self.sim_config.stage_length;
-        let deliver_stage_count = self.sim_config.deliver_stage_count;
 
-        let Some(ib_slot_start) = slot.checked_sub(stage_length * (deliver_stage_count + 2)) else {
+        let Some(ib_slot_start) = slot.checked_sub(stage_length * 4) else {
             // The IBs for this EB were "generated" before the sim began.
             // It's valid iff there are no IBs.
             return if eb.ibs.is_empty() {
@@ -1039,12 +1101,12 @@ impl Node {
 
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
-        for eb in &votes.ebs {
+        for (eb, count) in &votes.ebs {
             self.leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .push(votes.id.producer);
+                .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         let votes = Arc::new(votes);
         self.leios
@@ -1071,7 +1133,7 @@ impl Node {
         if self.trace {
             trace!(
                 "node {} sent msg of size {} to node {to}",
-                self.id,
+                self.name,
                 msg.bytes_size()
             );
         }

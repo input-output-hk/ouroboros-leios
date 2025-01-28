@@ -19,6 +19,7 @@ pub struct TransactionProducer {
     ib_shards: u64,
     frequency_ms: FloatDistribution,
     size_bytes: FloatDistribution,
+    max_size: u64,
 }
 
 impl TransactionProducer {
@@ -35,6 +36,7 @@ impl TransactionProducer {
             ib_shards: config.ib_shards,
             frequency_ms: config.transaction_frequency_ms,
             size_bytes: config.transaction_size_bytes,
+            max_size: config.max_tx_size,
         }
     }
 
@@ -46,7 +48,7 @@ impl TransactionProducer {
         loop {
             let id = TransactionId::new(next_tx_id);
             let shard = rng.gen_range(0..self.ib_shards);
-            let bytes = self.size_bytes.sample(&mut rng) as u64;
+            let bytes = (self.size_bytes.sample(&mut rng) as u64).min(self.max_size);
             let tx = Transaction { id, shard, bytes };
 
             let node_index = rng.gen_range(0..node_count);

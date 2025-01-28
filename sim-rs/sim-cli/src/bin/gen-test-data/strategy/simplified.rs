@@ -3,9 +3,9 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::{RawConfig, RawNodeConfig};
+use sim_core::config::{RawLegacyTopology, RawNodeConfig};
 
-use super::utils::{distribute_stake, generate_full_config, LinkTracker};
+use super::utils::{distribute_stake, GraphBuilder};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -40,11 +40,10 @@ const SHORT_HOP: Duration = Duration::from_millis(12);
 const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
-pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
+pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
     let mut rng = thread_rng();
 
-    let mut nodes = vec![];
-    let mut links = LinkTracker::new();
+    let mut graph = GraphBuilder::new();
 
     // We want nodes to have ~equal numbers of "short", "medium", and "long" connections to each other.
     // We also want physically plausible arrangements of nodes, so visualizations make sense.
@@ -69,16 +68,14 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
     for i in 0..pool_count {
         let cluster = i % 5;
         let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
-        let pool_id = nodes.len();
-        nodes.push(RawNodeConfig {
+        let pool_id = graph.add(RawNodeConfig {
             location: pool_loc,
             region: None,
             stake: stake.get(i).cloned(),
             cpu_multiplier: 1.0,
             cores: None,
         });
-        let relay_id = nodes.len();
-        nodes.push(RawNodeConfig {
+        let relay_id = graph.add(RawNodeConfig {
             location: relay_loc,
             region: None,
             stake: None,
@@ -86,7 +83,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
             cores: None,
         });
 
-        links.add(pool_id, relay_id, Some(SHORT_HOP));
+        graph.link(pool_id, relay_id, Some(SHORT_HOP));
 
         let mut local_candidates: Vec<usize> = relays_in_cluster(cluster)
             .filter(|id| *id != relay_id)
@@ -98,7 +95,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
                 break;
             }
             let neighbor = local_candidates.remove(rng.gen_range(0..local_candidates.len()));
-            links.add(relay_id, neighbor, Some(SHORT_HOP));
+            graph.link(relay_id, neighbor, Some(SHORT_HOP));
         }
 
         for other_cluster in (0..5).filter(|c| *c != cluster) {
@@ -117,17 +114,17 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawConfig> {
                     break;
                 }
                 let neighbor = candidates.remove(rng.gen_range(0..candidates.len()));
-                links.add(relay_id, neighbor, Some(latency));
+                graph.link(relay_id, neighbor, Some(latency));
             }
         }
     }
 
-    Ok(generate_full_config(nodes, links.links))
+    Ok(graph.into_topology())
 }
 
 #[cfg(test)]
 mod tests {
-    use sim_core::config::SimConfiguration;
+    use sim_core::config::Topology;
 
     use super::{simplified, SimplifiedArgs};
 
@@ -135,8 +132,8 @@ mod tests {
     fn should_generate_valid_graph() {
         let args = SimplifiedArgs { pool_count: 1000 };
 
-        let raw_config = simplified(&args).unwrap();
-        let config: SimConfiguration = raw_config.into();
-        config.validate().unwrap();
+        let raw = simplified(&args).unwrap();
+        let topology: Topology = raw.into();
+        topology.validate().unwrap();
     }
 }

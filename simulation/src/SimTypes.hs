@@ -1,24 +1,38 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module SimTypes where
 
-import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericToEncoding, object, typeMismatch, withObject, (.!=), (.:), (.:?))
+import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), Parser, ToJSON (..), ToJSONKey, Value (..), object, typeMismatch, withObject, (.!=), (.:), (.:?))
 import Data.Default (Default (..))
 import Data.Hashable
 import Data.Ix (Ix)
 import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Vector as V
 import GHC.Generics (Generic)
+import GHC.Records
 import TimeCompat
 
 data CPUTask = CPUTask {cpuTaskDuration :: !DiffTime, cpuTaskLabel :: !Text}
   deriving (Eq, Ord, Show, Generic)
   deriving (ToJSON, FromJSON)
+
+cpuTask :: HasField "stringId" t String => String -> (t -> DiffTime) -> t -> CPUTask
+cpuTask prefix d x =
+  let !delay = d x
+      !label = T.pack $ prefix ++ ": " ++ x.stringId
+   in CPUTask delay label
 
 newtype NodeId = NodeId Int
   deriving (Eq, Ord, Ix, Show)
@@ -32,15 +46,27 @@ data LabelLink e = LabelLink NodeId NodeId e deriving (Show)
 data Point = Point {_1 :: !Double, _2 :: !Double}
   deriving (Eq, Show, Generic)
 
+instance ToJSON Point where
+  toJSON :: Point -> Value
+  toJSON (Point x y) = toJSON [x, y]
+
+instance FromJSON Point where
+  parseJSON :: Value -> Parser Point
+  parseJSON = withTuple "Point" $ \(x, y) ->
+    Point <$> parseJSON x <*> parseJSON y
+   where
+    withTuple :: String -> ((Value, Value) -> Parser a) -> Value -> Parser a
+    withTuple _expected k (toTuple -> Just xy) = k xy
+    withTuple expected _k v = typeMismatch expected v
+
+    toTuple :: Value -> Maybe (Value, Value)
+    toTuple (Array v) | V.length v == 2 = Just (v V.! 0, v V.! 1)
+    toTuple _ = Nothing
+
 -- | Path in simulation world
 newtype Path = Path [Point]
   deriving (Eq, Show, Generic)
   deriving newtype (Semigroup, Monoid)
-
-instance ToJSON Point where
-  toEncoding = genericToEncoding defaultOptions
-
-instance FromJSON Point
 
 type WorldDimensions = (Double, Double)
 
@@ -87,3 +113,16 @@ instance FromJSON World where
     worldDimensions <- o .: "dimensions"
     worldShape <- o .:? "shape" .!= Rectangle
     pure World{..}
+
+newtype NetworkRate = NetworkRate Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+newtype NodeRate = NodeRate Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+newtype StakeFraction = StakeFraction Double
+  deriving (Eq, Ord, Show)
+  deriving newtype (ToJSON, FromJSON)
+data NumCores = Infinite | Finite Int
+  deriving (Eq, Ord, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)

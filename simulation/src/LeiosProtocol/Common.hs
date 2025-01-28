@@ -3,8 +3,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Common (
@@ -28,19 +30,24 @@ module LeiosProtocol.Common (
   NodeId,
   SubSlotNo (..),
   Word64,
+  NetworkRate (..),
+  NodeRate (..),
+  StakeFraction (..),
+  NumCores (..),
+  mkStringId,
 )
 where
 
 import ChanTCP
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Coerce
 import Data.Hashable
 import Data.Map (Map)
 import Data.Word (Word64, Word8)
 import GHC.Generics
 import GHC.Records
-import PraosProtocol.Common hiding (Block, BlockHeader)
-import qualified PraosProtocol.Common as Praos (Block, BlockHeader)
+import PraosProtocol.Common
 import SimTypes
 
 {-
@@ -62,7 +69,7 @@ import SimTypes
 
 -}
 
-type RankingBlockHeader = Praos.BlockHeader
+type RankingBlockHeader = BlockHeader
 data RankingBlockBody = RankingBlockBody
   { endorseBlocks :: ![(EndorseBlockId, Certificate)]
   -- ^ at most one in short leios.
@@ -79,7 +86,7 @@ data RankingBlockBody = RankingBlockBody
 rankingBlockBodyInvariant :: RankingBlockBody -> Bool
 rankingBlockBodyInvariant rbb = rbb.payload <= rbb.size
 
-type RankingBlock = Praos.Block RankingBlockBody
+type RankingBlock = Block RankingBlockBody
 
 type RankingBlockId = HeaderHash RankingBlock
 
@@ -220,3 +227,21 @@ instance MessageSize VoteId where
 
 instance MessageSize VoteMsg where
   messageSizeBytes b = b.size
+
+mkStringId :: (HasField "node" a NodeId, HasField "num" a Int) => a -> String
+mkStringId x = concat [show (coerce @_ @Int x.node), "-", show x.num]
+
+instance HasField "stringId" InputBlockHeader String where
+  getField = mkStringId . (.id)
+
+instance HasField "stringId" InputBlock String where
+  getField = mkStringId . (.id)
+
+instance HasField "stringId" InputBlockBody String where
+  getField = mkStringId . (.id)
+
+instance HasField "stringId" VoteMsg String where
+  getField = mkStringId . (.id)
+
+instance HasField "stringId" EndorseBlock String where
+  getField = mkStringId . (.id)

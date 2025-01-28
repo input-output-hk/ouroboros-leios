@@ -18,7 +18,7 @@ import Data.Hashable (hash)
 import qualified Data.IntervalMap.Strict as ILMap
 import Data.List (foldl', intercalate, sortOn)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import Data.Monoid (Any)
 import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
@@ -29,12 +29,14 @@ import qualified Diagrams.TwoD.Adjust as Dia
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 import LeiosProtocol.Common hiding (Point)
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
 import LeiosProtocol.Short.VizSim (
+  DataTransmitted (..),
   IBsInRBsReport (..),
   LeiosModelConfig (..),
   LeiosSimVizModel,
@@ -48,18 +50,18 @@ import LeiosProtocol.Short.VizSim (
   totalIBsInRBs,
  )
 import Linear.V2
-import ModelTCP (TcpMsgForecast (..))
+import ModelTCP (Bytes, TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.PraosNode (PraosMessage (..))
 import Sample
-import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
+import SimTypes (NodeId (..), Point (..), World (..))
 import System.FilePath (dropExtension, (<.>))
-import System.Random (uniformR)
-import qualified System.Random as Random
+import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
+import Topology
 import Viz
 import VizChart
 import VizSim
@@ -155,19 +157,19 @@ leiosGenCountRender =
     let ebs = st.ebMsgs.numMsgsGenerated
     let votes = st.voteMsgs.numMsgsGenerated
     let IBsInRBsReport{..} = totalIBsInRBs st.ibsInRBs
-    Cairo.showText $
-      intercalate
+    Cairo.showText
+      $ intercalate
         ";  "
-        [ "Blocks generated: "
+      $ [ "Blocks generated: "
             ++ intercalate
               ",  "
               [ printf "%s: %i (%.2f %s/s)" lbl n (perSec n) lbl
               | (n, lbl) <- [(rbs, "RB"), (ibs, "IB"), (ebs, "EB"), (votes, "Vote")]
               ]
-        , printf "IBs in RBs: %i (%i%%)" ibsInRBsNum ((ibsInRBsNum * 100) `div` ibs)
-        , printf "IBs in EBs: %i (%i%%)" ibsInEBsNum ((ibsInEBsNum * 100) `div` ibs)
-        , printf "EBs in RBs: %i (%i%%)" ebsInRBsNum ((ebsInRBsNum * 100) `div` ibs)
         ]
+        ++ [printf "IBs in RBs: %i (%i%%)" ibsInRBsNum ((ibsInRBsNum * 100) `div` ibs) | ibs > 0]
+        ++ [printf "IBs in EBs: %i (%i%%)" ibsInEBsNum ((ibsInEBsNum * 100) `div` ibs) | ibs > 0]
+        ++ [printf "EBs in RBs: %i (%i%%)" ebsInRBsNum ((ebsInRBsNum * 100) `div` ebs) | ebs > 0]
 
 leiosP2PSimVizRenderModel ::
   LeiosP2PSimVizConfig ->
@@ -427,11 +429,11 @@ chartDiffusionImperfection ::
   LeiosP2PSimVizConfig ->
   VizRender LeiosSimVizModel
 chartDiffusionImperfection
-  p2ptopography
+  p2ptopography@P2PTopography{p2pNodes}
   processingDelay
   serialisationDelay
   LeiosP2PSimVizConfig{nodeMessageColor}
-    | Map.size (p2pNodes p2ptopography) > 100 =
+    | Map.size p2pNodes > 100 =
         nullVizRender
     | otherwise =
         chartVizRender 25 $
@@ -609,6 +611,49 @@ chartCPUUsage LeiosModelConfig{numCores} =
                 ]
             }
 
+chartDataTransmitted :: LeiosModelConfig -> VizRender LeiosSimVizModel
+chartDataTransmitted LeiosModelConfig{maxBandwidthPerNode} =
+  chartVizRender 25 $
+    \(Time now)
+     _
+     ( SimVizModel
+        _
+        vs
+      ) ->
+        let
+          numNodes = Map.size vs.vizNodePos
+          toMiB = (/ 1e6)
+          maxChart = toMiB . fromIntegral $ maxBandwidthPerNode
+          toBps (ILMap.ClosedInterval s e, bytes) = realToFrac $ fromIntegral bytes / (e - s) :: Double
+          toBps _ = error "internal: non-closed-interval"
+          values =
+            [ (nid, [(n, "")])
+            | (NodeId nid, m) <- map (second (.messagesTransmitted)) $ Map.toList vs.dataTransmittedPerNode
+            , let n = toMiB . sum . map toBps . ILMap.toList . flip ILMap.containing now $ m
+            ]
+         in
+          (Chart.def :: Chart.Layout Double Double)
+            { Chart._layout_title = "Instantaneous Data Transmitted per Node"
+            , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
+            , Chart._layout_x_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledIntAxis
+                        Chart.defaultIntAxis{Chart._la_nLabels = 10}
+                        (0, numNodes - 1)
+                  , Chart._laxis_title = "Node #"
+                  }
+            , Chart._layout_y_axis =
+                Chart.def
+                  { Chart._laxis_generate =
+                      Chart.scaledAxis Chart.def (0, maxChart)
+                  , Chart._laxis_title = "Mbps"
+                  }
+            , Chart._layout_plots =
+                [ Chart.plotBars (Chart.def{Chart._plot_bars_values_with_labels = values})
+                ]
+            }
+
 chartLinkUtilisation :: VizRender LeiosSimVizModel
 chartLinkUtilisation =
   chartVizRender 25 $
@@ -687,15 +732,15 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> NumCores -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength numCores =
+defaultVizConfig :: Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
+defaultVizConfig stageLength numCores maxBandwidthPerNode =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
     , voteColor = toSRGB . voteColor
     , ebColor = toSRGB . ebColor
     , ibColor = toSRGB . pipelineColor Propose . (hash . (.id) &&& (.slot))
-    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores}
+    , model = LeiosModelConfig{recentSpan = fromIntegral stageLength, numCores, maxBandwidthPerNode}
     }
  where
   testPtclMessageColor ::
@@ -756,8 +801,8 @@ blendColors (x : xs) = foldl' (Dia.blend 0.5) x xs
 toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
-example2 :: Int -> Int -> Maybe P2PTopography -> NumCores -> Visualization
-example2 seed sliceLength maybeP2PTopography processingCores =
+example2 :: StdGen -> OnDisk.Config -> P2PNetwork -> Visualization
+example2 rng onDiskConfig p2pNetwork@P2PNetwork{p2pNodeCores} =
   slowmoVisualization 0.5 $
     Viz model $
       LayoutAbove
@@ -781,47 +826,31 @@ example2 seed sliceLength maybeP2PTopography processingCores =
                     tag <- [IB, EB, VT, RB]
                     ]
                 , LayoutAbove
-                    [ LayoutReqSize 350 300 $
+                    [ LayoutReqSize 350 150 $
                         Layout $
                           chartBandwidth modelConfig
-                    , LayoutReqSize 350 300 $
+                    , LayoutReqSize 350 200 $
+                        Layout $
+                          chartDataTransmitted modelConfig
+                    , LayoutReqSize 350 200 $
                         Layout $
                           chartCPUUsage modelConfig
-                    , LayoutReqSize 350 300 $
+                    , LayoutReqSize 350 150 $
                         Layout chartLinkUtilisation
                     ]
                 ]
             ]
         ]
  where
-  config = defaultVizConfig 5 processingCores
+  processingCores = maximum $ Map.elems p2pNodeCores
+  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
   modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTracer2' seed sliceLength maybeP2PTopography processingCores)
+  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pNetwork)
 
-exampleTracer2' :: Int -> Int -> Maybe P2PTopography -> NumCores -> LeiosTrace
-exampleTracer2' seed sliceLength maybeP2PTopography =
-  exampleTrace2 rng2 sliceLength p2pTopography
- where
-  rng0 = mkStdGen seed
-  (rng1, rng2) = Random.split rng0
-  p2pTopography =
-    flip fromMaybe maybeP2PTopography $
-      flip genArbitraryP2PTopography rng1 $
-        P2PTopographyCharacteristics
-          { p2pWorld =
-              World
-                { worldDimensions = (0.600, 0.300)
-                , worldShape = Cylinder
-                }
-          , p2pNumNodes = 100
-          , p2pNodeLinksClose = 5
-          , p2pNodeLinksRandom = 5
-          }
-
-exampleSim :: Int -> Int -> Maybe P2PTopography -> NumCores -> Time -> FilePath -> IO ()
-exampleSim seed sliceLength maybeP2PTopography processingCores stop fp = do
-  let trace = exampleTracer2' seed sliceLength maybeP2PTopography processingCores
+exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
+exampleSim seed config p2pNetwork@P2PNetwork{..} emitControl stop fp = do
+  let trace = exampleTrace2 seed config p2pNetwork
   let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
-  runSampleModel' traceFile logLeiosEvent sampleModel stop trace
+  runSampleModel' traceFile (logLeiosEvent p2pNodeNames emitControl) sampleModel stop trace
  where
   traceFile = dropExtension fp <.> "log"

@@ -33,7 +33,6 @@ import Control.Monad.Class.MonadAsync (MonadAsync)
 import Data.Bits (Bits, FiniteBits (..))
 import qualified Data.Foldable as Foldable
 import Data.Kind (Type)
-import qualified Data.List as List
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map (Map)
@@ -625,6 +624,17 @@ initRelayConsumerLocalState =
     , buffer = Map.empty
     }
 
+relayConsumerLocalStateInvariant :: Ord id => RelayConsumerLocalState id header body n -> Bool
+relayConsumerLocalStateInvariant lst =
+  let
+    windowSet = Set.fromList (Foldable.toList lst.window)
+    bufferSet = Map.keysSet lst.buffer
+    availableSet = Map.keysSet lst.available
+   in
+    bufferSet `Set.isSubsetOf` windowSet
+      && availableSet `Set.isSubsetOf` windowSet
+      && Set.null (Set.intersection bufferSet availableSet)
+
 data Collect id header body
   = CollectHeaders WindowExpand [header]
   | CollectBodies [header] [(id, body)]
@@ -708,11 +718,27 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     STM m (RelayConsumer id header body n 'StIdle m ())
   requestBodies lst = do
-    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize lst.available
+    -- New headers are filtered before becoming available, but we have
+    -- to filter `lst.available` again in the same STM tx that sets them as
+    -- `inFlight`.
+    inFlight <- readTVar sst.inFlightVar
+    relayBuffer <- readTVar sst.relayBufferVar
+    let (ignored, available1) =
+          Map.partitionWithKey
+            ( \k _ ->
+                k `Set.member` inFlight
+                  || k `RB.member` relayBuffer
+            )
+            lst.available
+    -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
+    let buffer' = lst.buffer <> Map.map (const Nothing) ignored
+
+    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize available1
     let idsToRequest = map config.headerId hdrsToRequest
-    modifyTVar' sst.inFlightVar (Set.union $ Set.fromList idsToRequest)
-    let available' = List.foldl' (flip Map.delete) lst.available idsToRequest
-    let lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available'}
+    let idsToRequestSet = Set.fromList idsToRequest
+    modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+    let available2 = Map.withoutKeys available1 idsToRequestSet
+    let !lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available2, buffer = buffer'}
     return $
       TS.YieldPipelined
         (MsgRequestBodies idsToRequest)
@@ -889,6 +915,7 @@ relayConsumerPipelined config sst =
         config.submitBlocks bodiesToSubmit now $ \validated -> do
           -- Note: here we could set a flag to drop this producer if not
           -- all blocks validated.
+          -- TODO: the validation logic should be the one inserting into relayBuffer.
           modifyTVar' sst.relayBufferVar $
             flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
           -- TODO: won't remove from inFlight blocks not validated.

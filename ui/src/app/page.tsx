@@ -1,4 +1,5 @@
-import { GraphWrapper } from "@/components/Graph/GraphWapper";
+import { SimWrapper } from "@/components/Sim/SimWrapper";
+import { SimContextProvider } from "@/contexts/SimContext/SimContextProvider";
 import { getSetSimulationMaxTime, getSimulationTopography } from "./queries";
 
 export default async function Home() {
@@ -10,7 +11,9 @@ export default async function Home() {
   return (
     <div>
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start overflow-hidden">
-        <GraphWrapper maxTime={maxTime} topography={topography}/>
+        <SimContextProvider maxTime={maxTime} topography={topography}>
+          <SimWrapper />
+        </SimContextProvider>
       </main>
     </div>
   );

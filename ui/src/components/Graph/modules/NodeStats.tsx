@@ -1,24 +1,26 @@
-import { useGraphContext } from "@/contexts/GraphContext/context";
+import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useMemo, useRef } from "react";
 
 export const NodeStats: FC = () => {
   const {
     state: {
       aggregatedData,
-      currentNode,
       topography,
-      canvasOffsetX,
-      canvasOffsetY,
-      canvasScale,
+      graph: {
+        currentNode,
+        canvasOffsetX,
+        canvasOffsetY,
+        canvasScale,
+      }
     },
-  } = useGraphContext();
+  } = useSimContext();
   const ref = useRef<HTMLDivElement>(null);
   const currentNodeStats = useMemo(() => {
     return currentNode ? aggregatedData.nodes.get(currentNode) : undefined;
   }, [currentNode, aggregatedData.nodes]);
 
   const currentNodeData = useMemo(
-    () => topography.nodes.get(Number(currentNode)),
+    () => currentNode ? topography.nodes.get(currentNode) : undefined,
     [currentNode, topography],
   );
   const { left, top } = useMemo(() => {
@@ -69,7 +71,7 @@ export const NodeStats: FC = () => {
       }}
     >
       <h2 className="flex items-center justify-between gap-4 font-bold uppercase mb-2">
-        Node Stats <span>ID: #{currentNode}</span>
+        Node Stats <span>{currentNode}</span>
       </h2>
       {currentNodeStats && (
         <>

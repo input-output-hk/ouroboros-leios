@@ -11,8 +11,8 @@ use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
-    events::Event,
-    model::{EndorserBlockId, InputBlockId, TransactionId, VoteBundleId},
+    events::{Event, Node},
+    model::TransactionId,
 };
 use tokio::{
     fs::{self, File},
@@ -20,6 +20,10 @@ use tokio::{
     sync::mpsc,
 };
 use tracing::{info, info_span};
+
+type InputBlockId = sim_core::model::InputBlockId<Node>;
+type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
+type VoteBundleId = sim_core::model::VoteBundleId<Node>;
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
@@ -57,7 +61,7 @@ impl EventMonitor {
             .filter_map(|p| if p.stake > 0 { Some(p.id) } else { None })
             .collect();
         let stage_length = config.stage_length;
-        let maximum_ib_age = stage_length * (config.deliver_stage_count + 1);
+        let maximum_ib_age = stage_length * 3;
         Self {
             node_ids,
             pool_ids,
@@ -206,16 +210,16 @@ impl EventMonitor {
                     }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
                         if *old_vrf > vrf {
-                            *blocks_published.entry(producer).or_default() += 1;
+                            *blocks_published.entry(producer.id).or_default() += 1;
                             *blocks_published.entry(*old_producer).or_default() -= 1;
                             *blocks_rejected.entry(*old_producer).or_default() += 1;
-                            blocks.insert(slot, (producer, vrf));
+                            blocks.insert(slot, (producer.id, vrf));
                         } else {
-                            *blocks_rejected.entry(producer).or_default() += 1;
+                            *blocks_rejected.entry(producer.id).or_default() += 1;
                         }
                     } else {
-                        *blocks_published.entry(producer).or_default() += 1;
-                        blocks.insert(slot, (producer, vrf));
+                        *blocks_published.entry(producer.id).or_default() += 1;
+                        blocks.insert(slot, (producer.id, vrf));
                     }
                     for published_tx in all_txs {
                         let tx = txs.get_mut(&published_tx).unwrap();
@@ -229,33 +233,30 @@ impl EventMonitor {
                 Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockLotteryWon { .. } => {}
-                Event::InputBlockGenerated {
-                    header,
-                    transactions,
-                } => {
+                Event::InputBlockGenerated { id, transactions } => {
                     generated_ibs += 1;
                     if transactions.is_empty() {
                         empty_ibs += 1;
                     }
-                    pending_ibs.insert(header.id);
-                    ib_txs.insert(header.id, transactions.clone());
+                    pending_ibs.insert(id.clone());
+                    ib_txs.insert(id.clone(), transactions.clone());
                     let mut ib_bytes = 0;
                     for tx_id in &transactions {
-                        *txs_in_ib.entry(header.id).or_default() += 1.;
+                        *txs_in_ib.entry(id.clone()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
                         ib_bytes += tx.bytes;
-                        *bytes_in_ib.entry(header.id).or_default() += tx.bytes as f64;
+                        *bytes_in_ib.entry(id.clone()).or_default() += tx.bytes as f64;
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
                         }
                     }
-                    *seen_ibs.entry(header.id.producer).or_default() += 1.;
+                    *seen_ibs.entry(id.producer.id).or_default() += 1.;
                     info!(
                         "Pool {} generated an IB with {} transaction(s) in slot {} ({}).",
-                        header.id.producer,
+                        id.producer,
                         transactions.len(),
-                        header.id.slot,
+                        id.slot,
                         pretty_bytes(ib_bytes, pbo.clone()),
                     )
                 }
@@ -264,15 +265,15 @@ impl EventMonitor {
                 }
                 Event::InputBlockReceived { recipient, .. } => {
                     ib_messages.received += 1;
-                    *seen_ibs.entry(recipient).or_default() += 1.;
+                    *seen_ibs.entry(recipient.id).or_default() += 1.;
                 }
                 Event::EndorserBlockLotteryWon { .. } => {}
                 Event::EndorserBlockGenerated { id, input_blocks } => {
                     generated_ebs += 1;
-                    eb_ibs.insert(id, input_blocks.clone());
+                    eb_ibs.insert(id.clone(), input_blocks.clone());
                     for ib_id in &input_blocks {
-                        *ibs_in_eb.entry(id).or_default() += 1.0;
-                        *ebs_containing_ib.entry(*ib_id).or_default() += 1.0;
+                        *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
+                        *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;
                         pending_ibs.remove(ib_id);
                         for tx_id in ib_txs.get(ib_id).unwrap() {
                             let tx = txs.get_mut(tx_id).unwrap();
@@ -295,12 +296,12 @@ impl EventMonitor {
                     eb_messages.received += 1;
                 }
                 Event::VoteLotteryWon { .. } => {}
-                Event::VotesGenerated { id, ebs } => {
-                    for eb in ebs {
-                        total_votes += 1;
-                        *votes_per_bundle.entry(id).or_default() += 1.0;
-                        *eb_votes.entry(eb).or_default() += 1.0;
-                        *votes_per_pool.entry(id.producer).or_default() += 1.0;
+                Event::VotesGenerated { id, votes } => {
+                    for (eb, count) in votes.0 {
+                        total_votes += count as u64;
+                        *votes_per_bundle.entry(id.clone()).or_default() += count as f64;
+                        *eb_votes.entry(eb).or_default() += count as f64;
+                        *votes_per_pool.entry(id.producer.id).or_default() += count as f64;
                     }
                 }
                 Event::NoVote { .. } => {}

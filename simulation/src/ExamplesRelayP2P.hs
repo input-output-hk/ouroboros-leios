@@ -3,6 +3,7 @@
 module ExamplesRelayP2P where
 
 import Data.Functor.Contravariant (Contravariant (contramap))
+import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import RelayProtocol
@@ -12,6 +13,7 @@ import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes
 import System.Random (mkStdGen, uniform)
 import TimeCompat (secondsToDiffTime)
+import Topology (topologyToNetwork)
 import Viz
 import VizSimRelay (relaySimVizModel)
 import VizSimRelayP2P
@@ -54,8 +56,8 @@ example1 =
     trace =
       traceRelayP2P
         rng0
-        p2pTopography
-        (\latency -> mkTcpConnProps latency (kilobytes 1000))
+        p2pNetwork
+        (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \rng ->
             RelayNodeConfig
               { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms
@@ -69,6 +71,7 @@ example1 =
               }
         )
 
+  p2pNetwork = topologyToNetwork (Just (kilobytes 1000)) p2pTopography
   p2pTopography =
     genArbitraryP2PTopography p2pTopographyCharacteristics rng0
 
@@ -146,8 +149,8 @@ example2 =
     trace =
       traceRelayP2P
         rng0
-        p2pTopography
-        (\latency -> mkTcpConnProps latency (kilobytes 1000))
+        (topologyToNetwork (Just (kilobytes 1000)) p2pTopography)
+        (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \rng ->
             RelayNodeConfig
               { blockProcessingDelay = const (secondsToDiffTime 0.1) -- 100ms

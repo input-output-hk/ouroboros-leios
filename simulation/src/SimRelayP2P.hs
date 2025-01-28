@@ -20,20 +20,20 @@ import System.Random (StdGen, split)
 import TimeCompat
 
 import ChanTCP
-import P2P (P2PTopography (..))
 import SimRelay
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
+import Topology
 
 traceRelayP2P ::
   StdGen ->
-  P2PTopography ->
-  (DiffTime -> TcpConnProps) ->
+  P2PNetwork ->
+  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
   (StdGen -> RelayNodeConfig) ->
   RelaySimTrace
 traceRelayP2P
   rng0
-  P2PTopography
+  P2PNetwork
     { p2pNodes
     , p2pLinks
     , p2pWorld
@@ -53,9 +53,9 @@ traceRelayP2P
               (inChan, outChan) <-
                 newConnectionTCP
                   (linkTracer na nb)
-                  (tcpprops (secondsToDiffTime latency))
+                  (tcpprops (secondsToDiffTime latency) bw)
               return ((na, nb), (inChan, outChan))
-            | ((na, nb), latency) <- Map.toList p2pLinks
+            | ((na, nb), (latency, bw)) <- Map.toList p2pLinks
             ]
         let tcplinksInChan =
               Map.fromListWith

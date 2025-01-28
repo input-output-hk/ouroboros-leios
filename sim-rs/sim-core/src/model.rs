@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, sync::Arc};
 
 use crate::{clock::Timestamp, config::NodeId};
 use serde::{ser::SerializeStruct, Serialize};
@@ -29,6 +29,18 @@ macro_rules! id_wrapper {
     };
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct CpuTaskId<Node = NodeId> {
+    pub node: Node,
+    pub index: u64,
+}
+
+impl<Node: Display> Display for CpuTaskId<Node> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}-{}", self.node, self.index))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Block {
     pub slot: u64,
@@ -48,15 +60,15 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct InputBlockId {
+pub struct InputBlockId<Node = NodeId> {
     pub slot: u64,
-    pub producer: NodeId,
+    pub producer: Node,
     /// Need this field to distinguish IBs from the same slot+producer.
     /// The real implementation can use the VRF proof for that.
     pub index: u64,
 }
 
-impl Display for InputBlockId {
+impl<Node: Display> Display for InputBlockId<Node> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{}-{}-{}",
@@ -65,7 +77,7 @@ impl Display for InputBlockId {
     }
 }
 
-impl Serialize for InputBlockId {
+impl<Node: Display + Serialize> Serialize for InputBlockId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -79,9 +91,8 @@ impl Serialize for InputBlockId {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct InputBlockHeader {
-    #[serde(flatten)]
     pub id: InputBlockId,
     pub vrf: u64,
     pub timestamp: Timestamp,
@@ -99,16 +110,16 @@ impl InputBlock {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct EndorserBlockId {
+pub struct EndorserBlockId<Node = NodeId> {
     pub slot: u64,
-    pub producer: NodeId,
+    pub producer: Node,
 }
-impl Display for EndorserBlockId {
+impl<Node: Display> Display for EndorserBlockId<Node> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
     }
 }
-impl Serialize for EndorserBlockId {
+impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -138,16 +149,16 @@ impl EndorserBlock {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct VoteBundleId {
+pub struct VoteBundleId<Node = NodeId> {
     pub slot: u64,
-    pub producer: NodeId,
+    pub producer: Node,
 }
-impl Display for VoteBundleId {
+impl<Node: Display> Display for VoteBundleId<Node> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
     }
 }
-impl Serialize for VoteBundleId {
+impl<Node: Display + Serialize> Serialize for VoteBundleId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -163,7 +174,7 @@ impl Serialize for VoteBundleId {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VoteBundle {
     pub id: VoteBundleId,
-    pub ebs: Vec<EndorserBlockId>, // contains duplicates
+    pub ebs: BTreeMap<EndorserBlockId, usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -174,7 +185,7 @@ pub enum NoVoteReason {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct Endorsement {
-    pub eb: EndorserBlockId,
-    pub votes: Vec<NodeId>,
+pub struct Endorsement<Node: Display = NodeId> {
+    pub eb: EndorserBlockId<Node>,
+    pub votes: Vec<Node>,
 }

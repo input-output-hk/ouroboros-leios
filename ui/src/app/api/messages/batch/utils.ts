@@ -1,12 +1,13 @@
-import { EMessageType, IServerMessage } from "@/components/Graph/types";
+import { EMessageType, IServerMessage } from "@/components/Sim/types";
 import { createReadStream, statSync } from "fs";
 import readline from "readline";
 
 import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
+  ISimulationBlock,
   ISimulationIntermediateDataState,
-} from "@/contexts/GraphContext/types";
+} from "@/contexts/SimContext/types";
 
 export const incrementNodeAggregationData = (
   aggregationNodeDataRef: ISimulationAggregatedDataState["nodes"],
@@ -48,6 +49,7 @@ export const processMessage = (
       message.publisher.toString(),
       "txGenerated",
     );
+    intermediate.txs.push({ id: Number(message.id), bytes: message.bytes });
   } else if (message.type === EMessageType.TransactionSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -66,7 +68,10 @@ export const processMessage = (
       message.producer.toString(),
       "ibGenerated",
     );
-    intermediate.txsPerIb.set(message.id, message.transactions.length);
+    intermediate.ibs.set(message.id, {
+      slot: message.slot,
+      txs: message.transactions,
+    });
   } else if (message.type === EMessageType.InputBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -85,11 +90,35 @@ export const processMessage = (
       message.producer.toString(),
       "pbGenerated",
     );
-    aggregatedData.global.praosTxOnChain += message.transactions.length;
+    const block: ISimulationBlock = {
+      slot: message.slot,
+      txs: message.transactions.map(id => intermediate.txs[id]),
+      endorsement: null,
+    };
+    const praosTx = message.transactions.length;
+    let leiosTx = 0;
     if (message.endorsement != null) {
-      let eb = message.endorsement.eb.id;
-      aggregatedData.global.leiosTxOnChain += intermediate.txsPerEb.get(eb) ?? 0;
+      const ebId = message.endorsement.eb.id;
+      const eb = intermediate.ebs.get(ebId)!;
+      const ibs = eb.ibs.map(id => {
+        const ib = intermediate.ibs.get(id)!;
+        leiosTx += ib.txs.length;
+        const txs = ib.txs.map(tx => intermediate.txs[tx]);
+        return {
+          id,
+          slot: ib.slot,
+          txs,
+        };
+      })
+      block.endorsement = {
+        id: ebId,
+        slot: eb.slot,
+        ibs,
+      }
     }
+    aggregatedData.global.praosTxOnChain += praosTx;
+    aggregatedData.global.leiosTxOnChain += leiosTx;
+    aggregatedData.blocks.push(block);
   } else if (message.type === EMessageType.PraosBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -108,10 +137,11 @@ export const processMessage = (
       message.producer.toString(),
       "ebGenerated",
     );
-    const txs = message.input_blocks
-      .map(ib => intermediate.txsPerIb.get(ib.id) ?? 0)
-      .reduce((p, c) => p + c, 0);
-    intermediate.txsPerEb.set(message.id, txs);
+    const ibs = message.input_blocks.map(ib => ib.id);
+    intermediate.ebs.set(message.id, {
+      slot: message.slot,
+      ibs,
+    });
   } else if (message.type === EMessageType.EndorserBlockSent) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
@@ -127,7 +157,7 @@ export const processMessage = (
   } else if (message.type === EMessageType.VotesGenerated) {
     incrementNodeAggregationData(
       aggregatedData.nodes,
-      message.id.id.toString(),
+      message.id.toString(),
       "votesGenerated",
     );
   } else if (message.type === EMessageType.VotesSent) {

@@ -7,9 +7,9 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::{RawConfig, RawNodeConfig};
+use sim_core::config::{RawLegacyTopology, RawNodeConfig};
 
-use crate::strategy::utils::{distance, distribute_stake, generate_full_config, LinkTracker};
+use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
@@ -81,7 +81,7 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     results
 }
 
-pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
+pub fn globe(args: &GlobeArgs) -> Result<RawLegacyTopology> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -92,8 +92,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
     let stake = distribute_stake(args.stake_pool_count)?;
     let mut rng = thread_rng();
 
-    let mut nodes = vec![];
-    let mut links = LinkTracker::new();
+    let mut graph = GraphBuilder::new();
 
     println!("generating nodes...");
     for (id, region) in regions.into_iter().enumerate() {
@@ -102,7 +101,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
             (region.location.1 + rng.gen_range(-4.0..4.0)).clamp(0.0, 180.0),
         );
         let stake = stake.get(id).cloned();
-        nodes.push(RawNodeConfig {
+        graph.add(RawNodeConfig {
             location,
             region: Some(region.name),
             stake,
@@ -122,17 +121,17 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
         };
 
         let mut candidates: Vec<_> = (first_candidate_connection..args.node_count)
-            .filter(|c| *c != from && !links.exists(from, *c))
+            .filter(|c| *c != from && !graph.exists(from, *c))
             .map(|c| {
                 (
                     c,
-                    (max_distance / distance(nodes[from].location, nodes[c].location)) as u64,
+                    (max_distance / distance(graph.location_of(from), graph.location_of(c))) as u64,
                 )
             })
             .collect();
         let mut total_weight: u64 = candidates.iter().map(|(_, weight)| *weight).sum();
         let conn_count = rng.gen_range(args.min_connections..args.max_connections);
-        while links.count(from) < conn_count && !candidates.is_empty() {
+        while graph.count(from) < conn_count && !candidates.is_empty() {
             let next = rng.gen_range(0..total_weight);
             let Some(to_index) = candidates
                 .iter()
@@ -145,21 +144,21 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
                 break;
             };
             let (to, to_weight) = candidates.remove(to_index);
-            links.add(from, to, None);
+            graph.link(from, to, None);
             total_weight -= to_weight;
         }
     }
 
     // Every node must connect to at least one other node
     for from in 0..args.node_count {
-        if !links.connections.contains_key(&from) {
+        if !graph.connections.contains_key(&from) {
             let candidate_targets: Vec<usize> = if from < args.stake_pool_count {
                 (args.stake_pool_count..args.node_count).collect()
             } else {
                 (0..args.node_count).filter(|&to| to != from).collect()
             };
             let to = candidate_targets.choose(&mut rng).cloned().unwrap();
-            links.add(from, to, None);
+            graph.link(from, to, None);
         }
     }
 
@@ -167,7 +166,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
     let mut connected_nodes = BTreeSet::new();
     track_connections(
         &mut connected_nodes,
-        &links.connections,
+        &graph.connections,
         args.stake_pool_count,
     );
 
@@ -176,13 +175,13 @@ pub fn globe(args: &GlobeArgs) -> Result<RawConfig> {
         if !connected_nodes.contains(&relay) {
             let from = last_conn;
             let to = relay;
-            links.add(from, to, None);
-            track_connections(&mut connected_nodes, &links.connections, relay);
+            graph.link(from, to, None);
+            track_connections(&mut connected_nodes, &graph.connections, relay);
             last_conn = relay;
         }
     }
 
-    Ok(generate_full_config(nodes, links.links))
+    Ok(graph.into_topology())
 }
 
 fn track_connections(
@@ -202,7 +201,7 @@ fn track_connections(
 
 #[cfg(test)]
 mod tests {
-    use sim_core::config::SimConfiguration;
+    use sim_core::config::Topology;
 
     use super::{globe, GlobeArgs};
 
@@ -217,8 +216,8 @@ mod tests {
             distribution: path.into(),
         };
 
-        let raw_config = globe(&args).unwrap();
-        let config: SimConfiguration = raw_config.into();
-        config.validate().unwrap();
+        let raw = globe(&args).unwrap();
+        let topology: Topology = raw.into();
+        topology.validate().unwrap();
     }
 }
