@@ -17,26 +17,27 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import Data.List (unfoldr)
-import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
+import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
+import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import P2P (P2PTopography (..))
 import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
+import Topology (P2PNetwork (..))
 
 traceLeiosP2P ::
   StdGen ->
-  P2PTopography ->
-  (DiffTime -> TcpConnProps) ->
+  P2PNetwork ->
+  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
   (SlotConfig -> NodeId -> StdGen -> LeiosNodeConfig) ->
   LeiosTrace
 traceLeiosP2P
   rng0
-  P2PTopography
+  P2PNetwork
     { p2pNodes
     , p2pLinks
     , p2pWorld
@@ -57,9 +58,9 @@ traceLeiosP2P
               (inChan, outChan) <-
                 newConnectionBundleTCP @Leios
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency))
+                  (tcpprops (realToFrac latency) bandwidth)
               return ((na, nb), (inChan, outChan))
-            | ((na, nb), latency) <- Map.toList p2pLinks
+            | ((na, nb), (latency, bandwidth)) <- Map.toList p2pLinks
             ]
         let tcplinksInChan =
               Map.fromListWith
@@ -107,69 +108,25 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> Int -> P2PTopography -> NumCores -> LeiosTrace
-exampleTrace2 rng0 sliceLength p2pTopography@P2PTopography{..} processingCores =
+exampleTrace2 :: StdGen -> OnDisk.Config -> P2PNetwork -> LeiosTrace
+exampleTrace2 rng = exampleTrace2' rng . convertConfig
+
+exampleTrace2' :: StdGen -> LeiosConfig -> P2PNetwork -> LeiosTrace
+exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
   traceLeiosP2P
     rng0
     p2pTopography
-    (\latency -> mkTcpConnProps latency (kilobytes 1000))
+    (\l b -> mkTcpConnProps l (fromMaybe (error "Unlimited bandwidth: TBD") b))
     leiosNodeConfig
  where
-  p2pNumNodes = fromIntegral (M.size p2pNodes)
   leiosNodeConfig slotConfig nodeId rng =
     LeiosNodeConfig
-      { stake = StakeFraction $ 1 / p2pNumNodes
+      { stake = fromMaybe undefined $ Map.lookup nodeId p2pNodeStakes
       , baseChain = Genesis
+      , slotConfig
       , leios
-      , rankingBlockFrequencyPerSlot = 1 / fromIntegral leios.sliceLength
-      , rankingBlockPayload = 0
-      , inputBlockPayload = kilobytes 96
       , processingQueueBound = 100
-      , processingCores
+      , processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores
       , nodeId
       , rng
-      }
-   where
-    leios = exampleLeiosConfig sliceLength slotConfig
-
-exampleLeiosConfig :: Int -> SlotConfig -> LeiosConfig
-exampleLeiosConfig sliceLength slotConfig = leios
- where
-  -- TODO: review voting numbers, these might not make sense.
-  leios =
-    LeiosConfig
-      { praos
-      , sliceLength = sliceLength -- matching the interval between RBs
-      , inputBlockFrequencyPerSlot = 5
-      , endorseBlockFrequencyPerStage = 1.5
-      , activeVotingStageLength = 1
-      , votingFrequencyPerStage = 500
-      , votesForCertificate = 150
-      , sizes
-      , delays
-      }
-  -- TODO: realistic sizes
-  sizes =
-    SizesConfig
-      { producerId = 4
-      , vrfProof = 32
-      , signature_ = 32
-      , reference = 32
-      , voteCrypto = 64
-      , certificate = const (50 * 1024)
-      }
-  delays =
-    LeiosDelays
-      { inputBlockHeaderValidation = const 0.005
-      , inputBlockValidation = const 0.1
-      , endorseBlockValidation = const 0.005
-      , voteMsgValidation = const 0.005
-      , certificateCreation = const 0.050
-      }
-
-  praos =
-    PraosConfig
-      { slotConfig
-      , blockValidationDelay = const 0.1 -- 100ms --TODO: should depend on certificate/payload
-      , headerValidationDelay = const 0.005 -- 5ms
       }

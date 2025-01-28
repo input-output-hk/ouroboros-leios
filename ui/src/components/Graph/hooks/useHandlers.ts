@@ -1,7 +1,7 @@
 import {
   defaultAggregatedData,
-  useGraphContext,
-} from "@/contexts/GraphContext/context";
+  useSimContext,
+} from "@/contexts/SimContext/context";
 import { useCallback } from "react";
 
 import { DEFAULT_SCALE } from "@/app/constants";
@@ -11,16 +11,18 @@ export const useHandlers = () => {
   const {
     state: {
       aggregatedData,
-      canvasRef,
-      canvasOffsetX,
-      canvasOffsetY,
-      canvasScale,
-      currentNode,
+      graph: {
+        canvasOffsetX,
+        canvasOffsetY,
+        canvasRef,
+        canvasScale,
+        currentNode,
+      },
       maxTime,
       topography,
     },
     dispatch,
-  } = useGraphContext();
+  } = useSimContext();
 
   const drawTopography = useCallback(() => {
     const canvas = canvasRef.current;
@@ -56,7 +58,7 @@ export const useHandlers = () => {
       context.lineTo(nodeEnd.fx, nodeEnd.fy);
       context.strokeStyle = "#ddd";
 
-      if (link.source === Number(currentNode) || link.target === Number(currentNode)) {
+      if (link.source === currentNode || link.target === currentNode) {
         context.strokeStyle = "black";
       }
 
@@ -107,12 +109,9 @@ export const useHandlers = () => {
 
   const handleResetSim = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
 
-    const width = canvas.parentElement?.getBoundingClientRect().width || 1024;
-    const height = canvas.parentElement?.getBoundingClientRect().height || 800;
+    const width = canvas?.parentElement?.getBoundingClientRect().width || 1024;
+    const height = canvas?.parentElement?.getBoundingClientRect().height || 800;
     const { offsetX, offsetY } = getOffsetCoordinates(
       topography,
       width,
@@ -123,11 +122,17 @@ export const useHandlers = () => {
     dispatch({
       type: "BATCH_UPDATE",
       payload: {
-        currentNode: undefined,
         aggregatedData: defaultAggregatedData,
-        canvasOffsetX: offsetX,
-        canvasOffsetY: offsetY,
-        canvasScale: DEFAULT_SCALE,
+        graph: {
+          canvasRef,
+          currentNode: undefined,
+          canvasOffsetX: offsetX,
+          canvasOffsetY: offsetY,
+          canvasScale: DEFAULT_SCALE,
+        },
+        blocks: {
+          currentBlock: undefined,
+        }
       },
     });
 

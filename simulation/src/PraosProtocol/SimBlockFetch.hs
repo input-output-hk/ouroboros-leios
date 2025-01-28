@@ -5,6 +5,7 @@ module PraosProtocol.SimBlockFetch where
 import Chan (Chan)
 import ChanDriver (ProtocolMessage)
 import ChanTCP
+import Control.Monad
 import Control.Monad.Class.MonadAsync (
   MonadAsync (..),
   mapConcurrently_,
@@ -68,28 +69,33 @@ traceRelayLink1 tcpprops =
               [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
-      praosConfig <- defaultPraosConfig
+      let praosConfig = defaultPraosConfig
       concurrently_
         (nodeA praosConfig outChan)
         (nodeB inChan)
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  bchain = mkChainSimple $ replicate 10 (BlockBody $ BS.replicate 100 0)
+  bchain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()
   nodeA praosConfig chan = do
     peerChainVar <- newTVarIO (blockHeader <$> bchain)
     (st, peerId) <- newBlockFetchControllerState Genesis >>= addPeer (asReadOnly peerChainVar)
-    (ts, submitFetchedBlock) <- setupValidatorThreads nullTracer praosConfig st 1
-    concurrently_ (mapConcurrently_ id ts) $
-      concurrently_
-        ( blockFetchController nullTracer st
-        )
-        ( runBlockFetchConsumer nullTracer praosConfig chan $
-            initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
-        )
+    taskTMVar <- newEmptyTMVarIO
+    let queue (_, t) = putTMVar taskTMVar t
+    let processingThread = forever $ do
+          join $ atomically $ takeTMVar taskTMVar
+    (ts, submitFetchedBlock) <- setupValidatorThreads praosConfig st queue
+    concurrently_ processingThread $
+      concurrently_ (mapConcurrently_ id ts) $
+        concurrently_
+          ( blockFetchController nullTracer st
+          )
+          ( runBlockFetchConsumer nullTracer praosConfig chan $
+              initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock
+          )
   -- Block-Fetch Producer
   nodeB chan = do
     st <- BlockFetchProducerState . asReadOnly <$> newTVarIO (toBlocks bchain)

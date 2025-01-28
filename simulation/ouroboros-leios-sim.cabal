@@ -61,9 +61,9 @@ library
     LeiosProtocol.Short.VizSim
     LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
-    LeiosProtocol.TaskMultiQueue
     LeiosProtocol.VizSimTestRelay
     ModelTCP
+    JSONCompat
     P2P
     PlotTCP
     PraosProtocol.BlockFetch
@@ -90,6 +90,7 @@ library
     STMCompat
     SimTCPLinks
     SimTypes
+    TaskMultiQueue
     TimeCompat
     Topology
     Viz
@@ -141,6 +142,7 @@ library
     , pqueue
     , quiet
     , random
+    , scientific
     , serialise
     , si-timers
     , singletons
@@ -171,6 +173,7 @@ executable ols
   build-depends:
     , aeson
     , base
+    , containers
     , data-default
     , optparse-applicative
     , ouroboros-leios-sim

@@ -68,7 +68,7 @@ instance MessageSize TestMessage where
 mkTcpConnProps ::
   -- | latency in seconds
   DiffTime ->
-  -- | sender serialisation bandwidth in bytes per sec
+  -- | sender serialisation bandwidth in bytes per sec, @Nothing@ for unlimited
   Bytes ->
   TcpConnProps
 mkTcpConnProps latency bandwidth =

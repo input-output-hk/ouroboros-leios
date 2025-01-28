@@ -4,27 +4,44 @@ use std::{
 };
 
 use anyhow::Result;
-use sim_core::config::RawLinkConfig;
+use netsim_core::geo::{latency_between_locations, Location};
+use sim_core::config::{RawLegacyTopology, RawLinkConfig, RawNodeConfig};
 use statrs::distribution::{Beta, ContinuousCDF as _};
 
 #[derive(Default)]
-pub struct LinkTracker {
+pub struct GraphBuilder {
     pub connections: BTreeMap<usize, BTreeSet<usize>>,
-    pub links: Vec<RawLinkConfig>,
+    nodes: Vec<RawNodeConfig>,
+    links: Vec<RawLinkConfig>,
 }
 
-impl LinkTracker {
+impl GraphBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn add(&mut self, from: usize, to: usize, latency: Option<Duration>) {
+    pub fn add(&mut self, node: RawNodeConfig) -> usize {
+        let id = self.nodes.len();
+        self.nodes.push(node);
+        id
+    }
+    pub fn location_of(&self, id: usize) -> (f64, f64) {
+        self.nodes[id].location
+    }
+    pub fn link(&mut self, from: usize, to: usize, latency: Option<Duration>) {
         if to < from {
-            self.add(to, from, latency);
+            self.link(to, from, latency);
             return;
         }
+        let latency = latency.unwrap_or_else(|| {
+            let loc1 = to_netsim_location(self.location_of(from));
+            let loc2 = to_netsim_location(self.location_of(to));
+            latency_between_locations(loc1, loc2, 1.)
+                .unwrap()
+                .to_duration()
+        });
         self.links.push(RawLinkConfig {
             nodes: (from, to),
-            latency_ms: latency.map(|l| l.as_millis() as u64),
+            latency_ms: latency.as_millis() as u64,
         });
         self.connections.entry(from).or_default().insert(to);
         self.connections.entry(to).or_default().insert(from);
@@ -41,6 +58,17 @@ impl LinkTracker {
             .map(|c| c.contains(&to))
             .unwrap_or_default()
     }
+
+    pub fn into_topology(self) -> RawLegacyTopology {
+        RawLegacyTopology {
+            nodes: self.nodes,
+            links: self.links,
+        }
+    }
+}
+
+fn to_netsim_location((lat, long): (f64, f64)) -> Location {
+    ((lat * 10000.) as i64, (long * 10000.) as u64)
 }
 
 pub fn distribute_stake(stake_pool_count: usize) -> Result<Vec<u64>> {

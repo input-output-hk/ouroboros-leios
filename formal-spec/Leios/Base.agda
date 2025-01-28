@@ -10,7 +10,7 @@ module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) (vrf' : LeiosVRF a)
 open import Leios.Blocks a using (EndorserBlock)
 
 StakeDistr : Type
-StakeDistr = PoolID ⇀ ℕ
+StakeDistr = TotalMap PoolID ℕ
 
 RankingBlock : Type
 RankingBlock = These EndorserBlock (List Tx)

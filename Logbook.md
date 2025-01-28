@@ -1,5 +1,168 @@
 # Leios logbook
 
+## 2025-01-27
+
+### Certificate size for "Fiat Accompli" sortition
+
+The Jupyter notebook [analysis/fiat-accompli.ipynb](analysis/fiat-accompli.ipynb) documents the certficate-size computation for the Fiat Accompli sortition scheme. This demonstrates that it is practical to achieve certificates smaller than 20 kB for Leios.
+
+![Fiat accompli certificate size](images/fiat-accompli-cert.svg)
+
+## 2025-01-26
+
+### Haskell Simulation
+
+- Leios and praos simulations can now read parameters and topologies
+  from disk using the agreed upon formats.
+- Added `generate-topology` command to output randomly generated
+  topologies (given some characteristics).
+- Aligned leios sortition to algorithms in sortition benchmarks and
+  technical report.
+- Discussed IB diffusion protocol and analysis of topologies with DeltaQ team.
+- Drafted report on comparison between praos simulation and benchmark
+  cluster, average adoption times from simulation are slower but
+  within 10% of measured, see PR #171 for details. Note: a review of
+  the simulation parameters is still pending.
+
+Nest steps:
+- Generate topologies where block producers are behind relays.
+- Start work on comparison with idealized diffusion model.
+- Run leios simulations configured for higher thoughput.
+
+## 2025-01-24
+
+### Analysis of "Fiat Accompli" sortition
+
+The ["Fiat Accompli" sortition scheme](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/) creates a hybrid committee containing a static, deterministic set of votes having large stake with a randomized, non-deterministic set of voters with smaller stake. We analyzed the FA1<sup>F</sup> and wFA schemes, based on the actual `mainnet` stake distribution for Epoch 535.
+
+| Unique, deterministic voters                             | Votes cast by deterministic voters                     |
+|----------------------------------------------------------|--------------------------------------------------------|
+| ![Fait accompli voters](images/fiat-accompli-voters.svg) | ![Fiat accompli votes](images/fiat-accompli-votes.svg) |
+
+Having deterministically-chosen voters significantly reduces the size of Leios certificates because the $\sigma_\text{eid}$ signature (96 bytes each) do not need to be stored in the certificate for these voters. For example, for the recommended minimum Leios committee size of 500 votes, under scheme wFA the 406 block-producing nodes with the largest stake would always be included in the voting committee; approximately 88 voters would be selected at random to complete each voting committee.
+
+## 2025-01-24
+
+### Rust Simulation
+
+First pass of block-level visualization complete.
+
+## 2025-01-23
+
+### First analysis of downstream impacts of Leios
+
+In order to start answering the question "How much 'heart surgery' will Leios entail?", we've started assessing the impacts of Leios on downstream ecosystem, infrastructure, and technical dependencies.
+
+- Logical changes to the ledger and physical changes to node data structures will likely affect most indexers, explorers, SDKs, and APIs.
+- Leios fees and memory-pool sharding will impact transaction construction and serialization by dapps and wallets.
+- Although the physical changes such as Input Blocks, Endorser Blocks, votes, and certificates may be invisbible to some dapps and wallets, the more complex and sophisticated use cases may need to query the physical layer or might choose to do so for reasons of performance optimization.
+- Conditions of very high throughput (i.e., many transactions per second) may necessitate more efficient filtering of ledger events by downstream services and applications.
+- Applications will need to be aware that a transaction's journey from the memory pool to its becoming referenced (as per Leios, via IBs and EBs) by a Praos block might be longer than a "pure Praos" journey from the memory pool directly into a Praos block.
+
+The extent of the downstream impacts strongly depends upon the APIs that the node and middleware services provide to consuming services and applications, and the extent to which those services and applications must interact or choose to interact with Leios's physical layer. Further analyses and collaborations with stakeholders will begin to quantify the assessment of downstream effects.
+
+### DeltaQ Update
+
+- thanks to the Haskell simulation CLI now supporting to export the generated topology, plus the Rust simulation being able to read that same topology format, we can now run both simulations on the same topology
+  (it would be even nicer if `cabal ols -- sim` could read a topology file as well)
+- now my current ΔQ model for IB diffusion does match (well enough) to both of them! Yeehah!
+- note that the Rust simulation does not include bandwidth effects while Haskell does, which incurs an additional 328ms network delay at each hop (at 1MB/s allocated bandwidth)
+
+### Rust Simulation
+
+- Updated existing topology files to bake latencies in, instead of computing on the fly based on locations.
+- Began putting together a block-level visualization in (addition to the graph view). This will be able to show the relationships between the different types of blocks (IBs/EBs/RBs), and demonstrate the benefits of Leios.
+
+## 2025-01-22
+
+### DeltaQ Update
+
+- performed new comparison with Haskell simulation based on the JSONL event log (added over past two weeks)
+  - first verified transmission & validation latencies match parameters used in the config to validate the scripts
+  - then extracted IB diffusion timings using improved JQ scripts
+  - _et violá_: achieving a pretty good match with a reasonable ΔQ expression (see `delta_q/comparison_hs.txt`)
+- started new comparison with Rust simulation using realistic topology config
+  - 3000 nodes and all Leios stages generate a ton of JSONL (8GB to see first EB with IBs)
+  - filtered only for InputBlock* events
+  - added block ID information to `InputBlockGenerated` and `InputBlockValidated` events of type `CpuTaskFinished`
+  - used these to measure diffusion latencies
+  - current finding is that diffusion is _waaay_ quicker than in Haskell, completing in under 1sec for 3000 nodes ⟹ pending further investigation
+
+## 2025-01-21
+
+### Rust Simulation
+
+Update simulation output to use "human readable" names from shared topology format. This should make it easier to compare output from different simulations, as now we can use common ids.
+
+## 2025-01-19
+
+### Haskell Simulation
+
+- In preliminary results, diffusion latency of praos blocks is closely
+  comparable to data obtained from the benchmark cluster. Validation
+  times are inferred from closely related timings in the report.
+- Short Leios node implementation integrated simulation parameters
+  agreed upon with the rust team.
+- Reviewed previous PI goal and completed it by including total data
+  transmitted per node in the visualization.
+
+## 2025-01-17
+
+### Cryptography benchmarking and progress
+
+We implemented and benchmarked all of the Leios cryptography, as a Rust crate [leios_crypto_benchmarks](crypto-benchmarks.rs/).
+
+- VRF (prerequisite to each sortition):
+  - VRF proving: 240 µs
+  - VRF verifying: 390 µs
+- Sortition (not including the required VRF evaluation):
+  - RB leadership: 0.17 µs/slot
+  - IB leadership: 0.17 µs/slot
+  - EB leadership: 0.17 µs/pipeline
+  - Number of votes: 3.8 µs/pipeline
+- BLS
+  - Verify the proof of key possession: 1.5 ms/key
+  - Generate vote: 280 µs/vote
+  - Verify vote: 1.4 ms/vote
+  - Generate certificate for a 300-vote quorum: 50 ms/cert
+  - Verify certificate for a 300-vote quorum: 90 ms/cert
+
+Overall, we're in pretty good shape:
+
+- The total cryptography for a phase is less than one second CPU, and phases are at least 30 seconds long.
+- The costly verification of votes and possession can be done as the votes arrive.
+- The costly certificate operations fit within a slot.
+
+We also made significant progress on clarifying some of the decisions around vote contents, certificate size, and the framework for cryptographic keys.
+
+- If key management (rotation etc.) is handled outside of the vote data structure, then the vote signature could be as small as 192 bytes.
+  - If nodes with large amounts of stake were automatically (deterministically) included in the committee of voters, then it might be possible to further reduce the size of the vote signature.
+- The content of the vote (aside from the signature) would be at least another 64 bytes, but that would be common to all votes in a given election.
+- With a 500-vote committee and a quorum of 60% agreement on certifying the EB, even a naive certificate aggregation would be 58 kB, which would easily fit in a Praos block.
+- It may be possible to coordinate key registration with the 36-hour KES rotation or the operational certificates.
+- It also may be possible to leverate the fact that the Praos VRF uses BLS keys.
+
+### Cryptography sections of technical report
+
+Completed the cryptography-related sections of the first Leios technical report, incorporating responses to reviewer comments.
+
+- We're going to freeze that content and put our recent and any new benchmarking, design proposals, and analyses into future documents (e.g., the second technical report) because it doesn't makes sense to destabilize the reviewed document by adding unreviewed material, especially as we'll be finalizing the report soon.
+- We might want to add a disclaimer at the front of the report to the effect that it represents a snapshot of our provisional analysis and understanding of Leios, and that we expect future work to supercede and perhaps contradict it.
+  
+## 2025-01-16
+
+### Rust simulation
+
+Use more granular CPU simulation times. Still need to update the actual values to match latest estimates.
+
+Fixed a race condition in the simulated clock.
+
+## 2025-01-15
+
+### Rust simulation
+
+Start consuming the new shared configuration file format. Topologies are still stored in yaml for now.
+
 ## 2025-01-13
 
 ### Haskell and Rust simulations

@@ -11,6 +11,7 @@ module LeiosProtocol.Short.VizSim where
 import ChanDriver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
+import qualified Data.Foldable as Foldable
 import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
@@ -26,12 +27,14 @@ import qualified Data.Set as Set
 import GHC.Records
 import qualified Graphics.Rendering.Cairo as Cairo
 import LeiosProtocol.Common hiding (Point)
-import LeiosProtocol.Relay (Message (MsgRespondBodies), RelayMessage, relayMessageLabel)
-import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), NumCores (Infinite), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
+import LeiosProtocol.Relay (Message (MsgRespondBodies, MsgRespondHeaders), RelayMessage, RelayState, relayMessageLabel)
+import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMessage (..), LeiosNodeEvent (..), RelayEBMessage, RelayIBMessage, RelayVoteMessage)
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
 import P2P (linkPathLatenciesSquared)
+import PraosProtocol.BlockFetch (Message (MsgBlock))
+import PraosProtocol.ChainSync (Message (MsgRollForward_StCanAwait, MsgRollForward_StMustReply))
 import PraosProtocol.PraosNode (PraosMessage (..))
 import qualified PraosProtocol.VizSimPraos as VizSimPraos
 import SimTypes
@@ -52,7 +55,7 @@ example1 =
         Layout $
           leiosSimVizRender examplesLeiosSimVizConfig
  where
-  model = leiosSimVizModel (LeiosModelConfig 5 Infinite) trace
+  model = leiosSimVizModel (LeiosModelConfig 5 Infinite 2000000) trace
    where
     trace = exampleTrace1
 
@@ -127,7 +130,16 @@ data LeiosSimVizState
   , voteMsgs :: !(LeiosSimVizMsgsState VoteId VoteMsg)
   , ibsInRBs :: !IBsInRBsState
   , nodeCpuUsage :: !(Map NodeId (IntervalMap DiffTime Int))
+  , dataTransmittedPerNode :: !(Map NodeId DataTransmitted)
   }
+
+newtype DataTransmitted = DataTransmitted
+  { messagesTransmitted :: IntervalMap DiffTime Bytes
+  -- ^ the total bandwidth used by the various mini-protocol.
+  }
+
+initDataTransmitted :: DataTransmitted
+initDataTransmitted = DataTransmitted ILMap.empty
 
 data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
   { msgsAtNodeQueue :: !(Map NodeId [msg])
@@ -233,6 +245,7 @@ data LeiosModelConfig = LeiosModelConfig
   { recentSpan :: !DiffTime
   -- ^ length of time the Recent* maps should cover
   , numCores :: !NumCores
+  , maxBandwidthPerNode :: !Bytes
   }
 
 -- | Make the vizualisation model for the relay simulation from a simulation
@@ -270,6 +283,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
       , voteMsgs = initMsgs
       , ibsInRBs = IBsInRBsState Map.empty Map.empty
       , nodeCpuUsage = Map.empty
+      , dataTransmittedPerNode = Map.empty
       }
 
   accumEventVizState ::
@@ -386,6 +400,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
               (nfrom, nto)
               [(msg, msgforecast, msgforecasts)]
               (vizMsgsInTransit vs)
+        , dataTransmittedPerNode = Map.alter (Just . accumDataTransmitted msg msgforecast . fromMaybe initDataTransmitted) nfrom (dataTransmittedPerNode vs)
         }
   accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) vs =
     vs{nodeCpuUsage = accumNodeCpuUsage now nid task (nodeCpuUsage vs)}
@@ -435,6 +450,50 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     secondsAgoSpan = addTime (negate recentSpan) now
     secondsAgo30 :: Time
     secondsAgo30 = addTime (-30) now
+
+accumDataTransmitted :: LeiosMessage -> TcpMsgForecast -> DataTransmitted -> DataTransmitted
+accumDataTransmitted msg forecast DataTransmitted{..} =
+  DataTransmitted
+    { messagesTransmitted = (ILMap.insert interval $! msgSize forecast) messagesTransmitted
+    }
+ where
+  interval :: ILMap.Interval DiffTime
+  interval =
+    ILMap.ClosedInterval
+      (coerce forecast.msgSendLeadingEdge)
+      (coerce forecast.msgSendTrailingEdge)
+  -- could be interesting to compare to "useful" data.
+  _accumPayloadAndBlocksTransmitted (payload0, blocks0) =
+    (maybe id (ILMap.insert interval) payload payload0, maybe id (ILMap.insert interval) block blocks0)
+   where
+    payloadIB ::
+      HasField "size" body Bytes =>
+      ProtocolMessage (RelayState id header body) ->
+      Maybe Bytes
+    payloadIB (ProtocolMessage (SomeMessage rmsg)) =
+      case rmsg of
+        MsgRespondBodies xs -> Just $ sum $ map ((.size) . snd) xs
+        _ -> Nothing
+    blockRelay :: MessageSize body => ([header] -> Maybe Bytes) -> RelayMessage id header body -> Maybe Bytes
+    blockRelay f (ProtocolMessage (SomeMessage rmsg)) =
+      case rmsg of
+        MsgRespondHeaders xs -> f . Foldable.toList $ xs
+        MsgRespondBodies xs -> Just . sum . map (messageSizeBytes . snd) $ xs
+        _ -> Nothing
+    (payload, block) = case msg of
+      RelayIB ibmsg -> (payloadIB ibmsg, blockRelay (Just . sum . map (.size)) ibmsg)
+      RelayEB ebmsg -> (Nothing, blockRelay (const Nothing) ebmsg)
+      RelayVote votemsg -> (Nothing, blockRelay (const Nothing) votemsg)
+      PraosMsg (PraosMessage pmsg) -> case pmsg of
+        (Left (ProtocolMessage (SomeMessage csmsg))) ->
+          case csmsg of
+            MsgRollForward_StCanAwait header _ -> (Nothing, Just $ messageSizeBytes header)
+            MsgRollForward_StMustReply header _ -> (Nothing, Just $ messageSizeBytes header)
+            _ -> (Nothing, Nothing)
+        (Right (ProtocolMessage (SomeMessage csmsg))) ->
+          case csmsg of
+            MsgBlock _ body -> (Just body.payload, Just body.size)
+            _ -> (Nothing, Nothing)
 
 -- | Vote messages contain multiple votes each, so we bump the count by that amount
 adjustNumVotes :: BlockEvent -> VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg -> LeiosSimVizMsgsState VoteId VoteMsg

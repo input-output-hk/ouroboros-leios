@@ -1,4 +1,4 @@
-import { ITransformedNodeMap } from "./types";
+import { ITransformedNodeMap } from "@/components/Sim/types";
 
 export const isWithinRange = (
   elapsedTimestamp: number,
