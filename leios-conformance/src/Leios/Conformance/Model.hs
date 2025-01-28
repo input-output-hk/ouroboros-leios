@@ -23,44 +23,42 @@ data EnvAction
   | NewVote Vote
   deriving (Eq, Show)
 
-instance FromJSON InputBlock where
-  parseJSON = undefined
+instance FromJSON IBHeader
+instance FromJSON IBBody
+instance FromJSON InputBlock
 
-instance ToJSON InputBlock where
-  toJSON = undefined
+instance ToJSON IBHeader
+instance ToJSON IBBody
+instance ToJSON InputBlock
 
 instance Pretty InputBlock where
-  pPrint (InputBlock _ _) = "InputBlock"
-
--- TODO: use EndorserBlock extracted from Agda
-data EndorserBlock = EndorserBlock
-  deriving (Show, Eq, Generic)
+  pPrint (InputBlock {}) = "InputBlock"
 
 instance FromJSON EndorserBlock
 instance ToJSON EndorserBlock
 instance Pretty EndorserBlock where
-  pPrint EndorserBlock = "EndorserBlock"
+  pPrint (EndorserBlock {}) = "EndorserBlock"
 
--- TODO: use Vote extracted from Agda
-data Vote = Vote
-  deriving (Show, Eq, Generic)
-
-instance FromJSON Vote
-instance ToJSON Vote
-instance Pretty Vote where
-  pPrint Vote = "Vote"
-
--- TODO: use LeiosState extracted from Agda
-data NodeModel = NodeModel
-  { currentSlot :: Integer
-  , ibs :: [InputBlock]
-  , ebs :: [EndorserBlock]
-  , votes :: [Vote]
-  }
-  deriving Show
+type Vote = () -- TODO: use Vote extracted from Agda
+type NodeModel = LeiosState
 
 initialModelState :: NodeModel
-initialModelState = NodeModel 0 [] [] []
+initialModelState = LeiosState
+  { v = ()
+  , sD = MkHSMap []
+  , fFDState = ()
+  , ledger = []
+  , toPropose = []
+  , iBs = []
+  , eBs = []
+  , vs = []
+  , slot = 0
+  , iBHeaders = []
+  , iBBodies = []
+  , upkeep = MkHSSet []
+  , baseState = ()
+  , votingState = ()
+  }
 
 --TODO
 makeIB :: NodeModel -> Maybe InputBlock
@@ -75,13 +73,13 @@ makeVote :: NodeModel -> Maybe Vote
 makeVote _ = Nothing
 
 addIB :: InputBlock -> NodeModel -> NodeModel
-addIB ib nm@NodeModel{..} = nm { ibs = ib : ibs }
+addIB ib nm@LeiosState{..} = nm { iBs = ib : iBs }
 
 addEB :: EndorserBlock -> NodeModel -> NodeModel
-addEB eb nm@NodeModel{..} = nm { ebs = eb : ebs }
+addEB eb nm@LeiosState{..} = nm { eBs = eb : eBs }
 
 addVote :: Vote -> NodeModel -> NodeModel
-addVote v nm@NodeModel{..} = nm { votes = v : votes }
+addVote x nm@LeiosState{..} = nm { vs = [x] : vs }
 
 -- TODO: Leios executable specification
 transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [Vote]), NodeModel)

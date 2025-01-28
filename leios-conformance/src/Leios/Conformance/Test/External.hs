@@ -103,7 +103,7 @@ type Runtime = StateT RunState IO
 
 instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [EndorserBlock], [Vote]) => RunModel NetworkModel Runtime where
 
-  perform net@NetworkModel{nodeModel = NodeModel{..}} (Step a) _ = case a of
+  perform net@NetworkModel{nodeModel = LeiosState{..}} (Step a) _ = case a of
     Tick -> do
       rs@RunState{..} <- get
       modify $ \rs' -> rs' {unfetchedIBs = mempty, unfetchedEBs = mempty, unfetchedVotes = mempty}
@@ -133,8 +133,8 @@ instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [E
     let (expectedIBs, expectedEBs, expectedVotes) = maybe (mempty, mempty, mempty) fst $ transition s a
     let ok = (ibs, ebs) == (expectedIBs, expectedEBs)
     monitorPost . counterexample . show $ "  action $" <+> pPrint a
-    when (a == Tick && currentSlot s == currentSlot s' + 1) $
-      monitorPost . counterexample $ "  -- new slot: " ++ show (currentSlot s')
+    when (a == Tick && slot s == slot s' + 1) $
+      monitorPost . counterexample $ "  -- new slot: " ++ show (slot s')
     unless (null ibs) $
       monitorPost . counterexample . show $ "  --      got InputBlocks:" <+> pPrint ibs
     when (ibs /= expectedIBs) $

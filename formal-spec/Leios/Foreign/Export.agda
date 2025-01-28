@@ -10,7 +10,7 @@ open import Tactic.Derive.Convertible
 open import Tactic.Derive.HsType
 
 open import Leios.Prelude
-open import Leios.Trace
+open import Leios.Trace renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HSTypes
 
@@ -20,20 +20,20 @@ instance
   HsTy-SlotUpkeep = autoHsType SlotUpkeep ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
   Conv-SlotUpkeep = autoConvert SlotUpkeep
 
-record IBHeaderHs : Type where
+record IBHeader : Type where
   field slotNumber : Int
         producerID : Int
 
 {-# FOREIGN GHC
-data IBHeaderHs = IBHeaderHs Integer Integer
+data IBHeader = IBHeader Integer Integer
   deriving (Show, Eq, Generic)
 #-}
 
-{-# COMPILE GHC IBHeaderHs = data IBHeaderHs (IBHeaderHs) #-}
+{-# COMPILE GHC IBHeader = data IBHeader (IBHeader) #-}
 
 instance
-  HsTy-IBHeader = MkHsType IBHeader IBHeaderHs
-  Conv-IBHeader : Convertible IBHeader IBHeaderHs
+  HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
+  Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
     { to = λ (record { slotNumber = sl ; producerID = pid }) → record { slotNumber = + sl ; producerID = + toℕ pid }
     ; from = λ (record { slotNumber = sl ; producerID = pid }) →
@@ -64,23 +64,23 @@ instance
   Conv-ℕ : HsConvertible ℕ 
   Conv-ℕ = Convertible-Refl
 
-record EndorserBlockHs : Type where
+record EndorserBlock : Type where
   field slotNumber : Int
         producerID : Int
         ibRefs     : List Int
         
 {-# FOREIGN GHC
-data EndorserBlockHs = EndorserBlockHs Integer Integer [Integer]
+data EndorserBlock = EndorserBlock Integer Integer [Integer]
   deriving (Show, Eq, Generic)
 #-}
 
-{-# COMPILE GHC EndorserBlockHs = data EndorserBlockHs (EndorserBlockHs) #-}
+{-# COMPILE GHC EndorserBlock = data EndorserBlock (EndorserBlock) #-}
 
 instance
 
-  HsTy-EndorserBlock = MkHsType EndorserBlock EndorserBlockHs
+  HsTy-EndorserBlock = MkHsType EndorserBlockAgda EndorserBlock
   
-  Conv-EndorserBlock : Convertible EndorserBlock EndorserBlockHs
+  Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
   Conv-EndorserBlock =
     record
       { to = λ (record { slotNumber = sl ; producerID = pid }) → record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = [] }
