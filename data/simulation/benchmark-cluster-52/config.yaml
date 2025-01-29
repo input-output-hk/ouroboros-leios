@@ -1,0 +1,29 @@
+# Sec 2.2 Anomaly Control
+#   * Block size: 88908 bytes
+# We subtract 1kB for the header.
+# Note: for a praos-only simulation nothing else contributes to body size.
+rb-body-legacy-praos-payload-avg-size-bytes: 87884
+rb-head-size-bytes: 1024
+rb-body-max-size-bytes: 100000
+
+# Sec 2.3 Forging
+#   * Slot start to announced: 0.12975s
+# Note: In the simulation we generate and adopt at the same time, and
+# forging alone does not impact diffusion times.
+rb-generation-cpu-time-ms: 129.75
+
+# Sec 2.5 Individual peer propagation
+#   * Noticed to fetch request: 0.00141s
+#   * Fetched to sending:       0.04453s
+rb-head-validation-cpu-time-ms: 1.41
+rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 44.53
+rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0
+
+
+# Chapter 1 Manifest
+#   * Analysed run duration: 48049s
+#   * Blocks analyzed:       2277
+# Blocks per second during analysis: 2277/48049 = 4.7489e2
+# We can assume parameters were set to target 0.05 block/s.
+rb-generation-probability: 0.05
+
