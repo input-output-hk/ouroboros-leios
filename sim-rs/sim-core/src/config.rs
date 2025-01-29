@@ -160,7 +160,7 @@ impl Topology {
         frontier.push_back(first_node);
         while let Some(node) = frontier.pop_front() {
             if connected_nodes.insert(node.id) {
-                for peer_id in &node.peers {
+                for peer_id in &node.consumers {
                     if node.id == *peer_id {
                         self_connected_nodes.push(node.id);
                     }
@@ -197,14 +197,14 @@ impl From<RawLegacyTopology> for Topology {
                 stake: raw.stake.unwrap_or_default(),
                 cpu_multiplier: raw.cpu_multiplier,
                 cores: raw.cores,
-                peers: vec![],
+                consumers: vec![],
             })
             .collect();
         let mut links = vec![];
         for link in value.links {
             let (id1, id2) = link.nodes;
-            nodes[id1].peers.push(NodeId::new(id2));
-            nodes[id2].peers.push(NodeId::new(id1));
+            nodes[id1].consumers.push(NodeId::new(id2));
+            nodes[id2].consumers.push(NodeId::new(id1));
             links.push(LinkConfiguration {
                 nodes: (NodeId::new(id1), NodeId::new(id2)),
                 latency: Duration::from_millis(link.latency_ms),
@@ -217,42 +217,49 @@ impl From<RawLegacyTopology> for Topology {
 impl From<RawTopology> for Topology {
     fn from(value: RawTopology) -> Self {
         let mut node_ids = BTreeMap::new();
-        for (id, name) in value.nodes.keys().enumerate() {
-            node_ids.insert(name.clone(), NodeId::new(id));
-        }
-        let mut nodes = vec![];
-        let mut links = BTreeMap::new();
-        for (name, raw_node) in value.nodes.into_iter() {
-            let id = *node_ids.get(&name).unwrap();
-            let mut node = NodeConfiguration {
+        let mut nodes = BTreeMap::new();
+        for (index, (name, node)) in value.nodes.iter().enumerate() {
+            let id = NodeId::new(index);
+            node_ids.insert(name.clone(), id);
+            nodes.insert(
                 id,
-                name,
-                stake: raw_node.stake.unwrap_or_default(),
-                cpu_multiplier: 1.0,
-                cores: raw_node.cpu_core_count,
-                peers: vec![],
-            };
-            for (peer_name, peer_info) in raw_node.producers {
-                let peer_id = *node_ids.get(&peer_name).unwrap();
-                node.peers.push(peer_id);
-                let mut ids = [id, peer_id];
+                NodeConfiguration {
+                    id,
+                    name: name.clone(),
+                    stake: node.stake.unwrap_or_default(),
+                    cpu_multiplier: 1.0,
+                    cores: node.cpu_core_count,
+                    consumers: vec![],
+                },
+            );
+        }
+        let mut links = BTreeMap::new();
+        for (consumer_name, raw_node) in value.nodes.into_iter() {
+            let consumer_id = *node_ids.get(&consumer_name).unwrap();
+
+            for (producer_name, producer_info) in raw_node.producers {
+                let producer_id = *node_ids.get(&producer_name).unwrap();
+                nodes
+                    .get_mut(&producer_id)
+                    .unwrap()
+                    .consumers
+                    .push(consumer_id);
+                let mut ids = [consumer_id, producer_id];
                 ids.sort();
                 links.insert(
                     ids,
                     LinkConfiguration {
                         nodes: (ids[0], ids[1]),
-                        latency: duration_ms(peer_info.latency_ms),
+                        latency: duration_ms(producer_info.latency_ms),
                     },
                 );
             }
-            nodes.push(node);
-        }
-        for [from, to] in links.keys() {
-            nodes[from.to_inner()].peers.push(*to);
-            nodes[to.to_inner()].peers.push(*from);
         }
         let links = links.into_values().collect();
-        Self { nodes, links }
+        Self {
+            nodes: nodes.into_values().collect(),
+            links,
+        }
     }
 }
 
@@ -388,7 +395,7 @@ pub struct NodeConfiguration {
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
-    pub peers: Vec<NodeId>,
+    pub consumers: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone)]
