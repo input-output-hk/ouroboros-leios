@@ -5,10 +5,13 @@ use std::{
 
 use anyhow::Result;
 use netsim_core::geo::{latency_between_locations, Location};
-use sim_core::config::{RawLegacyTopology, RawLinkConfig, RawNodeConfig};
+use sim_core::config::{
+    RawLegacyTopology, RawLinkConfig, RawLinkInfo, RawNode, RawNodeConfig, RawNodeLocation,
+    RawTopology,
+};
 use statrs::distribution::{Beta, ContinuousCDF as _};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct GraphBuilder {
     pub connections: BTreeMap<usize, BTreeSet<usize>>,
     nodes: Vec<RawNodeConfig>,
@@ -59,11 +62,48 @@ impl GraphBuilder {
             .unwrap_or_default()
     }
 
-    pub fn into_topology(self) -> RawLegacyTopology {
+    pub fn into_legacy_topology(self) -> RawLegacyTopology {
         RawLegacyTopology {
             nodes: self.nodes,
             links: self.links,
         }
+    }
+
+    pub fn into_topology(self) -> RawTopology {
+        let mut nodes: BTreeMap<_, _> = self
+            .nodes
+            .into_iter()
+            .enumerate()
+            .map(|(id, n)| {
+                let name = format!("node-{id}");
+                let node = RawNode {
+                    stake: n.stake,
+                    location: RawNodeLocation::Coords(n.location),
+                    cpu_core_count: n.cores,
+                    producers: BTreeMap::new(),
+                };
+                (name, node)
+            })
+            .collect();
+        for link in self.links {
+            let from_id = format!("node-{}", link.nodes.0);
+            let to_id = format!("node-{}", link.nodes.1);
+            nodes.get_mut(&from_id).unwrap().producers.insert(
+                to_id.clone(),
+                RawLinkInfo {
+                    latency_ms: link.latency_ms as f64,
+                    bandwidth_bytes_per_second: None,
+                },
+            );
+            nodes.get_mut(&to_id).unwrap().producers.insert(
+                from_id,
+                RawLinkInfo {
+                    latency_ms: link.latency_ms as f64,
+                    bandwidth_bytes_per_second: None,
+                },
+            );
+        }
+        RawTopology { nodes }
     }
 }
 

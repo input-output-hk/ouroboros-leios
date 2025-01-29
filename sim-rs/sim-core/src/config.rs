@@ -112,33 +112,36 @@ pub struct RawLegacyTopology {
     pub links: Vec<RawLinkConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawTopology {
     pub nodes: BTreeMap<String, RawNode>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawNode {
-    stake: Option<u64>,
-    // location: RawNodeLocation,
-    cpu_core_count: Option<u64>,
-    producers: BTreeMap<String, RawLinkInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stake: Option<u64>,
+    pub location: RawNodeLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_core_count: Option<u64>,
+    pub producers: BTreeMap<String, RawLinkInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", untagged)]
 pub enum RawNodeLocation {
     Cluster { cluster: String },
     Coords((f64, f64)),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawLinkInfo {
-    latency_ms: f64,
-    // bandwidth_bytes_per_second: Option<u64>,
+    pub latency_ms: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bandwidth_bytes_per_second: Option<u64>,
 }
 
 pub struct Topology {
@@ -263,7 +266,7 @@ impl From<RawTopology> for Topology {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RawNodeConfig {
     pub location: (f64, f64),
     pub stake: Option<u64>,
@@ -274,7 +277,7 @@ pub struct RawNodeConfig {
     pub cores: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RawLinkConfig {
     pub nodes: (usize, usize),
     pub latency_ms: u64,

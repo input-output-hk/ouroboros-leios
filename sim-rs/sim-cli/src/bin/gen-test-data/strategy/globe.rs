@@ -7,7 +7,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::{RawLegacyTopology, RawNodeConfig};
+use sim_core::config::RawNodeConfig;
 
 use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
 
@@ -81,7 +81,7 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
     results
 }
 
-pub fn globe(args: &GlobeArgs) -> Result<RawLegacyTopology> {
+pub fn globe(args: &GlobeArgs) -> Result<GraphBuilder> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -181,7 +181,7 @@ pub fn globe(args: &GlobeArgs) -> Result<RawLegacyTopology> {
         }
     }
 
-    Ok(graph.into_topology())
+    Ok(graph)
 }
 
 fn track_connections(
@@ -217,7 +217,7 @@ mod tests {
         };
 
         let raw = globe(&args).unwrap();
-        let topology: Topology = raw.into();
+        let topology: Topology = raw.into_topology().into();
         topology.validate().unwrap();
     }
 }

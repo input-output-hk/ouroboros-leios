@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
-use sim_core::config::{RawLegacyTopology, RawNodeConfig};
+use sim_core::config::RawNodeConfig;
 
 use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
 
@@ -15,7 +15,7 @@ pub struct RandomGraphArgs {
     max_connections: usize,
 }
 
-pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
+pub fn random_graph(args: &RandomGraphArgs) -> Result<GraphBuilder> {
     if args.stake_pool_count >= args.node_count {
         bail!("At least one node must not be a stake pool");
     }
@@ -108,7 +108,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<RawLegacyTopology> {
         }
     }
 
-    Ok(graph.into_topology())
+    Ok(graph)
 }
 
 fn track_connections(
@@ -142,7 +142,7 @@ mod tests {
         };
 
         let raw = random_graph(&args).unwrap();
-        let topology: Topology = raw.into();
+        let topology: Topology = raw.into_topology().into();
         topology.validate().unwrap();
     }
 }

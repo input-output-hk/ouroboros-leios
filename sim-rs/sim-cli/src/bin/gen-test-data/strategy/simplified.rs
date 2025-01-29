@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::{RawLegacyTopology, RawNodeConfig};
+use sim_core::config::RawNodeConfig;
 
 use super::utils::{distribute_stake, GraphBuilder};
 
@@ -40,7 +40,7 @@ const SHORT_HOP: Duration = Duration::from_millis(12);
 const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
-pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
+pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
     let mut rng = thread_rng();
 
     let mut graph = GraphBuilder::new();
@@ -119,7 +119,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
         }
     }
 
-    Ok(graph.into_topology())
+    Ok(graph)
 }
 
 #[cfg(test)]
@@ -133,7 +133,7 @@ mod tests {
         let args = SimplifiedArgs { pool_count: 1000 };
 
         let raw = simplified(&args).unwrap();
-        let topology: Topology = raw.into();
+        let topology: Topology = raw.into_topology().into();
         topology.validate().unwrap();
     }
 }
