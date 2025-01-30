@@ -60,7 +60,7 @@ data NodeRequest
   | NewSlot
       { newIBs :: [InputBlock]
       , newEBs :: [EndorserBlock]
-      , newVotes :: [Vote]
+      , newVotes :: [[Vote]]
       }
   | Stop
   deriving (Eq, Generic, Show)
@@ -72,7 +72,7 @@ data NodeResponse
   = NodeResponse
       { diffuseIBs :: [InputBlock]
       , diffuseEBs :: [EndorserBlock]
-      , diffuseVotes :: [Vote]
+      , diffuseVotes :: [[Vote]]
       }
   | Failed
       { failure :: String
@@ -91,7 +91,7 @@ data RunState = RunState
   , hWriter :: Handle
   , unfetchedIBs :: [InputBlock]
   , unfetchedEBs :: [EndorserBlock]
-  , unfetchedVotes :: [Vote]
+  , unfetchedVotes :: [[Vote]]
   }
 
 callSUT :: RunState -> NodeRequest -> IO NodeResponse
@@ -102,7 +102,7 @@ callSUT RunState{hReader, hWriter} req =
 
 type Runtime = StateT RunState IO
 
-instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [EndorserBlock], [Vote]) => RunModel NetworkModel Runtime where
+instance Realized IO ([InputBlock], [EndorserBlock], [[Vote]]) ~ ([InputBlock], [EndorserBlock], [[Vote]]) => RunModel NetworkModel Runtime where
   perform net@NetworkModel{nodeModel = LeiosState{..}} (Step a) _ = case a of
     Tick -> do
       rs@RunState{..} <- get
@@ -126,7 +126,7 @@ instance Realized IO ([InputBlock], [EndorserBlock], [Vote]) ~ ([InputBlock], [E
       modify $ \rs -> rs{unfetchedEBs = unfetchedEBs rs ++ pure eb}
       pure (mempty, mempty, mempty)
     NewVote v -> do
-      modify $ \rs -> rs{unfetchedVotes = unfetchedVotes rs ++ pure v}
+      modify $ \rs -> rs{unfetchedVotes = unfetchedVotes rs ++ pure [v]}
       pure (mempty, mempty, mempty)
 
   postcondition (net@NetworkModel{nodeModel = s}, NetworkModel{nodeModel = s'}) (Step a) _ (ibs, ebs, votes) = do

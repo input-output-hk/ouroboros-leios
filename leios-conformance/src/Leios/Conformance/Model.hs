@@ -11,6 +11,7 @@ module Leios.Conformance.Model (
 ) where
 
 import Data.Aeson (FromJSON (..), ToJSON (..))
+import Data.List ((\\))
 import Data.Maybe (maybeToList)
 import GHC.Generics (Generic)
 import Text.PrettyPrint.HughesPJClass (Pretty (pPrint))
@@ -62,17 +63,11 @@ initialModelState =
     , votingState = ()
     }
 
--- TODO
-makeIB :: NodeModel -> Maybe InputBlock
-makeIB _ = Nothing
-
--- TODO
-makeEB :: NodeModel -> Maybe EndorserBlock
-makeEB _ = Nothing
-
--- TODO
-makeVote :: NodeModel -> Maybe Vote
-makeVote _ = Nothing
+makeStep :: NodeModel -> Maybe NodeModel
+makeStep nm =
+  case step nm I_SLOT of
+    Success (_, s) -> Just s
+    Failure _ -> Nothing
 
 addIB :: InputBlock -> NodeModel -> NodeModel
 addIB ib nm@LeiosState{..} = nm{iBs = ib : iBs}
@@ -84,13 +79,11 @@ addVote :: Vote -> NodeModel -> NodeModel
 addVote x nm@LeiosState{..} = nm{vs = [x] : vs}
 
 -- TODO: Leios executable specification
-transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [Vote]), NodeModel)
+transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [[Vote]]), NodeModel)
 transition nm Tick = do
   -- TODO: guards
-  let ibs = maybeToList (makeIB nm)
-      ebs = maybeToList (makeEB nm)
-      votes = maybeToList (makeVote nm)
-  pure ((ibs, ebs, votes), nm)
+  s <- makeStep nm
+  pure ((iBs s \\ iBs nm, eBs s \\ eBs nm, vs s \\ vs nm), s)
 transition nm (NewIB ib) = do
   -- TODO: guards
   pure (([], [], []), addIB ib nm)

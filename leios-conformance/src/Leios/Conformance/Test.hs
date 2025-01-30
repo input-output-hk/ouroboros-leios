@@ -72,7 +72,7 @@ instance Arbitrary EndorserBlock
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
-    Step :: EnvAction -> Action NetworkModel ([InputBlock], [EndorserBlock], [Vote])
+    Step :: EnvAction -> Action NetworkModel ([InputBlock], [EndorserBlock], [[Vote]])
 
   initialState =
     NetworkModel
