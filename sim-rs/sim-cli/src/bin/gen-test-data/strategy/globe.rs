@@ -7,9 +7,8 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
 use serde::Deserialize;
-use sim_core::config::RawNodeConfig;
 
-use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
+use crate::strategy::utils::{distance, distribute_stake, GraphBuilder, RawNodeConfig};
 
 #[derive(Debug, Parser)]
 pub struct GlobeArgs {
@@ -105,7 +104,6 @@ pub fn globe(args: &GlobeArgs) -> Result<GraphBuilder> {
             location,
             region: Some(region.name),
             stake,
-            cpu_multiplier: 1.0,
             cores: None,
         });
     }

@@ -3,9 +3,8 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::RawNodeConfig;
 
-use super::utils::{distribute_stake, GraphBuilder};
+use super::utils::{distribute_stake, GraphBuilder, RawNodeConfig};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -72,14 +71,12 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
             location: pool_loc,
             region: None,
             stake: stake.get(i).cloned(),
-            cpu_multiplier: 1.0,
             cores: None,
         });
         let relay_id = graph.add(RawNodeConfig {
             location: relay_loc,
             region: None,
             stake: None,
-            cpu_multiplier: 1.0,
             cores: None,
         });
 

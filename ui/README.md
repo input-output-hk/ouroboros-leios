@@ -22,7 +22,7 @@ Before you can run the UI, ensure you have the following installed:
    simulation. Navigate to the `sim-rs` directory and run the following command:
 
    ```bash
-   cargo run --release test_data/thousand.toml output/messages.jsonl -s 30
+   cargo run --release test_data/thousand.yaml output/messages.jsonl -s 30
    ```
 
    This command will generate a trace file at `output/messages.jsonl`.

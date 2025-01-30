@@ -12,8 +12,6 @@ struct Args {
     path: PathBuf,
     #[command(subcommand)]
     strategy: Strategy,
-    #[arg(short, long)]
-    legacy: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -32,11 +30,7 @@ fn main() -> Result<()> {
         Strategy::Globe(args) => globe(&args)?,
     };
 
-    let serialized = if args.legacy {
-        toml::to_string_pretty(&raw_topology.clone().into_legacy_topology())?
-    } else {
-        serde_yaml::to_string(&raw_topology.clone().into_topology())?
-    };
+    let serialized = serde_yaml::to_string(&raw_topology.clone().into_topology())?;
 
     let topology: Topology = raw_topology.into_topology().into();
     topology.validate()?;

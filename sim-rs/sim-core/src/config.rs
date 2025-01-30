@@ -107,12 +107,6 @@ pub struct RawParameters {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawLegacyTopology {
-    pub nodes: Vec<RawNodeConfig>,
-    pub links: Vec<RawLinkConfig>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawTopology {
     pub nodes: BTreeMap<String, RawNode>,
@@ -188,35 +182,6 @@ impl Topology {
     }
 }
 
-impl From<RawLegacyTopology> for Topology {
-    fn from(value: RawLegacyTopology) -> Self {
-        let mut nodes: Vec<NodeConfiguration> = value
-            .nodes
-            .into_iter()
-            .enumerate()
-            .map(|(index, raw)| NodeConfiguration {
-                id: NodeId::new(index),
-                name: format!("node-{index}"),
-                stake: raw.stake.unwrap_or_default(),
-                cpu_multiplier: raw.cpu_multiplier,
-                cores: raw.cores,
-                consumers: vec![],
-            })
-            .collect();
-        let mut links = vec![];
-        for link in value.links {
-            let (id1, id2) = link.nodes;
-            nodes[id1].consumers.push(NodeId::new(id2));
-            nodes[id2].consumers.push(NodeId::new(id1));
-            links.push(LinkConfiguration {
-                nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: Duration::from_millis(link.latency_ms),
-            });
-        }
-        Self { nodes, links }
-    }
-}
-
 impl From<RawTopology> for Topology {
     fn from(value: RawTopology) -> Self {
         let mut node_ids = BTreeMap::new();
@@ -264,23 +229,6 @@ impl From<RawTopology> for Topology {
             links,
         }
     }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RawNodeConfig {
-    pub location: (f64, f64),
-    pub stake: Option<u64>,
-    pub region: Option<String>,
-    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
-    pub cpu_multiplier: f64,
-    #[serde(default)]
-    pub cores: Option<u64>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RawLinkConfig {
-    pub nodes: (usize, usize),
-    pub latency_ms: u64,
 }
 
 #[derive(Debug, Clone)]

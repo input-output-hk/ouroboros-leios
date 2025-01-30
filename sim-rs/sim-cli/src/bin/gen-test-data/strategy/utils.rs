@@ -5,11 +5,23 @@ use std::{
 
 use anyhow::Result;
 use netsim_core::geo::{latency_between_locations, Location};
-use sim_core::config::{
-    RawLegacyTopology, RawLinkConfig, RawLinkInfo, RawNode, RawNodeConfig, RawNodeLocation,
-    RawTopology,
-};
+use sim_core::config::{RawLinkInfo, RawNode, RawNodeLocation, RawTopology};
 use statrs::distribution::{Beta, ContinuousCDF as _};
+
+#[derive(Clone, Debug)]
+pub struct RawNodeConfig {
+    pub location: (f64, f64),
+    pub stake: Option<u64>,
+    #[expect(unused)]
+    pub region: Option<String>,
+    pub cores: Option<u64>,
+}
+
+#[derive(Clone)]
+struct RawLinkConfig {
+    pub nodes: (usize, usize),
+    pub latency_ms: u64,
+}
 
 #[derive(Clone, Default)]
 pub struct GraphBuilder {
@@ -60,13 +72,6 @@ impl GraphBuilder {
             .get(&from)
             .map(|c| c.contains(&to))
             .unwrap_or_default()
-    }
-
-    pub fn into_legacy_topology(self) -> RawLegacyTopology {
-        RawLegacyTopology {
-            nodes: self.nodes,
-            links: self.links,
-        }
     }
 
     pub fn into_topology(self) -> RawTopology {

@@ -3,9 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{bail, Result};
 use clap::Parser;
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
-use sim_core::config::RawNodeConfig;
 
-use crate::strategy::utils::{distance, distribute_stake, GraphBuilder};
+use crate::strategy::utils::{distance, distribute_stake, GraphBuilder, RawNodeConfig};
 
 #[derive(Debug, Parser)]
 pub struct RandomGraphArgs {
@@ -32,7 +31,6 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<GraphBuilder> {
             location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
             region: None,
             stake,
-            cpu_multiplier: 1.0,
             cores: None,
         });
     }
