@@ -3,11 +3,16 @@ import {
   ILink,
   INode,
   IServerMessage,
+  IServerNodeMap
 } from "@/components/Sim/types";
-import { parse } from "@iarna/toml";
-import { closeSync, createReadStream, openSync, readSync, statSync } from "fs";
+import { closeSync, openSync, readFile, readSync, statSync } from "fs";
 import path from "path";
+import { promisify } from "util";
+import { parse } from "yaml";
+import { Coord2D, Node as IServerNode } from '../../../data/simulation/topology';
 import { messagesPath } from "./api/utils";
+
+const readFileAsync = promisify(readFile);
 
 export const getSetSimulationMaxTime = async (): Promise<number> => {
   return new Promise((resolve, reject) => {
@@ -75,36 +80,27 @@ export const getSetSimulationMaxTime = async (): Promise<number> => {
   });
 };
 
-export const getSimulationTopography = async () => {
+export const getSimulationTopography = async (): Promise<IServerNodeMap> => {
   const filePath = path.resolve(
     __dirname,
-    "../../../../../sim-rs/test_data/thousand.toml",
+    "../../../../../sim-rs/test_data/thousand.yaml",
   );
-  const fileStream = createReadStream(filePath, {
-    encoding: "utf8",
-    highWaterMark: 100_000,
-  });
-  const result = (await parse.stream(fileStream)) as unknown as {
-    links: ILink[];
-    nodes: INode[];
-  };
+  const file = await readFileAsync(filePath, { encoding: 'utf8' });
+  const yaml = parse(file);
 
-  const sanitizeBigints = (_: string, v: any) =>
-    typeof v === "bigint" ? `${v}n` : v;
-  const restoreBigints = (_: string, v: any) =>
-    typeof v === "string" && /^\d+n$/.test(v) ? BigInt(v.replace("n", "")) : v;
+  const nodes: INode[] = [];
+  const links = new Map<String, ILink>();
+  for (const [id, node] of Object.entries<IServerNode<Coord2D>>(yaml.nodes)) {
+    nodes.push({
+      id,
+      location: node.location,
+      stake: node.stake as unknown as number,
+    });
+    for (const peerId of Object.keys(node.producers)) {
+      const linkIds = [id, peerId].sort();
+      links.set(JSON.stringify(linkIds), { nodes: linkIds });
+    }
+  }
 
-  // Must sanitize the objects to exclude symbols from the TOML parser.
-  const sanitized = JSON.parse(
-    JSON.stringify(
-      {
-        links: result.links,
-        nodes: result.nodes,
-      },
-      sanitizeBigints,
-    ),
-    restoreBigints,
-  );
-
-  return sanitized;
-};
+  return { nodes, links: [...links.values()] };
+}
