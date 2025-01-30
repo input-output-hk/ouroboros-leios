@@ -45,6 +45,7 @@ library
     ChanDriver
     ChanMux
     ChanTCP
+    Diffusion
     ExamplesLayout
     ExamplesRelay
     ExamplesRelayP2P

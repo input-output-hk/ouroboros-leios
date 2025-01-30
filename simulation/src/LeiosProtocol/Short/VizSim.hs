@@ -98,6 +98,7 @@ data LeiosSimVizState
   = LeiosSimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
+  , vizNodeStakes :: !(Map NodeId StakeFraction)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
       !( Map
@@ -205,7 +206,7 @@ accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewT
 accumChains _ _ = id
 
 type DiffusionLatencyMap = DiffusionLatencyMap' (HeaderHash RankingBlockHeader) RankingBlockHeader
-type DiffusionLatencyMap' id msg = Map id (msg, NodeId, Time, [Time])
+type DiffusionLatencyMap' id msg = Map id (msg, NodeId, Time, [(NodeId, Time)])
 
 accumDiffusionLatency :: Time -> LeiosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
 accumDiffusionLatency now (LeiosEventNode (LabelNode n (PraosNodeEvent e))) =
@@ -230,12 +231,12 @@ accumDiffusionLatency' now nid Generate msgid msg vs =
   assert (not (msgid `Map.member` vs)) $
     Map.insert
       msgid
-      (msg, nid, now, [now])
+      (msg, nid, now, [(nid, now)])
       vs
-accumDiffusionLatency' now _nid EnterState msgid _msg vs =
+accumDiffusionLatency' now nid EnterState msgid _msg vs =
   Map.adjust
     ( \(hdr, nid', created, arrivals) ->
-        (hdr, nid', created, now : arrivals)
+        (hdr, nid', created, (nid, now) : arrivals)
     )
     msgid
     vs
@@ -264,6 +265,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     LeiosSimVizState
       { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
+      , vizNodeStakes = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
       , vizNodeTip = Map.empty
@@ -291,10 +293,11 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     LeiosEvent ->
     LeiosSimVizState ->
     LeiosSimVizState
-  accumEventVizState _now (LeiosEventSetup shape nodes links) vs =
+  accumEventVizState _now (LeiosEventSetup shape nodes stakes links) vs =
     vs
       { vizWorld = shape
       , vizNodePos = nodes
+      , vizNodeStakes = stakes
       , vizNodeLinks =
           Map.fromSet
             ( \(n1, n2) ->
@@ -343,7 +346,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
           assert (not (blockHash blk `Map.member` vizMsgsDiffusionLatency vs)) $
             Map.insert
               (blockHash blk)
-              (blockHeader blk, nid, now, [now])
+              (blockHeader blk, nid, now, [(nid, now)])
               (vizMsgsDiffusionLatency vs)
       , ibsInRBs = accumIBsInRBs (Left blk) vs.ibsInRBs
       }
@@ -378,7 +381,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
       , vizMsgsDiffusionLatency =
           Map.adjust
             ( \(hdr, nid', created, arrivals) ->
-                (hdr, nid', created, now : arrivals)
+                (hdr, nid', created, (nid, now) : arrivals)
             )
             (blockHash blk)
             (vizMsgsDiffusionLatency vs)

@@ -39,6 +39,7 @@ traceLeiosP2P
   rng0
   P2PNetwork
     { p2pNodes
+    , p2pNodeStakes
     , p2pLinks
     , p2pWorld
     }
@@ -51,6 +52,7 @@ traceLeiosP2P
           LeiosEventSetup
             p2pWorld
             p2pNodes
+            p2pNodeStakes
             (Map.keysSet p2pLinks)
         tcplinks <-
           sequence

@@ -51,6 +51,7 @@ data LeiosEvent
     LeiosEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
+      !(Map NodeId StakeFraction)
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
     LeiosEventNode (LabelNode LeiosNodeEvent)
@@ -181,6 +182,11 @@ traceRelayLink1 tcpprops =
           ( Map.fromList
               [ (nodeA, Point 50 100)
               , (nodeB, Point 450 100)
+              ]
+          )
+          ( Map.fromList
+              [ (nodeA, StakeFraction 0.5)
+              , (nodeB, StakeFraction 0.5)
               ]
           )
           ( Set.fromList
