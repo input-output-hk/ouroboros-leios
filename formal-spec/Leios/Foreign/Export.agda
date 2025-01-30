@@ -59,16 +59,16 @@ instance
     record
       { to = Data.Fin.toℕ
       ; from = λ _ → zero
-      } 
+      }
 
-  Conv-ℕ : HsConvertible ℕ 
+  Conv-ℕ : HsConvertible ℕ
   Conv-ℕ = Convertible-Refl
 
 record EndorserBlock : Type where
   field slotNumber : Int
         producerID : Int
         ibRefs     : List Int
-        
+
 {-# FOREIGN GHC
 data EndorserBlock = EndorserBlock Integer Integer [Integer]
   deriving (Show, Eq, Generic)
@@ -79,7 +79,7 @@ data EndorserBlock = EndorserBlock Integer Integer [Integer]
 instance
 
   HsTy-EndorserBlock = MkHsType EndorserBlockAgda EndorserBlock
-  
+
   Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
   Conv-EndorserBlock =
     record
@@ -97,3 +97,26 @@ instance
 
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
+
+  HsTy-LeiosInput = autoHsType LeiosInput ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  Conv-LeiosInput = autoConvert LeiosInput
+
+  HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  Conv-LeiosOutput = autoConvert LeiosOutput
+
+open import Class.Computational as C
+open import Class.Computational22
+
+open Computational22
+
+instance
+  postulate
+    Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
+    Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
+
+open import Leios.Short.Deterministic st as D public
+
+stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (LeiosOutput × LeiosState))
+stepHs = to (compute Computational--⟦/⟧⇀)
+
+{-# COMPILE GHC stepHs as step #-}

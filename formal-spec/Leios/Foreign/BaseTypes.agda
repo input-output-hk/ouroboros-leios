@@ -104,12 +104,12 @@ instance
 
   -- * ComputationResult
 
-{-
+  open import Class.Computational as C
+
   HsTy-ComputationResult : ∀ {l} {Err} {A : Type l}
                            → ⦃ HasHsType Err ⦄ → ⦃ HasHsType A ⦄
-                           → HasHsType (ComputationResult Err A)
+                           → HasHsType (C.ComputationResult Err A)
   HsTy-ComputationResult {Err = Err} {A} = MkHsType _ (F.ComputationResult (HsType Err) (HsType A))
 
-  Conv-ComputationResult : ConvertibleType ComputationResult F.ComputationResult
+  Conv-ComputationResult : ConvertibleType C.ComputationResult F.ComputationResult
   Conv-ComputationResult = autoConvertible
--}
