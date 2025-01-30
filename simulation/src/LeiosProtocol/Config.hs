@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -14,8 +15,9 @@
 
 module LeiosProtocol.Config where
 
+import Data.Aeson (Options (allNullaryToStringTag), defaultOptions, genericToJSON)
 import Data.Aeson.Encoding (pairs)
-import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Parser, ToJSON (..), Value (..), object, typeMismatch, withObject, (.:))
+import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (constructorTagModifier), Parser, ToJSON (..), Value (..), genericParseJSON, object, typeMismatch, withObject, (.:))
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
@@ -23,7 +25,7 @@ import Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import GHC.Exception (displayException)
 import GHC.Generics (Generic)
-import JSONCompat (Getter, always, get, omitDefault, parseFieldOrDefault)
+import JSONCompat (Getter, always, camelToKebab, get, omitDefault, parseFieldOrDefault)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
@@ -38,6 +40,13 @@ data Distribution
   = Normal {mean :: Double, std_dev :: Double}
   | Exp {lambda :: Double, scale :: Maybe Double}
   | LogNormal {mu :: Double, sigma :: Double}
+  deriving (Show, Eq, Generic)
+
+data DiffusionStrategy
+  = -- | use same order as relay peer
+    PeerOrder
+  | -- | request message with highest slot
+    FreshestFirst
   deriving (Show, Eq, Generic)
 
 data Config = Config
@@ -63,12 +72,14 @@ data Config = Config
   , ibBodyValidationCpuTimeMsPerByte :: DurationMs
   , ibBodyMaxSizeBytes :: SizeBytes
   , ibBodyAvgSizeBytes :: SizeBytes
+  , ibDiffusionStrategy :: DiffusionStrategy
   , ebGenerationProbability :: Double
   , ebGenerationCpuTimeMs :: DurationMs
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
-  , voteGenerationProbability :: Double
+  , --  , ebDiffusionStrategy :: DiffusionStrategy -- TBD?
+    voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
@@ -76,7 +87,8 @@ data Config = Config
   , voteOneEbPerVrfWin :: Bool
   , voteBundleSizeBytesConstant :: SizeBytes
   , voteBundleSizeBytesPerEb :: SizeBytes
-  , certGenerationCpuTimeMsConstant :: DurationMs
+  , --  , voteDiffusionStrategy :: DiffusionStrategy -- TBS?
+    certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
   , certValidationCpuTimeMsPerNode :: DurationMs
@@ -111,6 +123,7 @@ instance Default Config where
       , ibBodyValidationCpuTimeMsPerByte = 0.0005
       , ibBodyMaxSizeBytes = 327680
       , ibBodyAvgSizeBytes = 327680
+      , ibDiffusionStrategy = FreshestFirst
       , ebGenerationProbability = 5.0
       , ebGenerationCpuTimeMs = 300.0
       , ebValidationCpuTimeMs = 1.0
@@ -225,6 +238,7 @@ instance FromJSON Config where
     ibBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"ibBodyValidationCpuTimeMsPerByte" obj
     ibBodyMaxSizeBytes <- parseFieldOrDefault @Config @"ibBodyMaxSizeBytes" obj
     ibBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ibBodyAvgSizeBytes" obj
+    ibDiffusionStrategy <- parseFieldOrDefault @Config @"ibDiffusionStrategy" obj
     ebGenerationProbability <- parseFieldOrDefault @Config @"ebGenerationProbability" obj
     ebGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ebGenerationCpuTimeMs" obj
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
@@ -289,6 +303,22 @@ instance FromJSON Distribution where
           pure LogNormal{..}
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
+
+instance FromJSON DiffusionStrategy where
+  parseJSON =
+    genericParseJSON
+      defaultOptions
+        { constructorTagModifier = camelToKebab
+        , allNullaryToStringTag = True
+        }
+
+instance ToJSON DiffusionStrategy where
+  toJSON =
+    genericToJSON
+      defaultOptions
+        { constructorTagModifier = camelToKebab
+        , allNullaryToStringTag = True
+        }
 
 -- | Create a 'Config' from a file.
 readConfigEither :: FilePath -> IO (Either ParseException Config)

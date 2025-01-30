@@ -498,7 +498,7 @@ data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
   , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
-  , prioritize :: !(Map id header -> [header])
+  , prioritize :: !(Map id header -> [header] -> [header])
   -- ^ returns a subset of headers, in order of what should be fetched first.
   --   Note: `prioritize` is given the map of ids in the `window` but
   --   not in-flight or fetched yet (the `available` field of the shared state).
@@ -733,7 +733,9 @@ relayConsumerPipelined config sst =
     -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
     let buffer' = lst.buffer <> Map.map (const Nothing) ignored
 
-    let hdrsToRequest = take (fromIntegral config.maxBodiesToRequest) $ config.prioritize available1
+    let hdrsToRequest =
+          take (fromIntegral config.maxBodiesToRequest) $
+            config.prioritize available1 (mapMaybe (`Map.lookup` available1) $ Foldable.toList $ lst.window)
     let idsToRequest = map config.headerId hdrsToRequest
     let idsToRequestSet = Set.fromList idsToRequest
     modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet

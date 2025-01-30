@@ -31,6 +31,7 @@ export interface Config {
   "ib-body-validation-cpu-time-ms-per-byte": number;
   "ib-body-max-size-bytes": bigint;
   "ib-body-avg-size-bytes": bigint;
+  "ib-diffusion-strategy": DiffusionStrategy;
 
   // Endorsement Block Configuration
   "eb-generation-probability": number;
@@ -82,3 +83,9 @@ export interface LogNormalDistribution {
   mu: number;
   sigma: number;
 }
+
+export enum DiffusionStrategy {
+  PeerOrder = "peer-order",
+  FreshestFirst = "freshest-first",
+}
+

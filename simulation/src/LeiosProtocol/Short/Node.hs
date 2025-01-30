@@ -25,7 +25,7 @@ import Control.Tracer
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.Ix (Ix)
-import Data.List (sort, sortOn)
+import Data.List (sortOn)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -50,7 +50,6 @@ import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
 import SimTypes (cpuTask)
 import System.Random
-import TaskMultiQueue
 
 --------------------------------------------------------------
 ---- Events
@@ -212,13 +211,12 @@ relayIBConfig ::
   ([InputBlockHeader] -> m ()) ->
   SubmitBlocks m InputBlockHeader InputBlockBody ->
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
-relayIBConfig _tracer _cfg validateHeaders submitBlocks =
+relayIBConfig _tracer cfg validateHeaders submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = (.id)
     , validateHeaders
-    , -- TODO: add prioritization policy to LeiosConfig
-      prioritize = sortOn (Down . (.slot)) . Map.elems
+    , prioritize = prioritize cfg.leios.ibDiffusionStrategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1
@@ -231,13 +229,12 @@ relayEBConfig ::
   LeiosNodeConfig ->
   SubmitBlocks m EndorseBlockId EndorseBlock ->
   RelayConsumerConfig EndorseBlockId EndorseBlockId EndorseBlock m
-relayEBConfig _tracer _cfg submitBlocks =
+relayEBConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = id
     , validateHeaders = const $ return ()
-    , -- TODO: add prioritization policy to LeiosConfig?
-      prioritize = sort . Map.elems
+    , prioritize = prioritize cfg.leios.ebDiffusionStrategy $ error "FFD not supported for endorse blocks."
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?
@@ -250,13 +247,12 @@ relayVoteConfig ::
   LeiosNodeConfig ->
   SubmitBlocks m VoteId VoteMsg ->
   RelayConsumerConfig VoteId VoteId VoteMsg m
-relayVoteConfig _tracer _cfg submitBlocks =
+relayVoteConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = id
     , validateHeaders = const $ return ()
-    , -- TODO: add prioritization policy to LeiosConfig?
-      prioritize = sort . Map.elems
+    , prioritize = prioritize cfg.leios.voteDiffusionStrategy $ error "FFD not supported for vote bundles."
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?

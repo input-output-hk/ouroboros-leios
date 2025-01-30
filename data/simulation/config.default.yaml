@@ -55,6 +55,7 @@ ib-body-validation-cpu-time-ms-constant: 50.0
 ib-body-validation-cpu-time-ms-per-byte: 0.0005
 ib-body-max-size-bytes: 327680
 ib-body-avg-size-bytes: 327680
+ib-diffusion-strategy: "freshest-first"
 
 ################################################################################
 # Endorsement Block Configuration

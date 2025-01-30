@@ -5,14 +5,13 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoFieldSelectors #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use newtype instead of data" #-}
-
-module LeiosProtocol.Short where
+module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..))
+where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.List
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (
@@ -20,6 +19,7 @@ import Data.Maybe (
   mapMaybe,
   maybeToList,
  )
+import Data.Ord
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
@@ -54,6 +54,17 @@ data LeiosDelays = LeiosDelays
   , certificateValidation :: !(Certificate -> DiffTime)
   }
 
+prioritize ::
+  DiffusionStrategy ->
+  (header -> SlotNo) ->
+  -- | available to request
+  Map id header ->
+  -- | same headers in the order we received them from peer.
+  [header] ->
+  [header]
+prioritize PeerOrder _ = \_ hs -> hs
+prioritize FreshestFirst sl = \m _ -> sortOn (Down . sl) . Map.elems $ m
+
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
 --       Would need to rework def. of Stage to accomodate different pipeline shapes.
 data LeiosConfig = LeiosConfig
@@ -70,6 +81,9 @@ data LeiosConfig = LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
+  , ibDiffusionStrategy :: DiffusionStrategy
+  , ebDiffusionStrategy :: DiffusionStrategy
+  , voteDiffusionStrategy :: DiffusionStrategy
   }
 
 convertConfig :: OnDisk.Config -> LeiosConfig
@@ -84,6 +98,9 @@ convertConfig disk =
     , votesForCertificate = fromIntegral disk.voteThreshold
     , sizes
     , delays
+    , ibDiffusionStrategy = disk.ibDiffusionStrategy
+    , ebDiffusionStrategy = PeerOrder
+    , voteDiffusionStrategy = PeerOrder
     }
  where
   forEach n xs = n * fromIntegral (length xs)
