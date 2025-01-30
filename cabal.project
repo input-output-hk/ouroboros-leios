@@ -16,7 +16,7 @@ index-state:
 
 packages: 
   simulation
-  leios-conformance
+  -- leios-conformance
 
 tests: True
 
