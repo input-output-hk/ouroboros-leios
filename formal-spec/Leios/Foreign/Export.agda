@@ -98,10 +98,10 @@ instance
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
 
-  HsTy-LeiosInput = autoHsType LeiosInput ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  HsTy-LeiosInput = autoHsType LeiosInput ⊣ onConstructors (("I_" S.++_) ∘ S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
   Conv-LeiosInput = autoConvert LeiosInput
 
-  HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (("O_" S.++_) ∘ S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
   Conv-LeiosOutput = autoConvert LeiosOutput
 
 open import Class.Computational as C
