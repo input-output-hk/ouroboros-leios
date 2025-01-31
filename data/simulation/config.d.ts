@@ -5,6 +5,7 @@ export interface Config {
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
   "leios-stage-active-voting-slots": bigint;
+  "leios-vote-send-recv-stages": boolean;
 
   // Transaction Configuration
   "tx-generation-distribution": Distribution;

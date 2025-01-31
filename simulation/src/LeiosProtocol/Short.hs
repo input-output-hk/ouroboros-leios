@@ -1,9 +1,17 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..))
@@ -11,6 +19,7 @@ where
 
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Kind
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -65,10 +74,15 @@ prioritize ::
 prioritize PeerOrder _ = \_ hs -> hs
 prioritize FreshestFirst sl = \m _ -> sortOn (Down . sl) . Map.elems $ m
 
+data SingPipeline (p :: Pipeline) where
+  SingSingleVote :: SingPipeline SingleVote
+  SingSplitVote :: SingPipeline SplitVote
+
 -- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
 --       Would need to rework def. of Stage to accomodate different pipeline shapes.
-data LeiosConfig = LeiosConfig
+data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   { praos :: PraosConfig RankingBlockBody
+  , pipeline :: SingPipeline p
   , sliceLength :: Int
   -- ^ measured in slots, also stage length in Short leios.
   , inputBlockFrequencyPerSlot :: Double
@@ -78,6 +92,7 @@ data LeiosConfig = LeiosConfig
   , activeVotingStageLength :: Int
   -- ^ prefix of the voting stage where new votes are generated, <= sliceLength.
   , votingFrequencyPerStage :: Double
+  , voteSendStage :: Stage p
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
@@ -90,12 +105,14 @@ convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
   LeiosConfig
     { praos
+    , pipeline = SingSingleVote
     , sliceLength = fromIntegral disk.leiosStageLengthSlots
     , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
     , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
     , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
     , votingFrequencyPerStage = disk.voteGenerationProbability
     , votesForCertificate = fromIntegral disk.voteThreshold
+    , voteSendStage = Vote
     , sizes
     , delays
     , ibDiffusionStrategy = disk.ibDiffusionStrategy
@@ -222,8 +239,32 @@ instance FixSize body => FixSize (Block body) where
 ---- Stages
 -----------------------------------------------------------
 
-data Stage = Propose | Deliver1 | Deliver2 | Endorse | Vote
-  deriving (Eq, Ord, Show, Enum, Bounded)
+data Pipeline = SingleVote | SplitVote
+
+data Stage :: Pipeline -> Type where
+  Propose, Deliver1, Deliver2, Endorse :: Stage a
+  Vote :: Stage SingleVote
+  VoteSend, VoteRecv :: Stage SplitVote
+
+deriving instance Eq (Stage a)
+deriving instance Ord (Stage a)
+deriving instance Show (Stage a)
+
+-- TODO: find better representation
+class IsPipeline (a :: Pipeline) where
+  allStages :: [Stage a]
+instance IsPipeline SingleVote where
+  allStages = [Propose, Deliver1, Deliver2, Endorse, Vote]
+instance IsPipeline SplitVote where
+  allStages = [Propose, Deliver1, Deliver2, Endorse, VoteSend, VoteRecv]
+instance IsPipeline a => Enum (Stage a) where
+  toEnum n = allStages !! n
+  fromEnum s = fromMaybe undefined $ findIndex (s ==) allStages
+instance IsPipeline a => Bounded (Stage a) where
+  minBound = case allStages of
+    (x : _) -> x
+    [] -> undefined
+  maxBound = last allStages
 
 inRange :: SlotNo -> (SlotNo, SlotNo) -> Bool
 inRange s (a, b) = a <= s && s <= b
@@ -233,22 +274,23 @@ rangePrefix l (start, _) = (start, toEnum $ fromEnum start + l - 1)
 
 -- | Returns inclusive range of slots.
 stageRange ::
+  IsPipeline p =>
   LeiosConfig ->
   -- | current stage of pipeline
-  Stage ->
+  Stage p ->
   -- | current slot
   SlotNo ->
   -- | stage to compute the range for
-  Stage ->
+  Stage p ->
   Maybe (SlotNo, SlotNo)
 stageRange cfg = stageRange' cfg.sliceLength
 
-stageRange' :: Int -> Stage -> SlotNo -> Stage -> Maybe (SlotNo, SlotNo)
+stageRange' :: IsPipeline p => Int -> Stage p -> SlotNo -> Stage p -> Maybe (SlotNo, SlotNo)
 stageRange' l s0 slot s = slice l slot (fromEnum s0 - fromEnum s)
 
-prop_stageRange' :: Int -> SlotNo -> Bool
+prop_stageRange' :: forall p. IsPipeline p => Int -> SlotNo -> Bool
 prop_stageRange' l slot =
-  and [Just True == ((slot `inRange`) <$> stageRange' l stage slot stage) | stage <- stages]
+  and [Just True == ((slot `inRange`) <$> stageRange' @p l stage slot stage) | stage <- stages]
     && and [contiguous $ mapMaybe (stageRange' l stage slot) stages | stage <- stages]
  where
   stages = [minBound .. maxBound]
@@ -256,15 +298,26 @@ prop_stageRange' l slot =
   contiguous (x : y : xs) = rightSize x && succ (snd x) == fst y && contiguous (y : xs)
   contiguous _ = True
 
-stageEnd :: LeiosConfig -> Stage -> SlotNo -> Stage -> Maybe SlotNo
+stageEnd :: IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> Stage p -> Maybe SlotNo
 stageEnd l s0 slot s = snd <$> stageRange l s0 slot s
 
-stageStart :: LeiosConfig -> Stage -> SlotNo -> Stage -> Maybe SlotNo
+stageStart :: IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> Stage p -> Maybe SlotNo
 stageStart l s0 slot s = fst <$> stageRange l s0 slot s
 
 -- | Assumes pipelines start at slot 0 and keep going.
-isStage :: LeiosConfig -> Stage -> SlotNo -> Bool
+isStage :: IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> Bool
 isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
+
+newtype PipelineNo = PipelineNo Word64
+  deriving (Bounded, Enum, Show, Eq, Ord)
+
+stageRangeOf :: forall p. IsPipeline p => LeiosConfig -> PipelineNo -> Stage p -> (SlotNo, SlotNo)
+stageRangeOf cfg pl stage =
+  fromMaybe
+    undefined
+    (stageRange cfg minBound (toEnum (fromEnum pl * pLength)) stage)
+ where
+  pLength = length $ allStages @p
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -298,11 +351,14 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
  where
   ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
+forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
+forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
+
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
-mkEndorseBlock cfg id slot producer inputBlocks =
+mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer inputBlocks =
   -- Endorse blocks are produced at the beginning of the stage.
-  assert (stageStart cfg Endorse slot Endorse == Just slot) $
+  assert (stageStart @p cfg Endorse slot Endorse == Just slot) $
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
@@ -352,9 +408,9 @@ inputBlocksToEndorse ::
   SlotNo ->
   InputBlocksSnapshot ->
   [InputBlockId]
-inputBlocksToEndorse cfg current buffer = fromMaybe [] $ do
-  generatedBetween <- stageRange cfg Endorse current Propose
-  receivedBy <- stageEnd cfg Endorse current Deliver2
+inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buffer = fromMaybe [] $ do
+  generatedBetween <- stageRange @p cfg Endorse current Propose
+  receivedBy <- stageEnd @p cfg Endorse current Deliver2
   pure $
     buffer.validInputBlocks
       InputBlocksQuery
@@ -369,22 +425,23 @@ shouldVoteOnEB ::
   InputBlocksSnapshot ->
   EndorseBlock ->
   Bool
-shouldVoteOnEB cfg slot _buffers | Nothing <- stageRange cfg Vote slot Propose = const False
-shouldVoteOnEB cfg slot buffers = cond
+shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot _buffers
+  | Nothing <- stageRange cfg voteSendStage slot Propose = const False
+shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot buffers = cond
  where
-  generatedBetween = fromMaybe (error "impossible") $ stageRange cfg Vote slot Propose
+  generatedBetween = fromMaybe (error "impossible") $ stageRange cfg voteSendStage slot Propose
   receivedByEndorse =
     buffers.validInputBlocks
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg Vote slot Endorse
+        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg voteSendStage slot Endorse
         }
   receivedByDeliver1 = buffers.validInputBlocks q
    where
     q =
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg Vote slot Deliver1
+        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg voteSendStage slot Deliver1
         }
   -- Order of references in EndorseBlock matters for ledger state, so we stick to lists.
   -- Note: maybe order on (slot, subSlot, vrf proof) should be used instead?
@@ -396,7 +453,7 @@ shouldVoteOnEB cfg slot buffers = cond
     assumptions =
       null eb.endorseBlocksEarlierStage
         && null eb.endorseBlocksEarlierPipeline
-        && eb.slot `inRange` fromMaybe (error "impossible") (stageRange cfg Vote slot Endorse)
+        && eb.slot `inRange` fromMaybe (error "impossible") (stageRange cfg voteSendStage slot Endorse)
     -- A. all referenced IBs have been received by the end of the Endorse stage,
     -- C. all referenced IBs validate (wrt. script execution), and,
     -- D. only IBs from this pipeline’s Propose stage are referenced (and not from other pipelines).
@@ -411,10 +468,10 @@ endorseBlocksToVoteFor ::
   InputBlocksSnapshot ->
   EndorseBlocksSnapshot ->
   [EndorseBlock]
-endorseBlocksToVoteFor cfg slot ibs ebs =
+endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
    in filter cond $
-        maybe [] ebs.validEndorseBlocks (stageRange cfg Vote slot Endorse)
+        maybe [] ebs.validEndorseBlocks (stageRange cfg voteSendStage slot Endorse)
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.
@@ -431,29 +488,34 @@ splitIntoSubSlots (NetworkRate r)
         replicate q fq
 
 inputBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
-inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot} stake = \slot ->
-  assert (isStage cfg Propose slot) $ Just f
+inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot, pipeline = _ :: SingPipeline p} stake = \slot ->
+  assert (isStage @p cfg Propose slot) $ Just f
  where
   !(Sortition f) = sortition stake $ NetworkRate inputBlockFrequencyPerSlot
 
 endorseBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
-endorseBlockRate cfg stake = \slot -> do
-  guard $ isStage cfg Endorse slot
-  startEndorse <- stageStart cfg Endorse slot Endorse
+endorseBlockRate cfg@LeiosConfig{pipeline = _ :: SingPipeline p} stake = \slot -> do
+  guard $ isStage @p cfg Endorse slot
+  startEndorse <- stageStart @p cfg Endorse slot Endorse
   guard $ startEndorse == slot
   return $ min 1 . f
  where
   !(Sortition f) = sortition stake $ NetworkRate cfg.endorseBlockFrequencyPerStage
 
-votingRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
-votingRate cfg stake = \slot -> do
-  guard $ isStage cfg Vote slot
-  range <- stageRange cfg Vote slot Vote
-  guard $ slot `inRange` rangePrefix cfg.activeVotingStageLength range
-  return f
+votingRanges :: LeiosConfig -> [(SlotNo, SlotNo)]
+votingRanges cfg@LeiosConfig{voteSendStage} = go 0
  where
-  !(Sortition f) = sortition stake votingFrequencyPerSlot
-  votingFrequencyPerSlot = NetworkRate $ cfg.votingFrequencyPerStage / fromIntegral cfg.activeVotingStageLength
+  go slot =
+    case rangePrefix cfg.activeVotingStageLength <$> stageRange cfg minBound slot voteSendStage of
+      Just r -> r : go nextSlot
+      Nothing -> go nextSlot
+   where
+    nextSlot = toEnum $ fromEnum slot + cfg.sliceLength
+
+votingRatePerPipeline :: LeiosConfig -> StakeFraction -> Double -> Word64
+votingRatePerPipeline cfg stake = f
+ where
+  !(Sortition f) = sortition stake $ NetworkRate cfg.votingFrequencyPerStage
 
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
 nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)

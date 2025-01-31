@@ -52,6 +52,7 @@ data DiffusionStrategy
 data Config = Config
   { leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
+  , leiosVoteSendRecvStages :: Bool
   , txGenerationDistribution :: Distribution
   , txSizeBytesDistribution :: Distribution
   , txValidationCpuTimeMs :: DurationMs
@@ -103,6 +104,7 @@ instance Default Config where
     Config
       { leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
+      , leiosVoteSendRecvStages = False
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
       , txSizeBytesDistribution = LogNormal{mu = 6.833, sigma = 1.127}
       , txValidationCpuTimeMs = 1.5
@@ -218,6 +220,7 @@ instance FromJSON Config where
   parseJSON = withObject "Config" $ \obj -> do
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
+    leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
     txGenerationDistribution <- parseFieldOrDefault @Config @"txGenerationDistribution" obj
     txSizeBytesDistribution <- parseFieldOrDefault @Config @"txSizeBytesDistribution" obj
     txValidationCpuTimeMs <- parseFieldOrDefault @Config @"txValidationCpuTimeMs" obj

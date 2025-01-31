@@ -360,7 +360,7 @@ runSimOptions SimOptions{..} = case simCommand of
     let (rng1, rng2) = Random.split rng0
     config <- OnDisk.readConfig configFile
     p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    VizShortLeiosP2P.exampleSim writeLog rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
+    VizShortLeiosP2P.exampleSim (not skipLog) rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
 
 data SimOptions = SimOptions
   { simCommand :: SimCommand
@@ -401,7 +401,7 @@ data SimCommand
       , topographyOptions :: TopographyOptions
       , overrideUnlimitedBps :: Bytes
       , emitControl :: Bool
-      , writeLog :: Bool
+      , skipLog :: Bool
       }
 
 parserSimCommand :: Parser SimCommand

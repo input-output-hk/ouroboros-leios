@@ -45,7 +45,7 @@ import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import LeiosProtocol.Short.SimP2P (exampleTrace2)
+import LeiosProtocol.Short.SimP2P (exampleTrace2, exampleTrace2')
 import LeiosProtocol.Short.VizSim (
   ChainsMap,
   DataTransmitted (..),
@@ -752,8 +752,8 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength numCores maxBandwidthPerNode =
+defaultVizConfig :: forall p. IsPipeline p => Stage p -> Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
+defaultVizConfig voteSendStage stageLength numCores maxBandwidthPerNode =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
@@ -779,7 +779,7 @@ defaultVizConfig stageLength numCores maxBandwidthPerNode =
       RelayVote msg -> (VT,) <$> relayMessageColor voteColor msg
   ibColor = pipelineColor Propose . (hash . (.id) &&& (.slot))
   ebColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
-  voteColor = pipelineColor Vote . (hash . (.id) &&& (.slot))
+  voteColor = pipelineColor voteSendStage . (hash . (.id) &&& (.slot))
   relayMessageColor :: (body -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgRespondBodies bodies -> Just $ blendColors $ map (f . snd) bodies
@@ -798,7 +798,7 @@ defaultVizConfig stageLength numCores maxBandwidthPerNode =
     -- TODO?: better palettes than gradients on a color
     c = palettes !! p
     f = fst $ uniformR (0, 0.5) seed
-  pipelineColor :: Stage -> (Int, SlotNo) -> Dia.Colour Double
+  pipelineColor :: IsPipeline p => Stage p -> (Int, SlotNo) -> Dia.Colour Double
   pipelineColor slotStage (i, slot) = case stageRange' stageLength slotStage slot Propose of
     Just (fromEnum -> startOfPipeline, _) ->
       let
@@ -822,50 +822,53 @@ toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
 example2 :: StdGen -> OnDisk.Config -> P2PNetwork -> Visualization
-example2 rng onDiskConfig p2pNetwork@P2PNetwork{p2pNodeCores} =
-  slowmoVisualization 0.5 $
-    Viz model $
-      LayoutAbove
-        [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
-        , LayoutBeside
-            [ LayoutReqSize 1200 1000 $
-                Layout $
-                  leiosP2PSimVizRender config
-            , LayoutBeside
-                [ LayoutAbove
-                    [ LayoutReqSize 350 250 $
-                      Layout $
-                        chartDiffusionLatency config tag
-                    | -- , LayoutReqSize 350 300 $
-                    --     Layout $
-                    --       chartDiffusionImperfection
-                    --         p2pTopography
-                    --         0.1
-                    --         (96 / 1000)
-                    --         config
-                    tag <- [IB, EB, VT, RB]
-                    ]
-                , LayoutAbove
-                    [ LayoutReqSize 350 150 $
+example2
+  rng
+  (convertConfig -> leiosConfig@LeiosConfig{voteSendStage})
+  p2pNetwork@P2PNetwork{p2pNodeCores} =
+    slowmoVisualization 0.5 $
+      Viz model $
+        LayoutAbove
+          [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
+          , LayoutBeside
+              [ LayoutReqSize 1200 1000 $
+                  Layout $
+                    leiosP2PSimVizRender config
+              , LayoutBeside
+                  [ LayoutAbove
+                      [ LayoutReqSize 350 250 $
                         Layout $
-                          chartBandwidth modelConfig
-                    , LayoutReqSize 350 200 $
-                        Layout $
-                          chartDataTransmitted modelConfig
-                    , LayoutReqSize 350 200 $
-                        Layout $
-                          chartCPUUsage modelConfig
-                    , LayoutReqSize 350 150 $
-                        Layout chartLinkUtilisation
-                    ]
-                ]
-            ]
-        ]
- where
-  processingCores = maximum $ Map.elems p2pNodeCores
-  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
-  modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pNetwork)
+                          chartDiffusionLatency config tag
+                      | -- , LayoutReqSize 350 300 $
+                      --     Layout $
+                      --       chartDiffusionImperfection
+                      --         p2pTopography
+                      --         0.1
+                      --         (96 / 1000)
+                      --         config
+                      tag <- [IB, EB, VT, RB]
+                      ]
+                  , LayoutAbove
+                      [ LayoutReqSize 350 150 $
+                          Layout $
+                            chartBandwidth modelConfig
+                      , LayoutReqSize 350 200 $
+                          Layout $
+                            chartDataTransmitted modelConfig
+                      , LayoutReqSize 350 200 $
+                          Layout $
+                            chartCPUUsage modelConfig
+                      , LayoutReqSize 350 150 $
+                          Layout chartLinkUtilisation
+                      ]
+                  ]
+              ]
+          ]
+   where
+    processingCores = maximum $ Map.elems p2pNodeCores
+    config = defaultVizConfig voteSendStage 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
+    modelConfig = config.model
+    model = leiosSimVizModel modelConfig (exampleTrace2' rng leiosConfig p2pNetwork)
 
 data LeiosSimState = LeiosSimState
   { chains :: !ChainsMap

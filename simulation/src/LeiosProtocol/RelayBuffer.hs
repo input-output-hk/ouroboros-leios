@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module LeiosProtocol.RelayBuffer where
@@ -12,6 +14,7 @@ import qualified Data.Foldable as Foldable
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Word (Word64)
 
 --------------------------------
@@ -108,6 +111,16 @@ ticketSearchMeasure n ml mr = mMaxTicket ml >= n && mMinTicket mr > n
 
 toList :: Ord key => RelayBuffer key value -> [EntryWithTicket key value]
 toList rb = Foldable.toList rb.entries
+
+filter :: Ord key => (EntryWithTicket key value -> Bool) -> RelayBuffer key value -> RelayBuffer key value
+filter p RelayBuffer{..} =
+  RelayBuffer
+    { entries = FingerTree.fromList filtered
+    , index = Map.restrictKeys index $ Set.fromList $ map (.key) filtered
+    , nextTicket
+    }
+ where
+  filtered = Prelude.filter p $ Foldable.toList entries
 
 values :: Ord key => RelayBuffer key value -> [value]
 values = map value . toList

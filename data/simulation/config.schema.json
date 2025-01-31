@@ -150,6 +150,9 @@
       "properties": {},
       "type": "number"
     },
+    "leios-vote-send-recv-stages": {
+      "type": "boolean"
+    },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,
       "properties": {},

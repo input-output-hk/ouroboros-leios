@@ -275,4 +275,4 @@ instance FromJSON VoteId where
 
 parseStringId :: (NodeId -> Int -> a) -> Value -> Parser a
 parseStringId c (String s) = maybe (fail "string id not readable") (pure . uncurry c) $ readStringId (T.unpack s)
-parseStringId c v = unexpected v
+parseStringId _ v = unexpected v

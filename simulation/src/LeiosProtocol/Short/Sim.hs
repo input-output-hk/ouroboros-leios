@@ -204,6 +204,8 @@ traceRelayLink1 tcpprops =
                 endorseBlockFrequencyPerStage = 4
               , -- \^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
                 activeVotingStageLength = 1
+              , pipeline = SingSingleVote
+              , voteSendStage = Vote
               , votingFrequencyPerStage = 4
               , votesForCertificate = 1 -- just two nodes available to vote!
               , sizes -- TODO: realistic sizes
