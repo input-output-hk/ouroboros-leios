@@ -1,5 +1,16 @@
 # Leios logbook
 
+## 2025-01-31
+
+### Haskell Simulation
+
+- `short-leios` sim now also outputs diffusion latency data.
+- added support for different IB diffusion stategies (see `ib-diffusion-strategy` config field):
+  - freshest-first - higher slot number are requested first
+  - peer-order - requested in the order the peer announced them.
+- added support for Vote (Send) and Vote (Recv) stages, see `leios-vote-send-recv-stages` config field.
+- Next step: run simulations to evaluate impacts
+
 ## 2025-01-27
 
 ### Certificate size for "Fiat Accompli" sortition
