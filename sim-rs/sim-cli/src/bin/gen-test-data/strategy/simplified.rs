@@ -64,24 +64,28 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
             .map(move |id| (cluster * 2) + id + 1)
     };
     let stake = distribute_stake(pool_count);
-    for i in 0..pool_count {
-        let cluster = i % 5;
-        let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
-        let pool_id = graph.add(RawNodeConfig {
-            name: format!("pool-{i}"),
-            location: pool_loc,
-            region: None,
-            stake: stake.get(i).cloned(),
-            cores: None,
-        });
-        let relay_id = graph.add(RawNodeConfig {
-            name: format!("relay-{i}"),
-            location: relay_loc,
-            region: None,
-            stake: None,
-            cores: None,
-        });
-
+    let pools: Vec<_> = (0..pool_count)
+        .map(|i| {
+            let cluster = i % 5;
+            let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
+            let pool_id = graph.add(RawNodeConfig {
+                name: format!("pool-{i}"),
+                location: pool_loc,
+                region: None,
+                stake: stake.get(i).cloned(),
+                cores: None,
+            });
+            let relay_id = graph.add(RawNodeConfig {
+                name: format!("relay-{i}"),
+                location: relay_loc,
+                region: None,
+                stake: None,
+                cores: None,
+            });
+            (cluster, pool_id, relay_id)
+        })
+        .collect();
+    for (cluster, pool_id, relay_id) in pools {
         graph.bidi_link(pool_id, relay_id, Some(SHORT_HOP));
 
         let mut local_candidates: Vec<usize> = relays_in_cluster(cluster)
