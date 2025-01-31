@@ -63,24 +63,26 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
             .step_by(cluster_size * 2)
             .map(move |id| (cluster * 2) + id + 1)
     };
-    let stake = distribute_stake(pool_count)?;
+    let stake = distribute_stake(pool_count);
     for i in 0..pool_count {
         let cluster = i % 5;
         let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
         let pool_id = graph.add(RawNodeConfig {
+            name: format!("pool-{i}"),
             location: pool_loc,
             region: None,
             stake: stake.get(i).cloned(),
             cores: None,
         });
         let relay_id = graph.add(RawNodeConfig {
+            name: format!("relay-{i}"),
             location: relay_loc,
             region: None,
             stake: None,
             cores: None,
         });
 
-        graph.link(pool_id, relay_id, Some(SHORT_HOP));
+        graph.bidi_link(pool_id, relay_id, Some(SHORT_HOP));
 
         let mut local_candidates: Vec<usize> = relays_in_cluster(cluster)
             .filter(|id| *id != relay_id)
@@ -92,7 +94,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
                 break;
             }
             let neighbor = local_candidates.remove(rng.gen_range(0..local_candidates.len()));
-            graph.link(relay_id, neighbor, Some(SHORT_HOP));
+            graph.bidi_link(relay_id, neighbor, Some(SHORT_HOP));
         }
 
         for other_cluster in (0..5).filter(|c| *c != cluster) {
@@ -111,7 +113,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
                     break;
                 }
                 let neighbor = candidates.remove(rng.gen_range(0..candidates.len()));
-                graph.link(relay_id, neighbor, Some(latency));
+                graph.bidi_link(relay_id, neighbor, Some(latency));
             }
         }
     }
