@@ -11,6 +11,34 @@
 - added support for Vote (Send) and Vote (Recv) stages, see `leios-vote-send-recv-stages` config field.
 - Next step: run simulations to evaluate impacts
 
+### Rust Simulation
+
+Added an "organic" topology generator which more closely matches mainnet topology. It generates "clusters" of colocated stake pools and relays, and uses stake to determine how connected each relay is.
+
+## 2025-01-30
+
+### Rust Simulation
+
+Talked to stake pool owners and outside experts about what the mainnet topology actually looks like. Takeaways:
+ - Most stake pools have more than one relay. I managed to connect to 2312 relays across 1278 pools; this only accounts for fully public relays, and many nodes have private relays as well.
+ - Stake pool operators sometimes have multiple pools. When they do, the pools are typically colocated and all share the same relays.
+ - Each relay has a fixed number of outgoing connections controlled by configuration. In practice, most relays have ~25 active outgoing connections.
+ - The p2p protocol ensures that each relay receives some number of incoming connections based on stake weight. Relays for smaller pools can have 10-20 incoming connections, relays for larger pools can have 400+.
+
+## 2025-01-29
+
+### Rust Simulation
+
+The rust sim is now respecting directional "producer" relationships used by Haskell. A node will only receive block updates from its producers.
+
+Migrated all topologies to the new shared YAML format and deleted all code related to the old TOML format
+
+## 2025-01-28
+
+### Rust Simulation
+
+Finished visualization for demo. Fixed transactions getting included in both Leios and Praos blocks. Started tracking redundant/duplicate transactions within a Leios block.
+
 ## 2025-01-27
 
 ### Certificate size for "Fiat Accompli" sortition
@@ -51,8 +79,6 @@ The ["Fiat Accompli" sortition scheme](https://iohk.io/en/research/library/paper
 | ![Fait accompli voters](images/fiat-accompli-voters.svg) | ![Fiat accompli votes](images/fiat-accompli-votes.svg) |
 
 Having deterministically-chosen voters significantly reduces the size of Leios certificates because the $\sigma_\text{eid}$ signature (96 bytes each) do not need to be stored in the certificate for these voters. For example, for the recommended minimum Leios committee size of 500 votes, under scheme wFA the 406 block-producing nodes with the largest stake would always be included in the voting committee; approximately 88 voters would be selected at random to complete each voting committee.
-
-## 2025-01-24
 
 ### Rust Simulation
 
