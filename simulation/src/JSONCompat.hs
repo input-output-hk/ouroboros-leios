@@ -23,10 +23,14 @@ kebabToCamel = go False
   go b (c : cs) = (if b then toUpper c else c) : go False cs
 
 camelToKebab :: String -> String
-camelToKebab [] = []
-camelToKebab (c : cs)
-  | isUpper c = '-' : toLower c : camelToKebab cs
-  | otherwise = c : camelToKebab cs
+camelToKebab = go . lowerFirst
+ where
+  lowerFirst [] = []
+  lowerFirst (c : cs) = toLower c : cs
+  go (c : cs)
+    | isUpper c = '-' : toLower c : go cs
+    | otherwise = c : go cs
+  go [] = []
 
 newtype Getter r = Getter {unGetter :: forall f v e kv. SSymbol f -> (HasField f r v, KeyValue e kv, ToJSON v, Eq v) => r -> Maybe kv}
 
