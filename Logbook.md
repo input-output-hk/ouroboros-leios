@@ -15,15 +15,20 @@
 
 Added an "organic" topology generator which more closely matches mainnet topology. It generates "clusters" of colocated stake pools and relays, and uses stake to determine how connected each relay is.
 
+### DeltaQ update
+
+Wrote a report on the work since Sep’24: [Report 2025-01.md](./delta_q/docs/Report%202025-01.md)
+
 ## 2025-01-30
 
 ### Rust Simulation
 
 Talked to stake pool owners and outside experts about what the mainnet topology actually looks like. Takeaways:
- - Most stake pools have more than one relay. I managed to connect to 2312 relays across 1278 pools; this only accounts for fully public relays, and many nodes have private relays as well.
- - Stake pool operators sometimes have multiple pools. When they do, the pools are typically colocated and all share the same relays.
- - Each relay has a fixed number of outgoing connections controlled by configuration. In practice, most relays have ~25 active outgoing connections.
- - The p2p protocol ensures that each relay receives some number of incoming connections based on stake weight. Relays for smaller pools can have 10-20 incoming connections, relays for larger pools can have 400+.
+
+- Most stake pools have more than one relay. I managed to connect to 2312 relays across 1278 pools; this only accounts for fully public relays, and many nodes have private relays as well.
+- Stake pool operators sometimes have multiple pools. When they do, the pools are typically colocated and all share the same relays.
+- Each relay has a fixed number of outgoing connections controlled by configuration. In practice, most relays have ~25 active outgoing connections.
+- The p2p protocol ensures that each relay receives some number of incoming connections based on stake weight. Relays for smaller pools can have 10-20 incoming connections, relays for larger pools can have 400+.
 
 ## 2025-01-29
 
@@ -64,6 +69,7 @@ The Jupyter notebook [analysis/fiat-accompli.ipynb](analysis/fiat-accompli.ipynb
   the simulation parameters is still pending.
 
 Nest steps:
+
 - Generate topologies where block producers are behind relays.
 - Start work on comparison with idealized diffusion model.
 - Run leios simulations configured for higher thoughput.
