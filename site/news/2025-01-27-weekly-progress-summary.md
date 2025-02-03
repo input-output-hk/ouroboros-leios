@@ -27,7 +27,8 @@ tags: [progress, update, weekly]
 ## DeltaQ update
 
 - Wrote a comprehensive report covering work since September 2024
-- Report available at [Report 2025-01.md](./delta_q/docs/Report%202025-01.md)
+- Report available at
+  [Report 2025-01.md](https://github.com/input-output-hk/ouroboros-leios/blob/main/delta_q/docs/Report%202025-01.md)
 
 ## Formal Methods
 
