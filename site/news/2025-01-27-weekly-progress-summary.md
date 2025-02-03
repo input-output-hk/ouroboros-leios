@@ -28,3 +28,8 @@ tags: [progress, update, weekly]
 
 - Wrote a comprehensive report covering work since September 2024
 - Report available at [Report 2025-01.md](./delta_q/docs/Report%202025-01.md)
+
+## Formal Methods
+
+- Finalizing executable specifications for Simplified and Short Leios
+- Short Leios spec extracted to Haskell for conformance testing
