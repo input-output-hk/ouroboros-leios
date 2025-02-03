@@ -4,10 +4,56 @@
         <title>Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Leios Blog</description>
-        <lastBuildDate>Mon, 20 Jan 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 27 Jan 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly progress summary - January 27, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary</guid>
+            <pubDate>Mon, 27 Jan 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[Haskell simulation updates]]></description>
+            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation-updates">Haskell simulation updates<a class="hash-link" aria-label="Direct link to Haskell simulation updates" title="Direct link to Haskell simulation updates" href="https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary#haskell-simulation-updates">​</a></h2>
+<ul>
+<li><code>short-leios</code> simulation now outputs diffusion latency data</li>
+<li>Added support for different IB diffusion strategies:<!-- -->
+<ul>
+<li>freshest-first: higher slot numbers requested first</li>
+<li>peer-order: requested in order of peer announcement</li>
+</ul>
+</li>
+<li>Added support for Vote (Send) and Vote (Recv) stages</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-progress">Rust simulation progress<a class="hash-link" aria-label="Direct link to Rust simulation progress" title="Direct link to Rust simulation progress" href="https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary#rust-simulation-progress">​</a></h2>
+<ul>
+<li>Added an "organic" topology generator that better matches mainnet topology</li>
+<li>Generator creates clusters of colocated stake pools and relays</li>
+<li>Uses stake to determine relay connectivity</li>
+<li>Topology insights gathered from stake pool owners:<!-- -->
+<ul>
+<li>Most pools have multiple relays (2312 relays across 1278 pools counted)</li>
+<li>Pool operators often run multiple colocated pools sharing relays</li>
+<li>Relays typically maintain ~25 active outgoing connections</li>
+<li>Incoming connections scale with stake weight (10-400+ connections)</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-update">DeltaQ update<a class="hash-link" aria-label="Direct link to DeltaQ update" title="Direct link to DeltaQ update" href="https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary#deltaq-update">​</a></h2>
+<ul>
+<li>Wrote a comprehensive report covering work since September 2024</li>
+<li>Report available at
+<a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/delta_q/docs/Report%202025-01.md" target="_blank" rel="noopener noreferrer">Report 2025-01.md</a></li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal Methods<a class="hash-link" aria-label="Direct link to Formal Methods" title="Direct link to Formal Methods" href="https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary#formal-methods">​</a></h2>
+<ul>
+<li>Finalizing executable specifications for Simplified and Short Leios</li>
+<li>Short Leios spec extracted to Haskell for conformance testing</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly progress summary – January 20, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary</link>
