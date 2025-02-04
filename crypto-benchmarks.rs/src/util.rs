@@ -21,7 +21,7 @@ where
 {
     struct FixedBytesVisitor<const N: usize>;
 
-    impl<'de, const N: usize> Visitor<'de> for FixedBytesVisitor<N> {
+    impl<const N: usize> Visitor<'_> for FixedBytesVisitor<N> {
         type Value = [u8; N];
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

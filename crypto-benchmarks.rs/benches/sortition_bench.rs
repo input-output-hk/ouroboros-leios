@@ -10,21 +10,21 @@ fn benchmark_log(c: &mut Criterion) {
 fn benchmark_rb(c: &mut Criterion) {
     let f: Quad = into_quad(0.05);
     let s: Quad = into_quad(0.002);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.05 as f64).powf(0.0001 as f64));
+    let p: Quad = into_quad(1.0 - (1.0 - 0.05_f64).powf(0.0001_f64));
     c.bench_function("RB leadership", |b| b.iter(|| leader_check(f, s, p)));
 }
 
 fn benchmark_ib(c: &mut Criterion) {
     let f: Quad = into_quad(0.90);
     let s: Quad = into_quad(0.002);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.90 as f64).powf(0.002 as f64));
+    let p: Quad = into_quad(1.0 - (1.0 - 0.90_f64).powf(0.002_f64));
     c.bench_function("IB leadership", |b| b.iter(|| leader_check(f, s, p)));
 }
 
 fn benchmark_eb(c: &mut Criterion) {
     let f: Quad = into_quad(0.75);
     let s: Quad = into_quad(0.02);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.75 as f64).powf(0.002 as f64));
+    let p: Quad = into_quad(1.0 - (1.0 - 0.75_f64).powf(0.002_f64));
     c.bench_function("EB leadership", |b| b.iter(|| leader_check(f, s, p)));
 }
 
