@@ -1,4 +1,4 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 use leios_crypto_benchmarks::vrf::*;
 
 fn benchmark_prove(c: &mut Criterion) {

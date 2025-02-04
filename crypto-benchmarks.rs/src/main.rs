@@ -1,5 +1,6 @@
 use blst::min_sig::PublicKey;
 use blst::min_sig::SecretKey;
+use blst::min_sig::Signature;
 use leios_crypto_benchmarks::bls::*;
 use leios_crypto_benchmarks::sortition::*;
 use leios_crypto_benchmarks::vote::*;
@@ -59,10 +60,10 @@ fn main() {
         let pk_refs: Vec<&PublicKey> = pks.iter().collect();
         let eid = b"Election ID";
         let m: [u8; 500] = [0; 500];
-        let vss: Vec<VoteSignature> = sks.iter().map(|sk| gen_vote(sk, eid, &m)).collect();
-        let vs_refs: Vec<&VoteSignature> = vss.iter().collect();
-        let cs: CertSignature = gen_cert(&vs_refs).unwrap();
-        println!("{:?}", cs.sigma_tilde_eid);
+        let vss: Vec<(Signature, Signature)> = sks.iter().map(|sk| gen_vote(sk, eid, &m)).collect();
+        let vs_refs: Vec<&(Signature, Signature)> = vss.iter().collect();
+        let cs: (Signature, Signature) = gen_cert(&vs_refs).unwrap();
+        println!("{:?}", cs.0);
         println!("{}", verify_cert(&pk_refs, eid, &m, &vs_refs, &cs));
 
         let (mu1, mu2) = make_pop(&sks[0]);

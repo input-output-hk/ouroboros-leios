@@ -1,5 +1,5 @@
 use blst::{min_sig::PublicKey, min_sig::SecretKey};
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 use leios_crypto_benchmarks::vote::*;
 
 fn benchmark_check_pop(c: &mut Criterion) {
