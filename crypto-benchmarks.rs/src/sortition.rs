@@ -1,6 +1,6 @@
 use rustc_apfloat::{
-    Float, FloatConvert,
     ieee::{Double, IeeeFloat, Quad},
+    Float, FloatConvert,
 };
 
 pub fn into_quad(x: f64) -> Quad {
