@@ -1,30 +1,57 @@
-use blst::{min_sig::PublicKey, min_sig::SecretKey};
 use criterion::{criterion_group, criterion_main, Criterion};
-use leios_crypto_benchmarks::vote::*;
+use quickcheck::{Arbitrary, Gen};
+
+use leios_crypto_benchmarks::api::*;
 
 fn benchmark_check_pop(c: &mut Criterion) {
-    let sk: SecretKey = gen_key();
-    let pk: PublicKey = sk.sk_to_pk();
-    let (mu1, mu2) = make_pop(&sk);
-    c.bench_function("CheckPOP", |b| b.iter(|| check_pop(&pk, &mu1, &mu2)));
+    c.bench_function("check_pop", |b| {
+        b.iter_batched(
+            || {
+                let (_, mvk, mu) = key_gen();
+                (mvk, mu)
+            },
+            |(mvk, mu)| check_pop(&mvk, &mu),
+            criterion::BatchSize::SmallInput,
+        )
+    });
 }
 
 fn benchmark_gen_vote(c: &mut Criterion) {
-    let sk: SecretKey = gen_key();
-    let eid = b"Election ID";
-    let m: [u8; 64] = [0; 64];
-    c.bench_function("GenVote", |b| b.iter(|| gen_vote(&sk, eid, &m)));
+    let mut g = Gen::new(10);
+    c.bench_function("gen_vote", |b| {
+        b.iter_batched(
+            || {
+                let eid = Eid::arbitrary(&mut g);
+                let m = EbHash::arbitrary(&mut g);
+                let sk = SecKey::arbitrary(&mut g);
+                (eid, m, sk)
+            },
+            |(eid, m, sk)| {
+                gen_vote(&eid, &m, &sk);
+            },
+            criterion::BatchSize::SmallInput,
+        )
+    });
 }
 
 fn benchmark_verify_vote(c: &mut Criterion) {
-    let sk: SecretKey = gen_key();
-    let pk: blst::min_sig::PublicKey = sk.sk_to_pk();
-    let eid = b"Election ID";
-    let m: [u8; 64] = [0; 64];
-    let vs: VoteSignature = gen_vote(&sk, eid, &m);
-    c.bench_function("VerifyVote", |b| b.iter(|| verify_vote(&pk, eid, &m, &vs)));
+    let mut g = Gen::new(10);
+    c.bench_function("verify_vote", |b| {
+        b.iter_batched(
+            || {
+                let eid = Eid::arbitrary(&mut g);
+                let m = EbHash::arbitrary(&mut g);
+                let sk = SecKey::arbitrary(&mut g);
+                let vote = gen_vote(&eid, &m, &sk);
+                (eid, m, sk.pub_key(), vote)
+            },
+            |(eid, m, mvk, vote)| verify_vote(&eid, &m, &mvk, &vote),
+            criterion::BatchSize::SmallInput,
+        )
+    });
 }
 
+/*
 fn benchmark_gen_cert(c: &mut Criterion) {
     let sks: Vec<SecretKey> = (0..750).map(|_| gen_key()).collect();
     let eid = b"Election ID";
@@ -47,14 +74,15 @@ fn benchmark_verify_cert(c: &mut Criterion) {
         b.iter(|| verify_cert(&pk_refs, eid, &m, &vs_refs, &cs))
     });
 }
+*/
 
 criterion_group!(
     benches,
     benchmark_check_pop,
     benchmark_gen_vote,
-    benchmark_verify_vote,
-    benchmark_gen_cert,
-    benchmark_verify_cert,
+    benchmark_verify_vote, /*
+                           benchmark_gen_cert,
+                           benchmark_verify_cert,*/
 );
 
 criterion_main!(benches);

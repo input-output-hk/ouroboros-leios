@@ -26,3 +26,7 @@ harness = false
 [[bench]]
 name = "vote_bench"
 harness = false
+
+[[bench]]
+name = "serialization_bench"
+harness = false
