@@ -1359,11 +1359,11 @@ mod tests {
             farXL :=
             CDF[(1.598, 1)]
 
-            hop :=
-            (((near ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
+            hop := (((near
+             ->- near) ->- near) ->- nearXL) 1<>2 ((((mid ->- mid) ->- mid) ->- midXL) 1<>1 (((far ->- far) ->- far) ->- farXL))
 
-            hopEB :=
-            (((near ->- near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
+            hopEB := (((near ->-
+             near) ->- near) ->- nearL) 1<>2 ((((mid ->- mid) ->- mid) ->- midL) 1<>1 (((far ->- far) ->- far) ->- farL))
 
             mid :=
             CDF[(0.069, 1)]
@@ -1384,10 +1384,10 @@ mod tests {
             CDF[(0.078, 1)]
             ";
         let ctx = eval_ctx(SOURCE).unwrap();
-        assert_eq!(ctx.iter().count(), 13);
+        assert_eq!(ctx.iter().count(), 14);
         assert_eq!(ctx.get("diffuse").unwrap().to_string(), "hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop");
 
-        const DEST: &'static str = "\
+        const DEST: &'static str = "\n            -- start with a comment
             diffuse := hop 0.6<>99.4 hop ->- hop 8.58<>90.82 (hop ->- hop) ->- hop 65.86<>24.96 ((hop ->- hop) ->- hop) ->- hop\n\
             diffuseEB := hopEB 0.6<>99.4 hopEB ->- hopEB 8.58<>90.82 (hopEB ->- hopEB) ->- hopEB 65.86<>24.96 ((hopEB ->- hopEB) ->- hopEB) ->- hopEB\n\
             far := CDF[(0.268, 1)]\n\
