@@ -5,6 +5,7 @@ export interface Config {
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
   "leios-stage-active-voting-slots": bigint;
+  "leios-vote-send-recv-stages": boolean;
 
   // Transaction Configuration
   "tx-generation-distribution": Distribution;
@@ -31,6 +32,7 @@ export interface Config {
   "ib-body-validation-cpu-time-ms-per-byte": number;
   "ib-body-max-size-bytes": bigint;
   "ib-body-avg-size-bytes": bigint;
+  "ib-diffusion-strategy": DiffusionStrategy;
 
   // Endorsement Block Configuration
   "eb-generation-probability": number;
@@ -82,3 +84,9 @@ export interface LogNormalDistribution {
   mu: number;
   sigma: number;
 }
+
+export enum DiffusionStrategy {
+  PeerOrder = "peer-order",
+  FreshestFirst = "freshest-first",
+}
+

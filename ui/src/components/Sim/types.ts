@@ -1,10 +1,11 @@
 export interface INode {
+  id: string;
   location: number[];
   stake?: number;
 }
 
 export interface ILink {
-  nodes: number[];
+  nodes: string[];
 }
 
 export interface IServerNodeMap {

@@ -25,7 +25,7 @@ import Control.Tracer
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.Ix (Ix)
-import Data.List (sort, sortOn)
+import Data.List (sortOn)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -33,6 +33,8 @@ import Data.Ord
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import Data.Traversable
+import Data.Tuple (swap)
 import LeiosProtocol.Common
 import LeiosProtocol.Relay
 import qualified LeiosProtocol.RelayBuffer as RB
@@ -50,7 +52,6 @@ import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
 import SimTypes (cpuTask)
 import System.Random
-import TaskMultiQueue
 
 --------------------------------------------------------------
 ---- Events
@@ -212,13 +213,12 @@ relayIBConfig ::
   ([InputBlockHeader] -> m ()) ->
   SubmitBlocks m InputBlockHeader InputBlockBody ->
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
-relayIBConfig _tracer _cfg validateHeaders submitBlocks =
+relayIBConfig _tracer cfg validateHeaders submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = (.id)
     , validateHeaders
-    , -- TODO: add prioritization policy to LeiosConfig
-      prioritize = sortOn (Down . (.slot)) . Map.elems
+    , prioritize = prioritize cfg.leios.ibDiffusionStrategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1
@@ -231,13 +231,12 @@ relayEBConfig ::
   LeiosNodeConfig ->
   SubmitBlocks m EndorseBlockId EndorseBlock ->
   RelayConsumerConfig EndorseBlockId EndorseBlockId EndorseBlock m
-relayEBConfig _tracer _cfg submitBlocks =
+relayEBConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = id
     , validateHeaders = const $ return ()
-    , -- TODO: add prioritization policy to LeiosConfig?
-      prioritize = sort . Map.elems
+    , prioritize = prioritize cfg.leios.ebDiffusionStrategy $ error "FFD not supported for endorse blocks."
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?
@@ -250,13 +249,12 @@ relayVoteConfig ::
   LeiosNodeConfig ->
   SubmitBlocks m VoteId VoteMsg ->
   RelayConsumerConfig VoteId VoteId VoteMsg m
-relayVoteConfig _tracer _cfg submitBlocks =
+relayVoteConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
     , headerId = id
     , validateHeaders = const $ return ()
-    , -- TODO: add prioritization policy to LeiosConfig?
-      prioritize = sort . Map.elems
+    , prioritize = prioritize cfg.leios.voteDiffusionStrategy $ error "FFD not supported for vote bundles."
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?
@@ -385,7 +383,10 @@ leiosNode tracer cfg followers peers = do
 
   -- TODO: expiration times to be decided. At least need EB/IBs to be
   -- around long enough to compute ledger state if they end in RB.
-  let pruningThreads = []
+  let pruningThreads = case cfg.leios of
+        LeiosConfig{pipeline = SingSplitVote} ->
+          [pruneVoteBuffer tracer cfg leiosState]
+        _ -> []
 
   return $
     concat
@@ -398,6 +399,24 @@ leiosNode tracer cfg followers peers = do
       , computeLedgerStateThreads
       , pruningThreads
       ]
+
+pruneVoteBuffer ::
+  (Monad m, MonadDelay m, MonadTime m, MonadSTM m) =>
+  Tracer m LeiosNodeEvent ->
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  m ()
+pruneVoteBuffer _tracer cfg st = go (toEnum 0)
+ where
+  go p = do
+    let last_vote_recv = snd $ stageRangeOf cfg.leios p VoteRecv
+    let last_vote_send = snd $ stageRangeOf cfg.leios p VoteSend
+    _ <- waitNextSlot cfg.slotConfig (succ last_vote_recv)
+    atomically $ do
+      modifyTVar' st.relayVoteState.relayBufferVar $
+        RB.filter $
+          \RB.EntryWithTicket{value} -> (snd value).slot <= last_vote_send
+    go (succ p)
 
 computeLedgerStateThread ::
   forall m.
@@ -600,13 +619,30 @@ mkBuffersView cfg st = BuffersView{..}
     return EndorseBlocksSnapshot{..}
 
 mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
-mkSchedule cfg = mkScheduler cfg.rng (\slot -> map (fmap ($ slot)) rates)
+mkSchedule cfg = do
+  votingSlots <- newTVarIO $ pickFromRanges rng1 $ votingRanges cfg.leios
+  mkScheduler rng2 (rates votingSlots)
  where
+  (rng1, rng2) = split cfg.rng
   calcWins rate = Just $ \sample ->
     if sample <= coerce (nodeRate cfg.stake rate) then 1 else 0
-  rates =
+  voteRate = votingRatePerPipeline cfg.leios cfg.stake
+  pureRates =
     [ (SomeRole Generate.Propose, inputBlockRate cfg.leios cfg.stake)
     , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
-    , (SomeRole Generate.Vote, votingRate cfg.leios cfg.stake)
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
+  rates votingSlots slot = do
+    vote <- atomically $ do
+      vs <- readTVar votingSlots
+      case vs of
+        (sl : sls)
+          | sl == slot -> do
+              writeTVar votingSlots sls
+              pure (Just voteRate)
+        _ -> pure Nothing
+    pure $ (SomeRole Generate.Vote, vote) : map (fmap ($ slot)) pureRates
+  pickFromRanges :: StdGen -> [(SlotNo, SlotNo)] -> [SlotNo]
+  pickFromRanges rng0 rs = snd $ mapAccumL f rng0 rs
+   where
+    f rng r = coerce $ swap $ uniformR (coerce r :: (Word64, Word64)) rng

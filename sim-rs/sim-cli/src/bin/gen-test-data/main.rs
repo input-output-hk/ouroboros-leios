@@ -3,7 +3,10 @@ use std::{fs, path::PathBuf};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sim_core::config::Topology;
-use strategy::{globe, random_graph, simplified, GlobeArgs, RandomGraphArgs, SimplifiedArgs};
+use strategy::{
+    globe, organic, random_graph, simplified, GlobeArgs, OrganicArgs, RandomGraphArgs,
+    SimplifiedArgs,
+};
 
 mod strategy;
 
@@ -16,6 +19,7 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Strategy {
+    Organic(OrganicArgs),
     RandomGraph(RandomGraphArgs),
     Simplified(SimplifiedArgs),
     Globe(GlobeArgs),
@@ -28,11 +32,12 @@ fn main() -> Result<()> {
         Strategy::RandomGraph(args) => random_graph(&args)?,
         Strategy::Simplified(args) => simplified(&args)?,
         Strategy::Globe(args) => globe(&args)?,
+        Strategy::Organic(args) => organic(&args)?,
     };
 
-    let serialized = toml::to_string_pretty(&raw_topology)?;
+    let serialized = serde_yaml::to_string(&raw_topology.clone().into_topology())?;
 
-    let topology: Topology = raw_topology.into();
+    let topology: Topology = raw_topology.into_topology().into();
     topology.validate()?;
 
     fs::write(args.path, serialized)?;

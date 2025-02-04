@@ -39,6 +39,7 @@ traceLeiosP2P
   rng0
   P2PNetwork
     { p2pNodes
+    , p2pNodeStakes
     , p2pLinks
     , p2pWorld
     }
@@ -51,6 +52,7 @@ traceLeiosP2P
           LeiosEventSetup
             p2pWorld
             p2pNodes
+            p2pNodeStakes
             (Map.keysSet p2pLinks)
         tcplinks <-
           sequence
@@ -125,8 +127,10 @@ exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
       , baseChain = Genesis
       , slotConfig
       , leios
-      , processingQueueBound = 100
-      , processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores
+      , processingQueueBound = defaultQueueBound processingCores
+      , processingCores
       , nodeId
       , rng
       }
+   where
+    processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores

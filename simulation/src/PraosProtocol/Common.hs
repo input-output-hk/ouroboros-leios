@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
@@ -203,7 +204,11 @@ waitNextSlot slotConfig targetSlot = do
   threadDelayNDT (tgt `diffUTCTime` now)
   return slot
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(a, Maybe (Double -> Word64))]) -> m (SlotNo -> m [(a, Word64)])
+mkScheduler ::
+  MonadSTM m =>
+  StdGen ->
+  (SlotNo -> m [(a, Maybe (Double -> Word64))]) ->
+  m (SlotNo -> m [(a, Word64)])
 mkScheduler rng0 rates = do
   let
     sampleRates (_role, Nothing) = return []
@@ -213,9 +218,11 @@ mkScheduler rng0 rates = do
       let wins = f sample
       return [(role, wins) | wins >= 1]
   rngVar <- newTVarIO rng0
-  let sched slot = atomically $ do
-        rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
-        writeTVar rngVar rng1
-        return acts
+  let sched slot = do
+        rs <- rates slot
+        atomically $ do
+          rng <- readTVar rngVar
+          let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rs
+          writeTVar rngVar rng1
+          return acts
   return sched

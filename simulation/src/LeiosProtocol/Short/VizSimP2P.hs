@@ -1,24 +1,33 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module LeiosProtocol.Short.VizSimP2P where
 
 import ChanDriver
 import Control.Arrow ((&&&))
+import Control.Exception
+import Data.Aeson
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import Data.Bifunctor (second)
+import Data.Coerce
 import qualified Data.Colour.SRGB as Colour
 import Data.Hashable (hash)
+import qualified Data.IntMap as IMap
+import Data.IntervalMap (IntervalMap)
 import qualified Data.IntervalMap.Strict as ILMap
 import Data.List (foldl', intercalate, sortOn)
+import Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, maybeToList)
+import Data.Maybe (catMaybes, fromMaybe, maybeToList)
 import Data.Monoid (Any)
 import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
@@ -26,6 +35,8 @@ import qualified Diagrams.Backend.Cairo.Internal as Dia
 import qualified Diagrams.Core as Dia
 import qualified Diagrams.Prelude as Dia
 import qualified Diagrams.TwoD.Adjust as Dia
+import Diffusion
+import GHC.Generics
 import qualified Graphics.Rendering.Cairo as Cairo
 import qualified Graphics.Rendering.Chart.Easy as Chart
 import LeiosProtocol.Common hiding (Point)
@@ -34,9 +45,12 @@ import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import LeiosProtocol.Short.SimP2P (exampleTrace2)
+import LeiosProtocol.Short.SimP2P (exampleTrace2, exampleTrace2')
 import LeiosProtocol.Short.VizSim (
+  ChainsMap,
   DataTransmitted (..),
+  DiffusionLatencyMap,
+  DiffusionLatencyMap',
   IBsInRBsReport (..),
   LeiosModelConfig (..),
   LeiosSimVizModel,
@@ -44,19 +58,25 @@ import LeiosProtocol.Short.VizSim (
   LeiosSimVizState (..),
   LeiosVizConfig (praosMessageColor),
   LinkPoints (..),
+  accumChains,
+  accumDataTransmitted,
+  accumDiffusionLatency',
+  accumNodeCpuUsage,
   examplesLeiosSimVizConfig,
+  initDataTransmitted,
   leiosSimVizModel,
   recentRate,
   totalIBsInRBs,
  )
 import Linear.V2
-import ModelTCP (Bytes, TcpMsgForecast (..))
+import ModelTCP (Bytes, TcpEvent (TcpSendMsg), TcpMsgForecast (..))
 import Network.TypedProtocol
 import P2P
 import PraosProtocol.BlockFetch (Message (..))
+import PraosProtocol.ExamplesPraosP2P ()
 import PraosProtocol.PraosNode (PraosMessage (..))
 import Sample
-import SimTypes (NodeId (..), Point (..), World (..))
+import SimTypes (LabelLink (LabelLink), LabelNode (LabelNode), NodeId (..), Point (..), World (..))
 import System.FilePath (dropExtension, (<.>))
 import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
@@ -382,15 +402,15 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
      ( SimVizModel
         _
         st@LeiosSimVizState
-          { vizNodePos
+          { vizNodeStakes
           }
       ) -> case tag of
-        RB -> theChart (show tag) vizNodePos nodeMessageColor st.vizMsgsDiffusionLatency
-        IB -> theChart (show tag) vizNodePos cfg.ibColor st.ibDiffusionLatency
-        EB -> theChart (show tag) vizNodePos cfg.ebColor st.ebDiffusionLatency
-        VT -> theChart (show tag) vizNodePos cfg.voteColor st.voteDiffusionLatency
+        RB -> theChart (show tag) vizNodeStakes nodeMessageColor . coerce . Map.elems $ st.vizMsgsDiffusionLatency
+        IB -> theChart (show tag) vizNodeStakes cfg.ibColor . coerce . Map.elems $ st.ibDiffusionLatency
+        EB -> theChart (show tag) vizNodeStakes cfg.ebColor . coerce . Map.elems $ st.ebDiffusionLatency
+        VT -> theChart (show tag) vizNodeStakes cfg.voteColor . coerce . Map.elems $ st.voteDiffusionLatency
  where
-  theChart lbl nodePos nodeMsgColor msgsDiffusionLatency =
+  theChart lbl nodeStakes nodeMsgColor (msgsDiffusionLatency :: [(a, NodeId, DiffTime, [(NodeId, DiffTime)])]) =
     (Chart.def :: Chart.Layout DiffTime Chart.Percent)
       { Chart._layout_title = "Diffusion latency" ++ " (" ++ lbl ++ ")"
       , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
@@ -414,14 +434,14 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
                         { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
                         }
               }
-          | let nnodes = Map.size nodePos
-          , (blk, _nid, created, arrivals) <- Map.elems msgsDiffusionLatency
+          | (blk, _nid, created, arrivals) <- msgsDiffusionLatency
           , let timeseries =
                   map (second Chart.Percent) $
-                    diffusionLatencyPerStakeFraction nnodes created arrivals
+                    Diffusion.diffusionLatencyPerStakeFraction nodeStakes created arrivals
           ]
       }
 
+-- TODO: handle non-uniform stakes
 chartDiffusionImperfection ::
   P2PTopography ->
   DiffTime ->
@@ -464,7 +484,7 @@ chartDiffusionImperfection
                     | (blk, nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
                     , let timeseries =
                             [ (latencyActual, imperfection)
-                            | (arrivalActual, latencyIdeal) <-
+                            | ((_, arrivalActual), latencyIdeal) <-
                                 zip
                                   (reverse arrivals)
                                   ( p2pGraphIdealDiffusionTimesFromNode
@@ -732,8 +752,8 @@ isRelayMessageControl (ProtocolMessage (SomeMessage msg)) = case msg of
   _otherwise -> True
 
 -- | takes stage length, assumes pipelines start at Slot 0.
-defaultVizConfig :: Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
-defaultVizConfig stageLength numCores maxBandwidthPerNode =
+defaultVizConfig :: forall p. IsPipeline p => Stage p -> Int -> NumCores -> Bytes -> LeiosP2PSimVizConfig
+defaultVizConfig voteSendStage stageLength numCores maxBandwidthPerNode =
   LeiosP2PSimVizConfig
     { nodeMessageColor = testNodeMessageColor
     , ptclMessageColor = testPtclMessageColor
@@ -759,7 +779,7 @@ defaultVizConfig stageLength numCores maxBandwidthPerNode =
       RelayVote msg -> (VT,) <$> relayMessageColor voteColor msg
   ibColor = pipelineColor Propose . (hash . (.id) &&& (.slot))
   ebColor = pipelineColor Endorse . (hash . (.id) &&& (.slot))
-  voteColor = pipelineColor Vote . (hash . (.id) &&& (.slot))
+  voteColor = pipelineColor voteSendStage . (hash . (.id) &&& (.slot))
   relayMessageColor :: (body -> Dia.Colour Double) -> RelayMessage id header body -> Maybe (Dia.Colour Double)
   relayMessageColor f (ProtocolMessage (SomeMessage msg)) = case msg of
     MsgRespondBodies bodies -> Just $ blendColors $ map (f . snd) bodies
@@ -778,7 +798,7 @@ defaultVizConfig stageLength numCores maxBandwidthPerNode =
     -- TODO?: better palettes than gradients on a color
     c = palettes !! p
     f = fst $ uniformR (0, 0.5) seed
-  pipelineColor :: Stage -> (Int, SlotNo) -> Dia.Colour Double
+  pipelineColor :: IsPipeline p => Stage p -> (Int, SlotNo) -> Dia.Colour Double
   pipelineColor slotStage (i, slot) = case stageRange' stageLength slotStage slot Propose of
     Just (fromEnum -> startOfPipeline, _) ->
       let
@@ -802,55 +822,184 @@ toSRGB :: Dia.Colour Double -> (Double, Double, Double)
 toSRGB (Dia.toSRGB -> Dia.RGB r g b) = (r, g, b)
 
 example2 :: StdGen -> OnDisk.Config -> P2PNetwork -> Visualization
-example2 rng onDiskConfig p2pNetwork@P2PNetwork{p2pNodeCores} =
-  slowmoVisualization 0.5 $
-    Viz model $
-      LayoutAbove
-        [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
-        , LayoutBeside
-            [ LayoutReqSize 1200 1000 $
-                Layout $
-                  leiosP2PSimVizRender config
-            , LayoutBeside
-                [ LayoutAbove
-                    [ LayoutReqSize 350 250 $
-                      Layout $
-                        chartDiffusionLatency config tag
-                    | -- , LayoutReqSize 350 300 $
-                    --     Layout $
-                    --       chartDiffusionImperfection
-                    --         p2pTopography
-                    --         0.1
-                    --         (96 / 1000)
-                    --         config
-                    tag <- [IB, EB, VT, RB]
-                    ]
-                , LayoutAbove
-                    [ LayoutReqSize 350 150 $
+example2
+  rng
+  (convertConfig -> leiosConfig@LeiosConfig{voteSendStage})
+  p2pNetwork@P2PNetwork{p2pNodeCores} =
+    slowmoVisualization 0.5 $
+      Viz model $
+        LayoutAbove
+          [ LayoutBeside [layoutLabelTime, Layout leiosGenCountRender]
+          , LayoutBeside
+              [ LayoutReqSize 1200 1000 $
+                  Layout $
+                    leiosP2PSimVizRender config
+              , LayoutBeside
+                  [ LayoutAbove
+                      [ LayoutReqSize 350 250 $
                         Layout $
-                          chartBandwidth modelConfig
-                    , LayoutReqSize 350 200 $
-                        Layout $
-                          chartDataTransmitted modelConfig
-                    , LayoutReqSize 350 200 $
-                        Layout $
-                          chartCPUUsage modelConfig
-                    , LayoutReqSize 350 150 $
-                        Layout chartLinkUtilisation
-                    ]
-                ]
-            ]
-        ]
- where
-  processingCores = maximum $ Map.elems p2pNodeCores
-  config = defaultVizConfig 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
-  modelConfig = config.model
-  model = leiosSimVizModel modelConfig (exampleTrace2 rng onDiskConfig p2pNetwork)
+                          chartDiffusionLatency config tag
+                      | -- , LayoutReqSize 350 300 $
+                      --     Layout $
+                      --       chartDiffusionImperfection
+                      --         p2pTopography
+                      --         0.1
+                      --         (96 / 1000)
+                      --         config
+                      tag <- [IB, EB, VT, RB]
+                      ]
+                  , LayoutAbove
+                      [ LayoutReqSize 350 150 $
+                          Layout $
+                            chartBandwidth modelConfig
+                      , LayoutReqSize 350 200 $
+                          Layout $
+                            chartDataTransmitted modelConfig
+                      , LayoutReqSize 350 200 $
+                          Layout $
+                            chartCPUUsage modelConfig
+                      , LayoutReqSize 350 150 $
+                          Layout chartLinkUtilisation
+                      ]
+                  ]
+              ]
+          ]
+   where
+    processingCores = maximum $ Map.elems p2pNodeCores
+    config = defaultVizConfig voteSendStage 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
+    modelConfig = config.model
+    model = leiosSimVizModel modelConfig (exampleTrace2' rng leiosConfig p2pNetwork)
 
-exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
-exampleSim seed config p2pNetwork@P2PNetwork{..} emitControl stop fp = do
-  let trace = exampleTrace2 seed config p2pNetwork
-  let sampleModel = SampleModel{initState = (), accumState = \_ _ x -> x, renderState = \_ -> return ()}
+data LeiosSimState = LeiosSimState
+  { chains :: !ChainsMap
+  , rbDiffusionLatency :: !DiffusionLatencyMap
+  , ibDiffusionLatency :: !(DiffusionLatencyMap' InputBlockId InputBlockHeader)
+  , ebDiffusionLatency :: !(DiffusionLatencyMap' EndorseBlockId EndorseBlock)
+  , voteDiffusionLatency :: !(DiffusionLatencyMap' VoteId VoteMsg)
+  , nodeCpuUsage :: !(Map NodeId (IntervalMap DiffTime Int))
+  , dataTransmittedPerNode :: !(Map NodeId DataTransmitted)
+  }
+
+accumLeiosSimState ::
+  Time ->
+  LeiosEvent ->
+  LeiosSimState ->
+  LeiosSimState
+accumLeiosSimState _now (LeiosEventSetup{}) vs =
+  vs
+accumLeiosSimState _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventNewTip _tip)))) vs =
+  vs
+accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) LeiosSimState{..} =
+  case blk of
+    EventIB x ->
+      LeiosSimState
+        { ibDiffusionLatency = accumDiffusionLatency' now nid event x.id x.header ibDiffusionLatency
+        , ..
+        }
+    EventEB x ->
+      LeiosSimState
+        { ebDiffusionLatency = accumDiffusionLatency' now nid event x.id x ebDiffusionLatency
+        , ..
+        }
+    EventVote x ->
+      LeiosSimState
+        { voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x voteDiffusionLatency
+        , ..
+        }
+accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
+  vs
+    { rbDiffusionLatency =
+        assert (not (blockHash blk `Map.member` rbDiffusionLatency vs)) $
+          Map.insert
+            (blockHash blk)
+            (blockHeader blk, nid, now, [(nid, now)])
+            (rbDiffusionLatency vs)
+    }
+accumLeiosSimState _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventReceived _blk)))) vs =
+  vs
+accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventEnterState blk)))) vs =
+  vs
+    { rbDiffusionLatency =
+        Map.adjust
+          ( \(hdr, nid', created, arrivals) ->
+              (hdr, nid', created, (nid, now) : arrivals)
+          )
+          (blockHash blk)
+          (rbDiffusionLatency vs)
+    }
+accumLeiosSimState
+  _now
+  ( LeiosEventTcp
+      ( LabelLink
+          nfrom
+          _nto
+          (TcpSendMsg msg msgforecast _msgforecasts)
+        )
+    )
+  LeiosSimState{..} =
+    LeiosSimState
+      { dataTransmittedPerNode = Map.alter (Just . accumDataTransmitted msg msgforecast . fromMaybe initDataTransmitted) nfrom dataTransmittedPerNode
+      , ..
+      }
+accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) LeiosSimState{..} =
+  LeiosSimState
+    { nodeCpuUsage = accumNodeCpuUsage now nid task nodeCpuUsage
+    , ..
+    }
+accumLeiosSimState
+  _now
+  ( LeiosEventNode
+      (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
+    )
+  _vs = error "PraosNodeEventCPU should not be generated by leios nodes"
+
+data LeiosData = LeiosData
+  { network :: SomeTopology
+  , config :: OnDisk.Config
+  , ib_diffusion :: DiffusionData InputBlockId
+  , eb_diffusion :: DiffusionData EndorseBlockId
+  , vt_diffusion :: DiffusionData VoteId
+  , rb_diffusion :: DiffusionData Int
+  , stable_chain_hashes :: [Int]
+  -- , average_block_fetch_duration :: DiffTime
+  -- -- ^ for comparison with benchmark cluster measurement.
+  }
+  deriving (Generic, ToJSON, FromJSON)
+
+exampleSim :: Bool -> StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
+exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop fp = do
+  let trace = exampleTrace2 seed cfg p2pNetwork
+  let sampleModel =
+        SampleModel
+          { initState = LeiosSimState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
+          , accumState = \t e s -> accumLeiosSimState t e s{chains = accumChains t e s.chains}
+          , renderState
+          }
   runSampleModel' traceFile (logLeiosEvent p2pNodeNames emitControl) sampleModel stop trace
  where
-  traceFile = dropExtension fp <.> "log"
+  traceFile
+    | doLog = Just (dropExtension fp <.> "log")
+    | otherwise = Nothing
+  renderState LeiosSimState{..} = do
+    let
+      ib_diffusion = diffusionDataFromMap p2pNodeStakes ibDiffusionLatency
+      eb_diffusion = diffusionDataFromMap p2pNodeStakes ebDiffusionLatency
+      vt_diffusion = diffusionDataFromMap p2pNodeStakes voteDiffusionLatency
+      rb_diffusion = coerce $ diffusionDataFromMap p2pNodeStakes rbDiffusionLatency
+      stable_chain_hashes = coerce $ stableChainHashes chains
+      network = p2pNetworkToSomeTopology (fromIntegral $ Map.size p2pNodeStakes * 1000) p2pNetwork
+      config = cfg
+    let diffusionData = LeiosData{..}
+    encodeFile fp diffusionData
+    putStrLn $ "Data written to " ++ fp
+    reportAll diffusionData
+  reportAll LeiosData{..} = do
+    sequence_ $
+      [ uncurry report ("IB", ib_diffusion)
+      , uncurry report ("EB", eb_diffusion)
+      , uncurry report ("Vote", vt_diffusion)
+      , uncurry report ("RB", rb_diffusion)
+      ]
+  report tag DiffusionData{..} = do
+    putStrLn $ tag ++ ": average latencies (from slot start) by percentile"
+    putStrLn $ unlines $ map show $ Map.toList average_latencies

@@ -3,9 +3,8 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use sim_core::config::{RawLegacyTopology, RawNodeConfig};
 
-use super::utils::{distribute_stake, GraphBuilder};
+use super::utils::{distribute_stake, GraphBuilder, RawNodeConfig};
 
 #[derive(Debug, Parser)]
 pub struct SimplifiedArgs {
@@ -40,7 +39,7 @@ const SHORT_HOP: Duration = Duration::from_millis(12);
 const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
-pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
+pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
     let mut rng = thread_rng();
 
     let mut graph = GraphBuilder::new();
@@ -64,26 +63,30 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
             .step_by(cluster_size * 2)
             .map(move |id| (cluster * 2) + id + 1)
     };
-    let stake = distribute_stake(pool_count)?;
-    for i in 0..pool_count {
-        let cluster = i % 5;
-        let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
-        let pool_id = graph.add(RawNodeConfig {
-            location: pool_loc,
-            region: None,
-            stake: stake.get(i).cloned(),
-            cpu_multiplier: 1.0,
-            cores: None,
-        });
-        let relay_id = graph.add(RawNodeConfig {
-            location: relay_loc,
-            region: None,
-            stake: None,
-            cpu_multiplier: 1.0,
-            cores: None,
-        });
-
-        graph.link(pool_id, relay_id, Some(SHORT_HOP));
+    let stake = distribute_stake(pool_count);
+    let pools: Vec<_> = (0..pool_count)
+        .map(|i| {
+            let cluster = i % 5;
+            let (pool_loc, relay_loc) = clusters[cluster].random_loc(&mut rng);
+            let pool_id = graph.add(RawNodeConfig {
+                name: format!("pool-{i}"),
+                location: pool_loc,
+                region: None,
+                stake: stake.get(i).cloned(),
+                cores: None,
+            });
+            let relay_id = graph.add(RawNodeConfig {
+                name: format!("relay-{i}"),
+                location: relay_loc,
+                region: None,
+                stake: None,
+                cores: None,
+            });
+            (cluster, pool_id, relay_id)
+        })
+        .collect();
+    for (cluster, pool_id, relay_id) in pools {
+        graph.bidi_link(pool_id, relay_id, Some(SHORT_HOP));
 
         let mut local_candidates: Vec<usize> = relays_in_cluster(cluster)
             .filter(|id| *id != relay_id)
@@ -95,7 +98,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
                 break;
             }
             let neighbor = local_candidates.remove(rng.gen_range(0..local_candidates.len()));
-            graph.link(relay_id, neighbor, Some(SHORT_HOP));
+            graph.bidi_link(relay_id, neighbor, Some(SHORT_HOP));
         }
 
         for other_cluster in (0..5).filter(|c| *c != cluster) {
@@ -114,12 +117,12 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<RawLegacyTopology> {
                     break;
                 }
                 let neighbor = candidates.remove(rng.gen_range(0..candidates.len()));
-                graph.link(relay_id, neighbor, Some(latency));
+                graph.bidi_link(relay_id, neighbor, Some(latency));
             }
         }
     }
 
-    Ok(graph.into_topology())
+    Ok(graph)
 }
 
 #[cfg(test)]
@@ -133,7 +136,7 @@ mod tests {
         let args = SimplifiedArgs { pool_count: 1000 };
 
         let raw = simplified(&args).unwrap();
-        let topology: Topology = raw.into();
+        let topology: Topology = raw.into_topology().into();
         topology.validate().unwrap();
     }
 }

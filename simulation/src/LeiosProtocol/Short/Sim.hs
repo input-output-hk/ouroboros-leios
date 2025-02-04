@@ -51,6 +51,7 @@ data LeiosEvent
     LeiosEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
+      !(Map NodeId StakeFraction)
       !(Set (NodeId, NodeId)) -- links between nodes
   | -- | An event at a node
     LeiosEventNode (LabelNode LeiosNodeEvent)
@@ -183,6 +184,11 @@ traceRelayLink1 tcpprops =
               , (nodeB, Point 450 100)
               ]
           )
+          ( Map.fromList
+              [ (nodeA, StakeFraction 0.5)
+              , (nodeB, StakeFraction 0.5)
+              ]
+          )
           ( Set.fromList
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
@@ -198,6 +204,8 @@ traceRelayLink1 tcpprops =
                 endorseBlockFrequencyPerStage = 4
               , -- \^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
                 activeVotingStageLength = 1
+              , pipeline = SingSingleVote
+              , voteSendStage = Vote
               , votingFrequencyPerStage = 4
               , votesForCertificate = 1 -- just two nodes available to vote!
               , sizes -- TODO: realistic sizes
@@ -225,6 +233,9 @@ traceRelayLink1 tcpprops =
                     , voteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
                     }
+              , ibDiffusionStrategy = FreshestFirst
+              , ebDiffusionStrategy = PeerOrder
+              , voteDiffusionStrategy = PeerOrder
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig

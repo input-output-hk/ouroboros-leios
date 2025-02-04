@@ -111,7 +111,7 @@ pub struct Node {
     stake: u64,
     total_stake: u64,
     cpu: CpuTaskQueue<CpuTask>,
-    peers: Vec<NodeId>,
+    consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
     praos: NodePraosState,
     leios: NodeLeiosState,
@@ -181,7 +181,7 @@ impl Node {
         let id = config.id;
         let stake = config.stake;
         let cpu = CpuTaskQueue::new(config.cores, config.cpu_multiplier);
-        let peers = config.peers.clone();
+        let consumers = config.consumers.clone();
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
 
@@ -200,7 +200,7 @@ impl Node {
             stake,
             total_stake,
             cpu,
-            peers,
+            consumers,
             txs: HashMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
@@ -687,9 +687,11 @@ impl Node {
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
-        // Do not remove TXs in these blocks from the leios mempool.
-        // Wait until we learn more about how praos and leios interact.
-        for peer in &self.peers {
+        // Remove TXs in these blocks from the leios mempool.
+        for tx in &block.transactions {
+            self.leios.mempool.remove(&tx.id);
+        }
+        for peer in &self.consumers {
             if self
                 .praos
                 .peer_heads
@@ -738,7 +740,7 @@ impl Node {
         }
         self.txs.insert(id, TransactionView::Received(tx.clone()));
         self.praos.mempool.insert(tx.id, tx.clone());
-        for peer in &self.peers {
+        for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
@@ -813,7 +815,7 @@ impl Node {
         }
         self.leios.ibs.insert(id, InputBlockState::Pending(header));
         // We haven't seen this header before, so propagate it to our neighbors
-        for peer in &self.peers {
+        for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
@@ -873,7 +875,7 @@ impl Node {
             .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
 
-        for peer in &self.peers {
+        for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
@@ -928,7 +930,7 @@ impl Node {
         }
         self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
         // We haven't seen this EB before, so propagate it to our neighbors
-        for peer in &self.peers {
+        for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
@@ -980,7 +982,7 @@ impl Node {
                 .extend(std::iter::repeat(votes.id.producer).take(*count));
         }
         // We haven't seen these votes before, so propagate them to our neighbors
-        for peer in &self.peers {
+        for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
@@ -1026,7 +1028,7 @@ impl Node {
             .or_default()
             .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
-        for peer in &self.peers {
+        for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceIBHeader(id))?;
         }
         Ok(())
@@ -1052,7 +1054,7 @@ impl Node {
         let id = eb.id();
         self.leios.ebs.insert(id, eb.clone());
         self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
-        for peer in &self.peers {
+        for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
         }
         Ok(())
@@ -1112,7 +1114,7 @@ impl Node {
         self.leios
             .votes
             .insert(votes.id, VoteBundleState::Received(votes.clone()));
-        for peer in &self.peers {
+        for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceVotes(votes.id))?;
         }
         Ok(())

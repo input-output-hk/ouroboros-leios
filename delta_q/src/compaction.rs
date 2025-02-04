@@ -26,8 +26,9 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
                 pos += 1;
             }
             if x == prev_x {
+                #[cfg(target_arch = "wasm32")]
                 web_sys::console::log_2(&"duplicate x".into(), &format!("{:?}", data).into());
-                panic!("duplicate x");
+                panic!("duplicate x {data:?}");
             }
             prev_x = x;
         }

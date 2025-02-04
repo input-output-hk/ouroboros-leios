@@ -5,7 +5,7 @@ Within the context of Ouroboros Leios we very much need to model resource constr
 
 > This article documents my journey in understanding how ΔQSD can be used, with some missteps and wrong interpretations along the way.
 > One important thing I learnt was that ΔQSD is meant only for timeliness analysis, complemented by load tracking _synthesis_.
-> In other words, the effect of resource constraint is fed into the model, not an output of the evaluation of the model.
+> In other words, the effect of resource constraints is fed into the model, not an output of the evaluation of the model.
 
 ## High fidelity resource usage tracking
 
@@ -29,13 +29,13 @@ A resource constraint would be formulated as a CUDF that acts as a lower bound f
 For example, a hard limit would be expressed by a step function that goes from zero to one at the available maximum.
 The probability of a violation is then obtained by evaluating the computed CUDF at that maximum and subtracting the value from one.
 The maximum demanded resource usage is given by the resource value at which the CUDF reaches one.
-In case of a violation, the set of collaboratively violating outcomes needs to be transformed to express the effect of the resource constraint (e.g. sending across a network becomes slower and takes longer); or the resource demand it inflexible and thus the system fails (e.g. when more storage space is required than available).
+In case of a violation, the set of collaboratively violating outcomes needs to be transformed to express the effect of the resource constraint (e.g. sending across a network becomes slower and takes longer); or the resource demand is inflexible and thus the system fails (e.g. when more storage space is required than available).
 
-The first issue with implementing the above is that resources may occur in multiple parallel branches of a ΔQ expression, which means that constraint violations cannot be recognised while evaluating an expression in bottom-up fashion in a fashion that is required to compute the outcome transformation.
+The first issue with implementing the above is that resources may occur in multiple parallel branches of a ΔQ expression, which means that constraint violations cannot be recognised while evaluating an expression bottom-up as is required to compute the outcome transformation.
 Assuming that a constraint violation has been recognised, the appropriate response is to stretch or delay a resouce usage so that the constraint is respected — if the network or CPU is busy right now, further work will be finished later.
 The second issue then is that some parallel branches of a ΔQ expression may be unaffected by the resource constraint violation and thus require no time stretching or delay: the effect of resource exhaustion is localised to one resource, which may affect some but not all branches.
 Consider as example `∀(delay10 | useCPU)` where the delay depends only on wall clock time while the CPU usage may be subject to stretching or delay.
-This means that a resource constraint violating discovered when combining this expression with some other expression needs to transform not the whole composite outcome but only `useCPU`, the result of which then needs to be combined again with the unaffected `delay10`.
+This means that a resource constraint violation discovered when combining this expression with some other expression needs to transform not the whole composite outcome but only `useCPU`, the result of which then needs to be combined again with the unaffected `delay10`.
 
 ## Possibly correct but horrible solution
 
@@ -54,11 +54,11 @@ The main blocker is that constraints live in their resource dimension but affect
 
 ## Resources are localized
 
-One further complication is that each resource is associated with a specific location within the system: sending bytes from A to B does not exhaust resources at C.
+One further complication is that each resource is associated with a specific location within the system: sending bytes from A to B does not exhaust resources at location C.
 Resource usage of an outcome thus must be labelled with either the input or output events for that outcome, assuming that each event belongs to exactly one location — this is a reasonable assumption for any accurate model of a distributed system, where all information is subject to local availability.
-This means that modelling the diffusion of data across the network requires tracking resources at a couple thousand locations, and it means expanding the expression modelling this activity to actually have a couple thousand branches instead of using the nice and simple choices between 1, 2, 3, 4 hops as used for the [earlier Peras model](https://peras.cardano-scaling.org/docs/reports/tech-report-1/#certificates-in-block-header).
+This means that modelling the diffusion of data across something like the Cardano network requires tracking resources at a couple thousand locations, and it means expanding the expression modelling this activity to actually have a couple thousand branches instead of using the nice and simple choices between 1, 2, 3, 4 hops as used for the [earlier Peras model](https://peras.cardano-scaling.org/docs/reports/tech-report-1/#certificates-in-block-header).
 
-It would be nice if a single diffusion activity could be computed once and then be uses in probabilistic fashion: the node under observation could be at any one place within the gossip flow tree.
+It would be nice if a single diffusion activity could be computed once and then be used in probabilistic fashion: the node under observation could be at any one place within the gossip flow tree.
 Unfortunately we will want to simulate the interaction of overlapping pipeline instances, which may hit a given node at different times; adversarial behaviour may exacerbate this problem.
 So for some analyses we may not be able to greatly simplify the outcome expression back to the 1, 2, 3, 4 hop model, which in combination with an iterative algorithm like the one sketched above smells like it will require substantial computational resources.
 And this runs counter to the impetus for this whole work, which is to offer an _interactive_ tool to the whole community, both within and without of IOG.

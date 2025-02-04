@@ -25,13 +25,13 @@ export const SimContextProvider: FC<
   const defaultSyncedState = useMemo(() => {
     const transformedTopography: ITransformedNodeMap = {
       nodes: new Map(
-        topography.nodes.map((n, i) => [
-          `node-${i}`,
+        topography.nodes.map((n) => [
+          n.id,
           {
             data: n,
             fy: n.location[0],
             fx: n.location[1],
-            id: `node-${i}`,
+            id: n.id,
           },
         ]),
       ),
@@ -39,8 +39,8 @@ export const SimContextProvider: FC<
         topography.links.map((l) => [
           `${l.nodes[0]}|${l.nodes[1]}`,
           {
-            source: `node-${l.nodes[0]}`,
-            target: `node-${l.nodes[1]}`,
+            source: l.nodes[0],
+            target: l.nodes[1],
           },
         ]),
       ),

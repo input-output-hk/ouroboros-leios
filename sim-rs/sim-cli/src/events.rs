@@ -106,6 +106,7 @@ impl EventMonitor {
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
         let mut leios_txs = 0u64;
+        let mut unique_leios_txs = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
@@ -193,20 +194,24 @@ impl EventMonitor {
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
-                        let mut block_leios_txs: Vec<_> = eb_ibs
+                        let block_leios_txs: Vec<_> = eb_ibs
                             .get(&endorsement.eb)
                             .unwrap()
                             .iter()
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
                             .copied()
-                            .dedup()
                             .collect();
+
+                        let mut unique_block_leios_txs: Vec<_> =
+                            block_leios_txs.iter().copied().sorted().dedup().collect();
                         info!(
-                            "This block had an additional {} leios tx(s).",
-                            block_leios_txs.len()
+                            "This block had an additional {} leios tx(s) ({} unique).",
+                            block_leios_txs.len(),
+                            unique_block_leios_txs.len()
                         );
                         leios_txs += block_leios_txs.len() as u64;
-                        all_txs.append(&mut block_leios_txs);
+                        unique_leios_txs += unique_block_leios_txs.len() as u64;
+                        all_txs.append(&mut unique_block_leios_txs);
                     }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
                         if *old_vrf > vrf {
@@ -323,7 +328,7 @@ impl EventMonitor {
                 "{} slot(s) had no naive praos blocks.",
                 total_slots - blocks.len() as u64
             );
-            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + leios_txs, pretty_bytes(published_bytes, pbo.clone()));
+            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + unique_leios_txs, pretty_bytes(published_bytes, pbo.clone()));
             info!(
                 "{} transaction(s) ({}) did not reach a naive praos block.",
                 pending_txs.len(),
@@ -453,8 +458,9 @@ impl EventMonitor {
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
-            info!("{} tx(s) were referenced by a Leios endorsement.", leios_txs);
+            info!("{} tx(s) were referenced by a Leios endorsement.", unique_leios_txs);
             info!("{} tx(s) were included directly in a Praos block.", praos_txs);
+            info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", leios_txs - unique_leios_txs, (leios_txs - unique_leios_txs) as f64 / leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
                 ib_time_stats.mean, ib_time_stats.std_dev,

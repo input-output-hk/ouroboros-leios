@@ -141,7 +141,7 @@ relayNode
             , -- sequential validation of headers
               validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId
-            , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
+            , prioritize = \m _ -> sortOn (Down . testHeaderExpiry) . Map.elems $ m
             , submitPolicy = SubmitAll
             , maxHeadersToRequest = relayConfig.maxWindowSize.value
             , maxBodiesToRequest = 1 -- let pipelining stream them.

@@ -13,6 +13,12 @@
 
 leios-stage-length-slots: 20
 leios-stage-active-voting-slots: 1
+# Whether the pipeline should have `Vote (Send)` and `Vote (Recv)` stages,
+# rather than a single `Vote` stage.
+#
+# If set to `true`, it is recommended to set
+# `leios-stage-active-voting-slots` equal to `leios-stage-length-slots`.
+leios-vote-send-recv-stages: false
 
 ################################################################################
 # Transaction Configuration
@@ -55,6 +61,7 @@ ib-body-validation-cpu-time-ms-constant: 50.0
 ib-body-validation-cpu-time-ms-per-byte: 0.0005
 ib-body-max-size-bytes: 327680
 ib-body-avg-size-bytes: 327680
+ib-diffusion-strategy: "freshest-first"
 
 ################################################################################
 # Endorsement Block Configuration

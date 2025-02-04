@@ -91,6 +91,12 @@
 # - ignore: {name: Use let}
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
 
+# Ignores all builting hints.
+- ignore: {}
+
+# Re-enables the warning configured with `modules` above.
+- warning: {name: "Avoid restricted module"}
+
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~
 
