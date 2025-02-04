@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use blst::min_sig::*;
 use pallas::ledger::primitives::{byron::Blake2b256, Hash, PoolKeyhash};
 use pallas::ledger::traverse::time::Slot;
@@ -13,7 +11,7 @@ use crate::vote;
 pub struct Eid(Slot);
 
 impl Eid {
-    pub fn bytes(self: &Self) -> [u8; 8] {
+    pub fn bytes(&self) -> [u8; 8] {
         u64::to_be_bytes(self.0)
     }
 }
@@ -47,7 +45,7 @@ impl Arbitrary for Eid {
 pub struct EbHash(Blake2b256);
 
 impl EbHash {
-    pub fn bytes(self: &Self) -> [u8; 32] {
+    pub fn bytes(&self) -> [u8; 32] {
         self.0.as_slice().try_into().unwrap()
     }
 }
@@ -81,15 +79,15 @@ impl Arbitrary for EbHash {
 pub struct SecKey(SecretKey);
 
 impl SecKey {
-  pub fn pub_key(self: &Self) -> PubKey {
-    PubKey(self.0.sk_to_pk())
-  }
+    pub fn pub_key(&self) -> PubKey {
+        PubKey(self.0.sk_to_pk())
+    }
 }
 
 impl PartialEq for SecKey {
-  fn eq(&self, other: &Self) -> bool {
-      self.0.to_bytes() == other.0.to_bytes()
-  }
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bytes() == other.0.to_bytes()
+    }
 }
 
 impl Eq for SecKey {}
