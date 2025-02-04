@@ -391,13 +391,27 @@ impl AllPathStats {
     pub fn add_hop_stats(&mut self, mut hop_stats: HopStats) {
         let reached = hop_stats.latencies.len() as f32;
         hop_stats.latencies.sort_by(|a, b| a.total_cmp(b));
-        let scale = 1.0 / reached as f32;
-        let latency = hop_stats
-            .latencies
-            .into_iter()
-            .enumerate()
-            .map(|(i, l)| (l as f32, (i as f32 + 1.0) * scale))
-            .collect::<CDF>();
+
+        // Create points for unique latencies with proper cumulative probabilities
+        let mut points: Vec<(f32, f32)> = Vec::new();
+        let mut prev_latency = None;
+
+        for latency in hop_stats.latencies.iter() {
+            let cumulative = hop_stats
+                .latencies
+                .iter()
+                .filter(|&&x| x <= *latency)
+                .count() as f32;
+            let y = cumulative / reached;
+
+            // Only add point if latency is different from previous
+            if prev_latency != Some(*latency) {
+                points.push((*latency as f32, y));
+                prev_latency = Some(*latency);
+            }
+        }
+
+        let latency = points.into_iter().collect::<CDF>();
 
         self.reached_min = f32::min(self.reached_min, reached);
         self.reached_avg = (self.reached_avg * self.inputs + reached) / (self.inputs + 1.0);

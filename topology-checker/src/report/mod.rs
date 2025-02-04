@@ -84,10 +84,12 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
         stake_stats.gini_coefficient
     ));
 
-    report.push_str("### Top 5 Stake Holders\n\n");
+    report.push_str("### Top 5 Stake Holders (by % of total network stake)\n\n");
     report.push_str("| Node | Stake | % of Total |\n");
     report.push_str("|------|--------|------------|\n");
-    for (node, stake) in stake_stats.top_stake_holders {
+    let mut stake_holders: Vec<_> = stake_stats.top_stake_holders.into_iter().collect();
+    stake_holders.sort_by(|(_node1, stake1), (_node2, stake2)| stake2.cmp(stake1));
+    for (node, stake) in stake_holders.into_iter().take(5) {
         let percentage = (stake as f64 / stake_stats.total_stake as f64) * 100.0;
         report.push_str(&format!("| {} | {} | {:.2}% |\n", node, stake, percentage));
     }
@@ -107,7 +109,7 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
     // Add network reliability section
     if !network_stats.critical_nodes.is_empty() {
         report.push_str("## Network Reliability\n\n");
-        report.push_str("The following nodes, if removed, would isolate significant stake:\n\n");
+        report.push_str("The following nodes, if removed, would isolate the specified percentage of total network stake:\n\n");
         report.push_str("| Node | Isolated Stake | % of Total Stake |\n");
         report.push_str("|------|----------------|------------------|\n");
         for node in &network_stats.critical_nodes {
@@ -142,34 +144,48 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
 
         report.push_str("\n### Raw Latencies per Hop\n\n");
         for stats in &hop_stats {
-            report.push_str(&format!("Hop {}: CDF[", stats.hop_number));
-            let scale = 1.0 / stats.latencies.len() as f64;
-            let mut steps = stats
-                .latencies
+            report.push_str(&format!("Hop {}: ", stats.hop_number));
+
+            // Check for duplicate latencies
+            let mut latency_counts = std::collections::HashMap::new();
+            for &latency in &stats.latencies {
+                *latency_counts.entry(format!("{:.3}", latency)).or_insert(0) += 1;
+            }
+            let duplicates: Vec<_> = latency_counts
                 .iter()
-                .enumerate()
-                .map(|(y_idx, x)| {
-                    (
-                        format!("{:.3}", x),
-                        format!("{:.3}", (y_idx + 1) as f64 * scale),
-                    )
-                })
-                .collect::<Vec<_>>();
-            steps.reverse();
-            let mut prev_x = "-1".to_owned();
-            steps.retain(|(x, _y)| {
-                if *x != prev_x {
-                    prev_x = x.clone();
-                    true
-                } else {
-                    false
+                .filter(|(_, &count)| count > 1)
+                .collect();
+
+            if !duplicates.is_empty() {
+                report.push_str("\n⚠️ Warning: Duplicate latencies found:\n");
+                for (latency, count) in duplicates {
+                    report.push_str(&format!("   {}ms appears {} times\n", latency, count));
                 }
-            });
-            for (idx, (x, y)) in steps.iter().rev().enumerate() {
+            }
+
+            report.push_str("CDF[");
+
+            // Create CDF points, handling duplicates
+            let mut unique_latencies = stats.latencies.clone();
+            unique_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            unique_latencies.dedup(); // Remove duplicates while keeping order
+
+            let total_points = stats.latencies.len() as f64;
+            let mut prev_y = 0.0;
+
+            for (idx, latency) in unique_latencies.iter().enumerate() {
                 if idx > 0 {
                     report.push_str(",");
                 }
-                report.push_str(&format!("({}, {})", x, y));
+                // For each unique latency, count all points less than or equal
+                let y = stats.latencies.iter().filter(|&&x| x <= *latency).count() as f64
+                    / total_points;
+
+                // Only output if this y is different from the previous one
+                if y > prev_y || idx == 0 {
+                    report.push_str(&format!("({:.3}, {:.3})", latency, y));
+                    prev_y = y;
+                }
             }
             report.push_str("]\n\n");
         }
