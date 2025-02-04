@@ -1,84 +1,6 @@
 use blst::min_sig::*;
 use blst::*;
-use quickcheck::{Arbitrary, Gen};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::util::*;
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct BlsKey(pub [u8; 96]);
-
-impl BlsKey {
-
-    pub fn from_point(pk: &PublicKey) -> Self {
-       let pk_bytes: [u8; 96] = pk.to_bytes();
-       BlsKey(pk_bytes)
-    }
-
-    pub fn to_point(&self) -> Result<PublicKey, BLST_ERROR> {
-        PublicKey::from_bytes(&self.0)
-    }
-
-}
-
-impl Serialize for BlsKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serialize_fixed_bytes(&self.0, serializer)
-    }
-  }
-  
-  impl<'de> Deserialize<'de> for BlsKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-      deserialize_fixed_bytes(deserializer).map(BlsKey)
-    }
-  }
-
-impl Arbitrary for BlsKey {
-    fn arbitrary(g: &mut Gen) -> Self {
-        BlsKey(arbitrary_fixed_bytes(g))
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct BlsSig(pub [u8; 48]);
-
-impl BlsSig {
-
-    pub fn from_point(sig: &Signature) -> Self {
-        let sig_bytes: [u8; 48] = sig.to_bytes();
-        BlsSig(sig_bytes)
-    }
-
-    pub fn to_point(&self) -> Result<Signature, BLST_ERROR> {
-        Signature::from_bytes(&self.0)
-    }
-
-}
-
-impl Serialize for BlsSig {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serialize_fixed_bytes(&self.0, serializer)
-    }
-  }
-  
-  impl<'de> Deserialize<'de> for BlsSig{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-      deserialize_fixed_bytes(deserializer).map(BlsSig)
-    }
-  }
-  
 pub fn pk_transform(f: &dyn Fn(blst_p2) -> blst_p2, pk: &PublicKey) -> PublicKey {
     let mut point: blst_p2 = blst_p2::default();
     unsafe {
@@ -116,11 +38,5 @@ pub fn sig_transform(f: &dyn Fn(blst_p1) -> blst_p1, sig: &Signature) -> Signatu
         let mut sig1_bytes: [u8; 96] = [0; 96];
         blst_p1_affine_serialize(sig1_bytes.as_mut_ptr(), &point1_aff);
         Signature::deserialize(&sig1_bytes).unwrap()
-    }
-}
-
-impl Arbitrary for BlsSig {
-    fn arbitrary(g: &mut Gen) -> Self {
-        BlsSig(arbitrary_fixed_bytes(g))
     }
 }
