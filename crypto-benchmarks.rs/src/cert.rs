@@ -1,45 +1,23 @@
 use blst::min_sig::*;
 use quickcheck::{Arbitrary, Gen};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::bls_vote;
+use crate::registry::PersistentId;
 use crate::key::{SecKey,Sig};
+use crate::primitive::{EbHash, Eid, PoolKeyhash};
+use crate::vote::Vote;
 use crate::util::*;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {
+    eid: Eid,
+    eb: EbHash,
+    persistent_voters: HashMap<PersistentId, Sig>,
+    nonpersistent_voters: HashMap<PoolKeyhash, Vote>,
     sigma_tilde_eid: Sig,
     sigma_tilde_m: Sig,
-}
-
-impl Serialize for Cert {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut bytes: [u8; 96] = [0; 96];
-        bytes[0..48].copy_from_slice(&self.sigma_tilde_eid.0.to_bytes());
-        bytes[48..96].copy_from_slice(&self.sigma_tilde_m.0.to_bytes());
-        serialize_fixed_bytes(&bytes, serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Cert {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserialize_fixed_bytes(deserializer).and_then(|bytes: [u8; 96]| {
-            let sigma_tilde_eid = Signature::from_bytes(&bytes[0..48])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            let sigma_tilde_m = Signature::from_bytes(&bytes[48..96])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            Ok(Cert {
-                sigma_tilde_eid: Sig(sigma_tilde_eid),
-                sigma_tilde_m: Sig(sigma_tilde_m),
-            })
-        })
-    }
 }
 
 impl Arbitrary for Cert {
@@ -49,6 +27,10 @@ impl Arbitrary for Cert {
         let msg: [u8; 10] = arbitrary_fixed_bytes(g);
         let (sigma_tilde_eid, sigma_tilde_m) = bls_vote::gen_vote(&sk, &eid, &msg);
         Cert {
+            eid: Eid::arbitrary(g),
+            eb: EbHash::arbitrary(g),
+            persistent_voters: HashMap::new(),
+            nonpersistent_voters: HashMap::new(),
             sigma_tilde_eid: Sig(sigma_tilde_eid),
             sigma_tilde_m: Sig(sigma_tilde_m),
         }

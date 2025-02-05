@@ -3,7 +3,7 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 
 use crate::bls_vote;
-use crate::fait_accompli::PersistentId;
+use crate::registry::PersistentId;
 use crate::key::{PubKey, SecKey, Sig};
 use crate::primitive::{arbitrary_poolkeyhash, EbHash, Eid, PoolKeyhash};
 use crate::util::*;

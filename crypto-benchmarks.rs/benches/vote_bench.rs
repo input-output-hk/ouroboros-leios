@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use leios_crypto_benchmarks::fait_accompli::PersistentId;
+use leios_crypto_benchmarks::registry::PersistentId;
 use quickcheck::{Arbitrary, Gen};
 
 use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
