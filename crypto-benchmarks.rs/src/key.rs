@@ -121,40 +121,10 @@ impl Arbitrary for Sig {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct PoP {
     pub mu1: Sig,
     pub mu2: Sig,
-}
-
-impl Serialize for PoP {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut bytes: [u8; 96] = [0; 96];
-        bytes[0..48].copy_from_slice(&self.mu1.0.to_bytes());
-        bytes[48..96].copy_from_slice(&self.mu2.0.to_bytes());
-        serialize_fixed_bytes(&bytes, serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for PoP {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserialize_fixed_bytes(deserializer).and_then(|bytes: [u8; 96]| {
-            let mu1 = Signature::from_bytes(&bytes[0..48])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            let mu2 = Signature::from_bytes(&bytes[48..96])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            Ok(PoP {
-                mu1: Sig(mu1),
-                mu2: Sig(mu2),
-            })
-        })
-    }
 }
 
 impl Arbitrary for PoP {
@@ -168,7 +138,7 @@ impl Arbitrary for PoP {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Reg {
     pool: PoolKeyhash,
     mvk: PubKey,
@@ -176,47 +146,6 @@ pub struct Reg {
     kes_sig: KesSig,
 }
 
-impl Serialize for Reg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut bytes: [u8; 668] = [0; 668];
-        bytes[0..28].copy_from_slice(self.pool.as_slice());
-        bytes[28..124].copy_from_slice(&self.mvk.0.to_bytes());
-        bytes[124..172].copy_from_slice(&self.mu.mu1.0.to_bytes());
-        bytes[172..220].copy_from_slice(&self.mu.mu2.0.to_bytes());
-        bytes[220..668].copy_from_slice(&self.kes_sig.0);
-        serialize_fixed_bytes(&bytes, serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Reg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserialize_fixed_bytes(deserializer).and_then(|bytes: [u8; 668]| {
-            let pool: PoolKeyhash = Hash::from(&bytes[0..28]);
-            let mvk: PublicKey = PublicKey::from_bytes(&bytes[28..124])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            let mu1: Signature = Signature::from_bytes(&bytes[124..172])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            let mu2: Signature = Signature::from_bytes(&bytes[172..220])
-                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
-            let kes_sig: KesSig = KesSig(bytes[220..668].try_into().unwrap());
-            Ok(Reg {
-                pool,
-                mvk: PubKey(mvk),
-                mu: PoP {
-                    mu1: Sig(mu1),
-                    mu2: Sig(mu2),
-                },
-                kes_sig,
-            })
-        })
-    }
-}
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
         let sk: SecretKey = SecKey::arbitrary(g).0;
