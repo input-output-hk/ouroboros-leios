@@ -219,10 +219,12 @@ impl<'de> Deserialize<'de> for Reg {
 }
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
+        let sk: SecretKey = SecKey::arbitrary(g).0;
+        let (mu1, mu2) = bls_vote::make_pop(&sk);
         Reg {
             pool: Hash::from(arbitrary_fixed_bytes(g)),
             mvk: PubKey::arbitrary(g),
-            mu: PoP::arbitrary(g),
+            mu: PoP {mu1: Sig(mu1), mu2: Sig(mu2),},
             kes_sig: KesSig::arbitrary(g),
         }
     }
