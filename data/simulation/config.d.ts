@@ -65,7 +65,8 @@ export interface Config {
 export type Distribution =
   | NormalDistribution
   | ExpDistribution
-  | LogNormalDistribution;
+  | LogNormalDistribution
+  | ConstantDistribution;
 
 export interface NormalDistribution {
   distribution: "normal";
@@ -83,6 +84,11 @@ export interface LogNormalDistribution {
   distribution: "log-normal";
   mu: number;
   sigma: number;
+}
+
+export interface ConstantDistribution {
+  distribution: "constant";
+  value: number;
 }
 
 export enum DiffusionStrategy {

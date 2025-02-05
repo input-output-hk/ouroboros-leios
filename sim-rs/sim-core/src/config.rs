@@ -32,6 +32,7 @@ pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
     Exp { lambda: f64, scale: Option<f64> },
     LogNormal { mu: f64, sigma: f64 },
+    Constant { value: f64 },
 }
 impl From<DistributionConfig> for FloatDistribution {
     fn from(value: DistributionConfig) -> Self {
@@ -43,6 +44,7 @@ impl From<DistributionConfig> for FloatDistribution {
                 FloatDistribution::scaled_exp(lambda, scale.unwrap_or(1.))
             }
             DistributionConfig::LogNormal { mu, sigma } => FloatDistribution::log_normal(mu, sigma),
+            DistributionConfig::Constant { value } => FloatDistribution::constant(value),
         }
     }
 }
