@@ -1,138 +1,74 @@
-use crate::bls::*;
 use blst::min_sig::*;
-use blst::*;
-use rand::RngCore;
+use quickcheck::{Arbitrary, Gen};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-const EMPTY: [u8; 0] = [];
+use crate::bls_vote;
+use crate::key::{PubKey, SecKey, Sig};
+use crate::primitive::{EbHash, Eid};
+use crate::util::*;
 
-const DST: &[u8; 5] = b"Leios";
-
-pub fn gen_key() -> SecretKey {
-    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
-    let mut ikm: [u8; 32] = [0u8; 32];
-    rng.fill_bytes(&mut ikm);
-    let info = b"";
-    SecretKey::key_gen(&ikm, info).unwrap()
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct Vote {
+    sigma_eid: Sig,
+    sigma_m: Sig,
 }
 
-pub fn make_pop(sk: &SecretKey) -> (Signature, Signature) {
-    let m1: [u8; 192] = sk.sk_to_pk().serialize();
-    let m2 = EMPTY;
-    (sk.sign(&m1, DST, b"PoP"), sk.sign(&m2, DST, &EMPTY))
-}
-
-pub fn check_pop(pk: &PublicKey, mu1: &Signature, mu2: &Signature) -> bool {
-    let m1: [u8; 192] = pk.serialize();
-    let m2 = EMPTY;
-    let result1 = mu1.verify(true, &m1, DST, b"PoP", pk, true);
-    let result2 = mu2.verify(true, &m2, DST, &EMPTY, pk, true);
-    result1 == BLST_ERROR::BLST_SUCCESS && result2 == BLST_ERROR::BLST_SUCCESS
-}
-
-pub fn gen_vote(sk: &SecretKey, eid: &[u8], m: &[u8]) -> (Signature, Signature) {
-    (sk.sign(&EMPTY, DST, eid), sk.sign(m, DST, eid))
-}
-
-pub fn verify_vote(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &(Signature, Signature)) -> bool {
-    let result_eid = vs.0.verify(true, &EMPTY, DST, eid, pk, true);
-    let result_m = vs.1.verify(true, m, DST, eid, pk, false);
-    result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
-}
-
-fn hash_sigs(vss: &[&(Signature, Signature)]) -> [u8; 32] {
-    fn serialise_vs(vs: &(Signature, Signature)) -> Vec<u8> {
-        [vs.0, vs.1].iter().flat_map(|s| s.serialize()).collect()
-    }
-    let msg: Vec<u8> = vss.iter().flat_map(|vs| serialise_vs(vs)).collect();
-
-    unsafe {
-        let mut out: [u8; 32] = [0; 32];
-        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
-        out
+impl Serialize for Vote {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut bytes: [u8; 96] = [0; 96];
+        bytes[0..48].copy_from_slice(&self.sigma_eid.0.to_bytes());
+        bytes[48..96].copy_from_slice(&self.sigma_m.0.to_bytes());
+        serialize_fixed_bytes(&bytes, serializer)
     }
 }
 
-fn hash_index(i: i32, h: &[u8; 32]) -> [u8; 32] {
-    let mut msg: [u8; 36] = [0; 36];
-    let ii: [u8; 4] = i.to_ne_bytes();
-    msg[0..32].copy_from_slice(h);
-    msg[32..36].copy_from_slice(&ii);
-
-    unsafe {
-        let mut out: [u8; 32] = [0; 32];
-        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
-        let mut sca: blst_scalar = blst_scalar::default();
-        blst_scalar_from_bendian(&mut sca, out.as_ptr());
-        out
+impl<'de> Deserialize<'de> for Vote {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserialize_fixed_bytes(deserializer).and_then(|bytes: [u8; 96]| {
+            let sigma_eid = Signature::from_bytes(&bytes[0..48])
+                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
+            let sigma_m = Signature::from_bytes(&bytes[48..96])
+                .map_err(|_| serde::de::Error::custom("BLST_ERROR"))?;
+            Ok(Vote {
+                sigma_eid: Sig(sigma_eid),
+                sigma_m: Sig(sigma_m),
+            })
+        })
     }
 }
 
-pub fn gen_cert(vss: &[&(Signature, Signature)]) -> Result<(Signature, Signature), BLST_ERROR> {
-    let h: [u8; 32] = hash_sigs(vss);
-    let f = |i: usize| {
-        move |point: blst_p1| {
-            let hi: [u8; 32] = hash_index(i as i32, &h);
-            let mut point1: blst_p1 = blst_p1::default();
-            unsafe {
-                blst_p1_mult(&mut point1, &point, hi.as_ptr(), 8 * h.len());
-            }
-            point1
+impl Arbitrary for Vote {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let sk: SecretKey = SecKey::arbitrary(g).0;
+        let eid: [u8; 8] = arbitrary_fixed_bytes(g);
+        let msg: [u8; 10] = arbitrary_fixed_bytes(g);
+        let (sigma_eid, sigma_m) = bls_vote::gen_vote(&sk, &eid, &msg);
+        Vote {
+            sigma_eid: Sig(sigma_eid),
+            sigma_m: Sig(sigma_m),
         }
-    };
-
-    let sigmas_eid: Vec<Signature> = vss
-        .iter()
-        .enumerate()
-        .map(|(i, vs)| sig_transform(&f(i), &vs.0))
-        .collect();
-    let sigma_eid_refs: Vec<&Signature> = sigmas_eid.iter().collect();
-    let result_eid = AggregateSignature::aggregate(&sigma_eid_refs, true);
-
-    let sigmas_m: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
-    let result_m = AggregateSignature::aggregate(&sigmas_m, true);
-
-    match (result_eid, result_m) {
-        (Ok(sig_eid), Ok(sig_m)) => Ok((sig_eid.to_signature(), sig_m.to_signature())),
-        (Err(err), _) => Err(err),
-        (_, Err(err)) => Err(err),
     }
 }
 
-pub fn verify_cert(
-    pks: &[&PublicKey],
-    eid: &[u8],
-    m: &[u8],
-    vss: &[&(Signature, Signature)],
-    cs: &(Signature, Signature),
-) -> bool {
-    let h: [u8; 32] = hash_sigs(vss);
-    let f = |i: usize| {
-        move |point: blst_p2| {
-            let hi: [u8; 32] = hash_index(i as i32, &h);
-            let mut point1: blst_p2 = blst_p2::default();
-            unsafe {
-                blst_p2_mult(&mut point1, &point, hi.as_ptr(), 8 * h.len());
-            }
-            point1
-        }
-    };
-
-    let pks1: Vec<PublicKey> = pks
-        .iter()
-        .enumerate()
-        .map(|(i, pk)| pk_transform(&f(i), pk))
-        .collect();
-    let pk1_refs: Vec<&PublicKey> = pks1.iter().collect();
-
-    let result_pk = AggregatePublicKey::aggregate(pks, true);
-    let result_pk1 = AggregatePublicKey::aggregate(&pk1_refs, true);
-    match (result_pk, result_pk1) {
-        (Ok(pk), Ok(pk1)) => {
-            let result_eid =
-                cs.0.verify(true, &EMPTY, DST, eid, &pk1.to_public_key(), true);
-            let result_m = cs.1.verify(true, m, DST, eid, &pk.to_public_key(), true);
-            result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
-        }
-        _ => false,
+pub fn gen_vote(eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
+    let (sigma_eid, sigma_m) = bls_vote::gen_vote(&sk.0, &eid.bytes(), &m.bytes());
+    Vote {
+        sigma_eid: Sig(sigma_eid),
+        sigma_m: Sig(sigma_m),
     }
+}
+
+pub fn verify_vote(eid: &Eid, m: &EbHash, mvk: &PubKey, vote: &Vote) -> bool {
+    bls_vote::verify_vote(
+        &mvk.0,
+        &eid.bytes(),
+        &m.bytes(),
+        &(vote.sigma_eid.0, vote.sigma_m.0),
+    )
 }

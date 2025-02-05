@@ -1,7 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::api::*;
+use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
+use leios_crypto_benchmarks::primitive::{EbHash, Eid};
+use leios_crypto_benchmarks::vote::*;
 
 fn benchmark_check_pop(c: &mut Criterion) {
     c.bench_function("check_pop", |b| {

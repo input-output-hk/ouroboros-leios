@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::api::*;
+use leios_crypto_benchmarks::key::Reg;
+use leios_crypto_benchmarks::vote::Vote;
 
 fn benchmark_serialize_reg(c: &mut Criterion) {
     let mut g = Gen::new(10);

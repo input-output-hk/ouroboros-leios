@@ -3,7 +3,9 @@ extern crate quickcheck_macros;
 
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::api::*;
+use leios_crypto_benchmarks::key::{check_pop, key_gen, PoP, PubKey, SecKey};
+use leios_crypto_benchmarks::primitive::{EbHash, Eid};
+use leios_crypto_benchmarks::vote::{gen_vote, verify_vote};
 
 #[derive(Clone, Debug)]
 struct PopScenario {

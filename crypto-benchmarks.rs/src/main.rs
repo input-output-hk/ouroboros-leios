@@ -1,11 +1,10 @@
-use blst::min_sig::PublicKey;
-use blst::min_sig::SecretKey;
-use blst::min_sig::Signature;
-use leios_crypto_benchmarks::bls::*;
-use leios_crypto_benchmarks::sortition::*;
-use leios_crypto_benchmarks::vote::*;
-use leios_crypto_benchmarks::vrf::*;
+use blst::min_sig::{PublicKey, SecretKey, Signature};
 use rustc_apfloat::ieee::Quad;
+
+use leios_crypto_benchmarks::bls_util::*;
+use leios_crypto_benchmarks::bls_vote::*;
+use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::vrf::*;
 
 fn main() {
     let f: Quad = "4.8771764574959465286614323309274434524463393558834E-2"

@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use leios_crypto_benchmarks::sortition::*;
 use rustc_apfloat::ieee::Quad;
+
+use leios_crypto_benchmarks::sortition::*;
 
 fn benchmark_log(c: &mut Criterion) {
     let f: Quad = into_quad(0.05);

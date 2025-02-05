@@ -1,5 +1,6 @@
-use leios_crypto_benchmarks::sortition::*;
 use rustc_apfloat::ieee::Quad;
+
+use leios_crypto_benchmarks::sortition::*;
 
 #[test]
 fn leader() {
@@ -8,8 +9,7 @@ fn leader() {
         .unwrap();
     let f1: Quad = ln_1_minus(f);
     let s: Quad = into_quad(0.001);
-    let pexpected: f64 = 1.0
-        - (1.0 - 4.877_176_457_495_946_4e-2_f64).powf(0.001_f64);
+    let pexpected: f64 = 1.0 - (1.0 - 4.877_176_457_495_946_4e-2_f64).powf(0.001_f64);
     assert!(leader_check(f1, s, into_quad(pexpected - 1e-15)));
     assert!(!leader_check(f1, s, into_quad(pexpected + 1e-15)));
 }

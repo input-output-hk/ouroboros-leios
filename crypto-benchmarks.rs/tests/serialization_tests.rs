@@ -3,7 +3,10 @@ extern crate quickcheck_macros;
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use leios_crypto_benchmarks::api::*;
+use leios_crypto_benchmarks::cert::Cert;
+use leios_crypto_benchmarks::key::{PoP, PubKey, Reg, SecKey, Sig};
+use leios_crypto_benchmarks::primitive::{EbHash, Eid, KesSig};
+use leios_crypto_benchmarks::vote::Vote;
 
 fn prop_serialization<A>(expected: A) -> bool
 where
