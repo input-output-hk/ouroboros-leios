@@ -8,7 +8,13 @@ use crate::util::*;
 pub use pallas::ledger::primitives::PoolKeyhash;
 
 pub fn arbitrary_poolkeyhash(g: &mut Gen) -> PoolKeyhash {
-  Hash::from(arbitrary_fixed_bytes(g))
+    Hash::from(arbitrary_fixed_bytes(g))
+}
+
+pub use pallas::ledger::primitives::Coin;
+
+pub fn arbitrary_coin(g: &mut Gen) -> Coin {
+    u64::arbitrary(g) % 2000000000000
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]

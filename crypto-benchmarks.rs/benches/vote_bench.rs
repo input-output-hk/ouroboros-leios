@@ -125,8 +125,8 @@ criterion_group!(
     benchmark_gen_vote_nonpersistent,
     benchmark_verify_vote_persistent,
     benchmark_verify_vote_nonpersistent, /*
-                           benchmark_gen_cert,
-                           benchmark_verify_cert,*/
+                                         benchmark_gen_cert,
+                                         benchmark_verify_cert,*/
 );
 
 criterion_main!(benches);

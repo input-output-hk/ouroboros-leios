@@ -1,71 +1,38 @@
-use blst::min_sig::{PublicKey, SecretKey, Signature};
-use rustc_apfloat::ieee::Quad;
+use quickcheck::Gen;
+use std::collections::BTreeMap;
 
-use leios_crypto_benchmarks::bls_util::*;
-use leios_crypto_benchmarks::bls_vote::*;
-use leios_crypto_benchmarks::sortition::*;
-use leios_crypto_benchmarks::vrf::*;
+use leios_crypto_benchmarks::fait_accompli::*;
+use leios_crypto_benchmarks::primitive::*;
 
 fn main() {
-    let f: Quad = "4.8771764574959465286614323309274434524463393558834E-2"
-        .parse::<Quad>()
-        .unwrap();
-    let f1: Quad = ln_1_minus(f);
-    let s: Quad = into_quad(0.001);
-    let p: f64 = 1.0 - (1.0 - 4.8771764574959465e-2_f64).powf(0.001_f64);
-    let p0: Quad = into_quad(p - 1e-15);
-    let p1: Quad = into_quad(p + 1e-15);
-    println!(
-        "ln(1 - f) = {} vs {}",
-        (1.0 - 4.8771764574959465e-2_f64).ln(),
-        f1
-    );
-    println!("1 - (1 -f)^s = {} vs {} ", p, leader_value(f1, s));
-    println!("Lower: {}", leader_check(f1, s, p0));
-    println!("Upper: {}", leader_check(f1, s, p1));
+    let g = &mut Gen::new(10);
 
-    let votes: Quad = into_quad(500.0);
-    let mut pv: Quad = into_quad(0.0);
-    loop {
-        pv = (pv + into_quad(0.01)).value;
-        if pv > into_quad(1.0) {
-            break;
+    let mut stakes: BTreeMap<PoolKeyhash, Coin> = BTreeMap::new();
+    /*
+        for _ in 1..10 {
+          stakes.insert(arbitrary_poolkeyhash(g), arbitrary_coin(g));
         }
-        println!("{} {}", pv, voter_check(votes, s, pv))
-    }
+    */
+    stakes.insert(arbitrary_poolkeyhash(g), 10);
+    stakes.insert(arbitrary_poolkeyhash(g), 50);
+    stakes.insert(arbitrary_poolkeyhash(g), 100);
+    stakes.insert(arbitrary_poolkeyhash(g), 200);
+    stakes.insert(arbitrary_poolkeyhash(g), 500);
+    print!("\n");
+    print!("Stake\n");
+    stakes
+        .iter()
+        .for_each(|(pool, stake)| print!("  {} : {}\n", pool.to_string(), stake));
 
-    let sk = sk_random();
-    let pk = sk_to_pk_point(&sk);
-    let input = b"The VRF input.";
-    let dst = b"Praos RB";
-    let (gamma, c, s) = vrf_prove(&sk, input, dst);
-    println!("{:?}", gamma);
-    println!("{:?}", c);
-    println!("{:?}", s);
-    println!("{}", vrf_verify(&pk, input, dst, &gamma, &c, &s));
-
-    {
-        let sks: Vec<SecretKey> = (0..3).map(|_| gen_key()).collect();
-        println!("sks.len() = {}", sks.len());
-        let pks: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
-        println!("{:?}", sks[0]);
-        println!("{:?}", pks[0]);
-        println!("{:?}", pks[0].serialize());
-        let xf = |point| {
-            println!("{:?}", point);
-            point
-        };
-        pk_transform(&xf, &pks[0]);
-        let pk_refs: Vec<&PublicKey> = pks.iter().collect();
-        let eid = b"Election ID";
-        let m: [u8; 500] = [0; 500];
-        let vss: Vec<(Signature, Signature)> = sks.iter().map(|sk| gen_vote(sk, eid, &m)).collect();
-        let vs_refs: Vec<&(Signature, Signature)> = vss.iter().collect();
-        let cs: (Signature, Signature) = gen_cert(&vs_refs).unwrap();
-        println!("{:?}", cs.0);
-        println!("{}", verify_cert(&pk_refs, eid, &m, &vs_refs, &cs));
-
-        let (mu1, mu2) = make_pop(&sks[0]);
-        println!("pop = {}", check_pop(&pks[0], &mu1, &mu2));
-    }
+    print!("\n");
+    let fa = fait_accompli(&stakes, 3);
+    print!("Persistent: {}\n", fa.n_persistent);
+    fa.persistent
+        .iter()
+        .for_each(|(pool, weight)| print!("  {} : {}\n", pool, weight));
+    print!("Non-persistent: {}\n", fa.n_nonpersistent);
+    fa.nonpersistent
+        .iter()
+        .for_each(|(pool, weight)| print!("  {} : {}\n", pool, weight));
+    print!("Rho: {}\n", fa.rho);
 }

@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::bls_vote;
-use crate::registry::PersistentId;
-use crate::key::{SecKey,Sig};
+use crate::key::{SecKey, Sig};
 use crate::primitive::{EbHash, Eid, PoolKeyhash};
-use crate::vote::Vote;
+use crate::registry::PersistentId;
 use crate::util::*;
+use crate::vote::Vote;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {

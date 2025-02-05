@@ -47,7 +47,7 @@ impl<'de> Deserialize<'de> for SecKey {
 
 impl Arbitrary for SecKey {
     fn arbitrary(g: &mut Gen) -> Self {
-        let ikm: [u8; 32]= arbitrary_fixed_bytes(g);
+        let ikm: [u8; 32] = arbitrary_fixed_bytes(g);
         let info: &[u8; 5] = b"Leios";
         SecKey(SecretKey::key_gen(&ikm, info).unwrap())
     }
@@ -124,7 +124,7 @@ impl Arbitrary for Sig {
 pub struct PoP {
     pub mu1: Sig, // 48 bytes
     pub mu2: Sig, // 48 bytes
-}                 // 96 bytes
+} // 96 bytes
 
 impl Arbitrary for PoP {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -143,7 +143,7 @@ pub struct Reg {
     pub mvk: PubKey,       //  96 bytes
     pub mu: PoP,           //  96 bytes
     pub kes_sig: KesSig,   // 448 bytes
-}                          // 668 bytes
+} // 668 bytes
 
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -152,7 +152,10 @@ impl Arbitrary for Reg {
         Reg {
             pool: arbitrary_poolkeyhash(g),
             mvk: PubKey::arbitrary(g),
-            mu: PoP {mu1: Sig(mu1), mu2: Sig(mu2),},
+            mu: PoP {
+                mu1: Sig(mu1),
+                mu2: Sig(mu2),
+            },
             kes_sig: KesSig::arbitrary(g),
         }
     }
