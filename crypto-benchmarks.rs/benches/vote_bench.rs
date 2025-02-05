@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use leios_crypto_benchmarks::fait_accompli::PersistentId;
 use quickcheck::{Arbitrary, Gen};
 
 use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
@@ -18,9 +19,28 @@ fn benchmark_check_pop(c: &mut Criterion) {
     });
 }
 
-fn benchmark_gen_vote(c: &mut Criterion) {
+fn benchmark_gen_vote_persistent(c: &mut Criterion) {
     let mut g = Gen::new(10);
-    c.bench_function("gen_vote", |b| {
+    c.bench_function("gen_vote_persistent", |b| {
+        b.iter_batched(
+            || {
+                let persistent = PersistentId::arbitrary(&mut g);
+                let eid = Eid::arbitrary(&mut g);
+                let m = EbHash::arbitrary(&mut g);
+                let sk = SecKey::arbitrary(&mut g);
+                (persistent, eid, m, sk)
+            },
+            |(persistent, eid, m, sk)| {
+                gen_vote_persistent(&persistent, &eid, &m, &sk);
+            },
+            criterion::BatchSize::SmallInput,
+        )
+    });
+}
+
+fn benchmark_gen_vote_nonpersistent(c: &mut Criterion) {
+    let mut g = Gen::new(10);
+    c.bench_function("gen_vote_nonpersistent", |b| {
         b.iter_batched(
             || {
                 let pool = arbitrary_poolkeyhash(&mut g);
@@ -30,23 +50,41 @@ fn benchmark_gen_vote(c: &mut Criterion) {
                 (pool, eid, m, sk)
             },
             |(pool, eid, m, sk)| {
-                gen_vote(&pool, &eid, &m, &sk);
+                gen_vote_nonpersistent(&pool, &eid, &m, &sk);
             },
             criterion::BatchSize::SmallInput,
         )
     });
 }
 
-fn benchmark_verify_vote(c: &mut Criterion) {
+fn benchmark_verify_vote_persistent(c: &mut Criterion) {
     let mut g = Gen::new(10);
-    c.bench_function("verify_vote", |b| {
+    c.bench_function("verify_vote_persistent", |b| {
+        b.iter_batched(
+            || {
+                let persistent = PersistentId::arbitrary(&mut g);
+                let eid = Eid::arbitrary(&mut g);
+                let m = EbHash::arbitrary(&mut g);
+                let sk = SecKey::arbitrary(&mut g);
+                let vote = gen_vote_persistent(&persistent, &eid, &m, &sk);
+                (sk.pub_key(), vote)
+            },
+            |(mvk, vote)| verify_vote(&mvk, &vote),
+            criterion::BatchSize::SmallInput,
+        )
+    });
+}
+
+fn benchmark_verify_vote_nonpersistent(c: &mut Criterion) {
+    let mut g = Gen::new(10);
+    c.bench_function("verify_vote_nonpersistent", |b| {
         b.iter_batched(
             || {
                 let pool = arbitrary_poolkeyhash(&mut g);
                 let eid = Eid::arbitrary(&mut g);
                 let m = EbHash::arbitrary(&mut g);
                 let sk = SecKey::arbitrary(&mut g);
-                let vote = gen_vote(&pool, &eid, &m, &sk);
+                let vote = gen_vote_nonpersistent(&pool, &eid, &m, &sk);
                 (sk.pub_key(), vote)
             },
             |(mvk, vote)| verify_vote(&mvk, &vote),
@@ -83,8 +121,10 @@ fn benchmark_verify_cert(c: &mut Criterion) {
 criterion_group!(
     benches,
     benchmark_check_pop,
-    benchmark_gen_vote,
-    benchmark_verify_vote, /*
+    benchmark_gen_vote_persistent,
+    benchmark_gen_vote_nonpersistent,
+    benchmark_verify_vote_persistent,
+    benchmark_verify_vote_nonpersistent, /*
                            benchmark_gen_cert,
                            benchmark_verify_cert,*/
 );

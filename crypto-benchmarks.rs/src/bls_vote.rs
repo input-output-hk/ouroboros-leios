@@ -30,6 +30,15 @@ pub fn check_pop(pk: &PublicKey, mu1: &Signature, mu2: &Signature) -> bool {
     result1 == BLST_ERROR::BLST_SUCCESS && result2 == BLST_ERROR::BLST_SUCCESS
 }
 
+pub fn gen_sig(sk: &SecretKey, eid: &[u8], m: &[u8]) -> Signature {
+    sk.sign(m, DST, eid)
+}
+
+pub fn verify_sig(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &Signature) -> bool {
+    let result_m = vs.verify(true, m, DST, eid, pk, false);
+    result_m == BLST_ERROR::BLST_SUCCESS
+}
+
 pub fn gen_vote(sk: &SecretKey, eid: &[u8], m: &[u8]) -> (Signature, Signature) {
     (sk.sign(&EMPTY, DST, eid), sk.sign(m, DST, eid))
 }
