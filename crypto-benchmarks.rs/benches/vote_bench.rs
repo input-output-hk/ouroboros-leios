@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 
 use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
-use leios_crypto_benchmarks::primitive::{EbHash, Eid};
+use leios_crypto_benchmarks::primitive::{arbitrary_poolkeyhash, EbHash, Eid};
 use leios_crypto_benchmarks::vote::*;
 
 fn benchmark_check_pop(c: &mut Criterion) {
@@ -23,13 +23,14 @@ fn benchmark_gen_vote(c: &mut Criterion) {
     c.bench_function("gen_vote", |b| {
         b.iter_batched(
             || {
+                let pool = arbitrary_poolkeyhash(&mut g);
                 let eid = Eid::arbitrary(&mut g);
                 let m = EbHash::arbitrary(&mut g);
                 let sk = SecKey::arbitrary(&mut g);
-                (eid, m, sk)
+                (pool, eid, m, sk)
             },
-            |(eid, m, sk)| {
-                gen_vote(&eid, &m, &sk);
+            |(pool, eid, m, sk)| {
+                gen_vote(&pool, &eid, &m, &sk);
             },
             criterion::BatchSize::SmallInput,
         )
@@ -41,13 +42,14 @@ fn benchmark_verify_vote(c: &mut Criterion) {
     c.bench_function("verify_vote", |b| {
         b.iter_batched(
             || {
+                let pool = arbitrary_poolkeyhash(&mut g);
                 let eid = Eid::arbitrary(&mut g);
                 let m = EbHash::arbitrary(&mut g);
                 let sk = SecKey::arbitrary(&mut g);
-                let vote = gen_vote(&eid, &m, &sk);
-                (eid, m, sk.pub_key(), vote)
+                let vote = gen_vote(&pool, &eid, &m, &sk);
+                (sk.pub_key(), vote)
             },
-            |(eid, m, mvk, vote)| verify_vote(&eid, &m, &mvk, &vote),
+            |(mvk, vote)| verify_vote(&mvk, &vote),
             criterion::BatchSize::SmallInput,
         )
     });

@@ -3,7 +3,7 @@ extern crate quickcheck_macros;
 
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::key::{check_pop, key_gen, PoP, PubKey, SecKey};
+use leios_crypto_benchmarks::key::{check_pop, key_gen, PoP, PubKey, Reg, SecKey};
 use leios_crypto_benchmarks::primitive::{EbHash, Eid};
 use leios_crypto_benchmarks::vote::{gen_vote, verify_vote};
 
@@ -26,8 +26,9 @@ fn prop_check_pop(kgo: PopScenario) -> bool {
 }
 
 #[quickcheck]
-fn prop_verify_vote(eid: Eid, m: EbHash, sk: SecKey) -> bool {
-    let vote = gen_vote(&eid, &m, &sk);
+fn prop_verify_vote(reg: Reg, eid: Eid, m: EbHash, sk: SecKey) -> bool {
+    let pool = reg.pool;
+    let vote = gen_vote(&pool, &eid, &m, &sk);
     let pk = sk.pub_key();
-    verify_vote(&eid, &m, &pk, &vote)
+    verify_vote(&pk, &vote)
 }

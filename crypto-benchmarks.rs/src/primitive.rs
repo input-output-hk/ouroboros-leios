@@ -7,6 +7,10 @@ use crate::util::*;
 
 pub use pallas::ledger::primitives::PoolKeyhash;
 
+pub fn arbitrary_poolkeyhash(g: &mut Gen) -> PoolKeyhash {
+  Hash::from(arbitrary_fixed_bytes(g))
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Eid(pub(crate) Slot);
 

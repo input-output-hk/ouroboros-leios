@@ -1,10 +1,9 @@
 use blst::min_sig::*;
-use pallas::ledger::primitives::Hash;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::bls_vote;
-use crate::primitive::{KesSig, PoolKeyhash};
+use crate::primitive::{arbitrary_poolkeyhash, KesSig, PoolKeyhash};
 use crate::util::*;
 
 #[derive(Clone, Debug)]
@@ -123,9 +122,9 @@ impl Arbitrary for Sig {
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct PoP {
-    pub mu1: Sig,
-    pub mu2: Sig,
-}
+    pub mu1: Sig, // 48 bytes
+    pub mu2: Sig, // 48 bytes
+}                 // 96 bytes
 
 impl Arbitrary for PoP {
     fn arbitrary(g: &mut Gen) -> Self {
@@ -140,18 +139,18 @@ impl Arbitrary for PoP {
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Reg {
-    pool: PoolKeyhash,
-    mvk: PubKey,
-    mu: PoP,
-    kes_sig: KesSig,
-}
+    pub pool: PoolKeyhash, //  28 bytes
+    pub mvk: PubKey,       //  96 bytes
+    pub mu: PoP,           //  96 bytes
+    pub kes_sig: KesSig,   // 448 bytes
+}                          // 668 bytes
 
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
         let sk: SecretKey = SecKey::arbitrary(g).0;
         let (mu1, mu2) = bls_vote::make_pop(&sk);
         Reg {
-            pool: Hash::from(arbitrary_fixed_bytes(g)),
+            pool: arbitrary_poolkeyhash(g),
             mvk: PubKey::arbitrary(g),
             mu: PoP {mu1: Sig(mu1), mu2: Sig(mu2),},
             kes_sig: KesSig::arbitrary(g),
