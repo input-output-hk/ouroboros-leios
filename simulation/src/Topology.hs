@@ -600,13 +600,14 @@ forgetNodeInfo = G.nemap snd id
 -- Conversion between FGL Graph and P2PTopography
 --------------------------------------------------------------------------------
 
-type BandwidthPerSecond = Bytes
+type BandwidthBytesPerSecond = Bytes
+
 data P2PNetwork = P2PNetwork
   { p2pNodes :: !(Map NodeId Point)
   , p2pNodeNames :: !(Map NodeId Text)
   , p2pNodeCores :: !(Map NodeId NumCores)
   , p2pNodeStakes :: !(Map NodeId StakeFraction)
-  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe Bytes))
+  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic)
