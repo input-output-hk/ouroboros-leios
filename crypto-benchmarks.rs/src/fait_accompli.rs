@@ -6,14 +6,21 @@ use std::collections::BTreeMap;
 
 use crate::primitive::{Coin, PoolKeyhash};
 
+#[derive(Debug)]
+pub struct FaSortition {
+    pub n_persistent: usize,
+    pub n_nonpersistent: usize,
+    pub persistent: Vec<(PoolKeyhash, Ratio<BigInt>)>,
+    pub nonpersistent: BTreeMap<PoolKeyhash, Ratio<BigInt>>,
+    pub rho: Ratio<BigInt>,
+}
+
 fn sort_stake(
     pools: &BTreeMap<PoolKeyhash, Coin>,
-    total: Coin,
 ) -> (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) {
-    let stake = BigInt::from(total);
     let mut sp: Vec<(Ratio<BigInt>, &PoolKeyhash)> = pools
         .into_iter()
-        .map(|(pool, coins)| (Ratio::new(BigInt::from(*coins), stake.clone()), pool))
+        .map(|(pool, coins)| (Ratio::from_integer(BigInt::from(*coins)), pool))
         .collect();
     sp.sort();
     sp.reverse();
@@ -21,7 +28,7 @@ fn sort_stake(
 }
 
 fn sum_stake(s: &Vec<Ratio<BigInt>>) -> Vec<Ratio<BigInt>> {
-    let zero: Ratio<BigInt> = Ratio::new(BigInt::zero(), BigInt::one());
+    let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
     let (mut rho, _): (Vec<Ratio<BigInt>>, Ratio<BigInt>) =
         s.iter()
             .rev()
@@ -34,27 +41,17 @@ fn sum_stake(s: &Vec<Ratio<BigInt>>) -> Vec<Ratio<BigInt>> {
     rho
 }
 
-#[derive(Debug)]
-pub struct FaSortition {
-    pub n_persistent: usize,
-    pub n_nonpersistent: usize,
-    pub persistent: Vec<(PoolKeyhash, Ratio<BigInt>)>,
-    pub nonpersistent: BTreeMap<PoolKeyhash, Ratio<BigInt>>,
-    pub rho: Ratio<BigInt>,
-}
-
 fn fa_test(s: &Vec<Ratio<BigInt>>, rho: &Vec<Ratio<BigInt>>, n: usize, i: usize) -> bool {
-    let one: Ratio<BigInt> = Ratio::new(BigInt::one(), BigInt::one());
+    let one: Ratio<BigInt> = Ratio::from_integer(BigInt::one());
     let x = one - s[i - 1].clone() / rho[i - 1].clone();
     x.clone() * x >= Ratio::new(BigInt::from(n - i), BigInt::from(n - i + 1))
 }
 
 pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> FaSortition {
-    let stake: Coin = pools.values().sum();
-    let (s, p): (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) = sort_stake(pools, stake);
+    let (s, p): (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) = sort_stake(pools);
     let rho: Vec<Ratio<BigInt>> = sum_stake(&s);
-    let mut i_star: usize = 0;
-    while fa_test(&s, &rho, n, i_star + 1) {
+    let mut i_star: usize = 1;
+    while !fa_test(&s, &rho, n, i_star) {
         i_star = i_star + 1
     }
     let rho_star = &rho[i_star];
@@ -63,14 +60,14 @@ pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> FaSortiti
     FaSortition {
         persistent: pp
             .into_iter()
-            .map(|pool| (*pool, Ratio::new(BigInt::from(pools[&pool]), BigInt::one())))
+            .map(|pool| (*pool, Ratio::from_integer(BigInt::from(pools[&pool]))))
             .collect(),
         nonpersistent: pnp
             .into_iter()
             .map(|pool| {
                 (
                     *pool,
-                    Ratio::new(BigInt::from(pools[&pool]), BigInt::one()) / rho_star,
+                    Ratio::from_integer(BigInt::from(pools[&pool])) / rho_star,
                 )
             })
             .collect(),
