@@ -214,29 +214,33 @@
             <td>GB</td>
           </tr>
           <tr>
-            <th rowspan="5">Costs</th>
+            <th rowspan="5">Costs<br/>
+              <br/><input type="button" value="hyperscale provider" onclick="Controller.hyperscaleCosts()"/> <span title="Set costs to values typical of the largest cloud providers">ⓘ</span>
+              <br/><input type="button" value="discount provider" onclick="Controller.discountCosts()"/> <span title="Set costs to values typical of a discount cloud provider">ⓘ</span>
+            </th>
             <th colspan="2">vCPU <span title="Monthly cost of a virtual CPU.">ⓘ</span></th>
             <td><input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/></td>
             <td>USD/vCPU/month</td>
           </tr>
           <tr>
             <th colspan="2">Storage <span title="Monthly cost of cloud disk attached to a virtual machine.">ⓘ</span></th>
-            <td><input id="uiStorage" type="number" min="0" max="1" value="0.12" step="0.01"/></td>
+            <td><input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/></td>
             <td>USD/GB/month</td>
           </tr>
           <tr>
             <th colspan="2">IOPS <span title="Monthly cost of cloud input/output operation capacity.">ⓘ</span></th>
-            <td><input id="uiIops" type="number" min="0" max="0.5" value="0.05" step="0.001"/></td>
+            <td><input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/></td>
             <td>USD/(IO/s)/month</td>
           </tr>
           <tr>
             <th colspan="2">Network egress <span title="Monthly cost of cloud network egress.">ⓘ</span></th>
-            <td><input id="uiEgress" type="number" min="0" max="1" value="0.10" step="0.01"/></td>
+            <td><input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/></td>
             <td>USD/GB</td>
           </tr>
           <tr>
-            <th colspan="2">Discount rate <span title="Annual rate at which cloud-computing costs decrease.">ⓘ</span></th>
-            <td><input id="uiDiscount" type="number" min="0" max="50" value="15" step="0.1"/></td>
+            <th colspan="1">Discount rate <span title="Annual rate at which cloud-computing costs decrease.">ⓘ</span></th>
+            <th>Amortize? <span title="Whether to compute perpetual storage cost.">ⓘ</span><input id="uiAmortize" type="checkbox"/></th>
+            <td><input id="uiDiscount" type="number" min="0" max="50" value="15" step="0.1" disabled="true"/></td>
             <td>%/year</td>
           </tr>
           <tr>
@@ -247,7 +251,7 @@
           </tr>
           <tr>
             <th colspan="2">Relays <span title="Number of relay nodes operated by the stake pool.">ⓘ</span></th>
-            <td><input id="uiRelays" type="number" min="0" max="10" value="2" step="1"/></td>
+            <td><input id="uiRelays" type="number" min="0" max="10" value="1" step="1"/></td>
             <td>nodes</td>
           </tr>
           <tr>
@@ -294,7 +298,7 @@
           </tr>
           <tr>
             <th colspan="2">Storage compression <span title="Percentage by which each node's disk storage space is reduced by using data compression or a compressed file system.">ⓘ</span></th>
-            <td><input id="uiCompression" type="number" min="0" max="100" value="75" step="0.1"/></td>
+            <td><input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/></td>
             <td>%</td>
           </tr>
           <tr>
@@ -344,7 +348,7 @@
             <td>USD/month</td>
           </tr>
           <tr>
-            <th>Disk (amortized) <span title="The stake pool's monthly cost of perpetually storing the month's transactions on disk.">ⓘ</span></th>
+            <th>Disk <span id="uiAmortized">(amortized)</span> <span title="The stake pool's monthly cost of perpetually storing the month's transactions on disk.">ⓘ</span></th>
             <td id="uiCostStorage">?</td>
             <td>USD/month</td>
           </tr>
