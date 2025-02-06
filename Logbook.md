@@ -4,7 +4,7 @@
 
 ### Enhancements to online cost calculator
 
-In response to queries and suggestions, the [online Leios cost calculator]() has been enhanced:
+In response to queries and suggestions, the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/) has been enhanced:
 
 - Users can select costs for either hyperscale providers (like AWS, Azure, and GCP) or discount providers (Hetzner, OVH Cloud, etc.).
 - Costs default to that of a discount provider.
