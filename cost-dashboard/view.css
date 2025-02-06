@@ -42,10 +42,20 @@
   text-decoration: line-through;
 }
 
-input {
+input[type="text"] {
   width: 75px;
   text-align: right;
   font-family: monospace;
+}
+
+input[type="number"] {
+  width: 75px;
+  text-align: right;
+  font-family: monospace;
+}
+
+input[type="button"] {
+  width: 75%;
 }
 
 table {
