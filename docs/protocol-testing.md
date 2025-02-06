@@ -23,7 +23,7 @@ behavior, it is a red flag.
 
 ## Test Cases
 
-| No. | Description                  | Parameter(s)                                                                     |
+| No. | Description                  | [Parameter](../data/simulation/config.d.ts)                                      |
 | --- | ---------------------------- | -------------------------------------------------------------------------------- |
 | 1   | Impact of increasing IB size | `ib-body-max-size-bytes`, `ib-body-avg-size-bytes`, `tx-size-bytes-distribution` |
 | 2   | Vary IB production rate      | `ib-generation-probability`                                                      |
