@@ -20,11 +20,11 @@ serde = "1.0.217"
 serde_cbor = "0.11.2"
 
 [[bench]]
-name = "sortition_bench"
+name = "serialization_bench"
 harness = false
 
 [[bench]]
-name = "vrf_bench"
+name = "fait_accompli_bench"
 harness = false
 
 [[bench]]
@@ -32,5 +32,9 @@ name = "vote_bench"
 harness = false
 
 [[bench]]
-name = "serialization_bench"
+name = "sortition_bench"
+harness = false
+
+[[bench]]
+name = "vrf_bench"
 harness = false
