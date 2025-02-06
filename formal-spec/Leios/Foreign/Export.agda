@@ -95,6 +95,16 @@ instance
                       }
       }
 
+  Listable-Fin : Listable (Fin 1)
+  Listable-Fin =
+    record
+      { listing = singleton zero
+      ; complete = λ {a} → (Equivalence.to ∈-singleton) a≡zero
+      }
+    where
+      a≡zero : ∀ {a : Fin 1} → a ≡ zero
+      a≡zero {zero} = refl
+
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
 

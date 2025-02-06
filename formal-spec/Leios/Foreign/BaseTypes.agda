@@ -1,5 +1,3 @@
-{-# OPTIONS --allow-unsolved-metas #-}
-
 module Leios.Foreign.BaseTypes where
 
 -- TODO: copied from the formal-ledger project for now
@@ -8,7 +6,6 @@ module Leios.Foreign.BaseTypes where
 open import Data.Rational
 
 open import Leios.Prelude
-open import Axiom.Set.Properties th
 
 open import Data.Fin
 open import Function.Related.TypeIsomorphisms
@@ -18,9 +15,11 @@ open import Tactic.Derive.Convertible
 open import Tactic.Derive.HsType
 
 open import Class.Convertible
+open import Class.Decidable.Instances
 open import Class.HasHsType
 
 open import Leios.Foreign.HSTypes as F
+open import Leios.Foreign.Util
 open import Foreign.Haskell
 
 instance
@@ -83,18 +82,38 @@ instance
     .to   → F.MkHSMap ∘ to
     .from → from ∘ F.HSMap.assocList
 
-  Convertible-TotalMap : ∀ {K K' V V'} → ⦃ DecEq K ⦄
+record Listable (A : Type) : Type where
+  field
+    listing  : ℙ A
+    complete : ∀ {a : A} → a ∈ listing
+
+totalDec : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → Dec (total R)
+totalDec {A} {B} {R} with all? (_∈? dom R)
+... | yes p = yes λ {a} → p {a} ((Listable.complete it) {a})
+... | no ¬p = no λ x → ¬p λ {a} _ → x {a}
+
+instance
+
+  total? : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → ({a : A} → a ∈ dom R) ⁇
+  total? = ⁇ totalDec
+
+  Convertible-TotalMap : ∀ {K K' V V'} → ⦃ DecEq K ⦄ → ⦃ Listable K ⦄
     → ⦃ Convertible K K' ⦄ → ⦃ Convertible V V' ⦄
     → Convertible (TotalMap K V) (List $ Pair K' V')
   Convertible-TotalMap {K} = λ where
     .to   → to ∘ TotalMap.rel
-    .from → {!!} 
+    .from → λ x →
+      let (r , l) = fromListᵐ (map from x)
+      in case (¿ total r ¿) of λ where
+           (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
+           (no p) → error "Expected total map"
 
   HsTy-TotalMap : ∀ {A B} → ⦃ HasHsType A ⦄ → ⦃ HasHsType B ⦄ → HasHsType (TotalMap A B)
   HsTy-TotalMap {A} {B} = MkHsType _ (F.HSMap (HsType A) (HsType B))
 
   Conv-HSTotalMap : ∀ {A B} ⦃ _ : HasHsType A ⦄ ⦃ _ : HasHsType B ⦄
     → ⦃ DecEq A ⦄
+    → ⦃ Listable A ⦄
     → ⦃ HsConvertible A ⦄
     → ⦃ HsConvertible B ⦄
     → HsConvertible (TotalMap A B)
