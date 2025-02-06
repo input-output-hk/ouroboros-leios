@@ -68,4 +68,5 @@ fn main() {
         .iter()
         .for_each(|(pool, weight)| println!("  {} : {}", pool, weight));
     println!("Rho: {}", fa.rho);
+
 }

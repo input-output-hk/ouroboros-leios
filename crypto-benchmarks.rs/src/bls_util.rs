@@ -1,5 +1,8 @@
-use blst::min_sig::*;
 use blst::*;
+use blst::min_sig::*;
+use num_bigint::{BigInt, Sign};
+use num_rational::Ratio;
+use num_traits::FromPrimitive;
 
 pub fn pk_transform(f: &dyn Fn(blst_p2) -> blst_p2, pk: &PublicKey) -> PublicKey {
     let mut point: blst_p2 = blst_p2::default();
@@ -39,4 +42,11 @@ pub fn sig_transform(f: &dyn Fn(blst_p1) -> blst_p1, sig: &Signature) -> Signatu
         blst_p1_affine_serialize(sig1_bytes.as_mut_ptr(), &point1_aff);
         Signature::deserialize(&sig1_bytes).unwrap()
     }
+}
+
+pub fn sig_to_rational(sig: &Signature) -> Ratio<BigInt> {
+    let bytes: [u8; 48] = sig.to_bytes();
+    let numer = BigInt::from_bytes_be(Sign::Plus, &bytes);
+    let denom: BigInt = BigInt::from_u128(2u128 ^ 127u128).unwrap();
+    Ratio::new(numer % denom.clone(), denom)
 }

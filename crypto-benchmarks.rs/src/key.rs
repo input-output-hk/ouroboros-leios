@@ -1,7 +1,10 @@
 use blst::min_sig::*;
+use num_bigint::BigInt;
+use num_rational::Ratio;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::bls_util;
 use crate::bls_vote;
 use crate::primitive::{arbitrary_poolkeyhash, KesSig, PoolKeyhash};
 use crate::util::*;
@@ -88,6 +91,11 @@ impl Arbitrary for PubKey {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Sig(pub(crate) Signature);
 
+impl Sig {
+    pub fn to_rational(&self) -> Ratio<BigInt> {
+      bls_util::sig_to_rational(&self.0)
+    }
+}
 impl Serialize for Sig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
