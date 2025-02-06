@@ -1,8 +1,20 @@
 # Leios logbook
 
+## 2025-02-06
+
+### Enhancements to online cost calculator
+
+In response to queries and suggestions, the [online Leios cost calculator]() has been enhanced:
+
+- Users can select costs for either hyperscale providers (like AWS, Azure, and GCP) or discount providers (Hetzner, OVH Cloud, etc.).
+- Costs default to that of a discount provider.
+- Users can optionally amortize ledger storage costs perpetually vs compute a first-month snapshot of storage costs.
+- Deployments default to a single relay instead of two.
+- The disk compression default was reduced to a conservative 50%.
+
 ## 2025-01-31
 
-## Formal Methods
+### Formal Methods
 
 - Finalizing executable specifications for Simplified and Short Leios
 - Short Leios spec extracted to Haskell for conformance testing
