@@ -35,8 +35,8 @@ import Text.PrettyPrint.HughesPJClass (
 import Leios.Conformance.Model (
   EndorserBlock (..),
   EnvAction (..),
-  IBHeader (..),
   IBBody (..),
+  IBHeader (..),
   InputBlock (..),
   NodeModel (..),
   Vote (..),
