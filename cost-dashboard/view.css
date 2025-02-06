@@ -38,6 +38,10 @@
   text-align: left; 
 }
 
+#uiAmortized {
+  text-decoration: line-through;
+}
+
 input {
   width: 75px;
   text-align: right;
