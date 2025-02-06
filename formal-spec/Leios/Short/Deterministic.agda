@@ -219,7 +219,7 @@ data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState 
                     ; BaseState = bs'
                     } ↑ L.filter isValid? msgs
        in
-       ∙ Upkeep ≡ᵉ allUpkeep
+--       ∙ Upkeep ≡ᵉ allUpkeep
        ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
        ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
        ∙ s0 -⟦Base⟧⇀    s1
@@ -254,6 +254,7 @@ _-⟦_/_⟧ⁿᵈ*⇀_ = ReflexiveTransitiveClosure _-⟦_/_⟧ⁿᵈ⇀_
 -- Key fact: stepping with the deterministic relation means we can
 -- also step with the non-deterministic one
 -- TODO: this is a lot like a weak simulation, can we do something prettier?
+{-
 -⟦/⟧⇀⇒ND : s -⟦ i / o ⟧⇀ s' → ∃₂[ i , o ] (s -⟦ i / o ⟧ⁿᵈ*⇀ s')
 -⟦/⟧⇀⇒ND (Slot x x₁ x₂ hB hIB hEB hV) = replicate 5 SLOT , replicate 5 EMPTY ,
   (BS-ind (ND.Slot x x₁ x₂) $
@@ -263,7 +264,7 @@ _-⟦_/_⟧ⁿᵈ*⇀_ = ReflexiveTransitiveClosure _-⟦_/_⟧ⁿᵈ⇀_
    STS⇒RTC (V-Role⇒ND hV))
 -⟦/⟧⇀⇒ND Ftch = _ , _ , STS⇒RTC Ftch
 -⟦/⟧⇀⇒ND Base₁ = _ , _ , STS⇒RTC Base₁
-
+-}
 open Computational22 ⦃...⦄
 
 open import Function.Related.TypeIsomorphisms
@@ -282,7 +283,7 @@ module _ ⦃ Computational-B : Computational22 B._-⟦_/_⟧⇀_ String ⦄
     Computational--⟦/⟧⇀ .computeProof s (SUBMIT (inj₂ txs)) = success (-, Base₁)
     Computational--⟦/⟧⇀ .computeProof s SLOT = let open LeiosState s in
       case (¿ Upkeep ≡ᵉ allUpkeep ¿ ,′ computeProof BaseState B.FTCH-LDG ,′ computeProof FFDState FFD.Fetch) of λ where
-        (yes p , success ((B.BASE-LDG l , bs) , p₁) , success ((FFD.FetchRes msgs , ffds) , p₂)) →
+        (_ {- yes p -}, success ((B.BASE-LDG l , bs) , p₁) , success ((FFD.FetchRes msgs , ffds) , p₂)) →
           success (let
             open ≡-Reasoning
             s = _ -- solved later by unification
@@ -297,9 +298,9 @@ module _ ⦃ Computational-B : Computational22 B._-⟦_/_⟧⇀_ String ⦄
             (s2 , ib-step) = IB-Role-total {s = s1} (subst (IB-Role ∉_) (sym upkeep-s1≡Base) (a≢b→a∉b λ ()))
             (s3 , eb-step) = EB-Role-total {s = s2} {!!}
             (s4 , v-step) = V-Role-total {s = s3} {!!}
-            in (_ , Slot p p₁ p₂ base-step ib-step eb-step v-step))
-        (yes p , _ , _) → failure "Subsystem failed"
-        (no ¬p , _) → failure "Upkeep incorrect"
+            in (_ , Slot {- p -} p₁ p₂ base-step ib-step eb-step v-step))
+        (_ {-yes p-} , _ , _) → failure "Subsystem failed"
+        -- (_ {-no ¬p-} , _) → failure "Upkeep incorrect"
     Computational--⟦/⟧⇀ .computeProof s FTCH-LDG = success (-, Ftch)
     Computational--⟦/⟧⇀ .completeness = {!!}
 

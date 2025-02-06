@@ -13,6 +13,7 @@ open import Leios.Prelude
 open import Leios.Trace renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HSTypes
+open import Leios.Foreign.Util
 
 module Leios.Foreign.Export where
 
@@ -118,11 +119,20 @@ open import Class.Computational as C
 open import Class.Computational22
 
 open Computational22
+open BaseAbstract
+open FFDAbstract
 
 instance
-  postulate
-    Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
-    Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
+  Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
+  Computational-B .computeProof s (INIT x) = success ((STAKE sd , tt) , tt)
+  Computational-B .computeProof s (SUBMIT x) = success ((EMPTY , tt) , tt)
+  Computational-B .computeProof s FTCH-LDG = success (((BASE-LDG []) , tt) , tt)
+  Computational-B .completeness _ _ _ _ _ = error "Computational-B completeness"
+
+  Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
+  Computational-FFD .computeProof s (Send x x₁) = success ((SendRes , tt) , tt)
+  Computational-FFD .computeProof s Fetch = success ((FetchRes [] , tt) , tt)
+  Computational-FFD .completeness _ _ _ _ _ = error "Computational-FFD completeness"
 
 open import Leios.Short.Deterministic st as D public
 

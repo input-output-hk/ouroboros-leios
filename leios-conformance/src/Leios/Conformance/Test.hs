@@ -35,6 +35,8 @@ import Text.PrettyPrint.HughesPJClass (
 import Leios.Conformance.Model (
   EndorserBlock (..),
   EnvAction (..),
+  IBHeader (..),
+  IBBody (..),
   InputBlock (..),
   NodeModel (..),
   Vote (..),
@@ -66,9 +68,17 @@ instance Pretty EnvAction where
   pPrint (NewEB eb) = "NewEB" <+> pPrint eb
   pPrint (NewVote v) = "NewVote" <+> pPrint v
 
-instance Arbitrary InputBlock
+instance Arbitrary IBHeader where
+  arbitrary = IBHeader <$> arbitrary <*> arbitrary
 
-instance Arbitrary EndorserBlock
+instance Arbitrary IBBody where
+  arbitrary = IBBody <$> arbitrary
+
+instance Arbitrary InputBlock where
+  arbitrary = InputBlock <$> arbitrary <*> arbitrary
+
+instance Arbitrary EndorserBlock where
+  arbitrary = EndorserBlock <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
@@ -85,6 +95,7 @@ instance StateModel NetworkModel where
       [(1, pure Tick)]
         ++ fmap (1,) [NewIB <$> arbitrary]
         ++ fmap (1,) [NewEB <$> arbitrary]
+        ++ fmap (1,) [NewVote <$> arbitrary]
 
   shrinkAction _ _ (Step Tick) = []
   shrinkAction _ _ Step{} = [Some (Step Tick)]
