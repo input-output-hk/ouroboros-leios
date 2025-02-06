@@ -393,7 +393,7 @@ example2 =
     trace =
       tracePraosP2P
         rng0
-        (P2P.topologyToNetwork (Just (kilobytes 1000)) p2pTopography)
+        (P2P.topologyToNetwork p2pTopography)
         (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \slotConfig nid rng ->
             PraosNodeConfig

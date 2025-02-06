@@ -71,7 +71,7 @@ example1 =
               }
         )
 
-  p2pNetwork = topologyToNetwork (Just (kilobytes 1000)) p2pTopography
+  p2pNetwork = topologyToNetwork p2pTopography
   p2pTopography =
     genArbitraryP2PTopography p2pTopographyCharacteristics rng0
 
@@ -149,7 +149,7 @@ example2 =
     trace =
       traceRelayP2P
         rng0
-        (topologyToNetwork (Just (kilobytes 1000)) p2pTopography)
+        (topologyToNetwork p2pTopography)
         (\latency -> mkTcpConnProps latency . fromMaybe undefined)
         ( \rng ->
             RelayNodeConfig
