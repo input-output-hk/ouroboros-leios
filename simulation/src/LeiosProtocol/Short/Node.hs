@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short.Node where
 
@@ -22,6 +23,7 @@ import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
 import Control.Tracer
+import Data.Bifunctor
 import Data.Coerce (coerce)
 import Data.Foldable (forM_)
 import Data.Ix (Ix)
@@ -121,8 +123,8 @@ data LeiosNodeTask
   deriving (Eq, Ord, Ix, Bounded, Show)
 
 type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
-type RelayEBState = RelayConsumerSharedState EndorseBlockId EndorseBlockId EndorseBlock
-type RelayVoteState = RelayConsumerSharedState VoteId VoteId VoteMsg
+type RelayEBState = RelayConsumerSharedState EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
+type RelayVoteState = RelayConsumerSharedState VoteId (RelayHeader VoteId) VoteMsg
 
 data LedgerState = LedgerState
 
@@ -136,9 +138,15 @@ data ValidationRequest m
 --- Messages
 --------------------------------------------------------------
 
+data RelayHeader id = RelayHeader {id :: !id, slot :: !SlotNo}
+  deriving (Show)
+
+instance MessageSize id => MessageSize (RelayHeader id) where
+  messageSizeBytes (RelayHeader x y) = messageSizeBytes x + messageSizeBytes y
+
 type RelayIBMessage = RelayMessage InputBlockId InputBlockHeader InputBlockBody
-type RelayEBMessage = RelayMessage EndorseBlockId EndorseBlockId EndorseBlock
-type RelayVoteMessage = RelayMessage VoteId VoteId VoteMsg
+type RelayEBMessage = RelayMessage EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
+type RelayVoteMessage = RelayMessage VoteId (RelayHeader VoteId) VoteMsg
 type PraosMessage = PraosNode.PraosMessage RankingBlockBody
 
 data LeiosMessage
@@ -166,14 +174,14 @@ instance MuxBundle Leios where
   type MuxMsg Leios = LeiosMessage
   toFromMuxMsgBundle =
     Leios
-      { protocolIB = ToFromMuxMsg RelayIB fromRelayIB
-      , protocolEB = ToFromMuxMsg RelayEB fromRelayEB
-      , protocolVote = ToFromMuxMsg RelayVote fromRelayVote
+      { protocolIB = ToFromMuxMsg RelayIB (.fromRelayIB)
+      , protocolEB = ToFromMuxMsg RelayEB (.fromRelayEB)
+      , protocolVote = ToFromMuxMsg RelayVote (.fromRelayVote)
       , protocolPraos = case toFromMuxMsgBundle @(PraosNode.Praos RankingBlockBody) of
           PraosNode.Praos a b -> PraosNode.Praos (p >>> a) (p >>> b)
       }
    where
-    p = ToFromMuxMsg PraosMsg fromPraosMsg
+    p = ToFromMuxMsg PraosMsg (.fromPraosMsg)
 
   traverseMuxBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseMuxBundle f d
 
@@ -230,17 +238,18 @@ relayEBConfig ::
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   SubmitBlocks m EndorseBlockId EndorseBlock ->
-  RelayConsumerConfig EndorseBlockId EndorseBlockId EndorseBlock m
+  RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock m
 relayEBConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
-    , headerId = id
+    , headerId = (.id)
     , validateHeaders = const $ return ()
-    , prioritize = prioritize cfg.leios.ebDiffusionStrategy $ error "FFD not supported for endorse blocks."
+    , prioritize = prioritize cfg.leios.ebDiffusionStrategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?
-    , submitBlocks
+    , submitBlocks = \hbs t k ->
+        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     }
 
 relayVoteConfig ::
@@ -248,17 +257,18 @@ relayVoteConfig ::
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   SubmitBlocks m VoteId VoteMsg ->
-  RelayConsumerConfig VoteId VoteId VoteMsg m
+  RelayConsumerConfig VoteId (RelayHeader VoteId) VoteMsg m
 relayVoteConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = 100}
-    , headerId = id
+    , headerId = (.id)
     , validateHeaders = const $ return ()
-    , prioritize = prioritize cfg.leios.voteDiffusionStrategy $ error "FFD not supported for vote bundles."
+    , prioritize = prioritize cfg.leios.voteDiffusionStrategy (.slot)
     , submitPolicy = SubmitAll
     , maxHeadersToRequest = 100
     , maxBodiesToRequest = 1 -- should we chunk bodies here?
-    , submitBlocks
+    , submitBlocks = \hbs t k ->
+        submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     }
 
 queueAndWait :: (MonadSTM m, MonadDelay m) => LeiosNodeState m -> LeiosNodeTask -> [CPUTask] -> m ()
@@ -337,29 +347,29 @@ leiosNode tracer cfg followers peers = do
       valHeaderRB
       submitRB
       praosState
-      (map protocolPraos followers)
-      (map protocolPraos peers)
+      (map (.protocolPraos) followers)
+      (map (.protocolPraos) peers)
 
   ibThreads <-
     setupRelay
       (relayIBConfig tracer cfg valHeaderIB submitIB)
       relayIBState
-      (map protocolIB followers)
-      (map protocolIB peers)
+      (map (.protocolIB) followers)
+      (map (.protocolIB) peers)
 
   ebThreads <-
     setupRelay
       (relayEBConfig tracer cfg submitEB)
       relayEBState
-      (map protocolEB followers)
-      (map protocolEB peers)
+      (map (.protocolEB) followers)
+      (map (.protocolEB) peers)
 
   voteThreads <-
     setupRelay
       (relayVoteConfig tracer cfg submitVote)
       relayVoteState
-      (map protocolVote followers)
-      (map protocolVote peers)
+      (map (.protocolVote) followers)
+      (map (.protocolVote) peers)
 
   let processWaitingForRB =
         processWaiting'
@@ -554,10 +564,10 @@ generator tracer cfg st = do
           atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
-          atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (eb.id, eb))
+          atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (RelayHeader eb.id eb.slot, eb))
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
-          atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (v.id, v))
+          atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (RelayHeader v.id v.slot, v))
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
   leiosBlockGenerator $ LeiosGeneratorConfig{submit = mapM_ submitOne, ..}
@@ -620,6 +630,9 @@ mkBuffersView cfg st = BuffersView{..}
 
 mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
 mkSchedule cfg = do
+  -- For each pipeline, we want to deploy all our votes in a single
+  -- message to cut down on traffic, so we pick one slot out of each
+  -- active voting range (they are assumed not to overlap).
   votingSlots <- newTVarIO $ pickFromRanges rng1 $ votingRanges cfg.leios
   mkScheduler rng2 (rates votingSlots)
  where

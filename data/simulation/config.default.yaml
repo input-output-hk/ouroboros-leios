@@ -72,6 +72,7 @@ eb-generation-cpu-time-ms: 300.0
 eb-validation-cpu-time-ms: 1.0
 eb-size-bytes-constant: 32
 eb-size-bytes-per-ib: 32
+eb-diffusion-strategy: "peer-order"
 
 ################################################################################
 # Vote Configuration
@@ -84,6 +85,7 @@ vote-validation-cpu-time-ms: 3.0
 vote-threshold: 150
 vote-bundle-size-bytes-constant: 32
 vote-bundle-size-bytes-per-eb: 32
+vote-diffusion-strategy: "peer-order"
 
 ################################################################################
 # Certificate Configuration

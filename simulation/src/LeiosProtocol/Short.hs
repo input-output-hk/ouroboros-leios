@@ -73,6 +73,7 @@ prioritize ::
   [header]
 prioritize PeerOrder _ = \_ hs -> hs
 prioritize FreshestFirst sl = \m _ -> sortOn (Down . sl) . Map.elems $ m
+prioritize OldestFirst sl = \m _ -> sortOn sl . Map.elems $ m
 
 data SingPipeline (p :: Pipeline) where
   SingSingleVote :: SingPipeline SingleVote
@@ -116,8 +117,8 @@ convertConfig disk =
     , sizes
     , delays
     , ibDiffusionStrategy = disk.ibDiffusionStrategy
-    , ebDiffusionStrategy = PeerOrder
-    , voteDiffusionStrategy = PeerOrder
+    , ebDiffusionStrategy = disk.ebDiffusionStrategy
+    , voteDiffusionStrategy = disk.voteDiffusionStrategy
     }
  where
   forEach n xs = n * fromIntegral (length xs)

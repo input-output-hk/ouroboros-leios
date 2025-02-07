@@ -14,7 +14,7 @@
       "type": "object"
     },
     "DiffusionStrategy": {
-      "enum": ["peer-order", "freshest-first"],
+      "enum": ["peer-order", "freshest-first", "oldest-first"],
       "type": "string"
     },
     "Distribution": {
@@ -102,6 +102,9 @@
     },
     "cert-validation-cpu-time-ms-per-node": {
       "type": "number"
+    },
+    "eb-diffusion-strategy": {
+      "$ref": "#/definitions/DiffusionStrategy"
     },
     "eb-generation-cpu-time-ms": {
       "type": "number"
@@ -221,6 +224,9 @@
       "additionalProperties": false,
       "properties": {},
       "type": "number"
+    },
+    "vote-diffusion-strategy": {
+      "$ref": "#/definitions/DiffusionStrategy"
     },
     "vote-generation-cpu-time-ms-constant": {
       "type": "number"

@@ -47,6 +47,8 @@ data DiffusionStrategy
     PeerOrder
   | -- | request message with highest slot
     FreshestFirst
+  | -- | request message with lowest slot
+    OldestFirst
   deriving (Show, Eq, Generic)
 
 data Config = Config
@@ -79,8 +81,8 @@ data Config = Config
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
-  , --  , ebDiffusionStrategy :: DiffusionStrategy -- TBD?
-    voteGenerationProbability :: Double
+  , ebDiffusionStrategy :: DiffusionStrategy
+  , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
@@ -88,8 +90,8 @@ data Config = Config
   , voteOneEbPerVrfWin :: Bool
   , voteBundleSizeBytesConstant :: SizeBytes
   , voteBundleSizeBytesPerEb :: SizeBytes
-  , --  , voteDiffusionStrategy :: DiffusionStrategy -- TBS?
-    certGenerationCpuTimeMsConstant :: DurationMs
+  , voteDiffusionStrategy :: DiffusionStrategy
+  , certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
   , certValidationCpuTimeMsPerNode :: DurationMs
@@ -131,6 +133,7 @@ instance Default Config where
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 32
       , ebSizeBytesPerIb = 32
+      , ebDiffusionStrategy = PeerOrder
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 1.0
       , voteGenerationCpuTimeMsPerIb = 1.0
@@ -139,6 +142,7 @@ instance Default Config where
       , voteOneEbPerVrfWin = False
       , voteBundleSizeBytesConstant = 32
       , voteBundleSizeBytesPerEb = 32
+      , voteDiffusionStrategy = PeerOrder
       , certGenerationCpuTimeMsConstant = 50.0
       , certGenerationCpuTimeMsPerNode = 1.0
       , certValidationCpuTimeMsConstant = 50.0
@@ -247,6 +251,7 @@ instance FromJSON Config where
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
+    ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
@@ -255,6 +260,7 @@ instance FromJSON Config where
     voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
     voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
+    voteDiffusionStrategy <- parseFieldOrDefault @Config @"voteDiffusionStrategy" obj
     certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
     certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
     certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj

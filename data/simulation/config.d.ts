@@ -40,6 +40,7 @@ export interface Config {
   "eb-validation-cpu-time-ms": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
+  "eb-diffusion-strategy": DiffusionStrategy;
 
   // Vote Configuration
   "vote-generation-probability": number;
@@ -49,6 +50,7 @@ export interface Config {
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;
   "vote-bundle-size-bytes-per-eb": bigint;
+  "vote-diffusion-strategy": DiffusionStrategy;
 
   // deprecated:
   // "vote-one-eb-per-vrf-win": boolean;
@@ -94,5 +96,6 @@ export interface ConstantDistribution {
 export enum DiffusionStrategy {
   PeerOrder = "peer-order",
   FreshestFirst = "freshest-first",
+  OldestFirst = "oldest-first",
 }
 
