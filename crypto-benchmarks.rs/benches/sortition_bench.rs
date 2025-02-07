@@ -1,11 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use num_traits::{FromPrimitive, One};
+use num_bigint::BigInt;
+use num_rational::Ratio;
 use rustc_apfloat::ieee::Quad;
 
 use leios_crypto_benchmarks::sortition::*;
 
 fn benchmark_log(c: &mut Criterion) {
-    let f: Quad = into_quad(0.05);
-    c.bench_function("log (1 - f)", |b| b.iter(|| ln_1_minus(f)));
+    let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
+    c.bench_function("log (1 - f)", |b| b.iter(|| ln_1_minus(f.clone())));
 }
 
 fn benchmark_rb(c: &mut Criterion) {

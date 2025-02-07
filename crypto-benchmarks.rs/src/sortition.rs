@@ -1,7 +1,10 @@
+use num_traits::{FromPrimitive, One, Zero, Signed};
 use rustc_apfloat::{
     ieee::{Double, IeeeFloat, Quad},
     Float, FloatConvert,
 };
+use num_bigint::BigInt;
+use num_rational::Ratio;
 
 pub fn into_quad(x: f64) -> Quad {
     let y: Double = Double::from_bits(x.to_bits() as u128);
@@ -25,19 +28,22 @@ fn div(x: Quad, y: Quad) -> Quad {
     (x / y).value
 }
 
-pub fn ln_1_minus(f: Quad) -> Quad {
-    let mut acc: Quad = Quad::ZERO;
-    let mut prev: Quad = Quad::from_i128(1).value;
-    let mut i: i128 = 1;
+pub fn ln_1_minus(f: Ratio<BigInt>) -> Ratio<BigInt> {
+    let epsilon = Ratio::new(BigInt::one(), BigInt::from_i128(10000000000000000000000000000000000i128).unwrap());
+    let zero = Ratio::from_integer(BigInt::zero());
+    let one = Ratio::from_integer(BigInt::one());
+    let mut acc = zero.clone();
+    let mut prev = one.clone();
+    let mut i = one.clone();
     loop {
-        let term: Quad = mul(prev, f);
-        let acc1: Quad = sub(acc, div(term, Quad::from_i128(i).value));
-        if acc == acc1 {
+        let term = prev * f.clone();
+        let acc1 = acc.clone() - term.clone() / i.clone();
+        if Signed::abs(&(acc.clone() - acc1.clone())) < epsilon {
             break acc;
         }
         prev = term;
         acc = acc1;
-        i += 1;
+        i += one.clone();
     }
 }
 

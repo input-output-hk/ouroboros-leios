@@ -1,8 +1,12 @@
+use num_bigint::BigInt;
+use num_rational::Ratio;
+use num_traits::{FromPrimitive, One};
 use quickcheck::Gen;
 use std::collections::BTreeMap;
 
 use leios_crypto_benchmarks::fait_accompli::*;
 use leios_crypto_benchmarks::primitive::*;
+use leios_crypto_benchmarks::sortition::*;
 
 fn main() {
     let g = &mut Gen::new(10);
@@ -68,5 +72,8 @@ fn main() {
         .iter()
         .for_each(|(pool, weight)| println!("  {} : {}", pool, weight));
     println!("Rho: {}", fa.rho);
+
+    let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
+    println!("ln(1 - {}) = {}", f.clone(), ln_1_minus(f));
 
 }
