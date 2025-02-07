@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use num_rational::Ratio;
-use rustc_apfloat::ieee::Quad;
+use num_traits::{FromPrimitive, One};
 use quickcheck::{Arbitrary, Gen};
 use std::cmp::{min,max};
 
@@ -9,14 +9,13 @@ use leios_crypto_benchmarks::sortition::*;
 
 #[test]
 fn leader() {
-    let f: Quad = "4.8771764574959465286614323309274434524463393558834E-2"
-        .parse::<Quad>()
-        .unwrap();
-    let f1: Quad = ln_1_minus(f);
-    let s: Quad = into_quad(0.001);
-    let pexpected: f64 = 1.0 - (1.0 - 4.877_176_457_495_946_4e-2_f64).powf(0.001_f64);
-    assert!(leader_check(f1, s, into_quad(pexpected - 1e-15)));
-    assert!(!leader_check(f1, s, into_quad(pexpected + 1e-15)));
+    let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
+    let ln1f = ln_1_minus(&f);
+    let s = Ratio::new(BigInt::one(), BigInt::from_i16(1000).unwrap());
+    let p0 = Ratio::new(BigInt::from_i128(512919789090i128).unwrap(), BigInt::from_i128(10000000000000000i128).unwrap());
+    let p1 = Ratio::new(BigInt::from_i128(512919789091i128).unwrap(), BigInt::from_i128(10000000000000000i128).unwrap());
+    assert!(leader_check(&ln1f, &s, &p0));
+    assert!(!leader_check(&ln1f, &s, &p1));
 }
 
 #[test]

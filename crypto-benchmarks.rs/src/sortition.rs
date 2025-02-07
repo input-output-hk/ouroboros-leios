@@ -28,7 +28,7 @@ fn div(x: Quad, y: Quad) -> Quad {
     (x / y).value
 }
 
-pub fn ln_1_minus(f: Ratio<BigInt>) -> Ratio<BigInt> {
+pub fn ln_1_minus(f: &Ratio<BigInt>) -> Ratio<BigInt> {
     let epsilon = Ratio::new(BigInt::one(), BigInt::from_i128(10000000000000000000000000000000000i128).unwrap());
     let zero = Ratio::from_integer(BigInt::zero());
     let one = Ratio::from_integer(BigInt::one());
@@ -36,7 +36,7 @@ pub fn ln_1_minus(f: Ratio<BigInt>) -> Ratio<BigInt> {
     let mut prev = one.clone();
     let mut i = one.clone();
     loop {
-        let term = prev * f.clone();
+        let term = prev * f;
         let acc1 = acc.clone() - term.clone() / i.clone();
         if Signed::abs(&(acc.clone() - acc1.clone())) < epsilon {
             break acc;
@@ -47,23 +47,25 @@ pub fn ln_1_minus(f: Ratio<BigInt>) -> Ratio<BigInt> {
     }
 }
 
-pub fn leader_check(ln1f: Quad, s: Quad, p: Quad) -> bool {
-    let t0: Quad = mul(s, ln1f);
-    let mut acc: Quad = Quad::ZERO;
-    let mut prev: Quad = Quad::from_i128(1).value;
-    let mut i: i128 = 1;
+pub fn leader_check(ln1f: &Ratio<BigInt>, s: &Ratio<BigInt>, p: &Ratio<BigInt>) -> bool {
+    let t0 = s * ln1f;
+    let zero = Ratio::from_integer(BigInt::zero());
+    let one = Ratio::from_integer(BigInt::one());
+    let mut acc = zero.clone();
+    let mut prev = one.clone();
+    let mut i = one.clone();
     loop {
-        let term: Quad = div(mul(prev, t0), Quad::from_i128(i).value);
-        let err: Quad = term.abs();
-        let acc1: Quad = sub(acc, term);
-        if p < sub(acc1, err) {
+        let term = prev.clone() * t0.clone() / i.clone();
+        let err = Signed::abs(&term);
+        let acc1 = acc.clone() - term.clone();
+        if p < &(acc1.clone() - err.clone()) {
             break true;
-        } else if p > add(acc1, err) {
+        } else if p > &(acc1.clone() + err.clone()) {
             break false;
         }
         prev = term;
         acc = acc1;
-        i += 1;
+        i += one.clone();
     }
 }
 
