@@ -17,6 +17,10 @@ open import Leios.Foreign.Util
 
 module Leios.Foreign.Export where
 
+{-# FOREIGN GHC
+  {-# LANGUAGE DuplicateRecordFields #-}
+#-}
+
 instance
   HsTy-SlotUpkeep = autoHsType SlotUpkeep ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
   Conv-SlotUpkeep = autoConvert SlotUpkeep
@@ -26,7 +30,7 @@ record IBHeader : Type where
         producerID : Int
 
 {-# FOREIGN GHC
-data IBHeader = IBHeader Integer Integer
+data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer}
   deriving (Show, Eq, Generic)
 #-}
 
@@ -71,7 +75,7 @@ record EndorserBlock : Type where
         ibRefs     : List Int
 
 {-# FOREIGN GHC
-data EndorserBlock = EndorserBlock Integer Integer [Integer]
+data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Integer, ibRefs :: [Integer] }
   deriving (Show, Eq, Generic)
 #-}
 
