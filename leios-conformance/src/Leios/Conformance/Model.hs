@@ -14,9 +14,13 @@ import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.List ((\\))
 import Data.Maybe (maybeToList)
 import GHC.Generics (Generic)
-import Text.PrettyPrint.HughesPJClass (Pretty (pPrint))
-
 import Lib
+import Text.PrettyPrint (braces, hang, text, vcat, (<+>))
+import Text.PrettyPrint.HughesPJClass (
+  Pretty (pPrint, pPrintPrec),
+  maybeParens,
+  prettyNormal,
+ )
 
 data EnvAction
   = Tick
@@ -34,12 +38,26 @@ instance ToJSON IBBody
 instance ToJSON InputBlock
 
 instance Pretty InputBlock where
-  pPrint (InputBlock{}) = "InputBlock"
+  pPrint (InputBlock{header = IBHeader s p, body = IBBody{..}}) =
+    hang "InputBlock" 2 $
+      braces $
+        vcat
+          [ hang "slot number =" 2 $ pPrint s
+          , hang "producer Id =" 2 $ pPrint p
+          , hang "transactions =" 2 $ pPrint txs
+          ]
 
 instance FromJSON EndorserBlock
 instance ToJSON EndorserBlock
 instance Pretty EndorserBlock where
-  pPrint (EndorserBlock{}) = "EndorserBlock"
+  pPrint (EndorserBlock s p ibs) =
+    hang "EndorserBlock" 2 $
+      braces $
+        vcat
+          [ hang "slot number =" 2 $ pPrint s
+          , hang "producer Id =" 2 $ pPrint p
+          , hang "IB refs=" 2 $ pPrint ibs
+          ]
 
 type Vote = () -- TODO: use Vote extracted from Agda
 type NodeModel = LeiosState
@@ -48,7 +66,7 @@ initialModelState :: NodeModel
 initialModelState =
   LeiosState
     { v = ()
-    , sD = MkHSMap [(0,1)]
+    , sD = MkHSMap [(0, 1)]
     , fFDState = ()
     , ledger = []
     , toPropose = []
