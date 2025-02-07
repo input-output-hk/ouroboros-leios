@@ -136,7 +136,7 @@ data LeiosSimVizState
 
 newtype DataTransmitted = DataTransmitted
   { messagesTransmitted :: IntervalMap DiffTime Bytes
-  -- ^ the total bandwidth used by the various mini-protocol.
+  -- ^ the total bandwidth used by the various mini-protocols.
   }
 
 initDataTransmitted :: DataTransmitted
@@ -195,9 +195,21 @@ accumNodeCpuUsage ::
   CPUTask ->
   Map NodeId (IntervalMap DiffTime Int) ->
   Map NodeId (IntervalMap DiffTime Int)
-accumNodeCpuUsage (Time now) nid task =
-  Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
+accumNodeCpuUsage = accumNodeCpuUsage' id
 
+accumNodeCpuUsage' ::
+  (Num a, Ord a) =>
+  (DiffTime -> a) ->
+  Time ->
+  NodeId ->
+  CPUTask ->
+  Map NodeId (IntervalMap a Int) ->
+  Map NodeId (IntervalMap a Int)
+accumNodeCpuUsage' f (Time now') nid task =
+  Map.insertWith ILMap.union nid (ILMap.singleton (IntervalCO now (now + d)) 1)
+ where
+  now = f now'
+  d = f (cpuTaskDuration task)
 type ChainsMap = IntMap (Chain RankingBlock)
 
 accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
@@ -462,7 +474,7 @@ accumDataTransmitted msg forecast DataTransmitted{..} =
  where
   interval :: ILMap.Interval DiffTime
   interval =
-    ILMap.ClosedInterval
+    ILMap.IntervalCO
       (coerce forecast.msgSendLeadingEdge)
       (coerce forecast.msgSendTrailingEdge)
   -- could be interesting to compare to "useful" data.

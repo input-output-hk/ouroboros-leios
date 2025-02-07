@@ -2,12 +2,16 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module LeiosProtocol.Short.VizSimP2P where
@@ -17,18 +21,21 @@ import Control.Arrow ((&&&))
 import Control.Exception
 import Data.Aeson
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
-import Data.Bifunctor (second)
+import Data.Bifunctor
 import Data.Coerce
 import qualified Data.Colour.SRGB as Colour
+import Data.Fixed
 import Data.Hashable (hash)
 import qualified Data.IntMap as IMap
 import Data.IntervalMap (IntervalMap)
+import qualified Data.IntervalMap.Interval as ILMap
 import qualified Data.IntervalMap.Strict as ILMap
-import Data.List (foldl', intercalate, sortOn)
+import Data.List (foldl', group, intercalate, sort, sortOn, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe
 import Data.Monoid (Any)
+import qualified Data.Set as Set
 import Diagrams ((#))
 import qualified Diagrams.Backend.Cairo as Dia
 import qualified Diagrams.Backend.Cairo.Internal as Dia
@@ -61,7 +68,7 @@ import LeiosProtocol.Short.VizSim (
   accumChains,
   accumDataTransmitted,
   accumDiffusionLatency',
-  accumNodeCpuUsage,
+  accumNodeCpuUsage',
   examplesLeiosSimVizConfig,
   initDataTransmitted,
   leiosSimVizModel,
@@ -644,12 +651,10 @@ chartDataTransmitted LeiosModelConfig{maxBandwidthPerNode} =
           numNodes = Map.size vs.vizNodePos
           toMiB = (/ 1e6)
           maxChart = toMiB . fromIntegral $ maxBandwidthPerNode
-          toBps (ILMap.ClosedInterval s e, bytes) = realToFrac $ fromIntegral bytes / (e - s) :: Double
-          toBps _ = error "internal: non-closed-interval"
           values =
             [ (nid, [(n, "")])
             | (NodeId nid, m) <- map (second (.messagesTransmitted)) $ Map.toList vs.dataTransmittedPerNode
-            , let n = toMiB . sum . map toBps . ILMap.toList . flip ILMap.containing now $ m
+            , let n = toMiB . msgsTransmittedToBps . flip ILMap.containing now $ m
             ]
          in
           (Chart.def :: Chart.Layout Double Double)
@@ -673,6 +678,15 @@ chartDataTransmitted LeiosModelConfig{maxBandwidthPerNode} =
                 [ Chart.plotBars (Chart.def{Chart._plot_bars_values_with_labels = values})
                 ]
             }
+
+msgsTransmittedToBps :: (Real a, Fractional a) => ILMap.IntervalMap a Bytes -> Double
+msgsTransmittedToBps = sum . map toBps . ILMap.toList
+ where
+  toBps (i, bytes)
+    | d <- (ILMap.upperBound i - ILMap.lowerBound i)
+    , d > 0 =
+        realToFrac $ fromIntegral bytes / d :: Double
+    | otherwise = 0
 
 chartLinkUtilisation :: VizRender LeiosSimVizModel
 chartLinkUtilisation =
@@ -876,9 +890,10 @@ data LeiosSimState = LeiosSimState
   , ibDiffusionLatency :: !(DiffusionLatencyMap' InputBlockId InputBlockHeader)
   , ebDiffusionLatency :: !(DiffusionLatencyMap' EndorseBlockId EndorseBlock)
   , voteDiffusionLatency :: !(DiffusionLatencyMap' VoteId VoteMsg)
-  , nodeCpuUsage :: !(Map NodeId (IntervalMap DiffTime Int))
+  , nodeCpuUsage :: !(Map NodeId (IntervalMap Micro Int))
   , dataTransmittedPerNode :: !(Map NodeId DataTransmitted)
   }
+  deriving (Generic)
 
 accumLeiosSimState ::
   Time ->
@@ -943,7 +958,7 @@ accumLeiosSimState
       }
 accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) LeiosSimState{..} =
   LeiosSimState
-    { nodeCpuUsage = accumNodeCpuUsage now nid task nodeCpuUsage
+    { nodeCpuUsage = accumNodeCpuUsage' @Micro (MkFixed . round . (* 1e6)) now nid task nodeCpuUsage
     , ..
     }
 accumLeiosSimState
@@ -961,13 +976,20 @@ data LeiosData = LeiosData
   , vt_diffusion :: DiffusionData VoteId
   , rb_diffusion :: DiffusionData Int
   , stable_chain_hashes :: [Int]
-  -- , average_block_fetch_duration :: DiffTime
-  -- -- ^ for comparison with benchmark cluster measurement.
+  , cpuUseSegments :: Map.Map NodeId [(Int, Micro)]
+  -- ^ cpu usage as a step function: [(cpu#,duration)]
+  , cpuUseCdfAvg :: ![(Int, Micro)]
+  , transmittedBpsSegments :: Map.Map NodeId [(Double, Micro)]
+  -- ^ cpu usage as a step function: [(bps,duration)]
+  , transmittedBpsCdfAvg :: ![(Double, Micro)]
+  , transmittedMsgsSegments :: Map.Map NodeId [(Int, Micro)]
+  -- ^ cpu usage as a step function: [(bps,duration)]
+  , transmittedMsgsCdfAvg :: ![(Int, Micro)]
   }
   deriving (Generic, ToJSON, FromJSON)
 
 exampleSim :: Bool -> StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
-exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop fp = do
+exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop@(Time stop') fp = do
   let trace = exampleTrace2 seed cfg p2pNetwork
   let sampleModel =
         SampleModel
@@ -988,7 +1010,25 @@ exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop fp = do
       rb_diffusion = coerce $ diffusionDataFromMap p2pNodeStakes rbDiffusionLatency
       stable_chain_hashes = coerce $ stableChainHashes chains
       network = p2pNetworkToSomeTopology (fromIntegral $ Map.size p2pNodeStakes * 1000) p2pNetwork
+      (cpuUseSegments, Map.toAscList -> cpuUseCdfAvg) =
+        intervalsToSegmentsAndCdfAvg
+          Set.toList
+          (ILMap.size . fst)
+          (realToFrac stop')
+          nodeCpuUsage
       config = cfg
+      (transmittedBpsSegments, Map.toAscList -> transmittedBpsCdfAvg) =
+        intervalsToSegmentsAndCdfAvg
+          (uniformBins 20)
+          (\(im, i) -> assert (all (`ILMap.subsumes` i) $ ILMap.keys im) $ msgsTransmittedToBps . fst $ (im, i))
+          stop'
+          (Map.map (.messagesTransmitted) dataTransmittedPerNode)
+      (transmittedMsgsSegments, Map.toAscList -> transmittedMsgsCdfAvg) =
+        intervalsToSegmentsAndCdfAvg
+          Set.toList
+          (ILMap.size . fst)
+          stop'
+          (Map.map (.messagesTransmitted) dataTransmittedPerNode)
     let diffusionData = LeiosData{..}
     encodeFile fp diffusionData
     putStrLn $ "Data written to " ++ fp
@@ -1003,3 +1043,74 @@ exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop fp = do
   report tag DiffusionData{..} = do
     putStrLn $ tag ++ ": average latencies (from slot start) by percentile"
     putStrLn $ unlines $ map show $ Map.toList average_latencies
+
+-------------------------------------------------------------------------
+-- Stats helpers
+-- TODO: move to own module?
+
+coefficientOfVariability :: Floating v => v -> [(v, v)] -> v
+coefficientOfVariability total xs = stdDev / mean
+ where
+  mean = sum (map (uncurry (*)) xs) / total
+  stdDev = sqrt $ sum (map (\(x, w) -> ((x - mean) ** 2) * w) xs) / total
+
+uniformBins :: (RealFrac a, Num b) => Integer -> Set.Set a -> [b]
+uniformBins n ks = case (fst <$> Set.minView ks, fst <$> Set.maxView ks) of
+  (Just (floor -> l), Just (ceiling -> u)) ->
+    let step = (u - l) `div` n :: Integer
+     in map fromIntegral $
+          (++ [u]) . takeWhile (< u) . iterate (+ step) $
+            l
+  (_, _) -> error "impossible"
+
+-- | Takes a per node Map of interval maps, and some helper functions.
+--   Returns
+--     * per node, a step function as in-order non-overlapping
+--       segments of the input
+--     * an average of the cdfs of the above step functions: what
+--       fraction of interval length is <= a given value.
+--
+--   Generalized NodeId to `k`.
+--
+--   We use `d` or `Micro` rather than DiffTime because Double would
+--   cause spurious interval overlaps.
+intervalsToSegmentsAndCdfAvg ::
+  (Real d, Ord v, Show v) =>
+  -- | function to pick out keys for the cdf from set of segment keys.
+  (Set.Set v -> [v]) ->
+  -- | what value to measure for a given segment interval and map of intersecting ones.
+  ((ILMap.IntervalMap Micro a, ILMap.Interval Micro) -> v) ->
+  -- | upper bound of the measurement interval (lower bound assumed to be 0), used to normalize interval lengths for the cdf.
+  d ->
+  Map k (ILMap.IntervalMap d a) ->
+  (Map k [(v, Micro)], Map v Micro)
+intervalsToSegmentsAndCdfAvg _ _ _ m | Map.size m == 0 = (Map.empty, Map.empty)
+intervalsToSegmentsAndCdfAvg bins f stop dataPerNode' = (segments, avgMaps $ map pmf2cdf $ pmfs)
+ where
+  dataPerNode = Map.map (ILMap.fromList . map (first (fmap realToFrac)) . ILMap.toList) dataPerNode'
+  numNodes = Map.size dataPerNode
+  segments =
+    Map.map
+      (map (first f) . segmentILMap (realToFrac stop))
+      dataPerNode
+  segmentILMap ub im =
+    let intervals =
+          mapMaybe (fmap fst . uncons) . group . (0 :) . (++ [ub]) . takeWhile (<= ub) $ -- parallel tasks produce duplicates.
+            sort $ -- lower bounds are in-order but upper-bounds aren't.
+              concatMap (\i -> [ILMap.lowerBound i, ILMap.upperBound i]) $
+                ILMap.keys im
+     in [ ((ILMap.intersecting im i, i), ILMap.upperBound i - ILMap.lowerBound i)
+        | i <-
+            [ ILMap.IntervalCO x y
+            | (x, y) <- zip intervals (drop 1 intervals)
+            ]
+        ]
+  pmf = Map.map (/ realToFrac stop) . Map.fromListWith (+)
+  pmf2cdf pmf0 = Map.fromList $ zip (Map.keys pmf0) (scanl1 (+) $ Map.elems pmf0)
+  pmfs = map pmf . Map.elems $ segments
+  -- we sample the cdfs to have the same keys, so we can take take average pointwise.
+  sampleCdfs cdfs = map sampleCdf cdfs
+   where
+    ks = bins $ Set.unions $ map Map.keysSet cdfs
+    sampleCdf m = Map.fromList [(k, v) | k <- ks, let v = fromMaybe 0 $ snd <$> Map.lookupLE k m]
+  avgMaps = Map.map (/ fromIntegral numNodes) . Map.unionsWith (+) . sampleCdfs
