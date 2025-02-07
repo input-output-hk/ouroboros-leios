@@ -48,7 +48,7 @@ initialModelState :: NodeModel
 initialModelState =
   LeiosState
     { v = ()
-    , sD = MkHSMap []
+    , sD = MkHSMap [(0,1)]
     , fFDState = ()
     , ledger = []
     , toPropose = []
