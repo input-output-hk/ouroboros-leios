@@ -20,14 +20,14 @@ fn benchmark_check_pop(c: &mut Criterion) {
 }
 
 fn benchmark_gen_vote_persistent(c: &mut Criterion) {
-    let mut g = Gen::new(10);
+    let g = &mut Gen::new(10);
     c.bench_function("gen_vote_persistent", |b| {
         b.iter_batched(
             || {
-                let persistent = PersistentId::arbitrary(&mut g);
-                let eid = Eid::arbitrary(&mut g);
-                let m = EbHash::arbitrary(&mut g);
-                let sk = SecKey::arbitrary(&mut g);
+                let persistent = PersistentId::arbitrary(g);
+                let eid = Eid::arbitrary(g);
+                let m = EbHash::arbitrary(g);
+                let sk = SecKey::arbitrary(g);
                 (persistent, eid, m, sk)
             },
             |(persistent, eid, m, sk)| {
@@ -39,14 +39,14 @@ fn benchmark_gen_vote_persistent(c: &mut Criterion) {
 }
 
 fn benchmark_gen_vote_nonpersistent(c: &mut Criterion) {
-    let mut g = Gen::new(10);
+    let g = &mut Gen::new(10);
     c.bench_function("gen_vote_nonpersistent", |b| {
         b.iter_batched(
             || {
-                let pool = arbitrary_poolkeyhash(&mut g);
-                let eid = Eid::arbitrary(&mut g);
-                let m = EbHash::arbitrary(&mut g);
-                let sk = SecKey::arbitrary(&mut g);
+                let pool = arbitrary_poolkeyhash(g);
+                let eid = Eid::arbitrary(g);
+                let m = EbHash::arbitrary(g);
+                let sk = SecKey::arbitrary(g);
                 (pool, eid, m, sk)
             },
             |(pool, eid, m, sk)| {
@@ -58,14 +58,14 @@ fn benchmark_gen_vote_nonpersistent(c: &mut Criterion) {
 }
 
 fn benchmark_verify_vote_persistent(c: &mut Criterion) {
-    let mut g = Gen::new(10);
+    let g = &mut Gen::new(10);
     c.bench_function("verify_vote_persistent", |b| {
         b.iter_batched(
             || {
-                let persistent = PersistentId::arbitrary(&mut g);
-                let eid = Eid::arbitrary(&mut g);
-                let m = EbHash::arbitrary(&mut g);
-                let sk = SecKey::arbitrary(&mut g);
+                let persistent = PersistentId::arbitrary(g);
+                let eid = Eid::arbitrary(g);
+                let m = EbHash::arbitrary(g);
+                let sk = SecKey::arbitrary(g);
                 let vote = gen_vote_persistent(&persistent, &eid, &m, &sk);
                 (sk.pub_key(), vote)
             },
@@ -76,14 +76,14 @@ fn benchmark_verify_vote_persistent(c: &mut Criterion) {
 }
 
 fn benchmark_verify_vote_nonpersistent(c: &mut Criterion) {
-    let mut g = Gen::new(10);
+    let g = &mut Gen::new(10);
     c.bench_function("verify_vote_nonpersistent", |b| {
         b.iter_batched(
             || {
-                let pool = arbitrary_poolkeyhash(&mut g);
-                let eid = Eid::arbitrary(&mut g);
-                let m = EbHash::arbitrary(&mut g);
-                let sk = SecKey::arbitrary(&mut g);
+                let pool = arbitrary_poolkeyhash(g);
+                let eid = Eid::arbitrary(g);
+                let m = EbHash::arbitrary(g);
+                let sk = SecKey::arbitrary(g);
                 let vote = gen_vote_nonpersistent(&pool, &eid, &m, &sk);
                 (sk.pub_key(), vote)
             },
