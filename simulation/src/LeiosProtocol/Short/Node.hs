@@ -437,10 +437,19 @@ computeLedgerStateThread ::
   m ()
 computeLedgerStateThread _tracer _cfg st = forever $ do
   _readyLedgerState <- atomically $ do
+    -- TODO: this will get more costly as the base chain grows,
+    -- however it grows much more slowly than anything else.
     blocks <- readTVar st.praosState.blockFetchControllerState.blocksVar
     when (Map.null blocks) retry
-    ledgerMissing <- Map.elems . (blocks Map.\\) <$> readTVar st.ledgerStateVar
+    ledgerState <- readTVar st.ledgerStateVar
+    let ledgerMissing = Map.elems $ blocks Map.\\ ledgerState
     when (null ledgerMissing) retry
+    let ledgerEligible = flip filter ledgerMissing $ \blk ->
+          case blockPrevHash blk of
+            GenesisHash -> True
+            BlockHash prev -> prev `Map.member` ledgerState
+    when (null ledgerEligible) retry
+
     ibsNeededForEB <- readTVar st.ibsNeededForEBVar
     let readyLedgerState =
           [ (blockHash rb, LedgerState)
@@ -454,6 +463,22 @@ computeLedgerStateThread _tracer _cfg st = forever $ do
   -- TODO? trace readyLedgerState
   return ()
 
+adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
+adoptIB leiosState ib deliveryTime = do
+  -- NOTE: voting relies on delivery times for IBs
+  modifyTVar'
+    leiosState.ibDeliveryTimesVar
+    (Map.insertWith min ib.id deliveryTime)
+
+  -- TODO: likely needs optimization, although EBs also grow slowly.
+  modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete ib.id))
+
+adoptEB :: MonadSTM m => LeiosNodeState m -> EndorseBlock -> STM m ()
+adoptEB leiosState eb = do
+  ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
+  let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
+  modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
+
 dispatchValidation ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -463,34 +488,25 @@ dispatchValidation ::
   ValidationRequest m ->
   m ()
 dispatchValidation tracer cfg leiosState req =
-  atomically $ mapM_ (uncurry $ writeTMQueue leiosState.taskQueue) =<< go req
+  atomically $ queue =<< go req
  where
   queue = mapM_ (uncurry $ writeTMQueue leiosState.taskQueue)
   labelTask (tag, (f, m)) = let !task = f (show tag) in (tag, (task, m))
   valRB rb m = do
     let task prefix = cpuTask prefix cfg.leios.praos.blockValidationDelay rb
     labelTask (ValRB, (task, m))
-  valIB x deliveryTime completion =
+  valIB x@(uncurry InputBlock -> ib) deliveryTime completion =
     let
-      delay prefix = cpuTask prefix cfg.leios.delays.inputBlockValidation (uncurry InputBlock x)
+      delay prefix = cpuTask prefix cfg.leios.delays.inputBlockValidation ib
       task = atomically $ do
         completion [x]
-
-        -- NOTE: voting relies on delivery times for IBs
-        modifyTVar'
-          leiosState.ibDeliveryTimesVar
-          (Map.insertWith min (fst x).id deliveryTime)
-
-        -- TODO: likely needs optimization
-        modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete (fst x).id))
+        adoptIB leiosState ib deliveryTime
      in
       labelTask (ValIB, (delay, task >> traceEnterState [uncurry InputBlock x] EventIB))
   valEB eb completion = labelTask . (ValEB,) . (\p -> cpuTask p cfg.leios.delays.endorseBlockValidation eb,) $ do
     atomically $ do
       completion [eb]
-      ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
-      let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
-      modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
+      adoptEB leiosState eb
     traceEnterState [eb] EventEB
   valVote v completion = labelTask . (ValVote,) . (\p -> cpuTask p cfg.leios.delays.voteMsgValidation v,) $ do
     atomically $ completion [v]
@@ -554,17 +570,23 @@ generator tracer cfg st = do
     submitOne (delay, x) = withDelay delay $
       case x of
         SomeAction Generate.Base rb0 -> (GenRB,) $ do
-          rb <- atomically $ do
-            ha <- Chain.headAnchor <$> PraosNode.preferredChain st.praosState
-            let rb = fixSize cfg.leios $ fixupBlock ha rb0
+          (rb, newChain) <- atomically $ do
+            chain <- PraosNode.preferredChain st.praosState
+            let rb = fixSize cfg.leios $ fixupBlock (Chain.headAnchor chain) rb0
             addProducedBlock st.praosState.blockFetchControllerState rb
-            return rb
+            return (rb, chain :> rb)
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
+          traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
         SomeAction Generate.Propose ib -> (GenIB,) $ do
-          atomically $ modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+          now <- getCurrentTime
+          atomically $ do
+            modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+            adoptIB st ib now
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
-          atomically $ modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (RelayHeader eb.id eb.slot, eb))
+          atomically $ do
+            modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (RelayHeader eb.id eb.slot, eb))
+            adoptEB st eb
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
           atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (RelayHeader v.id v.slot, v))
@@ -576,6 +598,13 @@ mkBuffersView :: forall m. MonadSTM m => LeiosNodeConfig -> LeiosNodeState m -> 
 mkBuffersView cfg st = BuffersView{..}
  where
   newRBData = do
+    -- This gets called pretty rarely, so doesn't seem worth caching,
+    -- though it's getting more expensive as we go.
+    chain <- PraosNode.preferredChain st.praosState
+    let ebsInChain =
+          Set.fromList $
+            [ eb | rb <- Chain.chainToList chain, (eb, _) <- rb.blockBody.endorseBlocks
+            ]
     bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
     -- TODO: cache?
@@ -589,6 +618,7 @@ mkBuffersView cfg st = BuffersView{..}
     let totalVotes = fromIntegral . sum . Map.elems
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
+          guard (not $ Set.member eb.id ebsInChain)
           guard (cfg.leios.votesForCertificate <= totalVotes votes)
           return $! (eb.id,) $! mkCertificate cfg.leios votes
 

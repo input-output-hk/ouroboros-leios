@@ -64,7 +64,7 @@ logLeiosEvent nodeNames emitControl e = case e of
   LeiosEventSetup{} -> Nothing
   LeiosEventNode (LabelNode nid x) -> do
     pairs <$> logNode nid x
-  LeiosEventTcp (LabelLink from to (TcpSendMsg msg _ _)) -> do
+  LeiosEventTcp (LabelLink from to (TcpSendMsg msg forecast _)) -> do
     ps <- logMsg msg
     pure $
       pairs $
@@ -72,6 +72,7 @@ logLeiosEvent nodeNames emitControl e = case e of
           <> "sender" .= from
           <> "receipient" .= to
           <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
+          <> "sending_s" .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> ps
  where
   node nid = "node" .= nid <> "node_name" .= nodeNames Map.! nid
@@ -98,6 +99,9 @@ logLeiosEvent nodeNames emitControl e = case e of
               [ "slot" .= ib.header.slot
               , "payload_bytes" .= fromBytes ib.body.size
               , "size_bytes" .= fromBytes (messageSizeBytes ib)
+              , "rb_ref" .= case (ib.header.rankingBlock) of
+                  GenesisHash -> "genesis"
+                  BlockHash x -> show (coerce x :: Int)
               ]
           EventEB eb ->
             mconcat
@@ -129,6 +133,7 @@ logLeiosEvent nodeNames emitControl e = case e of
         , "id" .= show (coerce @_ @Int (blockHash blk))
         , "size_bytes" .= fromBytes (messageSizeBytes h + messageSizeBytes b)
         , node nid
+        , "endorsed" .= map fst b.endorseBlocks
         ]
   logPraos nid (PraosNodeEventReceived blk) =
     Just $
