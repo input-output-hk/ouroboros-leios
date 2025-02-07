@@ -2,6 +2,18 @@
 
 ## 2025-02-07
 
+### Reference implementation and benchmarking of Leios cryptography
+
+The Rust benchmarks for Leios cryptography were redesigned and throroughly revised so that they are a reference implementation for a viable realization of Leios.
+
+- Implemented the Fait Accompli sortition
+- Sortition now uses rational arithmetic instead of quad-precision floats, and is independent of machine precision
+- Quickcheck tests for all capabilities
+- Benchmarks for serialization
+- Squeezed more bytes out of the votes and certificate
+
+The package still needs documentation and a few more benchmarks.
+
 ### Formal Methods
 
 - Initial conformance testing is setup using quickcheck-dynamic with the executable spec of Short Leios as model. Next steps are conformance testing the Leios simulators
