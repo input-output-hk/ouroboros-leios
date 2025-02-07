@@ -78,7 +78,7 @@ const config: Config = {
                 },
                 { to: '/news', label: 'Latest News', position: 'right' },
                 {
-                    href: 'https://www.insightmaker.com/insight/5B3Sq5gsrcGzTD11GyZJ0u/Cardano-Throughput-v0-2',
+                    href: 'https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3',
                     label: 'Throughput Simulation',
                     position: 'right',
                 },

@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-02-07
+
+### Refresh of throughput simulator
+
+The [Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) has been updated with the latest cloud-computing cost model, synchronized with the assumptions in the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
+ 
 ## 2025-02-06
 
 ### Enhancements to online cost calculator
