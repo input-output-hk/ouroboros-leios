@@ -1,5 +1,5 @@
-use blst::*;
 use blst::min_sig::*;
+use blst::*;
 use num_bigint::{BigInt, Sign};
 use num_rational::Ratio;
 use num_traits::FromPrimitive;

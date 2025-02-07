@@ -49,12 +49,26 @@ pub fn verify_vote(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &(Signature, Signat
     result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
 }
 
+/*
 fn hash_sigs(vss: &[&(Signature, Signature)]) -> [u8; 32] {
     fn serialise_vs(vs: &(Signature, Signature)) -> Vec<u8> {
         [vs.0, vs.1].iter().flat_map(|s| s.serialize()).collect()
     }
     let msg: Vec<u8> = vss.iter().flat_map(|vs| serialise_vs(vs)).collect();
 
+    unsafe {
+        let mut out: [u8; 32] = [0; 32];
+        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
+        out
+    }
+}
+*/
+
+fn hash_sigs(sigma_eids: &[&Signature], sigma_ms: &[&Signature]) -> [u8; 32] {
+    let mut sigmas: Vec<&Signature> = Vec::new();
+    sigmas.extend(sigma_eids);
+    sigmas.extend(sigma_ms);
+    let msg: Vec<u8> = sigmas.iter().flat_map(|s| s.serialize()).collect();
     unsafe {
         let mut out: [u8; 32] = [0; 32];
         blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
@@ -78,7 +92,60 @@ fn hash_index(i: i32, h: &[u8; 32]) -> [u8; 32] {
 }
 
 pub fn gen_cert(vss: &[&(Signature, Signature)]) -> Result<(Signature, Signature), BLST_ERROR> {
-    let h: [u8; 32] = hash_sigs(vss);
+    let sigma_eids: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
+    let sigma_ms: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
+    gen_cert_fa(&sigma_eids, &sigma_ms)
+}
+
+pub fn verify_cert(
+    pks: &[&PublicKey],
+    eid: &[u8],
+    m: &[u8],
+    vss: &[&(Signature, Signature)],
+    cs: &(Signature, Signature),
+) -> bool {
+    let sigma_eids: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
+    let sigma_ms: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
+    let h: [u8; 32] = hash_sigs(&sigma_eids, &sigma_ms);
+
+    let f = |i: usize| {
+        move |point: blst_p2| {
+            let hi: [u8; 32] = hash_index(i as i32, &h);
+            let mut point1: blst_p2 = blst_p2::default();
+            unsafe {
+                blst_p2_mult(&mut point1, &point, hi.as_ptr(), 8 * h.len());
+            }
+            point1
+        }
+    };
+
+    let pks1: Vec<PublicKey> = pks
+        .iter()
+        .enumerate()
+        .map(|(i, pk)| pk_transform(&f(i), pk))
+        .collect();
+    let pk1_refs: Vec<&PublicKey> = pks1.iter().collect();
+
+    let result_pk = AggregatePublicKey::aggregate(pks, true);
+    let result_pk1 = AggregatePublicKey::aggregate(&pk1_refs, true);
+
+    match (result_pk, result_pk1) {
+        (Ok(pk), Ok(pk1)) => {
+            let result_eid =
+                cs.0.verify(true, &EMPTY, DST, eid, &pk1.to_public_key(), true);
+            let result_m = cs.1.verify(true, m, DST, eid, &pk.to_public_key(), true);
+            result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
+        }
+        _ => false,
+    }
+}
+
+pub fn gen_cert_fa(
+    sigma_eids: &[&Signature],
+    sigma_ms: &[&Signature],
+) -> Result<(Signature, Signature), BLST_ERROR> {
+    let h: [u8; 32] = hash_sigs(sigma_eids, sigma_ms);
+
     let f = |i: usize| {
         move |point: blst_p1| {
             let hi: [u8; 32] = hash_index(i as i32, &h);
@@ -89,17 +156,14 @@ pub fn gen_cert(vss: &[&(Signature, Signature)]) -> Result<(Signature, Signature
             point1
         }
     };
-
-    let sigmas_eid: Vec<Signature> = vss
+    let sigma_eis_xfmd: Vec<Signature> = sigma_eids
         .iter()
         .enumerate()
-        .map(|(i, vs)| sig_transform(&f(i), &vs.0))
+        .map(|(i, sigma_eid)| sig_transform(&f(i), sigma_eid))
         .collect();
-    let sigma_eid_refs: Vec<&Signature> = sigmas_eid.iter().collect();
-    let result_eid = AggregateSignature::aggregate(&sigma_eid_refs, true);
-
-    let sigmas_m: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
-    let result_m = AggregateSignature::aggregate(&sigmas_m, true);
+    let sigma_eid_xfmd_refs: Vec<&Signature> = sigma_eis_xfmd.iter().collect();
+    let result_eid = AggregateSignature::aggregate(&sigma_eid_xfmd_refs, true);
+    let result_m = AggregateSignature::aggregate(sigma_ms, true);
 
     match (result_eid, result_m) {
         (Ok(sig_eid), Ok(sig_m)) => Ok((sig_eid.to_signature(), sig_m.to_signature())),
@@ -108,7 +172,8 @@ pub fn gen_cert(vss: &[&(Signature, Signature)]) -> Result<(Signature, Signature
     }
 }
 
-pub fn verify_cert(
+/*
+pub fn verify_cert_fa(
     pks: &[&PublicKey],
     eid: &[u8],
     m: &[u8],
@@ -146,3 +211,4 @@ pub fn verify_cert(
         _ => false,
     }
 }
+*/

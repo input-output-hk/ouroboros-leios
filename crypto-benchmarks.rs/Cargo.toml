@@ -24,6 +24,10 @@ name = "serialization_bench"
 harness = false
 
 [[bench]]
+name = "fait_accompli_bench"
+harness = false
+
+[[bench]]
 name = "vote_bench"
 harness = false
 
@@ -33,8 +37,4 @@ harness = false
 
 [[bench]]
 name = "vrf_bench"
-harness = false
-
-[[bench]]
-name = "fait_accompli_bench"
 harness = false

@@ -3,6 +3,7 @@ use num_bigint::BigInt;
 use num_rational::Ratio;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::hash::{Hash, Hasher};
 
 use crate::bls_util;
 use crate::bls_vote;
@@ -59,6 +60,12 @@ impl Arbitrary for SecKey {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct PubKey(pub(crate) PublicKey);
 
+impl Hash for PubKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(&self.0.to_bytes(), state);
+    }
+}
+
 impl Serialize for PubKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -93,7 +100,7 @@ pub struct Sig(pub(crate) Signature);
 
 impl Sig {
     pub fn to_rational(&self) -> Ratio<BigInt> {
-      bls_util::sig_to_rational(&self.0)
+        bls_util::sig_to_rational(&self.0)
     }
 }
 impl Serialize for Sig {

@@ -1,9 +1,12 @@
-use num_traits::{FromPrimitive, One, Zero, Signed};
 use num_bigint::BigInt;
 use num_rational::Ratio;
+use num_traits::{FromPrimitive, One, Signed, Zero};
 
 pub fn ln_1_minus(f: &Ratio<BigInt>) -> Ratio<BigInt> {
-    let epsilon = Ratio::new(BigInt::one(), BigInt::from_i128(10000000000000000000000000000000000i128).unwrap());
+    let epsilon = Ratio::new(
+        BigInt::one(),
+        BigInt::from_i128(10000000000000000000000000000000000i128).unwrap(),
+    );
     let zero = Ratio::from_integer(BigInt::zero());
     let one = Ratio::from_integer(BigInt::one());
     let mut acc = zero;
@@ -44,7 +47,10 @@ pub fn leader_check(ln1f: &Ratio<BigInt>, s: &Ratio<BigInt>, p: &Ratio<BigInt>) 
 }
 
 fn exp(x: &Ratio<BigInt>) -> Ratio<BigInt> {
-    let epsilon = Ratio::new(BigInt::one(), BigInt::from_i128(10000000000000000000000000000000000i128).unwrap());
+    let epsilon = Ratio::new(
+        BigInt::one(),
+        BigInt::from_i128(10000000000000000000000000000000000i128).unwrap(),
+    );
     let one = Ratio::from_integer(BigInt::one());
     let mut prev = one.clone();
     let mut acc = prev.clone();
@@ -64,7 +70,7 @@ fn exp(x: &Ratio<BigInt>) -> Ratio<BigInt> {
 
 pub fn voter_check(votes: usize, s: &Ratio<BigInt>, p: &Ratio<BigInt>) -> usize {
     let x = Ratio::from_integer(BigInt::from_usize(votes).unwrap()) * s;
-    let v = p / exp(&(- x.clone()));
+    let v = p / exp(&(-x.clone()));
     let mut i: usize = 0;
     let mut prev = Ratio::from_integer(BigInt::one());
     let mut acc = prev.clone();

@@ -17,7 +17,7 @@ pub fn arbitrary_coin(g: &mut Gen) -> Coin {
     u64::arbitrary(g) % 2000000000000
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct Eid(pub(crate) Slot);
 
 impl Eid {
@@ -51,7 +51,7 @@ impl Arbitrary for Eid {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct EbHash(pub(crate) Blake2b256);
 
 impl EbHash {

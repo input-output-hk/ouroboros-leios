@@ -73,13 +73,19 @@ fn main() {
         .for_each(|(pool, weight)| println!("  {} : {}", pool, weight));
     println!("Rho: {}", fa.rho);
 
+    println!();
     let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
     let ln1f = ln_1_minus(&f);
     println!("ln(1 - {}) = {}", f.clone(), ln1f.clone());
     let s = Ratio::new(BigInt::one(), BigInt::from_i16(1000).unwrap());
-    let p0 = Ratio::new(BigInt::from_i128(512919789090i128).unwrap(), BigInt::from_i128(10000000000000000i128).unwrap());
-    let p1 = Ratio::new(BigInt::from_i128(512919789091i128).unwrap(), BigInt::from_i128(10000000000000000i128).unwrap());
+    let p0 = Ratio::new(
+        BigInt::from_i128(512919789090i128).unwrap(),
+        BigInt::from_i128(10000000000000000i128).unwrap(),
+    );
+    let p1 = Ratio::new(
+        BigInt::from_i128(512919789091i128).unwrap(),
+        BigInt::from_i128(10000000000000000i128).unwrap(),
+    );
     println!("{}", leader_check(&ln1f, &s, &p0));
     println!("{}", leader_check(&ln1f, &s, &p1));
-
 }
