@@ -2,7 +2,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use num_traits::{FromPrimitive, One};
 use num_bigint::BigInt;
 use num_rational::Ratio;
-use rustc_apfloat::ieee::Quad;
 
 use leios_crypto_benchmarks::sortition::*;
 
@@ -20,10 +19,10 @@ fn benchmark_rb(c: &mut Criterion) {
 }
 
 fn benchmark_voter(c: &mut Criterion) {
-    let votes: Quad = into_quad(500.0);
-    let s: Quad = into_quad(0.002);
-    let p: Quad = into_quad(0.999);
-    c.bench_function("Votes", |b| b.iter(|| voter_check(votes, s, p)));
+    let votes : usize = 500;
+    let s = Ratio::new(BigInt::one(), BigInt::from_i16(500).unwrap());
+    let p = Ratio::new(BigInt::from_i16(999).unwrap(), BigInt::from_i16(1000).unwrap());
+    c.bench_function("IB/EB/vote sortition", |b| b.iter(|| voter_check(votes, &s, &p)));
 }
 
 criterion_group!(
