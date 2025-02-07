@@ -49,6 +49,7 @@ instance Pretty InputBlock where
 
 instance FromJSON EndorserBlock
 instance ToJSON EndorserBlock
+
 instance Pretty EndorserBlock where
   pPrint (EndorserBlock s p ibs) =
     hang "EndorserBlock" 2 $

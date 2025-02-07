@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -12,7 +13,10 @@ module Leios.Conformance.Test where
 import Data.Maybe (isJust)
 import Test.QuickCheck (
   Arbitrary (..),
+  Gen,
+  chooseInteger,
   frequency,
+  suchThat,
  )
 import Test.QuickCheck.DynamicLogic (DynLogicModel)
 import Test.QuickCheck.StateModel (
@@ -38,6 +42,7 @@ import Leios.Conformance.Model (
   IBBody (..),
   IBHeader (..),
   InputBlock (..),
+  LeiosState (..),
   NodeModel (..),
   Vote (..),
   initialModelState,
@@ -68,8 +73,17 @@ instance Pretty EnvAction where
   pPrint (NewEB eb) = "NewEB" <+> pPrint eb
   pPrint (NewVote v) = "NewVote" <+> pPrint v
 
+genPositiveInteger :: Gen Integer
+genPositiveInteger = abs <$> arbitrary
+
+genSlot :: Gen Integer
+genSlot = genPositiveInteger
+
+genProducer :: Gen Integer
+genProducer = chooseInteger (0, 1) -- TODO: Only two parties for now
+
 instance Arbitrary IBHeader where
-  arbitrary = IBHeader <$> arbitrary <*> arbitrary
+  arbitrary = IBHeader <$> genSlot <*> genProducer
 
 instance Arbitrary IBBody where
   arbitrary = IBBody <$> arbitrary
@@ -78,7 +92,7 @@ instance Arbitrary InputBlock where
   arbitrary = InputBlock <$> arbitrary <*> arbitrary
 
 instance Arbitrary EndorserBlock where
-  arbitrary = EndorserBlock <$> arbitrary <*> arbitrary <*> arbitrary
+  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> arbitrary
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
@@ -90,7 +104,7 @@ instance StateModel NetworkModel where
       , initialized = True
       }
 
-  arbitraryAction _ _ =
+  arbitraryAction _ NetworkModel{nodeModel = LeiosState{..}} = do
     fmap (Some . Step) . frequency $
       [(1, pure Tick)]
         ++ fmap (1,) [NewIB <$> arbitrary]
