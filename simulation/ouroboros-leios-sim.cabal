@@ -191,7 +191,9 @@ test-suite ols-test
   hs-source-dirs: test
   main-is:        Main.hs
   build-depends:
+    , aeson
     , base
+    , data-default
     , directory
     , fgl
     , fgl-arbitrary
@@ -202,7 +204,9 @@ test-suite ols-test
     , tasty-hunit
     , tasty-quickcheck
     , text
+    , yaml
   other-modules:
     Paths_ouroboros_leios_sim
     Test.Topology
+    Test.Config
   default-language: Haskell2010

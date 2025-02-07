@@ -87,7 +87,6 @@ data Config = Config
   , voteGenerationCpuTimeMsPerIb :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
-  , voteOneEbPerVrfWin :: Bool
   , voteBundleSizeBytesConstant :: SizeBytes
   , voteBundleSizeBytesPerEb :: SizeBytes
   , voteDiffusionStrategy :: DiffusionStrategy
@@ -119,7 +118,7 @@ instance Default Config where
       , rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant = 50.0
       , rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte = 0.0005
       , rbBodyLegacyPraosPayloadAvgSizeBytes = 0
-      , ibGenerationProbability = 0.5
+      , ibGenerationProbability = 5
       , ibGenerationCpuTimeMs = 300.0
       , ibHeadSizeBytes = 32
       , ibHeadValidationCpuTimeMs = 1.0
@@ -139,7 +138,6 @@ instance Default Config where
       , voteGenerationCpuTimeMsPerIb = 1.0
       , voteValidationCpuTimeMs = 3.0
       , voteThreshold = 150
-      , voteOneEbPerVrfWin = False
       , voteBundleSizeBytesConstant = 32
       , voteBundleSizeBytesPerEb = 32
       , voteDiffusionStrategy = PeerOrder
@@ -192,7 +190,6 @@ configToKVsWith getter cfg =
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
-    , get @"voteOneEbPerVrfWin" getter cfg
     , get @"voteBundleSizeBytesConstant" getter cfg
     , get @"voteBundleSizeBytesPerEb" getter cfg
     , get @"certGenerationCpuTimeMsConstant" getter cfg
@@ -257,7 +254,6 @@ instance FromJSON Config where
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
-    voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
     voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
     voteDiffusionStrategy <- parseFieldOrDefault @Config @"voteDiffusionStrategy" obj
