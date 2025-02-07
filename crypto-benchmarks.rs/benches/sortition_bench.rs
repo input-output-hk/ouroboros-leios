@@ -8,28 +8,15 @@ use leios_crypto_benchmarks::sortition::*;
 
 fn benchmark_log(c: &mut Criterion) {
     let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
-    c.bench_function("log (1 - f)", |b| b.iter(|| ln_1_minus(f.clone())));
+    c.bench_function("log (1 - f)", |b| b.iter(|| ln_1_minus(&f)));
 }
 
 fn benchmark_rb(c: &mut Criterion) {
-    let f: Quad = into_quad(0.05);
-    let s: Quad = into_quad(0.002);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.05_f64).powf(0.0001_f64));
-    c.bench_function("RB leadership", |b| b.iter(|| leader_check(f, s, p)));
-}
-
-fn benchmark_ib(c: &mut Criterion) {
-    let f: Quad = into_quad(0.90);
-    let s: Quad = into_quad(0.002);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.90_f64).powf(0.002_f64));
-    c.bench_function("IB leadership", |b| b.iter(|| leader_check(f, s, p)));
-}
-
-fn benchmark_eb(c: &mut Criterion) {
-    let f: Quad = into_quad(0.75);
-    let s: Quad = into_quad(0.02);
-    let p: Quad = into_quad(1.0 - (1.0 - 0.75_f64).powf(0.002_f64));
-    c.bench_function("EB leadership", |b| b.iter(|| leader_check(f, s, p)));
+    let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
+    let ln1f = ln_1_minus(&f);
+    let s = Ratio::new(BigInt::one(), BigInt::from_i16(1000).unwrap());
+    let p = Ratio::new(BigInt::from_i128(512919789090i128).unwrap(), BigInt::from_i128(10000000000000000i128).unwrap());
+    c.bench_function("RB leadership", |b| b.iter(|| leader_check(&ln1f, &s, &p)));
 }
 
 fn benchmark_voter(c: &mut Criterion) {
@@ -43,8 +30,6 @@ criterion_group!(
     benches,
     benchmark_log,
     benchmark_rb,
-    benchmark_ib,
-    benchmark_eb,
     benchmark_voter
 );
 criterion_main!(benches);
