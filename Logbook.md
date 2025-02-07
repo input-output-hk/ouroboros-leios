@@ -2,6 +2,11 @@
 
 ## 2025-02-07
 
+### Formal Methods
+
+- Initial conformance testing is setup using quickcheck-dynamic with the executable spec of Short Leios as model. Next steps are conformance testing the Leios simulators
+- Performance improvements of the proofs in the executable spec module
+
 ### Refresh of throughput simulator
 
 The [Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) has been updated with the latest cloud-computing cost model, synchronized with the assumptions in the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
