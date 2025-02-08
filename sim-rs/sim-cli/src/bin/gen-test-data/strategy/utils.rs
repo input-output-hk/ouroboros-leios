@@ -64,6 +64,7 @@ impl GraphBuilder {
             latency_between_locations(loc1, loc2, 1.)
                 .unwrap()
                 .to_duration()
+                .max(Duration::from_millis(1))
         });
         self.links.push(RawLinkConfig {
             node: self.nodes.get(node).unwrap().name.clone(),
