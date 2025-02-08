@@ -51,6 +51,10 @@ impl Arbitrary for Vote {
     }
 }
 
+pub fn gen_sigma_eid(eid: &Eid, sk: &SecKey) -> Sig {
+    Sig(bls_vote::gen_sigma_eid(&sk.0, &eid.bytes()))
+}
+
 pub fn gen_vote_persistent(peristent: &PersistentId, eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
     let sigma_m = bls_vote::gen_sig(&sk.0, &eid.bytes(), &m.bytes());
     Vote::Persistent {

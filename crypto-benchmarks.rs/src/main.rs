@@ -1,91 +1,229 @@
+use clap::{Parser, Subcommand};
+use hex::ToHex;
 use num_bigint::BigInt;
 use num_rational::Ratio;
-use num_traits::{FromPrimitive, One};
-use quickcheck::Gen;
-use std::collections::BTreeMap;
+use num_traits::FromPrimitive;
+use quickcheck::{Arbitrary,Gen};
+use serde_cbor;
+use std::io::{Error, ErrorKind};
+use std::path::PathBuf;
+use std::process;
 
-use leios_crypto_benchmarks::fait_accompli::*;
+use leios_crypto_benchmarks::key::*;
 use leios_crypto_benchmarks::primitive::*;
 use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::vote::*;
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    name: Option<String>,
+    #[arg(long)]
+    verbose: bool,
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    GenEid,
+    GenEbHash,
+    GenPoolKeyHash,
+    GenKey {
+        #[arg(long)]
+        sec_file: PathBuf,
+        #[arg(long)]
+        pub_file: PathBuf,
+        #[arg(long)]
+        pop_file: PathBuf,
+    },
+    RegisterKey {
+        #[arg(long)]
+        pool: PoolKeyhash,
+        #[arg(long)]
+        pub_file: PathBuf,
+        #[arg(long)]
+        pop_file: PathBuf,
+        #[arg(long)]
+        reg_file: PathBuf,
+    },
+    CheckPop {
+        #[arg(long)]
+        pub_file: PathBuf,
+        #[arg(long)]
+        pop_file: PathBuf,
+    },
+    SignMessage {
+        #[arg(long)]
+        sec_file: PathBuf,
+        #[arg(long)]
+        dst: String,
+        #[arg(long)]
+        msg_file: PathBuf,
+        #[arg(long)]
+        sig_file: PathBuf,
+    },
+    VerifyMessage {
+        #[arg(long)]
+        pub_file: PathBuf,
+        #[arg(long)]
+        dst: String,
+        #[arg(long)]
+        msg_file: PathBuf,
+        #[arg(long)]
+        sig_file: PathBuf,
+    },
+    CountVotes {
+        #[arg(long)]
+        sec_file: PathBuf,
+        #[arg(long, value_parser=Eid::parse)]
+        eid: Eid,
+        #[arg(long)]
+        pool_stake: Coin,
+        #[arg(long)]
+        total_stake: Coin,
+        #[arg(long)]
+        voters: usize,
+    },
+      CastVote {
+      #[arg(long)]
+      sec_file: PathBuf,
+      #[arg(long)]
+      pool: PoolKeyhash,
+      #[arg(long, value_parser=Eid::parse)]
+      eid: Eid,
+      #[arg(long, value_parser=EbHash::parse)]
+      eb_hash: EbHash,
+      #[arg(long)]
+      vote_file: PathBuf,
+    },
+    VerifyVote {
+      #[arg(long)]
+      pub_file: PathBuf,
+      #[arg(long)]
+      vote_file: PathBuf,
+    },
+}
+
 
 fn main() {
-    let g = &mut Gen::new(10);
 
-    let mut stakes: BTreeMap<PoolKeyhash, Coin> = BTreeMap::new();
-    for i in 1..10 {
-        let pool = PoolKeyhash::from([
-            (i >> 8) as u8,
-            (i & 0xFF) as u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-            0u8,
-        ]);
-        stakes.insert(pool, arbitrary_coin(g));
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Some(Commands::GenEid{}) => {
+            let g = &mut Gen::new(10);
+            let eid = Eid::arbitrary(g);
+            println!("{}", eid.0);
+          }
+          Some(Commands::GenEbHash{}) => {
+              let g = &mut Gen::new(10);
+              let ebhash = EbHash::arbitrary(g);
+              println!("{}", ebhash.encode_hex::<String>());
+          }
+          Some(Commands::GenPoolKeyHash{}) => {
+            let g = &mut Gen::new(10);
+            let pool = arbitrary_poolkeyhash(g);
+            println!("{}", pool.encode_hex::<String>());
+          }
+          Some(Commands::GenKey {sec_file, pub_file, pop_file}) => {
+            let (sec_key, pub_key, proof) = key_gen();
+            write_cbor(sec_file, &sec_key).unwrap();
+            write_cbor(pub_file, &pub_key).unwrap();
+            write_cbor(pop_file, &proof).unwrap();
+        }
+        Some(Commands::RegisterKey { pool, pub_file, pop_file, reg_file }) => {
+            let pub_key: PubKey = read_cbor(pub_file).unwrap();
+            let proof: PoP = read_cbor(pop_file).unwrap();
+            let reg = Reg {pool: *pool, mvk: pub_key, mu: proof, kes_sig: KesSig::null()};
+            write_cbor(reg_file, &reg).unwrap();
+        }
+        Some(Commands::CheckPop { pub_file, pop_file }) => {
+            let pub_key: PubKey = read_cbor(pub_file).unwrap();
+            let proof: PoP = read_cbor(pop_file).unwrap();
+            let result = check_pop(&pub_key, &proof);
+            if cli.verbose {
+                if result {
+                    println!("Proof of possesion verified.");
+                } else {
+                    println!("Invalid proof of possession.");
+                }
+            }
+            process::exit(if result {0} else {-1});
+        }
+        Some(Commands::SignMessage { sec_file, dst, msg_file, sig_file }) => {
+            let sec_key: SecKey = read_cbor(sec_file).unwrap();
+            let msg: Vec<u8> = std::fs::read(msg_file).unwrap();
+            let sig = sign_message(&sec_key, dst.as_bytes(), &msg);
+            write_cbor(sig_file, &sig).unwrap();
+        }
+        Some(Commands::VerifyMessage { pub_file, dst, msg_file, sig_file }) => {
+            let pub_key: PubKey = read_cbor(pub_file).unwrap();
+            let msg: Vec<u8> = std::fs::read(msg_file).unwrap();
+            let sig : Sig = read_cbor(sig_file).unwrap();
+            let result = verify_message(&pub_key, dst.as_bytes(), &msg, &sig);
+            if cli.verbose {
+                if result {
+                    println!("Signature verified.");
+                } else {
+                    println!("Invalid signature.");
+                }
+            }
+            process::exit(if result {0} else {-1});
+        }
+        Some(Commands::CountVotes { sec_file, eid, pool_stake, total_stake, voters }) => {
+           let sec_key: SecKey = read_cbor(sec_file).unwrap();
+           let sig = gen_sigma_eid(eid, &sec_key);
+           let p = sig.to_rational();
+           let s = Ratio::new(BigInt::from_u64(*pool_stake).unwrap(), BigInt::from_u64(*total_stake).unwrap());
+           let votes = voter_check(*voters, &s, &p);
+           if cli.verbose {
+            eprintln!("Stake fraction: {}", s);
+            eprintln!("Probability: {}", p);
+            eprintln!("Vote fraction: {}/{}", votes, voters);
+        }
+           println!("{}", votes);
+        }
+        Some(Commands::CastVote { sec_file, pool, eid, eb_hash, vote_file }) => {
+            let sec_key: SecKey = read_cbor(sec_file).unwrap();
+            let vote: Vote = gen_vote_nonpersistent(pool, eid, eb_hash, &sec_key);
+            write_cbor(vote_file, &vote).unwrap();
+        }   
+        Some(Commands::VerifyVote { pub_file, vote_file }) => {
+            let pub_key: PubKey = read_cbor(pub_file).unwrap();
+            let vote: Vote = read_cbor(vote_file).unwrap();
+            let result = verify_vote(&pub_key, &vote);
+            if cli.verbose {
+                if result {
+                    println!("Vote verified.");
+                } else {
+                    println!("Invalid vote.");
+                }
+            }
+            process::exit(if result {0} else {-1});
+        }
+        None => {}
     }
-    /*
-    stakes.insert(arbitrary_poolkeyhash(g), 10);
-    stakes.insert(arbitrary_poolkeyhash(g), 40);
-    stakes.insert(arbitrary_poolkeyhash(g), 50);
-    stakes.insert(arbitrary_poolkeyhash(g), 100);
-    stakes.insert(arbitrary_poolkeyhash(g), 100);
-    stakes.insert(arbitrary_poolkeyhash(g), 200);
-    stakes.insert(arbitrary_poolkeyhash(g), 500);
-    stakes.insert(arbitrary_poolkeyhash(g), 750);
-    */
-    println!();
-    println!("Stake");
-    stakes
-        .iter()
-        .for_each(|(pool, stake)| println!("  {} : {}", pool, stake));
 
-    println!();
-    let fa = fait_accompli(&stakes, 5);
-    println!("Persistent: {}", fa.n_persistent);
-    fa.persistent
-        .iter()
-        .for_each(|(pool, weight)| println!("  {} : {}", pool, weight));
-    println!("Non-persistent: {}", fa.n_nonpersistent);
-    fa.nonpersistent
-        .iter()
-        .for_each(|(pool, weight)| println!("  {} : {}", pool, weight));
-    println!("Rho: {}", fa.rho);
+}
 
-    println!();
-    let f = Ratio::new(BigInt::one(), BigInt::from_i16(20).unwrap());
-    let ln1f = ln_1_minus(&f);
-    println!("ln(1 - {}) = {}", f.clone(), ln1f.clone());
-    let s = Ratio::new(BigInt::one(), BigInt::from_i16(1000).unwrap());
-    let p0 = Ratio::new(
-        BigInt::from_i128(512919789090i128).unwrap(),
-        BigInt::from_i128(10000000000000000i128).unwrap(),
-    );
-    let p1 = Ratio::new(
-        BigInt::from_i128(512919789091i128).unwrap(),
-        BigInt::from_i128(10000000000000000i128).unwrap(),
-    );
-    println!("{}", leader_check(&ln1f, &s, &p0));
-    println!("{}", leader_check(&ln1f, &s, &p1));
+fn write_cbor<A>(path: &PathBuf, item: &A) -> Result<(), Error>
+where
+    A: serde::Serialize,
+{
+    let cbor =
+      serde_cbor::to_vec(&item)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    std::fs::write(path, cbor)
+}
+
+fn read_cbor<A>(path: &PathBuf) -> Result<A, Error>
+where
+    A: serde::de::DeserializeOwned,
+{
+    let cbor = std::fs::read(path)?;
+    let item: A =
+      serde_cbor::from_slice(&cbor)
+      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    Ok(item)
 }

@@ -1,4 +1,5 @@
 use blst::min_sig::*;
+use blst::BLST_ERROR;
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use quickcheck::{Arbitrary, Gen};
@@ -192,4 +193,13 @@ pub fn key_gen() -> (SecKey, PubKey, PoP) {
 
 pub fn check_pop(mvk: &PubKey, mu: &PoP) -> bool {
     bls_vote::check_pop(&mvk.0, &mu.mu1.0, &mu.mu2.0)
+}
+
+pub fn sign_message(sk: &SecKey, dst: &[u8], msg: &[u8]) -> Sig {
+  Sig(sk.0.sign(msg, dst, &[]))
+}
+
+pub fn verify_message(pk: &PubKey, dst: &[u8], msg: &[u8], sig: &Sig) -> bool {
+    let result = sig.0.verify(true, msg, dst, &[], &pk.0, true);
+    result == BLST_ERROR::BLST_SUCCESS
 }

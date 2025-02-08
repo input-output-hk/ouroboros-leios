@@ -39,6 +39,10 @@ pub fn verify_sig(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &Signature) -> bool 
     result_m == BLST_ERROR::BLST_SUCCESS
 }
 
+pub fn gen_sigma_eid(sk: &SecretKey, eid: &[u8]) -> Signature {
+    sk.sign(&EMPTY, DST, eid)
+}
+
 pub fn gen_vote(sk: &SecretKey, eid: &[u8], m: &[u8]) -> (Signature, Signature) {
     (sk.sign(&EMPTY, DST, eid), sk.sign(m, DST, eid))
 }

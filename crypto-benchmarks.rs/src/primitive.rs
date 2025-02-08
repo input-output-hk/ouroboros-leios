@@ -1,3 +1,4 @@
+use hex::{FromHex,ToHex};
 use pallas::ledger::primitives::{byron::Blake2b256, Hash};
 use pallas::ledger::traverse::time::Slot;
 use quickcheck::{Arbitrary, Gen};
@@ -18,12 +19,20 @@ pub fn arbitrary_coin(g: &mut Gen) -> Coin {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-pub struct Eid(pub(crate) Slot);
+pub struct Eid(pub Slot);
 
 impl Eid {
-    pub fn bytes(&self) -> [u8; 8] {
+
+pub fn parse(s: &str) -> Result<Self, String> {
+    let value = s.parse::<u64>()
+      .map_err(|e| format!("Invalid Eid: {}", e))?;
+    Ok(Eid(value))
+}
+
+pub fn bytes(&self) -> [u8; 8] {
         u64::to_be_bytes(self.0)
     }
+
 }
 
 impl Serialize for Eid {
@@ -55,9 +64,31 @@ impl Arbitrary for Eid {
 pub struct EbHash(pub(crate) Blake2b256);
 
 impl EbHash {
+
     pub fn bytes(&self) -> [u8; 32] {
         self.0.as_slice().try_into().unwrap()
     }
+
+    pub fn parse(s: &str) -> Result<Self, String> {
+        let bytes = Vec::<u8>::from_hex(s)
+          .map_err(|e| format!("Invalid hex bytes: {}", e))?;
+        if bytes.len()!= 32 {
+            return Err("Incorrect byte length: must be 32 bytes".to_string());
+        }
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+        Ok(EbHash(Hash::new(array)))
+    }
+
+}
+
+impl ToHex for EbHash {
+ fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
+     self.0.encode_hex()
+ }
+ fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
+     self.0.encode_hex_upper()
+ }
 }
 
 impl Serialize for EbHash {
@@ -88,6 +119,11 @@ impl Arbitrary for EbHash {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct KesSig(pub(crate) [u8; 448]);
 
+impl KesSig {
+    pub fn null() -> Self {
+        KesSig([0; 448])
+    }
+}
 impl Serialize for KesSig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
