@@ -22,6 +22,11 @@ The package still needs documentation and a few more benchmarks.
 ### Refresh of throughput simulator
 
 The [Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) has been updated with the latest cloud-computing cost model, synchronized with the assumptions in the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
+
+### Rust simulation
+
+- Minor fixes to new graph generation strategy
+- Planned out a roadmap for visualization work; next steps will be to show more about the lifecycle of Leios transactions
  
 ## 2025-02-06
 
