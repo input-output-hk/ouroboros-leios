@@ -9,3 +9,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 indexmap = { version = "2.1.0", features = ["serde"] }
 delta_q = { path = "../delta_q" }
+terminal_size = "0.4.1"
+textplots = "0.8.6"

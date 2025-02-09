@@ -1,6 +1,8 @@
-use crate::models::{Node, Topology};
+use crate::models::{Latency, Node, Topology};
 use delta_q::CDF;
 use indexmap::IndexMap;
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub struct NetworkStats {
@@ -11,11 +13,11 @@ pub struct NetworkStats {
     pub avg_connections: f64,
     pub clustering_coefficient: f64,
     pub network_diameter: usize,
-    pub avg_latency_ms: f64,
-    pub max_latency_ms: f64,
+    pub avg_latency_ms: Latency,
+    pub max_latency_ms: Latency,
     pub bidirectional_connections: usize,
     pub asymmetry_ratio: f64,
-    pub stake_weighted_latency_ms: f64,
+    pub stake_weighted_latency_ms: Latency,
     pub critical_nodes: Vec<StakeIsolation>,
 }
 
@@ -96,15 +98,15 @@ fn calculate_network_diameter(topology: &Topology) -> usize {
     max_distance
 }
 
-fn calculate_latency_stats(topology: &Topology) -> (f64, f64) {
-    let mut total_latency = 0.0;
-    let mut max_latency = 0.0;
+fn calculate_latency_stats(topology: &Topology) -> (Latency, Latency) {
+    let mut total_latency = Latency::zero();
+    let mut max_latency = Latency::zero();
     let mut connection_count = 0;
 
     for node in topology.nodes.values() {
         for producer in node.producers.values() {
             total_latency += producer.latency_ms;
-            max_latency = f64::max(max_latency, producer.latency_ms);
+            max_latency = max_latency.max(producer.latency_ms);
             connection_count += 1;
         }
     }
@@ -112,14 +114,14 @@ fn calculate_latency_stats(topology: &Topology) -> (f64, f64) {
     let avg_latency = if connection_count > 0 {
         total_latency / connection_count as f64
     } else {
-        0.0
+        Latency::zero()
     };
 
     (avg_latency, max_latency)
 }
 
-fn calculate_stake_weighted_latency(topology: &Topology) -> f64 {
-    let mut weighted_sum = 0.0;
+fn calculate_stake_weighted_latency(topology: &Topology) -> Latency {
+    let mut weighted_sum = Latency::zero();
     let mut weight_sum = 0.0;
 
     for (_source_name, source) in &topology.nodes {
@@ -134,7 +136,7 @@ fn calculate_stake_weighted_latency(topology: &Topology) -> f64 {
     if weight_sum > 0.0 {
         weighted_sum / weight_sum
     } else {
-        0.0
+        Latency::zero()
     }
 }
 
@@ -265,7 +267,7 @@ pub fn analyze_network_stats(topology: &Topology) -> NetworkStats {
 #[derive(Debug)]
 pub struct HopStats {
     pub hop_number: usize,
-    pub latencies: Vec<f64>,
+    pub latencies: Vec<Latency>,
 }
 
 pub struct ReversedTopology {
@@ -319,7 +321,7 @@ pub fn analyze_hop_stats(topology: &ReversedTopology, start_node: &str) -> Vec<H
     // Add hop 0 with just the start node (0 latency)
     hop_stats.push(HopStats {
         hop_number: 0,
-        latencies: vec![0.0],
+        latencies: vec![Latency::zero()],
     });
 
     let mut current_hop = 0;
@@ -361,6 +363,60 @@ pub fn analyze_hop_stats(topology: &ReversedTopology, start_node: &str) -> Vec<H
     hop_stats
 }
 
+pub struct ShortestPathLink {
+    pub node: String,
+    pub latency: Latency,
+    pub total: Latency,
+}
+
+pub fn shortest_paths(
+    topology: &ReversedTopology,
+    start_node: &str,
+) -> HashMap<String, ShortestPathLink> {
+    // Min-heap to select the node with the smallest cumulative latency
+    let mut heap = BinaryHeap::new();
+    // Map to keep track of the shortest known distances to each node
+    let mut distances = HashMap::new();
+    // Map to store the shortest path links
+    let mut shortest_paths = HashMap::new();
+
+    // Initialize the distance to the start node as 0 and push it to the heap
+    distances.insert(start_node.to_string(), Latency::zero());
+    heap.push(Reverse((Latency::zero(), start_node.to_string())));
+
+    while let Some(Reverse((current_dist, current_node))) = heap.pop() {
+        // If we've already found a better path, skip processing this node
+        if current_dist > distances[&current_node] {
+            continue;
+        }
+
+        // Examine neighbors of the current node
+        if let Some(node_data) = topology.nodes.get(&current_node) {
+            for (neighbor, producer) in &node_data.producers {
+                let new_dist = current_dist + producer.latency_ms;
+
+                // If a shorter path to the neighbor is found
+                if new_dist < *distances.get(neighbor).unwrap_or(&Latency::infinity()) {
+                    distances.insert(neighbor.clone(), new_dist);
+                    heap.push(Reverse((new_dist, neighbor.clone())));
+
+                    // Record the path
+                    shortest_paths.insert(
+                        neighbor.clone(),
+                        ShortestPathLink {
+                            node: current_node.clone(),
+                            latency: producer.latency_ms,
+                            total: new_dist,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    shortest_paths
+}
+
 #[derive(Debug)]
 pub struct AllPathStats {
     pub reached_min: f32,
@@ -390,13 +446,13 @@ impl AllPathStats {
 
     pub fn add_hop_stats(&mut self, mut hop_stats: HopStats) {
         let reached = hop_stats.latencies.len() as f32;
-        hop_stats.latencies.sort_by(|a, b| a.total_cmp(b));
+        hop_stats.latencies.sort();
         let scale = 1.0 / reached as f32;
         let latency = hop_stats
             .latencies
             .into_iter()
             .enumerate()
-            .map(|(i, l)| (l as f32, (i as f32 + 1.0) * scale))
+            .map(|(i, l)| (l.as_f32(), (i as f32 + 1.0) * scale))
             .collect::<CDF>();
 
         self.reached_min = f32::min(self.reached_min, reached);
@@ -459,14 +515,14 @@ mod tests {
         node1_producers.insert(
             "node2".to_string(),
             Producer {
-                latency_ms: 10.0,
+                latency_ms: 10.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
         node1_producers.insert(
             "node3".to_string(),
             Producer {
-                latency_ms: 20.0,
+                latency_ms: 20.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -475,7 +531,7 @@ mod tests {
         node2_producers.insert(
             "node3".to_string(),
             Producer {
-                latency_ms: 5.0,
+                latency_ms: 5.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -484,7 +540,7 @@ mod tests {
         node3_producers.insert(
             "node4".to_string(),
             Producer {
-                latency_ms: 15.0,
+                latency_ms: 15.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -562,8 +618,8 @@ mod tests {
         // Total latencies: 10.0 + 20.0 + 5.0 + 15.0 = 50.0
         // Number of connections: 4
         // Average should be 12.5
-        assert!((stats.avg_latency_ms - 12.5).abs() < f64::EPSILON);
-        assert!((stats.max_latency_ms - 20.0).abs() < f64::EPSILON);
+        assert!((stats.avg_latency_ms.as_f64() - 12.5).abs() < f64::EPSILON);
+        assert!((stats.max_latency_ms.as_f64() - 20.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -598,20 +654,20 @@ mod tests {
         let hop0 = &hop_stats[0];
         assert_eq!(hop0.hop_number, 0);
         assert_eq!(hop0.latencies.len(), 1);
-        assert_eq!(hop0.latencies[0], 0.0);
+        assert_eq!(hop0.latencies[0], Latency::zero());
 
         // Check hop 1 - direct latencies from node1
         let hop1 = &hop_stats[1];
         assert_eq!(hop1.hop_number, 1);
         assert_eq!(hop1.latencies.len(), 2);
-        assert_eq!(hop1.latencies[0], 10.0); // node1 -> node2
-        assert_eq!(hop1.latencies[1], 20.0); // node1 -> node3
+        assert_eq!(hop1.latencies[0].as_f64(), 10.0); // node1 -> node2
+        assert_eq!(hop1.latencies[1].as_f64(), 20.0); // node1 -> node3
 
         // Check hop 2 - direct latency from node3 to node4
         let hop2 = &hop_stats[2];
         assert_eq!(hop2.hop_number, 2);
         assert_eq!(hop2.latencies.len(), 1);
-        assert_eq!(hop2.latencies[0], 15.0); // node3 -> node4
+        assert_eq!(hop2.latencies[0].as_f64(), 15.0); // node3 -> node4
     }
 
     #[test]
@@ -651,7 +707,7 @@ mod tests {
         let hop0 = &hop_stats[0];
         assert_eq!(hop0.hop_number, 0);
         assert_eq!(hop0.latencies.len(), 1);
-        assert_eq!(hop0.latencies[0], 0.0);
+        assert_eq!(hop0.latencies[0].as_f64(), 0.0);
     }
 
     #[test]
@@ -663,7 +719,7 @@ mod tests {
         node1_producers.insert(
             "node2".to_string(),
             Producer {
-                latency_ms: 10.0,
+                latency_ms: 10.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -672,7 +728,7 @@ mod tests {
         node2_producers.insert(
             "node3".to_string(),
             Producer {
-                latency_ms: 20.0,
+                latency_ms: 20.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -681,7 +737,7 @@ mod tests {
         node3_producers.insert(
             "node1".to_string(),
             Producer {
-                latency_ms: 30.0,
+                latency_ms: 30.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -735,18 +791,18 @@ mod tests {
         let hop0 = &hop_stats[0];
         assert_eq!(hop0.hop_number, 0);
         assert_eq!(hop0.latencies.len(), 1);
-        assert_eq!(hop0.latencies[0], 0.0);
+        assert_eq!(hop0.latencies[0].as_f64(), 0.0);
 
         // Check hop 1 - direct latency from node1 to node2
         let hop1 = &hop_stats[1];
         assert_eq!(hop1.hop_number, 1);
         assert_eq!(hop1.latencies.len(), 1);
-        assert_eq!(hop1.latencies[0], 10.0);
+        assert_eq!(hop1.latencies[0].as_f64(), 10.0);
 
         // Check hop 2 - direct latency from node2 to node3
         let hop2 = &hop_stats[2];
         assert_eq!(hop2.hop_number, 2);
         assert_eq!(hop2.latencies.len(), 1);
-        assert_eq!(hop2.latencies[0], 20.0);
+        assert_eq!(hop2.latencies[0].as_f64(), 20.0);
     }
 }
