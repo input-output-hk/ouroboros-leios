@@ -80,7 +80,7 @@ genSlot :: Gen Integer
 genSlot = genPositiveInteger
 
 genProducer :: Gen Integer
-genProducer = chooseInteger (0, 1) -- TODO: Only two parties for now
+genProducer = pure 0 -- FIXME: different parties
 
 instance Arbitrary IBHeader where
   arbitrary = IBHeader <$> genSlot <*> genProducer
@@ -92,7 +92,7 @@ instance Arbitrary InputBlock where
   arbitrary = InputBlock <$> arbitrary <*> arbitrary
 
 instance Arbitrary EndorserBlock where
-  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> arbitrary
+  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> pure [] -- FIXME: include ibRefs
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
