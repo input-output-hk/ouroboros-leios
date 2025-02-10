@@ -13,6 +13,7 @@ module Leios.Conformance.Model (
 import Data.Aeson (FromJSON (..), ToJSON (..))
 import Data.List ((\\))
 import Data.Maybe (maybeToList)
+import Data.Text.Internal (Text)
 import GHC.Generics (Generic)
 import Lib
 import Text.PrettyPrint (braces, hang, text, vcat, (<+>))
@@ -21,7 +22,6 @@ import Text.PrettyPrint.HughesPJClass (
   maybeParens,
   prettyNormal,
  )
-import Data.Text.Internal (Text)
 
 data EnvAction
   = Tick
@@ -108,7 +108,7 @@ transition s Tick = do
   s' <- makeStep s
   let ffd = fFDState s
   let ffd' = fFDState s'
-  pure (([],[],[]), s) -- FIXME: return blocks from FFD
+  pure (([], [], []), s) -- FIXME: return blocks from FFD
 transition nm (NewIB ib) = do
   -- TODO: guards
   pure (([], [], []), addIB ib nm)
