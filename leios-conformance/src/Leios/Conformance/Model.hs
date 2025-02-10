@@ -21,6 +21,7 @@ import Text.PrettyPrint.HughesPJClass (
   maybeParens,
   prettyNormal,
  )
+import Data.Text.Internal (Text)
 
 data EnvAction
   = Tick
@@ -82,9 +83,12 @@ initialModelState =
     , votingState = ()
     }
 
+makeStep' :: LeiosState -> ComputationResult Text (LeiosOutput, LeiosState)
+makeStep' = flip step I_SLOT
+
 makeStep :: NodeModel -> Maybe NodeModel
 makeStep nm =
-  case step nm I_SLOT of
+  case makeStep' nm of
     Success (_, s) -> Just s
     Failure _ -> Nothing
 
@@ -99,10 +103,12 @@ addVote x nm@LeiosState{..} = nm{vs = [x] : vs}
 
 -- TODO: Leios executable specification
 transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [[Vote]]), NodeModel)
-transition nm Tick = do
+transition s Tick = do
   -- TODO: guards
-  s <- makeStep nm
-  pure ((iBs s \\ iBs nm, eBs s \\ eBs nm, vs s \\ vs nm), s)
+  s' <- makeStep s
+  let ffd = fFDState s
+  let ffd' = fFDState s'
+  pure (([],[],[]), s) -- FIXME: return blocks from FFD
 transition nm (NewIB ib) = do
   -- TODO: guards
   pure (([], [], []), addIB ib nm)

@@ -15,6 +15,7 @@ import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Default (def)
 import Data.Map qualified as Map (fromList)
 import Data.Set qualified as Set (fromList)
+import Data.Text (unpack)
 import Data.Version (showVersion)
 import Options.Applicative qualified as O
 import Paths_leios_conformance (version)
@@ -63,13 +64,15 @@ handle :: MonadIO m => MonadSTM m => NodeModel -> NodeRequest -> m (NodeResponse
 handle node =
   \case
     Initialize -> pure (def, node)
-    NewSlot ibs ebs votes ->
-      let node' = fromMaybe node (makeStep node)
-          ibs' = iBs node' \\ ibs
-          ebs' = eBs node' \\ ebs
-          votes' = vs node' \\ votes
-          res = NodeResponse{diffuseIBs = ibs', diffuseEBs = ebs', diffuseVotes = votes'}
-       in pure (res, node')
+    NewSlot ibs ebs votes -> -- FIXME: put into FFD
+      case makeStep' node of
+        Success (_, node') ->
+          let ibs' = [] -- FIXME: get from FFD
+              ebs' = []
+              votes' = []
+              res = NodeResponse{diffuseIBs = ibs', diffuseEBs = ebs', diffuseVotes = votes'}
+           in pure (res, node')
+        Failure m -> pure (Failed{failure = unpack m}, node)
     Stop -> pure (Stopped, node)
 
 newtype Command = Command
