@@ -15,7 +15,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Overview",
-      items: ["intro", "protocol-overview", "how-it-works"],
+      items: ["overview", "protocol-overview", "how-it-works"],
     },
     "faq",
     "glossary",

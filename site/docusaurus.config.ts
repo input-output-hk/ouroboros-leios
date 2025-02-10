@@ -107,7 +107,7 @@ const config: Config = {
                     items: [
                         {
                             label: "What is Ouroboros Leios?",
-                            to: "/docs/intro",
+                            to: "/docs/overview",
                         },
                         {
                             label: "Protocol overview",
