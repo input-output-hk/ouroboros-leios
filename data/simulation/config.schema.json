@@ -218,7 +218,7 @@
       "type": "number"
     },
     "leios-vote-send-recv-stages": {
-      "description": "Only supported by Haskell simulation.",
+      "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",
       "type": "boolean"
     },
     "multiplex-mini-protocols": {

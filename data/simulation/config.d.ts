@@ -13,7 +13,12 @@ export interface Config {
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
   "leios-stage-active-voting-slots": bigint;
-  /** Only supported by Haskell simulation. */
+  /**
+   * Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.
+   * If this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`
+   * to be equal to `leios-stage-length-slots`.
+   *
+   * Only supported by Haskell simulation. */
   "leios-vote-send-recv-stages": boolean;
 
   // Transaction Configuration
