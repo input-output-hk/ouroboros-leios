@@ -22,8 +22,7 @@ visualization and network modeling capabilities.
   - Added oldest-first strategy
   - Configurable strategies for IBs, EBs, and votes via `*-diffusion-strategy`
     configs
-- Created new [`small`](../../data/simulation/small) scenario for 100 nodes with
-  2000kBs links
+- Created new `small` scenario for 100 nodes with 2000kBs links
   - Tuned IB parameters to utilize one-third of link capacity
   - Configurations for both single-stage and send-recv voting
 - Fixed several simulation behaviors:
