@@ -68,7 +68,7 @@ import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 import qualified System.Random as Random
 import TimeCompat
-import Topology (P2PNetwork (..), PickLinksCloseAndRandomOptions (..), SLocationKind (..), SomeTopology (..), TopologyGenerationStrategy (..), defaultParams, generateTopology, layoutTopology, p2pNetworkToSomeTopology, readP2PTopographyFromSomeTopology, readTopology, readTopologyFromBenchTopology, validateP2PNetwork, writeTopology)
+import Topology hiding (topologyOptions)
 import Viz
 
 main :: IO ()
@@ -202,7 +202,6 @@ data VizSubCommand
       { seed :: Int
       , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
-      , overrideUnlimitedBps :: Bytes
       }
   | VizPraosP2P2
   | VizRelayTest1
@@ -213,7 +212,6 @@ data VizSubCommand
       { seed :: Int
       , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
-      , overrideUnlimitedBps :: Bytes
       }
 
 parserVizSubCommand :: Parser VizSubCommand
@@ -270,7 +268,6 @@ parserPraosP2P1 =
     <$> parserSeed
     <*> parserConfigOptions
     <*> parserTopologyOptions
-    <*> parserOverrideUnlimited
 
 parserSeed :: Parser Int
 parserSeed =
@@ -294,7 +291,6 @@ parserShortLeiosP2P1 =
       )
     <*> parserConfigOptions
     <*> parserTopologyOptions
-    <*> parserOverrideUnlimited
 
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
