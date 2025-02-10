@@ -13,7 +13,7 @@ cryptography and enhanced the online cost calculator with user-requested
 features. Both Haskell and Rust simulations received updates to improve
 visualization and network modeling capabilities.
 
-## Haskell Simulation
+## Haskell simulation
 
 - Added support for Send and Receive Voting stages
   - New configuration option `leios-vote-send-recv-stages`
@@ -34,7 +34,7 @@ visualization and network modeling capabilities.
   shows a longer tail in the CPU usage CDF when simulation is run with unlimited
   cores
 
-## Cryptography Implementation
+## Cryptography implementation
 
 The Rust benchmarks for Leios cryptography were redesigned as a reference
 implementation:
@@ -45,7 +45,7 @@ implementation:
 - Added benchmarks for serialization
 - Optimized vote and certificate size
 
-## Cost Calculator Improvements
+## Cost calculator improvements
 
 The
 [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/)
@@ -59,7 +59,7 @@ received several enhancements:
   - More conservative 50% disk compression
   - Perpetual storage cost amortization
 
-## Throughput Simulator
+## Throughput simulator
 
 Updated the
 [Cardano throughput simulator](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3)
@@ -68,7 +68,7 @@ with:
 - Latest cloud-computing cost model
 - Synchronized assumptions with online cost calculator
 
-## Rust Simulation
+## Rust simulation
 
 - Minor fixes to new graph generation strategy
 - Planned out a roadmap for visualization work focusing on Leios transaction
