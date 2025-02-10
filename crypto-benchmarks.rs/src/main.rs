@@ -11,6 +11,7 @@ use std::process;
 
 use leios_crypto_benchmarks::key::*;
 use leios_crypto_benchmarks::primitive::*;
+use leios_crypto_benchmarks::realism::*;
 use leios_crypto_benchmarks::sortition::*;
 use leios_crypto_benchmarks::vote::*;
 
@@ -29,6 +30,22 @@ enum Commands {
     GenEid,
     GenEbHash,
     GenPoolKeyHash,
+    GenStake {
+        #[arg(long)]
+       pools: usize,
+       #[arg(long)]
+       total: Coin,
+       #[arg(long)]
+       stake_file: PathBuf,
+    },
+    GenPools {
+        #[arg(long)]
+       pools: usize,
+       #[arg(long)]
+       total: Coin,
+       #[arg(long)]
+       pools_file: PathBuf,
+    },
     GenKey {
         #[arg(long)]
         sec_file: PathBuf,
@@ -126,6 +143,16 @@ fn main() {
             let pool = arbitrary_poolkeyhash(g);
             println!("{}", pool.encode_hex::<String>());
           }
+          Some(Commands::GenStake { pools, total , stake_file}) => {
+            let g = &mut Gen::new(10);
+            let stake = realistic_stake(g, *total, *pools);
+            write_cbor(stake_file, &stake).unwrap();
+        }
+        Some(Commands::GenPools { pools, total , pools_file}) => {
+            let g = &mut Gen::new(10);
+            let stake = realistic_pools(g, *total, *pools);
+            write_cbor(pools_file, &stake).unwrap();
+        }
           Some(Commands::GenKey {sec_file, pub_file, pop_file}) => {
             let (sec_key, pub_key, proof) = key_gen();
             write_cbor(sec_file, &sec_key).unwrap();
