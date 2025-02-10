@@ -3,6 +3,8 @@ use rand::prelude::Distribution;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use statrs::distribution::Beta;
+use statrs::distribution::Continuous;
+use statrs::distribution::ContinuousCDF;
 use std::collections::HashMap;
 
 use crate::cert::*;
@@ -23,14 +25,8 @@ pub fn realistic_stake(g: &mut Gen, total: u64, n: usize) -> HashMap<PoolKeyhash
   )
 }
 
-fn realistic_stake_dist(g: &mut Gen, total: u64, n: usize) -> Vec<Coin> {
-
-  let dist = Beta::new(11f64, 1f64).unwrap();
-  let rng = &mut StdRng::seed_from_u64(u64::arbitrary(g));
-
-  let mut raw: Vec<f64> = (0..n).map(|_| dist.sample(rng)).collect();
-  raw.sort_by(|x, y| x.partial_cmp(y).unwrap());
-  let (cum, _) =
+fn cum_sum(raw: &[f64]) -> Vec<f64> {
+  let (mut cum, _) =
     raw
       .iter()
       .fold((Vec::new(), 0f64), |(mut acc, stake), delta| {
@@ -38,10 +34,16 @@ fn realistic_stake_dist(g: &mut Gen, total: u64, n: usize) -> Vec<Coin> {
         acc.push(stake.clone());
         (acc, new_stake)
       });
-  let scale: f64 = (total as f64) / cum.iter().sum::<f64>();
+      cum.sort_by(|x, y| x.partial_cmp(y).unwrap());
+      cum
+}
 
-  cum.iter().map(|coin| (scale * *coin).round() as Coin).collect()
-
+fn realistic_stake_dist(g: &mut Gen, total: u64, n: usize) -> Vec<Coin> {
+  let dist = Beta::new(11f64, 1f64).unwrap();
+  let cum: Vec<f64> = (0..n).map(|i| dist.cdf((i as f64) / (total as f64))).collect();
+  let dif: Vec<f64> = (1..n).map(|i| cum[i] - cum[i-1]).collect();
+  let scale: f64 = (total as f64) / dif.iter().sum::<f64>();
+  dif.iter().map(|coin| (scale * *coin).round() as Coin).collect()
 }
 
 pub fn realistic_pools(g: &mut Gen, total: u64, n: usize) -> Vec<PoolInfo> {
