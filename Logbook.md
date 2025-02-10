@@ -1,37 +1,47 @@
 # Leios logbook
 
-## 2025-02-10
+## 2025-02-07
 
 ### Haskell simulation
 
 - Added support for:
   - Send and Receive Voting stages, rather than just a single Vote stage.
     - See `leios-vote-send-recv-stages` config.
-    - If used, should also set `leios-stage-active-voting-slots` to length of stage.
-  - oldest-first diffusion strategy, and strategy configuration for EBs and votes.
-    - See `ib-diffusion-strategy`, `eb-diffusion-strategy`, and `vote-diffusion-strategy`.
-- Added `data/simulation/small` scenario with config for 100 nodes with 2000kBs links.
-  - The IB size and generation rate is tuned to utilize a third of 2000kBs, as Short-Leios targets.
-  - One config file for single-stage and one for send-recv voting (also covering 5 and 20 stage lengths).
-  - Other size and timing parameters are mostly the defaults, which should be reviewed.
-- Used trace and metrics from `small` scenario to investigate simulation behaviour.
+    - If used, should also set `leios-stage-active-voting-slots` to length of
+      stage.
+  - oldest-first diffusion strategy, and strategy configuration for EBs and
+    votes.
+    - See `ib-diffusion-strategy`, `eb-diffusion-strategy`, and
+      `vote-diffusion-strategy`.
+- Added `data/simulation/small` scenario with config for 100 nodes with 2000kBs
+  links.
+  - The IB size and generation rate is tuned to utilize a third of 2000kBs, as
+    Short-Leios targets.
+  - One config file for single-stage and one for send-recv voting (also covering
+    5 and 20 stage lengths).
+  - Other size and timing parameters are mostly the defaults, which should be
+    reviewed.
+- Used trace and metrics from `small` scenario to investigate simulation
+  behaviour.
   - Added more details to block generation and `Sent` events.
-  - Fixed block generation so own blocks are considered on-par with validated blocks a node received.
+  - Fixed block generation so own blocks are considered on-par with validated
+    blocks a node received.
   - Made sure an EB cannot be included more than once in the base chain.
-  - Confirmed trace shows EBs are regularly included in RBs that are
-    generated more than 5s after votes start diffusing.
-- Main difference observed between single-stage and send-recv is the
-  former shows a longer tail in the CPU usage CDF when simulation is
-  run with unlimited cores.
-
-## 2025-02-07
+  - Confirmed trace shows EBs are regularly included in RBs that are generated
+    more than 5s after votes start diffusing.
+- Main difference observed between single-stage and send-recv is the former
+  shows a longer tail in the CPU usage CDF when simulation is run with unlimited
+  cores.
 
 ### Reference implementation and benchmarking of Leios cryptography
 
-The Rust benchmarks for Leios cryptography were redesigned and throroughly revised so that they are a reference implementation for a viable realization of Leios.
+The Rust benchmarks for Leios cryptography were redesigned and throroughly
+revised so that they are a reference implementation for a viable realization of
+Leios.
 
 - Implemented the Fait Accompli sortition
-- Sortition now uses rational arithmetic instead of quad-precision floats, and is independent of machine precision
+- Sortition now uses rational arithmetic instead of quad-precision floats, and
+  is independent of machine precision
 - Quickcheck tests for all capabilities
 - Benchmarks for serialization
 - Squeezed more bytes out of the votes and certificate
@@ -40,27 +50,38 @@ The package still needs documentation and a few more benchmarks.
 
 ### Formal Methods
 
-- Initial conformance testing is setup using quickcheck-dynamic with the executable spec of Short Leios as model. Next steps are conformance testing the Leios simulators
+- Initial conformance testing is setup using quickcheck-dynamic with the
+  executable spec of Short Leios as model. Next steps are conformance testing
+  the Leios simulators
 - Performance improvements of the proofs in the executable spec module
 
 ### Refresh of throughput simulator
 
-The [Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) has been updated with the latest cloud-computing cost model, synchronized with the assumptions in the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
+The
+[Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3)
+has been updated with the latest cloud-computing cost model, synchronized with
+the assumptions in the
+[online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
 
 ### Rust simulation
 
 - Minor fixes to new graph generation strategy
-- Planned out a roadmap for visualization work; next steps will be to show more about the lifecycle of Leios transactions
- 
+- Planned out a roadmap for visualization work; next steps will be to show more
+  about the lifecycle of Leios transactions
+
 ## 2025-02-06
 
 ### Enhancements to online cost calculator
 
-In response to queries and suggestions, the [online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/) has been enhanced:
+In response to queries and suggestions, the
+[online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/)
+has been enhanced:
 
-- Users can select costs for either hyperscale providers (like AWS, Azure, and GCP) or discount providers (Hetzner, OVH Cloud, etc.).
+- Users can select costs for either hyperscale providers (like AWS, Azure, and
+  GCP) or discount providers (Hetzner, OVH Cloud, etc.).
 - Costs default to that of a discount provider.
-- Users can optionally amortize ledger storage costs perpetually vs compute a first-month snapshot of storage costs.
+- Users can optionally amortize ledger storage costs perpetually vs compute a
+  first-month snapshot of storage costs.
 - Deployments default to a single relay instead of two.
 - The disk compression default was reduced to a conservative 50%.
 
