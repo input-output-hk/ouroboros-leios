@@ -1,38 +1,41 @@
-import clsx from 'clsx';
-import Heading from '@theme/Heading';
-import styles from './styles.module.css';
+import Heading from "@theme/Heading";
+import clsx from "clsx";
+import styles from "./styles.module.css";
 
 type FeatureItem = {
     title: string;
-    Svg: React.ComponentType<React.ComponentProps<'svg'>>;
+    Svg: React.ComponentType<React.ComponentProps<"svg">>;
     description: JSX.Element;
 };
 
 const FeatureList: FeatureItem[] = [
     {
-        title: 'Heavy duty',
-        Svg: require('@site/static/img/cargo-ship.svg').default,
+        title: "Scalable",
+        Svg: require("@site/static/img/cargo-ship.svg").default,
         description: (
             <>
-                Ouroboros Leios is designed to maximise the use of available network bandwidth and therefore maximise overall throughput of the network.
+                Optimizes network bandwidth for faster transaction processing,
+                significantly enhancing Cardano’s scalability. Transactions are
+                confirmed with minimal delays for a seamless user experience.
             </>
         ),
     },
     {
-        title: 'Secure',
-        Svg: require('@site/static/img/safe.svg').default,
+        title: "Secure",
+        Svg: require("@site/static/img/safe.svg").default,
         description: (
             <>
-                Ouroboros Leios maintains the strong security properties of the Ouroboros family of protocols.
+                Preserves Ouroboros' strong security properties with robust
+                defenses against attacks while ensuring fair participation.
             </>
         ),
     },
     {
-        title: 'Flexible',
-        Svg: require('@site/static/img/socket-chord.svg').default,
+        title: "Flexible",
+        Svg: require("@site/static/img/socket-chord.svg").default,
         description: (
             <>
-                Being agnostic of the underlying Nakomoto consensus protocol, Ouroboros Leios can support a wide range of applications.
+                Ouroboros Leios supports diverse applications.
             </>
         ),
     },
@@ -40,7 +43,7 @@ const FeatureList: FeatureItem[] = [
 
 function Feature({ title, Svg, description }: FeatureItem) {
     return (
-        <div className={clsx('col col--4')}>
+        <div className={clsx("col col--4")}>
             <div className="text--center">
                 <Svg className={styles.featureSvg} role="img" />
             </div>

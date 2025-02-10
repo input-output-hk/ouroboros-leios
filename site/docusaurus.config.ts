@@ -3,7 +3,7 @@ import type { Config } from "@docusaurus/types";
 import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
-    title: "Leios",
+    title: "Ouroboros Leios",
     tagline: "A high-throughput protocol for Cardano",
     favicon: "img/wave-logo.ico",
 
@@ -110,11 +110,11 @@ const config: Config = {
                             to: "/docs/intro",
                         },
                         {
-                            label: "Protocol Overview",
+                            label: "Protocol overview",
                             to: "/docs/protocol-overview",
                         },
                         {
-                            label: "How It Works",
+                            label: "How it works",
                             to: "/docs/how-it-works",
                         },
                         {
