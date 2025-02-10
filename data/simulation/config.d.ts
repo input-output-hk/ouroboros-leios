@@ -6,7 +6,7 @@ export interface Config {
   /** Only supported by Haskell simulation. */
   "relay-strategy": RelayStrategy;
   /** Only supported by Haskell simulation. */
-  "transfer-protocol": TransferProtocol | null;
+  tcp: boolean;
   /** Only supported by Haskell simulation. */
   "multiplex-mini-protocols": boolean;
 
@@ -144,8 +144,4 @@ export enum DiffusionStrategy {
 export enum RelayStrategy {
   RequestFromAll = "request-from-all",
   RequestFromFirst = "request-from-first",
-}
-
-export enum TransferProtocol {
-  Tcp = "tcp",
 }

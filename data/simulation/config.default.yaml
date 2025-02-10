@@ -8,6 +8,14 @@
 # the Haskell simulation (`simulation/`) and the Rust simulation (`sim-rs/`).
 #
 ################################################################################
+# Simulation Configuration
+################################################################################
+
+relay-strategy: "request-from-all"
+tcp: false
+multiplex-mini-protocols: false
+
+################################################################################
 # Leios Protocol Configuration
 ################################################################################
 

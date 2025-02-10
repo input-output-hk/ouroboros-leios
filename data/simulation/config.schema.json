@@ -261,10 +261,9 @@
       "$ref": "#/definitions/RelayStrategy",
       "description": "Only supported by Haskell simulation."
     },
-    "transfer-protocol": {
-      "const": "tcp",
+    "tcp": {
       "description": "Only supported by Haskell simulation.",
-      "type": "string"
+      "type": "boolean"
     },
     "tx-generation-distribution": {
       "$ref": "#/definitions/Distribution",
