@@ -1056,8 +1056,11 @@ coefficientOfVariability total xs = stdDev / mean
 
 uniformBins :: (RealFrac a, Num b) => Integer -> Set.Set a -> [b]
 uniformBins n ks = case (fst <$> Set.minView ks, fst <$> Set.maxView ks) of
-  (Just (floor -> l), Just (ceiling -> u)) ->
+  (Just (floor -> l), Just u') ->
     let step = (u - l) `div` n :: Integer
+        u = ceiling (u' / 10 ^ (m - 2)) * 10 ^ (m - 2)
+         where
+          m = ceiling @Double @Int $ logBase 10 (realToFrac u')
      in map fromIntegral $
           (++ [u]) . takeWhile (< u) . iterate (+ step) $
             l
