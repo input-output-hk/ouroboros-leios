@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -135,7 +136,7 @@ data LeiosSimVizState
   }
 
 newtype DataTransmitted = DataTransmitted
-  { messagesTransmitted :: IntervalMap DiffTime Bytes
+  { messagesTransmitted :: IntervalMap DiffTime [Bytes]
   -- ^ the total bandwidth used by the various mini-protocols.
   }
 
@@ -206,7 +207,7 @@ accumNodeCpuUsage' ::
   Map NodeId (IntervalMap a Int) ->
   Map NodeId (IntervalMap a Int)
 accumNodeCpuUsage' f (Time now') nid task =
-  Map.insertWith ILMap.union nid (ILMap.singleton (IntervalCO now (now + d)) 1)
+  Map.insertWith (ILMap.unionWith (+)) nid (ILMap.singleton (IntervalCO now (now + d)) 1)
  where
   now = f now'
   d = f (cpuTaskDuration task)
@@ -469,9 +470,10 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
 accumDataTransmitted :: LeiosMessage -> TcpMsgForecast -> DataTransmitted -> DataTransmitted
 accumDataTransmitted msg forecast DataTransmitted{..} =
   DataTransmitted
-    { messagesTransmitted = (ILMap.insert interval $! msgSize forecast) messagesTransmitted
+    { messagesTransmitted = ILMap.insertWith (++) interval [msize] messagesTransmitted
     }
  where
+  !msize = msgSize forecast
   interval :: ILMap.Interval DiffTime
   interval =
     ILMap.IntervalCO
@@ -479,7 +481,9 @@ accumDataTransmitted msg forecast DataTransmitted{..} =
       (coerce forecast.msgSendTrailingEdge)
   -- could be interesting to compare to "useful" data.
   _accumPayloadAndBlocksTransmitted (payload0, blocks0) =
-    (maybe id (ILMap.insert interval) payload payload0, maybe id (ILMap.insert interval) block blocks0)
+    ( maybe id (ILMap.insertWith (++) interval . (: [])) payload payload0
+    , maybe id (ILMap.insertWith (++) interval . (: [])) block blocks0
+    )
    where
     payloadIB ::
       HasField "size" body Bytes =>

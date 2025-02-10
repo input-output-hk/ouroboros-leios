@@ -679,10 +679,10 @@ chartDataTransmitted LeiosModelConfig{maxBandwidthPerNode} =
                 ]
             }
 
-msgsTransmittedToBps :: (Real a, Fractional a) => ILMap.IntervalMap a Bytes -> Double
+msgsTransmittedToBps :: (Real a, Fractional a) => ILMap.IntervalMap a [Bytes] -> Double
 msgsTransmittedToBps = sum . map toBps . ILMap.toList
  where
-  toBps (i, bytes)
+  toBps (i, sum -> bytes)
     | d <- (ILMap.upperBound i - ILMap.lowerBound i)
     , d > 0 =
         realToFrac $ fromIntegral bytes / d :: Double
@@ -1013,7 +1013,7 @@ exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop@(Time stop'
       (cpuUseSegments, Map.toAscList -> cpuUseCdfAvg) =
         intervalsToSegmentsAndCdfAvg
           Set.toList
-          (ILMap.size . fst)
+          (sum . ILMap.elems . fst)
           (realToFrac stop')
           nodeCpuUsage
       config = cfg
@@ -1026,7 +1026,7 @@ exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop@(Time stop'
       (transmittedMsgsSegments, Map.toAscList -> transmittedMsgsCdfAvg) =
         intervalsToSegmentsAndCdfAvg
           Set.toList
-          (ILMap.size . fst)
+          (length . ILMap.elems . fst)
           stop'
           (Map.map (.messagesTransmitted) dataTransmittedPerNode)
     let diffusionData = LeiosData{..}
