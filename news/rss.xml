@@ -4,10 +4,98 @@
         <title>Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Leios Blog</description>
-        <lastBuildDate>Mon, 27 Jan 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 03 Feb 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly progress summary – February 3, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary</guid>
+            <pubDate>Mon, 03 Feb 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[High-level summary]]></description>
+            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#high-level-summary">​</a></h2>
+<p>This week saw significant progress in cryptography benchmarking and cost
+calculator improvements. The team completed a reference implementation for Leios
+cryptography and enhanced the online cost calculator with user-requested
+features. Both Haskell and Rust simulations received updates to improve
+visualization and network modeling capabilities.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#haskell-simulation">​</a></h2>
+<ul>
+<li>Added support for Send and Receive Voting stages<!-- -->
+<ul>
+<li>New configuration option <code>leios-vote-send-recv-stages</code></li>
+<li>Configurable stage length via <code>leios-stage-active-voting-slots</code></li>
+</ul>
+</li>
+<li>Implemented multiple diffusion strategies:<!-- -->
+<ul>
+<li>Added oldest-first strategy</li>
+<li>Configurable strategies for IBs, EBs, and votes via <code>*-diffusion-strategy</code>
+configs</li>
+</ul>
+</li>
+<li>Created new <code>small</code> scenario for 100 nodes with 2000kBs links<!-- -->
+<ul>
+<li>Tuned IB parameters to utilize one-third of link capacity</li>
+<li>Configurations for both single-stage and send-recv voting</li>
+</ul>
+</li>
+<li>Fixed several simulation behaviors:<!-- -->
+<ul>
+<li>Improved block generation logic</li>
+<li>Prevented duplicate EB inclusion in base chain</li>
+<li>Confirmed proper EB inclusion timing relative to vote diffusion</li>
+</ul>
+</li>
+<li>Main difference observed between single-stage and send-recv is the former
+shows a longer tail in the CPU usage CDF when simulation is run with unlimited
+cores</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-implementation">Cryptography implementation<a class="hash-link" aria-label="Direct link to Cryptography implementation" title="Direct link to Cryptography implementation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#cryptography-implementation">​</a></h2>
+<p>The Rust benchmarks for Leios cryptography were redesigned as a reference
+implementation:</p>
+<ul>
+<li>Implemented the Fait Accompli sortition</li>
+<li>Enhanced sortition to use rational arithmetic instead of quad-precision floats</li>
+<li>Added Quickcheck tests for all capabilities</li>
+<li>Added benchmarks for serialization</li>
+<li>Optimized vote and certificate size</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cost-calculator-improvements">Cost calculator improvements<a class="hash-link" aria-label="Direct link to Cost calculator improvements" title="Direct link to Cost calculator improvements" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#cost-calculator-improvements">​</a></h2>
+<p>The
+<a href="https://leios.cardano-scaling.org/cost-estimator/" target="_blank" rel="noopener noreferrer">online Leios cost calculator</a>
+received several enhancements:</p>
+<ul>
+<li>Added support for both hyperscale and discount cloud providers</li>
+<li>Made discount providers the default option</li>
+<li>Added option to amortize storage costs perpetually</li>
+<li>Updated defaults:<!-- -->
+<ul>
+<li>Single relay deployment</li>
+<li>More conservative 50% disk compression</li>
+<li>Perpetual storage cost amortization</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="throughput-simulator">Throughput simulator<a class="hash-link" aria-label="Direct link to Throughput simulator" title="Direct link to Throughput simulator" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#throughput-simulator">​</a></h2>
+<p>Updated the
+<a href="https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3" target="_blank" rel="noopener noreferrer">Cardano throughput simulator</a>
+with:</p>
+<ul>
+<li>Latest cloud-computing cost model</li>
+<li>Synchronized assumptions with online cost calculator</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/03/weekly-progress-summary#rust-simulation">​</a></h2>
+<ul>
+<li>Minor fixes to new graph generation strategy</li>
+<li>Planned out a roadmap for visualization work focusing on Leios transaction
+lifecycle</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly progress summary – January 27, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/01/27/weekly-progress-summary</link>
