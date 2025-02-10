@@ -601,12 +601,17 @@ mkBuffersView cfg st = BuffersView{..}
     -- This gets called pretty rarely, so doesn't seem worth caching,
     -- though it's getting more expensive as we go.
     chain <- PraosNode.preferredChain st.praosState
-    let ebsInChain =
-          Set.fromList $
-            [ eb | rb <- Chain.chainToList chain, (eb, _) <- rb.blockBody.endorseBlocks
-            ]
-    bufferEB <- map snd . RB.values <$> readTVar st.relayEBState.relayBufferVar
+    bufferEB <- readTVar st.relayEBState.relayBufferVar
     bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
+
+    -- RBs in the same chain should not contain certificates for the same pipeline.
+    let pipelinesInChain =
+          Set.fromList $
+            [ endorseBlockPipeline cfg.leios eb
+            | rb <- Chain.chainToList chain
+            , (ebId, _) <- rb.blockBody.endorseBlocks
+            , Just (_, eb) <- [RB.lookup bufferEB ebId]
+            ]
     -- TODO: cache?
     let votesForEB =
           Map.fromListWith
@@ -618,12 +623,18 @@ mkBuffersView cfg st = BuffersView{..}
     let totalVotes = fromIntegral . sum . Map.elems
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
-          guard (not $ Set.member eb.id ebsInChain)
+          guard (not $ Set.member (endorseBlockPipeline cfg.leios eb) pipelinesInChain)
           guard (cfg.leios.votesForCertificate <= totalVotes votes)
           return $! (eb.id,) $! mkCertificate cfg.leios votes
 
     -- TODO: cache index of EBs ordered by .slot descending?
-    let freshestCertifiedEB = listToMaybe . mapMaybe tryCertify . sortOn (Down . (.slot)) $ bufferEB
+    let freshestCertifiedEB =
+          listToMaybe
+            . mapMaybe tryCertify
+            . sortOn (Down . (.slot))
+            . map snd
+            . RB.values
+            $ bufferEB
     return $
       NewRankingBlockData
         { freshestCertifiedEB
