@@ -11,9 +11,9 @@
 # Simulation Configuration
 ################################################################################
 
-relay-strategy: "request-from-all"
-tcp: false
-multiplex-mini-protocols: false
+relay-strategy: "request-from-first"
+tcp: true
+multiplex-mini-protocols: true
 
 ################################################################################
 # Leios Protocol Configuration
