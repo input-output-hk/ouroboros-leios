@@ -635,21 +635,21 @@ parserPickLinksCloseAndRandomOptions =
     <$> parserWorld
     <*> option
       auto
-      ( long "tg-cnr-num-nodes"
+      ( long "tg-num-nodes"
           <> metavar "NUMBER"
           <> help "The number of nodes."
           <> shownDefValue (numNodes def)
       )
     <*> option
       auto
-      ( long "tg-cnr-num-links-close"
+      ( long "tg-num-links-close"
           <> metavar "NUMBER"
           <> help "The number of links to close peers for each node."
           <> shownDefValue (numCloseLinksPerNode def)
       )
     <*> option
       auto
-      ( long "tg-cnr-num-links-random"
+      ( long "tg-num-links-random"
           <> metavar "NUMBER"
           <> help "The number of links to random peers for each node."
           <> shownDefValue (numRandomLinksPerNode def)
