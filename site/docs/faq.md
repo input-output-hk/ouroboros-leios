@@ -2,7 +2,7 @@
 sidebar_position: 6
 ---
 
-# Ouroboros Leios FAQ
+# FAQs
 
 ## What are the benefits of Leios?
 

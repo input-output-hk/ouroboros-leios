@@ -118,7 +118,7 @@ const config: Config = {
                             to: "/docs/how-it-works",
                         },
                         {
-                            label: "FAQ",
+                            label: "FAQs",
                             to: "/docs/faq",
                         },
                         {
@@ -159,6 +159,23 @@ const config: Config = {
                         {
                             label: "Contributors",
                             to: "https://github.com/input-output-hk/ouroboros-leios/graphs/contributors",
+                        },
+                    ],
+                },
+                {
+                    title: "More resources",
+                    items: [
+                        {
+                            label: "IOHK research library",
+                            to: "https://iohk.io/en/research/library/",
+                        },
+                        {
+                            label: "Essential Cardano",
+                            to: "https://www.essentialcardano.io/",
+                        },
+                        {
+                            label: "Cardano Docs",
+                            to: "https://docs.cardano.org/",
                         },
                     ],
                 },
