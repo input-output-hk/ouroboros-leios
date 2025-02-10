@@ -29,6 +29,7 @@ import Data.Maybe (
   maybeToList,
  )
 import Data.Ord
+import Data.Word (Word16)
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
@@ -79,8 +80,13 @@ data SingPipeline (p :: Pipeline) where
   SingSingleVote :: SingPipeline SingleVote
   SingSplitVote :: SingPipeline SplitVote
 
--- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
---       Would need to rework def. of Stage to accomodate different pipeline shapes.
+data RelayDiffusionConfig = RelayDiffusionConfig
+  { strategy :: !DiffusionStrategy
+  , maxWindowSize :: !Word16
+  , maxHeadersToRequest :: !Word16
+  , maxBodiesToRequest :: !Word16
+  }
+
 data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   { praos :: PraosConfig RankingBlockBody
   , pipeline :: SingPipeline p
@@ -97,9 +103,9 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
-  , ibDiffusionStrategy :: DiffusionStrategy
-  , ebDiffusionStrategy :: DiffusionStrategy
-  , voteDiffusionStrategy :: DiffusionStrategy
+  , ibDiffusion :: RelayDiffusionConfig
+  , ebDiffusion :: RelayDiffusionConfig
+  , voteDiffusion :: RelayDiffusionConfig
   }
 
 convertConfig :: OnDisk.Config -> LeiosConfig
@@ -116,9 +122,27 @@ convertConfig disk =
     , voteSendStage = Vote
     , sizes
     , delays
-    , ibDiffusionStrategy = disk.ibDiffusionStrategy
-    , ebDiffusionStrategy = disk.ebDiffusionStrategy
-    , voteDiffusionStrategy = disk.voteDiffusionStrategy
+    , ibDiffusion =
+        RelayDiffusionConfig
+          { strategy = disk.ibDiffusionStrategy
+          , maxWindowSize = disk.ibDiffusionMaxWindowSize
+          , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+          , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+          }
+    , ebDiffusion =
+        RelayDiffusionConfig
+          { strategy = disk.ebDiffusionStrategy
+          , maxWindowSize = disk.ebDiffusionMaxWindowSize
+          , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+          , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+          }
+    , voteDiffusion =
+        RelayDiffusionConfig
+          { strategy = disk.voteDiffusionStrategy
+          , maxWindowSize = disk.voteDiffusionMaxWindowSize
+          , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+          , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+          }
     }
  where
   forEach n xs = n * fromIntegral (length xs)

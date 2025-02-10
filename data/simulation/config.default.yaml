@@ -63,6 +63,11 @@ ib-body-max-size-bytes: 327680
 ib-body-avg-size-bytes: 327680
 ib-diffusion-strategy: "freshest-first"
 
+# Haskell prototype relay mini-protocol parameters.
+ib-diffusion-max-bodies-to-request: 1
+ib-diffusion-max-headers-to-request: 100
+ib-diffusion-max-window-size: 100
+
 ################################################################################
 # Endorsement Block Configuration
 ################################################################################
@@ -73,6 +78,11 @@ eb-validation-cpu-time-ms: 1.0
 eb-size-bytes-constant: 32
 eb-size-bytes-per-ib: 32
 eb-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+eb-diffusion-max-bodies-to-request: 1
+eb-diffusion-max-headers-to-request: 100
+eb-diffusion-max-window-size: 100
 
 ################################################################################
 # Vote Configuration
@@ -86,6 +96,11 @@ vote-threshold: 150
 vote-bundle-size-bytes-constant: 32
 vote-bundle-size-bytes-per-eb: 32
 vote-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+vote-diffusion-max-bodies-to-request: 1
+vote-diffusion-max-headers-to-request: 100
+vote-diffusion-max-window-size: 100
 
 ################################################################################
 # Certificate Configuration

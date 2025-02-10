@@ -238,9 +238,9 @@ traceRelayLink1 tcpprops =
                     , voteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
                     }
-              , ibDiffusionStrategy = FreshestFirst
-              , ebDiffusionStrategy = PeerOrder
-              , voteDiffusionStrategy = PeerOrder
+              , ibDiffusion = RelayDiffusionConfig FreshestFirst 100 100 1
+              , ebDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
+              , voteDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig

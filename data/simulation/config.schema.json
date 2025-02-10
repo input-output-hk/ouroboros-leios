@@ -103,6 +103,21 @@
     "cert-validation-cpu-time-ms-per-node": {
       "type": "number"
     },
+    "eb-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "eb-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "eb-diffusion-max-window-size": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
     "eb-diffusion-strategy": {
       "$ref": "#/definitions/DiffusionStrategy"
     },
@@ -139,6 +154,21 @@
       "type": "number"
     },
     "ib-body-validation-cpu-time-ms-per-byte": {
+      "type": "number"
+    },
+    "ib-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "ib-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "ib-diffusion-max-window-size": {
+      "additionalProperties": false,
+      "properties": {},
       "type": "number"
     },
     "ib-diffusion-strategy": {
@@ -221,6 +251,21 @@
       "type": "number"
     },
     "vote-bundle-size-bytes-per-eb": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-max-window-size": {
       "additionalProperties": false,
       "properties": {},
       "type": "number"

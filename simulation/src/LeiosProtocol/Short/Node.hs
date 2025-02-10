@@ -223,13 +223,13 @@ relayIBConfig ::
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
 relayIBConfig _tracer cfg validateHeaders submitBlocks =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = 100}
+    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ibDiffusion.maxWindowSize}
     , headerId = (.id)
     , validateHeaders
-    , prioritize = prioritize cfg.leios.ibDiffusionStrategy (.slot)
+    , prioritize = prioritize cfg.leios.ibDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
-    , maxHeadersToRequest = 100
-    , maxBodiesToRequest = 1
+    , maxHeadersToRequest = cfg.leios.ibDiffusion.maxHeadersToRequest
+    , maxBodiesToRequest = cfg.leios.ibDiffusion.maxBodiesToRequest
     , submitBlocks
     }
 
@@ -241,13 +241,13 @@ relayEBConfig ::
   RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock m
 relayEBConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = 100}
+    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize}
     , headerId = (.id)
     , validateHeaders = const $ return ()
-    , prioritize = prioritize cfg.leios.ebDiffusionStrategy (.slot)
+    , prioritize = prioritize cfg.leios.ebDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
-    , maxHeadersToRequest = 100
-    , maxBodiesToRequest = 1 -- should we chunk bodies here?
+    , maxHeadersToRequest = cfg.leios.ebDiffusion.maxHeadersToRequest
+    , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     }
@@ -260,13 +260,13 @@ relayVoteConfig ::
   RelayConsumerConfig VoteId (RelayHeader VoteId) VoteMsg m
 relayVoteConfig _tracer cfg submitBlocks =
   RelayConsumerConfig
-    { relay = RelayConfig{maxWindowSize = 100}
+    { relay = RelayConfig{maxWindowSize = coerce cfg.leios.voteDiffusion.maxWindowSize}
     , headerId = (.id)
     , validateHeaders = const $ return ()
-    , prioritize = prioritize cfg.leios.voteDiffusionStrategy (.slot)
+    , prioritize = prioritize cfg.leios.voteDiffusion.strategy (.slot)
     , submitPolicy = SubmitAll
-    , maxHeadersToRequest = 100
-    , maxBodiesToRequest = 1 -- should we chunk bodies here?
+    , maxHeadersToRequest = cfg.leios.voteDiffusion.maxHeadersToRequest
+    , maxBodiesToRequest = cfg.leios.voteDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     }

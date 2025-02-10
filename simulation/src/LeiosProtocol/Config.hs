@@ -21,6 +21,7 @@ import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (cons
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
+import Data.Word
 import Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import GHC.Exception (displayException)
@@ -76,12 +77,18 @@ data Config = Config
   , ibBodyMaxSizeBytes :: SizeBytes
   , ibBodyAvgSizeBytes :: SizeBytes
   , ibDiffusionStrategy :: DiffusionStrategy
+  , ibDiffusionMaxWindowSize :: Word16
+  , ibDiffusionMaxHeadersToRequest :: Word16
+  , ibDiffusionMaxBodiesToRequest :: Word16
   , ebGenerationProbability :: Double
   , ebGenerationCpuTimeMs :: DurationMs
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
   , ebDiffusionStrategy :: DiffusionStrategy
+  , ebDiffusionMaxWindowSize :: Word16
+  , ebDiffusionMaxHeadersToRequest :: Word16
+  , ebDiffusionMaxBodiesToRequest :: Word16
   , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
@@ -90,6 +97,9 @@ data Config = Config
   , voteBundleSizeBytesConstant :: SizeBytes
   , voteBundleSizeBytesPerEb :: SizeBytes
   , voteDiffusionStrategy :: DiffusionStrategy
+  , voteDiffusionMaxWindowSize :: Word16
+  , voteDiffusionMaxHeadersToRequest :: Word16
+  , voteDiffusionMaxBodiesToRequest :: Word16
   , certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
@@ -127,12 +137,18 @@ instance Default Config where
       , ibBodyMaxSizeBytes = 327680
       , ibBodyAvgSizeBytes = 327680
       , ibDiffusionStrategy = FreshestFirst
+      , ibDiffusionMaxWindowSize = 100
+      , ibDiffusionMaxHeadersToRequest = 100
+      , ibDiffusionMaxBodiesToRequest = 1
       , ebGenerationProbability = 5.0
       , ebGenerationCpuTimeMs = 300.0
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 32
       , ebSizeBytesPerIb = 32
       , ebDiffusionStrategy = PeerOrder
+      , ebDiffusionMaxWindowSize = 100
+      , ebDiffusionMaxHeadersToRequest = 100
+      , ebDiffusionMaxBodiesToRequest = 1
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 1.0
       , voteGenerationCpuTimeMsPerIb = 1.0
@@ -141,6 +157,9 @@ instance Default Config where
       , voteBundleSizeBytesConstant = 32
       , voteBundleSizeBytesPerEb = 32
       , voteDiffusionStrategy = PeerOrder
+      , voteDiffusionMaxWindowSize = 100
+      , voteDiffusionMaxHeadersToRequest = 100
+      , voteDiffusionMaxBodiesToRequest = 1
       , certGenerationCpuTimeMsConstant = 50.0
       , certGenerationCpuTimeMsPerNode = 1.0
       , certValidationCpuTimeMsConstant = 50.0
@@ -160,6 +179,7 @@ configToKVsWith getter cfg =
   catMaybes
     [ get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
+    , get @"leiosVoteSendRecvStages" getter cfg
     , get @"txGenerationDistribution" getter cfg
     , get @"txSizeBytesDistribution" getter cfg
     , get @"txValidationCpuTimeMs" getter cfg
@@ -180,11 +200,19 @@ configToKVsWith getter cfg =
     , get @"ibBodyValidationCpuTimeMsPerByte" getter cfg
     , get @"ibBodyMaxSizeBytes" getter cfg
     , get @"ibBodyAvgSizeBytes" getter cfg
+    , get @"ibDiffusionStrategy" getter cfg
+    , get @"ibDiffusionMaxWindowSize" getter cfg
+    , get @"ibDiffusionMaxHeadersToRequest" getter cfg
+    , get @"ibDiffusionMaxBodiesToRequest" getter cfg
     , get @"ebGenerationProbability" getter cfg
     , get @"ebGenerationCpuTimeMs" getter cfg
     , get @"ebValidationCpuTimeMs" getter cfg
     , get @"ebSizeBytesConstant" getter cfg
     , get @"ebSizeBytesPerIb" getter cfg
+    , get @"ebDiffusionStrategy" getter cfg
+    , get @"ebDiffusionMaxWindowSize" getter cfg
+    , get @"ebDiffusionMaxHeadersToRequest" getter cfg
+    , get @"ebDiffusionMaxBodiesToRequest" getter cfg
     , get @"voteGenerationProbability" getter cfg
     , get @"voteGenerationCpuTimeMsConstant" getter cfg
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
@@ -192,6 +220,10 @@ configToKVsWith getter cfg =
     , get @"voteThreshold" getter cfg
     , get @"voteBundleSizeBytesConstant" getter cfg
     , get @"voteBundleSizeBytesPerEb" getter cfg
+    , get @"voteDiffusionStrategy" getter cfg
+    , get @"voteDiffusionMaxWindowSize" getter cfg
+    , get @"voteDiffusionMaxHeadersToRequest" getter cfg
+    , get @"voteDiffusionMaxBodiesToRequest" getter cfg
     , get @"certGenerationCpuTimeMsConstant" getter cfg
     , get @"certGenerationCpuTimeMsPerNode" getter cfg
     , get @"certValidationCpuTimeMsConstant" getter cfg
@@ -243,12 +275,18 @@ instance FromJSON Config where
     ibBodyMaxSizeBytes <- parseFieldOrDefault @Config @"ibBodyMaxSizeBytes" obj
     ibBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ibBodyAvgSizeBytes" obj
     ibDiffusionStrategy <- parseFieldOrDefault @Config @"ibDiffusionStrategy" obj
+    ibDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ibDiffusionMaxWindowSize" obj
+    ibDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxHeadersToRequest" obj
+    ibDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxBodiesToRequest" obj
     ebGenerationProbability <- parseFieldOrDefault @Config @"ebGenerationProbability" obj
     ebGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ebGenerationCpuTimeMs" obj
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
     ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
+    ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
+    ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj
+    ebDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxBodiesToRequest" obj
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
@@ -257,6 +295,9 @@ instance FromJSON Config where
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
     voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
     voteDiffusionStrategy <- parseFieldOrDefault @Config @"voteDiffusionStrategy" obj
+    voteDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"voteDiffusionMaxWindowSize" obj
+    voteDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"voteDiffusionMaxHeadersToRequest" obj
+    voteDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"voteDiffusionMaxBodiesToRequest" obj
     certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
     certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
     certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj

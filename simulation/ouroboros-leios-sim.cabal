@@ -205,6 +205,7 @@ test-suite ols-test
     , tasty-quickcheck
     , text
     , yaml
+    , bytestring
   other-modules:
     Paths_ouroboros_leios_sim
     Test.Topology

@@ -33,6 +33,9 @@ export interface Config {
   "ib-body-max-size-bytes": bigint;
   "ib-body-avg-size-bytes": bigint;
   "ib-diffusion-strategy": DiffusionStrategy;
+  "ib-diffusion-max-window-size": bigint;
+  "ib-diffusion-max-headers-to-request": bigint;
+  "ib-diffusion-max-bodies-to-request": bigint;
 
   // Endorsement Block Configuration
   "eb-generation-probability": number;
@@ -41,6 +44,9 @@ export interface Config {
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
   "eb-diffusion-strategy": DiffusionStrategy;
+  "eb-diffusion-max-window-size": bigint;
+  "eb-diffusion-max-headers-to-request": bigint;
+  "eb-diffusion-max-bodies-to-request": bigint;
 
   // Vote Configuration
   "vote-generation-probability": number;
@@ -51,6 +57,9 @@ export interface Config {
   "vote-bundle-size-bytes-constant": bigint;
   "vote-bundle-size-bytes-per-eb": bigint;
   "vote-diffusion-strategy": DiffusionStrategy;
+  "vote-diffusion-max-window-size": bigint;
+  "vote-diffusion-max-headers-to-request": bigint;
+  "vote-diffusion-max-bodies-to-request": bigint;
 
   // deprecated:
   // "vote-one-eb-per-vrf-win": boolean;
