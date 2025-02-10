@@ -394,13 +394,11 @@ data SimCommand
       { seed :: Int
       , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
-      , overrideUnlimitedBps :: Bytes
       }
   | SimShortLeios
       { seed :: Int
       , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
-      , overrideUnlimitedBps :: Bytes
       , emitControl :: Bool
       , skipLog :: Bool
       }
@@ -421,7 +419,6 @@ parserSimPraosDiffusion =
     <$> parserSeed
     <*> parserConfigOptions
     <*> parserTopologyOptions
-    <*> parserOverrideUnlimited
 
 parserShortLeios :: Parser SimCommand
 parserShortLeios =
@@ -429,7 +426,6 @@ parserShortLeios =
     <$> parserSeed
     <*> parserConfigOptions
     <*> parserTopologyOptions
-    <*> parserOverrideUnlimited
     <*> switch (long "log-control" <> help "Include control messages in log.")
     <*> switch (long "no-log" <> help "Do not output event log.")
 
