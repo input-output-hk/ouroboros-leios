@@ -45,14 +45,14 @@ import System.Random (StdGen, mkStdGen)
 import qualified Topology as P2P
 import Viz
 
-example1 :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> Visualization
+example1 :: StdGen -> OnDisk.Config -> P2P.P2PNetwork -> Visualization
 example1 _rng0 _cfg _p2pNetwork@P2P.P2PNetwork{p2pLinks, p2pNodeStakes}
   | not $ null [() | (_, Nothing) <- Map.elems p2pLinks] =
       error "Only finite bandwidth for this vizualization"
   | length (List.group $ Map.elems p2pNodeStakes) /= 1 =
       error "Only uniform stake supported for this vizualization"
 example1 rng0 cfg p2pNetwork =
-  Viz (praosSimVizModel (example1Trace rng0 cfg p2pNetwork)) $
+  Viz (praosSimVizModel (example1Trace rng0 (convertConfig cfg) p2pNetwork)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -260,7 +260,7 @@ convertConfig disk = praos
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
   StdGen ->
-  Maybe OnDisk.Config ->
+  OnDisk.Config ->
   P2P.P2PNetwork ->
   -- | when to stop simulation.
   Time ->
@@ -296,8 +296,8 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCo
   logMsg ((PraosMessage _)) = Nothing
 
   traceFile = dropExtension fp <.> "log"
-  praosConfig = maybe defaultPraosConfig convertConfig cfg
   stake nid = maybe undefined coerce $ Map.lookup nid p2pNodeStakes
+  praosConfig = convertConfig cfg
   trace =
     tracePraosP2P
       rng0

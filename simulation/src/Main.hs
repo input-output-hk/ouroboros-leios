@@ -14,10 +14,10 @@ import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import qualified Data.Traversable as Traversable
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import LeiosProtocol.Common (BlockBody, PraosConfig)
 import qualified LeiosProtocol.Config as OnDisk
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
@@ -30,6 +30,7 @@ import Options.Applicative (
   Parser,
   ParserInfo,
   ParserPrefs,
+  asum,
   auto,
   command,
   commandGroup,
@@ -199,7 +200,7 @@ data VizSubCommand
   | VizPraos1
   | VizPraosP2P1
       { seed :: Int
-      , optionalConfigFile :: Maybe FilePath
+      , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
       , overrideUnlimitedBps :: Bytes
       }
@@ -208,7 +209,12 @@ data VizSubCommand
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, configFile :: FilePath, topologyOptions :: TopologyOptions, overrideUnlimitedBps :: Bytes}
+  | VizShortLeiosP2P1
+      { seed :: Int
+      , configOptions :: ConfigOptions
+      , topologyOptions :: TopologyOptions
+      , overrideUnlimitedBps :: Bytes
+      }
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -262,7 +268,7 @@ parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
   VizPraosP2P1
     <$> parserSeed
-    <*> optional parserLeiosConfigFile
+    <*> parserConfigOptions
     <*> parserTopologyOptions
     <*> parserOverrideUnlimited
 
@@ -286,7 +292,7 @@ parserShortLeiosP2P1 =
           <> help "The seed for the random number generator."
           <> shownDefValue 0
       )
-    <*> parserLeiosConfigFile
+    <*> parserConfigOptions
     <*> parserTopologyOptions
     <*> parserOverrideUnlimited
 
@@ -306,7 +312,7 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
-    cfg <- fromMaybe def <$> traverse (fmap VizPraosP2P.convertConfig . OnDisk.readConfig) optionalConfigFile
+    cfg <- execConfigOptions configOptions
     pure $ VizPraosP2P.example1 rng2 cfg p2pNetwork
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
@@ -317,8 +323,8 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
-    config <- OnDisk.readConfig configFile
-    pure $ VizShortLeiosP2P.example2 rng2 config p2pNetwork
+    cfg <- execConfigOptions configOptions
+    pure $ VizShortLeiosP2P.example2 rng2 cfg p2pNetwork
 
 type VizSize = (Int, Int)
 
@@ -356,14 +362,14 @@ runSimOptions SimOptions{..} = case simCommand of
   SimPraosDiffusion{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    mconfig <- Traversable.traverse OnDisk.readConfig optionalConfigFile
+    config <- execConfigOptions configOptions
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
     -- let bandwidth = 10 * 125_000_000 :: Bytes -- 10 Gbps TODO: set in config
-    VizPraosP2P.example1000Diffusion rng2 mconfig p2pNetwork simOutputSeconds simOutputFile
+    VizPraosP2P.example1000Diffusion rng2 config p2pNetwork simOutputSeconds simOutputFile
   SimShortLeios{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    config <- OnDisk.readConfig configFile
+    config <- execConfigOptions configOptions
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
     VizShortLeiosP2P.exampleSim (not skipLog) rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
 
@@ -390,13 +396,13 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion
       { seed :: Int
-      , optionalConfigFile :: Maybe FilePath
+      , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
       , overrideUnlimitedBps :: Bytes
       }
   | SimShortLeios
       { seed :: Int
-      , configFile :: FilePath
+      , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
       , overrideUnlimitedBps :: Bytes
       , emitControl :: Bool
@@ -417,7 +423,7 @@ parserSimPraosDiffusion :: Parser SimCommand
 parserSimPraosDiffusion =
   SimPraosDiffusion
     <$> parserSeed
-    <*> optional parserLeiosConfigFile
+    <*> parserConfigOptions
     <*> parserTopologyOptions
     <*> parserOverrideUnlimited
 
@@ -425,11 +431,30 @@ parserShortLeios :: Parser SimCommand
 parserShortLeios =
   SimShortLeios
     <$> parserSeed
-    <*> parserLeiosConfigFile
+    <*> parserConfigOptions
     <*> parserTopologyOptions
     <*> parserOverrideUnlimited
     <*> switch (long "log-control" <> help "Include control messages in log.")
     <*> switch (long "no-log" <> help "Do not output event log.")
+
+data ConfigOptions
+  = LeiosConfigFile FilePath
+  | LeiosConfig OnDisk.Config
+
+execConfigOptions :: ConfigOptions -> IO OnDisk.Config
+execConfigOptions = \case
+  LeiosConfigFile configFile -> OnDisk.readConfig configFile
+  LeiosConfig config -> pure config
+
+execConfigOptionsForPraos :: ConfigOptions -> IO (PraosConfig BlockBody)
+execConfigOptionsForPraos = fmap VizPraosP2P.convertConfig . execConfigOptions
+
+parserConfigOptions :: Parser ConfigOptions
+parserConfigOptions =
+  asum
+    [ LeiosConfigFile <$> parserLeiosConfigFile
+    , pure $ LeiosConfig def
+    ]
 
 parserLeiosConfigFile :: Parser FilePath
 parserLeiosConfigFile =
@@ -559,10 +584,16 @@ data TopologyOptions
   = TopologyFile FilePath
   | TopologyGenerationOptions TopologyGenerationOptions
 
+instance Default TopologyOptions where
+  def = TopologyGenerationOptions def
+
 parserTopologyOptions :: Parser TopologyOptions
 parserTopologyOptions =
-  (TopologyFile <$> parserTopologyFile)
-    <|> (TopologyGenerationOptions <$> parserTopologyGenerationOptions)
+  asum
+    [ TopologyFile <$> parserTopologyFile
+    , TopologyGenerationOptions <$> parserTopologyGenerationOptions
+    , pure def
+    ]
 
 parserTopologyFile :: Parser FilePath
 parserTopologyFile =
@@ -576,6 +607,9 @@ parserTopologyFile =
 data TopologyGenerationOptions
   = TopologyGenerationStrategyFile FilePath
   | TopologyGenerationStrategy TopologyGenerationStrategy
+
+instance Default TopologyGenerationOptions where
+  def = TopologyGenerationStrategy def
 
 parserTopologyGenerationOptions :: Parser TopologyGenerationOptions
 parserTopologyGenerationOptions =
@@ -595,7 +629,7 @@ parserTopologyGenerationStrategy :: Parser TopologyGenerationStrategy
 parserTopologyGenerationStrategy =
   subparser . mconcat $
     [ commandGroup "Available topology generation strategies:"
-    , command "close-and-random" . info (PickLinksCloseAndRandom <$> parserPickLinksCloseAndRandomOptions) $
+    , command "close-and-random" . info (PickLinksCloseAndRandom <$> parserPickLinksCloseAndRandomOptions <**> helper) $
         progDesc "Pick links to close and random nodes."
     ]
 
@@ -605,21 +639,21 @@ parserPickLinksCloseAndRandomOptions =
     <$> parserWorld
     <*> option
       auto
-      ( long "tg-num-nodes"
+      ( long "tg-cnr-num-nodes"
           <> metavar "NUMBER"
           <> help "The number of nodes."
           <> shownDefValue (numNodes def)
       )
     <*> option
       auto
-      ( long "tg-num-links-close"
+      ( long "tg-cnr-num-links-close"
           <> metavar "NUMBER"
           <> help "The number of links to close peers for each node."
           <> shownDefValue (numCloseLinksPerNode def)
       )
     <*> option
       auto
-      ( long "tg-num-links-random"
+      ( long "tg-cnr-num-links-random"
           <> metavar "NUMBER"
           <> help "The number of links to random peers for each node."
           <> shownDefValue (numRandomLinksPerNode def)

@@ -890,10 +890,6 @@ data PickLinksCloseAndRandomOptions = PickLinksCloseAndRandomOptions
   }
   deriving (Eq, Show, Generic)
 
-data TopologyGenerationStrategy
-  = PickLinksCloseAndRandom !PickLinksCloseAndRandomOptions
-  deriving (Eq, Show, Generic)
-
 instance Default PickLinksCloseAndRandomOptions where
   def =
     PickLinksCloseAndRandomOptions
@@ -902,6 +898,13 @@ instance Default PickLinksCloseAndRandomOptions where
       , numCloseLinksPerNode = 5
       , numRandomLinksPerNode = 5
       }
+
+data TopologyGenerationStrategy
+  = PickLinksCloseAndRandom !PickLinksCloseAndRandomOptions
+  deriving (Eq, Show, Generic)
+
+instance Default TopologyGenerationStrategy where
+  def = PickLinksCloseAndRandom def
 
 generateTopology :: RandomGen g => g -> TopologyGenerationStrategy -> IO P2PNetwork
 generateTopology rng0 = \case
