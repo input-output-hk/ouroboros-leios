@@ -1,5 +1,29 @@
 # Leios logbook
 
+## 2025-02-10
+
+### Haskell simulation
+
+- Added support for:
+  - Send and Receive Voting stages, rather than just a single Vote stage.
+    - See `leios-vote-send-recv-stages` config.
+    - If used, should also set `leios-stage-active-voting-slots` to length of stage.
+  - oldest-first diffusion strategy, and strategy configuration for EBs and votes.
+    - See `ib-diffusion-strategy`, `eb-diffusion-strategy`, and `vote-diffusion-strategy`.
+- Added `data/simulation/small` scenario with config for 100 nodes with 2000kBs links.
+  - The IB size and generation rate is tuned to utilize a third of 2000kBs, as Short-Leios targets.
+  - One config file for single-stage and one for send-recv voting (also covering 5 and 20 stage lengths).
+  - Other size and timing parameters are mostly the defaults, which should be reviewed.
+- Used trace and metrics from `small` scenario to investigate simulation behaviour.
+  - Added more details to block generation and `Sent` events.
+  - Fixed block generation so own blocks are considered on-par with validated blocks a node received.
+  - Made sure an EB cannot be included more than once in the base chain.
+  - Confirmed trace shows EBs are regularly included in RBs that are
+    generated more than 5s after votes start diffusing.
+- Main difference observed between single-stage and send-recv is the
+  former shows a longer tail in the CPU usage CDF when simulation is
+  run with unlimited cores.
+
 ## 2025-02-07
 
 ### Reference implementation and benchmarking of Leios cryptography
