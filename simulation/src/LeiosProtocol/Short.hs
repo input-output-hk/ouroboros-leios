@@ -340,9 +340,13 @@ stageRangeOf :: forall p. IsPipeline p => LeiosConfig -> PipelineNo -> Stage p -
 stageRangeOf cfg pl stage =
   fromMaybe
     undefined
-    (stageRange cfg minBound (toEnum (fromEnum pl * pLength)) stage)
- where
-  pLength = length $ allStages @p
+    (stageRange cfg minBound (toEnum (fromEnum pl * cfg.sliceLength)) stage)
+
+pipelineOf :: forall p. IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> PipelineNo
+pipelineOf cfg stage sl =
+  toEnum $
+    fromMaybe undefined (fromEnum <$> stageStart cfg stage sl minBound)
+      `div` cfg.sliceLength
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -497,6 +501,9 @@ endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
    in filter cond $
         maybe [] ebs.validEndorseBlocks (stageRange cfg voteSendStage slot Endorse)
+
+endorseBlockPipeline :: LeiosConfig -> EndorseBlock -> PipelineNo
+endorseBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} eb = pipelineOf @p cfg Endorse eb.slot
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.
