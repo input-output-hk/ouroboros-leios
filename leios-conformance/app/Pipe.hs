@@ -64,7 +64,8 @@ handle :: MonadIO m => MonadSTM m => NodeModel -> NodeRequest -> m (NodeResponse
 handle node =
   \case
     Initialize -> pure (def, node)
-    NewSlot ibs ebs votes -> -- FIXME: put into FFD
+    NewSlot ibs ebs votes ->
+      -- FIXME: put into FFD
       case makeStep' node of
         Success (_, node') ->
           let ibs' = [] -- FIXME: get from FFD
