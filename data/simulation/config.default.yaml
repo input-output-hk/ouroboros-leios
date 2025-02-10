@@ -12,7 +12,7 @@
 ################################################################################
 
 relay-strategy: "request-from-first"
-tcp: true
+tcp-congestion-control: true
 multiplex-mini-protocols: true
 
 ################################################################################

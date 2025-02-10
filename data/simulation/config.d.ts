@@ -6,7 +6,7 @@ export interface Config {
   /** Only supported by Haskell simulation. */
   "relay-strategy": RelayStrategy;
   /** Only supported by Haskell simulation. */
-  tcp: boolean;
+  "tcp-congestion-control": boolean;
   /** Only supported by Haskell simulation. */
   "multiplex-mini-protocols": boolean;
 
