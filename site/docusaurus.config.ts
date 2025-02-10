@@ -1,32 +1,32 @@
-import { themes as prismThemes } from 'prism-react-renderer';
-import type { Config } from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import type * as Preset from "@docusaurus/preset-classic";
+import type { Config } from "@docusaurus/types";
+import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
-    title: 'Leios',
-    tagline: 'A high-throughput protocol for Cardano',
-    favicon: 'img/wave-logo.ico',
+    title: "Leios",
+    tagline: "A high-throughput protocol for Cardano",
+    favicon: "img/wave-logo.ico",
 
     // Set the production url of your site here
-    url: 'https://leios.cardano-scaling.org/',
+    url: "https://leios.cardano-scaling.org/",
     // Set the /<baseUrl>/ pathname under which your site is served
     // For GitHub pages deployment, it is often '/<projectName>/'
-    baseUrl: '/',
+    baseUrl: "/",
 
     // GitHub pages deployment config.
     // If you aren't using GitHub pages, you don't need these.
-    organizationName: 'input-output-hk', // Usually your GitHub org/user name.
-    projectName: 'ouroboros-leios', // Usually your repo name.
+    organizationName: "input-output-hk", // Usually your GitHub org/user name.
+    projectName: "ouroboros-leios", // Usually your repo name.
 
-    onBrokenLinks: 'throw',
-    onBrokenMarkdownLinks: 'warn',
+    onBrokenLinks: "throw",
+    onBrokenMarkdownLinks: "warn",
 
     // Even if you don't use internationalization, you can use this field to set
     // useful metadata like html lang. For example, if your site is Chinese, you
     // may want to replace "en" with "zh-Hans".
     i18n: {
-        defaultLocale: 'en',
-        locales: ['en'],
+        defaultLocale: "en",
+        locales: ["en"],
     },
 
     scripts: [
@@ -39,82 +39,109 @@ const config: Config = {
 
     presets: [
         [
-            'classic',
+            "classic",
             {
                 docs: {
-                    sidebarPath: './sidebars.ts',
+                    sidebarPath: "./sidebars.ts",
                 },
                 blog: {
-                    path: 'news/',
-                    routeBasePath: 'news',
+                    path: "news/",
+                    routeBasePath: "news",
                     blogTitle: "News",
                     blogSidebarTitle: "Latest News",
-                    sortPosts: 'descending',
+                    sortPosts: "descending",
                     showReadingTime: true,
                     authorsMapPath: "../authors.yaml",
                 },
                 theme: {
-                    customCss: './src/css/custom.css',
+                    customCss: "./src/css/custom.css",
                 },
             } satisfies Preset.Options,
         ],
     ],
 
     themeConfig: {
+        metadata: [{
+            name: "description",
+            content:
+                "Ouroboros Leios is a high-throughput protocol designed to scale Cardano by optimizing transaction processing and network resource utilization.",
+        }],
         // Replace with your project's social card
-        image: 'img/docusaurus-social-card.jpg',
+        image: "img/docusaurus-social-card.jpg",
         navbar: {
-            title: 'Leios',
+            title: "Leios",
             logo: {
-                alt: 'Leios Logo',
-                src: 'img/wave-logo.svg',
+                alt: "Leios Logo",
+                src: "img/wave-logo.svg",
             },
             items: [
                 {
-                    type: 'docSidebar',
-                    sidebarId: 'tutorialSidebar',
-                    position: 'left',
-                    label: 'Documentation',
+                    type: "docSidebar",
+                    sidebarId: "tutorialSidebar",
+                    position: "left",
+                    label: "Documentation",
                 },
-                { to: '/news', label: 'Latest News', position: 'right' },
+                { to: "/news", label: "Latest News", position: "right" },
                 {
-                    href: 'https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3',
-                    label: 'Throughput Simulation',
-                    position: 'right',
-                },
-                {
-                    to: 'pathname:///cost-estimator/',
-                    label: 'Cost Estimator',
-                    position: 'right',
+                    href:
+                        "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
+                    label: "Throughput Simulation",
+                    position: "right",
                 },
                 {
-                    href: 'https://github.com/input-output-hk/ouroboros-leios',
-                    label: 'GitHub',
-                    position: 'right',
+                    to: "pathname:///cost-estimator/",
+                    label: "Cost Estimator",
+                    position: "right",
+                },
+                {
+                    href: "https://github.com/input-output-hk/ouroboros-leios",
+                    label: "GitHub",
+                    position: "right",
                 },
             ],
         },
         footer: {
             links: [
                 {
-                    title: 'Docs',
+                    title: "Docs",
                     items: [
                         {
-                            label: 'Introduction',
-                            to: '/docs/intro',
+                            label: "What is Ouroboros Leios?",
+                            to: "/docs/intro",
+                        },
+                        {
+                            label: "Protocol Overview",
+                            to: "/docs/protocol-overview",
+                        },
+                        {
+                            label: "How It Works",
+                            to: "/docs/how-it-works",
+                        },
+                        {
+                            label: "FAQ",
+                            to: "/docs/faq",
+                        },
+                        {
+                            label: "Glossary",
+                            to: "/docs/glossary",
+                        },
+                        {
+                            label: "Resources",
+                            to: "/docs/resources",
                         },
                     ],
                 },
                 {
-                    title: 'Community',
+                    title: "Community",
                     items: [
                         {
-                            label: 'Discord',
-                            href: 'https://discord.gg/83aXYxy9',
+                            label: "Discord",
+                            href: "https://discord.gg/83aXYxy9",
                         },
                         {
-                            label: 'GitHub Discussions',
-                            href: 'https://github.com/input-output-hk/ouroboros-leios/discussions',
+                            label: "GitHub Discussions",
+                            href:
+                                "https://github.com/input-output-hk/ouroboros-leios/discussions",
                         },
                     ],
                 },
@@ -134,12 +161,19 @@ const config: Config = {
                             to: "https://github.com/input-output-hk/ouroboros-leios/graphs/contributors",
                         },
                     ],
-                }],
-            copyright: `Copyright © ${new Date().getFullYear()} <strong>Input Output Global</strong> <br/> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br/> <small>Built with Docusaurus</small>`,
+                },
+            ],
+            copyright: `Copyright © ${
+                new Date().getFullYear()
+            } <strong>Input Output Global</strong> <br/> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br/> <small>Built with Docusaurus</small>`,
         },
         prism: {
             theme: prismThemes.github,
             darkTheme: prismThemes.dracula,
+        },
+        socials: {
+            github: "https://github.com/input-output-hk/ouroboros-leios",
+            discord: "https://discord.gg/83aXYxy9",
         },
     } satisfies Preset.ThemeConfig,
 };
