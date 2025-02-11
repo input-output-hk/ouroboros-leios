@@ -15,8 +15,14 @@ module Chan.Mux (
   newConnectionBundleTCP,
 ) where
 
-import Chan.Core
-import Chan.TCP
+import Chan.Core (Chan (..))
+import Chan.TCP (
+  LabelTcpDir,
+  MessageSize (..),
+  TcpConnProps,
+  TcpEvent,
+  newConnectionTCP,
+ )
 import qualified Control.Category as Cat
 import Control.Concurrent.Class.MonadMVar (
   MonadMVar (MVar, newMVar, withMVar),
@@ -60,8 +66,8 @@ instance Cat.Category ToFromMuxMsg where
   id = ToFromMuxMsg id id
   (.) (ToFromMuxMsg f f') (ToFromMuxMsg g g') = ToFromMuxMsg (g . f) (f' . g')
 
-dynToFromMuxMsg :: Typeable a => ToFromMuxMsg Dynamic a
-dynToFromMuxMsg = ToFromMuxMsg toDyn (fromJust . fromDynamic)
+-- dynToFromMuxMsg :: Typeable a => ToFromMuxMsg Dynamic a
+-- dynToFromMuxMsg = ToFromMuxMsg toDyn (fromJust . fromDynamic)
 
 data BearerMsg a = BearerMsg !Int a
 
