@@ -116,7 +116,9 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
             } = vote.clone()
             {
                 let p = sigma_eid.to_rational();
-                let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio();
+                let s =
+                   CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
+                     / reg.nonpersistent_stake.to_ratio();
                 if voter_check(reg.voters, &s, &p) > 0 {
                     votes.push(vote);
                 }

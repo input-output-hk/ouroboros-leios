@@ -2,10 +2,10 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::fait_accompli::*;
+use crate::fait_accompli::fait_accompli;
 use crate::key::{arbitrary_reg, Reg, SecKey};
 use crate::primitive::{
-    arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, PoolKeyhash,
+    arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, CoinFraction, PoolKeyhash,
 };
 use crate::realism::realistic_voters;
 
@@ -57,6 +57,7 @@ pub struct Registry {
     pub persistent_pool: BTreeMap<PersistentId, PoolKeyhash>,
     pub persistent_id: BTreeMap<PoolKeyhash, PersistentId>,
     pub total_stake: Coin,
+    pub nonpersistent_stake: CoinFraction,
     pub voters: usize,
 }
 
@@ -83,6 +84,7 @@ impl Registry {
             persistent_pool,
             persistent_id,
             total_stake,
+            nonpersistent_stake: fa.rho,
             voters,
         }
     }
