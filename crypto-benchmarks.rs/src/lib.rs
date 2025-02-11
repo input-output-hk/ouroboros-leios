@@ -4,6 +4,7 @@ pub mod cert;
 pub mod fait_accompli;
 pub mod key;
 pub mod primitive;
+pub mod realism;
 pub mod registry;
 pub mod sortition;
 pub mod util;

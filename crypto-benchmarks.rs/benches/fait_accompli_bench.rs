@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;
 
-use leios_crypto_benchmarks::fait_accompli::fait_accompli;
+use leios_crypto_benchmarks::fait_accompli::FaSortition;
 use leios_crypto_benchmarks::primitive::{arbitrary_coin, Coin, PoolKeyhash};
 
 fn benchmark_fa(c: &mut Criterion) {
@@ -47,7 +47,7 @@ fn benchmark_fa(c: &mut Criterion) {
                 let n = usize::arbitrary(g) % 500 + 500;
                 (pools, n)
             },
-            |(pools, n)| fait_accompli(&pools, n),
+            |(pools, n)| FaSortition::fait_accompli(&pools, n),
             criterion::BatchSize::SmallInput,
         )
     });

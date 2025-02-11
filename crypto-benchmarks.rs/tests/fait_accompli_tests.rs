@@ -26,7 +26,7 @@ fn fa_test() {
     stakes.insert(p6, 50);
     stakes.insert(p2, 500);
 
-    let fa = fait_accompli(&stakes, 5);
+    let fa = FaSortition::fait_accompli(&stakes, 5);
 
     assert_eq!(4, fa.n_persistent, "Incorrect number of persistent voters.");
     assert_eq!(
@@ -34,27 +34,27 @@ fn fa_test() {
         "Incorrect number of non-persistent voters."
     );
     assert_eq!(
-        Ratio::from_integer(BigInt::from(100)),
-        fa.rho,
+        Ratio::from_integer(BigInt::from(200)),
+        fa.rho.0,
         "Incorrect rho."
     );
 
-    let expected_persistent: Vec<(PoolKeyhash, Ratio<BigInt>)> =
-        vec![(p1, 3000u64), (p2, 500u64), (p3, 200u64), (p4, 100u64)]
+    let expected_persistent: Vec<(PoolKeyhash, CoinFraction)> =
+        [(p1, 3000u64), (p2, 500u64), (p3, 200u64), (p4, 100u64)]
             .iter()
-            .map(|(p, x)| (*p, Ratio::from_integer(BigInt::from(*x))))
+            .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 1)))
             .collect();
     assert_eq!(
         expected_persistent, fa.persistent,
         "Unexpected persistent voters."
     );
 
-    let expected_nonpersistent: Vec<(PoolKeyhash, Ratio<BigInt>)> =
-        vec![(p8, 10u64), (p5, 100u64), (p6, 50u64), (p7, 40u64)]
+    let expected_nonpersistent: Vec<(PoolKeyhash, CoinFraction)> =
+        [(p8, 10u64), (p5, 100u64), (p6, 50u64), (p7, 40u64)]
             .iter()
-            .map(|(p, x)| (*p, Ratio::new(BigInt::from(*x), BigInt::from(100))))
+            .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 200)))
             .collect();
-    let actual_nonpersistent: Vec<(PoolKeyhash, Ratio<BigInt>)> =
+    let actual_nonpersistent: Vec<(PoolKeyhash, CoinFraction)> =
         fa.nonpersistent.into_iter().collect();
     assert_eq!(
         expected_nonpersistent, actual_nonpersistent,

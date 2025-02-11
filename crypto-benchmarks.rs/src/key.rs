@@ -1,4 +1,5 @@
 use blst::min_sig::*;
+use blst::BLST_ERROR;
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use quickcheck::{Arbitrary, Gen};
@@ -160,19 +161,24 @@ pub struct Reg {
     pub kes_sig: KesSig,   // 448 bytes
 } // 668 bytes
 
+pub fn arbitrary_reg(g: &mut Gen, pool: &PoolKeyhash, sk: &SecKey) -> Reg {
+    let (mu1, mu2) = bls_vote::make_pop(&sk.0);
+    Reg {
+        pool: *pool,
+        mvk: sk.pub_key(),
+        mu: PoP {
+            mu1: Sig(mu1),
+            mu2: Sig(mu2),
+        },
+        kes_sig: KesSig::arbitrary(g),
+    }
+}
+
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
-        let sk: SecretKey = SecKey::arbitrary(g).0;
-        let (mu1, mu2) = bls_vote::make_pop(&sk);
-        Reg {
-            pool: arbitrary_poolkeyhash(g),
-            mvk: PubKey::arbitrary(g),
-            mu: PoP {
-                mu1: Sig(mu1),
-                mu2: Sig(mu2),
-            },
-            kes_sig: KesSig::arbitrary(g),
-        }
+        let pool = arbitrary_poolkeyhash(g);
+        let sk = SecKey::arbitrary(g);
+        arbitrary_reg(g, &pool, &sk)
     }
 }
 
@@ -192,4 +198,13 @@ pub fn key_gen() -> (SecKey, PubKey, PoP) {
 
 pub fn check_pop(mvk: &PubKey, mu: &PoP) -> bool {
     bls_vote::check_pop(&mvk.0, &mu.mu1.0, &mu.mu2.0)
+}
+
+pub fn sign_message(sk: &SecKey, dst: &[u8], msg: &[u8]) -> Sig {
+    Sig(sk.0.sign(msg, dst, &[]))
+}
+
+pub fn verify_message(pk: &PubKey, dst: &[u8], msg: &[u8], sig: &Sig) -> bool {
+    let result = sig.0.verify(true, msg, dst, &[], &pk.0, true);
+    result == BLST_ERROR::BLST_SUCCESS
 }
