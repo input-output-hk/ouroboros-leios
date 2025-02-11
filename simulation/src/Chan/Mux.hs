@@ -12,26 +12,18 @@
 module Chan.Mux (
   ToFromBundleMsg (..),
   ConnectionBundle (..),
-  newConnectionBundleTCP,
+  fromBearerMsg,
+  newMuxChan,
 ) where
 
 import Chan.Core (Chan (..))
-import Chan.TCP (
-  LabelTcpDir,
-  MessageSize (..),
-  TcpConnProps,
-  TcpEvent,
-  newConnectionTCP,
- )
+import Chan.TCP (MessageSize (..))
 import qualified Control.Category as Cat
 import Control.Concurrent.Class.MonadMVar (MonadMVar (..))
 import Control.Monad (forever)
-import Control.Monad.Class.MonadAsync (MonadAsync)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
-import Control.Tracer (Contravariant (contramap), Tracer)
 import Data.Array (Array, listArray, (!))
 import STMCompat
-import TimeCompat
 
 class ConnectionBundle bundle where
   type BundleMsg bundle
@@ -142,17 +134,6 @@ demuxer bearer queues =
     case queues ! i of
       RecvQueue convert queue ->
         atomically $ writeTQueue queue $! convert msg
-
-newConnectionBundleTCP ::
-  forall bundle m.
-  (ConnectionBundle bundle, MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize (BundleMsg bundle), MonadMVar m, MonadFork m) =>
-  Tracer m (LabelTcpDir (TcpEvent (BundleMsg bundle))) ->
-  TcpConnProps ->
-  m (bundle (Chan m), bundle (Chan m))
-newConnectionBundleTCP tracer tcpprops = do
-  let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
-  (mA, mB) <- newConnectionTCP tracer' tcpprops
-  (,) <$> newMuxChan mA <*> newMuxChan mB
 
 data ExampleBundle f = ExampleBundle
   { exampleFoo :: f Int
