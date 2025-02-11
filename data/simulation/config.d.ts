@@ -3,7 +3,6 @@
 /** A configuration for a Leios simulation. */
 export interface Config {
   // Simulation Configuration
-  /** Only supported by Haskell simulation. */
   "relay-strategy": RelayStrategy;
   /** Only supported by Haskell simulation. */
   "tcp-congestion-control": boolean;

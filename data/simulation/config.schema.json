@@ -258,8 +258,7 @@
       "type": "number"
     },
     "relay-strategy": {
-      "$ref": "#/definitions/RelayStrategy",
-      "description": "Only supported by Haskell simulation."
+      "$ref": "#/definitions/RelayStrategy"
     },
     "tcp-congestion-control": {
       "description": "Only supported by Haskell simulation.",

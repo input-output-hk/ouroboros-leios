@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map, hash_map, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -14,7 +14,7 @@ use tracing::{info, trace};
 
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
-    config::{NodeConfiguration, NodeId, SimConfiguration},
+    config::{NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
     events::EventTracker,
     model::{
         Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
@@ -132,7 +132,7 @@ struct NodeLeiosState {
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
     ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
-    ebs: BTreeMap<EndorserBlockId, Arc<EndorserBlock>>,
+    ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
     votes_to_generate: BTreeMap<u64, usize>,
     votes_by_eb: BTreeMap<EndorserBlockId, Vec<NodeId>>,
@@ -140,18 +140,25 @@ struct NodeLeiosState {
 }
 
 enum InputBlockState {
+    HeaderPending,
     Pending(InputBlockHeader),
     Requested(InputBlockHeader),
     Received(Arc<InputBlock>),
 }
 impl InputBlockState {
-    fn header(&self) -> &InputBlockHeader {
+    fn header(&self) -> Option<&InputBlockHeader> {
         match self {
-            Self::Pending(header) => header,
-            Self::Requested(header) => header,
-            Self::Received(ib) => &ib.header,
+            Self::HeaderPending => None,
+            Self::Pending(header) => Some(header),
+            Self::Requested(header) => Some(header),
+            Self::Received(ib) => Some(&ib.header),
         }
     }
+}
+
+enum EndorserBlockState {
+    Pending,
+    Received(Arc<EndorserBlock>),
 }
 
 enum VoteBundleState {
@@ -292,11 +299,9 @@ impl Node {
                 .ebs
                 .keys()
                 .map(|eb_id| {
-                    let eb = self
-                        .leios
-                        .ebs
-                        .get(eb_id)
-                        .expect("node tried voting for an unknown EB");
+                    let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+                        panic!("node tried voting for an unknown EB");
+                    };
                     cpu_times.vote_generation_constant
                         + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
                 })
@@ -549,7 +554,9 @@ impl Node {
         };
         let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
-            let eb = self.leios.ebs.get(eb_id).unwrap();
+            let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+                panic!("Tried voting for EB which we haven't received");
+            };
             match self.should_vote_for(slot, eb) {
                 Ok(()) => true,
                 Err(reason) => {
@@ -603,6 +610,9 @@ impl Node {
             // If we are, get all referenced TXs out of the mempool
             let Some(eb) = self.leios.ebs.get(&endorsement.eb) else {
                 bail!("Missing endorsement block {}", endorsement.eb);
+            };
+            let EndorserBlockState::Received(eb) = eb else {
+                bail!("Haven't yet received endorsement block {}", endorsement.eb);
             };
             for ib_id in &eb.ibs {
                 let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
@@ -667,7 +677,9 @@ impl Node {
     }
 
     fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
-        let eb = self.leios.ebs.get(eb_id)?;
+        let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+            return None;
+        };
         let mut tx_set = HashSet::new();
         for ib_id in &eb.ibs {
             let InputBlockState::Received(ib) = self.leios.ibs.get(ib_id)? else {
@@ -707,8 +719,11 @@ impl Node {
     }
 
     fn receive_announce_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
-        if let hash_map::Entry::Vacant(e) = self.txs.entry(id) {
-            e.insert(TransactionView::Pending);
+        if self.txs.get(&id).is_none_or(|t| {
+            self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+                && matches!(t, TransactionView::Pending)
+        }) {
+            self.txs.insert(id, TransactionView::Pending);
             self.send_to(from, SimulationMessage::RequestTx(id))?;
         }
         Ok(())
@@ -735,10 +750,16 @@ impl Node {
 
     fn propagate_tx(&mut self, from: NodeId, tx: Arc<Transaction>) -> Result<()> {
         let id = tx.id;
+        if self
+            .txs
+            .insert(id, TransactionView::Received(tx.clone()))
+            .is_some_and(|tx| matches!(tx, TransactionView::Received(_)))
+        {
+            return Ok(());
+        }
         if self.trace {
             info!("node {} saw tx {id}", self.name);
         }
-        self.txs.insert(id, TransactionView::Received(tx.clone()));
         self.praos.mempool.insert(tx.id, tx.clone());
         for peer in &self.consumers {
             if *peer == from {
@@ -790,15 +811,22 @@ impl Node {
     }
 
     fn receive_announce_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        self.send_to(from, SimulationMessage::RequestIBHeader(id))?;
+        if self.leios.ibs.get(&id).is_none_or(|ib| {
+            self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+                && matches!(ib, InputBlockState::HeaderPending)
+        }) {
+            self.leios.ibs.insert(id, InputBlockState::HeaderPending);
+            self.send_to(from, SimulationMessage::RequestIBHeader(id))?;
+        }
         Ok(())
     }
 
     fn receive_request_ib_header(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(ib) = self.leios.ibs.get(&id) {
-            let header = ib.header().clone();
-            let have_body = matches!(ib, InputBlockState::Received(_));
-            self.send_to(from, SimulationMessage::IBHeader(header, have_body))?;
+            if let Some(header) = ib.header() {
+                let have_body = matches!(ib, InputBlockState::Received(_));
+                self.send_to(from, SimulationMessage::IBHeader(header.clone(), have_body))?;
+            }
         }
         Ok(())
     }
@@ -810,7 +838,12 @@ impl Node {
         has_body: bool,
     ) -> Result<()> {
         let id = header.id;
-        if self.leios.ibs.contains_key(&id) {
+        if self
+            .leios
+            .ibs
+            .get(&id)
+            .is_some_and(|ib| ib.header().is_some())
+        {
             return Ok(());
         }
         self.leios.ibs.insert(id, InputBlockState::Pending(header));
@@ -830,8 +863,14 @@ impl Node {
     }
 
     fn receive_announce_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
-        let Some(InputBlockState::Pending(header)) = self.leios.ibs.get(&id) else {
-            return Ok(());
+        let header = match self.leios.ibs.get(&id) {
+            Some(InputBlockState::Pending(header)) => header,
+            Some(InputBlockState::Requested(header))
+                if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
+            {
+                header
+            }
+            _ => return Ok(()),
         };
         // Do we have capacity to request this block?
         let reqs = self.leios.ib_requests.entry(from).or_default();
@@ -864,16 +903,20 @@ impl Node {
 
     fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id;
+        let slot = ib.header.id.slot;
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
         }
-        self.leios
-            .ibs_by_slot
-            .entry(ib.header.id.slot)
-            .or_default()
-            .push(id);
-        self.leios.ibs.insert(id, InputBlockState::Received(ib));
+        if self
+            .leios
+            .ibs
+            .insert(id, InputBlockState::Received(ib))
+            .is_some_and(|ib| matches!(ib, InputBlockState::Received(_)))
+        {
+            return Ok(());
+        }
+        self.leios.ibs_by_slot.entry(slot).or_default().push(id);
 
         for peer in &self.consumers {
             if *peer == from {
@@ -888,9 +931,17 @@ impl Node {
 
         // We now have capacity to request one more IB from this peer
         while let Some((id, _)) = reqs.pending.pop() {
-            let Some(InputBlockState::Pending(header)) = self.leios.ibs.get(&id) else {
-                // We fetched this IB from some other node already
-                continue;
+            let header = match self.leios.ibs.get(&id) {
+                Some(InputBlockState::Pending(header)) => header,
+                Some(InputBlockState::Requested(header))
+                    if self.sim_config.relay_strategy == RelayStrategy::RequestFromAll =>
+                {
+                    header
+                }
+                _ => {
+                    // We fetched this IB from some other node already
+                    continue;
+                }
             };
 
             // Make the request
@@ -906,12 +957,18 @@ impl Node {
     }
 
     fn receive_announce_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
-        self.send_to(from, SimulationMessage::RequestEB(id))?;
+        if self.leios.ebs.get(&id).is_none_or(|eb| {
+            self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+                && matches!(eb, EndorserBlockState::Pending)
+        }) {
+            self.leios.ebs.insert(id, EndorserBlockState::Pending);
+            self.send_to(from, SimulationMessage::RequestEB(id))?;
+        }
         Ok(())
     }
 
     fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
-        if let Some(eb) = self.leios.ebs.get(&id) {
+        if let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(&id) {
             self.tracker.track_eb_sent(id, self.id, from);
             self.send_to(from, SimulationMessage::EB(eb.clone()))?;
         }
@@ -925,7 +982,12 @@ impl Node {
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
         let id = eb.id();
-        if self.leios.ebs.insert(id, eb).is_some() {
+        if self
+            .leios
+            .ebs
+            .insert(id, EndorserBlockState::Received(eb))
+            .is_some_and(|eb| matches!(eb, EndorserBlockState::Received(_)))
+        {
             return Ok(());
         }
         self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
@@ -940,8 +1002,11 @@ impl Node {
     }
 
     fn receive_announce_votes(&mut self, from: NodeId, id: VoteBundleId) -> Result<()> {
-        if let btree_map::Entry::Vacant(e) = self.leios.votes.entry(id) {
-            e.insert(VoteBundleState::Requested);
+        if self.leios.votes.get(&id).is_none_or(|v| {
+            self.sim_config.relay_strategy == RelayStrategy::RequestFromAll
+                && matches!(v, VoteBundleState::Requested)
+        }) {
+            self.leios.votes.insert(id, VoteBundleState::Requested);
             self.send_to(from, SimulationMessage::RequestVotes(id))?;
         }
         Ok(())
@@ -1052,7 +1117,9 @@ impl Node {
         self.tracker.track_eb_generated(&eb);
 
         let id = eb.id();
-        self.leios.ebs.insert(id, eb.clone());
+        self.leios
+            .ebs
+            .insert(id, EndorserBlockState::Received(eb.clone()));
         self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
         for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;

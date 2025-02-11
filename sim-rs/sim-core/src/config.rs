@@ -52,6 +52,9 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
+    // Simulation Configuration
+    pub relay_strategy: RelayStrategy,
+
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
     pub leios_stage_active_voting_slots: u64,
@@ -106,6 +109,13 @@ pub struct RawParameters {
     pub cert_validation_cpu_time_ms_per_node: f64,
     // pub cert_size_bytes_constant: u64,
     // pub cert_size_bytes_per_node: u64,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RelayStrategy {
+    RequestFromAll,
+    RequestFromFirst,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -294,6 +304,7 @@ pub struct SimConfiguration {
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub stage_length: u64,
+    pub(crate) relay_strategy: RelayStrategy,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
@@ -318,6 +329,7 @@ impl SimConfiguration {
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
             links: topology.links,
+            relay_strategy: params.relay_strategy,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
