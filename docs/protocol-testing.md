@@ -18,9 +18,11 @@ behavior, it is a red flag.
 
 ## Questions
 
-- Are smaller-sized, more frequent IBs better or worse than larger-sized, less
-  frequent IBs?
-- How does IB generation frequency relate to IB network dissemination time? How does this time relate to the time described in the network functionality in the Leios paper? What is the induced network capacity ?
+### Input Block (IB) Parameters
+- Are smaller-sized, more frequent IBs better or worse than larger-sized, less frequent IBs?
+- How does IB generation frequency relate to IB network dissemination time?
+  - How does this time relate to the time described in the network functionality in the Leios paper?
+  - What is the induced network capacity?
 
 ## Test Cases
 
