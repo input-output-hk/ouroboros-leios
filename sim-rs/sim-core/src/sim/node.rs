@@ -1,5 +1,7 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
+    cmp::Reverse,
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    hash::Hash,
     sync::Arc,
     time::Duration,
 };
@@ -14,7 +16,7 @@ use tracing::{info, trace};
 
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
-    config::{NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
+    config::{DiffusionStrategy, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
     events::EventTracker,
     model::{
         Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
@@ -166,10 +168,58 @@ enum VoteBundleState {
     Received(Arc<VoteBundle>),
 }
 
-#[derive(Default)]
 struct PeerInputBlockRequests {
-    pending: PriorityQueue<InputBlockId, Timestamp>,
+    pending: PendingQueue<InputBlockId>,
     active: HashSet<InputBlockId>,
+}
+enum PendingQueue<T: Hash + Eq> {
+    PeerOrder(VecDeque<T>),
+    FreshestFirst(PriorityQueue<T, Timestamp>),
+    OldestFirst(PriorityQueue<T, Reverse<Timestamp>>),
+}
+impl<T: Hash + Eq> PendingQueue<T> {
+    fn new(strategy: DiffusionStrategy) -> Self {
+        match strategy {
+            DiffusionStrategy::PeerOrder => Self::PeerOrder(VecDeque::new()),
+            DiffusionStrategy::FreshestFirst => Self::FreshestFirst(PriorityQueue::new()),
+            DiffusionStrategy::OldestFirst => Self::OldestFirst(PriorityQueue::new()),
+        }
+    }
+    fn push(&mut self, value: T, timestamp: Timestamp) {
+        match self {
+            Self::PeerOrder(queue) => queue.push_back(value),
+            Self::FreshestFirst(queue) => {
+                queue.push(value, timestamp);
+            }
+            Self::OldestFirst(queue) => {
+                queue.push(value, Reverse(timestamp));
+            }
+        }
+    }
+    fn pop(&mut self) -> Option<T> {
+        match self {
+            Self::PeerOrder(queue) => queue.pop_back(),
+            Self::FreshestFirst(queue) => queue.pop().map(|(value, _)| value),
+            Self::OldestFirst(queue) => queue.pop().map(|(value, _)| value),
+        }
+    }
+}
+
+impl PeerInputBlockRequests {
+    fn new(config: &SimConfiguration) -> Self {
+        Self {
+            pending: PendingQueue::new(config.ib_diffusion_strategy),
+            active: HashSet::new(),
+        }
+    }
+
+    fn queue(&mut self, id: InputBlockId, timestamp: Timestamp) {
+        self.pending.push(id, timestamp);
+    }
+
+    fn next(&mut self) -> Option<InputBlockId> {
+        self.pending.pop()
+    }
 }
 
 impl Node {
@@ -873,7 +923,11 @@ impl Node {
             _ => return Ok(()),
         };
         // Do we have capacity to request this block?
-        let reqs = self.leios.ib_requests.entry(from).or_default();
+        let reqs = self
+            .leios
+            .ib_requests
+            .entry(from)
+            .or_insert(PeerInputBlockRequests::new(&self.sim_config));
         if reqs.active.len() < self.sim_config.max_ib_requests_per_peer {
             // If so, make the request
             self.leios
@@ -883,7 +937,7 @@ impl Node {
             self.send_to(from, SimulationMessage::RequestIB(id))?;
         } else {
             // If not, just track that this peer has this IB when we're ready
-            reqs.pending.push(id, header.timestamp);
+            reqs.queue(id, header.timestamp);
         }
         Ok(())
     }
@@ -926,11 +980,15 @@ impl Node {
         }
 
         // Mark that this IB is no longer pending
-        let reqs = self.leios.ib_requests.entry(from).or_default();
+        let reqs = self
+            .leios
+            .ib_requests
+            .entry(from)
+            .or_insert(PeerInputBlockRequests::new(&self.sim_config));
         reqs.active.remove(&id);
 
         // We now have capacity to request one more IB from this peer
-        while let Some((id, _)) = reqs.pending.pop() {
+        while let Some(id) = reqs.next() {
             let header = match self.leios.ibs.get(&id) {
                 Some(InputBlockState::Pending(header)) => header,
                 Some(InputBlockState::Requested(header))

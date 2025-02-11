@@ -54,7 +54,6 @@ export interface Config {
   "ib-body-avg-size-bytes": bigint;
   /** Only supported by Rust simulation. */
   "ib-body-max-size-bytes": bigint;
-  /** Only supported by Haskell simulation. */
   "ib-diffusion-strategy": DiffusionStrategy;
   /** Only supported by Haskell simulation. */
   "ib-diffusion-max-window-size": bigint;

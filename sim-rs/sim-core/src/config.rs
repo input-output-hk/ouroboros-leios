@@ -83,6 +83,7 @@ pub struct RawParameters {
     pub ib_body_validation_cpu_time_ms_constant: f64,
     pub ib_body_validation_cpu_time_ms_per_byte: f64,
     pub ib_body_max_size_bytes: u64,
+    pub ib_diffusion_strategy: DiffusionStrategy,
     #[serde(default = "u64::one")]
     pub ib_shards: u64,
 
@@ -109,6 +110,14 @@ pub struct RawParameters {
     pub cert_validation_cpu_time_ms_per_node: f64,
     // pub cert_size_bytes_constant: u64,
     // pub cert_size_bytes_per_node: u64,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DiffusionStrategy {
+    PeerOrder,
+    FreshestFirst,
+    OldestFirst,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -314,6 +323,7 @@ pub struct SimConfiguration {
     pub(crate) max_block_size: u64,
     pub(crate) max_tx_size: u64,
     pub(crate) max_ib_size: u64,
+    pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
     pub(crate) cpu_times: CpuTimeConfig,
@@ -340,6 +350,7 @@ impl SimConfiguration {
             max_tx_size: params.tx_max_size_bytes,
             stage_length: params.leios_stage_length_slots,
             max_ib_size: params.ib_body_max_size_bytes,
+            ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
             cpu_times: CpuTimeConfig::new(&params),

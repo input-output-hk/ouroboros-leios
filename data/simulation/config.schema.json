@@ -189,8 +189,7 @@
       "type": "number"
     },
     "ib-diffusion-strategy": {
-      "$ref": "#/definitions/DiffusionStrategy",
-      "description": "Only supported by Haskell simulation."
+      "$ref": "#/definitions/DiffusionStrategy"
     },
     "ib-generation-cpu-time-ms": {
       "type": "number"
