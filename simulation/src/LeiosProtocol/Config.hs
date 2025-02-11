@@ -188,7 +188,10 @@ configToEncodingWith getter = pairs . mconcat . configToKVsWith getter
 configToKVsWith :: KeyValue e kv => Getter Config -> Config -> [kv]
 configToKVsWith getter cfg =
   catMaybes
-    [ get @"leiosStageLengthSlots" getter cfg
+    [ get @"relayStrategy" getter cfg
+    , get @"tcpCongestionControl" getter cfg
+    , get @"multiplexMiniProtocols" getter cfg
+    , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
     , get @"leiosVoteSendRecvStages" getter cfg
     , get @"txGenerationDistribution" getter cfg
