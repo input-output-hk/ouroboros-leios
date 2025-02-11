@@ -8,8 +8,14 @@ module Chan (
   mkConnectionConfig,
   module Chan.Core,
   module Chan.Driver,
-  module Chan.Mux,
-  module Chan.TCP,
+  -- Chan.Mux
+  Bytes,
+  ConnectionBundle (..),
+  TcpConnProps (..),
+  TcpEvent (..),
+  LabelTcpDir (..),
+  MessageSize (..),
+  ToFromBundleMsg (..),
 ) where
 
 import Chan.Core

@@ -4,6 +4,7 @@
 module SimTCPLinks where
 
 import Chan
+import Chan.TCP (newConnectionTCP)
 import Control.Monad (replicateM_)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),

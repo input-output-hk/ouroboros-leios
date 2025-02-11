@@ -30,6 +30,7 @@ import STMCompat
 import System.Random (StdGen, uniform, uniformR)
 
 import Chan
+import Chan.TCP (newConnectionTCP)
 import RelayProtocol
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
