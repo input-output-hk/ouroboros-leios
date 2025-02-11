@@ -130,7 +130,7 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 - Certificate (for a realistic number of pools, stake distribution, and committee size)
     - *Generate certificate:* 90 ms/cert
     - *Verify certificate:* 130 ms/cert
-    - *Determine weight (total stake voted for) in certificate:* 5.9 ms/cert
+    - *Determine weight (i.e., total stake voted for) in certificate:* 5.9 ms/cert
 - Serialization
 	- *Key registration:* 1.1 µs
 	- *Vote:* 630 ns

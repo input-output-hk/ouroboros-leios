@@ -2,6 +2,10 @@
 
 See [Specification.md](Specification.md) for a description of the algorithms implemented by these benchmarks.
 
+- Reference implementation: [src/](src/)
+- Tests: [tests/](tests/)
+- Benchmarks: [benches/](benches/)
+
 
 ## Command-line interface
 

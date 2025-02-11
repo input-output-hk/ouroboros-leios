@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-02-11
+
+### Reference implementation and benchmarking BLS certificates
+
+The [BLS benchmarking Rust code for Leios](crypto-benchmarks.rs/) was overhauled and expanded with the following capabilities:
+
+- Reference implementation of every aspect of a viable BLS certificate scheme for Leios.
+- Property-based tests providing basic coverage of all functionality.
+- Benchmarks for the inputs to the Leios and Haskell, Rust, and DeltaQ simulations.
+- CBOR serialization and deserialization of Leios messages.
+- Command-line interface (with example) for trying out Leios's cryptography: create and verity votes, certificates, etc.
+* Document specifying the algorithms and tabulating benchmark results.
+
+Note that this BLS scheme is just one viable option for Leios. Ongoing work and ALBA, MUSEN, and SNARKs might result in schemes superior to this BLS approach. The key drawback is the need for periodic registration of ephemeral keys. Overall, this scheme provides the following:
+
+- Certificates smaller than 10 kB.
+- Certificate generation and verification in 90 ms and 130 ms, respectively.
+- Votes smaller than 200 bytes.
+
 ## 2025-02-07
 
 ### Haskell simulation
