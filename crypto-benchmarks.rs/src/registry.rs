@@ -2,7 +2,7 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::fait_accompli::fait_accompli;
+use crate::fait_accompli::FaSortition;
 use crate::key::{arbitrary_reg, Reg, SecKey};
 use crate::primitive::{
     arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, CoinFraction,
@@ -69,7 +69,7 @@ impl Registry {
 
         let pools: BTreeMap<PoolKeyhash, Coin> =
             BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool, pool.stake)));
-        let fa = fait_accompli(&pools, voters);
+        let fa = FaSortition::fait_accompli(&pools, voters);
         let persistent_pool: BTreeMap<PersistentId, PoolKeyhash> = BTreeMap::from_iter(
             (0..fa.persistent.len())
                 .zip(fa.persistent)

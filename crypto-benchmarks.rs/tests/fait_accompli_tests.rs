@@ -26,7 +26,7 @@ fn fa_test() {
     stakes.insert(p6, 50);
     stakes.insert(p2, 500);
 
-    let fa = fait_accompli(&stakes, 5);
+    let fa = FaSortition::fait_accompli(&stakes, 5);
 
     assert_eq!(4, fa.n_persistent, "Incorrect number of persistent voters.");
     assert_eq!(

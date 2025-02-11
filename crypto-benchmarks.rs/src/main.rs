@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::process;
 
 use leios_crypto_benchmarks::cert::*;
-use leios_crypto_benchmarks::fait_accompli::*;
+use leios_crypto_benchmarks::fait_accompli::FaSortition;
 use leios_crypto_benchmarks::key::*;
 use leios_crypto_benchmarks::primitive::*;
 use leios_crypto_benchmarks::registry::*;
@@ -292,7 +292,7 @@ fn main() {
             fa_file,
         }) => {
             let stake: BTreeMap<PoolKeyhash, Coin> = read_cbor(stake_file).unwrap();
-            let fa = fait_accompli(&stake, *voter_count);
+            let fa = FaSortition::fait_accompli(&stake, *voter_count);
             write_cbor(fa_file, &fa).unwrap();
         }
         Some(Commands::HasVotes {
