@@ -1,8 +1,17 @@
 use hex::{FromHex,ToHex};
+use num_bigint::BigInt;
+use num_rational::Ratio;
+use num_traits::FromPrimitive;
 use pallas::ledger::primitives::{byron::Blake2b256, Hash};
 use pallas::ledger::traverse::time::Slot;
 use quickcheck::{Arbitrary, Gen};
+use rand::prelude::Distribution;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use statrs::distribution::{Beta, Uniform};
+use statrs::distribution::ContinuousCDF;
+use std::collections::BTreeMap;
 
 use crate::util::*;
 
@@ -15,7 +24,57 @@ pub fn arbitrary_poolkeyhash(g: &mut Gen) -> PoolKeyhash {
 pub use pallas::ledger::primitives::Coin;
 
 pub fn arbitrary_coin(g: &mut Gen) -> Coin {
-    u64::arbitrary(g) % 2000000000000
+    u64::arbitrary(g) % 999999 + 1
+}
+
+pub(crate) fn realistic_stake_dist(g: &mut Gen, total: u64, n: usize) -> Vec<Coin> {
+    let rng = &mut StdRng::seed_from_u64(u64::arbitrary(g));
+    let noise = Uniform::new(0.75, 1.25).unwrap();
+    let beta = Beta::new(11f64, 1f64).unwrap();
+    let cum: Vec<f64> = (0..n).map(|i| beta.cdf((i as f64) / (total as f64))).collect();
+    let dif: Vec<f64> = (1..n).map(|i| (cum[i] - cum[i-1]) * noise.sample(rng)).collect();
+    let scale: f64 = (total as f64) / dif.iter().sum::<f64>();
+    dif.iter().map(|coin| (scale * *coin).round() as Coin).collect()
+  }
+  
+pub fn arbitrary_stake_distribution(g: &mut Gen, total: u64, n: usize) -> BTreeMap<PoolKeyhash, Coin> {
+    BTreeMap::from_iter(
+      realistic_stake_dist(g, total, n)
+        .iter()
+        .map(|coin| (arbitrary_poolkeyhash(g), *coin))
+    )
+  }
+  
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+pub struct CoinFraction(pub Ratio<BigInt>);
+
+impl CoinFraction {
+
+    pub fn from_coins(part: Coin, whole: Coin) -> Self {
+        CoinFraction(Ratio::new(BigInt::from_u64(part).unwrap(), BigInt::from_u64(whole).unwrap()))
+    }
+
+    pub fn to_ratio(&self) -> Ratio<BigInt> {
+        self.0.clone()
+    }
+
+}
+
+impl Serialize for CoinFraction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer {
+                (self.0.numer(), self.0.denom()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for CoinFraction {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+      where
+          D: Deserializer<'de> {
+      let (num, den) = <(BigInt, BigInt)>::deserialize(deserializer)?;
+      Ok(CoinFraction(Ratio::new(num, den)))
+  }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]

@@ -53,21 +53,6 @@ pub fn verify_vote(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &(Signature, Signat
     result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
 }
 
-/*
-fn hash_sigs(vss: &[&(Signature, Signature)]) -> [u8; 32] {
-    fn serialise_vs(vs: &(Signature, Signature)) -> Vec<u8> {
-        [vs.0, vs.1].iter().flat_map(|s| s.serialize()).collect()
-    }
-    let msg: Vec<u8> = vss.iter().flat_map(|vs| serialise_vs(vs)).collect();
-
-    unsafe {
-        let mut out: [u8; 32] = [0; 32];
-        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
-        out
-    }
-}
-*/
-
 fn hash_sigs(sigma_eids: &[&Signature], sigma_ms: &[&Signature]) -> [u8; 32] {
     let mut sigmas: Vec<&Signature> = Vec::new();
     sigmas.extend(sigma_eids);
@@ -148,7 +133,7 @@ pub fn gen_cert_fa(
     sigma_eids: &[&Signature],
     sigma_ms: &[&Signature],
 ) -> Result<(Signature, Signature), BLST_ERROR> {
-    let h: [u8; 32] = hash_sigs(sigma_eids, sigma_ms);
+    let h: [u8; 32] = hash_sigs(sigma_eids, &[]);
 
     let f = |i: usize| {
         move |point: blst_p1| {
@@ -176,15 +161,28 @@ pub fn gen_cert_fa(
     }
 }
 
-/*
+pub fn gen_cert_fa_pure(
+    sigma_ms: &[&Signature],
+) -> Result<Signature, BLST_ERROR> {
+    let result_m = AggregateSignature::aggregate(sigma_ms, true);
+    match result_m {
+        Ok(sig_m) => Ok(sig_m.to_signature()),
+        Err(err) => Err(err),
+    }
+}
+
 pub fn verify_cert_fa(
     pks: &[&PublicKey],
+    pks_nonpersistent: &[&PublicKey],
     eid: &[u8],
     m: &[u8],
-    vss: &[&(Signature, Signature)],
-    cs: &(Signature, Signature),
+    sigma_eids: &[&Signature],
+    sigma_tilde_eid: &Signature,
+    sigma_tilde_m: &Signature,
 ) -> bool {
-    let h: [u8; 32] = hash_sigs(vss);
+
+    let h: [u8; 32] = hash_sigs(sigma_eids, &[]);
+
     let f = |i: usize| {
         move |point: blst_p2| {
             let hi: [u8; 32] = hash_index(i as i32, &h);
@@ -196,7 +194,7 @@ pub fn verify_cert_fa(
         }
     };
 
-    let pks1: Vec<PublicKey> = pks
+    let pks1: Vec<PublicKey> = pks_nonpersistent
         .iter()
         .enumerate()
         .map(|(i, pk)| pk_transform(&f(i), pk))
@@ -205,14 +203,34 @@ pub fn verify_cert_fa(
 
     let result_pk = AggregatePublicKey::aggregate(pks, true);
     let result_pk1 = AggregatePublicKey::aggregate(&pk1_refs, true);
+    
     match (result_pk, result_pk1) {
         (Ok(pk), Ok(pk1)) => {
             let result_eid =
-                cs.0.verify(true, &EMPTY, DST, eid, &pk1.to_public_key(), true);
-            let result_m = cs.1.verify(true, m, DST, eid, &pk.to_public_key(), true);
+                sigma_tilde_eid.verify(true, &EMPTY, DST, eid, &pk1.to_public_key(), true);
+            let result_m = sigma_tilde_m.verify(true, m, DST, eid, &pk.to_public_key(), true);
             result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
         }
         _ => false,
     }
+
 }
-*/
+
+pub fn verify_cert_fa_pure(
+    pks: &[&PublicKey],
+    eid: &[u8],
+    m: &[u8],
+    sigma_tilde_m: &Signature,
+) -> bool {
+    let result_pk = AggregatePublicKey::aggregate(pks, true);
+    println!("{:?}", result_pk);
+    match result_pk {
+        Ok(pk) => {
+            let result_m = sigma_tilde_m.verify(true, m, DST, eid, &pk.to_public_key(), true);
+            println!("{:?}", result_m);
+            result_m == BLST_ERROR::BLST_SUCCESS
+        }
+        _ => false,
+    }
+
+}

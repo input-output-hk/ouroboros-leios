@@ -161,19 +161,24 @@ pub struct Reg {
     pub kes_sig: KesSig,   // 448 bytes
 } // 668 bytes
 
+pub fn arbitrary_reg(g: &mut Gen, pool: &PoolKeyhash, sk: &SecKey) -> Reg {
+    let (mu1, mu2) = bls_vote::make_pop(&sk.0);
+    Reg {
+        pool: *pool,
+        mvk: PubKey::arbitrary(g),
+        mu: PoP {
+            mu1: Sig(mu1),
+            mu2: Sig(mu2),
+        },
+        kes_sig: KesSig::arbitrary(g),
+    }
+}
+
 impl Arbitrary for Reg {
     fn arbitrary(g: &mut Gen) -> Self {
-        let sk: SecretKey = SecKey::arbitrary(g).0;
-        let (mu1, mu2) = bls_vote::make_pop(&sk);
-        Reg {
-            pool: arbitrary_poolkeyhash(g),
-            mvk: PubKey::arbitrary(g),
-            mu: PoP {
-                mu1: Sig(mu1),
-                mu2: Sig(mu2),
-            },
-            kes_sig: KesSig::arbitrary(g),
-        }
+        let pool = arbitrary_poolkeyhash(g);
+        let sk = SecKey::arbitrary(g);
+        arbitrary_reg(g, &pool, &sk)
     }
 }
 
