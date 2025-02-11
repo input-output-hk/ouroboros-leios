@@ -45,6 +45,8 @@ export interface Config {
   // Input Block Configuration
   "ib-generation-probability": number;
   "ib-generation-cpu-time-ms": number;
+  /** Only supported by Rust simulation. */
+  "ib-shards": number;
   /** Only supported by Haskell simulation. */
   "ib-head-size-bytes": bigint;
   "ib-head-validation-cpu-time-ms": number;

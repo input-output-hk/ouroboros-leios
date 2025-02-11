@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
-use num_traits::One as _;
 use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
@@ -78,14 +77,13 @@ pub struct RawParameters {
     // Input block configuration
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
+    pub ib_shards: u64,
     // pub ib_head_size_bytes: u64,
     pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
     pub ib_body_validation_cpu_time_ms_per_byte: f64,
     pub ib_body_max_size_bytes: u64,
     pub ib_diffusion_strategy: DiffusionStrategy,
-    #[serde(default = "u64::one")]
-    pub ib_shards: u64,
 
     // Endorsement block configuration
     pub eb_generation_probability: f64,

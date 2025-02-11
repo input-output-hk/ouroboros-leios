@@ -58,6 +58,7 @@ rb-body-legacy-praos-payload-avg-size-bytes: 0
 
 ib-generation-probability: 5.0
 ib-generation-cpu-time-ms: 300.0
+ib-shards: 1
 ib-head-size-bytes: 32
 ib-head-validation-cpu-time-ms: 1.0
 ib-body-validation-cpu-time-ms-constant: 50.0

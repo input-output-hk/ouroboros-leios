@@ -206,6 +206,10 @@
     "ib-head-validation-cpu-time-ms": {
       "type": "number"
     },
+    "ib-shards": {
+      "description": "Only supported by Rust simulation.",
+      "type": "number"
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
