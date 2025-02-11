@@ -8,7 +8,7 @@ Leios addresses three interconnected concerns often found in blockchains:
 
 - Transaction diffusion
 - Transaction validation and availability
-- Transaction ordering
+- Transaction ordering.
 
 By decoupling transaction processing from consensus, Leios allows for more
 efficient and continuous resource usage (eg, CPU and bandwidth). Instead of
@@ -16,23 +16,23 @@ experiencing short bursts of network load when blocks are fully created,
 validated, and diffused, Leios introduces two core components to facilitate this
 decoupling:
 
-## Input blocks (IBs)
+**Input blocks (IBs)**
 
 - Validators (stakeholders or miners) bundle transactions into lightweight IBs
   at high speed
 - IBs are generated concurrently, not sequentially, maximizing available
-  bandwidth
+  bandwidth.
 
-## Endorser blocks (EBs)
+**Endorser blocks (EBs)**
 
 - EBs aggregate batches of IBs and undergo a two-phase voting process to certify
   their validity and availability
 - This is necessary because blocks are divided into two parts: headers and
   bodies
 - An input block will not be referenced by an endorser block if its body is not
-  available
+  available.
 
-## Key Properties
+## Key properties
 
 The following properties set Leios apart from traditional blockchain protocols:
 
@@ -46,4 +46,4 @@ The following properties set Leios apart from traditional blockchain protocols:
 - **Scalability**: The system scales smoothly with network capacity and
   available CPU resources needed to run verifiable random function (VRF)
   lotteries, process blocks and votes, and generate certificates. It maintains
-  high performance even as participation fluctuates
+  high performance even as participation fluctuates.
