@@ -12,9 +12,7 @@
 
 module LeiosProtocol.Short.Sim where
 
-import Chan.Driver
-import Chan.Mux
-import Chan.TCP
+import Chan
 import Control.Exception (assert)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))

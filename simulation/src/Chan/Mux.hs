@@ -10,13 +10,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Chan.Mux (
-  newMuxChan,
-  Chan (..),
   ToFromMuxMsg (..),
-  dynToFromMuxMsg,
   MuxBundle (..),
-  BearerMsg,
-  fromBearerMsg,
   newConnectionBundleTCP,
 ) where
 
