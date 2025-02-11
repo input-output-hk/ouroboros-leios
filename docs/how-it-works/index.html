@@ -9,7 +9,7 @@
 
 
 <script src="https://plausible.io/js/script.js" defer="defer" data-domain="leios.cardano-scaling.org"></script><link rel="stylesheet" href="/assets/css/styles.9a127118.css">
-<script src="/assets/js/runtime~main.24db20ac.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.1fd4af03.js" defer="defer"></script>
 <script src="/assets/js/main.87c1e007.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -19,20 +19,20 @@ breakdown of how it works:</p>
 <ol>
 <li>
 <p><strong>Creating input blocks (IBs)</strong>:<br>
-Validators bundle transactions into IBs and broadcast them across the network</p>
+Validators bundle transactions into IBs and broadcast them across the network.</p>
 </li>
 <li>
 <p><strong>Proofs of data availability</strong>:<br>
-Validators verify that the IBs contain valid and accessible data</p>
+Validators verify that the IBs contain valid and accessible data.</p>
 </li>
 <li>
 <p><strong>Generating endorser blocks (EBs)</strong>:<br>
 EBs aggregate several verified IBs and propose them for inclusion in the
-blockchain</p>
+blockchain.</p>
 </li>
 <li>
 <p><strong>Pipelined processing</strong>:<br>
-The protocol follows a seven-stage endorsing pipeline (described below)</p>
+The protocol follows a seven-stage endorsing pipeline (described below).</p>
 </li>
 <li>
 <p><strong>Voting and certification</strong>:<br>
@@ -40,15 +40,15 @@ Validators ensure that IBs contain valid and accessible data by checking
 their correctness
 This process is primarily handled by the endorser block producer
 Includes verifying that all available IBs adhere to network rules and
-ensuring transactions are script compliant if required</p>
+ensuring transactions are script compliant if required.</p>
 </li>
 <li>
 <p><strong>Final inclusion in the blockchain</strong>:<br>
 A certificate (generated from the voting process and referencing the EB) is
-stored in the blockchain
+stored in the blockchain.
 This certificate is included in the Praos block (ranking block)
 Ensures blockchain efficiency while maintaining a verifiable record of
-endorsed transactions</p>
+endorsed transactions.</p>
 </li>
 </ol>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="leios-architecture">Leios architecture<a class="hash-link" aria-label="Direct link to Leios architecture" title="Direct link to Leios architecture" href="/docs/how-it-works#leios-architecture">​</a></h2>
@@ -60,7 +60,7 @@ A pipeline instance comprises seven stages:</p>
 <ul>
 <li>Validators generate and propose IBs containing transaction data</li>
 <li>IBs proposed during this stage are the focus of the current pipeline
-instance</li>
+instance.</li>
 </ul>
 </li>
 <li>
@@ -68,7 +68,7 @@ instance</li>
 <ul>
 <li>Allocates time for proposed IBs to be disseminated throughout the network</li>
 <li>Duration is crucial for ensuring all honest nodes receive IBs before the
-next stage</li>
+next stage.</li>
 </ul>
 </li>
 <li>
@@ -76,7 +76,7 @@ next stage</li>
 <ul>
 <li>Validators create EBs that reference the IBs generated in the &#x27;Propose&#x27;
 stage</li>
-<li>EBs serve as containers for grouping and ordering IBs</li>
+<li>EBs serve as containers for grouping and ordering IBs.</li>
 </ul>
 </li>
 <li>
@@ -84,7 +84,7 @@ stage</li>
 <ul>
 <li>Allows time for dissemination of any adversarial IBs referenced by EBs in
 the &#x27;Link&#x27; stage</li>
-<li>Ensures honest nodes have received all relevant IBs before casting votes</li>
+<li>Ensures honest nodes have received all relevant IBs before casting votes.</li>
 </ul>
 </li>
 <li>
@@ -92,7 +92,7 @@ the &#x27;Link&#x27; stage</li>
 <ul>
 <li>Validators cast votes for EBs from the &#x27;Link&#x27; stage</li>
 <li>Specifically for EBs whose referenced IBs have been successfully delivered</li>
-<li>An EB becomes Vote1-certified if it receives enough votes</li>
+<li>An EB becomes Vote1-certified if it receives enough votes.</li>
 </ul>
 </li>
 <li>
@@ -100,7 +100,7 @@ the &#x27;Link&#x27; stage</li>
 <ul>
 <li>Vote1-certified EBs are referenced by new EBs created during this stage</li>
 <li>Links EBs across different pipeline instances</li>
-<li>Strengthens overall confirmation of IBs</li>
+<li>Strengthens overall confirmation of IBs.</li>
 </ul>
 </li>
 <li>
@@ -108,9 +108,10 @@ the &#x27;Link&#x27; stage</li>
 <ul>
 <li>Validators cast final votes for EBs from the &#x27;Endorse&#x27; stage</li>
 <li>An EB becomes Vote2-certified if it meets specific criteria</li>
-<li>Must reference a majority of Vote1-certified EBs</li>
+<li>Must reference a majority of Vote1-certified EBs.</li>
 </ul>
 </li>
-</ol></div></article><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/protocol-overview"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Protocol overview</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/docs/faq"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">FAQs</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/docs/how-it-works#leios-architecture">Leios architecture</a></li></ul></div></div></div></div></main></div></div></div><div><div class="preFooter_SOPz"></div><footer class="footer"><div class="container container-fluid"><div class="row footer__links"><div class="col footer__col"><div class="footer__title">Docs</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/docs/overview">What is Ouroboros Leios?</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/protocol-overview">Protocol overview</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/how-it-works">How it works</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/faq">FAQs</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/glossary">Glossary</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/resources">Resources</a></li></ul></div><div class="col footer__col"><div class="footer__title">Community</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://discord.gg/83aXYxy9" target="_blank" rel="noopener noreferrer" class="footer__link-item">Discord<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/discussions" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub Discussions<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Legal</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Terms &amp; Conditions</a></li><li class="footer__item"><a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Privacy Policy</a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/graphs/contributors" target="_blank" rel="noopener noreferrer" class="footer__link-item">Contributors</a></li></ul></div><div class="col footer__col"><div class="footer__title">More resources</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://iohk.io/en/research/library/" target="_blank" rel="noopener noreferrer" class="footer__link-item">IOHK research library</a></li><li class="footer__item"><a href="https://www.essentialcardano.io/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Essential Cardano</a></li><li class="footer__item"><a href="https://docs.cardano.org/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Cardano Docs</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 <strong>Input Output Global</strong> <br> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br> <small>Built with Docusaurus</small></div></div></div></footer></div></div>
+</ol>
+<p>This pipelined architecture ensures the continuous generation, parallel processing,  dissemination, and confirmation of IBs, enabling Leios to achieve a high transaction throughput.</p></div></article><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/protocol-overview"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Protocol overview</div></a><a class="pagination-nav__link pagination-nav__link--next" href="/docs/faq"><div class="pagination-nav__sublabel">Next</div><div class="pagination-nav__label">FAQs</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/docs/how-it-works#leios-architecture">Leios architecture</a></li></ul></div></div></div></div></main></div></div></div><div><div class="preFooter_SOPz"></div><footer class="footer"><div class="container container-fluid"><div class="row footer__links"><div class="col footer__col"><div class="footer__title">Docs</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/docs/overview">What is Ouroboros Leios?</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/protocol-overview">Protocol overview</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/how-it-works">How it works</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/faq">FAQs</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/glossary">Glossary</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/resources">Resources</a></li></ul></div><div class="col footer__col"><div class="footer__title">Community</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://discord.gg/83aXYxy9" target="_blank" rel="noopener noreferrer" class="footer__link-item">Discord<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/discussions" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub Discussions<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Legal</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Terms &amp; Conditions</a></li><li class="footer__item"><a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Privacy Policy</a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/graphs/contributors" target="_blank" rel="noopener noreferrer" class="footer__link-item">Contributors</a></li></ul></div><div class="col footer__col"><div class="footer__title">More resources</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://iohk.io/en/research/library/" target="_blank" rel="noopener noreferrer" class="footer__link-item">IOHK research library</a></li><li class="footer__item"><a href="https://www.essentialcardano.io/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Essential Cardano</a></li><li class="footer__item"><a href="https://docs.cardano.org/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Cardano Docs</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 <strong>Input Output Global</strong> <br> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br> <small>Built with Docusaurus</small></div></div></div></footer></div></div>
 </body>
 </html>
