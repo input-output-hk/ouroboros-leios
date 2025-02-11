@@ -28,12 +28,7 @@ import STMCompat
 class ConnectionBundle bundle where
   type BundleMsg bundle
   toFromBundleMsgBundle :: bundle (ToFromBundleMsg (BundleMsg bundle))
-
-  traverseConnectionBundle ::
-    Monad m =>
-    (forall a. f a -> m (g a)) ->
-    bundle f ->
-    m (bundle g)
+  traverseConnectionBundle :: Monad m => (forall a. f a -> m (g a)) -> bundle f -> m (bundle g)
 
 -- | Injection, projection, between a common mux message type, and an
 -- individual message type. The following must hold:
