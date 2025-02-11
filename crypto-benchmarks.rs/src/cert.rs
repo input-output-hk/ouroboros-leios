@@ -5,18 +5,19 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::bls_vote;
 use crate::key::Sig;
-use crate::primitive::{EbHash, Eid, PoolKeyhash};
+use crate::primitive::{Coin, CoinFraction, EbHash, Eid, PoolKeyhash};
 use crate::registry::*;
+use crate::sortition::voter_check;
 use crate::vote::*;
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {
-    eid: Eid,
-    eb: EbHash,
-    persistent_voters: HashSet<PersistentId>,
-    nonpersistent_voters: BTreeMap<PoolKeyhash, Sig>,
-    sigma_tilde_eid: Option<Sig>,
-    sigma_tilde_m: Sig,
+    pub eid: Eid,
+    pub eb: EbHash,
+    pub persistent_voters: HashSet<PersistentId>,
+    pub nonpersistent_voters: BTreeMap<PoolKeyhash, Sig>,
+    pub sigma_tilde_eid: Option<Sig>,
+    pub sigma_tilde_m: Sig,
 }
 
 pub fn arbitrary_cert(g: &mut Gen, reg: &Registry) -> Cert {
@@ -151,4 +152,49 @@ pub fn verify_cert(reg: &Registry, cert: &Cert) -> bool {
                 )
         }
     }
+}
+
+fn weigh_persistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
+    let weight: Option<Coin> =
+      cert.persistent_voters
+      .iter()
+      .fold(Some(0), |acc, pid| 
+        reg.persistent_pool.get(pid)
+          .and_then(|pool|
+                acc.map(|total| total + reg.info[pool].stake))
+          );
+    weight.map(|total| CoinFraction::from_coins(total, 1))
+}
+
+fn weigh_nonpersistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
+    let nonpersistent_voters = reg.voters - cert.persistent_voters.len();
+    let weight: Option<usize> =
+      cert.nonpersistent_voters
+        .iter()
+        .fold(Some(0),|acc, (pool, sigma_eid)|
+            reg.info.get(pool)
+              .and_then(|info|
+                acc.map(|total| {
+                    let p = sigma_eid.to_rational();
+                    let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
+                    / reg.nonpersistent_stake.to_ratio();
+                    total + voter_check(nonpersistent_voters, &s, &p)
+                })
+            )
+        );
+    weight.map(|total|
+        CoinFraction(
+            CoinFraction::from_coins(total as u64 , nonpersistent_voters as u64).to_ratio()
+              * reg.nonpersistent_stake.to_ratio()
+        )
+    )
+}
+
+pub fn weigh_cert(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
+    let persistent_weight = weigh_persistent(reg, cert)?.to_ratio();
+    let nonpersistent_weight = weigh_nonpersistent(reg, cert)?.to_ratio();
+    Some(CoinFraction(
+        (persistent_weight + nonpersistent_weight)
+          * CoinFraction::from_coins(1, reg.total_stake).to_ratio()
+    ))
 }

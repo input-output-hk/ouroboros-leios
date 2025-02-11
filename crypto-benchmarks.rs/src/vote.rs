@@ -99,7 +99,6 @@ pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
 }
 
 pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
-    let zero = Ratio::from_integer(BigInt::zero());
     let mut votes = Vec::new();
     reg.info.values().for_each(|info| {
         if reg.persistent_id.contains_key(&info.reg.pool) {
@@ -109,7 +108,7 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
                 eb,
                 &info.secret,
             ));
-        } else {
+        } else if info.stake > 0 {
             let vote = gen_vote_nonpersistent(&info.reg.pool, eid, eb, &info.secret);
             if let Vote::Nonpersistent {
                 pool: _,
@@ -120,14 +119,10 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
             } = vote.clone()
             {
                 let p = sigma_eid.to_rational();
-                println!("STAKE = {:?}, TOTAL = {:?}, RHO = {:?}", info.stake, reg.total_stake, reg.nonpersistent_stake);
                 let s =
-                  if info.stake == 0 {
-                    zero.clone()
-                  } else {
                    CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
                      / reg.nonpersistent_stake.to_ratio()
-                  };
+                  ;
                 if voter_check(reg.voters, &s, &p) > 0 {
                     votes.push(vote);
                 }

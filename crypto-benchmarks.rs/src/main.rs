@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use hex::ToHex;
 use num_bigint::BigInt;
 use num_rational::Ratio;
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive,ToPrimitive};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;
 use std::io::{Error, ErrorKind};
@@ -48,6 +48,8 @@ enum Commands {
         eid: Eid,
         #[arg(long, value_parser=EbHash::parse)]
         eb_hash: EbHash,
+        #[arg(long)]
+        fraction_voting: f64,
         #[arg(long)]
         votes_file: PathBuf,
     },
@@ -144,7 +146,14 @@ enum Commands {
         #[arg(long)]
         pop_file: PathBuf,
     },
-    VerifyQuorum {},
+    VerifyQuorum {
+        #[arg(long)]
+        registry_file: PathBuf,
+        #[arg(long)]
+        certificate_file: PathBuf,
+        #[arg(long)]
+        quorum_fraction: f64,
+    },
     VerifySignature {
         #[arg(long)]
         pubkey_file: PathBuf,
@@ -217,9 +226,9 @@ fn main() {
             let result = check_pop(&pub_key, &proof);
             if cli.verbose {
                 if result {
-                    println!("Proof of possesion verified.");
+                    eprintln!("Proof of possesion verified.");
                 } else {
-                    println!("Invalid proof of possession.");
+                    eprintln!("Invalid proof of possession.");
                 }
             }
             process::exit(if result { 0 } else { -1 });
@@ -247,9 +256,9 @@ fn main() {
             let result = verify_message(&pub_key, domain_separator.as_bytes(), &msg, &sig);
             if cli.verbose {
                 if result {
-                    println!("Signature verified.");
+                    eprintln!("Signature verified.");
                 } else {
-                    println!("Invalid signature.");
+                    eprintln!("Invalid signature.");
                 }
             }
             process::exit(if result { 0 } else { -1 });
@@ -305,9 +314,9 @@ fn main() {
             let result = verify_vote(&pub_key, &vote);
             if cli.verbose {
                 if result {
-                    println!("Vote verified.");
+                    eprintln!("Vote verified.");
                 } else {
-                    println!("Invalid vote.");
+                    eprintln!("Invalid vote.");
                 }
             }
             process::exit(if result { 0 } else { -1 });
@@ -343,10 +352,17 @@ fn main() {
             registry_file,
             eid,
             eb_hash,
+            fraction_voting,
             votes_file,
         }) => {
+            let g = &mut Gen::new(10);
+            let f = (1000000. * *fraction_voting) as u32;
             let reg: Registry = read_cbor(registry_file).unwrap();
-            let votes: Vec<Vote> = do_voting(&reg, eid, eb_hash);
+            let votes: Vec<Vote> =
+                do_voting(&reg, eid, eb_hash)
+                    .into_iter()
+                    .filter(|_| u32::arbitrary(g) % 1000000 < f)
+                    .collect();
             write_cbor(votes_file, &votes).unwrap();
         }
         Some(Commands::MakeCertificate {
@@ -368,15 +384,35 @@ fn main() {
             let result = verify_cert(&reg, &cert);
             if cli.verbose {
                 if result {
-                    println!("Certificate verified.");
+                    eprintln!("Certificate verified.");
                 } else {
-                    println!("Invalid certificate.");
+                    eprintln!("Invalid certificate.");
                 }
             }
             process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::VerifyQuorum {}) => {
-            panic!("NOT IMPLEMENTED");
+        Some(Commands::VerifyQuorum { registry_file, certificate_file, quorum_fraction }) => {
+            let reg: Registry = read_cbor(registry_file).unwrap();
+            let cert: Cert = read_cbor(certificate_file).unwrap();
+            match weigh_cert(&reg, &cert) {
+                Some(weight) => {
+                    let result = weight.to_ratio().to_f64().unwrap() >= *quorum_fraction;
+                    if cli.verbose {
+                        eprintln!("Seats in election: {}", reg.voters);
+                        eprintln!("Persistent voters: {}", cert.persistent_voters.len());
+                        eprintln!("Nonpersistent voters: {}", cert.nonpersistent_voters.len());
+                        eprintln!("Fraction of stake: {} = {} %", weight.to_ratio(), 100. * weight.to_ratio().to_f64().unwrap());
+                        eprintln!("Quorum? {}", result);
+                    }
+                    process::exit(if result {0} else {1});
+                }
+                None => {
+                    if cli.verbose {
+                        eprintln!("Invalid certificate.");
+                    }
+                    process::exit(-1);
+                        }
+            }
         }
         None => {
             panic!("Invalid command.");
