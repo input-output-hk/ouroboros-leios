@@ -1,7 +1,4 @@
 use blst::min_sig::*;
-use num_bigint::BigInt;
-use num_rational::Ratio;
-use num_traits::Zero;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 
@@ -119,10 +116,8 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
             } = vote.clone()
             {
                 let p = sigma_eid.to_rational();
-                let s =
-                   CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
-                     / reg.nonpersistent_stake.to_ratio()
-                  ;
+                let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
+                    / reg.nonpersistent_stake.to_ratio();
                 if voter_check(reg.voters, &s, &p) > 0 {
                     votes.push(vote);
                 }

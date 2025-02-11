@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use crate::fait_accompli::fait_accompli;
 use crate::key::{arbitrary_reg, Reg, SecKey};
 use crate::primitive::{
-    arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, CoinFraction, PoolKeyhash,
+    arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, CoinFraction,
+    PoolKeyhash,
 };
 use crate::realism::realistic_voters;
 

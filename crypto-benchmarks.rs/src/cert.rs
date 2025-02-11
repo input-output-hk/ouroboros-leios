@@ -155,39 +155,33 @@ pub fn verify_cert(reg: &Registry, cert: &Cert) -> bool {
 }
 
 fn weigh_persistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
-    let weight: Option<Coin> =
-      cert.persistent_voters
-      .iter()
-      .fold(Some(0), |acc, pid| 
-        reg.persistent_pool.get(pid)
-          .and_then(|pool|
-                acc.map(|total| total + reg.info[pool].stake))
-          );
+    let weight: Option<Coin> = cert.persistent_voters.iter().try_fold(0, |acc, pid| {
+        reg.persistent_pool
+            .get(pid)
+            .map(|pool| acc + reg.info[pool].stake)
+    });
     weight.map(|total| CoinFraction::from_coins(total, 1))
 }
 
 fn weigh_nonpersistent(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     let nonpersistent_voters = reg.voters - cert.persistent_voters.len();
     let weight: Option<usize> =
-      cert.nonpersistent_voters
-        .iter()
-        .fold(Some(0),|acc, (pool, sigma_eid)|
-            reg.info.get(pool)
-              .and_then(|info|
-                acc.map(|total| {
+        cert.nonpersistent_voters
+            .iter()
+            .try_fold(0, |acc, (pool, sigma_eid)| {
+                reg.info.get(pool).map(|info| {
                     let p = sigma_eid.to_rational();
                     let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio()
-                    / reg.nonpersistent_stake.to_ratio();
-                    total + voter_check(nonpersistent_voters, &s, &p)
+                        / reg.nonpersistent_stake.to_ratio();
+                    acc + voter_check(nonpersistent_voters, &s, &p)
                 })
-            )
-        );
-    weight.map(|total|
+            });
+    weight.map(|total| {
         CoinFraction(
-            CoinFraction::from_coins(total as u64 , nonpersistent_voters as u64).to_ratio()
-              * reg.nonpersistent_stake.to_ratio()
+            CoinFraction::from_coins(total as u64, nonpersistent_voters as u64).to_ratio()
+                * reg.nonpersistent_stake.to_ratio(),
         )
-    )
+    })
 }
 
 pub fn weigh_cert(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
@@ -195,6 +189,6 @@ pub fn weigh_cert(reg: &Registry, cert: &Cert) -> Option<CoinFraction> {
     let nonpersistent_weight = weigh_nonpersistent(reg, cert)?.to_ratio();
     Some(CoinFraction(
         (persistent_weight + nonpersistent_weight)
-          * CoinFraction::from_coins(1, reg.total_stake).to_ratio()
+            * CoinFraction::from_coins(1, reg.total_stake).to_ratio(),
     ))
 }

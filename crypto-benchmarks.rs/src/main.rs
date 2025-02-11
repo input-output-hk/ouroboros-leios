@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use hex::ToHex;
 use num_bigint::BigInt;
 use num_rational::Ratio;
-use num_traits::{FromPrimitive,ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use quickcheck::{Arbitrary, Gen};
 use std::collections::BTreeMap;
 use std::io::{Error, ErrorKind};
@@ -358,11 +358,10 @@ fn main() {
             let g = &mut Gen::new(10);
             let f = (1000000. * *fraction_voting) as u32;
             let reg: Registry = read_cbor(registry_file).unwrap();
-            let votes: Vec<Vote> =
-                do_voting(&reg, eid, eb_hash)
-                    .into_iter()
-                    .filter(|_| u32::arbitrary(g) % 1000000 < f)
-                    .collect();
+            let votes: Vec<Vote> = do_voting(&reg, eid, eb_hash)
+                .into_iter()
+                .filter(|_| u32::arbitrary(g) % 1000000 < f)
+                .collect();
             write_cbor(votes_file, &votes).unwrap();
         }
         Some(Commands::MakeCertificate {
@@ -391,7 +390,11 @@ fn main() {
             }
             process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::VerifyQuorum { registry_file, certificate_file, quorum_fraction }) => {
+        Some(Commands::VerifyQuorum {
+            registry_file,
+            certificate_file,
+            quorum_fraction,
+        }) => {
             let reg: Registry = read_cbor(registry_file).unwrap();
             let cert: Cert = read_cbor(certificate_file).unwrap();
             match weigh_cert(&reg, &cert) {
@@ -401,17 +404,21 @@ fn main() {
                         eprintln!("Seats in election: {}", reg.voters);
                         eprintln!("Persistent voters: {}", cert.persistent_voters.len());
                         eprintln!("Nonpersistent voters: {}", cert.nonpersistent_voters.len());
-                        eprintln!("Fraction of stake: {} = {} %", weight.to_ratio(), 100. * weight.to_ratio().to_f64().unwrap());
+                        eprintln!(
+                            "Fraction of stake: {} = {} %",
+                            weight.to_ratio(),
+                            100. * weight.to_ratio().to_f64().unwrap()
+                        );
                         eprintln!("Quorum? {}", result);
                     }
-                    process::exit(if result {0} else {1});
+                    process::exit(if result { 0 } else { 1 });
                 }
                 None => {
                     if cli.verbose {
                         eprintln!("Invalid certificate.");
                     }
                     process::exit(-1);
-                        }
+                }
             }
         }
         None => {
