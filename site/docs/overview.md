@@ -44,3 +44,5 @@ chain) from transaction diffusion, availability, and validation. Ultimately,
 these multiple lanes must merge into a single, orderly flow of vehicles – just
 as the blocks of the underlying main chain consolidate transactions into a
 final, agreed-upon sequence.
+
+*Read the following sections to learn more about the protocol’s properties and high-level architecture.*
