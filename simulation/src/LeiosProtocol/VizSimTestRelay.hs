@@ -18,7 +18,6 @@ import LeiosProtocol.SimTestRelay
 import ModelTCP
 import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
-import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
 import System.Random.Stateful (uniform)

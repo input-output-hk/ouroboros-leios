@@ -22,7 +22,7 @@ import qualified LeiosProtocol.Config as OnDisk
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
-import ModelTCP (Bytes (..))
+import ModelTCP (Bytes (..), kilobytes)
 import Options.Applicative (
   Alternative ((<|>)),
   HasValue,
@@ -62,7 +62,6 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTCPLinks (kilobytes)
 import SimTypes
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)

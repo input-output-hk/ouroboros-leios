@@ -8,7 +8,7 @@
 
 module PraosProtocol.SimPraos where
 
-import Chan.Mux
+import Chan (ConnectionConfig, mkConnectionConfig, newConnectionBundle)
 import Chan.TCP
 import Control.Monad.Class.MonadAsync (MonadAsync (..))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
@@ -43,12 +43,12 @@ data PraosEvent
   deriving (Show)
 
 exampleTrace1 :: PraosTrace
-exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
+exampleTrace1 = traceRelayLink1 $ mkConnectionConfig True True 0.1 (Just 1000000)
 
 traceRelayLink1 ::
-  TcpConnProps ->
+  ConnectionConfig ->
   PraosTrace
-traceRelayLink1 tcpprops =
+traceRelayLink1 connectionConfig =
   selectTimedEvents $
     runSimTrace $ do
       traceWith tracer $
@@ -72,8 +72,8 @@ traceRelayLink1 tcpprops =
               | word <- [0 .. 9]
               ]
       let chainB = Genesis
-      (pA, cB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
-      (cA, pB) <- newConnectionBundleTCP (praosTracer nodeA nodeB) tcpprops
+      (pA, cB) <- newConnectionBundle (praosTracer nodeA nodeB) connectionConfig
+      (cA, pB) <- newConnectionBundle (praosTracer nodeA nodeB) connectionConfig
       concurrently_
         (runPraosNode (nodeTracer nodeA) praosConfig chainA [pA] [cA])
         (runPraosNode (nodeTracer nodeB) praosConfig chainB [pB] [cB])

@@ -23,6 +23,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import ModelTCP (mkTcpConnProps)
 import PraosProtocol.ChainSync (
   ChainConsumerState (..),
   ChainSyncState,
@@ -34,7 +35,6 @@ import qualified PraosProtocol.Common.Chain as Chain
 import STMCompat
 import SimTCPLinks (
   labelDirToLabelLink,
-  mkTcpConnProps,
   selectTimedEvents,
   simTracer,
  )

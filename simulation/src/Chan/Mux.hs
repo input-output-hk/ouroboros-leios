@@ -10,38 +10,26 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Chan.Mux (
-  ToFromMuxMsg (..),
-  MuxBundle (..),
-  newConnectionBundleTCP,
+  ToFromBundleMsg (..),
+  ConnectionBundle (..),
+  fromBearerMsg,
+  newMuxChan,
 ) where
 
 import Chan.Core (Chan (..))
-import Chan.TCP (
-  LabelTcpDir,
-  MessageSize (..),
-  TcpConnProps,
-  TcpEvent,
-  newConnectionTCP,
- )
+import Chan.TCP (MessageSize (..))
 import qualified Control.Category as Cat
-import Control.Concurrent.Class.MonadMVar (
-  MonadMVar (MVar, newMVar, withMVar),
- )
+import Control.Concurrent.Class.MonadMVar (MonadMVar (..))
 import Control.Monad (forever)
-import Control.Monad.Class.MonadAsync (MonadAsync)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
-import Control.Tracer (Contravariant (contramap), Tracer)
 import Data.Array (Array, listArray, (!))
-import Data.Dynamic (Dynamic, Typeable, fromDynamic, toDyn)
-import Data.Maybe (fromJust)
 import STMCompat
-import TimeCompat
 
-class MuxBundle bundle where
-  type MuxMsg bundle
-  toFromMuxMsgBundle :: bundle (ToFromMuxMsg (MuxMsg bundle))
+class ConnectionBundle bundle where
+  type BundleMsg bundle
+  toFromBundleMsgBundle :: bundle (ToFromBundleMsg (BundleMsg bundle))
 
-  traverseMuxBundle ::
+  traverseConnectionBundle ::
     Monad m =>
     (forall a. f a -> m (g a)) ->
     bundle f ->
@@ -50,24 +38,24 @@ class MuxBundle bundle where
 -- | Injection, projection, between a common mux message type, and an
 -- individual message type. The following must hold:
 --
--- > fromMuxMsg (toMuxMsg x) = x
+-- > fromBundleMsg (toBundleMsg x) = x
 --
--- But 'fromMuxMsg' is not required to be defined outside of the image of
--- 'toMuxMsg'. For example, a valid implementation would be:
+-- But 'fromBundleMsg' is not required to be defined outside of the image of
+-- 'toBundleMsg'. For example, a valid implementation would be:
 --
--- > ToFromMuxMsg toDynamic (fromJust . fromDynamic)
-data ToFromMuxMsg mm a
-  = ToFromMuxMsg
-  { toMuxMsg :: a -> mm
-  , fromMuxMsg :: mm -> a
+-- > ToFromBundleMsg toDynamic (fromJust . fromDynamic)
+data ToFromBundleMsg mm a
+  = ToFromBundleMsg
+  { toBundleMsg :: a -> mm
+  , fromBundleMsg :: mm -> a
   }
 
-instance Cat.Category ToFromMuxMsg where
-  id = ToFromMuxMsg id id
-  (.) (ToFromMuxMsg f f') (ToFromMuxMsg g g') = ToFromMuxMsg (g . f) (f' . g')
+instance Cat.Category ToFromBundleMsg where
+  id = ToFromBundleMsg id id
+  (.) (ToFromBundleMsg f f') (ToFromBundleMsg g g') = ToFromBundleMsg (g . f) (f' . g')
 
--- dynToFromMuxMsg :: Typeable a => ToFromMuxMsg Dynamic a
--- dynToFromMuxMsg = ToFromMuxMsg toDyn (fromJust . fromDynamic)
+-- dynToFromBundleMsg :: Typeable a => ToFromBundleMsg Dynamic a
+-- dynToFromBundleMsg = ToFromBundleMsg toDyn (fromJust . fromDynamic)
 
 data BearerMsg a = BearerMsg !Int a
 
@@ -79,24 +67,24 @@ instance MessageSize a => MessageSize (BearerMsg a) where
 
 newMuxChan ::
   forall bundle m.
-  (MuxBundle bundle, MonadMVar m, MonadSTM m, MonadFork m) =>
-  Chan m (BearerMsg (MuxMsg bundle)) ->
+  (ConnectionBundle bundle, MonadMVar m, MonadSTM m, MonadFork m) =>
+  Chan m (BearerMsg (BundleMsg bundle)) ->
   m (bundle (Chan m))
 newMuxChan bearer = do
   sendLock <- newMVar ()
-  -- Bit of a hack to use these TVars, could run the traverseMuxBundle
+  -- Bit of a hack to use these TVars, could run the traverseConnectionBundle
   -- in a reader+state monad instead. That'd be cleaner.
   recvQueuesAccum <- newTVarIO []
   recvQueuesIx <- newTVarIO 0
   chans <-
-    traverseMuxBundle
+    traverseConnectionBundle
       ( newMuxChanSingle @bundle
           bearer
           sendLock
           recvQueuesIx
           recvQueuesAccum
       )
-      toFromMuxMsgBundle
+      toFromBundleMsgBundle
   recvQueues <- reverse <$> readTVarIO recvQueuesAccum
   let recvQueues' = listArray (0, length recvQueues - 1) recvQueues
   _ <- forkIO $ demuxer @bundle bearer recvQueues'
@@ -105,21 +93,21 @@ newMuxChan bearer = do
 newMuxChanSingle ::
   forall bundle m a.
   (MonadMVar m, MonadSTM m) =>
-  Chan m (BearerMsg (MuxMsg bundle)) ->
+  Chan m (BearerMsg (BundleMsg bundle)) ->
   MVar m () ->
   TVar m Int ->
-  TVar m [RecvQueue m (MuxMsg bundle)] ->
-  ToFromMuxMsg (MuxMsg bundle) a ->
+  TVar m [RecvQueue m (BundleMsg bundle)] ->
+  ToFromBundleMsg (BundleMsg bundle) a ->
   m (Chan m a)
 newMuxChanSingle
   bearer
   sendLock
   recvQueuesIx
   recvQueuesAccum
-  ToFromMuxMsg{..} = do
+  ToFromBundleMsg{..} = do
     queue <- newTQueueIO
     i <- atomically $ do
-      modifyTVar recvQueuesAccum (RecvQueue fromMuxMsg queue :)
+      modifyTVar recvQueuesAccum (RecvQueue fromBundleMsg queue :)
       i <- readTVar recvQueuesIx
       writeTVar recvQueuesIx $! (i + 1)
       return i
@@ -127,7 +115,7 @@ newMuxChanSingle
       Chan
         { readChan = atomically (readTQueue queue)
         , writeChan = \msg ->
-            let !muxmsg = BearerMsg i (toMuxMsg msg)
+            let !muxmsg = BearerMsg i (toBundleMsg msg)
              in withMVar sendLock $ \_ -> writeChan bearer muxmsg
         }
 
@@ -137,8 +125,8 @@ data RecvQueue m mm where
 demuxer ::
   forall bundle m.
   MonadSTM m =>
-  Chan m (BearerMsg (MuxMsg bundle)) ->
-  Array Int (RecvQueue m (MuxMsg bundle)) ->
+  Chan m (BearerMsg (BundleMsg bundle)) ->
+  Array Int (RecvQueue m (BundleMsg bundle)) ->
   m ()
 demuxer bearer queues =
   forever $ do
@@ -146,17 +134,6 @@ demuxer bearer queues =
     case queues ! i of
       RecvQueue convert queue ->
         atomically $ writeTQueue queue $! convert msg
-
-newConnectionBundleTCP ::
-  forall bundle m.
-  (MuxBundle bundle, MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize (MuxMsg bundle), MonadMVar m, MonadFork m) =>
-  Tracer m (LabelTcpDir (TcpEvent (MuxMsg bundle))) ->
-  TcpConnProps ->
-  m (bundle (Chan m), bundle (Chan m))
-newConnectionBundleTCP tracer tcpprops = do
-  let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
-  (mA, mB) <- newConnectionTCP tracer' tcpprops
-  (,) <$> newMuxChan mA <*> newMuxChan mB
 
 data ExampleBundle f = ExampleBundle
   { exampleFoo :: f Int
@@ -167,16 +144,16 @@ data ExampleMsg
   = MsgFoo {fromMsgFoo :: Int}
   | MsgBar {fromMsgBar :: Bool}
 
-instance MuxBundle ExampleBundle where
-  type MuxMsg ExampleBundle = ExampleMsg
+instance ConnectionBundle ExampleBundle where
+  type BundleMsg ExampleBundle = ExampleMsg
 
-  toFromMuxMsgBundle =
+  toFromBundleMsgBundle =
     ExampleBundle
-      { exampleFoo = ToFromMuxMsg MsgFoo fromMsgFoo
-      , exampleBar = ToFromMuxMsg MsgBar fromMsgBar
+      { exampleFoo = ToFromBundleMsg MsgFoo fromMsgFoo
+      , exampleBar = ToFromBundleMsg MsgBar fromMsgBar
       }
 
-  traverseMuxBundle f ExampleBundle{..} =
+  traverseConnectionBundle f ExampleBundle{..} =
     ExampleBundle
       <$> f exampleFoo
       <*> f exampleBar

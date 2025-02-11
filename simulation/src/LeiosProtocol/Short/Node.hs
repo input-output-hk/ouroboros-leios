@@ -170,20 +170,20 @@ instance MessageSize LeiosMessage where
     RelayVote m -> messageSizeBytes m
     PraosMsg m -> messageSizeBytes m
 
-instance MuxBundle Leios where
-  type MuxMsg Leios = LeiosMessage
-  toFromMuxMsgBundle =
+instance ConnectionBundle Leios where
+  type BundleMsg Leios = LeiosMessage
+  toFromBundleMsgBundle =
     Leios
-      { protocolIB = ToFromMuxMsg RelayIB (.fromRelayIB)
-      , protocolEB = ToFromMuxMsg RelayEB (.fromRelayEB)
-      , protocolVote = ToFromMuxMsg RelayVote (.fromRelayVote)
-      , protocolPraos = case toFromMuxMsgBundle @(PraosNode.Praos RankingBlockBody) of
+      { protocolIB = ToFromBundleMsg RelayIB (.fromRelayIB)
+      , protocolEB = ToFromBundleMsg RelayEB (.fromRelayEB)
+      , protocolVote = ToFromBundleMsg RelayVote (.fromRelayVote)
+      , protocolPraos = case toFromBundleMsgBundle @(PraosNode.Praos RankingBlockBody) of
           PraosNode.Praos a b -> PraosNode.Praos (p >>> a) (p >>> b)
       }
    where
-    p = ToFromMuxMsg PraosMsg (.fromPraosMsg)
+    p = ToFromBundleMsg PraosMsg (.fromPraosMsg)
 
-  traverseMuxBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseMuxBundle f d
+  traverseConnectionBundle f (Leios a b c d) = Leios <$> f a <*> f b <*> f c <*> traverseConnectionBundle f d
 
 --------------------------------------------------------------
 

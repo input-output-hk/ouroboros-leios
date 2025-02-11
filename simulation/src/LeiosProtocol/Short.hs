@@ -14,9 +14,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
-module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..))
-where
+module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..)) where
 
+import Chan (mkConnectionConfig)
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Kind
@@ -170,6 +170,7 @@ convertConfig disk =
       , blockGenerationDelay = \(Block _ body) ->
           durationMsToDiffTime disk.rbGenerationCpuTimeMs
             + sum (map (certificateGeneration . snd) body.endorseBlocks)
+      , configureConnection = mkConnectionConfig (tcpCongestionControl disk) (multiplexMiniProtocols disk)
       }
   certificateSize (Certificate votesMap) =
     fromIntegral $

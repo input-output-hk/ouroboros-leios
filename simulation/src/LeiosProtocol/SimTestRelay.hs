@@ -11,6 +11,7 @@
 module LeiosProtocol.SimTestRelay where
 
 import Chan
+import Chan.TCP (newConnectionTCP)
 import Control.Category ((>>>))
 import Control.Exception (assert)
 import Control.Monad (forever, when)
@@ -251,15 +252,15 @@ newtype TestRelayBundle f = TestRelayBundle
   { testMsg :: f TestBlockRelayMessage
   }
 
-instance MuxBundle TestRelayBundle where
-  type MuxMsg TestRelayBundle = TestBlockRelayMessage
+instance ConnectionBundle TestRelayBundle where
+  type BundleMsg TestRelayBundle = TestBlockRelayMessage
 
-  toFromMuxMsgBundle =
+  toFromBundleMsgBundle =
     TestRelayBundle
-      { testMsg = ToFromMuxMsg id id
+      { testMsg = ToFromBundleMsg id id
       }
 
-  traverseMuxBundle f TestRelayBundle{..} =
+  traverseConnectionBundle f TestRelayBundle{..} =
     TestRelayBundle
       <$> f testMsg
 

@@ -6,25 +6,21 @@
 
 module LeiosProtocol.Short.SimP2P where
 
-import Chan.Mux (newConnectionBundleTCP)
+import Chan (ConnectionConfig, newConnectionBundle)
 import Chan.TCP
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
-import Control.Tracer as Tracer (
-  Contravariant (contramap),
-  Tracer,
-  traceWith,
- )
+import Control.Tracer as Tracer (Contravariant (..), Tracer, traceWith)
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import LeiosProtocol.Common
 import qualified LeiosProtocol.Config as OnDisk
-import LeiosProtocol.Short
+import LeiosProtocol.Short (LeiosConfig (..), convertConfig)
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
-import SimTCPLinks (labelDirToLabelLink, mkTcpConnProps, selectTimedEvents, simTracer)
+import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
 import Topology (P2PNetwork (..))
@@ -32,7 +28,7 @@ import Topology (P2PNetwork (..))
 traceLeiosP2P ::
   StdGen ->
   P2PNetwork ->
-  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
+  (DiffTime -> Maybe Bytes -> ConnectionConfig) ->
   (SlotConfig -> NodeId -> StdGen -> LeiosNodeConfig) ->
   LeiosTrace
 traceLeiosP2P
@@ -58,7 +54,7 @@ traceLeiosP2P
           sequence
             [ do
               (inChan, outChan) <-
-                newConnectionBundleTCP @Leios
+                newConnectionBundle @Leios
                   (linkTracer na nb)
                   (tcpprops (realToFrac latency) bandwidth)
               return ((na, nb), (inChan, outChan))
@@ -114,11 +110,11 @@ exampleTrace2 :: StdGen -> OnDisk.Config -> P2PNetwork -> LeiosTrace
 exampleTrace2 rng = exampleTrace2' rng . convertConfig
 
 exampleTrace2' :: StdGen -> LeiosConfig -> P2PNetwork -> LeiosTrace
-exampleTrace2' rng0 leios p2pTopography@P2PNetwork{..} =
+exampleTrace2' rng0 leios@LeiosConfig{praos = PraosConfig{configureConnection}} p2pTopography@P2PNetwork{..} =
   traceLeiosP2P
     rng0
     p2pTopography
-    (\l b -> mkTcpConnProps l (fromMaybe (error "Unlimited bandwidth: TBD") b))
+    configureConnection
     leiosNodeConfig
  where
   leiosNodeConfig slotConfig nodeId rng =

@@ -20,6 +20,7 @@ import System.Random (StdGen, split)
 import TimeCompat
 
 import Chan
+import Chan.TCP (newConnectionTCP)
 import SimRelay
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes

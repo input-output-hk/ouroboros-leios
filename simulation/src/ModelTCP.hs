@@ -15,6 +15,10 @@ module ModelTCP (
   forecastTcpMsgSend,
   TcpEvent (..),
   traceTcpSend,
+  mkTcpConnProps,
+  kilobytes,
+  segments,
+  bytesToKb,
 ) where
 
 import Control.Exception (assert)
@@ -53,6 +57,32 @@ data TcpConnProps = TcpConnProps
 
 newtype Bytes = Bytes {fromBytes :: Int}
   deriving (Eq, Ord, Enum, Num, Real, Integral, Show, Hashable)
+
+mkTcpConnProps ::
+  -- | latency in seconds
+  DiffTime ->
+  -- | sender serialisation bandwidth in bytes per sec, @Nothing@ for unlimited
+  Bytes ->
+  TcpConnProps
+mkTcpConnProps latency bandwidth =
+  TcpConnProps
+    { tcpLatency = latency
+    , tcpBandwidth = bandwidth
+    , tcpReceiverWindow = max (segments 10) recvwnd
+    }
+ where
+  -- set it big enough to not constrain the bandwidth
+  recvwnd = Bytes (ceiling (fromIntegral (fromBytes bandwidth) * latency * 2))
+
+kilobytes :: Int -> Bytes
+kilobytes kb = Bytes kb * 1024
+
+segments :: Int -> Bytes
+segments s = Bytes s * segmentSize
+
+-- | Rounds down.
+bytesToKb :: Bytes -> Int
+bytesToKb (Bytes b) = b `div` 1024
 
 data TcpState = TcpState
   { tcpCongestionWindow :: !Bytes
