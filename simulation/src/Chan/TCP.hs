@@ -3,12 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Chan.TCP (
-  newConnectionTCP,
-  MessageSize (..),
-  Bytes,
-  LabelTcpDir (..),
-  TcpEvent (..),
-  TcpConnProps (..),
+  module Chan.TCP,
+  module ModelTCP,
 ) where
 
 import Chan.Core (Chan (..))
