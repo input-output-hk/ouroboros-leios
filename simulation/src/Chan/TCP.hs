@@ -2,7 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module ChanTCP (
+module Chan.TCP (
   newConnectionTCP,
   MessageSize (..),
   Bytes,
@@ -11,7 +11,7 @@ module ChanTCP (
   TcpConnProps (..),
 ) where
 
-import Chan (Chan (..))
+import Chan.Core (Chan (..))
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.Class.MonadAsync (MonadAsync (async))

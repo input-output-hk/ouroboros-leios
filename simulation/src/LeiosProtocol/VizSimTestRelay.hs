@@ -4,7 +4,7 @@
 
 module LeiosProtocol.VizSimTestRelay where
 
-import ChanDriver (ProtocolMessage (..))
+import Chan.Driver (ProtocolMessage (..))
 import Control.Exception (assert)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map

@@ -16,7 +16,7 @@
 
 module LeiosProtocol.Short.VizSimP2P where
 
-import ChanDriver
+import Chan.Driver
 import Control.Arrow ((&&&))
 import Control.Exception
 import Data.Aeson

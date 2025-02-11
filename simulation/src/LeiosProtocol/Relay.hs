@@ -25,7 +25,7 @@
 module LeiosProtocol.Relay where
 
 import Chan
-import ChanDriver (ProtocolMessage, chanDriver)
+import Chan.Driver (ProtocolMessage, chanDriver)
 import Control.DeepSeq (NFData)
 import Control.Exception (Exception, assert, throw)
 import Control.Monad (forM_, join, unless, void, when)

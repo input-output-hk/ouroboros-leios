@@ -23,7 +23,7 @@
 module PraosProtocol.BlockFetch where
 
 import Chan (Chan)
-import ChanDriver (ProtocolMessage, chanDriver)
+import Chan.Driver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (forM, forever, guard, join, unless, void, when, (<=<))
 import Control.Tracer (Tracer, traceWith)

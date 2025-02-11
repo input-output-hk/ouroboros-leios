@@ -9,10 +9,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module ChanDriver where
+module Chan.Driver where
 
-import Chan
-import ChanTCP
+import Chan.Core
+import Chan.TCP
 import Data.Type.Equality
 import Network.TypedProtocol (
   ActiveState,

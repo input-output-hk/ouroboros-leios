@@ -13,7 +13,7 @@
 
 module LeiosProtocol.Short.Node where
 
-import ChanMux
+import Chan.Mux
 import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.TSem

@@ -11,8 +11,8 @@
 module LeiosProtocol.SimTestRelay where
 
 import Chan
-import ChanMux
-import ChanTCP
+import Chan.Mux
+import Chan.TCP
 import Control.Category ((>>>))
 import Control.Exception (assert)
 import Control.Monad (forever, when)

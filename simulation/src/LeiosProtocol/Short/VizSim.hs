@@ -9,7 +9,7 @@
 
 module LeiosProtocol.Short.VizSim where
 
-import ChanDriver
+import Chan.Driver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
 import qualified Data.Foldable as Foldable

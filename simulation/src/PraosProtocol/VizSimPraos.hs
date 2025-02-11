@@ -5,7 +5,7 @@
 
 module PraosProtocol.VizSimPraos where
 
-import ChanDriver
+import Chan.Driver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
 import Data.IntMap (IntMap)

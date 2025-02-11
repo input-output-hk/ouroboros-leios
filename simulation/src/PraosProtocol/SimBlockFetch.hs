@@ -3,8 +3,8 @@
 module PraosProtocol.SimBlockFetch where
 
 import Chan (Chan)
-import ChanDriver (ProtocolMessage)
-import ChanTCP
+import Chan.Driver (ProtocolMessage)
+import Chan.TCP
 import Control.Monad
 import Control.Monad.Class.MonadAsync (
   MonadAsync (..),

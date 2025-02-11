@@ -12,8 +12,8 @@
 
 module PraosProtocol.ExamplesPraosP2P where
 
-import ChanDriver
-import ChanTCP
+import Chan.Driver
+import Chan.TCP
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.Types

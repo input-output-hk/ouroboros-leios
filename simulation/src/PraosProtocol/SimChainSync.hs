@@ -2,8 +2,8 @@
 
 module PraosProtocol.SimChainSync where
 
-import ChanDriver (ProtocolMessage)
-import ChanTCP (
+import Chan.Driver (ProtocolMessage)
+import Chan.TCP (
   LabelTcpDir,
   TcpConnProps,
   TcpEvent,

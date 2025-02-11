@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module ChanMux (
+module Chan.Mux (
   newMuxChan,
   Chan (..),
   ToFromMuxMsg (..),
@@ -20,8 +20,8 @@ module ChanMux (
   newConnectionBundleTCP,
 ) where
 
-import Chan
-import ChanTCP
+import Chan.Core
+import Chan.TCP
 import qualified Control.Category as Cat
 import Control.Concurrent.Class.MonadMVar (
   MonadMVar (MVar, newMVar, withMVar),

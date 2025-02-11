@@ -39,7 +39,7 @@ module LeiosProtocol.Common (
 )
 where
 
-import ChanTCP
+import Chan.TCP
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Aeson

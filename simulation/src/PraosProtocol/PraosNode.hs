@@ -10,8 +10,8 @@ module PraosProtocol.PraosNode (
 )
 where
 
-import ChanDriver (protocolMessage)
-import ChanMux
+import Chan.Driver (protocolMessage)
+import Chan.Mux
 import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Monad.Class.MonadFork

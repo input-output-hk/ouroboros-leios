@@ -40,7 +40,7 @@ module PraosProtocol.Common (
   mkScheduler,
 ) where
 
-import ChanTCP (Bytes, MessageSize (..))
+import Chan.TCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad.State
 import Data.Coerce (coerce)

@@ -49,7 +49,7 @@ module PraosProtocol.Common.ConcreteBlock (
   fixupAnchoredFragmentFrom,
 ) where
 
-import ChanTCP (Bytes)
+import Chan.TCP (Bytes)
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Function (fix)

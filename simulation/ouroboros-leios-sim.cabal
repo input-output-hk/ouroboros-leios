@@ -42,9 +42,10 @@ library
 
   exposed-modules:
     Chan
-    ChanDriver
-    ChanMux
-    ChanTCP
+    Chan.Core
+    Chan.Driver
+    Chan.Mux
+    Chan.TCP
     Diffusion
     ExamplesLayout
     ExamplesRelay

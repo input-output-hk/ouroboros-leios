@@ -8,8 +8,8 @@
 
 module PraosProtocol.SimPraos where
 
-import ChanMux
-import ChanTCP
+import Chan.Mux
+import Chan.TCP
 import Control.Monad.Class.MonadAsync (MonadAsync (..))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (

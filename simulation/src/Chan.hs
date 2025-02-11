@@ -1,6 +1,11 @@
-module Chan where
+module Chan (
+  module Chan.Core,
+  module Chan.Driver,
+  module Chan.Mux,
+  module Chan.TCP,
+) where
 
-data Chan m a = Chan
-  { readChan :: m a
-  , writeChan :: a -> m ()
-  }
+import Chan.Core
+import Chan.Driver
+import Chan.Mux
+import Chan.TCP

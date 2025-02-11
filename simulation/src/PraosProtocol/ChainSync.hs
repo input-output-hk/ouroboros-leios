@@ -14,7 +14,7 @@
 module PraosProtocol.ChainSync where
 
 import Chan (Chan)
-import ChanDriver (ProtocolMessage, chanDriver)
+import Chan.Driver (ProtocolMessage, chanDriver)
 import Control.Exception (assert)
 import Control.Monad (void)
 import Control.Tracer (Tracer)
