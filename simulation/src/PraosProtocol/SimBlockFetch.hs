@@ -21,6 +21,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import ModelTCP (mkTcpConnProps)
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
 import STMCompat

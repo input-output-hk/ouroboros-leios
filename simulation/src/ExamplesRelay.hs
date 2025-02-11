@@ -1,12 +1,27 @@
 module ExamplesRelay where
 
 import Data.Word (Word8)
-import RelayProtocol
-import SimRelay
-import SimTCPLinks (kilobytes, mkTcpConnProps)
+import ModelTCP (kilobytes, mkTcpConnProps)
+import RelayProtocol (BlockRelayMessage (..), BlockTTL)
+import SimRelay (
+  PacketGenerationPattern (UniformGenerationPattern),
+  TestBlock (TestBlock),
+  TestBlockId (..),
+  traceRelayLink1,
+  traceRelayLink4,
+  traceRelayLink4Asymmetric,
+ )
 import System.Random (mkStdGen, uniform)
-import Viz
-import VizSimRelay
+import Viz (
+  Layout (Layout, LayoutReqSize),
+  Visualization (..),
+  slowmoVisualization,
+ )
+import VizSimRelay (
+  RelaySimVizConfig (..),
+  relaySimVizModel,
+  relaySimVizRender,
+ )
 
 example1 :: Visualization
 example1 =

@@ -5,11 +5,11 @@ module ExamplesRelayP2P where
 import Data.Functor.Contravariant (Contravariant (contramap))
 import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
+import ModelTCP (kilobytes, mkTcpConnProps)
 import P2P (P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import RelayProtocol
 import SimRelay
 import SimRelayP2P
-import SimTCPLinks (kilobytes, mkTcpConnProps)
 import SimTypes
 import System.Random (mkStdGen, uniform)
 import TimeCompat (secondsToDiffTime)

@@ -62,7 +62,7 @@ import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTCPLinks (kilobytes)
+import ModelTCP (kilobytes)
 import SimTypes
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)

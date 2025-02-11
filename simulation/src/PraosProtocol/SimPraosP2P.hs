@@ -5,8 +5,7 @@
 
 module PraosProtocol.SimPraosP2P where
 
-import Chan.Mux (newConnectionBundleTCP)
-import Chan.TCP
+import Chan (Bytes, ConnectionConfig, LabelTcpDir, TcpEvent, newConnectionBundle)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
@@ -28,7 +27,7 @@ import Topology
 tracePraosP2P ::
   StdGen ->
   P2PNetwork ->
-  (DiffTime -> Maybe Bytes -> TcpConnProps) ->
+  (DiffTime -> Maybe Bytes -> ConnectionConfig) ->
   (SlotConfig -> NodeId -> StdGen -> PraosNodeConfig) ->
   PraosTrace
 tracePraosP2P
@@ -38,7 +37,7 @@ tracePraosP2P
     , p2pLinks
     , p2pWorld
     }
-  tcpprops
+  configureConnection
   praosConfig =
     selectTimedEvents $
       runSimTrace $ do
@@ -52,9 +51,9 @@ tracePraosP2P
           sequence
             [ do
               (inChan, outChan) <-
-                newConnectionBundleTCP @(Praos BlockBody)
+                newConnectionBundle @(Praos BlockBody)
                   (linkTracer na nb)
-                  (tcpprops (realToFrac latency) bw)
+                  (configureConnection (realToFrac latency) bw)
               return ((na, nb), (inChan, outChan))
             | ((na, nb), (latency, bw)) <- Map.toList p2pLinks
             ]

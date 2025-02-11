@@ -168,12 +168,12 @@ messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
 messages trace = [(t, LabelLink x y msg) | (t, LeiosEventTcp (LabelLink x y (TcpSendMsg msg _ _))) <- trace]
 
 exampleTrace1 :: LeiosTrace
-exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
+exampleTrace1 = traceRelayLink1 (0.1, Just 1000000)
 
 traceRelayLink1 ::
-  TcpConnProps ->
+  (DiffTime, Maybe Bytes) ->
   LeiosTrace
-traceRelayLink1 tcpprops =
+traceRelayLink1 connectionOptions =
   selectTimedEvents $
     runSimTrace $ do
       traceWith tracer $
@@ -196,7 +196,7 @@ traceRelayLink1 tcpprops =
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
       slotConfig <- slotConfigFromNow
-      let praosConfig = defaultPraosConfig
+      let praosConfig@PraosConfig{configureConnection} = defaultPraosConfig
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
@@ -253,9 +253,8 @@ traceRelayLink1 tcpprops =
               , processingCores = Infinite
               , ..
               }
-
-      (pA, cB) <- newConnectionBundleTCP (leiosTracer nodeA nodeB) tcpprops
-      (cA, pB) <- newConnectionBundleTCP (leiosTracer nodeA nodeB) tcpprops
+      (pA, cB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
+      (cA, pB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
       threads <-
         (++)
           <$> leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA]

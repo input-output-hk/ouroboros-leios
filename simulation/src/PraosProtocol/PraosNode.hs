@@ -51,14 +51,14 @@ praosMessageLabel (PraosMessage d) =
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
 
-instance MuxBundle (Praos body) where
-  type MuxMsg (Praos body) = PraosMessage body
-  toFromMuxMsgBundle =
+instance ConnectionBundle (Praos body) where
+  type BundleMsg (Praos body) = PraosMessage body
+  toFromBundleMsgBundle =
     coerce $
       Praos
-        (ToFromMuxMsg Left $ fromLeft $ error "MuxBundle Praos: fromLeft")
-        (ToFromMuxMsg Right $ fromRight $ error "MuxBundle Praos: fromRight")
-  traverseMuxBundle f (Praos x y) = Praos <$> f x <*> f y
+        (ToFromBundleMsg Left $ fromLeft $ error "ConnectionBundle Praos: fromLeft")
+        (ToFromBundleMsg Right $ fromRight $ error "ConnectionBundle Praos: fromRight")
+  traverseConnectionBundle f (Praos x y) = Praos <$> f x <*> f y
 
 data PraosNodeState body m = PraosNodeState
   { blockFetchControllerState :: BlockFetchControllerState body m
