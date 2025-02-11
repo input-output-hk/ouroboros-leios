@@ -73,3 +73,5 @@ A pipeline instance comprises seven stages:
    - Validators cast final votes for EBs from the 'Endorse' stage
    - An EB becomes Vote2-certified if it meets specific criteria
    - Must reference a majority of Vote1-certified EBs.
+  
+  This pipelined architecture ensures the continuous generation, parallel processing,  dissemination, and confirmation of IBs, enabling Leios to achieve a high transaction throughput.
