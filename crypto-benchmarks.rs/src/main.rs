@@ -29,6 +29,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "Cast a single vote")]
     CastVote {
         #[arg(long)]
         seckey_file: PathBuf,
@@ -41,6 +42,7 @@ enum Commands {
         #[arg(long)]
         vote_file: PathBuf,
     },
+    #[command(about = "Cast votes by many stakepools")]
     CastVotes {
         #[arg(long)]
         registry_file: PathBuf,
@@ -53,6 +55,7 @@ enum Commands {
         #[arg(long)]
         votes_file: PathBuf,
     },
+    #[command(about = "Run the 'fait accompli' algorithm to select the persistent voters")]
     FaitAccompli {
         #[arg(long)]
         voter_count: usize,
@@ -61,8 +64,11 @@ enum Commands {
         #[arg(long)]
         fa_file: PathBuf,
     },
+    #[command(about = "Generate a random hash of an endorser block (EB)")]
     GenEbHash,
+    #[command(about = "Generate a random election identifier")]
     GenEid,
+    #[command(about = "Generate a random stakepool identifier")]
     GenKey {
         #[arg(long)]
         seckey_file: PathBuf,
@@ -71,13 +77,16 @@ enum Commands {
         #[arg(long)]
         pop_file: PathBuf,
     },
+    #[command(about = "Generate a random stakepool identifier")]
     GenPoolKeyHash,
+    #[command(about = "Generate keys for many stakepools")]
     GenPools {
         #[arg(long)]
         stake_file: PathBuf,
         #[arg(long)]
         pools_file: PathBuf,
     },
+    #[command(about = "Generate a random set of pools and their stake")]
     GenStake {
         #[arg(long)]
         pool_count: usize,
@@ -90,6 +99,7 @@ enum Commands {
         #[arg(long)]
         stake_file: PathBuf,
     },
+    #[command(about = "Determine how many votes a stakepool has in an election")]
     HasVotes {
         #[arg(long)]
         seckey_file: PathBuf,
@@ -102,6 +112,7 @@ enum Commands {
         #[arg(long)]
         voter_count: usize,
     },
+    #[command(about = "Build a certificate")]
     MakeCertificate {
         #[arg(long)]
         registry_file: PathBuf,
@@ -110,6 +121,7 @@ enum Commands {
         #[arg(long)]
         certificate_file: PathBuf,
     },
+    #[command(about = "Assemble a local registry of public information about stakepools")]
     MakeRegistry {
         #[arg(long)]
         pools_file: PathBuf,
@@ -118,6 +130,7 @@ enum Commands {
         #[arg(long)]
         registry_file: PathBuf,
     },
+    #[command(about = "Bundle the information for registering a BLS key with other stakepools")]
     RegisterKey {
         #[arg(long)]
         pool: PoolKeyhash,
@@ -128,6 +141,7 @@ enum Commands {
         #[arg(long)]
         registration_file: PathBuf,
     },
+    #[command(about = "Sign a message")]
     SignMessage {
         #[arg(long)]
         seckey_file: PathBuf,
@@ -138,18 +152,21 @@ enum Commands {
         #[arg(long)]
         signature_file: PathBuf,
     },
+    #[command(about = "Verify the cryptographic validity of a certificate")]
     VerifyCertificate {
         #[arg(long)]
         registry_file: PathBuf,
         #[arg(long)]
         certificate_file: PathBuf,
     },
+    #[command(about = "Verify the cryptographic validity a proof of possession")]
     VerifyPop {
         #[arg(long)]
         pubkey_file: PathBuf,
         #[arg(long)]
         pop_file: PathBuf,
     },
+    #[command(about = "Verify that a certificate attests to a particular quorum")]
     VerifyQuorum {
         #[arg(long)]
         registry_file: PathBuf,
@@ -158,6 +175,7 @@ enum Commands {
         #[arg(long)]
         quorum_fraction: f64,
     },
+    #[command(about = "Verify the signature of a message")]
     VerifySignature {
         #[arg(long)]
         pubkey_file: PathBuf,
@@ -168,6 +186,7 @@ enum Commands {
         #[arg(long)]
         signature_file: PathBuf,
     },
+    #[command(about = "Verify the cryptographic validity of a vote")]
     VerifyVote {
         #[arg(long)]
         pubkey_file: PathBuf,

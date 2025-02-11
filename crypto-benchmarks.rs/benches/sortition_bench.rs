@@ -42,7 +42,9 @@ fn benchmark_rb(c: &mut Criterion) {
     let ln1f = arbitrary_f(g);
     let s = arbitrary_stake(g);
     let p = arbitrary_probability(g);
-    c.bench_function("RB leadership", |b| b.iter(|| leader_check(&ln1f, &s, &p)));
+    c.bench_function("vrf::leader_check", |b| {
+        b.iter(|| leader_check(&ln1f, &s, &p))
+    });
 }
 
 fn benchmark_voter(c: &mut Criterion) {
@@ -50,7 +52,7 @@ fn benchmark_voter(c: &mut Criterion) {
     let votes = arbitrary_votes(g);
     let s = arbitrary_stake(g);
     let p = arbitrary_probability(g);
-    c.bench_function("IB/EB/vote sortition", |b| {
+    c.bench_function("vrf::voter_check", |b| {
         b.iter(|| voter_check(votes, &s, &p))
     });
 }
