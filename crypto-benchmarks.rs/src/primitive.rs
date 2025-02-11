@@ -27,12 +27,18 @@ pub fn arbitrary_coin(g: &mut Gen) -> Coin {
     u64::arbitrary(g) % 999999 + 1
 }
 
-pub(crate) fn realistic_stake_dist(g: &mut Gen, total: u64, n: usize) -> Vec<Coin> {
+pub(crate) fn realistic_stake_dist(
+    g: &mut Gen,
+    total: u64,
+    n: usize,
+    alpha: f64,
+    beta: f64,
+) -> Vec<Coin> {
     let rng = &mut StdRng::seed_from_u64(u64::arbitrary(g));
     let noise = Uniform::new(0.75, 1.25).unwrap();
-    let beta = Beta::new(11f64, 1f64).unwrap();
+    let curve = Beta::new(alpha, beta).unwrap();
     let cum: Vec<f64> = (0..n)
-        .map(|i| beta.cdf((i as f64) / (total as f64)))
+        .map(|i| curve.cdf((i as f64) / (total as f64)))
         .collect();
     let dif: Vec<f64> = (1..n)
         .map(|i| (cum[i] - cum[i - 1]) * noise.sample(rng))
@@ -47,9 +53,11 @@ pub fn arbitrary_stake_distribution(
     g: &mut Gen,
     total: u64,
     n: usize,
+    alpha: f64,
+    beta: f64,
 ) -> BTreeMap<PoolKeyhash, Coin> {
     BTreeMap::from_iter(
-        realistic_stake_dist(g, total, n)
+        realistic_stake_dist(g, total, n, alpha, beta)
             .iter()
             .map(|coin| (arbitrary_poolkeyhash(g), *coin)),
     )

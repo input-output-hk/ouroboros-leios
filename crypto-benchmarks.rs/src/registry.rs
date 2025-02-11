@@ -95,7 +95,7 @@ impl Arbitrary for Registry {
     fn arbitrary(g: &mut Gen) -> Registry {
         let total = u64::arbitrary(g) % 500000 + 500000;
         let n = usize::arbitrary(g) % 10 + 10;
-        let stake = arbitrary_stake_distribution(g, total, n);
+        let stake = arbitrary_stake_distribution(g, total, n, 11., 1.);
         let pools = arbitrary_pools(g, &stake);
         let voters = realistic_voters(g, stake.len());
         Registry::make(&pools, voters)

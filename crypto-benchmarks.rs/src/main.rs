@@ -84,6 +84,10 @@ enum Commands {
         #[arg(long)]
         total_stake: Coin,
         #[arg(long)]
+        shape_alpha: f64,
+        #[arg(long)]
+        shape_beta: f64,
+        #[arg(long)]
         stake_file: PathBuf,
     },
     HasVotes {
@@ -324,10 +328,18 @@ fn main() {
         Some(Commands::GenStake {
             pool_count,
             total_stake,
+            shape_alpha,
+            shape_beta,
             stake_file,
         }) => {
             let g = &mut Gen::new(10);
-            let stake = arbitrary_stake_distribution(g, *total_stake, *pool_count);
+            let stake = arbitrary_stake_distribution(
+                g,
+                *total_stake,
+                *pool_count,
+                *shape_alpha,
+                *shape_beta,
+            );
             write_cbor(stake_file, &stake).unwrap();
         }
         Some(Commands::GenPools {
@@ -363,6 +375,9 @@ fn main() {
                 .filter(|_| u32::arbitrary(g) % 1000000 < f)
                 .collect();
             write_cbor(votes_file, &votes).unwrap();
+            if cli.verbose {
+                eprintln!("Voters: {}", votes.len());
+            }
         }
         Some(Commands::MakeCertificate {
             registry_file,
