@@ -21,6 +21,7 @@ module Chan (
 import Chan.Core
 import Chan.Driver
 import Chan.Mux
+import Chan.Simple (SimpleConnProps (..), newConnectionSimple)
 import Chan.TCP
 import Control.Concurrent.Class.MonadMVar (MonadMVar (..))
 import Control.Monad.Class.MonadAsync (MonadAsync)
@@ -40,11 +41,11 @@ mkConnectionConfig tcp mux tcpLatency maybeTcpBandwidth = ConnectionConfig{..}
  where
   transportConfig
     | tcp = TransportTcp (mkTcpConnProps tcpLatency (fromMaybe defaultTcpBandwidth maybeTcpBandwidth))
-    | otherwise = TransportBasic
+    | otherwise = TransportSimple (SimpleConnProps tcpLatency maybeTcpBandwidth)
   defaultTcpBandwidth = (kilobytes 1000)
 
 data TransportConfig
-  = TransportBasic
+  = TransportSimple !SimpleConnProps
   | TransportTcp !TcpConnProps
 
 newConnectionBundle ::
@@ -54,22 +55,15 @@ newConnectionBundle ::
   ConnectionConfig ->
   m (bundle (Chan m), bundle (Chan m))
 newConnectionBundle tracer = \case
-  ConnectionConfig TransportBasic _mux@False ->
+  ConnectionConfig (TransportSimple _simpleConnProps) _mux@False ->
     error "Unsupported configuration (no TCP, no mux)"
-  ConnectionConfig TransportBasic _mux@True ->
-    error "Unsupported configuration (no TCP)"
+  ConnectionConfig (TransportSimple simpleConnProps) _mux@True -> do
+    let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
+    (mA, mB) <- newConnectionSimple tracer' simpleConnProps
+    (,) <$> newMuxChan mA <*> newMuxChan mB
   ConnectionConfig (TransportTcp _tcpConnProps) _mux@False ->
     error "Unsupported configuration (no mux)"
-  ConnectionConfig (TransportTcp tcpConnProps) _mux@True ->
-    newConnectionBundleTCPMux tracer tcpConnProps
-
-newConnectionBundleTCPMux ::
-  forall bundle m.
-  (ConnectionBundle bundle, MonadTime m, MonadMonotonicTimeNSec m, MonadDelay m, MonadAsync m, MessageSize (BundleMsg bundle), MonadMVar m, MonadFork m) =>
-  Tracer m (LabelTcpDir (TcpEvent (BundleMsg bundle))) ->
-  TcpConnProps ->
-  m (bundle (Chan m), bundle (Chan m))
-newConnectionBundleTCPMux tracer tcpprops = do
-  let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
-  (mA, mB) <- newConnectionTCP tracer' tcpprops
-  (,) <$> newMuxChan mA <*> newMuxChan mB
+  ConnectionConfig (TransportTcp tcpConnProps) _mux@True -> do
+    let tracer' = contramap ((fmap . fmap) fromBearerMsg) tracer
+    (mA, mB) <- newConnectionTCP tracer' tcpConnProps
+    (,) <$> newMuxChan mA <*> newMuxChan mB

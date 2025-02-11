@@ -46,6 +46,7 @@ library
     Chan.Driver
     Chan.Mux
     Chan.TCP
+    Chan.Simple
     Diffusion
     ExamplesLayout
     ExamplesRelay

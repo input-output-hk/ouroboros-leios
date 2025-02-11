@@ -6,4 +6,4 @@
 
 relay-strategy: "request-from-first"
 tcp-congestion-control: false
-multiplex-mini-protocols: false
+multiplex-mini-protocols: true
