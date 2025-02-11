@@ -161,9 +161,7 @@ pub fn gen_cert_fa(
     }
 }
 
-pub fn gen_cert_fa_pure(
-    sigma_ms: &[&Signature],
-) -> Result<Signature, BLST_ERROR> {
+pub fn gen_cert_fa_pure(sigma_ms: &[&Signature]) -> Result<Signature, BLST_ERROR> {
     let result_m = AggregateSignature::aggregate(sigma_ms, true);
     match result_m {
         Ok(sig_m) => Ok(sig_m.to_signature()),
@@ -180,7 +178,6 @@ pub fn verify_cert_fa(
     sigma_tilde_eid: &Signature,
     sigma_tilde_m: &Signature,
 ) -> bool {
-
     let h: [u8; 32] = hash_sigs(sigma_eids, &[]);
 
     let f = |i: usize| {
@@ -203,7 +200,7 @@ pub fn verify_cert_fa(
 
     let result_pk = AggregatePublicKey::aggregate(pks, true);
     let result_pk1 = AggregatePublicKey::aggregate(&pk1_refs, true);
-    
+
     match (result_pk, result_pk1) {
         (Ok(pk), Ok(pk1)) => {
             let result_eid =
@@ -213,7 +210,6 @@ pub fn verify_cert_fa(
         }
         _ => false,
     }
-
 }
 
 pub fn verify_cert_fa_pure(
@@ -223,14 +219,11 @@ pub fn verify_cert_fa_pure(
     sigma_tilde_m: &Signature,
 ) -> bool {
     let result_pk = AggregatePublicKey::aggregate(pks, true);
-    println!("{:?}", result_pk);
     match result_pk {
         Ok(pk) => {
             let result_m = sigma_tilde_m.verify(true, m, DST, eid, &pk.to_public_key(), true);
-            println!("{:?}", result_m);
             result_m == BLST_ERROR::BLST_SUCCESS
         }
         _ => false,
     }
-
 }

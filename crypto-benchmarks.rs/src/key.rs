@@ -165,7 +165,7 @@ pub fn arbitrary_reg(g: &mut Gen, pool: &PoolKeyhash, sk: &SecKey) -> Reg {
     let (mu1, mu2) = bls_vote::make_pop(&sk.0);
     Reg {
         pool: *pool,
-        mvk: PubKey::arbitrary(g),
+        mvk: sk.pub_key(),
         mu: PoP {
             mu1: Sig(mu1),
             mu2: Sig(mu2),
@@ -201,7 +201,7 @@ pub fn check_pop(mvk: &PubKey, mu: &PoP) -> bool {
 }
 
 pub fn sign_message(sk: &SecKey, dst: &[u8], msg: &[u8]) -> Sig {
-  Sig(sk.0.sign(msg, dst, &[]))
+    Sig(sk.0.sign(msg, dst, &[]))
 }
 
 pub fn verify_message(pk: &PubKey, dst: &[u8], msg: &[u8], sig: &Sig) -> bool {

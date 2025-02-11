@@ -95,34 +95,41 @@ pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
     }
 }
 
-
-
 pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
     let mut votes = Vec::new();
     reg.info.values().for_each(|info| {
-      if reg.persistent_id.contains_key(&info.reg.pool) {
-        votes.push(
-          gen_vote_persistent(&reg.persistent_id[&info.reg.pool], eid, eb, &info.secret)
-        );
-      } else {
-        let vote = gen_vote_nonpersistent(&info.reg.pool, eid, eb, &info.secret);
-        match vote.clone() {
-          Vote::Nonpersistent { pool: _, eid: _, eb: _, sigma_eid, sigma_m: _ } => {
-            let p = sigma_eid.to_rational();
-            let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio();
-            if voter_check(reg.voters, &s, &p) > 0 {
-              votes.push(vote);
+        if reg.persistent_id.contains_key(&info.reg.pool) {
+            votes.push(gen_vote_persistent(
+                &reg.persistent_id[&info.reg.pool],
+                eid,
+                eb,
+                &info.secret,
+            ));
+        } else {
+            let vote = gen_vote_nonpersistent(&info.reg.pool, eid, eb, &info.secret);
+            match vote.clone() {
+                Vote::Nonpersistent {
+                    pool: _,
+                    eid: _,
+                    eb: _,
+                    sigma_eid,
+                    sigma_m: _,
+                } => {
+                    let p = sigma_eid.to_rational();
+                    let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio();
+                    if voter_check(reg.voters, &s, &p) > 0 {
+                        votes.push(vote);
+                    }
+                }
+                _ => {}
             }
-          }
-          _ => {}
         }
-      }
     });
     votes
-  }
-  
-  pub fn arbitrary_votes(g: &mut Gen, reg: &Registry) -> Vec<Vote> {
+}
+
+pub fn arbitrary_votes(g: &mut Gen, reg: &Registry) -> Vec<Vote> {
     let eid = Eid::arbitrary(g);
     let eb = EbHash::arbitrary(g);
     do_voting(reg, &eid, &eb)
-  }
+}

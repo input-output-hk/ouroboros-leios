@@ -16,9 +16,7 @@ pub struct FaSortition {
     pub rho: CoinFraction,
 }
 
-fn sort_stake(
-    pools: &BTreeMap<PoolKeyhash, Coin>,
-) -> (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) {
+fn sort_stake(pools: &BTreeMap<PoolKeyhash, Coin>) -> (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) {
     let mut sp: Vec<(Ratio<BigInt>, &PoolKeyhash)> = pools
         .into_iter()
         .map(|(pool, coins)| (Ratio::from_integer(BigInt::from(*coins)), pool))
@@ -48,8 +46,8 @@ fn fa_test(s: &Vec<Ratio<BigInt>>, rho: &Vec<Ratio<BigInt>>, n: usize, i: usize)
     if rho[i - 1] == zero {
         true
     } else {
-    let x = one - s[i - 1].clone() / rho[i - 1].clone();
-     x.clone() * x >= Ratio::new(BigInt::from(n - i), BigInt::from(n - i + 1))
+        let x = one - s[i - 1].clone() / rho[i - 1].clone();
+        x.clone() * x >= Ratio::new(BigInt::from(n - i), BigInt::from(n - i + 1))
     }
 }
 
@@ -67,19 +65,22 @@ pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> FaSortiti
     FaSortition {
         persistent: pp
             .into_iter()
-            .map(|pool| (*pool, CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool])))))
-            .collect(),
-        nonpersistent:
-          if *rho_star > zero {
-           pnp
-            .into_iter()
             .map(|pool| {
                 (
                     *pool,
-                    CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool])) / rho_star),
+                    CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool]))),
                 )
             })
-            .collect()
+            .collect(),
+        nonpersistent: if *rho_star > zero {
+            pnp.into_iter()
+                .map(|pool| {
+                    (
+                        *pool,
+                        CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool])) / rho_star),
+                    )
+                })
+                .collect()
         } else {
             BTreeMap::new()
         },

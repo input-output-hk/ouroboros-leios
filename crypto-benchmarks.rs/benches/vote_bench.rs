@@ -3,7 +3,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use leios_crypto_benchmarks::registry::PersistentId;
 use quickcheck::{Arbitrary, Gen};
 
-
 use leios_crypto_benchmarks::bls_vote;
 use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
 use leios_crypto_benchmarks::primitive::{arbitrary_poolkeyhash, EbHash, Eid};
@@ -96,12 +95,14 @@ fn benchmark_verify_vote_nonpersistent(c: &mut Criterion) {
     });
 }
 
-
 fn benchmark_gen_cert(c: &mut Criterion) {
     let sks: Vec<SecretKey> = (0..750).map(|_| bls_vote::gen_key()).collect();
     let eid = b"Election ID";
     let m: [u8; 64] = [0; 64];
-    let vss: Vec<(Signature, Signature)> = sks.iter().map(|sk| bls_vote::gen_vote(&sk, eid, &m)).collect();
+    let vss: Vec<(Signature, Signature)> = sks
+        .iter()
+        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .collect();
     let vs_refs: Vec<&(Signature, Signature)> = vss.iter().map(|vs| vs).collect();
     c.bench_function("GenCert", |b| b.iter(|| bls_vote::gen_cert(&vs_refs)));
 }
@@ -112,11 +113,14 @@ fn benchmark_verify_cert(c: &mut Criterion) {
     let pk_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
     let eid = b"Election ID";
     let m: [u8; 64] = [0; 64];
-    let vss: Vec<(Signature, Signature)> = sks.iter().map(|sk| bls_vote::gen_vote(&sk, eid, &m)).collect();
+    let vss: Vec<(Signature, Signature)> = sks
+        .iter()
+        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .collect();
     let vs_refs: Vec<&(Signature, Signature)> = vss.iter().map(|vs| vs).collect();
     let cs: (Signature, Signature) = bls_vote::gen_cert(&vs_refs).unwrap();
     c.bench_function("VerifyCert", |b| {
-//      b.iter(|| if ! bls_vote::verify_cert(&pk_refs, eid, &m, &vs_refs, &cs) {panic!("VERIFY FAILED!");})
+        //      b.iter(|| if ! bls_vote::verify_cert(&pk_refs, eid, &m, &vs_refs, &cs) {panic!("VERIFY FAILED!");})
         b.iter(|| bls_vote::verify_cert(&pk_refs, eid, &m, &vs_refs, &cs))
     });
 }
@@ -127,11 +131,18 @@ fn benchmark_verify_cert_fa_pure(c: &mut Criterion) {
     let pk_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
     let eid = b"Election ID";
     let m: [u8; 64] = [0; 64];
-    let vss: Vec<(Signature, Signature)> = sks.iter().map(|sk| bls_vote::gen_vote(&sk, eid, &m)).collect();
+    let vss: Vec<(Signature, Signature)> = sks
+        .iter()
+        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .collect();
     let vs_refs: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
     let cs: Signature = bls_vote::gen_cert_fa_pure(&vs_refs).unwrap();
     c.bench_function("VerifyCert (pure)", |b| {
-        b.iter(|| if ! bls_vote::verify_cert_fa_pure(&pk_refs, eid, &m, &cs) {panic!("VERIFY FAILED!");})
+        b.iter(|| {
+            if !bls_vote::verify_cert_fa_pure(&pk_refs, eid, &m, &cs) {
+                panic!("VERIFY FAILED!");
+            }
+        })
     });
 }
 

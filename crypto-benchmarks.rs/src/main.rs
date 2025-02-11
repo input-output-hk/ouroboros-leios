@@ -3,7 +3,7 @@ use hex::ToHex;
 use num_bigint::BigInt;
 use num_rational::Ratio;
 use num_traits::FromPrimitive;
-use quickcheck::{Arbitrary,Gen};
+use quickcheck::{Arbitrary, Gen};
 use serde_cbor;
 use std::collections::BTreeMap;
 use std::io::{Error, ErrorKind};
@@ -14,9 +14,9 @@ use leios_crypto_benchmarks::cert::*;
 use leios_crypto_benchmarks::fait_accompli::*;
 use leios_crypto_benchmarks::key::*;
 use leios_crypto_benchmarks::primitive::*;
+use leios_crypto_benchmarks::registry::*;
 use leios_crypto_benchmarks::sortition::*;
 use leios_crypto_benchmarks::vote::*;
-use leios_crypto_benchmarks::registry::*;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -41,18 +41,18 @@ enum Commands {
         eb_hash: EbHash,
         #[arg(long)]
         vote_file: PathBuf,
-      },
-      CastVotes {
+    },
+    CastVotes {
         #[arg(long)]
         registry_file: PathBuf,
         #[arg(long, value_parser=Eid::parse)]
         eid: Eid,
         #[arg(long, value_parser=EbHash::parse)]
         eb_hash: EbHash,
-      #[arg(long)]
+        #[arg(long)]
         votes_file: PathBuf,
-       },
-          FaitAccompli {
+    },
+    FaitAccompli {
         #[arg(long)]
         voter_count: usize,
         #[arg(long)]
@@ -73,17 +73,17 @@ enum Commands {
     GenPoolKeyHash,
     GenPools {
         #[arg(long)]
-       stake_file: PathBuf,
-       #[arg(long)]
-       pools_file: PathBuf,
+        stake_file: PathBuf,
+        #[arg(long)]
+        pools_file: PathBuf,
     },
     GenStake {
         #[arg(long)]
-       pool_count: usize,
-       #[arg(long)]
-       total_stake: Coin,
-       #[arg(long)]
-       stake_file: PathBuf,
+        pool_count: usize,
+        #[arg(long)]
+        total_stake: Coin,
+        #[arg(long)]
+        stake_file: PathBuf,
     },
     HasVotes {
         #[arg(long)]
@@ -104,15 +104,15 @@ enum Commands {
         votes_file: PathBuf,
         #[arg(long)]
         certificate_file: PathBuf,
-       },
-        MakeRegistry {
+    },
+    MakeRegistry {
         #[arg(long)]
-       pools_file: PathBuf,
-       #[arg(long)]
-       voter_count: usize,
-       #[arg(long)]
-       registry_file: PathBuf,
-   },
+        pools_file: PathBuf,
+        #[arg(long)]
+        voter_count: usize,
+        #[arg(long)]
+        registry_file: PathBuf,
+    },
     RegisterKey {
         #[arg(long)]
         pool: PoolKeyhash,
@@ -138,16 +138,14 @@ enum Commands {
         registry_file: PathBuf,
         #[arg(long)]
         certificate_file: PathBuf,
-       },
-        VerifyPop {
+    },
+    VerifyPop {
         #[arg(long)]
         pubkey_file: PathBuf,
         #[arg(long)]
         pop_file: PathBuf,
     },
-    VerifyQuorum {
-
-    },
+    VerifyQuorum {},
     VerifySignature {
         #[arg(long)]
         pubkey_file: PathBuf,
@@ -159,47 +157,62 @@ enum Commands {
         signature_file: PathBuf,
     },
     VerifyVote {
-      #[arg(long)]
-      pubkey_file: PathBuf,
-      #[arg(long)]
-      vote_file: PathBuf,
+        #[arg(long)]
+        pubkey_file: PathBuf,
+        #[arg(long)]
+        vote_file: PathBuf,
     },
 }
 
-
 fn main() {
-
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::GenEid{}) => {
+        Some(Commands::GenEid {}) => {
             let g = &mut Gen::new(10);
             let eid = Eid::arbitrary(g);
             println!("{}", eid.0);
-          }
-          Some(Commands::GenEbHash{}) => {
-              let g = &mut Gen::new(10);
-              let ebhash = EbHash::arbitrary(g);
-              println!("{}", ebhash.encode_hex::<String>());
-          }
-          Some(Commands::GenPoolKeyHash{}) => {
+        }
+        Some(Commands::GenEbHash {}) => {
+            let g = &mut Gen::new(10);
+            let ebhash = EbHash::arbitrary(g);
+            println!("{}", ebhash.encode_hex::<String>());
+        }
+        Some(Commands::GenPoolKeyHash {}) => {
             let g = &mut Gen::new(10);
             let pool = arbitrary_poolkeyhash(g);
             println!("{}", pool.encode_hex::<String>());
-          }
-          Some(Commands::GenKey {seckey_file, pubkey_file, pop_file}) => {
+        }
+        Some(Commands::GenKey {
+            seckey_file,
+            pubkey_file,
+            pop_file,
+        }) => {
             let (sec_key, pub_key, proof) = key_gen();
             write_cbor(seckey_file, &sec_key).unwrap();
             write_cbor(pubkey_file, &pub_key).unwrap();
             write_cbor(pop_file, &proof).unwrap();
         }
-        Some(Commands::RegisterKey { pool, pubkey_file, pop_file, registration_file }) => {
+        Some(Commands::RegisterKey {
+            pool,
+            pubkey_file,
+            pop_file,
+            registration_file,
+        }) => {
             let pub_key: PubKey = read_cbor(pubkey_file).unwrap();
             let proof: PoP = read_cbor(pop_file).unwrap();
-            let reg = Reg {pool: *pool, mvk: pub_key, mu: proof, kes_sig: KesSig::null()};
+            let reg = Reg {
+                pool: *pool,
+                mvk: pub_key,
+                mu: proof,
+                kes_sig: KesSig::null(),
+            };
             write_cbor(registration_file, &reg).unwrap();
         }
-        Some(Commands::VerifyPop { pubkey_file, pop_file }) => {
+        Some(Commands::VerifyPop {
+            pubkey_file,
+            pop_file,
+        }) => {
             let pub_key: PubKey = read_cbor(pubkey_file).unwrap();
             let proof: PoP = read_cbor(pop_file).unwrap();
             let result = check_pop(&pub_key, &proof);
@@ -210,18 +223,28 @@ fn main() {
                     println!("Invalid proof of possession.");
                 }
             }
-            process::exit(if result {0} else {-1});
+            process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::SignMessage { seckey_file, domain_separator, message_file, signature_file }) => {
+        Some(Commands::SignMessage {
+            seckey_file,
+            domain_separator,
+            message_file,
+            signature_file,
+        }) => {
             let sec_key: SecKey = read_cbor(seckey_file).unwrap();
             let msg: Vec<u8> = std::fs::read(message_file).unwrap();
             let sig = sign_message(&sec_key, domain_separator.as_bytes(), &msg);
             write_cbor(signature_file, &sig).unwrap();
         }
-        Some(Commands::VerifySignature { pubkey_file, domain_separator, message_file, signature_file }) => {
+        Some(Commands::VerifySignature {
+            pubkey_file,
+            domain_separator,
+            message_file,
+            signature_file,
+        }) => {
             let pub_key: PubKey = read_cbor(pubkey_file).unwrap();
             let msg: Vec<u8> = std::fs::read(message_file).unwrap();
-            let sig : Sig = read_cbor(signature_file).unwrap();
+            let sig: Sig = read_cbor(signature_file).unwrap();
             let result = verify_message(&pub_key, domain_separator.as_bytes(), &msg, &sig);
             if cli.verbose {
                 if result {
@@ -230,32 +253,54 @@ fn main() {
                     println!("Invalid signature.");
                 }
             }
-            process::exit(if result {0} else {-1});
+            process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::FaitAccompli { voter_count, stake_file, fa_file }) => {
+        Some(Commands::FaitAccompli {
+            voter_count,
+            stake_file,
+            fa_file,
+        }) => {
             let stake: BTreeMap<PoolKeyhash, Coin> = read_cbor(stake_file).unwrap();
             let fa = fait_accompli(&stake, *voter_count);
             write_cbor(fa_file, &fa).unwrap();
         }
-        Some(Commands::HasVotes { seckey_file, eid, pool_stake, total_stake, voter_count }) => {
-           let sec_key: SecKey = read_cbor(seckey_file).unwrap();
-           let sig = gen_sigma_eid(eid, &sec_key);
-           let p = sig.to_rational();
-           let s = Ratio::new(BigInt::from_u64(*pool_stake).unwrap(), BigInt::from_u64(*total_stake).unwrap());
-           let votes = voter_check(*voter_count, &s, &p);
-           if cli.verbose {
-            eprintln!("Stake fraction: {}", s);
-            eprintln!("Probability: {}", p);
-            eprintln!("Vote fraction: {}/{}", votes, voter_count);
+        Some(Commands::HasVotes {
+            seckey_file,
+            eid,
+            pool_stake,
+            total_stake,
+            voter_count,
+        }) => {
+            let sec_key: SecKey = read_cbor(seckey_file).unwrap();
+            let sig = gen_sigma_eid(eid, &sec_key);
+            let p = sig.to_rational();
+            let s = Ratio::new(
+                BigInt::from_u64(*pool_stake).unwrap(),
+                BigInt::from_u64(*total_stake).unwrap(),
+            );
+            let votes = voter_check(*voter_count, &s, &p);
+            if cli.verbose {
+                eprintln!("Stake fraction: {}", s);
+                eprintln!("Probability: {}", p);
+                eprintln!("Vote fraction: {}/{}", votes, voter_count);
+            }
+            println!("{}", votes);
         }
-           println!("{}", votes);
-        }
-        Some(Commands::CastVote { seckey_file, pool, eid, eb_hash, vote_file }) => {
+        Some(Commands::CastVote {
+            seckey_file,
+            pool,
+            eid,
+            eb_hash,
+            vote_file,
+        }) => {
             let sec_key: SecKey = read_cbor(seckey_file).unwrap();
             let vote: Vote = gen_vote_nonpersistent(pool, eid, eb_hash, &sec_key);
             write_cbor(vote_file, &vote).unwrap();
-        }   
-        Some(Commands::VerifyVote { pubkey_file, vote_file }) => {
+        }
+        Some(Commands::VerifyVote {
+            pubkey_file,
+            vote_file,
+        }) => {
             let pub_key: PubKey = read_cbor(pubkey_file).unwrap();
             let vote: Vote = read_cbor(vote_file).unwrap();
             let result = verify_vote(&pub_key, &vote);
@@ -266,37 +311,59 @@ fn main() {
                     println!("Invalid vote.");
                 }
             }
-            process::exit(if result {0} else {-1});
+            process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::GenStake { pool_count, total_stake , stake_file}) => {
+        Some(Commands::GenStake {
+            pool_count,
+            total_stake,
+            stake_file,
+        }) => {
             let g = &mut Gen::new(10);
             let stake = arbitrary_stake_distribution(g, *total_stake, *pool_count);
             write_cbor(stake_file, &stake).unwrap();
         }
-        Some(Commands::GenPools { stake_file, pools_file}) => {
+        Some(Commands::GenPools {
+            stake_file,
+            pools_file,
+        }) => {
             let g = &mut Gen::new(10);
-            let stake : BTreeMap<PoolKeyhash, Coin> = read_cbor(stake_file).unwrap();
+            let stake: BTreeMap<PoolKeyhash, Coin> = read_cbor(stake_file).unwrap();
             let stake = arbitrary_pools(g, &stake);
             write_cbor(pools_file, &stake).unwrap();
         }
-        Some(Commands::MakeRegistry { pools_file, voter_count, registry_file }) =>
-        {
+        Some(Commands::MakeRegistry {
+            pools_file,
+            voter_count,
+            registry_file,
+        }) => {
             let pools: Vec<PoolInfo> = read_cbor(pools_file).unwrap();
             let reg = Registry::make(&pools, *voter_count);
             write_cbor(registry_file, &reg).unwrap();
         }
-        Some(Commands::CastVotes { registry_file, eid, eb_hash, votes_file }) => {
+        Some(Commands::CastVotes {
+            registry_file,
+            eid,
+            eb_hash,
+            votes_file,
+        }) => {
             let reg: Registry = read_cbor(registry_file).unwrap();
             let votes: Vec<Vote> = do_voting(&reg, eid, eb_hash);
             write_cbor(votes_file, &votes).unwrap();
         }
-        Some(Commands::MakeCertificate { registry_file, votes_file, certificate_file }) => {
+        Some(Commands::MakeCertificate {
+            registry_file,
+            votes_file,
+            certificate_file,
+        }) => {
             let reg: Registry = read_cbor(registry_file).unwrap();
             let votes: Vec<Vote> = read_cbor(votes_file).unwrap();
             let cert = gen_cert(&reg, &votes).unwrap();
             write_cbor(certificate_file, &cert).unwrap();
         }
-        Some(Commands::VerifyCertificate { registry_file, certificate_file }) => {
+        Some(Commands::VerifyCertificate {
+            registry_file,
+            certificate_file,
+        }) => {
             let reg: Registry = read_cbor(registry_file).unwrap();
             let cert: Cert = read_cbor(certificate_file).unwrap();
             let result = verify_cert(&reg, &cert);
@@ -307,25 +374,22 @@ fn main() {
                     println!("Invalid certificate.");
                 }
             }
-            process::exit(if result {0} else {-1});
+            process::exit(if result { 0 } else { -1 });
         }
-        Some(Commands::VerifyQuorum {  }) => {
+        Some(Commands::VerifyQuorum {}) => {
             panic!("NOT IMPLEMENTED");
         }
         None => {
             panic!("Invalid command.");
         }
     }
-
 }
 
 fn write_cbor<A>(path: &PathBuf, item: &A) -> Result<(), Error>
 where
     A: serde::Serialize,
 {
-    let cbor =
-      serde_cbor::to_vec(&item)
-      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let cbor = serde_cbor::to_vec(&item).map_err(|e| Error::new(ErrorKind::Other, e))?;
     std::fs::write(path, cbor)
 }
 
@@ -334,8 +398,6 @@ where
     A: serde::de::DeserializeOwned,
 {
     let cbor = std::fs::read(path)?;
-    let item: A =
-      serde_cbor::from_slice(&cbor)
-      .map_err(|e| Error::new(ErrorKind::Other, e))?;
+    let item: A = serde_cbor::from_slice(&cbor).map_err(|e| Error::new(ErrorKind::Other, e))?;
     Ok(item)
 }

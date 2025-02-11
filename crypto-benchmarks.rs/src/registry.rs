@@ -2,9 +2,11 @@ use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-use crate::key::{arbitrary_reg, Reg, SecKey};
 use crate::fait_accompli::*;
-use crate::primitive::{arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, PoolKeyhash};
+use crate::key::{arbitrary_reg, Reg, SecKey};
+use crate::primitive::{
+    arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, PoolKeyhash,
+};
 use crate::realism::{realistic_pool_count, realistic_total_stake, realistic_voters};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug, Serialize, Deserialize)]
@@ -37,19 +39,18 @@ impl Arbitrary for PoolInfo {
 
 pub fn arbitrary_pools(g: &mut Gen, stake: &BTreeMap<PoolKeyhash, Coin>) -> Vec<PoolInfo> {
     stake
-      .iter()
-      .map(|(pool, coin)| {
-        let secret = SecKey::arbitrary(g);
-        PoolInfo{
-          reg: arbitrary_reg(g, pool, &secret),
-          stake: *coin,
-          secret,
-        }
-  })
-      .collect()
-  }
-  
-  
+        .iter()
+        .map(|(pool, coin)| {
+            let secret = SecKey::arbitrary(g);
+            PoolInfo {
+                reg: arbitrary_reg(g, pool, &secret),
+                stake: *coin,
+                secret,
+            }
+        })
+        .collect()
+}
+
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct Registry {
     pub info: BTreeMap<PoolKeyhash, PoolInfo>,
@@ -60,48 +61,43 @@ pub struct Registry {
 }
 
 impl Registry {
+    pub fn make(stake: &Vec<PoolInfo>, voters: usize) -> Self {
+        let info: BTreeMap<PoolKeyhash, PoolInfo> = BTreeMap::from_iter(
+            stake
+                .iter()
+                .map(|pool| (pool.reg.pool.clone(), pool.clone())),
+        );
 
-  pub fn make(stake: &Vec<PoolInfo>, voters: usize) -> Self {
-  
-    let info: BTreeMap<PoolKeyhash, PoolInfo> =
-      BTreeMap::from_iter(
-        stake.iter()
-        .map(|pool| (pool.reg.pool.clone(), pool.clone()))
-      );
-  
-    let pools: BTreeMap<PoolKeyhash, Coin> =
-      BTreeMap::from_iter(
-        stake.iter()
-        .map(|pool| (pool.reg.pool.clone(), pool.stake))
-      );
-    let fa = fait_accompli(&pools, voters);
-    let persistent_pool: BTreeMap<PersistentId, PoolKeyhash> =
-      BTreeMap::from_iter(
-        (0..fa.persistent.len())
-        .zip(fa.persistent)
-        .map(|(i, (pool, _))| (PersistentId(i as u16), pool))
-    );
-    let persistent_id: BTreeMap<PoolKeyhash, PersistentId> =
-      BTreeMap::from_iter(
-        persistent_pool.iter()
-          .map(|(k, v)| (v.clone(), k.clone()))
-      );
-  
-    let total_stake: Coin = stake.iter().map(|pool| pool.stake).sum();
-  
-      Registry {info, persistent_pool, persistent_id, total_stake, voters,}
-  
-  }
+        let pools: BTreeMap<PoolKeyhash, Coin> =
+            BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool.clone(), pool.stake)));
+        let fa = fait_accompli(&pools, voters);
+        let persistent_pool: BTreeMap<PersistentId, PoolKeyhash> = BTreeMap::from_iter(
+            (0..fa.persistent.len())
+                .zip(fa.persistent)
+                .map(|(i, (pool, _))| (PersistentId(i as u16), pool)),
+        );
+        let persistent_id: BTreeMap<PoolKeyhash, PersistentId> =
+            BTreeMap::from_iter(persistent_pool.iter().map(|(k, v)| (v.clone(), k.clone())));
 
+        let total_stake: Coin = stake.iter().map(|pool| pool.stake).sum();
+
+        Registry {
+            info,
+            persistent_pool,
+            persistent_id,
+            total_stake,
+            voters,
+        }
+    }
 }
 
 impl Arbitrary for Registry {
-  fn arbitrary(g: &mut Gen) -> Registry {
-      let total = u64::arbitrary(g) % 500000 + 500000;
-      let n = usize::arbitrary(g) % 10 + 10;
-      let stake = arbitrary_stake_distribution(g, total, n);
-      let pools = arbitrary_pools(g, &stake);
-      let voters = realistic_voters(g, stake.len());
-      Registry::make(&pools, voters)
-  }
+    fn arbitrary(g: &mut Gen) -> Registry {
+        let total = u64::arbitrary(g) % 500000 + 500000;
+        let n = usize::arbitrary(g) % 10 + 10;
+        let stake = arbitrary_stake_distribution(g, total, n);
+        let pools = arbitrary_pools(g, &stake);
+        let voters = realistic_voters(g, stake.len());
+        Registry::make(&pools, voters)
+    }
 }
