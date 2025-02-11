@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 use crate::bls_vote;
-use crate::key::{PubKey, Sig};
+use crate::key::Sig;
 use crate::primitive::{EbHash, Eid, PoolKeyhash};
 use crate::registry::*;
 use crate::vote::*;
@@ -22,7 +22,7 @@ pub struct Cert {
 pub fn arbitrary_cert(g: &mut Gen, reg: &Registry) -> Cert {
     let eid = Eid::arbitrary(g);
     let eb = EbHash::arbitrary(g);
-    gen_cert(&reg, &do_voting(&reg, &eid, &eb)).unwrap()
+    gen_cert(reg, &do_voting(reg, &eid, &eb)).unwrap()
 }
 
 impl Arbitrary for Cert {
@@ -88,7 +88,7 @@ pub fn gen_cert(reg: &Registry, votes: &[Vote]) -> Option<Cert> {
         .try_for_each(|vote| traverse_vote(reg, &mut t, vote));
     let eid: &Eid = unique(&t.eids)?;
     let eb: &EbHash = unique(&t.ebs)?;
-    if t.sigma_eids.len() > 0 {
+    if !t.sigma_eids.is_empty() {
         let (sigma_tilde_eid, sigma_tilde_m) =
             bls_vote::gen_cert_fa(&t.sigma_eids, &t.sigma_ms).ok()?;
         Some(Cert {

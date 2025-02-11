@@ -39,8 +39,8 @@ fn fa_test() {
         "Incorrect rho."
     );
 
-    let mut expected_persistent: Vec<(PoolKeyhash, CoinFraction)> =
-        vec![(p1, 3000u64), (p2, 500u64), (p3, 200u64), (p4, 100u64)]
+    let expected_persistent: Vec<(PoolKeyhash, CoinFraction)> =
+        [(p1, 3000u64), (p2, 500u64), (p3, 200u64), (p4, 100u64)]
             .iter()
             .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 1)))
             .collect();
@@ -50,7 +50,7 @@ fn fa_test() {
     );
 
     let expected_nonpersistent: Vec<(PoolKeyhash, CoinFraction)> =
-        vec![(p8, 10u64), (p5, 100u64), (p6, 50u64), (p7, 40u64)]
+        [(p8, 10u64), (p5, 100u64), (p6, 50u64), (p7, 40u64)]
             .iter()
             .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 100)))
             .collect();

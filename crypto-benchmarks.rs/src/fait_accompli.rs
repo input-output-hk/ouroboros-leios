@@ -18,7 +18,7 @@ pub struct FaSortition {
 
 fn sort_stake(pools: &BTreeMap<PoolKeyhash, Coin>) -> (Vec<Ratio<BigInt>>, Vec<PoolKeyhash>) {
     let mut sp: Vec<(Ratio<BigInt>, &PoolKeyhash)> = pools
-        .into_iter()
+        .iter()
         .map(|(pool, coins)| (Ratio::from_integer(BigInt::from(*coins)), pool))
         .collect();
     sp.sort();
@@ -26,7 +26,7 @@ fn sort_stake(pools: &BTreeMap<PoolKeyhash, Coin>) -> (Vec<Ratio<BigInt>>, Vec<P
     sp.into_iter().unzip()
 }
 
-fn sum_stake(s: &Vec<Ratio<BigInt>>) -> Vec<Ratio<BigInt>> {
+fn sum_stake(s: &[Ratio<BigInt>]) -> Vec<Ratio<BigInt>> {
     let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
     let (mut rho, _): (Vec<Ratio<BigInt>>, Ratio<BigInt>) =
         s.iter()
@@ -40,7 +40,7 @@ fn sum_stake(s: &Vec<Ratio<BigInt>>) -> Vec<Ratio<BigInt>> {
     rho
 }
 
-fn fa_test(s: &Vec<Ratio<BigInt>>, rho: &Vec<Ratio<BigInt>>, n: usize, i: usize) -> bool {
+fn fa_test(s: &[Ratio<BigInt>], rho: &[Ratio<BigInt>], n: usize, i: usize) -> bool {
     let zero: Ratio<BigInt> = Ratio::from_integer(BigInt::zero());
     let one: Ratio<BigInt> = Ratio::from_integer(BigInt::one());
     if rho[i - 1] == zero {
@@ -57,27 +57,27 @@ pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> FaSortiti
     let rho: Vec<Ratio<BigInt>> = sum_stake(&s);
     let mut i_star: usize = 1;
     while !fa_test(&s, &rho, n, i_star) {
-        i_star = i_star + 1
+        i_star += 1
     }
     let rho_star = &rho[i_star];
     let n_persistent = max(1, i_star) - 1;
     let (pp, pnp) = p.split_at(n_persistent);
     FaSortition {
         persistent: pp
-            .into_iter()
+            .iter()
             .map(|pool| {
                 (
                     *pool,
-                    CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool]))),
+                    CoinFraction(Ratio::from_integer(BigInt::from(pools[pool]))),
                 )
             })
             .collect(),
         nonpersistent: if *rho_star > zero {
-            pnp.into_iter()
+            pnp.iter()
                 .map(|pool| {
                     (
                         *pool,
-                        CoinFraction(Ratio::from_integer(BigInt::from(pools[&pool])) / rho_star),
+                        CoinFraction(Ratio::from_integer(BigInt::from(pools[pool])) / rho_star),
                     )
                 })
                 .collect()

@@ -7,7 +7,7 @@ use crate::key::{arbitrary_reg, Reg, SecKey};
 use crate::primitive::{
     arbitrary_coin, arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, PoolKeyhash,
 };
-use crate::realism::{realistic_pool_count, realistic_total_stake, realistic_voters};
+use crate::realism::realistic_voters;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug, Serialize, Deserialize)]
 pub struct PersistentId(pub u16);
@@ -61,15 +61,12 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn make(stake: &Vec<PoolInfo>, voters: usize) -> Self {
-        let info: BTreeMap<PoolKeyhash, PoolInfo> = BTreeMap::from_iter(
-            stake
-                .iter()
-                .map(|pool| (pool.reg.pool.clone(), pool.clone())),
-        );
+    pub fn make(stake: &[PoolInfo], voters: usize) -> Self {
+        let info: BTreeMap<PoolKeyhash, PoolInfo> =
+            BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool, pool.clone())));
 
         let pools: BTreeMap<PoolKeyhash, Coin> =
-            BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool.clone(), pool.stake)));
+            BTreeMap::from_iter(stake.iter().map(|pool| (pool.reg.pool, pool.stake)));
         let fa = fait_accompli(&pools, voters);
         let persistent_pool: BTreeMap<PersistentId, PoolKeyhash> = BTreeMap::from_iter(
             (0..fa.persistent.len())
@@ -77,7 +74,7 @@ impl Registry {
                 .map(|(i, (pool, _))| (PersistentId(i as u16), pool)),
         );
         let persistent_id: BTreeMap<PoolKeyhash, PersistentId> =
-            BTreeMap::from_iter(persistent_pool.iter().map(|(k, v)| (v.clone(), k.clone())));
+            BTreeMap::from_iter(persistent_pool.iter().map(|(k, v)| (*v, k.clone())));
 
         let total_stake: Coin = stake.iter().map(|pool| pool.stake).sum();
 

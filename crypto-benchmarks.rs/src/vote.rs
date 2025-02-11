@@ -107,21 +107,19 @@ pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
             ));
         } else {
             let vote = gen_vote_nonpersistent(&info.reg.pool, eid, eb, &info.secret);
-            match vote.clone() {
-                Vote::Nonpersistent {
-                    pool: _,
-                    eid: _,
-                    eb: _,
-                    sigma_eid,
-                    sigma_m: _,
-                } => {
-                    let p = sigma_eid.to_rational();
-                    let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio();
-                    if voter_check(reg.voters, &s, &p) > 0 {
-                        votes.push(vote);
-                    }
+            if let Vote::Nonpersistent {
+                pool: _,
+                eid: _,
+                eb: _,
+                sigma_eid,
+                sigma_m: _,
+            } = vote.clone()
+            {
+                let p = sigma_eid.to_rational();
+                let s = CoinFraction::from_coins(info.stake, reg.total_stake).to_ratio();
+                if voter_check(reg.voters, &s, &p) > 0 {
+                    votes.push(vote);
                 }
-                _ => {}
             }
         }
     });

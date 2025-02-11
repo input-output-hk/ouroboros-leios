@@ -101,23 +101,23 @@ fn benchmark_gen_cert(c: &mut Criterion) {
     let m: [u8; 64] = [0; 64];
     let vss: Vec<(Signature, Signature)> = sks
         .iter()
-        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .map(|sk| bls_vote::gen_vote(sk, eid, &m))
         .collect();
-    let vs_refs: Vec<&(Signature, Signature)> = vss.iter().map(|vs| vs).collect();
+    let vs_refs: Vec<&(Signature, Signature)> = vss.iter().collect();
     c.bench_function("GenCert", |b| b.iter(|| bls_vote::gen_cert(&vs_refs)));
 }
 
 fn benchmark_verify_cert(c: &mut Criterion) {
     let sks: Vec<SecretKey> = (0..750).map(|_| bls_vote::gen_key()).collect();
     let pks: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
-    let pk_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
+    let pk_refs: Vec<&PublicKey> = pks.iter().collect();
     let eid = b"Election ID";
     let m: [u8; 64] = [0; 64];
     let vss: Vec<(Signature, Signature)> = sks
         .iter()
-        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .map(|sk| bls_vote::gen_vote(sk, eid, &m))
         .collect();
-    let vs_refs: Vec<&(Signature, Signature)> = vss.iter().map(|vs| vs).collect();
+    let vs_refs: Vec<&(Signature, Signature)> = vss.iter().collect();
     let cs: (Signature, Signature) = bls_vote::gen_cert(&vs_refs).unwrap();
     c.bench_function("VerifyCert", |b| {
         //      b.iter(|| if ! bls_vote::verify_cert(&pk_refs, eid, &m, &vs_refs, &cs) {panic!("VERIFY FAILED!");})
@@ -128,12 +128,12 @@ fn benchmark_verify_cert(c: &mut Criterion) {
 fn benchmark_verify_cert_fa_pure(c: &mut Criterion) {
     let sks: Vec<SecretKey> = (0..750).map(|_| bls_vote::gen_key()).collect();
     let pks: Vec<PublicKey> = sks.iter().map(|sk| sk.sk_to_pk()).collect();
-    let pk_refs: Vec<&PublicKey> = pks.iter().map(|pk| pk).collect();
+    let pk_refs: Vec<&PublicKey> = pks.iter().collect();
     let eid = b"Election ID";
     let m: [u8; 64] = [0; 64];
     let vss: Vec<(Signature, Signature)> = sks
         .iter()
-        .map(|sk| bls_vote::gen_vote(&sk, eid, &m))
+        .map(|sk| bls_vote::gen_vote(sk, eid, &m))
         .collect();
     let vs_refs: Vec<&Signature> = vss.iter().map(|vs| &vs.1).collect();
     let cs: Signature = bls_vote::gen_cert_fa_pure(&vs_refs).unwrap();

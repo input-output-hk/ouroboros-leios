@@ -4,7 +4,6 @@ use num_bigint::BigInt;
 use num_rational::Ratio;
 use num_traits::FromPrimitive;
 use quickcheck::{Arbitrary, Gen};
-use serde_cbor;
 use std::collections::BTreeMap;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
