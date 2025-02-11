@@ -16,14 +16,14 @@ experiencing short bursts of network load when blocks are fully created,
 validated, and diffused, Leios introduces two core components to facilitate this
 decoupling:
 
-**Input blocks (IBs)**
+## Input blocks (IBs)
 
 - Validators (stakeholders or miners) bundle transactions into lightweight IBs
   at high speed
 - IBs are generated concurrently, not sequentially, maximizing available
   bandwidth.
 
-**Endorser blocks (EBs)**
+## Endorser blocks (EBs)
 
 - EBs aggregate batches of IBs and undergo a two-phase voting process to certify
   their validity and availability
