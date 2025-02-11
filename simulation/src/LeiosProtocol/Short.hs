@@ -108,46 +108,54 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , voteDiffusion :: RelayDiffusionConfig
   }
 
+data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
+
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  LeiosConfig
-    { praos
-    , pipeline = SingSingleVote
-    , sliceLength = fromIntegral disk.leiosStageLengthSlots
-    , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-    , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-    , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-    , votingFrequencyPerStage = disk.voteGenerationProbability
-    , votesForCertificate = fromIntegral disk.voteThreshold
-    , voteSendStage = Vote
-    , sizes
-    , delays
-    , ibDiffusion =
-        RelayDiffusionConfig
-          { strategy = disk.ibDiffusionStrategy
-          , maxWindowSize = disk.ibDiffusionMaxWindowSize
-          , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
-          , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
-          }
-    , ebDiffusion =
-        RelayDiffusionConfig
-          { strategy = disk.ebDiffusionStrategy
-          , maxWindowSize = disk.ebDiffusionMaxWindowSize
-          , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
-          , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
-          }
-    , voteDiffusion =
-        RelayDiffusionConfig
-          { strategy = disk.voteDiffusionStrategy
-          , maxWindowSize = disk.voteDiffusionMaxWindowSize
-          , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
-          , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
-          }
-    }
+  case voting of
+    SomeStage pipeline voteSendStage ->
+      LeiosConfig
+        { praos
+        , pipeline
+        , voteSendStage
+        , sliceLength = fromIntegral disk.leiosStageLengthSlots
+        , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+        , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+        , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+        , votingFrequencyPerStage = disk.voteGenerationProbability
+        , votesForCertificate = fromIntegral disk.voteThreshold
+        , sizes
+        , delays
+        , ibDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ibDiffusionStrategy
+              , maxWindowSize = disk.ibDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+              }
+        , ebDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ebDiffusionStrategy
+              , maxWindowSize = disk.ebDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+              }
+        , voteDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.voteDiffusionStrategy
+              , maxWindowSize = disk.voteDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+              }
+        }
  where
   forEach n xs = n * fromIntegral (length xs)
   forEachKey n m = n * fromIntegral (Map.size m)
   durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
+  voting =
+    if disk.leiosVoteSendRecvStages
+      then SomeStage SingSplitVote VoteSend
+      else SomeStage SingSingleVote Vote
   praos =
     PraosConfig
       { blockFrequencyPerSlot = disk.rbGenerationProbability
