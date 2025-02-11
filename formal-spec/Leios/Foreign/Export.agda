@@ -110,6 +110,9 @@ instance
       a≡zero : ∀ {a : Fin 1} → a ≡ zero
       a≡zero {zero} = refl
 
+  HsTy-FFDState = autoHsType FFDState
+  Conv-FFDState = autoConvert FFDState
+
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
 
@@ -126,6 +129,10 @@ open Computational22
 open BaseAbstract
 open FFDAbstract
 
+open GenFFD.Header using (ibHeader; ebHeader; vHeader)
+open GenFFD.Body using (ibBody)
+open FFDState
+
 instance
   Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
   Computational-B .computeProof s (INIT x) = success ((STAKE sd , tt) , tt)
@@ -134,8 +141,12 @@ instance
   Computational-B .completeness _ _ _ _ _ = error "Computational-B completeness"
 
   Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
-  Computational-FFD .computeProof s (Send x x₁) = success ((SendRes , tt) , tt)
-  Computational-FFD .computeProof s Fetch = success ((FetchRes [] , tt) , tt)
+  Computational-FFD .computeProof s (Send (ibHeader h) (just (ibBody b))) = success ((SendRes , record s {outIBs = record {header = h; body = b} ∷ outIBs s}) , SendIB)
+  Computational-FFD .computeProof s (Send (ebHeader h) nothing) = success ((SendRes , record s {outEBs = h ∷ outEBs s}) , SendEB)
+  Computational-FFD .computeProof s (Send (vHeader h) nothing) = success ((SendRes , record s {outVTs = h ∷ outVTs s}) , SendVS)
+  Computational-FFD .computeProof (record {inIBs = record { header = h; body = b} ∷ i; inEBs = e; inVTs = v}) Fetch = success ((FetchRes (inj₁ (ibHeader h) ∷ inj₂ (ibBody b) ∷ []) , record {inIBs = i; inEBs = e; inVTs = v}) , FetchIB)
+  Computational-FFD .computeProof (record {inIBs = []; inEBs = e; inVTs = v}) Fetch = success ((FetchRes [] , record {inIBs = []; inEBs = e; inVTs = v}) , EmptyIB)
+  Computational-FFD .computeProof _ _ = failure "FFD error"
   Computational-FFD .completeness _ _ _ _ _ = error "Computational-FFD completeness"
 
 open import Leios.Short.Deterministic st as D public

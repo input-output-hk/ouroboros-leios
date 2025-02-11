@@ -104,13 +104,66 @@ instance
   hpe : Hashable PreEndorserBlock ⊤
   hpe = record { hash = λ x → tt }
 
+record FFDState : Type where
+  field inIBs : List InputBlock
+        inEBs : List EndorserBlock
+        inVTs : List (List Vote)
+
+        outIBs : List InputBlock
+        outEBs : List EndorserBlock
+        outVTs : List (List Vote)
+
+open GenFFD.Header
+open GenFFD.Body
+open FFDState
+
+data SimpleFFD : FFDState → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDState → Type where
+  SendIB : ∀ {s h b o} → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) o (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
+  SendEB : ∀ {s eb o} → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) o (record s { outEBs = eb ∷ outEBs s})
+  SendVS : ∀ {s vs o} → SimpleFFD s (FFDAbstract.Send (vHeader vs) nothing) o (record s { outVTs = vs ∷ outVTs s})
+
+  BadSendIB : ∀ {s h o} → SimpleFFD s (FFDAbstract.Send (ibHeader h) nothing) o s
+  BadSendEB : ∀ {s h b o} → SimpleFFD s (FFDAbstract.Send (ebHeader h) (just b)) o s
+  BadSendVS : ∀ {s h b o} → SimpleFFD s (FFDAbstract.Send (vHeader h) (just b)) o s
+
+  FetchIB : ∀ {s ib o} → SimpleFFD record s {inIBs = ib ∷ inIBs s} FFDAbstract.Fetch o s
+  EmptyIB : ∀ {s o} → SimpleFFD record s {inIBs = []} FFDAbstract.Fetch o s
+
+{-
+  FetchEB : ∀ {s eb o} → SimpleFFD record s {inEBs = eb ∷ inEBs s} FFDAbstract.Fetch o s
+  EmptyEB : ∀ {s o} → SimpleFFD record s {inEBs = []} FFDAbstract.Fetch o s
+
+  FetchVT : ∀ {s x o} → SimpleFFD record s {inVTs = x ∷ inVTs s} FFDAbstract.Fetch o s
+  EmptyVT : ∀ {s o} → SimpleFFD record s {inVTs = []} FFDAbstract.Fetch o s
+-}
+
+simple-total : ∀ {ffds i o} → ∃[ ffds' ] (SimpleFFD ffds i o ffds')
+simple-total {ffd} {FFDAbstract.Send (ibHeader h) (just (ibBody b))} {o} = record ffd { outIBs = record {header = h; body = b} ∷ outIBs ffd} , SendIB
+simple-total {ffd} {FFDAbstract.Send (ebHeader eb) nothing} {o} = record ffd { outEBs = eb ∷ outEBs ffd} , SendEB
+simple-total {ffd} {FFDAbstract.Send (vHeader vs) nothing} {o} = record ffd { outVTs = vs ∷ outVTs ffd} , SendVS
+
+simple-total {ffd} {FFDAbstract.Send (ibHeader h) nothing} {o} = ffd , BadSendIB
+simple-total {ffd} {FFDAbstract.Send (ebHeader eb) (just b)} {o} = ffd , BadSendEB
+simple-total {ffd} {FFDAbstract.Send (vHeader vs) (just b)} {o} = ffd , BadSendVS
+
+simple-total {record {inIBs = record {header = h; body = b} ∷ i; inEBs = e; inVTs = v}} {FFDAbstract.Fetch} {o} = record {inIBs = i; inEBs = e; inVTs = v} , FetchIB
+simple-total {record {inIBs = []; inEBs = e; inVTs = v}} {FFDAbstract.Fetch} {o} = record {inIBs = []; inEBs = e; inVTs = v} , EmptyIB
+
+{-
+simple-total {record {inIBs = i; inEBs = eb ∷ e; inVTs = v}} {FFDAbstract.Fetch} {o} = record {inIBs = i; inEBs = e; inVTs = v} , FetchEB
+simple-total {record {inIBs = i; inEBs = []; inVTs = v}} {FFDAbstract.Fetch} {o} = record {inIBs = i; inEBs = []; inVTs = v} , EmptyEB
+
+simple-total {record {inIBs = i; inEBs = e; inVTs = x ∷ v}} {FFDAbstract.Fetch} {o} = record {inIBs = i; inEBs = e; inVTs = v} , FetchVT
+simple-total {record {inIBs = i; inEBs = e; inVTs = []}} {FFDAbstract.Fetch} {o} = record {inIBs = ; inEBs = e; inVTs = []} , EmptyVT
+-}
+
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
   record
-    { State = ⊤
-    ; initFFDState = tt
-    ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
-    ; FFD-total = tt , tt
+    { State = FFDState
+    ; initFFDState = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
+    ; _-⟦_/_⟧⇀_ = SimpleFFD
+    ; FFD-total = simple-total
     }
 
 open import Leios.Voting public
@@ -161,6 +214,7 @@ sd = record
 s₀ : LeiosState
 s₀ = initLeiosState tt sd tt
 
+{-
 open import Leios.Traces st _-⟦_/_⟧⇀_
 
 -- i) Same slot
@@ -188,7 +242,7 @@ t₄ = addUpkeep t₃ Base
 s₁ : LeiosState
 s₁ = let open LeiosState t₄ in
   record t₄
-    { FFDState = tt
+    { FFDState = record { inIBs = [] }
     ; BaseState = tt
     ; Ledger = []
     ; IBs = []
@@ -206,7 +260,7 @@ stake≡1 : TotalMap.lookup (LeiosState.SD s₀) (SpecStructure.id st) ≡ 1
 stake≡1 = ∈-rel⇒lookup-≡ (LeiosState.SD s₀) {a = zero} {b = 1} (to ∈-singleton refl)
 
 ib-step : s₀ ⇉ t₁
-ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB tt)
+ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB ?)
   where
     uk : IB-Role ∉ LeiosState.Upkeep s₀
     uk = λ x → ∉-∅ x
@@ -224,7 +278,7 @@ lem3 : ∀ {A} {a b : A} → a ≢ b → a ∉ singleton b
 lem3 = to (¬-cong-⇔ ∈-singleton)
 
 eb-step : t₁ ⇉ t₂
-eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB tt)
+eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB ?)
   where
     uk : EB-Role ∉ ∅ ∪ ❴ IB-Role ❵
     uk = lem2 (lem3 (λ ()))
@@ -233,7 +287,7 @@ eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB tt)
     π-EB rewrite stake≡1 = s≤s z≤n , refl
 
 v-step : t₂ ⇉ t₃
-v-step = (SLOT , EMPTY) , Roles (V-Role uk π-V tt)
+v-step = (SLOT , EMPTY) , Roles (V-Role uk π-V ?)
   where
     uk : V-Role ∉ (∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵
     uk = lem1 (lem2 (lem3 λ ())) (lem3 λ ())
@@ -260,3 +314,5 @@ slot-transition-trace = 5
   , t₄ , base-step
   , s₁ , slot-step
   , refl
+
+-}

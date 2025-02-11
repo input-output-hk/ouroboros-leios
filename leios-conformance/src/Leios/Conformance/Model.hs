@@ -68,8 +68,8 @@ initialModelState :: NodeModel
 initialModelState =
   LeiosState
     { v = ()
-    , sD = MkHSMap [(0, 1)]
-    , fFDState = ()
+    , sD = MkHSMap [(0, 45000000000000000)]
+    , fFDState = FFDState [] [] [] [] [] []
     , ledger = []
     , toPropose = []
     , iBs = []
@@ -93,22 +93,22 @@ makeStep nm =
     Failure _ -> Nothing
 
 addIB :: InputBlock -> NodeModel -> NodeModel
-addIB ib nm@LeiosState{..} = nm{iBs = ib : iBs}
+addIB ib nm@LeiosState{..} = nm{fFDState = fFDState{inIBs = ib : inIBs fFDState}}
 
 addEB :: EndorserBlock -> NodeModel -> NodeModel
-addEB eb nm@LeiosState{..} = nm{eBs = eb : eBs}
+addEB eb nm@LeiosState{..} = nm{fFDState = fFDState{inEBs = eb : inEBs fFDState}}
 
 addVote :: Vote -> NodeModel -> NodeModel
-addVote x nm@LeiosState{..} = nm{vs = [x] : vs}
+addVote x nm@LeiosState{..} = nm{fFDState = fFDState{inVTs = [x] : inVTs fFDState}}
 
 -- TODO: Leios executable specification
 transition :: NodeModel -> EnvAction -> Maybe (([InputBlock], [EndorserBlock], [[Vote]]), NodeModel)
 transition s Tick = do
   -- TODO: guards
-  s' <- makeStep s
   let ffd = fFDState s
+  s' <- makeStep s
   let ffd' = fFDState s'
-  pure (([], [], []), s) -- FIXME: return blocks from FFD
+  pure ((outIBs ffd' \\ outIBs ffd, outEBs ffd' \\ outEBs ffd, outVTs ffd' \\ outVTs ffd), s')
 transition nm (NewIB ib) = do
   -- TODO: guards
   pure (([], [], []), addIB ib nm)

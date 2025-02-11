@@ -64,16 +64,22 @@ handle :: MonadIO m => MonadSTM m => NodeModel -> NodeRequest -> m (NodeResponse
 handle node =
   \case
     Initialize -> pure (def, node)
-    NewSlot ibs ebs votes ->
-      -- FIXME: put into FFD
-      case makeStep' node of
-        Success (_, node') ->
-          let ibs' = [] -- FIXME: get from FFD
-              ebs' = []
-              votes' = []
-              res = NodeResponse{diffuseIBs = ibs', diffuseEBs = ebs', diffuseVotes = votes'}
-           in pure (res, node')
-        Failure m -> pure (Failed{failure = unpack m}, node)
+    NewSlot i e v ->
+      let ffd = fFDState node
+          ffd' =
+            ffd
+              { inIBs = inIBs ffd ++ i
+              , inEBs = inEBs ffd ++ e
+              , inVTs = inVTs ffd ++ v
+              }
+       in case makeStep' (node{fFDState = ffd'}) of
+            Success (_, node') ->
+              let ibs' = outIBs $ fFDState node'
+                  ebs' = outEBs $ fFDState node'
+                  vts' = outVTs $ fFDState node'
+                  res = NodeResponse{diffuseIBs = ibs', diffuseEBs = ebs', diffuseVotes = vts'}
+               in pure (res, node')
+            Failure m -> pure (Failed{failure = unpack m}, node)
     Stop -> pure (Stopped, node)
 
 newtype Command = Command
