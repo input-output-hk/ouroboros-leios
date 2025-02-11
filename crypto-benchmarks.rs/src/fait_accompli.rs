@@ -59,7 +59,7 @@ pub fn fait_accompli(pools: &BTreeMap<PoolKeyhash, Coin>, n: usize) -> FaSortiti
     while !fa_test(&s, &rho, n, i_star) {
         i_star += 1
     }
-    let rho_star = &rho[i_star];
+    let rho_star = &rho[i_star - 1];
     let n_persistent = max(1, i_star) - 1;
     let (pp, pnp) = p.split_at(n_persistent);
     FaSortition {

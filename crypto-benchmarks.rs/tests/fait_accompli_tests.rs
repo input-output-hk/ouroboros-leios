@@ -34,7 +34,7 @@ fn fa_test() {
         "Incorrect number of non-persistent voters."
     );
     assert_eq!(
-        Ratio::from_integer(BigInt::from(100)),
+        Ratio::from_integer(BigInt::from(200)),
         fa.rho.0,
         "Incorrect rho."
     );
@@ -52,7 +52,7 @@ fn fa_test() {
     let expected_nonpersistent: Vec<(PoolKeyhash, CoinFraction)> =
         [(p8, 10u64), (p5, 100u64), (p6, 50u64), (p7, 40u64)]
             .iter()
-            .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 100)))
+            .map(|(p, x)| (*p, CoinFraction::from_coins(*x, 200)))
             .collect();
     let actual_nonpersistent: Vec<(PoolKeyhash, CoinFraction)> =
         fa.nonpersistent.into_iter().collect();
