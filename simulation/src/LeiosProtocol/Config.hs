@@ -15,7 +15,7 @@
 
 module LeiosProtocol.Config where
 
-import Data.Aeson (Options (allNullaryToStringTag), defaultOptions, genericToJSON)
+import Data.Aeson (Options (allNullaryToStringTag), defaultOptions, genericToEncoding, genericToJSON)
 import Data.Aeson.Encoding (pairs)
 import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (constructorTagModifier), Parser, ToJSON (..), Value (..), genericParseJSON, object, typeMismatch, withObject, (.:))
 import Data.Default (Default (..))
@@ -52,8 +52,16 @@ data DiffusionStrategy
     OldestFirst
   deriving (Show, Eq, Generic)
 
+data RelayStrategy
+  = RequestFromFirst
+  | RequestFromAll
+  deriving (Show, Eq, Generic)
+
 data Config = Config
-  { leiosStageLengthSlots :: Word
+  { relayStrategy :: RelayStrategy
+  , tcpCongestionControl :: Bool
+  , multiplexMiniProtocols :: Bool
+  , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
   , txGenerationDistribution :: Distribution
@@ -113,7 +121,10 @@ instance Default Config where
   def :: Config
   def =
     Config
-      { leiosStageLengthSlots = 20
+      { relayStrategy = RequestFromFirst
+      , tcpCongestionControl = True
+      , multiplexMiniProtocols = True
+      , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
@@ -251,6 +262,9 @@ instance ToJSON (OmitDefault Config) where
 
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \obj -> do
+    relayStrategy <- parseFieldOrDefault @Config @"relayStrategy" obj
+    tcpCongestionControl <- parseFieldOrDefault @Config @"tcpCongestionControl" obj
+    multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
@@ -350,21 +364,26 @@ instance FromJSON Distribution where
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
 
+defaultEnumOptions :: Options
+defaultEnumOptions =
+  defaultOptions
+    { constructorTagModifier = camelToKebab
+    , allNullaryToStringTag = True
+    }
+
 instance FromJSON DiffusionStrategy where
-  parseJSON =
-    genericParseJSON
-      defaultOptions
-        { constructorTagModifier = camelToKebab
-        , allNullaryToStringTag = True
-        }
+  parseJSON = genericParseJSON defaultEnumOptions
 
 instance ToJSON DiffusionStrategy where
-  toJSON =
-    genericToJSON
-      defaultOptions
-        { constructorTagModifier = camelToKebab
-        , allNullaryToStringTag = True
-        }
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
+
+instance FromJSON RelayStrategy where
+  parseJSON = genericParseJSON defaultEnumOptions
+
+instance ToJSON RelayStrategy where
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
 
 -- | Create a 'Config' from a file.
 readConfigEither :: FilePath -> IO (Either ParseException Config)
