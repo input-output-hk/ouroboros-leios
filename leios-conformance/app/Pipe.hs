@@ -63,7 +63,7 @@ main =
 handle :: MonadIO m => MonadSTM m => NodeModel -> NodeRequest -> m (NodeResponse, NodeModel)
 handle node =
   \case
-    Initialize -> pure (def, node)
+    Initialize -> pure (def, initialModelState)
     NewSlot i e v ->
       let ffd = fFDState node
           ffd' =
@@ -74,9 +74,9 @@ handle node =
               }
        in case makeStep' (node{fFDState = ffd'}) of
             Success (_, node') ->
-              let ibs' = outIBs $ fFDState node'
-                  ebs' = outEBs $ fFDState node'
-                  vts' = outVTs $ fFDState node'
+              let ibs' = (outIBs $ fFDState node') \\ (outIBs $ fFDState node)
+                  ebs' = (outEBs $ fFDState node') \\ (outEBs $ fFDState node)
+                  vts' = (outVTs $ fFDState node') \\ (outVTs $ fFDState node)
                   res = NodeResponse{diffuseIBs = ibs', diffuseEBs = ebs', diffuseVotes = vts'}
                in pure (res, node')
             Failure m -> pure (Failed{failure = unpack m}, node)
