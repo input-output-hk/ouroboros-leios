@@ -6,9 +6,9 @@ use std::collections::{BTreeMap, HashSet};
 use crate::bls_vote;
 use crate::key::Sig;
 use crate::primitive::{Coin, CoinFraction, EbHash, Eid, PoolKeyhash};
-use crate::registry::*;
+use crate::registry::{PersistentId, Registry};
 use crate::sortition::voter_check;
-use crate::vote::*;
+use crate::vote::{do_voting, Vote};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Cert {

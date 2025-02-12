@@ -1,10 +1,11 @@
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 
-use leios_crypto_benchmarks::cert::*;
-use leios_crypto_benchmarks::registry::*;
-use leios_crypto_benchmarks::vote::*;
 use quickcheck::Arbitrary;
+
+use leios_crypto_benchmarks::cert::{gen_cert, verify_cert, weigh_cert};
+use leios_crypto_benchmarks::registry::Registry;
+use leios_crypto_benchmarks::vote::{arbitrary_votes, Vote};
 
 #[derive(Clone, Debug)]
 struct CertScenario {

@@ -7,8 +7,12 @@ use leios_crypto_benchmarks::key::{check_pop, key_gen, SecKey};
 use leios_crypto_benchmarks::primitive::{
     arbitrary_poolkeyhash, arbitrary_stake_distribution, EbHash, Eid,
 };
-use leios_crypto_benchmarks::realism::*;
-use leios_crypto_benchmarks::vote::*;
+use leios_crypto_benchmarks::realism::{
+    realistic_pool_count, realistic_total_stake, realistic_voters,
+};
+use leios_crypto_benchmarks::vote::{
+    arbitrary_votes, gen_vote_nonpersistent, gen_vote_persistent, verify_vote,
+};
 
 fn benchmark_check_pop(c: &mut Criterion) {
     c.bench_function("key::check_pop", |b| {

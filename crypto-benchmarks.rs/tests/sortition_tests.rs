@@ -5,7 +5,7 @@ use quickcheck::{Arbitrary, Gen};
 use std::cmp::{max, min};
 
 use leios_crypto_benchmarks::key::Sig;
-use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::sortition::{leader_check, ln_1_minus};
 
 #[test]
 fn leader() {

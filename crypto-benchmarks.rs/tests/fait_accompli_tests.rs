@@ -2,8 +2,8 @@ use num_bigint::BigInt;
 use num_rational::Ratio;
 use std::collections::BTreeMap;
 
-use leios_crypto_benchmarks::fait_accompli::*;
-use leios_crypto_benchmarks::primitive::*;
+use leios_crypto_benchmarks::fait_accompli::FaSortition;
+use leios_crypto_benchmarks::primitive::{Coin, CoinFraction, PoolKeyhash};
 
 #[test]
 fn fa_test() {

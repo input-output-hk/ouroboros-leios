@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use leios_crypto_benchmarks::vrf::*;
+use leios_crypto_benchmarks::vrf::{sk_random, sk_to_pk_point, vrf_prove, vrf_verify};
 
 fn benchmark_prove(c: &mut Criterion) {
     let sk = sk_random();
