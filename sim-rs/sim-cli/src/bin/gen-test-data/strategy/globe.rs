@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
+use rand::{seq::IndexedRandom as _, Rng as _};
 use serde::Deserialize;
 
 use crate::strategy::utils::{distribute_stake, GraphBuilder, RawNodeConfig, Weight};
@@ -58,10 +58,10 @@ fn distribute_regions(node_count: usize, distribution: Distribution) -> Vec<Regi
 
     let mut country_regions: HashMap<String, Vec<u64>> = HashMap::new();
     let mut results = vec![];
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
     for _ in 0..node_count {
         let (country, id, location) = region_pool
-            .get(rng.gen_range(0..region_pool.len()))
+            .get(rng.random_range(0..region_pool.len()))
             .unwrap();
         let regions = country_regions.entry(country.clone()).or_default();
         let number = match regions.iter().position(|r| r == id) {
@@ -89,15 +89,15 @@ pub fn globe(args: &GlobeArgs) -> Result<GraphBuilder> {
     let regions = distribute_regions(args.node_count, distribution);
 
     let stake = distribute_stake(args.stake_pool_count);
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     let mut graph = GraphBuilder::new();
 
     println!("generating nodes...");
     for (id, region) in regions.into_iter().enumerate() {
         let location = (
-            (region.location.0 + rng.gen_range(-4.0..4.0)).clamp(-90.0, 90.0),
-            (region.location.1 + rng.gen_range(-4.0..4.0)).clamp(0.0, 180.0),
+            (region.location.0 + rng.random_range(-4.0..4.0)).clamp(-90.0, 90.0),
+            (region.location.1 + rng.random_range(-4.0..4.0)).clamp(0.0, 180.0),
         );
         let stake = stake.get(id).cloned();
         graph.add(RawNodeConfig {
@@ -119,7 +119,7 @@ pub fn globe(args: &GlobeArgs) -> Result<GraphBuilder> {
         };
 
         let candidates = first_candidate_connection..args.node_count;
-        let target_count = rng.gen_range(args.min_connections..args.max_connections);
+        let target_count = rng.random_range(args.min_connections..args.max_connections);
         graph.add_random_connections(
             from,
             candidates,

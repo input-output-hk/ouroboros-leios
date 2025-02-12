@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use rand::{seq::SliceRandom as _, thread_rng, Rng as _};
+use rand::{seq::IndexedRandom as _, Rng as _};
 
 use crate::strategy::utils::{distribute_stake, GraphBuilder, RawNodeConfig, Weight};
 
@@ -20,7 +20,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<GraphBuilder> {
     }
 
     let stake = distribute_stake(args.stake_pool_count);
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     let mut graph = GraphBuilder::new();
 
@@ -29,7 +29,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<GraphBuilder> {
         let stake = stake.get(id).cloned();
         graph.add(RawNodeConfig {
             name: format!("node-{id}"),
-            location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
+            location: (rng.random_range(-90.0..90.0), rng.random_range(0.0..180.0)),
             region: None,
             stake,
             cores: None,
@@ -46,7 +46,7 @@ pub fn random_graph(args: &RandomGraphArgs) -> Result<GraphBuilder> {
         };
 
         let candidates = first_candidate_connection..args.node_count;
-        let target_count = rng.gen_range(args.min_connections..args.max_connections);
+        let target_count = rng.random_range(args.min_connections..args.max_connections);
         graph.add_random_connections(
             from,
             candidates,
