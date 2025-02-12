@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::bls_vote;
 use crate::key::{PubKey, SecKey, Sig};
-use crate::primitive::*;
+use crate::primitive::{arbitrary_poolkeyhash, CoinFraction, EbHash, Eid, PoolKeyhash};
 use crate::registry::*;
 use crate::sortition::*;
 use crate::util::*;

@@ -1,0 +1,41 @@
+name: "crypto-benchmarks-rs"
+
+on:
+  pull_request:
+    paths:
+      - "crypto-benchmarks.rs/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "crypto-benchmarks.rs/**"
+
+jobs:
+
+  crypto-benchmarks-rs-test:
+    name: "Test"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Rust packages
+        working-directory: crypto-benchmarks.rs
+        run: |
+          cargo test
+          if [ $? -ne 0 ]; then
+            echo "Cargo test failed"
+            exit 1
+          fi
+
+  crypto-benchmarks-rs-benchmark:
+    name: "Benchmark"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Rust packages
+        working-directory: crypto-benchmarks.rs
+        run: |
+          if ! cargo bench -- --noplot --sample-size 20 --quiet
+          then
+            echo "Cargo benchmarks failed"
+            exit 1
+          fi

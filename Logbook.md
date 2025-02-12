@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2025-02-12
+
+### Added BLS crypto to CI
+
+The CI job [crypto-benchmarks-rs](.github/workflows/crypto-benchmarks-rs.yaml) does the following:
+
+- Runs the tests for the BLS reference implementation
+- Runs the BLS vote and certificate benchmarks
+
 ## 2025-02-11
 
 ### Reference implementation and benchmarking BLS certificates

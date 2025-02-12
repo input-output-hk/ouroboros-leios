@@ -1,12 +1,14 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::cert::*;
+use leios_crypto_benchmarks::cert::{gen_cert, Cert};
 use leios_crypto_benchmarks::key::Reg;
-use leios_crypto_benchmarks::primitive::*;
-use leios_crypto_benchmarks::realism::*;
-use leios_crypto_benchmarks::registry::*;
-use leios_crypto_benchmarks::vote::*;
+use leios_crypto_benchmarks::primitive::arbitrary_stake_distribution;
+use leios_crypto_benchmarks::realism::{
+    realistic_pool_count, realistic_total_stake, realistic_voters,
+};
+use leios_crypto_benchmarks::registry::{arbitrary_pools, Registry};
+use leios_crypto_benchmarks::vote::{arbitrary_votes, Vote};
 
 fn benchmark_serialize_reg(c: &mut Criterion) {
     let g = &mut Gen::new(10);

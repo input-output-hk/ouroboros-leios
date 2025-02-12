@@ -13,7 +13,7 @@ use statrs::distribution::ContinuousCDF;
 use statrs::distribution::{Beta, Uniform};
 use std::collections::BTreeMap;
 
-use crate::util::*;
+use crate::util::{arbitrary_fixed_bytes, deserialize_fixed_bytes, serialize_fixed_bytes};
 
 pub use pallas::ledger::primitives::PoolKeyhash;
 

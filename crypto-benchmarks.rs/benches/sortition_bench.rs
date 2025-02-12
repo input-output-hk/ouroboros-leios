@@ -4,7 +4,7 @@ use num_rational::Ratio;
 use num_traits::{FromPrimitive, One};
 use quickcheck::{Arbitrary, Gen};
 
-use leios_crypto_benchmarks::sortition::*;
+use leios_crypto_benchmarks::sortition::{leader_check, ln_1_minus, voter_check};
 
 fn arbitrary_f(g: &mut Gen) -> Ratio<BigInt> {
     Ratio::new(

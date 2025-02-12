@@ -9,7 +9,7 @@ use std::hash::{Hash, Hasher};
 use crate::bls_util;
 use crate::bls_vote;
 use crate::primitive::{arbitrary_poolkeyhash, KesSig, PoolKeyhash};
-use crate::util::*;
+use crate::util::{arbitrary_fixed_bytes, deserialize_fixed_bytes, serialize_fixed_bytes};
 
 #[derive(Clone, Debug)]
 pub struct SecKey(pub(crate) SecretKey);
