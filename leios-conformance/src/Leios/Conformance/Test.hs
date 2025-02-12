@@ -92,7 +92,7 @@ instance Arbitrary InputBlock where
   arbitrary = InputBlock <$> arbitrary <*> arbitrary
 
 instance Arbitrary EndorserBlock where
-  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> pure [] -- FIXME: include ibRefs
+  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> arbitrary
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
