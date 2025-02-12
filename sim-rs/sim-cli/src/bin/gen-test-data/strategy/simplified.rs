@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{rngs::ThreadRng, Rng};
 
 use super::utils::{distribute_stake, GraphBuilder, RawNodeConfig};
 
@@ -24,8 +24,8 @@ impl Cluster {
 
     fn random_loc(&self, rng: &mut ThreadRng) -> ((f64, f64), (f64, f64)) {
         let (lat_origin, long_origin) = self.origin;
-        let lat_offset = rng.gen_range(-10.0..10.0);
-        let long_offset = rng.gen_range(-10.0..10.0);
+        let lat_offset = rng.random_range(-10.0..10.0);
+        let long_offset = rng.random_range(-10.0..10.0);
         let pool_loc = (
             lat_origin + lat_offset * 2.0,
             long_origin + long_offset * 2.0,
@@ -40,7 +40,7 @@ const MEDIUM_HOP: Duration = Duration::from_millis(69);
 const LONG_HOP: Duration = Duration::from_millis(268);
 
 pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     let mut graph = GraphBuilder::new();
 
@@ -97,7 +97,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
             if local_candidates.is_empty() {
                 break;
             }
-            let neighbor = local_candidates.remove(rng.gen_range(0..local_candidates.len()));
+            let neighbor = local_candidates.remove(rng.random_range(0..local_candidates.len()));
             graph.bidi_link(relay_id, neighbor, Some(SHORT_HOP));
         }
 
@@ -116,7 +116,7 @@ pub fn simplified(args: &SimplifiedArgs) -> Result<GraphBuilder> {
                 if candidates.is_empty() {
                     break;
                 }
-                let neighbor = candidates.remove(rng.gen_range(0..candidates.len()));
+                let neighbor = candidates.remove(rng.random_range(0..candidates.len()));
                 graph.bidi_link(relay_id, neighbor, Some(latency));
             }
         }

@@ -528,7 +528,7 @@ impl Node {
         for next_p in vrf_probabilities(self.sim_config.ib_generation_probability) {
             if let Some(vrf) = self.run_vrf(next_p) {
                 // IBs are generated at the start of any slot within this stage
-                let vrf_slot = slot + self.rng.gen_range(0..self.sim_config.stage_length);
+                let vrf_slot = slot + self.rng.random_range(0..self.sim_config.stage_length);
                 slot_vrfs.entry(vrf_slot).or_default().push(vrf);
             }
         }
@@ -580,7 +580,7 @@ impl Node {
         // Each node chooses a slot at random in which to produce all its votes.
         // Randomness spreads out vote generation across the whole network to make traffic less spiky,
         // but each node generates all votes for a pipeline at once to minimize overall traffic.
-        let new_slot = slot + self.rng.gen_range(0..self.sim_config.vote_slot_length);
+        let new_slot = slot + self.rng.random_range(0..self.sim_config.vote_slot_length);
         self.tracker.track_vote_lottery_won(VoteBundleId {
             slot: new_slot,
             producer: self.id,
@@ -1248,7 +1248,7 @@ impl Node {
     // Simulates the output of a VRF using this node's stake (if any).
     fn run_vrf(&mut self, success_rate: f64) -> Option<u64> {
         let target_vrf_stake = compute_target_vrf_stake(self.stake, self.total_stake, success_rate);
-        let result = self.rng.gen_range(0..self.total_stake);
+        let result = self.rng.random_range(0..self.total_stake);
         if result < target_vrf_stake {
             Some(result)
         } else {

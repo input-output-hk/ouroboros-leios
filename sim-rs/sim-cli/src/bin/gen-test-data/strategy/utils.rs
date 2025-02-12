@@ -86,7 +86,7 @@ impl GraphBuilder {
         let mut candidate_weights = self.candidate_connections(from, candidates, weight);
         let mut total_weight: u128 = candidate_weights.iter().map(|(_, weight)| *weight).sum();
         while self.connections_count(from) < target_count && !candidate_weights.is_empty() {
-            let next = rng.gen_range(0..total_weight);
+            let next = rng.random_range(0..total_weight);
             let Some(to_index) = candidate_weights
                 .iter()
                 .scan(0u128, |cum_weight, (_, weight)| {
