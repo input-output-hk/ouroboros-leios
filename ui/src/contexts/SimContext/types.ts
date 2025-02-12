@@ -66,11 +66,16 @@ export interface ISimulationEndorsementBlock {
   ibs: ISimulationInputBlock[];
 }
 
+export interface ISimulationCertificate {
+  bytes: number;
+  eb: ISimulationEndorsementBlock;
+}
+
 export interface ISimulationBlock {
   slot: number;
   txs: ISimulationTransaction[];
   headerBytes: number;
-  endorsement: ISimulationEndorsementBlock | null;
+  cert: ISimulationCertificate | null;
 }
 
 export interface ISimulationAggregatedDataState {
@@ -89,6 +94,7 @@ export interface ISimulationIntermediateInputBlock {
 
 export interface ISimulationIntermediateEndorsementBlock {
   slot: number;
+  bytes: number;
   ibs: string[];
 }
 

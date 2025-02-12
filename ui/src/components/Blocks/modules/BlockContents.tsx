@@ -29,14 +29,14 @@ const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, class
 interface ITXStats {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
   breakdown: [string, number][];
 }
 
 interface IStatsProps {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
   breakdown: [string, number][];
   position: [number, number];
 }
@@ -52,8 +52,7 @@ const printBytes = (bytes: number) => {
 }
 
 const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {
-  const count = txs.length;
-  const txBytes = txs.reduce((sum, tx) => sum + tx.bytes, 0);
+  const txBytes = txs?.reduce((sum, tx) => sum + tx.bytes, 0) ?? 0;
   const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
     <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
@@ -61,12 +60,12 @@ const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, t
         <div className="border-2 border-black rounded p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{count}</span></h4>
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{txs.length}</span></h4>}
           {breakdown.map(([name, bytes]) => (
             <h4 key={name} className="flex items-center justify-between gap-4">{name}: <span>{printBytes(bytes)}</span></h4>
           ))}
-          <h4 className="flex items-center justify-between gap-4">Transaction size: <span>{printBytes(txBytes)}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Total size: <span>{printBytes(totalBytes)}</span></h4>
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction size: <span>{printBytes(txBytes)}</span></h4>}
+          {txs && <h4 className="flex items-center justify-between gap-4">Total size: <span>{printBytes(totalBytes)}</span></h4>}
         </div>
       </div>
     </div>
@@ -84,8 +83,8 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
     const breakdown: [string, number][] = [
       ["Header size", block.headerBytes],
     ];
-    if (block.endorsement) {
-      breakdown.push(["Certificate size", block.endorsement.bytes]);
+    if (block.cert) {
+      breakdown.push(["Certificate size", block.cert.bytes]);
     }
     result.set("block", {
       name: "Block",
@@ -93,8 +92,14 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
       txs: block.txs,
       breakdown,
     });
-    if (block.endorsement) {
-      for (const ib of block.endorsement.ibs) {
+    if (block.cert) {
+      result.set("eb", {
+        name: "Endorsement Block",
+        slot: block.cert.eb.slot,
+        txs: null,
+        breakdown: [["Size", block.cert.eb.bytes]],
+      });
+      for (const ib of block.cert.eb.ibs) {
         result.set(ib.id, {
           name: "Input Block",
           slot: ib.slot,
@@ -121,8 +126,8 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
     }
   };
 
-  const eb = block.endorsement;
-  const ibs = block.endorsement?.ibs ?? [];
+  const eb = block.cert?.eb;
+  const ibs = block.cert?.eb?.ibs ?? [];
 
   return (
     <>
@@ -149,7 +154,7 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
           ) : null}
           {eb && (
             <div className={cx('pr-4 pl-6', classes.endorser, { [classes['has-ibs']]: ibs.length })}>
-              <Box proportion={1}>
+              <Box selected={selected?.key === "eb"} proportion={1} onClick={selectBox("eb")}>
                 Endorsement Block
                 <span className='text-sm'>Slot {eb.slot}</span>
               </Box>

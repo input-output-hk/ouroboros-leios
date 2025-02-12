@@ -162,6 +162,7 @@ export interface IEndorserBlockGenerated {
   id: string;
   slot: number;
   producer: number;
+  bytes: number;
   input_blocks: IInputBlock[]
 }
 

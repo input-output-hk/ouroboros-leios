@@ -143,6 +143,7 @@ pub enum Event {
     EndorserBlockGenerated {
         #[serde(flatten)]
         id: EndorserBlockId<Node>,
+        bytes: u64,
         input_blocks: Vec<InputBlockId<Node>>,
     },
     EndorserBlockSent {
@@ -357,6 +358,7 @@ impl EventTracker {
     pub fn track_eb_generated(&self, block: &crate::model::EndorserBlock) {
         self.send(Event::EndorserBlockGenerated {
             id: self.to_endorser_block(block.id()),
+            bytes: block.bytes,
             input_blocks: block
                 .ibs
                 .iter()

@@ -558,12 +558,14 @@ impl Node {
                     slot,
                     producer: self.id,
                 });
-                let mut eb = EndorserBlock {
+                let ibs = self.select_ibs_for_eb(slot);
+                let bytes = self.sim_config.sizes.eb(ibs.len());
+                let eb = EndorserBlock {
                     slot,
                     producer: self.id,
-                    ibs: vec![],
+                    bytes,
+                    ibs,
                 };
-                self.try_filling_eb(&mut eb);
                 self.schedule_cpu_task(CpuTask::EndorserBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
                 return;
@@ -1165,17 +1167,19 @@ impl Node {
         Ok(())
     }
 
-    fn try_filling_eb(&mut self, eb: &mut EndorserBlock) {
+    fn select_ibs_for_eb(&mut self, slot: u64) -> Vec<InputBlockId> {
         let config = &self.sim_config;
-        let Some(earliest_slot) = eb.slot.checked_sub(config.stage_length * 3) else {
-            return;
+        let Some(earliest_slot) = slot.checked_sub(config.stage_length * 3) else {
+            return vec![];
         };
+        let mut ibs = vec![];
         for slot in earliest_slot..(earliest_slot + config.stage_length) {
-            let Some(ibs) = self.leios.ibs_by_slot.remove(&slot) else {
+            let Some(slot_ibs) = self.leios.ibs_by_slot.remove(&slot) else {
                 continue;
             };
-            eb.ibs.extend(ibs);
+            ibs.extend(slot_ibs);
         }
+        ibs
     }
 
     fn finish_generating_eb(&mut self, eb: EndorserBlock) -> Result<()> {

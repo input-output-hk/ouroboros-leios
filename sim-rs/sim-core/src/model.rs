@@ -150,6 +150,7 @@ impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
 pub struct EndorserBlock {
     pub slot: u64,
     pub producer: NodeId,
+    pub bytes: u64,
     // The real impl will store hashes
     pub ibs: Vec<InputBlockId>,
 }

@@ -278,7 +278,9 @@ impl EventMonitor {
                     *seen_ibs.entry(recipient.id).or_default() += 1.;
                 }
                 Event::EndorserBlockLotteryWon { .. } => {}
-                Event::EndorserBlockGenerated { id, input_blocks } => {
+                Event::EndorserBlockGenerated {
+                    id, input_blocks, ..
+                } => {
                     generated_ebs += 1;
                     eb_ibs.insert(id.clone(), input_blocks.clone());
                     for ib_id in &input_blocks {

@@ -95,7 +95,7 @@ export const processMessage = (
       slot: message.slot,
       headerBytes: message.header_bytes,
       txs: message.transactions.map(id => intermediate.txs[id]),
-      endorsement: null,
+      cert: null,
     };
     const praosTx = message.transactions.length;
     let leiosTx = 0;
@@ -113,11 +113,14 @@ export const processMessage = (
           txs,
         };
       })
-      block.endorsement = {
-        id: ebId,
-        slot: eb.slot,
+      block.cert = {
         bytes: message.endorsement.bytes,
-        ibs,
+        eb: {
+          id: ebId,
+          slot: eb.slot,
+          bytes: eb.bytes,
+          ibs,
+        }
       }
     }
     aggregatedData.global.praosTxOnChain += praosTx;
@@ -144,6 +147,7 @@ export const processMessage = (
     const ibs = message.input_blocks.map(ib => ib.id);
     intermediate.ebs.set(message.id, {
       slot: message.slot,
+      bytes: message.bytes,
       ibs,
     });
   } else if (message.type === EMessageType.EndorserBlockSent) {
