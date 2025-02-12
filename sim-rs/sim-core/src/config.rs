@@ -68,7 +68,7 @@ pub struct RawParameters {
     pub rb_generation_probability: f64,
     pub rb_generation_cpu_time_ms: f64,
     pub rb_head_validation_cpu_time_ms: f64,
-    // pub rb_head_size_bytes: u64,
+    pub rb_head_size_bytes: u64,
     pub rb_body_max_size_bytes: u64,
 
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
@@ -106,8 +106,8 @@ pub struct RawParameters {
     pub cert_generation_cpu_time_ms_per_node: f64,
     pub cert_validation_cpu_time_ms_constant: f64,
     pub cert_validation_cpu_time_ms_per_node: f64,
-    // pub cert_size_bytes_constant: u64,
-    // pub cert_size_bytes_per_node: u64,
+    pub cert_size_bytes_constant: u64,
+    pub cert_size_bytes_per_node: u64,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -304,6 +304,27 @@ impl CpuTimeConfig {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct BlockSizeConfig {
+    pub block_header: u64,
+    pub cert_constant: u64,
+    pub cert_per_node: u64,
+}
+
+impl BlockSizeConfig {
+    fn new(params: &RawParameters) -> Self {
+        Self {
+            block_header: params.rb_head_size_bytes,
+            cert_constant: params.cert_size_bytes_constant,
+            cert_per_node: params.cert_size_bytes_per_node,
+        }
+    }
+
+    pub fn cert(&self, nodes: usize) -> u64 {
+        self.cert_constant + self.cert_per_node * nodes as u64
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
@@ -325,6 +346,7 @@ pub struct SimConfiguration {
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
     pub(crate) cpu_times: CpuTimeConfig,
+    pub(crate) sizes: BlockSizeConfig,
     pub(crate) transaction_frequency_ms: FloatDistribution,
     pub(crate) transaction_size_bytes: FloatDistribution,
 }
@@ -352,6 +374,7 @@ impl SimConfiguration {
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
             cpu_times: CpuTimeConfig::new(&params),
+            sizes: BlockSizeConfig::new(&params),
             transaction_frequency_ms: params.tx_generation_distribution.into(),
             transaction_size_bytes: params.tx_size_bytes_distribution.into(),
         }

@@ -690,6 +690,7 @@ impl Node {
             slot,
             producer: self.id,
             vrf,
+            header_bytes: self.sim_config.sizes.block_header,
             endorsement,
             transactions,
         };
@@ -722,8 +723,14 @@ impl Node {
             .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), votes.len()))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
+        let nodes = votes.iter().collect::<HashSet<_>>().len();
+        let bytes = self.sim_config.sizes.cert(nodes);
 
-        Some(Endorsement { eb: block, votes })
+        Some(Endorsement {
+            eb: block,
+            bytes,
+            votes,
+        })
     }
 
     fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {

@@ -163,7 +163,7 @@ impl HasBytesSize for SimulationMessage {
 
             Self::RollForward(_) => 8,
             Self::RequestBlock(_) => 8,
-            Self::Block(block) => block.transactions.iter().map(|t| t.bytes).sum(),
+            Self::Block(block) => block.bytes(),
 
             Self::AnnounceIBHeader(_) => 8,
             Self::RequestIBHeader(_) => 8,

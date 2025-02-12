@@ -61,12 +61,14 @@ export interface ISimulationInputBlock {
 export interface ISimulationEndorsementBlock {
   id: string;
   slot: number;
+  bytes: number;
   ibs: ISimulationInputBlock[];
 }
 
 export interface ISimulationBlock {
   slot: number;
   txs: ISimulationTransaction[];
+  header_bytes: number;
   endorsement: ISimulationEndorsementBlock | null;
 }
 

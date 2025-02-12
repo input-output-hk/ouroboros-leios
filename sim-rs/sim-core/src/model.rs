@@ -46,8 +46,21 @@ pub struct Block {
     pub slot: u64,
     pub producer: NodeId,
     pub vrf: u64,
+    pub header_bytes: u64,
     pub endorsement: Option<Endorsement>,
     pub transactions: Vec<Arc<Transaction>>,
+}
+
+impl Block {
+    pub fn bytes(&self) -> u64 {
+        self.header_bytes
+            + self
+                .endorsement
+                .as_ref()
+                .map(|e| e.bytes)
+                .unwrap_or_default()
+            + self.transactions.iter().map(|t| t.bytes).sum::<u64>()
+    }
 }
 
 id_wrapper!(TransactionId, u64);
@@ -187,5 +200,6 @@ pub enum NoVoteReason {
 #[derive(Clone, Debug, Serialize)]
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,
+    pub bytes: u64,
     pub votes: Vec<Node>,
 }

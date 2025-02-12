@@ -30,22 +30,31 @@ interface ITXStats {
   name: string;
   slot: number;
   txs: ISimulationTransaction[];
+  breakdown: [string, number][];
 }
 
 interface IStatsProps {
   name: string;
   slot: number;
   txs: ISimulationTransaction[];
+  breakdown: [string, number][];
   position: [number, number];
 }
 
-const Stats: FC<IStatsProps> = ({ name, slot, txs, position: [left, top] }) => {
+const printBytes = (bytes: number) => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(3)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(3)} KB`;
+  }
+  return `${bytes} bytes`;
+}
+
+const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {
   const count = txs.length;
-  const bytes = txs.reduce((sum, tx) => sum + tx.bytes, 0);
-  const size =
-    (bytes >= 1024 * 1024) ? `${(bytes / 1024 / 1024).toFixed(3)} MB` :
-      (bytes >= 1024) ? `${(bytes / 1024).toFixed(3)} KB` :
-        `${bytes} bytes`;
+  const txBytes = txs.reduce((sum, tx) => sum + tx.bytes, 0);
+  const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
     <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
       <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
@@ -53,7 +62,11 @@ const Stats: FC<IStatsProps> = ({ name, slot, txs, position: [left, top] }) => {
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
           <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{count}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Total size: <span>{size}</span></h4>
+          {breakdown.map(([name, bytes]) => (
+            <h4 key={name} className="flex items-center justify-between gap-4">{name}: <span>{printBytes(bytes)}</span></h4>
+          ))}
+          <h4 className="flex items-center justify-between gap-4">Transaction size: <span>{printBytes(txBytes)}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Total size: <span>{printBytes(totalBytes)}</span></h4>
         </div>
       </div>
     </div>
@@ -68,10 +81,26 @@ interface SelectState {
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
-    result.set("block", { name: "Block", slot: block.slot, txs: block.txs });
+    const breakdown: [string, number][] = [
+      ["Header size", block.header_bytes],
+    ];
+    if (block.endorsement) {
+      breakdown.push(["Certificate size", block.endorsement.bytes]);
+    }
+    result.set("block", {
+      name: "Block",
+      slot: block.slot,
+      txs: block.txs,
+      breakdown,
+    });
     if (block.endorsement) {
       for (const ib of block.endorsement.ibs) {
-        result.set(ib.id, { name: "Input Block", slot: ib.slot, txs: ib.txs });
+        result.set(ib.id, {
+          name: "Input Block",
+          slot: ib.slot,
+          txs: ib.txs,
+          breakdown: [],
+        });
       }
     }
     return result;

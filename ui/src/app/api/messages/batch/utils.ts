@@ -92,6 +92,7 @@ export const processMessage = (
     );
     const block: ISimulationBlock = {
       slot: message.slot,
+      header_bytes: message.header_bytes,
       txs: message.transactions.map(id => intermediate.txs[id]),
       endorsement: null,
     };
@@ -113,6 +114,7 @@ export const processMessage = (
       block.endorsement = {
         id: ebId,
         slot: eb.slot,
+        bytes: message.endorsement.bytes,
         ibs,
       }
     }

@@ -100,6 +100,7 @@ pub enum Event {
         slot: u64,
         producer: Node,
         vrf: u64,
+        header_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
@@ -266,8 +267,10 @@ impl EventTracker {
             slot: block.slot,
             producer: self.to_node(block.producer),
             vrf: block.vrf,
+            header_bytes: block.header_bytes,
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
                 eb: self.to_endorser_block(e.eb),
+                bytes: e.bytes,
                 votes: e.votes.iter().map(|n| self.to_node(*n)).collect(),
             }),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),

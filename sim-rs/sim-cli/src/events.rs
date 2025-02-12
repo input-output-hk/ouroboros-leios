@@ -184,6 +184,7 @@ impl EventMonitor {
                     vrf,
                     endorsement,
                     transactions,
+                    ..
                 } => {
                     let mut all_txs = transactions;
                     info!(

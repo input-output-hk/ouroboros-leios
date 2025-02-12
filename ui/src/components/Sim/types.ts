@@ -129,12 +129,15 @@ export interface IPraosBlockGenerated {
   id: string;
   slot: number;
   producer: number;
+  header_bytes: number;
   endorsement: IEndorsement | null;
   transactions: number[];
 }
 
 export interface IEndorsement {
   eb: { id: string }
+  bytes: number;
+  votes: {}
 }
 
 export interface IPraosBlockReceived {
