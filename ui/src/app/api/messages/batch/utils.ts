@@ -70,6 +70,7 @@ export const processMessage = (
     );
     intermediate.ibs.set(message.id, {
       slot: message.slot,
+      headerBytes: message.header_bytes,
       txs: message.transactions,
     });
   } else if (message.type === EMessageType.InputBlockSent) {
@@ -92,7 +93,7 @@ export const processMessage = (
     );
     const block: ISimulationBlock = {
       slot: message.slot,
-      header_bytes: message.header_bytes,
+      headerBytes: message.header_bytes,
       txs: message.transactions.map(id => intermediate.txs[id]),
       endorsement: null,
     };
@@ -108,6 +109,7 @@ export const processMessage = (
         return {
           id,
           slot: ib.slot,
+          headerBytes: ib.headerBytes,
           txs,
         };
       })

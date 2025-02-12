@@ -239,14 +239,18 @@ impl EventMonitor {
                 Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockLotteryWon { .. } => {}
-                Event::InputBlockGenerated { id, transactions } => {
+                Event::InputBlockGenerated {
+                    id,
+                    header_bytes,
+                    transactions,
+                } => {
                     generated_ibs += 1;
                     if transactions.is_empty() {
                         empty_ibs += 1;
                     }
                     pending_ibs.insert(id.clone());
                     ib_txs.insert(id.clone(), transactions.clone());
-                    let mut ib_bytes = 0;
+                    let mut ib_bytes = header_bytes;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(id.clone()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;

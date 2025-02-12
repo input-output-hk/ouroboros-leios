@@ -82,7 +82,7 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
     const breakdown: [string, number][] = [
-      ["Header size", block.header_bytes],
+      ["Header size", block.headerBytes],
     ];
     if (block.endorsement) {
       breakdown.push(["Certificate size", block.endorsement.bytes]);
@@ -99,7 +99,9 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
           name: "Input Block",
           slot: ib.slot,
           txs: ib.txs,
-          breakdown: [],
+          breakdown: [
+            ["Header size", ib.headerBytes],
+          ],
         });
       }
     }

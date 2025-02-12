@@ -121,6 +121,7 @@ pub enum Event {
     InputBlockGenerated {
         #[serde(flatten)]
         id: InputBlockId<Node>,
+        header_bytes: u64,
         transactions: Vec<TransactionId>,
     },
     InputBlockSent {
@@ -326,6 +327,7 @@ impl EventTracker {
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
         self.send(Event::InputBlockGenerated {
             id: self.to_input_block(block.header.id),
+            header_bytes: block.header.bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }

@@ -55,6 +55,7 @@ export interface ISimulationTransaction {
 export interface ISimulationInputBlock {
   id: string;
   slot: number;
+  headerBytes: number;
   txs: ISimulationTransaction[];
 }
 
@@ -68,7 +69,7 @@ export interface ISimulationEndorsementBlock {
 export interface ISimulationBlock {
   slot: number;
   txs: ISimulationTransaction[];
-  header_bytes: number;
+  headerBytes: number;
   endorsement: ISimulationEndorsementBlock | null;
 }
 
@@ -82,6 +83,7 @@ export interface ISimulationAggregatedDataState {
 
 export interface ISimulationIntermediateInputBlock {
   slot: number;
+  headerBytes: number;
   txs: number[];
 }
 

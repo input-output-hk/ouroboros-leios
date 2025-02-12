@@ -96,6 +96,7 @@ export interface IInputBlockGenerated {
   index: number;
   vrf: number;
   timestamp: number;
+  header_bytes: number
   transactions: number[];
 }
 

@@ -109,6 +109,7 @@ pub struct InputBlockHeader {
     pub id: InputBlockId,
     pub vrf: u64,
     pub timestamp: Timestamp,
+    pub bytes: u64,
 }
 
 #[derive(Debug)]
@@ -118,7 +119,7 @@ pub struct InputBlock {
 }
 impl InputBlock {
     pub fn bytes(&self) -> u64 {
-        self.transactions.iter().map(|tx| tx.bytes).sum()
+        self.header.bytes + self.transactions.iter().map(|tx| tx.bytes).sum::<u64>()
     }
 }
 

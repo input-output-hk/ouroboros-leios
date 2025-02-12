@@ -544,6 +544,7 @@ impl Node {
                     },
                     vrf,
                     timestamp: self.clock.now(),
+                    bytes: self.sim_config.sizes.ib_header,
                 })
                 .collect();
             self.leios.ibs_to_generate.insert(slot, headers);

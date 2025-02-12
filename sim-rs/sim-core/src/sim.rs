@@ -167,7 +167,7 @@ impl HasBytesSize for SimulationMessage {
 
             Self::AnnounceIBHeader(_) => 8,
             Self::RequestIBHeader(_) => 8,
-            Self::IBHeader(_, _) => 32,
+            Self::IBHeader(header, _) => header.bytes,
 
             Self::AnnounceIB(_) => 8,
             Self::RequestIB(_) => 8,

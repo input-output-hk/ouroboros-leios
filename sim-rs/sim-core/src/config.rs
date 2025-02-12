@@ -78,7 +78,7 @@ pub struct RawParameters {
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
     pub ib_shards: u64,
-    // pub ib_head_size_bytes: u64,
+    pub ib_head_size_bytes: u64,
     pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
     pub ib_body_validation_cpu_time_ms_per_byte: f64,
@@ -308,6 +308,7 @@ pub(crate) struct BlockSizeConfig {
     pub block_header: u64,
     pub cert_constant: u64,
     pub cert_per_node: u64,
+    pub ib_header: u64,
 }
 
 impl BlockSizeConfig {
@@ -316,6 +317,7 @@ impl BlockSizeConfig {
             block_header: params.rb_head_size_bytes,
             cert_constant: params.cert_size_bytes_constant,
             cert_per_node: params.cert_size_bytes_per_node,
+            ib_header: params.ib_head_size_bytes,
         }
     }
 
