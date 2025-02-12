@@ -50,6 +50,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
 import GHC.Word (Word64)
+import LeiosProtocol.Config (RelayStrategy (RequestFromFirst))
 import ModelTCP (kilobytes)
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
@@ -154,6 +155,7 @@ data PraosConfig body = PraosConfig
   , bodySize :: !(body -> Bytes)
   , bodyMaxSize :: !Bytes
   , configureConnection :: DiffTime -> Maybe Bytes -> ConnectionConfig
+  , relayStrategy :: RelayStrategy
   }
 
 defaultPraosConfig :: PraosConfig body
@@ -167,6 +169,7 @@ defaultPraosConfig =
     , bodySize = const $ kilobytes 95
     , bodyMaxSize = kilobytes 96
     , configureConnection = mkConnectionConfig True True
+    , relayStrategy = RequestFromFirst
     }
 
 instance Default (PraosConfig body) where

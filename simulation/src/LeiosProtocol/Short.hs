@@ -106,6 +106,7 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , ibDiffusion :: RelayDiffusionConfig
   , ebDiffusion :: RelayDiffusionConfig
   , voteDiffusion :: RelayDiffusionConfig
+  , relayStrategy :: RelayStrategy
   }
 
 data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
@@ -147,6 +148,7 @@ convertConfig disk =
               , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
               , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
               }
+        , relayStrategy = disk.relayStrategy
         }
  where
   forEach n xs = n * fromIntegral (length xs)
@@ -179,6 +181,7 @@ convertConfig disk =
           durationMsToDiffTime disk.rbGenerationCpuTimeMs
             + sum (map (certificateGeneration . snd) body.endorseBlocks)
       , configureConnection = mkConnectionConfig (tcpCongestionControl disk) (multiplexMiniProtocols disk)
+      , relayStrategy = disk.relayStrategy
       }
   certificateSize (Certificate votesMap) =
     fromIntegral $

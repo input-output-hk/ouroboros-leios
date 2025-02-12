@@ -31,6 +31,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import GHC.Records
 import LeiosProtocol.Common hiding (Point)
+import LeiosProtocol.Config
 import LeiosProtocol.Relay (Message (..), RelayMessage, relayMessageLabel)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -239,6 +240,7 @@ traceRelayLink1 connectionOptions =
               , ibDiffusion = RelayDiffusionConfig FreshestFirst 100 100 1
               , ebDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
               , voteDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
+              , relayStrategy = RequestFromAll
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig

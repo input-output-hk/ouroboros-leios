@@ -32,11 +32,12 @@ import Data.Kind (Type)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Type.Equality ((:~:) (Refl))
+import LeiosProtocol.Config (RelayStrategy (RequestFromAll, RequestFromFirst))
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -393,8 +394,8 @@ newBlockFetchControllerState chain = atomically $ do
   cpsVar <- newTVar $ initChainProducerState chain
   return BlockFetchControllerState{..}
 
-blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> BlockFetchControllerState body m -> m ()
-blockFetchController tracer st@BlockFetchControllerState{..} = forever makeRequests
+blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> PraosConfig body -> BlockFetchControllerState body m -> m ()
+blockFetchController tracer cfg st@BlockFetchControllerState{..} = forever makeRequests
  where
   makeRequests :: m ()
   makeRequests = traceNewTip tracer <=< atomically $ do
@@ -409,10 +410,10 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
         (useful, mtip) <- updateChains st chainUpdate
         whenMissing chainUpdate $ \_missingChain -> do
           -- TODO: filterFetched could be reusing the missingChain suffix.
-          br <- filterInFlight <=< filterFetched $ fragment
+          br <- maybeFilterInFlight <=< filterFetched $ fragment
           if null br.blockRequestFragments
             then unless useful retry
-            else addRequest peerId br
+            else addRequests peerId br
         return mtip
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
@@ -423,11 +424,37 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
   filterBR :: (BlockHeader -> Bool) -> BlockRequest -> BlockRequest
   filterBR p = BlockRequest . concatMap (AnchoredFragment.filter p) . (.blockRequestFragments)
 
+  maybeFilterInFlight br = case cfg.relayStrategy of
+    RequestFromAll -> return br
+    RequestFromFirst -> filterInFlight br
   filterInFlight :: BlockRequest -> STM m BlockRequest
   filterInFlight br = do
     in_flights <- forM (Map.elems peers) $ \peer -> do
       readTVar peer.blocksInFlightVar
     pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
+
+  addRequests :: PeerId -> BlockRequest -> STM m ()
+  addRequests pId br = do
+    case cfg.relayStrategy of
+      RequestFromFirst -> addRequest pId br
+      RequestFromAll -> do
+        addeds <- mapM (tryAddRequest br) (Map.toList peers)
+        assert (or addeds) $ return ()
+
+  tryAddRequest :: BlockRequest -> (PeerId, PeerStatus body m) -> STM m Bool
+  tryAddRequest br (pId, PeerStatus{..}) = do
+    peerChain <- readReadOnlyTVar peerChainVar
+    inFlight <- readTVar blocksInFlightVar
+    let peerHasHeader hdr =
+          isJust $
+            Chain.findBlock
+              (\hdr' -> blockHash hdr == blockHash hdr')
+              peerChain
+        toRequest hdr = headerPoint hdr `Set.notMember` inFlight && peerHasHeader hdr
+    case filterBR toRequest br of
+      br'
+        | null br.blockRequestFragments -> return False
+        | otherwise -> addRequest pId br' >> return True
 
   addRequest :: PeerId -> BlockRequest -> STM m ()
   addRequest pId br = assert (not $ null br.blockRequestFragments) $ do
