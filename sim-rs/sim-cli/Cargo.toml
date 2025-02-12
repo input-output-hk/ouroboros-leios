@@ -3,6 +3,7 @@ name = "sim-cli"
 version = "0.1.0"
 edition = "2021"
 default-run = "sim-cli"
+rust-version = "1.82"
 
 [dependencies]
 anyhow = "1"
