@@ -35,6 +35,7 @@ behavior, it is a red flag.
 
 - What are the peak CPU resources required as a function of throughput?
     - What operations create CPU bottlenecks?
+    - How much free CPU is available?
 
 ## Test Cases
 
