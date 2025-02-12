@@ -99,6 +99,8 @@ data LeiosNodeState m = LeiosNodeState
   , relayIBState :: !(RelayIBState m)
   , relayEBState :: !(RelayEBState m)
   , relayVoteState :: !(RelayVoteState m)
+  , prunedVoteStateToVar :: !(TVar m SlotNo)
+  -- ^ TODO: refactor into RelayState.
   , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId UTCTime))
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
   , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
@@ -107,6 +109,8 @@ data LeiosNodeState m = LeiosNodeState
   -- ^ waiting for ledger state of RB block to be validated.
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
+  , votesForEBVar :: !(TVar m (Map EndorseBlockId (Map VoteId Word64)))
+  -- ^ TODO: prune of EBs that won't make it into chain anymore.
   }
 
 data LeiosNodeTask
@@ -220,8 +224,9 @@ relayIBConfig ::
   LeiosNodeConfig ->
   ([InputBlockHeader] -> m ()) ->
   SubmitBlocks m InputBlockHeader InputBlockBody ->
+  RelayIBState m ->
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
-relayIBConfig _tracer cfg validateHeaders submitBlocks =
+relayIBConfig _tracer cfg validateHeaders submitBlocks st =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ibDiffusion.maxWindowSize}
     , headerId = (.id)
@@ -231,15 +236,19 @@ relayIBConfig _tracer cfg validateHeaders submitBlocks =
     , maxHeadersToRequest = cfg.leios.ibDiffusion.maxHeadersToRequest
     , maxBodiesToRequest = cfg.leios.ibDiffusion.maxBodiesToRequest
     , submitBlocks
+    , shouldIgnore = do
+        buff <- readTVarIO st.relayBufferVar
+        return $ flip RB.member buff . (.id)
     }
 
 relayEBConfig ::
-  MonadDelay m =>
+  (MonadDelay m, MonadSTM m) =>
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   SubmitBlocks m EndorseBlockId EndorseBlock ->
+  RelayEBState m ->
   RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock m
-relayEBConfig _tracer cfg submitBlocks =
+relayEBConfig _tracer cfg submitBlocks st =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize}
     , headerId = (.id)
@@ -250,15 +259,20 @@ relayEBConfig _tracer cfg submitBlocks =
     , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
+    , shouldIgnore = do
+        buff <- readTVarIO st.relayBufferVar
+        return $ flip RB.member buff . (.id)
     }
 
 relayVoteConfig ::
-  MonadDelay m =>
+  (MonadDelay m, Monad (STM m), MonadSTM m, MonadTime m) =>
   Tracer m LeiosNodeEvent ->
   LeiosNodeConfig ->
   SubmitBlocks m VoteId VoteMsg ->
+  RelayVoteState m ->
+  LeiosNodeState m ->
   RelayConsumerConfig VoteId (RelayHeader VoteId) VoteMsg m
-relayVoteConfig _tracer cfg submitBlocks =
+relayVoteConfig _tracer cfg submitBlocks _ leiosState =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = coerce cfg.leios.voteDiffusion.maxWindowSize}
     , headerId = (.id)
@@ -269,6 +283,12 @@ relayVoteConfig _tracer cfg submitBlocks =
     , maxBodiesToRequest = cfg.leios.voteDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
+    , shouldIgnore = atomically $ do
+        buffer <- readTVar leiosState.relayVoteState.relayBufferVar
+        prunedTo <- readTVar leiosState.prunedVoteStateToVar
+        return $ \hd ->
+          hd.slot < prunedTo
+            || hd.id `RB.member` buffer
     }
 
 queueAndWait :: (MonadSTM m, MonadDelay m) => LeiosNodeState m -> LeiosNodeTask -> [CPUTask] -> m ()
@@ -298,6 +318,8 @@ newLeiosNodeState cfg = do
   waitingForRBVar <- newTVarIO Map.empty
   waitingForLedgerStateVar <- newTVarIO Map.empty
   taskQueue <- atomically $ newTaskMultiQueue cfg.processingQueueBound
+  prunedVoteStateToVar <- newTVarIO (toEnum 0)
+  votesForEBVar <- newTVarIO Map.empty
   return $ LeiosNodeState{..}
 
 leiosNode ::
@@ -352,21 +374,21 @@ leiosNode tracer cfg followers peers = do
 
   ibThreads <-
     setupRelay
-      (relayIBConfig tracer cfg valHeaderIB submitIB)
+      (relayIBConfig tracer cfg valHeaderIB submitIB relayIBState)
       relayIBState
       (map (.protocolIB) followers)
       (map (.protocolIB) peers)
 
   ebThreads <-
     setupRelay
-      (relayEBConfig tracer cfg submitEB)
+      (relayEBConfig tracer cfg submitEB relayEBState)
       relayEBState
       (map (.protocolEB) followers)
       (map (.protocolEB) peers)
 
   voteThreads <-
     setupRelay
-      (relayVoteConfig tracer cfg submitVote)
+      (relayVoteConfig tracer cfg submitVote relayVoteState leiosState)
       relayVoteState
       (map (.protocolVote) followers)
       (map (.protocolVote) peers)
@@ -419,13 +441,15 @@ pruneVoteBuffer ::
 pruneVoteBuffer _tracer cfg st = go (toEnum 0)
  where
   go p = do
-    let last_vote_recv = snd $ stageRangeOf cfg.leios p VoteRecv
     let last_vote_send = snd $ stageRangeOf cfg.leios p VoteSend
+    let last_vote_recv = snd $ stageRangeOf cfg.leios p VoteRecv
+    let pruneTo = succ last_vote_send
     _ <- waitNextSlot cfg.slotConfig (succ last_vote_recv)
     atomically $ do
       modifyTVar' st.relayVoteState.relayBufferVar $
         RB.filter $
-          \RB.EntryWithTicket{value} -> (snd value).slot <= last_vote_send
+          \RB.EntryWithTicket{value} -> (snd value).slot >= pruneTo
+      writeTVar st.prunedVoteStateToVar $! pruneTo
     go (succ p)
 
 computeLedgerStateThread ::
@@ -479,6 +503,18 @@ adoptEB leiosState eb = do
   let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
   modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
 
+adoptVote :: MonadSTM m => LeiosNodeState m -> VoteMsg -> STM m ()
+adoptVote leiosState v = do
+  -- We keep tally for each EB as votes arrive, so the relayVoteBuffer
+  -- can be pruned without effects on EB certification.
+  modifyTVar' leiosState.votesForEBVar $
+    Map.unionWith Map.union $
+      Map.fromListWith
+        Map.union
+        [ (eb, Map.singleton v.id v.votes)
+        | eb <- v.endorseBlocks
+        ]
+
 dispatchValidation ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -509,7 +545,9 @@ dispatchValidation tracer cfg leiosState req =
       adoptEB leiosState eb
     traceEnterState [eb] EventEB
   valVote v completion = labelTask . (ValVote,) . (\p -> cpuTask p cfg.leios.delays.voteMsgValidation v,) $ do
-    atomically $ completion [v]
+    atomically $ do
+      completion [v]
+      adoptVote leiosState v
     traceEnterState [v] EventVote
 
   go :: ValidationRequest m -> STM m [(LeiosNodeTask, (CPUTask, m ()))]
@@ -589,7 +627,11 @@ generator tracer cfg st = do
             adoptEB st eb
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
-          atomically $ modifyTVar' st.relayVoteState.relayBufferVar (RB.snoc v.id (RelayHeader v.id v.slot, v))
+          atomically $ do
+            modifyTVar'
+              st.relayVoteState.relayBufferVar
+              (RB.snoc v.id (RelayHeader v.id v.slot, v))
+            adoptVote st v
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
   leiosBlockGenerator $ LeiosGeneratorConfig{submit = mapM_ submitOne, ..}
@@ -602,8 +644,7 @@ mkBuffersView cfg st = BuffersView{..}
     -- though it's getting more expensive as we go.
     chain <- PraosNode.preferredChain st.praosState
     bufferEB <- readTVar st.relayEBState.relayBufferVar
-    bufferVotes <- map snd . RB.values <$> readTVar st.relayVoteState.relayBufferVar
-
+    votesForEB <- readTVar st.votesForEBVar
     -- RBs in the same chain should not contain certificates for the same pipeline.
     let pipelinesInChain =
           Set.fromList $
@@ -611,14 +652,6 @@ mkBuffersView cfg st = BuffersView{..}
             | rb <- Chain.chainToList chain
             , (ebId, _) <- rb.blockBody.endorseBlocks
             , Just (_, eb) <- [RB.lookup bufferEB ebId]
-            ]
-    -- TODO: cache?
-    let votesForEB =
-          Map.fromListWith
-            Map.union
-            [ (eb, Map.singleton v.id v.votes)
-            | v <- bufferVotes
-            , eb <- v.endorseBlocks
             ]
     let totalVotes = fromIntegral . sum . Map.elems
     let tryCertify eb = do

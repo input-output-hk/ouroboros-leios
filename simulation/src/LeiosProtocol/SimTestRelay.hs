@@ -137,6 +137,9 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
+            , shouldIgnore = atomically $ do
+                rb <- readTVar relayBufferVar
+                return $ \hd -> RB.member (testHeaderId hd) rb
             , -- sequential validation of headers
               validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId

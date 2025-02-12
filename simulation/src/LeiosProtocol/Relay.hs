@@ -10,6 +10,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -495,6 +496,8 @@ data SubmitPolicy = SubmitInOrder | SubmitAll
 
 data RelayConsumerConfig id header body m = RelayConsumerConfig
   { relay :: !RelayConfig
+  , shouldIgnore :: m (header -> Bool)
+  -- ^ headers to ignore, e.g. already received or coming too late.
   , validateHeaders :: [header] -> m ()
   , headerId :: !(header -> id)
   , prioritize :: !(Map id header -> [header] -> [header])
@@ -661,9 +664,9 @@ relayConsumerPipelined config sst =
   -- \| Takes an STM action for the updated local state, so that
   -- requestBodies can update inFlightVar in the same STM tx.
   idleM ::
-    STM m (RelayConsumerLocalState id header body n) ->
+    m (RelayConsumerLocalState id header body n) ->
     m (RelayConsumer id header body n 'StIdle m ())
-  idleM mlst = atomically $ do
+  idleM mlst = do
     lst <- mlst
     let canRequestMoreBodies = not (Map.null lst.available)
     case lst.pendingRequests of
@@ -715,39 +718,41 @@ relayConsumerPipelined config sst =
   requestBodies ::
     forall (n :: N).
     RelayConsumerLocalState id header body n ->
-    STM m (RelayConsumer id header body n 'StIdle m ())
+    m (RelayConsumer id header body n 'StIdle m ())
   requestBodies lst = do
-    -- New headers are filtered before becoming available, but we have
-    -- to filter `lst.available` again in the same STM tx that sets them as
-    -- `inFlight`.
-    inFlight <- readTVar sst.inFlightVar
-    relayBuffer <- readTVar sst.relayBufferVar
-    let (ignored, available1) =
-          Map.partitionWithKey
-            ( \k _ ->
-                k `Set.member` inFlight
-                  || k `RB.member` relayBuffer
-            )
-            lst.available
-    -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
-    let buffer' = lst.buffer <> Map.map (const Nothing) ignored
+    isIgnored <- config.shouldIgnore
+    atomically $ do
+      -- New headers are filtered before becoming available, but we have
+      -- to filter `lst.available` again in the same STM tx that sets them as
+      -- `inFlight`.
+      inFlight <- readTVar sst.inFlightVar
+      let (ignored, available1) =
+            Map.partitionWithKey
+              ( \k hd ->
+                  k `Set.member` inFlight
+                    || isIgnored hd
+              )
+              lst.available
 
-    let hdrsToRequest =
-          take (fromIntegral config.maxBodiesToRequest) $
-            config.prioritize available1 (mapMaybe (`Map.lookup` available1) $ Foldable.toList $ lst.window)
-    let idsToRequest = map config.headerId hdrsToRequest
-    let idsToRequestSet = Set.fromList idsToRequest
-    modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
-    let available2 = Map.withoutKeys available1 idsToRequestSet
-    let !lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available2, buffer = buffer'}
-    return $
-      TS.YieldPipelined
-        (MsgRequestBodies idsToRequest)
-        ( TS.ReceiverAwait $ \case
-            MsgRespondBodies bodies ->
-              TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
-        )
-        (requestHeadersNonBlocking lst')
+      -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
+      let buffer' = lst.buffer <> Map.map (const Nothing) ignored
+
+      let hdrsToRequest =
+            take (fromIntegral config.maxBodiesToRequest) $
+              config.prioritize available1 (mapMaybe (`Map.lookup` available1) $ Foldable.toList $ lst.window)
+      let idsToRequest = map config.headerId hdrsToRequest
+      let idsToRequestSet = Set.fromList idsToRequest
+      modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+      let available2 = Map.withoutKeys available1 idsToRequestSet
+      let !lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available2, buffer = buffer'}
+      return $
+        TS.YieldPipelined
+          (MsgRequestBodies idsToRequest)
+          ( TS.ReceiverAwait $ \case
+              MsgRespondBodies bodies ->
+                TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
+          )
+          (requestHeadersNonBlocking lst')
 
   windowAdjust ::
     forall (n :: N).
@@ -860,6 +865,7 @@ relayConsumerPipelined config sst =
           -- though not all have replies.
           buffer1 = lst.buffer <> idsRequestedWithBodiesReceived
 
+          !_ = assert (relayConsumerLocalStateInvariant $ lst{buffer = buffer1}) ()
           -- We have to update the window here eagerly and not
           -- delay it to requestBodies, otherwise we could end up blocking in
           -- idle on more pipelined results rather than being able to
@@ -888,7 +894,7 @@ relayConsumerPipelined config sst =
           extraToSubmit = case config.submitPolicy of
             SubmitInOrder -> []
             SubmitAll ->
-              mapMaybe (\id' -> join (Map.lookup id' buffer1)) $
+              mapMaybe (\id' -> join (Map.lookup id' buffer2)) $
                 Foldable.toList window'
 
           -- And set them to `Nothing` in the buffer so they can be
@@ -937,11 +943,11 @@ relayConsumerPipelined config sst =
     RelayConsumerLocalState id header body n ->
     StrictSeq id ->
     Map id header ->
-    STM m (RelayConsumerLocalState id header body n)
+    m (RelayConsumerLocalState id header body n)
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
-    relayBuffer <- readTVar sst.relayBufferVar
-    inFlight <- readTVar sst.inFlightVar
+    isIgnored <- config.shouldIgnore
+    inFlight <- readTVarIO sst.inFlightVar
 
     let
       -- Divide the new ids in two: those that are already in the
@@ -949,7 +955,7 @@ relayConsumerPipelined config sst =
       -- and those that are not. We'll request some bodies from the latter.
       (ignoredIds, availableIdsMp) =
         Map.partitionWithKey
-          (\id' _ -> id' `RB.member` relayBuffer || id' `Set.member` inFlight)
+          (\id' hd -> isIgnored hd || id' `Set.member` inFlight)
           idsMap
 
       availableIdsU =
