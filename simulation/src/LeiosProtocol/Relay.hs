@@ -667,15 +667,16 @@ relayConsumerPipelined config sst =
     m (RelayConsumerLocalState id header body n) ->
     m (RelayConsumer id header body n 'StIdle m ())
   idleM mlst = do
-    lst <- mlst
-    let canRequestMoreBodies = not (Map.null lst.available)
-    case lst.pendingRequests of
-      Zero
-        | canRequestMoreBodies -> do
+    lst0 <- mlst
+    case lst0.pendingRequests of
+      Zero -> do
+        res <- tryRequestBodies lst0
+        case res of
+          Right rb -> do
             -- There are no replies in flight, but we do know some more bodies we
             -- can ask for, so lets ask for them and more headers.
-            requestBodies lst
-        | otherwise -> do
+            return rb
+          Left lst -> do
             -- There's no replies in flight, and we have no more txs we can
             -- ask for so the only remaining thing to do is to ask for more
             -- txids. Since this is the only thing to do now, we make this a
@@ -688,8 +689,10 @@ relayConsumerPipelined config sst =
               )
               $ return
               $ requestHeadersBlocking lst
-      Succ pendingRequests'
-        | canRequestMoreBodies -> do
+      Succ pendingRequests' -> do
+        res <- tryRequestBodies lst0
+        case res of
+          Right rb -> do
             -- We have replies in flight and we should eagerly collect them if
             -- available, but there are bodies to request too so we
             -- should not block waiting for replies.
@@ -701,10 +704,9 @@ relayConsumerPipelined config sst =
             -- It's important not to pipeline more requests for headers when we
             -- have no bodies to ask for, since (with no other guard) this will
             -- put us into a busy-polling loop.
-            let lst' = lst{pendingRequests = pendingRequests'}
-            rb <- requestBodies lst
+            let lst' = lst0{pendingRequests = pendingRequests'}
             return $ TS.Collect (Just rb) (handleResponse lst')
-        | otherwise -> do
+          Left lst -> do
             -- In this case there is nothing else to do so we block until we
             -- collect a reply.
             let lst' = lst{pendingRequests = pendingRequests'}
@@ -715,44 +717,65 @@ relayConsumerPipelined config sst =
     RelayConsumer id header body Z 'StDone m ()
   done _lst = TS.Done ()
 
-  requestBodies ::
+  dropFromLST ::
+    (id -> header -> Bool) ->
+    RelayConsumerLocalState id header body n ->
+    RelayConsumerLocalState id header body n
+  dropFromLST p lst =
+    let
+      (ignored, available') = Map.partitionWithKey p lst.available
+      buffer' = lst.buffer <> Map.map (const Nothing) ignored
+      (idsToAcknowledge, window') =
+        Seq.spanl (`Map.member` buffer') lst.window
+      lst' =
+        lst
+          { buffer = forceElemsToWHNF $ Map.restrictKeys buffer' (Set.fromList $ Foldable.toList window')
+          , available = available'
+          , window = window'
+          , pendingShrink = lst.pendingShrink + fromIntegral (Seq.length idsToAcknowledge)
+          }
+     in
+      assert (relayConsumerLocalStateInvariant lst') lst'
+
+  tryRequestBodies ::
     forall (n :: N).
     RelayConsumerLocalState id header body n ->
-    m (RelayConsumer id header body n 'StIdle m ())
-  requestBodies lst = do
+    m (Either (RelayConsumerLocalState id header body n) (RelayConsumer id header body n 'StIdle m ()))
+  tryRequestBodies lst0 = do
     isIgnored <- config.shouldIgnore
     atomically $ do
       -- New headers are filtered before becoming available, but we have
       -- to filter `lst.available` again in the same STM tx that sets them as
       -- `inFlight`.
       inFlight <- readTVar sst.inFlightVar
-      let (ignored, available1) =
-            Map.partitionWithKey
+      let !lst =
+            dropFromLST
               ( \k hd ->
                   k `Set.member` inFlight
                     || isIgnored hd
               )
-              lst.available
-
-      -- Ignored headers are set to Nothing in the buffer so they can be acknowledged later.
-      let buffer' = lst.buffer <> Map.map (const Nothing) ignored
+              lst0
 
       let hdrsToRequest =
             take (fromIntegral config.maxBodiesToRequest) $
-              config.prioritize available1 (mapMaybe (`Map.lookup` available1) $ Foldable.toList $ lst.window)
+              config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
       let idsToRequest = map config.headerId hdrsToRequest
       let idsToRequestSet = Set.fromList idsToRequest
-      modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
-      let available2 = Map.withoutKeys available1 idsToRequestSet
-      let !lst' = lst{pendingRequests = Succ lst.pendingRequests, available = available2, buffer = buffer'}
-      return $
-        TS.YieldPipelined
-          (MsgRequestBodies idsToRequest)
-          ( TS.ReceiverAwait $ \case
-              MsgRespondBodies bodies ->
-                TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
-          )
-          (requestHeadersNonBlocking lst')
+      if Set.null idsToRequestSet
+        then return (Left lst)
+        else do
+          let available2 = Map.withoutKeys lst.available idsToRequestSet
+          modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+          let !lst2 = lst{pendingRequests = Succ lst.pendingRequests, available = available2}
+          return $
+            Right $
+              TS.YieldPipelined
+                (MsgRequestBodies idsToRequest)
+                ( TS.ReceiverAwait $ \case
+                    MsgRespondBodies bodies ->
+                      TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
+                )
+                (requestHeadersNonBlocking lst2)
 
   windowAdjust ::
     forall (n :: N).
@@ -946,6 +969,7 @@ relayConsumerPipelined config sst =
     m (RelayConsumerLocalState id header body n)
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
+    -- TODO: rewrite with dropFromLST
     isIgnored <- config.shouldIgnore
     inFlight <- readTVarIO sst.inFlightVar
 
