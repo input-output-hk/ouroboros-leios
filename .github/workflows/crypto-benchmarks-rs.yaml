@@ -34,8 +34,8 @@ jobs:
       - name: Test Rust packages
         working-directory: crypto-benchmarks.rs
         run: |
-          cargo bench --noplot --sample-size 20
-          if [ $? -ne 0 ]; then
+          if ! cargo bench -- --noplot --sample-size 20
+          then
             echo "Cargo benchmarks failed"
             exit 1
           fi
