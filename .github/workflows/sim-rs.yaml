@@ -21,6 +21,8 @@ jobs:
       - name: Test Rust packages
         working-directory: sim-rs
         run: |
+          cargo --version
+          rustc --version
           cargo test
           if [ $? -ne 0 ]; then
             echo "Cargo test failed"
