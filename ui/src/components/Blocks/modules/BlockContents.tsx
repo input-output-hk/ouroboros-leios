@@ -2,6 +2,7 @@ import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/
 import cx from "classnames";
 import { FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
 
+import { printBytes } from '@/utils';
 import classes from "./styles.module.css";
 
 export interface IBlockContentsProps {
@@ -39,16 +40,6 @@ interface IStatsProps {
   txs: ISimulationTransaction[] | null;
   breakdown: [string, number][];
   position: [number, number];
-}
-
-const printBytes = (bytes: number) => {
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / 1024 / 1024).toFixed(3)} MB`;
-  }
-  if (bytes >= 1024) {
-    return `${(bytes / 1024).toFixed(3)} KB`;
-  }
-  return `${bytes} bytes`;
 }
 
 const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {

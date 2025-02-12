@@ -108,6 +108,7 @@ export async function GET(req: Request, res: Response) {
           txs: [],
           ibs: new Map(),
           ebs: new Map(),
+          bytes: new Map(),
         };
 
         interval = setInterval(() => {

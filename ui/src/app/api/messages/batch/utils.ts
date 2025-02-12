@@ -9,13 +9,18 @@ import {
   ISimulationIntermediateDataState,
 } from "@/contexts/SimContext/types";
 
-export const incrementNodeAggregationData = (
-  aggregationNodeDataRef: ISimulationAggregatedDataState["nodes"],
-  id: string,
+const incrementNodeAggregationData = (
+  aggregationNodeDataRef: ISimulationAggregatedDataState,
+  intermediate: ISimulationIntermediateDataState,
+  nodeId: string,
   key: keyof ISimulationAggregatedData,
+  id?: string,
 ) => {
-  const matchingNode = aggregationNodeDataRef.get(id);
-  aggregationNodeDataRef.set(id, {
+  const matchingNode = aggregationNodeDataRef.nodes.get(nodeId);
+  const bytesKey: keyof ISimulationAggregatedData = key.endsWith("Sent") ? "bytesSent" : "bytesReceived";
+  aggregationNodeDataRef.nodes.set(nodeId, {
+    bytesSent: 0,
+    bytesReceived: 0,
     ebGenerated: 0,
     ebReceived: 0,
     ebSent: 0,
@@ -32,7 +37,8 @@ export const incrementNodeAggregationData = (
     votesReceived: 0,
     votesSent: 0,
     ...matchingNode,
-    [key]: (matchingNode?.[key] || 0) + 1,
+    [key]: (matchingNode?.[key] ?? 0) + 1,
+    [bytesKey]: (matchingNode?.[bytesKey] ?? 0) + (id && intermediate.bytes.get(id) || 0),
   });
 };
 
@@ -45,29 +51,38 @@ export const processMessage = (
 
   if (message.type === EMessageType.TransactionGenerated) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.publisher.toString(),
       "txGenerated",
     );
+    intermediate.bytes.set(`tx-${message.id}`, message.bytes);
     intermediate.txs.push({ id: Number(message.id), bytes: message.bytes });
   } else if (message.type === EMessageType.TransactionSent) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.sender.toString(),
       "txSent",
+      `tx-${message.id}`,
     );
   } else if (message.type === EMessageType.TransactionReceived) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.recipient.toString(),
       "txReceived",
+      `tx-${message.id}`,
     );
   } else if (message.type === EMessageType.InputBlockGenerated) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.producer.toString(),
       "ibGenerated",
     );
+    const bytes = message.transactions.reduce((sum, tx) => sum + (intermediate.bytes.get(`tx-${tx}`) ?? 0), message.header_bytes);
+    intermediate.bytes.set(`ib-${message.id}`, bytes)
     intermediate.ibs.set(message.id, {
       slot: message.slot,
       headerBytes: message.header_bytes,
@@ -75,22 +90,28 @@ export const processMessage = (
     });
   } else if (message.type === EMessageType.InputBlockSent) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.sender.toString(),
       "ibSent",
+      `ib-${message.id}`,
     );
   } else if (message.type === EMessageType.InputBlockReceived) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.recipient.toString(),
       "ibReceived",
+      `ib-${message.id}`,
     );
   } else if (message.type === EMessageType.PraosBlockGenerated) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.producer.toString(),
       "pbGenerated",
     );
+    let bytes = message.transactions.reduce((sum, tx) => sum + (intermediate.bytes.get(`tx-${tx}`) ?? 0), message.header_bytes);
     const block: ISimulationBlock = {
       slot: message.slot,
       headerBytes: message.header_bytes,
@@ -100,6 +121,7 @@ export const processMessage = (
     const praosTx = message.transactions.length;
     let leiosTx = 0;
     if (message.endorsement != null) {
+      bytes += message.endorsement.bytes;
       const ebId = message.endorsement.eb.id;
       const eb = intermediate.ebs.get(ebId)!;
       const ibs = eb.ibs.map(id => {
@@ -123,28 +145,35 @@ export const processMessage = (
         }
       }
     }
+    intermediate.bytes.set(`pb-${message.id}`, bytes);
     aggregatedData.global.praosTxOnChain += praosTx;
     aggregatedData.global.leiosTxOnChain += leiosTx;
     aggregatedData.blocks.push(block);
   } else if (message.type === EMessageType.PraosBlockSent) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.sender.toString(),
       "pbSent",
+      `pb-${message.id}`,
     );
   } else if (message.type === EMessageType.PraosBlockReceived) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.recipient.toString(),
       "pbReceived",
+      `pb-${message.id}`,
     );
   } else if (message.type === EMessageType.EndorserBlockGenerated) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.producer.toString(),
       "ebGenerated",
     );
     const ibs = message.input_blocks.map(ib => ib.id);
+    intermediate.bytes.set(`eb-${message.id}`, message.bytes);
     intermediate.ebs.set(message.id, {
       slot: message.slot,
       bytes: message.bytes,
@@ -152,33 +181,43 @@ export const processMessage = (
     });
   } else if (message.type === EMessageType.EndorserBlockSent) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.sender.toString(),
       "ebSent",
+      `eb-${message.id}`,
     );
   } else if (message.type === EMessageType.EndorserBlockReceived) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.recipient.toString(),
       "ebReceived",
+      `eb-${message.id}`,
     );
   } else if (message.type === EMessageType.VotesGenerated) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
-      message.id.toString(),
+      aggregatedData,
+      intermediate,
+      message.producer.toString(),
       "votesGenerated",
     );
+    // TODO: track vote bundle size
   } else if (message.type === EMessageType.VotesSent) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.sender.toString(),
       "votesSent",
+      `votes-${message.id}`,
     );
   } else if (message.type === EMessageType.VotesReceived) {
     incrementNodeAggregationData(
-      aggregatedData.nodes,
+      aggregatedData,
+      intermediate,
       message.recipient.toString(),
       "votesReceived",
+      `votes-${message.id}`,
     );
   }
 };

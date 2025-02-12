@@ -25,6 +25,8 @@ export interface ISimulationAggregatedTotalData {
 }
 
 export interface ISimulationAggregatedData {
+  bytesSent: number;
+  bytesReceived: number;
   txGenerated: number;
   txSent: number;
   txReceived: number;
@@ -102,6 +104,7 @@ export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
   ibs: Map<string, ISimulationIntermediateInputBlock>;
   ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
+  bytes: Map<string, number>,
 }
 
 export interface IGraphContextState {

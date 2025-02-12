@@ -1,4 +1,5 @@
 import { useSimContext } from "@/contexts/SimContext/context";
+import { printBytes } from "@/utils";
 import { FC, useMemo, useRef } from "react";
 
 export const NodeStats: FC = () => {
@@ -75,21 +76,24 @@ export const NodeStats: FC = () => {
       </h2>
       {currentNodeStats && (
         <>
-          <h4 className="flex items-center justify-between gap-4">Tx Generated: <span>{currentNodeStats?.txGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Tx Sent: <span>{currentNodeStats?.txSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Tx Received: <span>{currentNodeStats?.txReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Generated: <span>{currentNodeStats?.ebGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Sent: <span>{currentNodeStats?.ebSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Received: <span>{currentNodeStats?.ebReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Generated: <span>{currentNodeStats?.ibGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Sent: <span>{currentNodeStats?.ibSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Received: <span>{currentNodeStats?.ibReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Generated: <span>{currentNodeStats?.pbGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Sent: <span>{currentNodeStats?.pbSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Received: <span>{currentNodeStats?.pbReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Generated: <span>{currentNodeStats?.votesGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Sent: <span>{currentNodeStats?.votesSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Received: <span>{currentNodeStats?.votesReceived}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Sent: <span>{printBytes(currentNodeStats.bytesSent)}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Received: <span>{printBytes(currentNodeStats.bytesReceived)}</span></h4>
+          <br />
+          <h4 className="flex items-center justify-between gap-4">Tx Generated: <span>{currentNodeStats.txGenerated}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Tx Sent: <span>{currentNodeStats.txSent}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Tx Received: <span>{currentNodeStats.txReceived}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">EB Generated: <span>{currentNodeStats.ebGenerated}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">EB Sent: <span>{currentNodeStats.ebSent}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">EB Received: <span>{currentNodeStats.ebReceived}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">IB Generated: <span>{currentNodeStats.ibGenerated}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">IB Sent: <span>{currentNodeStats.ibSent}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">IB Received: <span>{currentNodeStats.ibReceived}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">PB Generated: <span>{currentNodeStats.pbGenerated}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">PB Sent: <span>{currentNodeStats.pbSent}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">PB Received: <span>{currentNodeStats.pbReceived}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Votes Generated: <span>{currentNodeStats.votesGenerated}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Votes Sent: <span>{currentNodeStats.votesSent}</span></h4>
+          <h4 className="flex items-center justify-between gap-4">Votes Received: <span>{currentNodeStats.votesReceived}</span></h4>
         </>
       )}
     </div>
