@@ -618,19 +618,19 @@ generator tracer cfg st = do
         SomeAction Generate.Propose ib -> (GenIB,) $ do
           now <- getCurrentTime
           atomically $ do
-            modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+            modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
             adoptIB st ib now
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
           atomically $ do
-            modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (RelayHeader eb.id eb.slot, eb))
+            modifyTVar' st.relayEBState.relayBufferVar (RB.snocIfNew eb.id (RelayHeader eb.id eb.slot, eb))
             adoptEB st eb
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
           atomically $ do
             modifyTVar'
               st.relayVoteState.relayBufferVar
-              (RB.snoc v.id (RelayHeader v.id v.slot, v))
+              (RB.snocIfNew v.id (RelayHeader v.id v.slot, v))
             adoptVote st v
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg

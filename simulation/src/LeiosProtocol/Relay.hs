@@ -924,7 +924,7 @@ relayConsumerPipelined config sst =
           -- all blocks validated.
           -- TODO: the validation logic should be the one inserting into relayBuffer.
           modifyTVar' sst.relayBufferVar $
-            flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snoc (config.headerId h) blk buf)) validated
+            flip (Foldable.foldl' (\buf blk@(h, _) -> RB.snocIfNew (config.headerId h) blk buf)) validated
           -- TODO: won't remove from inFlight blocks not validated.
           modifyTVar' sst.inFlightVar (`Set.difference` Set.fromList (map (config.headerId . fst) validated))
 
