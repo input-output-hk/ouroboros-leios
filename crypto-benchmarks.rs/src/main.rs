@@ -25,7 +25,7 @@ use leios_crypto_benchmarks::vote::{
 };
 
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help=true)]
 struct Cli {
     name: Option<String>,
     #[arg(long)]
