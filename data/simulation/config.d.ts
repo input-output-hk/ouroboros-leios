@@ -34,7 +34,6 @@ export interface Config {
   "rb-generation-probability": number;
   "rb-generation-cpu-time-ms": number;
   "rb-head-validation-cpu-time-ms": number;
-  /** Only supported by Haskell simulation. */
   "rb-head-size-bytes": bigint;
   "rb-body-max-size-bytes": bigint;
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": number;
@@ -47,7 +46,6 @@ export interface Config {
   "ib-generation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
   "ib-shards": number;
-  /** Only supported by Haskell simulation. */
   "ib-head-size-bytes": bigint;
   "ib-head-validation-cpu-time-ms": number;
   "ib-body-validation-cpu-time-ms-constant": number;
@@ -68,9 +66,7 @@ export interface Config {
   "eb-generation-probability": number;
   "eb-generation-cpu-time-ms": number;
   "eb-validation-cpu-time-ms": number;
-  /** Only supported by Haskell simulation. */
   "eb-size-bytes-constant": bigint;
-  /** Only supported by Haskell simulation. */
   "eb-size-bytes-per-ib": bigint;
   /** Only supported by Haskell simulation. */
   "eb-diffusion-strategy": DiffusionStrategy;
@@ -105,9 +101,7 @@ export interface Config {
   "cert-generation-cpu-time-ms-per-node": number;
   "cert-validation-cpu-time-ms-constant": number;
   "cert-validation-cpu-time-ms-per-node": number;
-  /** Only supported by Haskell simulation. */
   "cert-size-bytes-constant": bigint;
-  /** Only supported by Haskell simulation. */
   "cert-size-bytes-per-node": bigint;
 }
 

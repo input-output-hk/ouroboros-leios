@@ -93,13 +93,11 @@
     },
     "cert-size-bytes-constant": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
     "cert-size-bytes-per-node": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -139,13 +137,11 @@
     },
     "eb-size-bytes-constant": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
     "eb-size-bytes-per-ib": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -199,7 +195,6 @@
     },
     "ib-head-size-bytes": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -253,7 +248,6 @@
     },
     "rb-head-size-bytes": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
