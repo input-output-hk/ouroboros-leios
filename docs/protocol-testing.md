@@ -24,6 +24,7 @@ behavior, it is a red flag.
 - How does IB generation frequency relate to IB network dissemination time?
     - How does this time relate to the time described in the network functionality in the Leios paper?
     - What is the induced network capacity?
+- Explore windowed versions of the freshest-first policy (recent IBs are downloaded oldest-first, older IBs are downloaded freshest first).
 - How rapidly or gradually does efficiency degrade as throughput increases?
 - Do RBs propagate back to IB producers in time for the ledger update to be available when the IB is produced?
 
