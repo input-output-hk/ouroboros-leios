@@ -1,7 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -23,12 +25,14 @@ import Control.Concurrent.Class.MonadMVar (MonadMVar (..))
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Data.Array (Array, listArray, (!))
+import Data.Kind
 import STMCompat
 
 class ConnectionBundle bundle where
   type BundleMsg bundle
+  type BundleConstraint bundle :: Type -> Constraint
   toFromBundleMsgBundle :: bundle (ToFromBundleMsg (BundleMsg bundle))
-  traverseConnectionBundle :: Monad m => (forall a. f a -> m (g a)) -> bundle f -> m (bundle g)
+  traverseConnectionBundle :: Monad m => (forall a. BundleConstraint bundle a => f a -> m (g a)) -> bundle f -> m (bundle g)
 
 -- | Injection, projection, between a common mux message type, and an
 -- individual message type. The following must hold:
@@ -70,7 +74,7 @@ newMuxChan bearer = do
   -- Bit of a hack to use these TVars, could run the traverseConnectionBundle
   -- in a reader+state monad instead. That'd be cleaner.
   recvQueuesAccum <- newTVarIO []
-  recvQueuesIx <- newTVarIO 0
+  recvQueuesIx <- newTVarIO (0 :: Int)
   chans <-
     traverseConnectionBundle
       ( newMuxChanSingle @bundle
@@ -139,8 +143,14 @@ data ExampleMsg
   = MsgFoo {fromMsgFoo :: Int}
   | MsgBar {fromMsgBar :: Bool}
 
+-- TODO: No other way to define an always true constraint that can be
+-- partially applied?
+class NoConstraint a
+instance NoConstraint a
+
 instance ConnectionBundle ExampleBundle where
   type BundleMsg ExampleBundle = ExampleMsg
+  type BundleConstraint ExampleBundle = NoConstraint
 
   toFromBundleMsgBundle =
     ExampleBundle

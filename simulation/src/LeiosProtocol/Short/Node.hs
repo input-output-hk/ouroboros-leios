@@ -179,6 +179,7 @@ instance MessageSize LeiosMessage where
 
 instance ConnectionBundle Leios where
   type BundleMsg Leios = LeiosMessage
+  type BundleConstraint Leios = MessageSize
   toFromBundleMsgBundle =
     Leios
       { protocolIB = ToFromBundleMsg RelayIB (.fromRelayIB)
