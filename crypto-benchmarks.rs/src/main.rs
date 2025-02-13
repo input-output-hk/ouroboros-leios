@@ -15,8 +15,7 @@ use leios_crypto_benchmarks::key::{
     check_pop, key_gen, sign_message, verify_message, PoP, PubKey, Reg, SecKey, Sig,
 };
 use leios_crypto_benchmarks::primitive::{
-    arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, EbHash, Eid, KesSig,
-    PoolKeyhash,
+    arbitrary_poolkeyhash, arbitrary_stake_distribution, Coin, EbHash, Eid, KesSig, PoolKeyhash,
 };
 use leios_crypto_benchmarks::registry::{arbitrary_pools, PoolInfo, Registry};
 use leios_crypto_benchmarks::sortition::voter_check;

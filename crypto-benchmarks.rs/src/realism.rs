@@ -1,8 +1,8 @@
+use pallas::ledger::primitives::Coin;
+use quickcheck::{Arbitrary, Gen};
 use rand::prelude::Distribution;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use pallas::ledger::primitives::Coin;
-use quickcheck::{Arbitrary, Gen};
 use statrs::distribution::ContinuousCDF;
 use statrs::distribution::{Beta, Uniform};
 
