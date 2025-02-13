@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-02-13
+
+### Certificate CPU benchmarks as a function of number of voters
+
+In support of the Haskell and Rust simulations, we've benchmarked certificate operations as a function of the number of voters. A realistic distribution of stake is used in these measurements.
+
+| Number of pools | Number of committee seats | Generate certificate | Verify certificate | Weigh certificate |
+|----------------:|--------------------------:|---------------------:|-------------------:|------------------:|
+|            2500 |                       500 |              63.4 ms |           104.8 ms |           10.6 ms |
+|            2500 |                       600 |              71.1 ms |           116.9 ms |           12.0 ms |
+|            2500 |                       700 |              77.4 ms |           125.5 ms |           12.3 ms |
+|            2500 |                       800 |              83.5 ms |           134.4 ms |           12.8 ms |
+|            2500 |                       900 |              88.2 ms |           141.1 ms |           12.4 ms |
+|            2500 |                      1000 |              92.5 ms |           144.9 ms |           12.3 ms |
+
+Serialization and deserialization likely also exhibit the same trend.
+
+A recipe for parallelizing parts of the certificate operations has been added to the [Specification for BLS certificates](crypto-benchmarks.rs/Specification.md).
+
 ## 2025-02-12
 
 ### Added BLS crypto to CI
