@@ -189,6 +189,7 @@ impl<Node: Display + Serialize> Serialize for VoteBundleId<Node> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct VoteBundle {
     pub id: VoteBundleId,
+    pub bytes: u64,
     pub ebs: BTreeMap<EndorserBlockId, usize>,
 }
 

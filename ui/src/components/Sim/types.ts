@@ -191,6 +191,7 @@ export interface IVotesGenerated {
   id: string;
   slot: number;
   producer: string;
+  bytes: number;
   votes: any[] // @todo
 }
 

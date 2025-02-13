@@ -281,13 +281,11 @@
     },
     "vote-bundle-size-bytes-constant": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
     "vote-bundle-size-bytes-per-eb": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },

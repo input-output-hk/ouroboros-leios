@@ -622,13 +622,13 @@ impl Node {
         }
         // For every VRF lottery you won, you can vote for every EB
         let votes_allowed = vote_count * ebs.len();
-        let eb_counts = ebs.into_iter().map(|eb| (eb, votes_allowed)).collect();
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,
                 producer: self.id,
             },
-            ebs: eb_counts,
+            bytes: self.sim_config.sizes.vote_bundle(ebs.len()),
+            ebs: ebs.into_iter().map(|eb| (eb, votes_allowed)).collect(),
         };
         if !votes.ebs.is_empty() {
             self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));

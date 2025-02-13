@@ -98,8 +98,8 @@ pub struct RawParameters {
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
-    // pub vote_size_bytes_constant: u64,
-    // pub vote_size_bytes_per_node: u64,
+    pub vote_bundle_size_bytes_constant: u64,
+    pub vote_bundle_size_bytes_per_eb: u64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
@@ -311,6 +311,8 @@ pub(crate) struct BlockSizeConfig {
     pub ib_header: u64,
     eb_constant: u64,
     eb_per_ib: u64,
+    vote_constant: u64,
+    vote_per_eb: u64,
 }
 
 impl BlockSizeConfig {
@@ -322,6 +324,8 @@ impl BlockSizeConfig {
             ib_header: params.ib_head_size_bytes,
             eb_constant: params.eb_size_bytes_constant,
             eb_per_ib: params.eb_size_bytes_per_ib,
+            vote_constant: params.vote_bundle_size_bytes_constant,
+            vote_per_eb: params.vote_bundle_size_bytes_per_eb,
         }
     }
 
@@ -331,6 +335,10 @@ impl BlockSizeConfig {
 
     pub fn eb(&self, ibs: usize) -> u64 {
         self.eb_constant + self.eb_per_ib * ibs as u64
+    }
+
+    pub fn vote_bundle(&self, ebs: usize) -> u64 {
+        self.vote_constant + self.vote_per_eb * ebs as u64
     }
 }
 

@@ -163,6 +163,7 @@ pub enum Event {
     VotesGenerated {
         #[serde(flatten)]
         id: VoteBundleId<Node>,
+        bytes: u64,
         votes: Votes<Node>,
     },
     NoVote {
@@ -389,6 +390,7 @@ impl EventTracker {
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VotesGenerated {
             id: self.to_vote_bundle(votes.id),
+            bytes: votes.bytes,
             votes: Votes(
                 votes
                     .ebs

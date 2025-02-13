@@ -83,9 +83,7 @@ export interface Config {
   "vote-generation-cpu-time-ms-per-ib": number;
   "vote-validation-cpu-time-ms": number;
   "vote-threshold": bigint;
-  /** Only supported by Haskell simulation. */
   "vote-bundle-size-bytes-constant": bigint;
-  /** Only supported by Haskell simulation. */
   "vote-bundle-size-bytes-per-eb": bigint;
   /** Only supported by Haskell simulation. */
   "vote-diffusion-strategy": DiffusionStrategy;

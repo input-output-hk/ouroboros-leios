@@ -202,7 +202,7 @@ export const processMessage = (
       message.producer.toString(),
       "votesGenerated",
     );
-    // TODO: track vote bundle size
+    intermediate.bytes.set(`votes-${message.id}`, message.bytes);
   } else if (message.type === EMessageType.VotesSent) {
     incrementNodeAggregationData(
       aggregatedData,

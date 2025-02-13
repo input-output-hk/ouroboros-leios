@@ -307,7 +307,7 @@ impl EventMonitor {
                     eb_messages.received += 1;
                 }
                 Event::VoteLotteryWon { .. } => {}
-                Event::VotesGenerated { id, votes } => {
+                Event::VotesGenerated { id, votes, .. } => {
                     for (eb, count) in votes.0 {
                         total_votes += count as u64;
                         *votes_per_bundle.entry(id.clone()).or_default() += count as f64;
