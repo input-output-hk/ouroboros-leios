@@ -48,6 +48,7 @@ import Data.Type.Equality ((:~:) (Refl))
 import Data.Unit.Strict (forceElemsToWHNF)
 import Data.Word (Word16)
 import GHC.Generics (Generic)
+import GHC.Stack
 import LeiosProtocol.Common
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
@@ -626,6 +627,12 @@ initRelayConsumerLocalState =
     , buffer = Map.empty
     }
 
+assertRelayConsumerLocalStateInvariant ::
+  (HasCallStack, Ord id) =>
+  RelayConsumerLocalState id header body n ->
+  RelayConsumerLocalState id header body n
+assertRelayConsumerLocalStateInvariant lst = assert (relayConsumerLocalStateInvariant lst) lst
+
 relayConsumerLocalStateInvariant :: Ord id => RelayConsumerLocalState id header body n -> Bool
 relayConsumerLocalStateInvariant lst =
   let
@@ -717,6 +724,7 @@ relayConsumerPipelined config sst =
     RelayConsumer id header body Z 'StDone m ()
   done _lst = TS.Done ()
 
+  -- Drops selected entries from `available`, shrinks the window accordingly.
   dropFromLST ::
     (id -> header -> Bool) ->
     RelayConsumerLocalState id header body n ->
@@ -727,15 +735,16 @@ relayConsumerPipelined config sst =
       buffer' = lst.buffer <> Map.map (const Nothing) ignored
       (idsToAcknowledge, window') =
         Seq.spanl (`Map.member` buffer') lst.window
-      lst' =
+     in
+      assertRelayConsumerLocalStateInvariant $
         lst
-          { buffer = forceElemsToWHNF $ Map.restrictKeys buffer' (Set.fromList $ Foldable.toList window')
+          { buffer =
+              forceElemsToWHNF $ -- TODO: Do we need this?
+                Map.restrictKeys buffer' (Set.fromList $ Foldable.toList window')
           , available = available'
           , window = window'
           , pendingShrink = lst.pendingShrink + fromIntegral (Seq.length idsToAcknowledge)
           }
-     in
-      assert (relayConsumerLocalStateInvariant lst') lst'
 
   tryRequestBodies ::
     forall (n :: N).
@@ -888,7 +897,8 @@ relayConsumerPipelined config sst =
           -- though not all have replies.
           buffer1 = lst.buffer <> idsRequestedWithBodiesReceived
 
-          !_ = assert (relayConsumerLocalStateInvariant $ lst{buffer = buffer1}) ()
+          !_ = assertRelayConsumerLocalStateInvariant $ lst{buffer = buffer1}
+
           -- We have to update the window here eagerly and not
           -- delay it to requestBodies, otherwise we could end up blocking in
           -- idle on more pipelined results rather than being able to
@@ -969,66 +979,16 @@ relayConsumerPipelined config sst =
     m (RelayConsumerLocalState id header body n)
   acknowledgeIds lst idsSeq _ | Seq.null idsSeq = pure lst
   acknowledgeIds lst idsSeq idsMap = do
-    -- TODO: rewrite with dropFromLST
     isIgnored <- config.shouldIgnore
     inFlight <- readTVarIO sst.inFlightVar
 
-    let
-      -- Divide the new ids in two: those that are already in the
-      -- relay buffer or in flight (both locally and shared in-flight)
-      -- and those that are not. We'll request some bodies from the latter.
-      (ignoredIds, availableIdsMp) =
-        Map.partitionWithKey
-          (\id' hd -> isIgnored hd || id' `Set.member` inFlight)
-          idsMap
-
-      availableIdsU =
-        Map.filterWithKey
-          (\txid _ -> txid `notElem` lst.window)
-          idsMap
-
-      available' = lst.available <> Map.intersection availableIdsMp availableIdsU
-
-      -- The txs that we intentionally don't request, because they are
-      -- already in the mempool, need to be acknowledged.
-      --
-      -- So we extend buffer with those txs (so of course they have
-      -- no corresponding reply).
-      buffer' =
-        lst.buffer
-          <> Map.map (const Nothing) ignoredIds
-
-      window' = lst.window <> idsSeq
-
-      -- Check if having decided not to request more bodies we can now
-      -- confirm any ids (in strict order in the window
-      -- sequence). This is used in the 'numTxsToAcknowledge' below
-      -- which will then be used next time we MsgRequestHeaders.
-      --
-      (acknowledgedIds, window'') =
-        Seq.spanl (`Map.member` buffer') window'
-
-      -- If so we can remove acknowledged txs from our buffer provided that they
-      -- are not still in window''. This happens in case of duplicate
-      -- ids.
-      buffer'' =
-        forceElemsToWHNF $
-          Foldable.foldl'
-            ( \m txid ->
-                if txid `elem` window''
-                  then m
-                  else Map.delete txid m
-            )
-            buffer'
-            acknowledgedIds
+    let lst1 =
+          assertRelayConsumerLocalStateInvariant $
+            lst
+              { window = lst.window <> idsSeq
+              , available = lst.available <> idsMap
+              }
+    let lst' = dropFromLST (\id' hd -> isIgnored hd || id' `Set.member` inFlight) lst1
 
     -- Return the next local state
-    return $
-      lst
-        { available = available'
-        , buffer = buffer''
-        , window = window''
-        , pendingShrink =
-            lst.pendingShrink
-              + fromIntegral (Seq.length acknowledgedIds)
-        }
+    return lst'
