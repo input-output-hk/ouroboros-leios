@@ -178,6 +178,7 @@ executable ols
     , base
     , containers
     , data-default
+    , filepath
     , optparse-applicative
     , ouroboros-leios-sim
     , random

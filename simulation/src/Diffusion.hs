@@ -93,23 +93,28 @@ stableChainHashes chains =
    in map blockHash $ Chain.toNewestFirst stable_chain
 
 diffusionDataFromMap ::
+  Bool ->
   Map NodeId StakeFraction ->
   Map id (msg, NodeId, Time, [(NodeId, Time)]) ->
   DiffusionData id
-diffusionDataFromMap stakes arrivals = DiffusionData{..}
+diffusionDataFromMap analize stakes arrivals = DiffusionData{..}
  where
   entries =
     [ DiffusionEntry{..}
     | (block_id, (_, NodeId node_id, Time created, ts)) <- Map.toList arrivals
     , let adoptions = map (second (\(Time t) -> t)) ts
     ]
-  latency_per_stake = map (diffusionEntryToLatencyPerStake stakes) entries
+  latency_per_stake
+    | analize = map (diffusionEntryToLatencyPerStake stakes) entries
+    | otherwise = []
   avg ts = sum ts / fromIntegral (length ts)
-  average_latencies =
-    Map.map avg $
-      Map.fromListWith
-        (++)
-        [ (p, [d])
-        | l <- latency_per_stake
-        , (Just d, p) <- l.latencies
-        ]
+  average_latencies
+    | analize =
+        Map.map avg $
+          Map.fromListWith
+            (++)
+            [ (p, [d])
+            | l <- latency_per_stake
+            , (Just d, p) <- l.latencies
+            ]
+    | otherwise = Map.empty

@@ -19,6 +19,7 @@ module LeiosProtocol.Short.VizSimP2P where
 import Chan.Driver
 import Control.Arrow ((&&&))
 import Control.Exception
+import Control.Monad
 import Data.Aeson
 import Data.Array.Unboxed (Ix, UArray, accumArray, (!))
 import Data.Bifunctor
@@ -84,7 +85,6 @@ import PraosProtocol.ExamplesPraosP2P ()
 import PraosProtocol.PraosNode (PraosMessage (..))
 import Sample
 import SimTypes (LabelLink (LabelLink), LabelNode (LabelNode), NodeId (..), Point (..), World (..))
-import System.FilePath (dropExtension, (<.>))
 import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
@@ -988,51 +988,75 @@ data LeiosData = LeiosData
   }
   deriving (Generic, ToJSON, FromJSON)
 
-exampleSim :: Bool -> StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> Time -> FilePath -> IO ()
-exampleSim doLog seed cfg p2pNetwork@P2PNetwork{..} emitControl stop@(Time stop') fp = do
-  let trace = exampleTrace2 seed cfg p2pNetwork
-  let sampleModel =
+data SimOutputConfig = SimOutputConfig
+  { logFile :: Maybe FilePath
+  , emitControl :: Bool
+  , dataFile :: Maybe FilePath
+  , analize :: Bool
+  , stop :: Time
+  }
+
+exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> SimOutputConfig -> IO ()
+exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{stop = stop@(Time stop'), ..} = do
+  case dataFile of
+    Just fp ->
+      runModel
         SampleModel
           { initState = LeiosSimState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
           , accumState = \t e s -> accumLeiosSimState t e s{chains = accumChains t e s.chains}
-          , renderState
+          , renderState = renderState fp
           }
-  runSampleModel' traceFile (logLeiosEvent p2pNodeNames emitControl) sampleModel stop trace
+    Nothing ->
+      runModel
+        SampleModel
+          { initState = ()
+          , accumState = \_ _ s -> s
+          , renderState = const (return ())
+          }
  where
-  traceFile
-    | doLog = Just (dropExtension fp <.> "log")
-    | otherwise = Nothing
-  renderState LeiosSimState{..} = do
+  runModel :: SampleModel LeiosEvent state -> IO ()
+  runModel model =
+    runSampleModel' logFile (logLeiosEvent p2pNodeNames emitControl) model stop $
+      exampleTrace2 seed cfg p2pNetwork
+  renderState fp LeiosSimState{..} = do
     let
-      ib_diffusion = diffusionDataFromMap p2pNodeStakes ibDiffusionLatency
-      eb_diffusion = diffusionDataFromMap p2pNodeStakes ebDiffusionLatency
-      vt_diffusion = diffusionDataFromMap p2pNodeStakes voteDiffusionLatency
-      rb_diffusion = coerce $ diffusionDataFromMap p2pNodeStakes rbDiffusionLatency
+      ib_diffusion = diffusionDataFromMap analize p2pNodeStakes ibDiffusionLatency
+      eb_diffusion = diffusionDataFromMap analize p2pNodeStakes ebDiffusionLatency
+      vt_diffusion = diffusionDataFromMap analize p2pNodeStakes voteDiffusionLatency
+      rb_diffusion = coerce $ diffusionDataFromMap analize p2pNodeStakes rbDiffusionLatency
       stable_chain_hashes = coerce $ stableChainHashes chains
       network = p2pNetworkToSomeTopology (fromIntegral $ Map.size p2pNodeStakes * 1000) p2pNetwork
-      (cpuUseSegments, Map.toAscList -> cpuUseCdfAvg) =
-        intervalsToSegmentsAndCdfAvg
-          Set.toList
-          (sum . ILMap.elems . fst)
-          (realToFrac stop')
-          nodeCpuUsage
       config = cfg
-      (transmittedBpsSegments, Map.toAscList -> transmittedBpsCdfAvg) =
-        intervalsToSegmentsAndCdfAvg
-          (uniformBins 20)
-          (\(im, i) -> assert (all (`ILMap.subsumes` i) $ ILMap.keys im) $ msgsTransmittedToBps . fst $ (im, i))
-          stop'
-          (Map.map (.messagesTransmitted) dataTransmittedPerNode)
-      (transmittedMsgsSegments, Map.toAscList -> transmittedMsgsCdfAvg) =
-        intervalsToSegmentsAndCdfAvg
-          Set.toList
-          (length . ILMap.elems . fst)
-          stop'
-          (Map.map (.messagesTransmitted) dataTransmittedPerNode)
+      maybeDoAnalysis :: (b, [a]) -> (b, [a])
+      maybeDoAnalysis = if analize then id else second (const [])
+      (cpuUseSegments, cpuUseCdfAvg) =
+        maybeDoAnalysis $
+          second Map.toAscList $
+            intervalsToSegmentsAndCdfAvg
+              Set.toList
+              (sum . ILMap.elems . fst)
+              (realToFrac stop')
+              nodeCpuUsage
+      (transmittedBpsSegments, transmittedBpsCdfAvg) =
+        maybeDoAnalysis $
+          second Map.toAscList $
+            intervalsToSegmentsAndCdfAvg
+              (uniformBins 20)
+              (\(im, i) -> assert (all (`ILMap.subsumes` i) $ ILMap.keys im) $ msgsTransmittedToBps . fst $ (im, i))
+              stop'
+              (Map.map (.messagesTransmitted) dataTransmittedPerNode)
+      (transmittedMsgsSegments, transmittedMsgsCdfAvg) =
+        maybeDoAnalysis $
+          second Map.toAscList $
+            intervalsToSegmentsAndCdfAvg
+              Set.toList
+              (length . ILMap.elems . fst)
+              stop'
+              (Map.map (.messagesTransmitted) dataTransmittedPerNode)
     let diffusionData = LeiosData{..}
     encodeFile fp diffusionData
     putStrLn $ "Data written to " ++ fp
-    reportAll diffusionData
+    when analize $ reportAll diffusionData
   reportAll LeiosData{..} = do
     sequence_ $
       [ uncurry report ("IB", ib_diffusion)

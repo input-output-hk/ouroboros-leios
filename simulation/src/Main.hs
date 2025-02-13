@@ -13,7 +13,7 @@ import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
@@ -64,6 +64,7 @@ import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
 import SimTypes
 import System.Exit (exitFailure)
+import System.FilePath
 import System.IO (hPutStrLn, stderr)
 import qualified System.Random as Random
 import TimeCompat
@@ -366,7 +367,15 @@ runSimOptions SimOptions{..} = case simCommand of
     let (rng1, rng2) = Random.split rng0
     config <- execConfigOptions configOptions
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
-    VizShortLeiosP2P.exampleSim (not skipLog) rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
+    let outputCfg =
+          VizShortLeiosP2P.SimOutputConfig
+            { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | not skipLog]
+            , emitControl
+            , dataFile = Just simOutputFile
+            , analize
+            , stop = simOutputSeconds
+            }
+    VizShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
 parserSimOptions :: Parser SimOptions
 parserSimOptions =
@@ -400,6 +409,7 @@ data SimCommand
       , topologyOptions :: TopologyOptions
       , emitControl :: Bool
       , skipLog :: Bool
+      , analize :: Bool
       }
 
 parserSimCommand :: Parser SimCommand
@@ -427,6 +437,7 @@ parserShortLeios =
     <*> parserTopologyOptions
     <*> switch (long "log-control" <> help "Include control messages in log.")
     <*> switch (long "no-log" <> help "Do not output event log.")
+    <*> switch (long "analize" <> help "Calculate metrics and statistics.")
 
 data ConfigOptions
   = LeiosConfigFile FilePath
