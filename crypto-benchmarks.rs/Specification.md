@@ -142,6 +142,17 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 As a general rule of thumb, assume that 80% of votes are persistent and 20% are non-persistent.
 
+Here are details for how certificate operations vary with committee size.
+
+| Number of pools | Number of committee seats | Generate certificate | Verify certificate | Weigh certificate |
+|----------------:|--------------------------:|---------------------:|-------------------:|------------------:|
+|            2500 |                       500 |              63.4 ms |           104.8 ms |           10.6 ms |
+|            2500 |                       600 |              71.1 ms |           116.9 ms |           12.0 ms |
+|            2500 |                       700 |              77.4 ms |           125.5 ms |           12.3 ms |
+|            2500 |                       800 |              83.5 ms |           134.4 ms |           12.8 ms |
+|            2500 |                       900 |              88.2 ms |           141.1 ms |           12.4 ms |
+|            2500 |                      1000 |              92.5 ms |           144.9 ms |           12.3 ms |
+
 
 ## Certificate size for realistic stake distributions
 

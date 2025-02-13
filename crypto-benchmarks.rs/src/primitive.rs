@@ -5,14 +5,10 @@ use num_traits::FromPrimitive;
 use pallas::ledger::primitives::{byron::Blake2b256, Hash};
 use pallas::ledger::traverse::time::Slot;
 use quickcheck::{Arbitrary, Gen};
-use rand::prelude::Distribution;
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use statrs::distribution::ContinuousCDF;
-use statrs::distribution::{Beta, Uniform};
 use std::collections::BTreeMap;
 
+use crate::realism::realistic_stake_dist;
 use crate::util::{arbitrary_fixed_bytes, deserialize_fixed_bytes, serialize_fixed_bytes};
 
 pub use pallas::ledger::primitives::PoolKeyhash;
@@ -25,28 +21,6 @@ pub use pallas::ledger::primitives::Coin;
 
 pub fn arbitrary_coin(g: &mut Gen) -> Coin {
     u64::arbitrary(g) % 999999 + 1
-}
-
-pub(crate) fn realistic_stake_dist(
-    g: &mut Gen,
-    total: u64,
-    n: usize,
-    alpha: f64,
-    beta: f64,
-) -> Vec<Coin> {
-    let rng = &mut StdRng::seed_from_u64(u64::arbitrary(g));
-    let noise = Uniform::new(0.75, 1.25).unwrap();
-    let curve = Beta::new(alpha, beta).unwrap();
-    let cum: Vec<f64> = (0..n)
-        .map(|i| curve.cdf((i as f64) / (total as f64)))
-        .collect();
-    let dif: Vec<f64> = (1..n)
-        .map(|i| (cum[i] - cum[i - 1]) * noise.sample(rng))
-        .collect();
-    let scale: f64 = (total as f64) / dif.iter().sum::<f64>();
-    dif.iter()
-        .map(|coin| (scale * *coin).round() as Coin)
-        .collect()
 }
 
 pub fn arbitrary_stake_distribution(
