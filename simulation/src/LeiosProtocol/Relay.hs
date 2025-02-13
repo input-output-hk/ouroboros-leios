@@ -711,6 +711,22 @@ relayConsumerPipelined config sst =
             -- It's important not to pipeline more requests for headers when we
             -- have no bodies to ask for, since (with no other guard) this will
             -- put us into a busy-polling loop.
+            --
+            -- Question (Andrea) : Here we have a branching in the local state:
+            --  - `rb` continues using the state that tracks we have requested more bodies
+            --
+            --  - `handleResponse lst'` instead doesn't know about
+            --    more bodies requested but shrinks the pending
+            --    requests (which makes sense, because it's the one
+            --    used when a response is received.)
+            --
+            --  Both of those eventually go back to idle, but there
+            --  doesn't seem to be a mechanism to reconcile the
+            --  states, nor to stop one of the branches?
+            --
+            --  Aside from the state branching, don't you get more and
+            --  more `RelayConsumer id header body n 'StIdle m ()` continuations to
+            --  process (probably retaining data we no longer need?) this way?
             let lst' = lst0{pendingRequests = pendingRequests'}
             return $ TS.Collect (Just rb) (handleResponse lst')
           Left lst -> do
