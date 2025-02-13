@@ -75,6 +75,16 @@ empty = RelayBuffer FingerTree.empty Map.empty firstUsableTicket
 null :: RelayBuffer key value -> Bool
 null = FingerTree.null . (.entries)
 
+snocIfNew ::
+  Ord key =>
+  key ->
+  value ->
+  RelayBuffer key value ->
+  RelayBuffer key value
+snocIfNew k v rb
+  | member k rb = rb
+  | otherwise = snoc k v rb
+
 snoc ::
   Ord key =>
   key ->

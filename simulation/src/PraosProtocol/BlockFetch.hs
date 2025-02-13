@@ -18,6 +18,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module PraosProtocol.BlockFetch where
@@ -32,11 +33,12 @@ import Data.Kind (Type)
 import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Type.Equality ((:~:) (Refl))
+import LeiosProtocol.Config (RelayStrategy (RequestFromAll, RequestFromFirst))
 import Network.TypedProtocol (
   Agency (ClientAgency, NobodyAgency, ServerAgency),
   IsPipelined (NonPipelined),
@@ -393,8 +395,8 @@ newBlockFetchControllerState chain = atomically $ do
   cpsVar <- newTVar $ initChainProducerState chain
   return BlockFetchControllerState{..}
 
-blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> BlockFetchControllerState body m -> m ()
-blockFetchController tracer st@BlockFetchControllerState{..} = forever makeRequests
+blockFetchController :: forall body m. (IsBody body, MonadSTM m) => Tracer m (PraosNodeEvent body) -> PraosConfig body -> BlockFetchControllerState body m -> m ()
+blockFetchController tracer cfg st@BlockFetchControllerState{..} = forever makeRequests
  where
   makeRequests :: m ()
   makeRequests = traceNewTip tracer <=< atomically $ do
@@ -409,10 +411,10 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
         (useful, mtip) <- updateChains st chainUpdate
         whenMissing chainUpdate $ \_missingChain -> do
           -- TODO: filterFetched could be reusing the missingChain suffix.
-          br <- filterInFlight <=< filterFetched $ fragment
-          if null br.blockRequestFragments
-            then unless useful retry
-            else addRequest peerId br
+          br <- filterFetched $ fragment
+          addRequests peerId br $ \case
+            True -> return ()
+            False -> unless useful retry
         return mtip
 
   filterFetched :: AnchoredFragment BlockHeader -> STM m BlockRequest
@@ -429,6 +431,31 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
       readTVar peer.blocksInFlightVar
     pure $ List.foldl' (flip $ \s -> filterBR ((`Set.notMember` s) . headerPoint)) br in_flights
 
+  addRequests :: PeerId -> BlockRequest -> (Bool -> STM m a) -> STM m a
+  addRequests pId br done = do
+    case cfg.relayStrategy of
+      RequestFromFirst -> do
+        br' <- filterInFlight br
+        done =<< tryAddRequest br' (pId, fromMaybe undefined (Map.lookup pId peers))
+      RequestFromAll -> do
+        addeds <- mapM (tryAddRequest br) (Map.toList peers)
+        done (or addeds)
+
+  tryAddRequest :: BlockRequest -> (PeerId, PeerStatus body m) -> STM m Bool
+  tryAddRequest (isEmptyBR -> True) _ = return False
+  tryAddRequest br (pId, PeerStatus{..}) = do
+    peerChain <- readReadOnlyTVar peerChainVar
+    inFlight <- readTVar blocksInFlightVar
+    let peerHasHeader hdr =
+          isJust $
+            Chain.findBlock
+              (\hdr' -> blockHash hdr == blockHash hdr')
+              peerChain
+        toRequest hdr = headerPoint hdr `Set.notMember` inFlight && peerHasHeader hdr
+    case filterBR toRequest br of
+      (isEmptyBR -> True) -> return False
+      finalBR -> addRequest pId finalBR >> return True
+
   addRequest :: PeerId -> BlockRequest -> STM m ()
   addRequest pId br = assert (not $ null br.blockRequestFragments) $ do
     case Map.lookup pId peers of
@@ -436,6 +463,9 @@ blockFetchController tracer st@BlockFetchControllerState{..} = forever makeReque
       Just PeerStatus{..} -> do
         modifyTVar' blocksInFlightVar (`Set.union` Set.fromList (blockRequestPoints br))
         modifyTVar' blockRequestVar (<> br)
+
+isEmptyBR :: BlockRequest -> Bool
+isEmptyBR = null . (.blockRequestFragments)
 
 ------------------------------------------------------
 ---- MissingBlocksChain

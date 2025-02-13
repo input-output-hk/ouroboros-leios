@@ -179,7 +179,7 @@ setupPraosThreads' ::
 setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM (addPeer valHeader) (length peers) st1
-  let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
+  let controllerThread = Concurrently $ blockFetchController tracer cfg st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer tracer cfg submitFetchedBlock st2) peerIds peers
   return (controllerThread : concat followerThreads <> concat peerThreads)

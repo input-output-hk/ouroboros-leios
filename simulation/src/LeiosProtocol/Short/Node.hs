@@ -18,7 +18,7 @@ import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.TSem
 import Control.Exception (assert)
-import Control.Monad (forever, guard, when)
+import Control.Monad (forever, guard, replicateM, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
@@ -38,6 +38,7 @@ import qualified Data.Text as T
 import Data.Traversable
 import Data.Tuple (swap)
 import LeiosProtocol.Common
+import LeiosProtocol.Config
 import LeiosProtocol.Relay
 import qualified LeiosProtocol.RelayBuffer as RB
 import LeiosProtocol.Short
@@ -125,10 +126,12 @@ data LeiosNodeTask
   | GenVote
   | GenRB
   deriving (Eq, Ord, Ix, Bounded, Show)
-
-type RelayIBState = RelayConsumerSharedState InputBlockId InputBlockHeader InputBlockBody
-type RelayEBState = RelayConsumerSharedState EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
-type RelayVoteState = RelayConsumerSharedState VoteId (RelayHeader VoteId) VoteMsg
+data NodeRelayState id header body m = NodeRelayState
+  { relayBufferVar :: !(TVar m (RB.RelayBuffer id (header, body)))
+  }
+type RelayIBState = NodeRelayState InputBlockId InputBlockHeader InputBlockBody
+type RelayEBState = NodeRelayState EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock
+type RelayVoteState = NodeRelayState VoteId (RelayHeader VoteId) VoteMsg
 
 data LedgerState = LedgerState
 
@@ -193,22 +196,29 @@ instance ConnectionBundle Leios where
 
 newRelayState ::
   (Ord id, MonadSTM m) =>
-  m (RelayConsumerSharedState id header body m)
+  m (NodeRelayState id header body m)
 newRelayState = do
   relayBufferVar <- newTVarIO RB.empty
-  inFlightVar <- newTVarIO Set.empty
-  return $ RelayConsumerSharedState{relayBufferVar, inFlightVar}
+  return $ NodeRelayState{relayBufferVar}
 
 setupRelay ::
   (Ord id, MonadAsync m, MonadSTM m, MonadDelay m, MonadTime m) =>
+  LeiosConfig ->
   RelayConsumerConfig id header body m ->
-  RelayConsumerSharedState id header body m ->
+  NodeRelayState id header body m ->
   [Chan m (RelayMessage id header body)] ->
   [Chan m (RelayMessage id header body)] ->
   m [m ()]
-setupRelay cfg consumerSST followers peers = do
-  let producerSST = RelayProducerSharedState{relayBufferVar = asReadOnly consumerSST.relayBufferVar}
-  let consumers = map (runRelayConsumer cfg consumerSST) peers
+setupRelay leiosConfig cfg st followers peers = do
+  let producerSST = RelayProducerSharedState{relayBufferVar = asReadOnly st.relayBufferVar}
+  ssts <- do
+    case leiosConfig.relayStrategy of
+      RequestFromFirst -> do
+        inFlightVar <- newTVarIO Set.empty
+        return $ repeat $ RelayConsumerSharedState{relayBufferVar = st.relayBufferVar, inFlightVar}
+      RequestFromAll -> do
+        (fmap . fmap) (RelayConsumerSharedState st.relayBufferVar) . replicateM (length peers) $ newTVarIO Set.empty
+  let consumers = map (uncurry $ runRelayConsumer cfg) (zip ssts peers)
   let producers = map (runRelayProducer cfg.relay producerSST) followers
   return $ consumers ++ producers
 
@@ -374,6 +384,7 @@ leiosNode tracer cfg followers peers = do
 
   ibThreads <-
     setupRelay
+      cfg.leios
       (relayIBConfig tracer cfg valHeaderIB submitIB relayIBState)
       relayIBState
       (map (.protocolIB) followers)
@@ -381,6 +392,7 @@ leiosNode tracer cfg followers peers = do
 
   ebThreads <-
     setupRelay
+      cfg.leios
       (relayEBConfig tracer cfg submitEB relayEBState)
       relayEBState
       (map (.protocolEB) followers)
@@ -388,6 +400,7 @@ leiosNode tracer cfg followers peers = do
 
   voteThreads <-
     setupRelay
+      cfg.leios
       (relayVoteConfig tracer cfg submitVote relayVoteState leiosState)
       relayVoteState
       (map (.protocolVote) followers)
@@ -618,19 +631,19 @@ generator tracer cfg st = do
         SomeAction Generate.Propose ib -> (GenIB,) $ do
           now <- getCurrentTime
           atomically $ do
-            modifyTVar' st.relayIBState.relayBufferVar (RB.snoc ib.header.id (ib.header, ib.body))
+            modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
             adoptIB st ib now
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
           atomically $ do
-            modifyTVar' st.relayEBState.relayBufferVar (RB.snoc eb.id (RelayHeader eb.id eb.slot, eb))
+            modifyTVar' st.relayEBState.relayBufferVar (RB.snocIfNew eb.id (RelayHeader eb.id eb.slot, eb))
             adoptEB st eb
           traceWith tracer (LeiosNodeEvent Generate (EventEB eb))
         SomeAction Generate.Vote v -> (GenVote,) $ do
           atomically $ do
             modifyTVar'
               st.relayVoteState.relayBufferVar
-              (RB.snoc v.id (RelayHeader v.id v.slot, v))
+              (RB.snocIfNew v.id (RelayHeader v.id v.slot, v))
             adoptVote st v
           traceWith tracer (LeiosNodeEvent Generate (EventVote v))
   let LeiosNodeConfig{..} = cfg
