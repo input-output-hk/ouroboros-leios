@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, sync::Arc, time::Duration};
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use tokio::sync::mpsc;
 use tracing::warn;
 
@@ -72,10 +72,8 @@ pub enum Event {
     CpuSubtaskStarted {
         task: CpuTaskId<Node>,
         subtask_id: u64,
-    },
-    CpuSubtaskFinished {
-        task: CpuTaskId<Node>,
-        subtask_id: u64,
+        #[serde(serialize_with = "duration_as_nanos")]
+        duration: Duration,
     },
     TransactionGenerated {
         id: TransactionId,
@@ -243,17 +241,16 @@ impl EventTracker {
         });
     }
 
-    pub fn track_cpu_subtask_started(&self, task_id: CpuTaskId, subtask_id: u64) {
+    pub fn track_cpu_subtask_started(
+        &self,
+        task_id: CpuTaskId,
+        subtask_id: u64,
+        duration: Duration,
+    ) {
         self.send(Event::CpuSubtaskStarted {
             task: self.to_task(task_id),
             subtask_id,
-        });
-    }
-
-    pub fn track_cpu_subtask_finished(&self, task_id: CpuTaskId, subtask_id: u64) {
-        self.send(Event::CpuSubtaskFinished {
-            task: self.to_task(task_id),
-            subtask_id,
+            duration,
         });
     }
 
@@ -474,4 +471,8 @@ impl EventTracker {
             name: self.node_names.get(&id).unwrap().clone(),
         }
     }
+}
+
+fn duration_as_nanos<S: Serializer>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_u128(duration.as_nanos())
 }

@@ -295,7 +295,7 @@ impl Node {
             index: subtask.task_id,
         };
         self.tracker
-            .track_cpu_subtask_started(task_id, subtask.subtask_id);
+            .track_cpu_subtask_started(task_id, subtask.subtask_id, subtask.duration);
         let timestamp = self.clock.now() + subtask.duration;
         self.events.push(FutureEvent(
             timestamp,
@@ -391,7 +391,6 @@ impl Node {
                         NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
                             let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
-                            self.tracker.track_cpu_subtask_finished(task_id.clone(), subtask.subtask_id);
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
                             if let Some(subtask) = next_subtask {
                                 self.start_cpu_subtask(subtask);
