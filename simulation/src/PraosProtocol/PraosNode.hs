@@ -51,8 +51,9 @@ praosMessageLabel (PraosMessage d) =
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
 
-instance ConnectionBundle (Praos body) where
+instance MessageSize body => ConnectionBundle (Praos body) where
   type BundleMsg (Praos body) = PraosMessage body
+  type BundleConstraint (Praos body) = MessageSize
   toFromBundleMsgBundle =
     coerce $
       Praos

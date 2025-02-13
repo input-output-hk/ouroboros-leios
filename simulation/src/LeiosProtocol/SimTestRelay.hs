@@ -257,6 +257,7 @@ newtype TestRelayBundle f = TestRelayBundle
 
 instance ConnectionBundle TestRelayBundle where
   type BundleMsg TestRelayBundle = TestBlockRelayMessage
+  type BundleConstraint TestRelayBundle = MessageSize
 
   toFromBundleMsgBundle =
     TestRelayBundle
