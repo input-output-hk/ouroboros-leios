@@ -72,7 +72,7 @@ pub enum Event {
     CpuSubtaskStarted {
         task: CpuTaskId<Node>,
         subtask_id: u64,
-        #[serde(serialize_with = "duration_as_nanos")]
+        #[serde(serialize_with = "duration_as_secs")]
         duration: Duration,
     },
     TransactionGenerated {
@@ -473,6 +473,6 @@ impl EventTracker {
     }
 }
 
-fn duration_as_nanos<S: Serializer>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_u128(duration.as_nanos())
+fn duration_as_secs<S: Serializer>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_f32(duration.as_secs_f32())
 }

@@ -75,7 +75,7 @@ export const getSetSimulationMaxTime = async (): Promise<number> => {
       reject("Could not find the last transaction.");
     } else {
       const message: IServerMessage = JSON.parse(lastLine.trim());
-      resolve(message.time / 1_000_000);
+      resolve(message.time);
     }
   });
 };

@@ -43,7 +43,7 @@ function getTimestampAtPosition(
 
         rl.on("line", (line) => {
           const message: IServerMessage = JSON.parse(line);
-          const timestamp = message.time / 1_000_000;
+          const timestamp = message.time;
           rl.close();
           resolve(timestamp);
         });
@@ -161,7 +161,7 @@ export async function GET(req: Request, res: Response) {
 
             const serializedData = {
               ...aggregatedData,
-              progress: JSON.parse(batch[batch.length - 1]).time / 1_000_000,
+              progress: JSON.parse(batch[batch.length - 1]).time,
               nodes: Array.from(aggregatedData.nodes.entries()),
               lastNodesUpdated: [...nodesUpdated],
             };

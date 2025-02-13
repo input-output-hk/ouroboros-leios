@@ -282,7 +282,7 @@ export function getTimestampAtPosition(
 
         rl.on("line", (line) => {
           const message: IServerMessage = JSON.parse(line);
-          const timestamp = message.time / 1_000_000;
+          const timestamp = message.time;
           rl.close();
           resolve(timestamp);
         });
