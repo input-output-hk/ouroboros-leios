@@ -34,6 +34,12 @@ record LeiosVRF : Type₁ where
   canProduceEB : ℕ → PrivKey → ℕ → VrfPf → Type
   canProduceEB slot k stake π = let (val , pf) = eval k (genEBInput slot) in val < stake × pf ≡ π
 
+  Dec-canProduceEB : ∀ {slot k stake} → (∃[ π ] canProduceEB slot k stake π) ⊎ (∀ π → ¬ canProduceEB slot k stake π)
+  Dec-canProduceEB {slot} {k} {stake} with eval k (genEBInput slot)
+  ... | (val , pf) = case ¿ val < stake ¿ of λ where
+    (yes p) → inj₁ (pf , p , refl)
+    (no ¬p) → inj₂ (λ π (h , _) → ¬p h)
+
   canProduceEBPub : ℕ → ℕ → PubKey → VrfPf → ℕ → Type
   canProduceEBPub slot val k pf stake = verify k (genEBInput slot) val pf × val < stake
 
@@ -43,5 +49,13 @@ record LeiosVRF : Type₁ where
   canProduceV1 : ℕ → PrivKey → ℕ → Type
   canProduceV1 slot k stake = proj₁ (eval k (genV1Input slot)) < stake
 
+  Dec-canProduceV1 : ∀ {slot k stake} → Dec (canProduceV1 slot k stake)
+  Dec-canProduceV1 {slot} {k} {stake} with eval k (genV1Input slot)
+  ... | (val , pf) = ¿ val < stake ¿
+
   canProduceV2 : ℕ → PrivKey → ℕ → Type
   canProduceV2 slot k stake = proj₁ (eval k (genV2Input slot)) < stake
+
+  Dec-canProduceV2 : ∀ {slot k stake} → Dec (canProduceV2 slot k stake)
+  Dec-canProduceV2 {slot} {k} {stake} with eval k (genV2Input slot)
+  ... | (val , pf) = ¿ val < stake ¿

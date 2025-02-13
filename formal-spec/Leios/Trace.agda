@@ -123,6 +123,14 @@ d-VotingAbstract =
     ; isVoteCertified = λ _ _ → ⊤
     }
 
+d-VotingAbstract-2 : VotingAbstract (Fin 2 × EndorserBlock)
+d-VotingAbstract-2 =
+  record
+    { VotingState = ⊤
+    ; initVotingState = tt
+    ; isVoteCertified = λ _ _ → ⊤
+    }
+
 st : SpecStructure 1
 st = record
       { a = d-Abstract
@@ -141,6 +149,26 @@ st = record
       ; K' = d-KeyRegistration
       ; KF = d-KeyRegistrationFunctionality
       ; va = d-VotingAbstract
+      }
+
+st-2 : SpecStructure 2
+st-2 = record
+      { a = d-Abstract
+      ; id = zero
+      ; FFD' = d-FFDFunctionality
+      ; vrf' = d-VRF
+      ; sk-IB = tt
+      ; sk-EB = tt
+      ; sk-V = tt
+      ; pk-IB = tt
+      ; pk-EB = tt
+      ; pk-V = tt
+      ; B' = d-Base
+      ; BF = d-BaseFunctionality
+      ; initBaseState = tt
+      ; K' = d-KeyRegistration
+      ; KF = d-KeyRegistrationFunctionality
+      ; va = d-VotingAbstract-2
       }
 
 open import Leios.Short st public
