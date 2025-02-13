@@ -115,7 +115,7 @@ IB-Role⇒ND (No-IB-Role x x₁) = Roles (No-IB-Role x x₁)
 opaque
   IB-Role-total : LeiosState.needsUpkeep s IB-Role → ∃[ s' ] s -⟦IB-Role⟧⇀ s'
   IB-Role-total {s = s} h = let open LeiosState s in case Dec-canProduceIB of λ where
-    (inj₁ (π , pf)) → -, IB-Role    h pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, IB-Role    h pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-IB-Role h pf
 
 IB-Role-Upkeep : s -⟦IB-Role⟧⇀ s' → LeiosState.needsUpkeep s IB-Role × ¬ LeiosState.needsUpkeep s' IB-Role
@@ -147,7 +147,7 @@ EB-Role⇒ND (No-EB-Role x x₁) = Roles (No-EB-Role x x₁)
 opaque
   EB-Role-total : LeiosState.needsUpkeep s EB-Role → ∃[ s' ] s -⟦EB-Role⟧⇀ s'
   EB-Role-total {s = s} h = let open LeiosState s in case Dec-canProduceEB of λ where
-    (inj₁ (π , pf)) → -, EB-Role    h pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, EB-Role    h pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-EB-Role h pf
 
 EB-Role-Upkeep : s -⟦EB-Role⟧⇀ s' → LeiosState.needsUpkeep s EB-Role × ¬ LeiosState.needsUpkeep s' EB-Role
@@ -179,7 +179,7 @@ V-Role⇒ND (No-V-Role x x₁) = Roles (No-V-Role x x₁)
 opaque
   V-Role-total : LeiosState.needsUpkeep s V-Role → ∃[ s' ] s -⟦V-Role⟧⇀ s'
   V-Role-total {s = s} h = let open LeiosState s in case Dec-canProduceV of λ where
-    (yes p) → -, V-Role h p (proj₂ FFD.FFD-total)
+    (yes p) → -, V-Role h p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V-Role h ¬p
 
 V-Role-Upkeep : s -⟦V-Role⟧⇀ s' → LeiosState.needsUpkeep s V-Role × ¬ LeiosState.needsUpkeep s' V-Role

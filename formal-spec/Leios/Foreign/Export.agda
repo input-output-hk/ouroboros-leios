@@ -144,8 +144,8 @@ instance
   Computational-FFD .computeProof s (Send (ibHeader h) (just (ibBody b))) = success ((SendRes , record s {outIBs = record {header = h; body = b} ∷ outIBs s}) , SendIB)
   Computational-FFD .computeProof s (Send (ebHeader h) nothing) = success ((SendRes , record s {outEBs = h ∷ outEBs s}) , SendEB)
   Computational-FFD .computeProof s (Send (vHeader h) nothing) = success ((SendRes , record s {outVTs = h ∷ outVTs s}) , SendVS)
-  Computational-FFD .computeProof (record {inIBs = record { header = h; body = b} ∷ i; inEBs = e; inVTs = v}) Fetch = success ((FetchRes (inj₁ (ibHeader h) ∷ inj₂ (ibBody b) ∷ []) , record {inIBs = i; inEBs = e; inVTs = v}) , FetchIB)
-  Computational-FFD .computeProof (record {inIBs = []; inEBs = e; inVTs = v}) Fetch = success ((FetchRes [] , record {inIBs = []; inEBs = e; inVTs = v}) , EmptyIB)
+  Computational-FFD .computeProof s Fetch = success ((FetchRes (flushIns s) , record s {inIBs = []; inEBs = []; inVTs = []}) , Fetch)
+
   Computational-FFD .computeProof _ _ = failure "FFD error"
   Computational-FFD .completeness _ _ _ _ _ = error "Computational-FFD completeness"
 

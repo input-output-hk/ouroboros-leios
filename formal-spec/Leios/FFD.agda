@@ -21,7 +21,7 @@ record FFDAbstract : Type₁ where
     field State : Type
           initFFDState : State
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
-          FFD-total : ∀ {ffds i o} → ∃[ ffds' ] ffds -⟦ i / o ⟧⇀ ffds'
+          FFD-Send-total : ∀ {ffds h b} → ∃[ ffds' ] ffds -⟦ Send h b / SendRes ⟧⇀ ffds'
 
     open Input public
     open Output public
