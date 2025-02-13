@@ -1,10 +1,10 @@
 import { SimWrapper } from "@/components/Sim/SimWrapper";
 import { SimContextProvider } from "@/contexts/SimContext/SimContextProvider";
-import { getSetSimulationMaxTime, getSimulationTopography } from "./queries";
+import { getSimulationMaxTime, getSimulationTopography } from "./queries";
 
 export default async function Home() {
   const [maxTime, topography] = await Promise.all([
-    getSetSimulationMaxTime(),
+    getSimulationMaxTime(),
     getSimulationTopography(),
   ]);
 

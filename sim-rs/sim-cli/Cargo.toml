@@ -17,6 +17,7 @@ pretty-bytes-rust = "0.3.0"
 rand = "0.9"
 statrs = "0.18"
 serde = { version = "1", features = ["derive"] }
+serde_cbor = "0.11"
 serde_json = "1"
 serde_yaml = "0.9"
 sim-core = { path = "../sim-core" }

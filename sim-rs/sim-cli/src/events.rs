@@ -31,10 +31,10 @@ struct OutputEvent {
     message: Event,
 }
 
-#[derive(clap::ValueEnum, Clone, Copy)]
-pub enum OutputFormat {
-    EventStream,
-    SlotStream,
+#[derive(Clone, Copy)]
+enum OutputFormat {
+    JsonStream,
+    CborStream,
 }
 
 pub struct EventMonitor {
@@ -44,7 +44,6 @@ pub struct EventMonitor {
     maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
-    output_format: OutputFormat,
 }
 
 impl EventMonitor {
@@ -52,7 +51,6 @@ impl EventMonitor {
         config: &SimConfiguration,
         events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
-        output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
         let pool_ids = config
@@ -69,7 +67,6 @@ impl EventMonitor {
             maximum_ib_age,
             events_source,
             output_path,
-            output_format: output_format.unwrap_or(OutputFormat::EventStream),
         }
     }
 
@@ -128,12 +125,18 @@ impl EventMonitor {
         let mut output = match self.output_path {
             Some(ref path) => {
                 let file = File::create(path).await?;
-                match self.output_format {
-                    OutputFormat::EventStream => OutputTarget::EventStream(BufWriter::new(file)),
-                    OutputFormat::SlotStream => OutputTarget::SlotStream {
-                        file: BufWriter::new(file),
-                        next: None,
-                    },
+                let format = if path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext == "cbor")
+                {
+                    OutputFormat::CborStream
+                } else {
+                    OutputFormat::JsonStream
+                };
+                OutputTarget::EventStream {
+                    format,
+                    file: BufWriter::new(file),
                 }
             }
             None => OutputTarget::None,
@@ -540,61 +543,46 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
 }
 
 enum OutputTarget {
-    EventStream(BufWriter<File>),
-    SlotStream {
+    EventStream {
+        format: OutputFormat,
         file: BufWriter<File>,
-        next: Option<SlotEvents>,
     },
     None,
 }
 
-#[derive(Serialize)]
-struct SlotEvents {
-    slot: u64,
-    start_time: Timestamp,
-    events: Vec<OutputEvent>,
-}
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
         match self {
-            Self::EventStream(file) => {
-                Self::write_line(file, event).await?;
-            }
-            Self::SlotStream { file, next } => {
-                if let Event::Slot { number } = &event.message {
-                    if let Some(slot) = next.take() {
-                        Self::write_line(file, slot).await?;
-                    }
-                    *next = Some(SlotEvents {
-                        slot: *number,
-                        start_time: event.time,
-                        events: vec![],
-                    });
-                } else if let Some(slot) = next.as_mut() {
-                    slot.events.push(event);
-                }
+            Self::EventStream { format, file } => {
+                Self::write_line(*format, file, event).await?;
             }
             Self::None => {}
         }
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(file: &mut BufWriter<File>, event: T) -> Result<()> {
-        let mut string = serde_json::to_string(&event)?;
-        string.push('\n');
-        file.write_all(string.as_bytes()).await?;
+    async fn write_line<T: Serialize>(
+        format: OutputFormat,
+        file: &mut BufWriter<File>,
+        event: T,
+    ) -> Result<()> {
+        match format {
+            OutputFormat::JsonStream => {
+                let mut string = serde_json::to_string(&event)?;
+                string.push('\n');
+                file.write_all(string.as_bytes()).await?;
+            }
+            OutputFormat::CborStream => {
+                let bytes = serde_cbor::to_vec(&event)?;
+                file.write_all(&bytes).await?;
+            }
+        }
         Ok(())
     }
 
     async fn flush(self) -> Result<()> {
         match self {
-            Self::EventStream(mut file) => {
-                file.flush().await?;
-            }
-            Self::SlotStream { mut file, mut next } => {
-                if let Some(slot) = next.take() {
-                    Self::write_line(&mut file, slot).await?;
-                }
+            Self::EventStream { mut file, .. } => {
                 file.flush().await?;
             }
             Self::None => {}
