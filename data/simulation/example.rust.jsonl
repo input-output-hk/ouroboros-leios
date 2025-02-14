@@ -1,0 +1,32 @@
+{"time": 1000, "message": {"type": "Slot", "number": 1}}
+{"time": 2000, "message": {"type": "CpuTaskScheduled", "task": {"node": "node1", "index": 0}, "task_type": "PraosBlockValidated"}}
+{"time": 2100, "message": {"type": "CpuTaskFinished", "task": {"node": "node1", "index": 0}, "task_type": "PraosBlockValidated"}}
+{"time": 2200, "message": {"type": "CpuTaskScheduled", "task": {"node": "node1", "index": 1}, "task_type": "EndorserBlockValidated"}}
+{"time": 2300, "message": {"type": "CpuTaskFinished", "task": {"node": "node1", "index": 1}, "task_type": "EndorserBlockValidated"}}
+{"time": 2400, "message": {"type": "CpuTaskScheduled", "task": {"node": "node1", "index": 2}, "task_type": "VoteBundleValidated"}}
+{"time": 2500, "message": {"type": "CpuTaskFinished", "task": {"node": "node1", "index": 2}, "task_type": "VoteBundleValidated"}}
+{"time": 2600, "message": {"type": "CpuTaskScheduled", "task": {"node": "node1", "index": 3}, "task_type": "InputBlockValidated"}}
+{"time": 2700, "message": {"type": "CpuTaskFinished", "task": {"node": "node1", "index": 3}, "task_type": "InputBlockValidated"}}
+{"time": 2800, "message": {"type": "CpuTaskScheduled", "task": {"node": "node1", "index": 4}, "task_type": "TransactionValidated"}}
+{"time": 2900, "message": {"type": "CpuTaskFinished", "task": {"node": "node1", "index": 4}, "task_type": "TransactionValidated"}}
+{"time": 3000, "message": {"type": "CpuSubtaskStarted", "task": {"node": "node1", "index": 5}, "task_type": "VoteBundleValidated", "subtask_id": 0, "subtasks": 2}}
+{"time": 3100, "message": {"type": "CpuSubtaskFinished", "task": {"node": "node1", "index": 5}, "task_type": "VoteBundleValidated", "subtask_id": 0, "subtasks": 2}}
+{"time": 3200, "message": {"type": "CpuSubtaskStarted", "task": {"node": "node1", "index": 5}, "task_type": "VoteBundleValidated", "subtask_id": 1, "subtasks": 2}}
+{"time": 3300, "message": {"type": "CpuSubtaskFinished", "task": {"node": "node1", "index": 5}, "task_type": "VoteBundleValidated", "subtask_id": 1, "subtasks": 2}}
+{"time": 4000, "message": {"type": "InputBlockGenerated", "slot": 1, "producer": "node1", "index": 0, "header_bytes": 100, "transactions": ["tx1", "tx2"]}}
+{"time": 4100, "message": {"type": "InputBlockSent", "slot": 1, "producer": "node1", "sender": "node1", "recipient": "node2", "index": 0, "header_bytes": 100, "transactions": ["tx1", "tx2"]}}
+{"time": 4200, "message": {"type": "InputBlockReceived", "slot": 1, "producer": "node1", "sender": "node1", "recipient": "node2", "index": 0, "header_bytes": 100, "transactions": ["tx1", "tx2"]}}
+{"time": 4300, "message": {"type": "InputBlockLotteryWon", "slot": 1, "producer": "node1", "index": 0}}
+{"time": 5000, "message": {"type": "EndorserBlockGenerated", "slot": 1, "producer": "node2"}}
+{"time": 5100, "message": {"type": "EndorserBlockSent", "slot": 1, "producer": "node2", "sender": "node2", "recipient": "node3"}}
+{"time": 5200, "message": {"type": "EndorserBlockReceived", "slot": 1, "producer": "node2", "sender": "node2", "recipient": "node3"}}
+{"time": 5300, "message": {"type": "EndorserBlockLotteryWon", "slot": 1, "producer": "node2"}}
+{"time": 6000, "message": {"type": "PraosBlockGenerated", "slot": 1, "producer": "node3", "header_bytes": 200, "transactions": ["tx1", "tx2"], "vrf": 584785879898000}}
+{"time": 6100, "message": {"type": "PraosBlockSent", "slot": 1, "producer": "node3", "sender": "node3", "recipient": "node1", "header_bytes": 200, "transactions": ["tx1", "tx2"], "vrf": 584785879898836}}
+{"time": 6200, "message": {"type": "PraosBlockReceived", "slot": 1, "producer": "node3", "sender": "node3", "recipient": "node1", "header_bytes": 200, "transactions": ["tx1", "tx2"], "vrf": 584785870008836}}
+{"time": 6300, "message": {"type": "PraosBlockLotteryWon", "slot": 1, "producer": "node3", "vrf": 384785879898000}}
+{"time": 7000, "message": {"type": "TransactionSent", "id": "tx1", "sender": "node1", "recipient": "node2", "publisher": "node1", "bytes": 50}}
+{"time": 8000, "message": {"type": "VotesGenerated", "id": "vote1", "slot": 1, "producer": "node1", "votes": {"node1": 1}}}
+{"time": 8100, "message": {"type": "VotesSent", "id": "vote1", "slot": 1, "producer": "node1", "sender": "node1", "recipient": "node2", "votes": {"node1": 1}}}
+{"time": 8200, "message": {"type": "VotesReceived", "id": "vote1", "slot": 1, "producer": "node1", "sender": "node1", "recipient": "node2", "votes": {"node1": 1}}}
+{"time": 8300, "message": {"type": "VoteLotteryWon", "id": "vote1", "slot": 1, "producer": "node1"}} 
