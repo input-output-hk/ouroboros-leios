@@ -395,10 +395,10 @@ impl Node {
                             if let Some(subtask) = next_subtask {
                                 self.start_cpu_subtask(subtask);
                             }
-                            let Some(task) = finished_task else {
+                            let Some((task, cpu_time)) = finished_task else {
                                 continue;
                             };
-                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), task.extra());
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, task.extra());
                             match task {
                                 CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
                                 CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
