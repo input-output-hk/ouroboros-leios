@@ -1,4 +1,4 @@
-# Revision history for dummy-project
+# Revision history for leios-conformance
 
 ## 0.1.0.0 -- YYYY-mm-dd
 

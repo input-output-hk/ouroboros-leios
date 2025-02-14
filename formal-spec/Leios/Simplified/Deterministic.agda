@@ -133,12 +133,12 @@ IB-Role-Upkeep u≢IB-Role h (No-IB-Role _) u∈su = case Equivalence.from ∈-�
 opaque
   IB-Role-total : ∃[ s' ] s -⟦IB-Role⟧⇀ s'
   IB-Role-total {s = s} = let open LeiosState s in case Dec-canProduceIB of λ where
-    (inj₁ (π , pf)) → -, IB-Role    pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, IB-Role    pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-IB-Role pf
 
   IB-Role-total' : ∃[ ffds ] s -⟦IB-Role⟧⇀ addUpkeep record s { FFDState = ffds } IB-Role
   IB-Role-total' {s = s} = let open LeiosState s in case Dec-canProduceIB of λ where
-    (inj₁ (π , pf)) → -, IB-Role    pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, IB-Role    pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-IB-Role pf
 
 data _-⟦EB-Role⟧⇀_ : LeiosState → LeiosState → Type where
@@ -175,12 +175,12 @@ EB-Role-Upkeep u≢EB-Role h (No-EB-Role _) u∈su = case Equivalence.from ∈-�
 opaque
   EB-Role-total : ∃[ s' ] s -⟦EB-Role⟧⇀ s'
   EB-Role-total {s = s} = let open LeiosState s in case Dec-canProduceEB of λ where
-    (inj₁ (π , pf)) → -, EB-Role    pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, EB-Role    pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-EB-Role pf
 
   EB-Role-total' : ∃[ ffds ] s -⟦EB-Role⟧⇀ addUpkeep record s { FFDState = ffds } EB-Role
   EB-Role-total' {s = s} = let open LeiosState s in case Dec-canProduceEB of λ where
-    (inj₁ (π , pf)) → -, EB-Role    pf (proj₂ FFD.FFD-total)
+    (inj₁ (π , pf)) → -, EB-Role    pf (proj₂ FFD.FFD-Send-total)
     (inj₂ pf)       → -, No-EB-Role pf
 
 data _-⟦V1-Role⟧⇀_ : LeiosState → LeiosState → Type where
@@ -215,12 +215,12 @@ V1-Role-Upkeep u≢V1-Role h (No-V1-Role _) u∈su = case Equivalence.from ∈-�
 opaque
   V1-Role-total : ∃[ s' ] s -⟦V1-Role⟧⇀ s'
   V1-Role-total {s = s} = let open LeiosState s in case Dec-canProduceV1 of λ where
-    (yes p) → -, V1-Role p (proj₂ FFD.FFD-total)
+    (yes p) → -, V1-Role p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V1-Role ¬p
 
   V1-Role-total' : ∃[ ffds ] s -⟦V1-Role⟧⇀ addUpkeep record s { FFDState = ffds } V1-Role
   V1-Role-total' {s = s} = let open LeiosState s in case Dec-canProduceV1 of λ where
-    (yes p) → -, V1-Role    p (proj₂ FFD.FFD-total)
+    (yes p) → -, V1-Role    p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V1-Role ¬p
 
 data _-⟦V2-Role⟧⇀_ : LeiosState → LeiosState → Type where
@@ -255,12 +255,12 @@ V2-Role-Upkeep u≢V2-Role h (No-V2-Role _) u∈su = case Equivalence.from ∈-�
 opaque
   V2-Role-total : ∃[ s' ] s -⟦V2-Role⟧⇀ s'
   V2-Role-total {s = s} = let open LeiosState s in case Dec-canProduceV2 of λ where
-    (yes p) → -, V2-Role p (proj₂ FFD.FFD-total)
+    (yes p) → -, V2-Role p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V2-Role ¬p
 
   V2-Role-total' : ∃[ ffds ] s -⟦V2-Role⟧⇀ addUpkeep record s { FFDState = ffds } V2-Role
   V2-Role-total' {s = s} = let open LeiosState s in case Dec-canProduceV2 of λ where
-    (yes p) → -, V2-Role    p (proj₂ FFD.FFD-total)
+    (yes p) → -, V2-Role    p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V2-Role ¬p
 
 data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
