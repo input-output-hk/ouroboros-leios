@@ -4,6 +4,8 @@ export interface HaskellTraceEvent {
     event: HaskellEvent;
 }
 
+type MessageKind = "IB" | "EB" | "RB" | "VT";
+
 type HaskellEvent =
     | HaskellCpuEvent
     | HaskellGeneratedEvent
@@ -20,22 +22,43 @@ interface HaskellCpuEvent {
     task_label: string; // e.g., "ValIB: 6-29" or "ValRH: 6253064077348247640"
 }
 
-interface HaskellGeneratedEvent {
+type HaskellGeneratedEvent =
+    | HaskellGeneratedIBEvent
+    | HaskellGeneratedEBEvent
+    | HaskellGeneratedRBEvent
+    | HaskellGeneratedVTEvent;
+
+interface HaskellGeneratedBaseEvent {
     tag: "generated";
-    kind: "IB" | "EB" | "RB" | "VT";
-    id: string;
     node: number;
     node_name: string;
     size_bytes: number;
-    // Required for IB
-    slot?: number;
-    payload_bytes?: number;
-    rb_ref?: string;
-    // Required for EB
-    input_blocks?: string[];
-    // Required for VT
-    votes?: number;
-    endorse_blocks?: string[];
+}
+
+interface HaskellGeneratedIBEvent extends HaskellGeneratedBaseEvent {
+    kind: Extract<MessageKind, "IB">;
+    id: string;
+    slot: number;
+    payload_bytes: number;
+    rb_ref: string;
+}
+
+interface HaskellGeneratedEBEvent extends HaskellGeneratedBaseEvent {
+    kind: Extract<MessageKind, "EB">;
+    id: string;
+    input_blocks: string[];
+}
+
+interface HaskellGeneratedRBEvent extends HaskellGeneratedBaseEvent {
+    kind: Extract<MessageKind, "RB">;
+    id: string;
+}
+
+interface HaskellGeneratedVTEvent extends HaskellGeneratedBaseEvent {
+    kind: Extract<MessageKind, "VT">;
+    id: string;
+    votes: number;
+    endorse_blocks: string[];
 }
 
 interface HaskellSentEvent {
@@ -44,13 +67,13 @@ interface HaskellSentEvent {
     receipient: number;
     msg_size_bytes: number;
     sending_s: number;
-    kind: "IB" | "EB" | "RB" | "VT";
+    kind: MessageKind;
     ids: string[];
 }
 
 interface HaskellReceivedEvent {
     tag: "received";
-    kind: "IB" | "EB" | "RB" | "VT";
+    kind: MessageKind;
     id: string;
     node: number;
     node_name: string;
@@ -58,7 +81,7 @@ interface HaskellReceivedEvent {
 
 interface HaskellStateEvent {
     tag: "enteredstate";
-    kind: "IB" | "EB" | "RB" | "VT";
+    kind: MessageKind;
     id: string;
     node: number;
     node_name: string;

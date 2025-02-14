@@ -17,7 +17,6 @@
           "type": "string"
         },
         "task_label": {
-          "description": "CPU task types:\n- Block validation: ValIB, ValEB, ValRB\n- Header validation: ValIH, ValRH\n- Vote validation: ValVote\nFormat: \"<task_type>: <id>\"",
           "type": "string"
         }
       },
@@ -29,7 +28,16 @@
           "$ref": "#/definitions/HaskellCpuEvent"
         },
         {
-          "$ref": "#/definitions/HaskellGeneratedEvent"
+          "$ref": "#/definitions/HaskellGeneratedIBEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellGeneratedEBEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellGeneratedRBEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellGeneratedVTEvent"
         },
         {
           "$ref": "#/definitions/HaskellSentEvent"
@@ -42,14 +50,8 @@
         }
       ]
     },
-    "HaskellGeneratedEvent": {
+    "HaskellGeneratedEBEvent": {
       "properties": {
-        "endorse_blocks": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "id": {
           "type": "string"
         },
@@ -60,7 +62,32 @@
           "type": "array"
         },
         "kind": {
-          "enum": ["EB", "IB", "RB", "VT"],
+          "const": "EB",
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "tag": {
+          "const": "generated",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellGeneratedIBEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "IB",
           "type": "string"
         },
         "node": {
@@ -84,6 +111,62 @@
         "tag": {
           "const": "generated",
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellGeneratedRBEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "RB",
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "tag": {
+          "const": "generated",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellGeneratedVTEvent": {
+      "properties": {
+        "endorse_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "VT",
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "tag": {
+          "const": "generated",
+          "type": "string"
         },
         "votes": {
           "type": "number"
@@ -97,8 +180,7 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["EB", "IB", "RB", "VT"],
-          "type": "string"
+          "$ref": "#/definitions/MessageKind"
         },
         "node": {
           "type": "number"
@@ -122,8 +204,7 @@
           "type": "array"
         },
         "kind": {
-          "enum": ["EB", "IB", "RB", "VT"],
-          "type": "string"
+          "$ref": "#/definitions/MessageKind"
         },
         "msg_size_bytes": {
           "type": "number"
@@ -150,8 +231,7 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["EB", "IB", "RB", "VT"],
-          "type": "string"
+          "$ref": "#/definitions/MessageKind"
         },
         "node": {
           "type": "number"
@@ -165,6 +245,10 @@
         }
       },
       "type": "object"
+    },
+    "MessageKind": {
+      "enum": ["EB", "IB", "RB", "VT"],
+      "type": "string"
     }
   },
   "description": "Haskell simulation trace format",
