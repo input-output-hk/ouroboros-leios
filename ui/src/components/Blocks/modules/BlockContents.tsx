@@ -69,6 +69,18 @@ interface SelectState {
 }
 
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
+  const allTxs = useMemo(() => {
+    const txs = new Set<number>();
+    for (const tx of block.txs) {
+      txs.add(tx.id);
+    }
+    for (const ib of block.cert?.eb.ibs ?? []) {
+      for (const tx of ib.txs) {
+        txs.add(tx.id);
+      }
+    }
+    return txs;
+  }, [block])
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
     const breakdown: [string, number][] = [
@@ -126,6 +138,7 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
 
       <div className='flex flex-col w-full h-3/5 items-center' onClick={selectBox(null)}>
         <h2 className='font-bold text-xl'>Block Transactions</h2>
+        <h2 className='font-bold text-l'>{allTxs.size} transaction{allTxs.size === 1 ? '' : 's'} total</h2>
         <div className="flex w-full h-full items-center justify-center">
           {ibs.length ? (
             <div className={cx("pr-6 border-r-2 border-black")}>
