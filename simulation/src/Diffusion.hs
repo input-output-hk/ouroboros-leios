@@ -92,18 +92,20 @@ stableChainHashes chains =
         Chain.rollback p c1
    in map blockHash $ Chain.toNewestFirst stable_chain
 
-diffusionDataFromMap ::
+diffusionEntries :: Map id (msg, NodeId, Time, [(NodeId, Time)]) -> [DiffusionEntry id]
+diffusionEntries arrivals =
+  [ DiffusionEntry{..}
+  | (block_id, (_, NodeId node_id, Time created, ts)) <- Map.toList arrivals
+  , let adoptions = map (second (\(Time t) -> t)) ts
+  ]
+
+diffusionDataFromEntries ::
   Bool ->
   Map NodeId StakeFraction ->
-  Map id (msg, NodeId, Time, [(NodeId, Time)]) ->
+  [DiffusionEntry id] ->
   DiffusionData id
-diffusionDataFromMap analize stakes arrivals = DiffusionData{..}
+diffusionDataFromEntries analize stakes entries = DiffusionData{..}
  where
-  entries =
-    [ DiffusionEntry{..}
-    | (block_id, (_, NodeId node_id, Time created, ts)) <- Map.toList arrivals
-    , let adoptions = map (second (\(Time t) -> t)) ts
-    ]
   latency_per_stake
     | analize = map (diffusionEntryToLatencyPerStake stakes) entries
     | otherwise = []

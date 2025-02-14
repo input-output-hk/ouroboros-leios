@@ -23,12 +23,12 @@ module ModelTCP (
 
 import Control.Exception (assert)
 import Data.Foldable as Foldable (Foldable (sum))
-import Data.Hashable (Hashable)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 import Data.Semigroup (Semigroup (sconcat))
+import SimTypes
 import TimeCompat
 
 -- | The fixed characteristics of this TCP link: the latency, bandwidth and
@@ -54,9 +54,6 @@ data TcpConnProps = TcpConnProps
   -- to avoid limiting the throughput.
   }
   deriving (Show)
-
-newtype Bytes = Bytes {fromBytes :: Int}
-  deriving (Eq, Ord, Enum, Num, Real, Integral, Show, Hashable)
 
 mkTcpConnProps ::
   -- | latency in seconds
