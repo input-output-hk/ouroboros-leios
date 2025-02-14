@@ -126,3 +126,6 @@ newtype StakeFraction = StakeFraction Double
 data NumCores = Infinite | Finite Int
   deriving (Eq, Ord, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
+
+newtype Bytes = Bytes {fromBytes :: Int}
+  deriving newtype (Eq, Ord, Enum, Num, Real, Integral, Show, Hashable, ToJSON, FromJSON)

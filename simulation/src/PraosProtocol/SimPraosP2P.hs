@@ -5,7 +5,7 @@
 
 module PraosProtocol.SimPraosP2P where
 
-import Chan (Bytes, ConnectionConfig, LabelTcpDir, TcpEvent, newConnectionBundle)
+import Chan (ConnectionConfig, LabelTcpDir, TcpEvent, newConnectionBundle)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)

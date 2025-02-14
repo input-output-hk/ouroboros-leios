@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module LeiosProtocol.Short.VizSim where
 
@@ -16,6 +17,7 @@ import qualified Data.Foldable as Foldable
 import Data.Hashable (hash)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IMap
+import qualified Data.IntervalMap.Interval as ILMap
 import Data.IntervalMap.Strict (Interval (..), IntervalMap)
 import qualified Data.IntervalMap.Strict as ILMap
 import Data.Map.Strict (Map)
@@ -142,6 +144,15 @@ newtype DataTransmitted = DataTransmitted
 
 initDataTransmitted :: DataTransmitted
 initDataTransmitted = DataTransmitted ILMap.empty
+
+msgsTransmittedToBps :: (Real a, Fractional a) => ILMap.IntervalMap a [Bytes] -> Double
+msgsTransmittedToBps = sum . map toBps . ILMap.toList
+ where
+  toBps (i, sum -> bytes)
+    | d <- (ILMap.upperBound i - ILMap.lowerBound i)
+    , d > 0 =
+        realToFrac $ fromIntegral bytes / d :: Double
+    | otherwise = 0
 
 data LeiosSimVizMsgsState id msg = LeiosSimVizMsgsState
   { msgsAtNodeQueue :: !(Map NodeId [msg])
