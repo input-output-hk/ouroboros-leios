@@ -42,11 +42,17 @@ tx-max-size-bytes: 16384
 # Ranking Block Configuration
 ################################################################################
 
+# 1/leios-stage-length-slots, targeting one RB per pipeline.
+# Also 20s is current rate of praos blocks.
 rb-generation-probability: 5.0e-2
+# Eng. team targets 1kB as worst case upper bound.
+# Actual size fairly close.
+rb-head-size-bytes: 1024
+rb-body-max-size-bytes: 90112
+# TODO timings
 rb-generation-cpu-time-ms: 300.0
 rb-head-validation-cpu-time-ms: 1.0
-rb-head-size-bytes: 32
-rb-body-max-size-bytes: 90112
+
 
 rb-body-legacy-praos-payload-validation-cpu-time-ms-constant: 50.0
 rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0005
@@ -57,14 +63,27 @@ rb-body-legacy-praos-payload-avg-size-bytes: 0
 ################################################################################
 
 ib-generation-probability: 5.0
-ib-generation-cpu-time-ms: 300.0
 ib-shards: 1
-ib-head-size-bytes: 32
+# ProducerId  32
+# SlotNo      64
+# VRF proof   80
+# Body hash   32
+# RB Ref      32
+# Signature   64
+# Total       304
+#
+# NOTE: using a KES Signature (like for Praos headers)
+#       would instead more than double the total to 668.
+#       And even 828 including Op Cert.
+ib-head-size-bytes: 304
+# 100kB, using praos max size as ballpark estimate.
+ib-body-avg-size-bytes: 102400
+ib-body-max-size-bytes: 327680
+# TODO timings
+ib-generation-cpu-time-ms: 300.0
 ib-head-validation-cpu-time-ms: 1.0
 ib-body-validation-cpu-time-ms-constant: 50.0
 ib-body-validation-cpu-time-ms-per-byte: 0.0005
-ib-body-max-size-bytes: 327680
-ib-body-avg-size-bytes: 327680
 ib-diffusion-strategy: "freshest-first"
 
 # Haskell prototype relay mini-protocol parameters.
@@ -76,11 +95,22 @@ ib-diffusion-max-window-size: 100
 # Endorsement Block Configuration
 ################################################################################
 
-eb-generation-probability: 5.0
+# We want one per pipeline, but not too many.
+eb-generation-probability: 1.5
+# ProducerId  32
+# SlotNo      64
+# VRF proof   80
+# Signature   64
+# Total       240
+#
+# See Note about signatures on ib-head-size-bytes.
+eb-size-bytes-constant: 32
+# IB hash.
+eb-size-bytes-per-ib: 32
+# TODO timings
 eb-generation-cpu-time-ms: 300.0
 eb-validation-cpu-time-ms: 1.0
-eb-size-bytes-constant: 32
-eb-size-bytes-per-ib: 32
+
 eb-diffusion-strategy: "peer-order"
 
 # Haskell prototype relay mini-protocol parameters.
@@ -92,13 +122,32 @@ eb-diffusion-max-window-size: 100
 # Vote Configuration
 ################################################################################
 
+# Cryptography related values taken from [vote-spec](crypto-benchmarks.rs/Specification.md)
+# using weighted averages of 80% persistent and 20% non-persistent.
+
+# vote-spec#Committe and quorum size
+#
+# Note: this is used as the expected amount of total weight of
+# generated votes in the sims.
 vote-generation-probability: 500.0
-vote-generation-cpu-time-ms-constant: 1.0
-vote-generation-cpu-time-ms-per-ib: 1.0
-vote-validation-cpu-time-ms: 3.0
-vote-threshold: 150
-vote-bundle-size-bytes-constant: 32
-vote-bundle-size-bytes-per-eb: 32
+# vote-spec#"Committe and quorum size"
+# 60% of `vote-generation-probability`
+vote-threshold: 300
+# vote-spec#"Generate vote" 0.8*135e-3 + 0.2*280e-3
+vote-generation-cpu-time-ms-constant: 164e-3
+# No benchmark yet.
+vote-generation-cpu-time-ms-per-ib: 0
+# vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
+vote-validation-cpu-time-ms: 816e-3
+# The `Vote` structure counted in the -per-eb already identifies slot
+# (in Eid) and voter. We can assume a vote bundle is all for the same
+# voter and slot, so for non-persistent voters we could factor their
+# PoolKeyHash (28bytes) here, but thats for 20% of cases.
+# More relevant if EB generation is very high.
+vote-bundle-size-bytes-constant: 0
+# vote-spec#Votes 0.8*90 + 0.2*164
+vote-bundle-size-bytes-per-eb: 105
+
 vote-diffusion-strategy: "peer-order"
 
 # Haskell prototype relay mini-protocol parameters.
@@ -110,9 +159,13 @@ vote-diffusion-max-window-size: 100
 # Certificate Configuration
 ################################################################################
 
+# 90
 cert-generation-cpu-time-ms-constant: 50.0
 cert-generation-cpu-time-ms-per-node: 1.0
+# 130
 cert-validation-cpu-time-ms-constant: 50.0
 cert-validation-cpu-time-ms-per-node: 1.0
-cert-size-bytes-constant: 32
-cert-size-bytes-per-node: 32
+# vote-spec#"certificate bytes"
+cert-size-bytes-constant: 136
+# vote-spec#"certificate bytes" ((80/8) + 76 * (100 - 80))/100
+cert-size-bytes-per-node: 15
