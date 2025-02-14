@@ -1,17 +1,21 @@
 /** Rust simulation trace format */
 
 // Base types
-interface BaseEvent {
+interface RustBaseEvent {
     time: number; // nanoseconds
+    message: {
+        type: string;
+        [key: string]: any;
+    };
 }
 
-interface TaskInfo {
+interface RustTaskInfo {
     node: string;
     index: number;
 }
 
 // CPU Events
-type CpuTaskType =
+type RustCpuTaskType =
     | "PraosBlockValidated"
     | "EndorserBlockValidated"
     | "VoteBundleValidated"
@@ -22,15 +26,17 @@ type CpuTaskType =
     | "TransactionValidated"
     | "PraosBlockGenerated";
 
-interface CpuEvent extends BaseEvent {
+type RustCpuMessageType =
+    | "CpuTaskScheduled"
+    | "CpuTaskFinished"
+    | "CpuSubtaskStarted"
+    | "CpuSubtaskFinished";
+
+interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
     message: {
-        type:
-            | "CpuTaskScheduled"
-            | "CpuTaskFinished"
-            | "CpuSubtaskStarted"
-            | "CpuSubtaskFinished";
-        task: TaskInfo;
-        task_type?: CpuTaskType;
+        type: RustCpuMessageType;
+        task: RustTaskInfo;
+        task_type?: RustCpuTaskType;
         subtasks?: number;
         subtask_id?: number;
         extra?: string;
@@ -38,7 +44,7 @@ interface CpuEvent extends BaseEvent {
 }
 
 // Block Events
-interface BaseBlockEvent {
+interface RustBaseBlockEvent {
     id?: string;
     slot: number;
     producer: string;
@@ -46,36 +52,42 @@ interface BaseBlockEvent {
     recipient?: string;
 }
 
-interface InputBlockEvent extends BaseEvent {
-    message: BaseBlockEvent & {
-        type:
-            | "InputBlockSent"
-            | "InputBlockReceived"
-            | "InputBlockLotteryWon"
-            | "InputBlockGenerated";
+type RustInputBlockMessageType =
+    | "InputBlockSent"
+    | "InputBlockReceived"
+    | "InputBlockLotteryWon"
+    | "InputBlockGenerated";
+
+interface RustInputBlockEvent extends Omit<RustBaseEvent, "message"> {
+    message: RustBaseBlockEvent & {
+        type: RustInputBlockMessageType;
         index: number;
         header_bytes?: number;
         transactions?: string[];
     };
 }
 
-interface EndorserBlockEvent extends BaseEvent {
-    message: BaseBlockEvent & {
-        type:
-            | "EndorserBlockSent"
-            | "EndorserBlockReceived"
-            | "EndorserBlockLotteryWon"
-            | "EndorserBlockGenerated";
+type RustEndorserBlockMessageType =
+    | "EndorserBlockSent"
+    | "EndorserBlockReceived"
+    | "EndorserBlockLotteryWon"
+    | "EndorserBlockGenerated";
+
+interface RustEndorserBlockEvent extends Omit<RustBaseEvent, "message"> {
+    message: RustBaseBlockEvent & {
+        type: RustEndorserBlockMessageType;
     };
 }
 
-interface PraosBlockEvent extends BaseEvent {
-    message: BaseBlockEvent & {
-        type:
-            | "PraosBlockSent"
-            | "PraosBlockReceived"
-            | "PraosBlockLotteryWon"
-            | "PraosBlockGenerated";
+type RustPraosBlockMessageType =
+    | "PraosBlockSent"
+    | "PraosBlockReceived"
+    | "PraosBlockLotteryWon"
+    | "PraosBlockGenerated";
+
+interface RustPraosBlockEvent extends Omit<RustBaseEvent, "message"> {
+    message: RustBaseBlockEvent & {
+        type: RustPraosBlockMessageType;
         header_bytes?: number;
         transactions?: string[];
         vrf?: number;
@@ -84,12 +96,14 @@ interface PraosBlockEvent extends BaseEvent {
 }
 
 // Transaction Events
-interface TransactionEvent extends BaseEvent {
+type RustTransactionMessageType =
+    | "TransactionSent"
+    | "TransactionReceived"
+    | "TransactionGenerated";
+
+interface RustTransactionEvent extends Omit<RustBaseEvent, "message"> {
     message: {
-        type:
-            | "TransactionSent"
-            | "TransactionReceived"
-            | "TransactionGenerated";
+        type: RustTransactionMessageType;
         id: string;
         sender?: string;
         recipient?: string;
@@ -99,13 +113,15 @@ interface TransactionEvent extends BaseEvent {
 }
 
 // Vote Events
-interface VoteEvent extends BaseEvent {
+type RustVoteMessageType =
+    | "VotesReceived"
+    | "VotesSent"
+    | "VotesGenerated"
+    | "VoteLotteryWon";
+
+interface RustVoteEvent extends Omit<RustBaseEvent, "message"> {
     message: {
-        type:
-            | "VotesReceived"
-            | "VotesSent"
-            | "VotesGenerated"
-            | "VoteLotteryWon";
+        type: RustVoteMessageType;
         id: string;
         slot: number;
         producer: string;
@@ -116,7 +132,7 @@ interface VoteEvent extends BaseEvent {
 }
 
 // Slot Event
-interface SlotEvent extends BaseEvent {
+interface RustSlotEvent extends Omit<RustBaseEvent, "message"> {
     message: {
         type: "Slot";
         number: number;
@@ -125,10 +141,10 @@ interface SlotEvent extends BaseEvent {
 
 // Combined type
 export type RustTraceEvent =
-    | CpuEvent
-    | InputBlockEvent
-    | EndorserBlockEvent
-    | PraosBlockEvent
-    | TransactionEvent
-    | VoteEvent
-    | SlotEvent;
+    | RustCpuEvent
+    | RustInputBlockEvent
+    | RustEndorserBlockEvent
+    | RustPraosBlockEvent
+    | RustTransactionEvent
+    | RustVoteEvent
+    | RustSlotEvent;
