@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "HaskellCpuEvent": {
+      "properties": {
+        "duration_s": {
+          "type": "number"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "tag": {
+          "const": "Cpu",
+          "type": "string"
+        },
+        "task_label": {
+          "description": "CPU task types:\n- Block validation: ValIB, ValEB, ValRB\n- Header validation: ValIH, ValRH\n- Vote validation: ValVote\nFormat: \"<task_type>: <id>\"",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/HaskellCpuEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellGeneratedEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellSentEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellReceivedEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellStateEvent"
+        }
+      ]
+    },
+    "HaskellGeneratedEvent": {
+      "properties": {
+        "endorse_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "input_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "enum": ["EB", "IB", "RB", "VT"],
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "payload_bytes": {
+          "type": "number"
+        },
+        "rb_ref": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "tag": {
+          "const": "generated",
+          "type": "string"
+        },
+        "votes": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellReceivedEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": ["EB", "IB", "RB", "VT"],
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "tag": {
+          "const": "received",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellSentEvent": {
+      "properties": {
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "enum": ["EB", "IB", "RB", "VT"],
+          "type": "string"
+        },
+        "msg_size_bytes": {
+          "type": "number"
+        },
+        "receipient": {
+          "type": "number"
+        },
+        "sender": {
+          "type": "number"
+        },
+        "sending_s": {
+          "type": "number"
+        },
+        "tag": {
+          "const": "Sent",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HaskellStateEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": ["EB", "IB", "RB", "VT"],
+          "type": "string"
+        },
+        "node": {
+          "type": "number"
+        },
+        "node_name": {
+          "type": "string"
+        },
+        "tag": {
+          "const": "enteredstate",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "description": "Haskell simulation trace format",
+  "properties": {
+    "event": {
+      "$ref": "#/definitions/HaskellEvent"
+    },
+    "time_s": {
+      "type": "number"
+    }
+  },
+  "type": "object"
+}
