@@ -12,7 +12,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Leios.SpecStructure
 open import Leios.Trace using (st-2)
 
-module Leios.Simple.Deterministic.Test (Λ μ : ℕ) where
+module Leios.Simplified.Deterministic.Test (Λ μ : ℕ) where
 
 open SpecStructure st-2
 
@@ -45,7 +45,7 @@ private variable s s' s0 s1 s2 s3 s4 s5 : LeiosState
                  pks    : List PubKey
 
 open Computational22 ⦃...⦄
-open import Leios.Simple.Deterministic st-2 Λ μ
+open import Leios.Simplified.Deterministic st-2 Λ μ
 
 instance
   Computational-B : Computational22 B._-⟦_/_⟧⇀_ String

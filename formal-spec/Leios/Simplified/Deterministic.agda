@@ -14,7 +14,7 @@ open import Data.List.Relation.Unary.Any using (here)
 
 open import Leios.SpecStructure
 
-module Leios.Simple.Deterministic (⋯ : SpecStructure 2) (let open SpecStructure ⋯) (Λ μ : ℕ) where
+module Leios.Simplified.Deterministic (⋯ : SpecStructure 2) (let open SpecStructure ⋯) (Λ μ : ℕ) where
 
 import Leios.Simplified
 open import Leios.Simplified ⋯ Λ μ hiding (_-⟦_/_⟧⇀_)
