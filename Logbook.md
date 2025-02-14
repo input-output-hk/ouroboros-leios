@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-02-14
+
+### Rust simulation
+
+- Optimized decoding the CBOR stream in the visualization
+- Added total TX count to the visualization's view of blocks
+- Added total CPU time to TaskFinished events
+
 ## 2025-02-13
 
 ### Brainstorming succinct schemes for Leios BLS key registration and witnessing
@@ -45,6 +53,16 @@ Serialization and deserialization likely also exhibit the same trend.
 
 A recipe for parallelizing parts of the certificate operations has been added to the [Specification for BLS certificates](crypto-benchmarks.rs/Specification.md).
 
+### Rust simulation
+
+Updated event format to more closely match standards:
+ - Timestamps are in seconds instead of nanoseconds.
+ - CPU subtasks have a duration attached to the "started" event, and no "finished" event.
+
+Started tracking vote bundle sizes to display in visualization.
+
+Added support for CBOR output (with identical schema to JSON output).
+
 ## 2025-02-12
 
 ### Added BLS crypto to CI
@@ -53,6 +71,12 @@ The CI job [crypto-benchmarks-rs](.github/workflows/crypto-benchmarks-rs.yaml) d
 
 - Runs the tests for the BLS reference implementation
 - Runs the BLS vote and certificate benchmarks
+
+### Rust simulation
+
+Minor build fixes (specify a MSRV, use a fixed toolchain version in CI)
+
+Visualization now displays a breakdown of the size of each block, as well as total bytes sent/received by each node.
 
 ## 2025-02-11
 
@@ -72,6 +96,12 @@ Note that this BLS scheme is just one viable option for Leios. Ongoing work and 
 - Certificates smaller than 10 kB.
 - Certificate generation and verification in 90 ms and 130 ms, respectively.
 - Votes smaller than 200 bytes.
+
+### Rust simulation
+
+Added support for `ib-diffusion-strategy` (freshest-first, oldest-first, or peer-order). Unlike the Haskell sim, this doesn't affect EB or vote diffusion; nodes can download an unlimited number of EBs or vote bundles from any given peer.
+
+Added support for `relay-strategy`: it affects TXs, IBs, EBs, votes, and RBs.
 
 ## 2025-02-07
 
