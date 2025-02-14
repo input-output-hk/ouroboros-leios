@@ -277,6 +277,18 @@ impl CDF {
             .with_mode(self.steps.mode())
             .with_max_size(self.steps.max_size())
     }
+
+    pub fn compact(&self, mode: CompactionMode, max_size: usize) -> Self {
+        let mut data = self.steps.data().to_vec();
+        f32::compact(&mut data, mode, max_size);
+        Self::from_step_function(
+            StepFunction::try_from(data)
+                .expect("step function error")
+                .with_mode(self.steps.mode())
+                .with_max_size(self.steps.max_size()),
+        )
+        .unwrap()
+    }
 }
 
 impl FromIterator<(f32, f32)> for CDF {

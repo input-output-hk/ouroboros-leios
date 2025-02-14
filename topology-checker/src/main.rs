@@ -13,7 +13,7 @@ use models::Topology;
 struct Opt {
     /// Input topology file
     #[arg(short, long)]
-    input: PathBuf,
+    input: Option<PathBuf>,
 
     /// Output report file (optional)
     #[arg(short, long)]
@@ -26,9 +26,12 @@ struct Opt {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::parse();
+    let input = opt
+        .input
+        .unwrap_or_else(|| "../simulation/test/data/simulation/topo-default-100.yaml".into());
 
     // Read and parse topology file
-    let content = fs::read_to_string(&opt.input)?;
+    let content = fs::read_to_string(&input)?;
     let topology: Topology = serde_yaml::from_str(&content)?;
 
     // Validate start node if provided
@@ -41,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate report
     let report = report::generate_report(
         &topology,
-        opt.input.to_str().unwrap_or("unknown"),
+        input.to_str().unwrap_or("unknown"),
         opt.start_node.as_deref(),
     );
 

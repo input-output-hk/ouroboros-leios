@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+argmin = { version = "0.10.0", features = ["rayon"] }
 clap = { version = "4.4.11", features = ["derive"] }
+delta_q = { path = "../delta_q" }
+indexmap = { version = "2.1.0", features = ["serde"] }
+nalgebra = "0.33.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-indexmap = { version = "2.1.0", features = ["serde"] }
-delta_q = { path = "../delta_q" }
 terminal_size = "0.4.1"
-textplots = "0.8.6"
+textplots = { version = "0.8.6", path = "../../textplots-rs" }
