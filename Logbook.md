@@ -2,6 +2,26 @@
 
 ## 2025-02-14
 
+### Haskell simulation
+
+- Updated config defaults for block sizes and timings, PR waiting for
+  additional reviews by research.
+- Added support for idealized simulation conditions
+  - realism features that can be individually dropped:
+    - requesting block body from a single peer.
+    - tcp congestion window modeling
+      - also supports unlimited bandwidth links.
+    - mini-protocol multiplexing
+  - see data/simulation/config-idealised.yaml
+- Started work on comparison to idealised diffusion report.
+  - simulation final output includes `raw` field containing the
+    accumulated data and simulation parameters.
+    - other stats can be computed from this field.
+  - implemented extraction of block diffusion cdf for required
+    percentiles.
+    - TODO: expose it as a command that takes `raw` field as input
+  - small gnuplot script to plot multiple cdfs at once (y axis in logscale).
+
 ### Rust simulation
 
 - Optimized decoding the CBOR stream in the visualization
