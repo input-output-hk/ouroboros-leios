@@ -17,12 +17,15 @@ where
 import Control.Monad
 import Data.Aeson
 import Data.Bifunctor
+import Data.Coerce
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IMap
 import qualified Data.List as List
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Traversable
 import GHC.Generics
 import LeiosProtocol.Common hiding (Point)
@@ -57,7 +60,7 @@ diffusionEntryToLatencyPerStake :: Map NodeId StakeFraction -> DiffusionEntry id
 diffusionEntryToLatencyPerStake stakes DiffusionEntry{..} =
   LatencyPerStake
     { block_id
-    , latencies = bin $ diffusionLatencyPerStakeFraction stakes slotStart adoptions
+    , latencies = bin $ coerce $ diffusionLatencyPerStakeFraction stakes slotStart adoptions
     }
  where
   slotStart = fromIntegral @Integer $ floor created
@@ -68,7 +71,7 @@ diffusionLatencyPerStakeFraction ::
   Map NodeId StakeFraction ->
   DiffTime ->
   [(NodeId, DiffTime)] ->
-  [(DiffTime, Double)]
+  LatencyPerStakeCdf
 diffusionLatencyPerStakeFraction stakes t0 =
   snd
     . mapAccumL h 0
@@ -80,7 +83,25 @@ diffusionLatencyPerStakeFraction stakes t0 =
       !s' = s + ns
       !latency = t - t0
      in
-      (s', (latency, s'))
+      (s', (latency, StakeFraction s'))
+
+-- | In ascending order of StakeFraction
+type LatencyPerStakeCdf = [(DiffTime, StakeFraction)]
+
+-- Given a LatencyPerStakeCdf for each block, returns a map from
+-- requested stakes to all block latencies to reach that stake.
+transposeLatenciesPerStake :: [LatencyPerStakeCdf] -> Set StakeFraction -> Map StakeFraction [DiffTime]
+transposeLatenciesPerStake cdfs stakes =
+  Map.unionsWith (++)
+    . map (Map.fromAscList . map (second (: [])) . sample stakeBins)
+    $ cdfs
+ where
+  stakeBins = Set.toAscList stakes
+  sample :: [StakeFraction] -> LatencyPerStakeCdf -> [(StakeFraction, DiffTime)]
+  sample [] _ = []
+  sample (bin : bins) cdf = case dropWhile ((< bin) . snd) cdf of
+    [] -> []
+    ((l, _) : _) -> (bin, l) : sample bins cdf
 
 stableChainHashes :: HasHeader a => IntMap (Chain a) -> [HeaderHash a]
 stableChainHashes chains =
