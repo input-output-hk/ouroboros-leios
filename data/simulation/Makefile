@@ -18,7 +18,34 @@ trace.rust.schema.json: trace.rust.d.ts
 
 .PHONY: validate
 validate:
-	npx pajv -m schema.schema.json -s config.schema.json -d config.default.yaml
-	npx pajv -m schema.schema.json -s topology.schema.json -d topology-dense-52.yaml
-	npx pajv -m schema.schema.json -s trace.haskell.schema.json -d example.haskell.jsonl
-	npx pajv -m schema.schema.json -s trace.rust.schema.json -d example.rust.jsonl
+	@echo "Validating config..."
+	@npx pajv -m schema.schema.json -s config.schema.json -d config.default.yaml > /dev/null && echo "config.default.yaml valid" || exit 1
+	@echo "Validating topology..."
+	@npx pajv -m schema.schema.json -s topology.schema.json -d topology-dense-52.yaml > /dev/null && echo "topology-dense-52.yaml valid" || exit 1
+	@echo "Validating Haskell trace events..."
+	@line_num=0; \
+	while IFS= read -r line; do \
+		line_num=$$((line_num + 1)); \
+		echo "$$line" > temp.json; \
+		if ! npx ajv-cli validate -s trace.haskell.schema.json -d temp.json 2>/dev/null >/dev/null; then \
+			echo "Error in example.haskell.jsonl at line $$line_num:"; \
+			echo "$$line"; \
+			npx ajv-cli validate -s trace.haskell.schema.json -d temp.json; \
+			rm -f temp.json; \
+			exit 1; \
+		fi; \
+	done < example.haskell.jsonl && echo "example.haskell.jsonl valid"
+	@echo "Validating Rust trace events..."
+	@line_num=0; \
+	while IFS= read -r line; do \
+		line_num=$$((line_num + 1)); \
+		echo "$$line" > temp.json; \
+		if ! npx ajv-cli validate -s trace.rust.schema.json -d temp.json 2>/dev/null >/dev/null; then \
+			echo "Error in example.rust.jsonl at line $$line_num:"; \
+			echo "$$line"; \
+			npx ajv-cli validate -s trace.rust.schema.json -d temp.json; \
+			rm -f temp.json; \
+			exit 1; \
+		fi; \
+	done < example.rust.jsonl && echo "example.rust.jsonl valid"
+	@rm -f temp.json
