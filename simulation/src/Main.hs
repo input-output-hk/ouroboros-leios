@@ -19,10 +19,11 @@ import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
 import LeiosProtocol.Common (BlockBody, PraosConfig)
 import qualified LeiosProtocol.Config as OnDisk
+import qualified LeiosProtocol.Short.DataSimP2P as DataShortLeiosP2P
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
-import ModelTCP (Bytes (..), kilobytes)
+import ModelTCP (kilobytes)
 import Options.Applicative (
   Alternative ((<|>)),
   HasValue,
@@ -368,14 +369,14 @@ runSimOptions SimOptions{..} = case simCommand of
     config <- execConfigOptions configOptions
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
     let outputCfg =
-          VizShortLeiosP2P.SimOutputConfig
+          DataShortLeiosP2P.SimOutputConfig
             { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | not skipLog]
             , emitControl
             , dataFile = Just simOutputFile
             , analize
             , stop = simOutputSeconds
             }
-    VizShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
+    DataShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
 parserSimOptions :: Parser SimOptions
 parserSimOptions =

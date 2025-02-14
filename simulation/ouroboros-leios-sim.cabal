@@ -57,6 +57,7 @@ library
     LeiosProtocol.Relay
     LeiosProtocol.RelayBuffer
     LeiosProtocol.Short
+    LeiosProtocol.Short.DataSimP2P
     LeiosProtocol.Short.Generate
     LeiosProtocol.Short.Node
     LeiosProtocol.Short.Sim
