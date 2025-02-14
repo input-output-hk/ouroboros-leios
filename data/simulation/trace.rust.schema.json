@@ -5,13 +5,7 @@
       "$ref": "#/definitions/RustCpuEvent"
     },
     {
-      "$ref": "#/definitions/RustInputBlockEvent"
-    },
-    {
-      "$ref": "#/definitions/RustEndorserBlockEvent"
-    },
-    {
-      "$ref": "#/definitions/RustPraosBlockEvent"
+      "$ref": "#/definitions/RustBlockEvent"
     },
     {
       "$ref": "#/definitions/RustTransactionEvent"
@@ -47,6 +41,62 @@
       },
       "type": "object"
     },
+    "RustBlockEvent": {
+      "properties": {
+        "message": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RustBaseBlockEvent"
+            },
+            {
+              "properties": {
+                "endorsement": {},
+                "header_bytes": {
+                  "type": "number"
+                },
+                "index": {
+                  "type": "number"
+                },
+                "transactions": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "$ref": "#/definitions/RustBlockMessageType"
+                },
+                "vrf": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustBlockMessageType": {
+      "enum": [
+        "EndorserBlockGenerated",
+        "EndorserBlockLotteryWon",
+        "EndorserBlockReceived",
+        "EndorserBlockSent",
+        "InputBlockGenerated",
+        "InputBlockLotteryWon",
+        "InputBlockReceived",
+        "InputBlockSent",
+        "PraosBlockGenerated",
+        "PraosBlockLotteryWon",
+        "PraosBlockReceived",
+        "PraosBlockSent"
+      ],
+      "type": "string"
+    },
     "RustCpuEvent": {
       "properties": {
         "message": {
@@ -81,9 +131,11 @@
     "RustCpuMessageType": {
       "enum": [
         "CpuSubtaskFinished",
+        "CpuSubtaskScheduled",
         "CpuSubtaskStarted",
         "CpuTaskFinished",
-        "CpuTaskScheduled"
+        "CpuTaskScheduled",
+        "CpuTaskStarted"
       ],
       "type": "string"
     },
@@ -95,130 +147,10 @@
         "InputBlockValidated",
         "PraosBlockGenerated",
         "PraosBlockValidated",
+        "TransactionGenerated",
         "TransactionValidated",
         "VoteBundleGenerated",
         "VoteBundleValidated"
-      ],
-      "type": "string"
-    },
-    "RustEndorserBlockEvent": {
-      "properties": {
-        "message": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/RustBaseBlockEvent"
-            },
-            {
-              "properties": {
-                "type": {
-                  "$ref": "#/definitions/RustEndorserBlockMessageType"
-                }
-              },
-              "type": "object"
-            }
-          ]
-        },
-        "time": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustEndorserBlockMessageType": {
-      "enum": [
-        "EndorserBlockGenerated",
-        "EndorserBlockLotteryWon",
-        "EndorserBlockReceived",
-        "EndorserBlockSent"
-      ],
-      "type": "string"
-    },
-    "RustInputBlockEvent": {
-      "properties": {
-        "message": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/RustBaseBlockEvent"
-            },
-            {
-              "properties": {
-                "header_bytes": {
-                  "type": "number"
-                },
-                "index": {
-                  "type": "number"
-                },
-                "transactions": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": {
-                  "$ref": "#/definitions/RustInputBlockMessageType"
-                }
-              },
-              "type": "object"
-            }
-          ]
-        },
-        "time": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustInputBlockMessageType": {
-      "enum": [
-        "InputBlockGenerated",
-        "InputBlockLotteryWon",
-        "InputBlockReceived",
-        "InputBlockSent"
-      ],
-      "type": "string"
-    },
-    "RustPraosBlockEvent": {
-      "properties": {
-        "message": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/RustBaseBlockEvent"
-            },
-            {
-              "properties": {
-                "endorsement": {},
-                "header_bytes": {
-                  "type": "number"
-                },
-                "transactions": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": {
-                  "$ref": "#/definitions/RustPraosBlockMessageType"
-                },
-                "vrf": {
-                  "type": "number"
-                }
-              },
-              "type": "object"
-            }
-          ]
-        },
-        "time": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustPraosBlockMessageType": {
-      "enum": [
-        "PraosBlockGenerated",
-        "PraosBlockLotteryWon",
-        "PraosBlockReceived",
-        "PraosBlockSent"
       ],
       "type": "string"
     },
@@ -328,8 +260,8 @@
     },
     "RustVoteMessageType": {
       "enum": [
-        "VoteLotteryWon",
         "VotesGenerated",
+        "VotesLotteryWon",
         "VotesReceived",
         "VotesSent"
       ],
