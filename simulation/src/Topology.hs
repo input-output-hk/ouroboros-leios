@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -611,7 +612,7 @@ data P2PNetwork = P2PNetwork
   , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 validateP2PNetwork :: P2PNetwork -> IO P2PNetwork
 validateP2PNetwork net = do
