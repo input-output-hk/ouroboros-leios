@@ -425,7 +425,8 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
           | (blk, _nid, created, arrivals) <- msgsDiffusionLatency
           , let timeseries =
                   map (second Chart.Percent) $
-                    Diffusion.diffusionLatencyPerStakeFraction nodeStakes created arrivals
+                    coerce @_ @[(DiffTime, Double)] $
+                      Diffusion.diffusionLatencyPerStakeFraction nodeStakes created arrivals
           ]
       }
 
