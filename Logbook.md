@@ -2,6 +2,32 @@
 
 ## 2025-02-13
 
+### Brainstorming succinct schemes for Leios BLS key registration and witnessing
+
+Recall that we have the following situation/requirements:
+
+- We want to evolve the BLS keys and have forward security.
+- We don't want a registration process (commitment) that involves a big message.
+- We also don't want the proof of possession to involve a large message.
+- Individual votes must be small and contain no redundancy: i.e., we don't want to include a large witness for the proof of possession.
+
+Here's a snapshot of one recent proposal, but much discussion is underway.
+
+- Every 90 days, as part of its operational certificate each SPO includes a commitment to Leios keys: let's say that Leios keys evolve every epoch or KES period, so we'd need 18 or 60 commitments, respectively.  This commitment is only 124 bytes if KZG commitments are used.
+- Before the start of a new key evolution period, each SPOs diffuses a message opening their keys for the new period.
+    - This message would have to be 316 bytes:
+        - 28 bytes for the pool ID
+        - 96 bytes for the public key
+        - 96 bytes for the opening
+        - 2 * 48 = 96 bytes for the proof of possession
+    - 316 bytes/pool * 3000 pools = 948 kB would have to be stored permanently, so that syncing from genesis is possible.
+        - This is a lot of data to squeeze into RBs.
+        - However, It's not clear if it is safe to put it into IBs or a non-RB block.
+    - Instead of storing this on the ledger, would could a single SNARK attest to the following?
+        - Input is (ID of key evolution period, pool ID, public key)
+        - Output is whether the proof of possession exists.
+- Certificates are really small because we've already recorded the proofs of possession at the start of the key evolution period.
+
 ### Certificate CPU benchmarks as a function of number of voters
 
 In support of the Haskell and Rust simulations, we've benchmarked certificate operations as a function of the number of voters. A realistic distribution of stake is used in these measurements.
