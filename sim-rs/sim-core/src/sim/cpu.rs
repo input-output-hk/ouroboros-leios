@@ -6,6 +6,7 @@ use std::{
 struct TaskState<T> {
     task: T,
     subtasks: usize,
+    cpu_time: Duration,
 }
 
 pub struct Subtask {
@@ -43,6 +44,7 @@ impl<T> CpuTaskQueue<T> {
             TaskState {
                 task,
                 subtasks: durations.len(),
+                cpu_time: durations.iter().sum(),
             },
         );
 
@@ -64,7 +66,10 @@ impl<T> CpuTaskQueue<T> {
         (task_id, scheduled_subtasks)
     }
 
-    pub fn complete_subtask(&mut self, subtask: Subtask) -> (Option<T>, Option<Subtask>) {
+    pub fn complete_subtask(
+        &mut self,
+        subtask: Subtask,
+    ) -> (Option<(T, Duration)>, Option<Subtask>) {
         self.available_cores = self.available_cores.map(|c| c + 1);
 
         let task = self
@@ -73,7 +78,9 @@ impl<T> CpuTaskQueue<T> {
             .expect("task was already finished");
         task.subtasks -= 1;
         let finished_task = if task.subtasks == 0 {
-            self.tasks.remove(&subtask.task_id).map(|s| s.task)
+            self.tasks
+                .remove(&subtask.task_id)
+                .map(|s| (s.task, s.cpu_time))
         } else {
             None
         };
