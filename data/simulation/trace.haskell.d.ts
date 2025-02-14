@@ -36,7 +36,7 @@ interface HaskellGeneratedBaseEvent {
 }
 
 interface HaskellGeneratedIBEvent extends HaskellGeneratedBaseEvent {
-    kind: Extract<MessageKind, "IB">;
+    kind: "IB";
     id: string;
     slot: number;
     payload_bytes: number;
@@ -44,18 +44,18 @@ interface HaskellGeneratedIBEvent extends HaskellGeneratedBaseEvent {
 }
 
 interface HaskellGeneratedEBEvent extends HaskellGeneratedBaseEvent {
-    kind: Extract<MessageKind, "EB">;
+    kind: "EB";
     id: string;
     input_blocks: string[];
 }
 
 interface HaskellGeneratedRBEvent extends HaskellGeneratedBaseEvent {
-    kind: Extract<MessageKind, "RB">;
+    kind: "RB";
     id: string;
 }
 
 interface HaskellGeneratedVTEvent extends HaskellGeneratedBaseEvent {
-    kind: Extract<MessageKind, "VT">;
+    kind: "VT";
     id: string;
     votes: number;
     endorse_blocks: string[];
