@@ -1,6 +1,5 @@
 import { IServerMessage } from "@/components/Sim/types";
 import * as cbor from 'cbor';
-import { createReadStream, ReadStream } from "fs";
 import * as fs from 'fs/promises';
 import path from "path";
 import { ReadableStream, ReadableStreamDefaultReader } from "stream/web";
@@ -89,72 +88,6 @@ const getJsonMaxTime = async (path: string): Promise<number> => {
   throw new Error("Last line not found");
 }
 
-/*
-const createCborEventStream = (path: string): EventStream => {
-  let handle: fs.FileHandle;
-  let buffer: Buffer | null = null;
-
-  const decoder = new cbor.Decoder();
-  return new ReadableStream({
-    async start() {
-      handle = await fs.open(path, 'r');
-    },
-    async pull(controller) {
-      let readSomething = false;
-      while (!readSomething) {
-        const { bytesRead, buffer: chunk } = await handle.read();
-        if (bytesRead === 0) {
-          handle.close();
-          controller.close();
-          return;
-        } else {
-          buffer = buffer ? Buffer.concat([buffer, chunk], buffer.length + bytesRead) : chunk;
-          try {
-            decoder.decodeMultiple(buffer, event => {
-              console.log({ event });
-              controller.enqueue(event);
-              readSomething = true;
-            }) as any;
-            buffer = null;
-          } catch (err: any) {
-            if (err.incomplete) {
-              buffer = buffer!.subarray(err.lastPosition);
-            } else {
-              throw err;
-            }
-          }
-        }
-      }
-    },
-    async cancel() {
-      await handle.close();
-    }
-  });
-}
-*/
-
-const createCborEventStreamm = (path: string): EventStream => {
-  let buffer: ReadStream;
-  return new ReadableStream({
-    async start() {
-      buffer = createReadStream(path);
-    },
-    async pull(controller) {
-      try {
-        const event = await cbor.decodeFirst(buffer, { extendedResults: true });
-        console.log({ event });
-        controller.enqueue(event.value);
-      } catch (err) {
-        controller.close();
-        console.log({ err });
-      }
-    },
-    async cancel() {
-      buffer.close();
-    }
-  });
-}
-
 const createCborEventStream = (path: string): EventStream => {
   let handle: fs.FileHandle;
   let buffer: Buffer | null = null;
@@ -198,13 +131,34 @@ const createCborEventStream = (path: string): EventStream => {
 }
 
 const getCborMaxTime = async (path: string): Promise<number> => {
-  const stream = createCborEventStream(path);
-  let lastEvent: IServerMessage | null = null;
-  for await (const event of stream) {
-    lastEvent = event;
+  const chunkSize = 1024;
+
+  // We identify the start of an event by looking for the start of a two-element map where the first key is named "time".
+  // This subsequence appears at the start of every event, and only there.
+  // It's hacky, but we can search for a different subsequence if the format changes.
+  const needle = Uint8Array.from([0xa2, 0x64, 0x74, 0x69, 0x6d, 0x65]);
+
+  const handle = await fs.open(path, "r");
+  const { size } = await handle.stat();
+  let filepos = size - chunkSize;
+  let buffer = Buffer.alloc(0);
+  let index = 0;
+  while (filepos >= 0) {
+    const { buffer: chunk, bytesRead } = await handle.read({ position: filepos, length: chunkSize });
+    buffer = Buffer.concat([chunk, buffer], buffer.length + bytesRead);
+    index += bytesRead;
+    let start = buffer.lastIndexOf(needle, index - 1);
+    while (start >= 0) {
+      const raw = buffer.subarray(start, index);
+      try {
+        const event: IServerMessage = cbor.decode(raw);
+        await handle.close();
+        return event.time;
+      } catch (err) { }
+      index = start;
+    }
+    filepos -= chunkSize;
   }
-  if (!lastEvent) {
-    throw new Error('No events found');
-  }
-  return lastEvent.time;
+  await handle.close();
+  throw new Error("Last line not found");
 }
