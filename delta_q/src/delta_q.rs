@@ -2,7 +2,7 @@ use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MA
 use itertools::Itertools;
 use smallstr::SmallString;
 use std::{
-    cell::{Cell, OnceCell, RefCell},
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     str::FromStr,
@@ -201,7 +201,7 @@ pub struct DeltaQ {
     #[serde(with = "delta_q_serde")]
     expr: Arc<DeltaQExpr>,
     #[serde(skip)]
-    expanded: OnceCell<Result<Arc<DeltaQExpr>, DeltaQError>>,
+    expanded: OnceLock<Result<Arc<DeltaQExpr>, DeltaQError>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -329,7 +329,7 @@ impl From<DeltaQExpr> for DeltaQ {
     fn from(expr: DeltaQExpr) -> Self {
         DeltaQ {
             expr: Arc::new(expr),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 }
@@ -338,7 +338,7 @@ impl From<Arc<DeltaQExpr>> for DeltaQ {
     fn from(expr: Arc<DeltaQExpr>) -> Self {
         DeltaQ {
             expr,
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 }
@@ -418,7 +418,7 @@ impl DeltaQ {
         let expr = TOP
             .get_or_init(|| Arc::new(DeltaQExpr::Outcome(Outcome::top())))
             .clone();
-        let expanded = OnceCell::new();
+        let expanded = OnceLock::new();
         expanded.set(Ok(expr.clone())).unwrap();
         DeltaQ { expr, expanded }
     }
@@ -435,14 +435,14 @@ impl DeltaQ {
     pub fn name(name: &str) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Name(name.into(), None)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
     pub fn name_rec(name: &str, rec: Option<usize>) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Name(name.into(), rec)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -450,7 +450,7 @@ impl DeltaQ {
     pub fn cdf(cdf: CDF) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Outcome(Outcome::new(cdf))),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -458,7 +458,7 @@ impl DeltaQ {
     pub fn seq(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Seq(first.expr, load, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -471,7 +471,7 @@ impl DeltaQ {
                 second.expr,
                 second_weight,
             )),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -479,7 +479,7 @@ impl DeltaQ {
     pub fn for_all(first: DeltaQ, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::ForAll(first.expr, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -487,7 +487,7 @@ impl DeltaQ {
     pub fn for_some(first: DeltaQ, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::ForSome(first.expr, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 

@@ -289,6 +289,16 @@ impl CDF {
         )
         .unwrap()
     }
+
+    pub fn diff_area(&self, other: &Self) -> f32 {
+        assert_eq!(self.steps.at(f32::INFINITY), other.steps.at(f32::INFINITY));
+        self.steps
+            .zip(&other.steps)
+            .map(|(x, (&l, &r))| (x, (l - r).abs()))
+            .tuple_windows()
+            .map(|((lx, ld), (rx, _rd))| (rx - lx) * ld)
+            .sum()
+    }
 }
 
 impl FromIterator<(f32, f32)> for CDF {

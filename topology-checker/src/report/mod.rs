@@ -1,17 +1,15 @@
-use crate::analysis::{analyze_all_paths, reverse_topology, ShortestPathLink};
 use crate::analysis::{
-    analyze_network_stats, analyze_stake_distribution, basic::analyze_hop_stats,
-    check_triangle_inequality,
+    analyze_network_stats, analyze_stake_distribution, check_triangle_inequality,
 };
-use crate::models::{Severity, Topology};
-use std::collections::{BTreeSet, HashMap};
-use std::fmt::Write;
-
-// NEW IMPORTS
-use delta_q::{CompactionMode, StepValue, CDF};
-use std::collections::BTreeMap;
-use terminal_size::{terminal_size, Width};
-use textplots::{Chart, ColorPlot, Plot, Shape};
+use crate::analysis::{reverse_topology, ShortestPathLink};
+use crate::models::{Latency, Severity, Topology};
+use argmin::core::observers::ObserverMode;
+use argmin::core::{CostFunction, Executor, State};
+use argmin::solver::particleswarm::ParticleSwarm;
+use argmin_observer_slog::SlogLogger;
+use delta_q::{CompactionMode, DeltaQ, EphemeralContext, LoadUpdate, PersistentContext, CDF};
+use std::collections::HashMap;
+use textplots::{Chart, Plot, Shape};
 
 pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&str>) -> String {
     let mut report = String::new();
@@ -153,12 +151,18 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
         eprintln!("{}", far);
     } else {
         let reversed_topology = reverse_topology(topology);
+
         let mut near = CDF::bottom();
         let mut near_count = 0f32;
         let mut far = CDF::bottom();
         let mut far_count = 0f32;
+
+        let mut completion = CDF::bottom();
+        let mut completion_count = 0f32;
+
         for node in reversed_topology.nodes.keys() {
             let sp = crate::analysis::shortest_paths(&reversed_topology, node);
+
             let (near_cdf, far_cdf) = get_near_far_latencies(&sp);
             near = near
                 .choice(near_count / (near_count + 1.0), &near_cdf)
@@ -166,19 +170,52 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
             near_count += 1.0;
             far = far.choice(far_count / (far_count + 1.0), &far_cdf).unwrap();
             far_count += 1.0;
+
+            let completion_cdf = get_completion_cdf(&sp);
+            completion = completion
+                .choice(completion_count / (completion_count + 1.0), &completion_cdf)
+                .unwrap();
+            completion_count += 1.0;
         }
 
-        let near2 = near.compact(CompactionMode::OverApproximate, 5);
-        let near3 = near.compact(CompactionMode::UnderApproximate, 5);
-        let near4 = near2.choice(0.5, &near3).unwrap();
-        eprintln!("{}", plot_cdf([&near, &near2, &near3, &near4]));
-        eprintln!("{}", near4);
+        let near = near
+            .compact(CompactionMode::OverApproximate, 10)
+            .choice(0.5, &near.compact(CompactionMode::UnderApproximate, 10))
+            .unwrap();
 
-        let far2 = far.compact(CompactionMode::OverApproximate, 5);
-        let far3 = far.compact(CompactionMode::UnderApproximate, 5);
-        let far4 = far2.choice(0.5, &far3).unwrap();
-        eprintln!("{}", plot_cdf([&far, &far2, &far3, &far4]));
-        eprintln!("{}", far4);
+        let far = far
+            .compact(CompactionMode::OverApproximate, 10)
+            .choice(0.5, &far.compact(CompactionMode::UnderApproximate, 10))
+            .unwrap();
+
+        eprintln!("{completion_count}");
+
+        let observation = CompletionModel {
+            near: DeltaQ::cdf(near),
+            far: DeltaQ::cdf(far),
+            completion: completion.clone(),
+        };
+
+        let solver = ParticleSwarm::<Vec<f32>, f32, _>::new(
+            (
+                vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            ),
+            40,
+        );
+        let result = Executor::new(observation.clone(), solver)
+            .configure(|state| state.max_iters(100))
+            .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .run()
+            .unwrap();
+
+        eprintln!("{}", result);
+
+        let cdf = observation
+            .eval(result.state.get_best_param().unwrap().position.as_slice())
+            .unwrap();
+
+        eprintln!("{}", plot_cdf([&completion, &cdf]));
     }
 
     report
@@ -228,6 +265,25 @@ fn get_near_far_latencies(sp: &HashMap<String, ShortestPathLink>) -> (CDF, CDF) 
     (near, far)
 }
 
+fn get_completion_cdf(sp: &HashMap<String, ShortestPathLink>) -> CDF {
+    let mut latencies = sp.values().map(|info| info.total).collect::<Vec<_>>();
+    latencies.sort();
+    let mut prev_latency = Latency::zero();
+    let scale = 1.0 / (latencies.len() as f32);
+    let latencies = latencies
+        .into_iter()
+        .enumerate()
+        .rev()
+        .filter_map(|(i, latency)| {
+            (latency != prev_latency).then(|| {
+                prev_latency = latency;
+                (latency.as_f32(), (i + 1) as f32 * scale)
+            })
+        })
+        .collect::<Vec<_>>();
+    latencies.into_iter().rev().collect()
+}
+
 fn line_point_dist(line_start: (f32, f32), line_end: (f32, f32), point: (f32, f32)) -> f32 {
     let a = line_end.0 - line_start.0;
     let b = line_end.1 - line_start.1;
@@ -236,17 +292,103 @@ fn line_point_dist(line_start: (f32, f32), line_end: (f32, f32), point: (f32, f3
     (a * d - b * c).abs() / (a * a + b * b).sqrt()
 }
 
+#[allow(dead_code)]
 fn plot_cdf<'a>(cdf: impl IntoIterator<Item = &'a CDF> + 'a) -> String {
     let mut iter = cdf.into_iter().peekable();
-    let mut chart = Chart::new(100, 60, 0.0, iter.peek().unwrap().width());
+    let mut chart = Chart::new(400, 300, 0.0, iter.peek().unwrap().width());
     let shapes = iter
         .map(|cdf| Shape::Steps(&cdf.steps().data()))
         .collect::<Vec<_>>();
-    let mut chart = &mut chart;
     for shape in &shapes {
-        chart = chart.lineplot(shape);
+        chart.lineplot(shape);
     }
     chart.axis();
     chart.figures();
     format!("{}", chart)
+}
+
+#[derive(Debug, Clone)]
+pub struct CompletionModel {
+    pub near: DeltaQ,
+    pub far: DeltaQ,
+    pub completion: CDF,
+}
+
+impl CompletionModel {
+    pub fn eval(&self, param: &[f32]) -> Result<CDF, argmin::core::Error> {
+        let near_hop0 = param[0];
+        let near_hop1 = param[1];
+        let near_hop2 = param[2];
+        let far_hop0 = param[3];
+        let far_hop1 = param[4];
+        let far_hop2 = param[5];
+
+        let expr = DeltaQ::seq(
+            DeltaQ::choice(
+                DeltaQ::top(),
+                near_hop0,
+                DeltaQ::seq(
+                    self.near.clone(),
+                    LoadUpdate::default(),
+                    DeltaQ::choice(
+                        DeltaQ::top(),
+                        near_hop1,
+                        DeltaQ::seq(
+                            self.near.clone(),
+                            LoadUpdate::default(),
+                            DeltaQ::choice(
+                                DeltaQ::top(),
+                                near_hop2,
+                                self.near.clone(),
+                                1.0 - near_hop2,
+                            ),
+                        ),
+                        1.0 - near_hop1,
+                    ),
+                ),
+                1.0 - near_hop0,
+            ),
+            LoadUpdate::default(),
+            DeltaQ::choice(
+                DeltaQ::top(),
+                far_hop0,
+                DeltaQ::seq(
+                    self.far.clone(),
+                    LoadUpdate::default(),
+                    DeltaQ::choice(
+                        DeltaQ::top(),
+                        far_hop1,
+                        DeltaQ::seq(
+                            self.far.clone(),
+                            LoadUpdate::default(),
+                            DeltaQ::choice(
+                                DeltaQ::top(),
+                                far_hop2,
+                                self.far.clone(),
+                                1.0 - far_hop2,
+                            ),
+                        ),
+                        1.0 - far_hop1,
+                    ),
+                ),
+                1.0 - far_hop0,
+            ),
+        );
+        let ctx = PersistentContext::default();
+        let mut ephemeral = EphemeralContext::default();
+        Ok(expr
+            .eval(&ctx, &mut ephemeral)
+            .map_err(|e| argmin::core::Error::new(e))?
+            .cdf)
+    }
+}
+
+impl CostFunction for CompletionModel {
+    type Param = Vec<f32>;
+    type Output = f32;
+
+    fn cost(&self, param: &Self::Param) -> Result<Self::Output, argmin::core::Error> {
+        let result = self.eval(param)?;
+        Ok(self.completion.diff_area(&result))
+    }
 }

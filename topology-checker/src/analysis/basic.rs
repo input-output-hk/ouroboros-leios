@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::models::{Latency, Node, Topology};
 use delta_q::CDF;
 use indexmap::IndexMap;

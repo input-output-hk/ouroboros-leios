@@ -1,6 +1,6 @@
 use crate::{StepValue, CDF};
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BinaryHeap, io::Read, mem};
+use std::{cmp::Ordering, collections::BinaryHeap, mem};
 use textplots::{Chart, Plot, Shape};
 
 #[derive(Debug, PartialEq, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -40,8 +40,6 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
     // (without this rounding the pruning will be dominated by floating point errors)
     let scale = data[data.len() - 1].0;
     let granularity = scale / 10000.0;
-
-    let orig_cdf = data.iter().map(|(x, y)| (*x, *y)).collect::<CDF>();
 
     #[derive(Debug, PartialEq)]
     struct D {
