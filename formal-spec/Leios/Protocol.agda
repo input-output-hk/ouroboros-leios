@@ -128,6 +128,25 @@ module _ (s : LeiosState) where
       { IBBodies = b ∷ IBBodies
       }
 
+module _ {s s'} where
+  open LeiosState s'
+
+  upd-preserves-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep s'
+                               → LeiosState.Upkeep s ≡ LeiosState.Upkeep (upd s' x)
+  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with A.any? (matchIB? x) IBBodies
+  ... | yes p = refl
+  ... | no ¬p = refl
+  upd-preserves-Upkeep {inj₁ (ebHeader x)} refl = refl
+  upd-preserves-Upkeep {inj₁ (vHeader x)} refl = refl
+  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with A.any? (flip matchIB? x) IBHeaders
+  ... | yes p = refl
+  ... | no ¬p = refl
+
 infix 25 _↑_
 _↑_ : LeiosState → List (Header ⊎ Body) → LeiosState
 _↑_ = foldr (flip upd)
+
+↑-preserves-Upkeep : ∀ {s x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep (s ↑ x)
+↑-preserves-Upkeep {x = []} = refl
+↑-preserves-Upkeep {s = s} {x = x ∷ x₁} =
+  upd-preserves-Upkeep {s = s} {x = x} (↑-preserves-Upkeep {x = x₁})
