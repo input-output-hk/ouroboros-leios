@@ -1,0 +1,1003 @@
+nodes:
+  node-0:
+    stake: 90071
+    location:
+      - 11.08023285535424
+      - 55.34121794530708
+    producers:
+      node-23:
+        latency-ms: 11.0
+      node-27:
+        latency-ms: 38.0
+      node-28:
+        latency-ms: 43.0
+      node-32:
+        latency-ms: 43.0
+      node-48:
+        latency-ms: 16.0
+  node-1:
+    stake: 184377368
+    location:
+      - 0.43799717271507177
+      - 79.20816789214139
+    producers:
+      node-20:
+        latency-ms: 17.0
+      node-21:
+        latency-ms: 20.0
+      node-25:
+        latency-ms: 31.0
+      node-30:
+        latency-ms: 37.0
+      node-38:
+        latency-ms: 43.0
+      node-39:
+        latency-ms: 31.0
+      node-44:
+        latency-ms: 26.0
+      node-47:
+        latency-ms: 23.0
+      node-48:
+        latency-ms: 3.0
+  node-10:
+    stake: 16691391414222104
+    location:
+      - -32.3199760804763
+      - 152.86684760262298
+    producers:
+      node-26:
+        latency-ms: 32.0
+      node-27:
+        latency-ms: 16.0
+      node-31:
+        latency-ms: 17.0
+      node-32:
+        latency-ms: 41.0
+      node-34:
+        latency-ms: 20.0
+      node-38:
+        latency-ms: 28.0
+      node-39:
+        latency-ms: 61.0
+      node-43:
+        latency-ms: 14.0
+      node-46:
+        latency-ms: 51.0
+  node-11:
+    stake: 41225653758309736
+    location:
+      - 74.99861777403993
+      - 79.03904874423307
+    producers:
+      node-20:
+        latency-ms: 25.0
+      node-22:
+        latency-ms: 8.0
+      node-25:
+        latency-ms: 8.0
+      node-28:
+        latency-ms: 13.0
+      node-29:
+        latency-ms: 7.0
+      node-31:
+        latency-ms: 72.0
+      node-41:
+        latency-ms: 64.0
+      node-44:
+        latency-ms: 14.0
+      node-46:
+        latency-ms: 13.0
+  node-12:
+    stake: 94499213228191488
+    location:
+      - -70.37565494322038
+      - 68.52265039138713
+    producers:
+      node-26:
+        latency-ms: 10.0
+      node-34:
+        latency-ms: 50.0
+      node-35:
+        latency-ms: 3.0
+      node-38:
+        latency-ms: 6.0
+      node-40:
+        latency-ms: 18.0
+  node-13:
+    stake: 203328946126762720
+    location:
+      - -38.16986157292462
+      - 53.42495651281031
+    producers:
+      node-24:
+        latency-ms: 16.0
+      node-26:
+        latency-ms: 9.0
+      node-27:
+        latency-ms: 28.0
+      node-28:
+        latency-ms: 67.0
+      node-34:
+        latency-ms: 56.0
+      node-35:
+        latency-ms: 21.0
+      node-39:
+        latency-ms: 19.0
+      node-41:
+        latency-ms: 9.0
+      node-48:
+        latency-ms: 27.0
+  node-14:
+    stake: 414348341520315136
+    location:
+      - -10.507782471885207
+      - 43.245846142494884
+    producers:
+      node-26:
+        latency-ms: 24.0
+      node-36:
+        latency-ms: 37.0
+      node-40:
+        latency-ms: 25.0
+      node-41:
+        latency-ms: 17.0
+      node-44:
+        latency-ms: 38.0
+  node-15:
+    stake: 805462504982750080
+    location:
+      - -17.209773777727605
+      - 39.64615360755925
+    producers:
+      node-23:
+        latency-ms: 7.0
+      node-24:
+        latency-ms: 4.0
+      node-30:
+        latency-ms: 15.0
+      node-34:
+        latency-ms: 63.0
+      node-35:
+        latency-ms: 33.0
+      node-40:
+        latency-ms: 25.0
+      node-43:
+        latency-ms: 48.0
+  node-16:
+    stake: 1502374738521439488
+    location:
+      - 34.621728912151866
+      - 90.39000203427275
+    producers:
+      node-20:
+        latency-ms: 5.0
+      node-24:
+        latency-ms: 39.0
+      node-25:
+        latency-ms: 13.0
+      node-29:
+        latency-ms: 16.0
+      node-30:
+        latency-ms: 50.0
+      node-41:
+        latency-ms: 50.0
+      node-44:
+        latency-ms: 7.0
+      node-48:
+        latency-ms: 16.0
+  node-17:
+    stake: 2701845764883718144
+    location:
+      - 2.6189799770921525
+      - 0.6919668304431559
+    producers:
+      node-23:
+        latency-ms: 20.0
+      node-24:
+        latency-ms: 18.0
+      node-25:
+        latency-ms: 45.0
+      node-30:
+        latency-ms: 13.0
+      node-35:
+        latency-ms: 48.0
+      node-39:
+        latency-ms: 14.0
+      node-44:
+        latency-ms: 47.0
+  node-18:
+    stake: 4703725977635764224
+    location:
+      - 54.39519423253262
+      - 175.71296308625404
+    producers:
+      node-21:
+        latency-ms: 60.0
+      node-22:
+        latency-ms: 28.0
+      node-23:
+        latency-ms: 63.0
+      node-24:
+        latency-ms: 70.0
+      node-26:
+        latency-ms: 73.0
+      node-28:
+        latency-ms: 8.0
+      node-42:
+        latency-ms: 77.0
+      node-43:
+        latency-ms: 61.0
+      node-46:
+        latency-ms: 9.0
+  node-19:
+    stake: 7954234342383337472
+    location:
+      - -12.953868237464647
+      - 166.69633552633601
+    producers:
+      node-24:
+        latency-ms: 68.0
+      node-25:
+        latency-ms: 51.0
+      node-26:
+        latency-ms: 44.0
+      node-30:
+        latency-ms: 74.0
+      node-34:
+        latency-ms: 10.0
+      node-49:
+        latency-ms: 4.0
+  node-2:
+    stake: 15771515823
+    location:
+      - 81.48590723691152
+      - 81.89041545584915
+    producers:
+      node-25:
+        latency-ms: 12.0
+      node-29:
+        latency-ms: 10.0
+      node-32:
+        latency-ms: 80.0
+      node-34:
+        latency-ms: 44.0
+      node-47:
+        latency-ms: 25.0
+  node-20:
+    location:
+      - 28.103165236610252
+      - 98.66325840747909
+    producers:
+      node-1:
+        latency-ms: 17.0
+      node-11:
+        latency-ms: 25.0
+      node-16:
+        latency-ms: 5.0
+      node-3:
+        latency-ms: 32.0
+      node-36:
+        latency-ms: 1.0
+      node-39:
+        latency-ms: 45.0
+      node-4:
+        latency-ms: 41.0
+      node-47:
+        latency-ms: 5.0
+      node-5:
+        latency-ms: 32.0
+  node-21:
+    location:
+      - -34.03742990800871
+      - 95.41580672288843
+    producers:
+      node-1:
+        latency-ms: 20.0
+      node-18:
+        latency-ms: 60.0
+      node-31:
+        latency-ms: 15.0
+      node-38:
+        latency-ms: 25.0
+      node-40:
+        latency-ms: 3.0
+      node-41:
+        latency-ms: 27.0
+      node-9:
+        latency-ms: 55.0
+  node-22:
+    location:
+      - 71.5595611943622
+      - 22.963337615359983
+    producers:
+      node-11:
+        latency-ms: 8.0
+      node-18:
+        latency-ms: 28.0
+      node-3:
+        latency-ms: 4.0
+      node-45:
+        latency-ms: 79.0
+      node-48:
+        latency-ms: 41.0
+      node-6:
+        latency-ms: 3.0
+      node-9:
+        latency-ms: 28.0
+  node-23:
+    location:
+      - -3.7532167276513064
+      - 38.91348751698591
+    producers:
+      node-0:
+        latency-ms: 11.0
+      node-15:
+        latency-ms: 7.0
+      node-17:
+        latency-ms: 20.0
+      node-18:
+        latency-ms: 63.0
+      node-4:
+        latency-ms: 12.0
+      node-6:
+        latency-ms: 43.0
+      node-7:
+        latency-ms: 6.0
+      node-8:
+        latency-ms: 18.0
+  node-24:
+    location:
+      - -14.54622235742329
+      - 31.830221411849827
+    producers:
+      node-13:
+        latency-ms: 16.0
+      node-15:
+        latency-ms: 4.0
+      node-16:
+        latency-ms: 39.0
+      node-17:
+        latency-ms: 18.0
+      node-18:
+        latency-ms: 70.0
+      node-19:
+        latency-ms: 68.0
+      node-6:
+        latency-ms: 48.0
+      node-7:
+        latency-ms: 2.0
+  node-25:
+    location:
+      - 58.89648577501072
+      - 85.52031191137715
+    producers:
+      node-1:
+        latency-ms: 31.0
+      node-11:
+        latency-ms: 8.0
+      node-16:
+        latency-ms: 13.0
+      node-17:
+        latency-ms: 45.0
+      node-19:
+        latency-ms: 51.0
+      node-2:
+        latency-ms: 12.0
+      node-29:
+        latency-ms: 4.0
+      node-4:
+        latency-ms: 38.0
+      node-44:
+        latency-ms: 5.0
+  node-26:
+    location:
+      - -50.68707038968129
+      - 71.50622030997496
+    producers:
+      node-10:
+        latency-ms: 32.0
+      node-12:
+        latency-ms: 10.0
+      node-13:
+        latency-ms: 9.0
+      node-14:
+        latency-ms: 24.0
+      node-18:
+        latency-ms: 73.0
+      node-19:
+        latency-ms: 44.0
+      node-6:
+        latency-ms: 71.0
+  node-27:
+    location:
+      - -28.179147473018674
+      - 116.81847491485792
+    producers:
+      node-0:
+        latency-ms: 38.0
+      node-10:
+        latency-ms: 16.0
+      node-13:
+        latency-ms: 28.0
+      node-35:
+        latency-ms: 27.0
+      node-36:
+        latency-ms: 31.0
+      node-39:
+        latency-ms: 46.0
+      node-40:
+        latency-ms: 14.0
+      node-48:
+        latency-ms: 23.0
+      node-49:
+        latency-ms: 30.0
+  node-28:
+    location:
+      - 63.81604381571714
+      - 149.02438539936944
+    producers:
+      node-0:
+        latency-ms: 43.0
+      node-11:
+        latency-ms: 13.0
+      node-13:
+        latency-ms: 67.0
+      node-18:
+        latency-ms: 8.0
+      node-34:
+        latency-ms: 31.0
+      node-47:
+        latency-ms: 20.0
+  node-29:
+    location:
+      - 62.11516027976964
+      - 69.6769635576682
+    producers:
+      node-11:
+        latency-ms: 7.0
+      node-16:
+        latency-ms: 16.0
+      node-2:
+        latency-ms: 10.0
+      node-25:
+        latency-ms: 4.0
+      node-5:
+        latency-ms: 28.0
+      node-6:
+        latency-ms: 13.0
+  node-3:
+    stake: 361833335365
+    location:
+      - 63.40683666205291
+      - 18.428678581282586
+    producers:
+      node-20:
+        latency-ms: 32.0
+      node-22:
+        latency-ms: 4.0
+      node-31:
+        latency-ms: 76.0
+      node-35:
+        latency-ms: 77.0
+      node-44:
+        latency-ms: 21.0
+      node-45:
+        latency-ms: 76.0
+      node-46:
+        latency-ms: 25.0
+  node-30:
+    location:
+      - -21.54257852892644
+      - 10.270442334760874
+    producers:
+      node-1:
+        latency-ms: 37.0
+      node-15:
+        latency-ms: 15.0
+      node-16:
+        latency-ms: 50.0
+      node-17:
+        latency-ms: 13.0
+      node-19:
+        latency-ms: 74.0
+      node-7:
+        latency-ms: 10.0
+  node-31:
+    location:
+      - -57.237419089974516
+      - 120.49062272715538
+    producers:
+      node-10:
+        latency-ms: 17.0
+      node-11:
+        latency-ms: 72.0
+      node-21:
+        latency-ms: 15.0
+      node-3:
+        latency-ms: 76.0
+      node-37:
+        latency-ms: 42.0
+      node-38:
+        latency-ms: 13.0
+      node-40:
+        latency-ms: 15.0
+  node-32:
+    location:
+      - -64.16813692901013
+      - 15.73354150827733
+    producers:
+      node-0:
+        latency-ms: 43.0
+      node-10:
+        latency-ms: 41.0
+      node-2:
+        latency-ms: 80.0
+      node-36:
+        latency-ms: 61.0
+      node-5:
+        latency-ms: 87.0
+  node-33:
+    location:
+      - 64.79620710259186
+      - 120.14730591307557
+    producers:
+      node-34:
+        latency-ms: 35.0
+      node-36:
+        latency-ms: 20.0
+      node-40:
+        latency-ms: 56.0
+      node-44:
+        latency-ms: 12.0
+      node-45:
+        latency-ms: 73.0
+      node-46:
+        latency-ms: 5.0
+      node-49:
+        latency-ms: 43.0
+  node-34:
+    location:
+      - 5.142133596603969
+      - 158.10876012177664
+    producers:
+      node-10:
+        latency-ms: 20.0
+      node-12:
+        latency-ms: 50.0
+      node-13:
+        latency-ms: 56.0
+      node-15:
+        latency-ms: 63.0
+      node-19:
+        latency-ms: 10.0
+      node-2:
+        latency-ms: 44.0
+      node-28:
+        latency-ms: 31.0
+      node-33:
+        latency-ms: 35.0
+      node-7:
+        latency-ms: 70.0
+  node-35:
+    location:
+      - -75.71852866998907
+      - 79.79554286444812
+    producers:
+      node-12:
+        latency-ms: 3.0
+      node-13:
+        latency-ms: 21.0
+      node-15:
+        latency-ms: 33.0
+      node-17:
+        latency-ms: 48.0
+      node-27:
+        latency-ms: 27.0
+      node-3:
+        latency-ms: 77.0
+      node-8:
+        latency-ms: 22.0
+  node-36:
+    location:
+      - 29.25201709657631
+      - 101.73897766206099
+    producers:
+      node-14:
+        latency-ms: 37.0
+      node-20:
+        latency-ms: 1.0
+      node-27:
+        latency-ms: 31.0
+      node-32:
+        latency-ms: 61.0
+      node-33:
+        latency-ms: 20.0
+      node-6:
+        latency-ms: 34.0
+  node-37:
+    location:
+      - 11.667542925921907
+      - 170.41804411020095
+    producers:
+      node-31:
+        latency-ms: 42.0
+      node-39:
+        latency-ms: 79.0
+      node-41:
+        latency-ms: 72.0
+      node-43:
+        latency-ms: 38.0
+      node-44:
+        latency-ms: 40.0
+      node-49:
+        latency-ms: 9.0
+      node-5:
+        latency-ms: 21.0
+      node-7:
+        latency-ms: 77.0
+  node-38:
+    location:
+      - -80.96515680917526
+      - 94.15967924817477
+    producers:
+      node-1:
+        latency-ms: 43.0
+      node-10:
+        latency-ms: 28.0
+      node-12:
+        latency-ms: 6.0
+      node-21:
+        latency-ms: 25.0
+      node-31:
+        latency-ms: 13.0
+      node-45:
+        latency-ms: 5.0
+      node-48:
+        latency-ms: 45.0
+      node-6:
+        latency-ms: 87.0
+  node-39:
+    location:
+      - -14.191684825042003
+      - 22.55936165208007
+    producers:
+      node-1:
+        latency-ms: 31.0
+      node-10:
+        latency-ms: 61.0
+      node-13:
+        latency-ms: 19.0
+      node-17:
+        latency-ms: 14.0
+      node-20:
+        latency-ms: 45.0
+      node-27:
+        latency-ms: 46.0
+      node-37:
+        latency-ms: 79.0
+      node-4:
+        latency-ms: 12.0
+      node-7:
+        latency-ms: 3.0
+      node-8:
+        latency-ms: 18.0
+      node-9:
+        latency-ms: 21.0
+  node-4:
+    stake: 4020257192474
+    location:
+      - 8.022535898824032
+      - 18.49915736258597
+    producers:
+      node-20:
+        latency-ms: 41.0
+      node-23:
+        latency-ms: 12.0
+      node-25:
+        latency-ms: 38.0
+      node-39:
+        latency-ms: 12.0
+      node-40:
+        latency-ms: 42.0
+  node-40:
+    location:
+      - -37.50119598146573
+      - 87.53801401801233
+    producers:
+      node-12:
+        latency-ms: 18.0
+      node-14:
+        latency-ms: 25.0
+      node-15:
+        latency-ms: 25.0
+      node-21:
+        latency-ms: 3.0
+      node-27:
+        latency-ms: 14.0
+      node-31:
+        latency-ms: 15.0
+      node-33:
+        latency-ms: 56.0
+      node-4:
+        latency-ms: 42.0
+      node-7:
+        latency-ms: 32.0
+  node-41:
+    location:
+      - -41.35738545610147
+      - 29.62373971610827
+    producers:
+      node-11:
+        latency-ms: 64.0
+      node-13:
+        latency-ms: 9.0
+      node-14:
+        latency-ms: 17.0
+      node-16:
+        latency-ms: 50.0
+      node-21:
+        latency-ms: 27.0
+      node-37:
+        latency-ms: 72.0
+      node-7:
+        latency-ms: 16.0
+      node-8:
+        latency-ms: 9.0
+      node-9:
+        latency-ms: 35.0
+  node-42:
+    location:
+      - -88.8972003766478
+      - 58.40919632774573
+    producers:
+      node-18:
+        latency-ms: 77.0
+      node-43:
+        latency-ms: 16.0
+      node-44:
+        latency-ms: 73.0
+      node-45:
+        latency-ms: 10.0
+      node-46:
+        latency-ms: 82.0
+      node-47:
+        latency-ms: 66.0
+  node-43:
+    location:
+      - -59.03089974869402
+      - 163.16095566567833
+    producers:
+      node-10:
+        latency-ms: 14.0
+      node-15:
+        latency-ms: 48.0
+      node-18:
+        latency-ms: 61.0
+      node-37:
+        latency-ms: 38.0
+      node-42:
+        latency-ms: 16.0
+  node-44:
+    location:
+      - 48.39583648892176
+      - 89.89448413373856
+    producers:
+      node-1:
+        latency-ms: 26.0
+      node-11:
+        latency-ms: 14.0
+      node-14:
+        latency-ms: 38.0
+      node-16:
+        latency-ms: 7.0
+      node-17:
+        latency-ms: 47.0
+      node-25:
+        latency-ms: 5.0
+      node-3:
+        latency-ms: 21.0
+      node-33:
+        latency-ms: 12.0
+      node-37:
+        latency-ms: 40.0
+      node-42:
+        latency-ms: 73.0
+      node-5:
+        latency-ms: 28.0
+      node-6:
+        latency-ms: 23.0
+      node-9:
+        latency-ms: 39.0
+  node-45:
+    location:
+      - -70.26974418895178
+      - 87.4368646579035
+    producers:
+      node-22:
+        latency-ms: 79.0
+      node-3:
+        latency-ms: 76.0
+      node-33:
+        latency-ms: 73.0
+      node-38:
+        latency-ms: 5.0
+      node-42:
+        latency-ms: 10.0
+      node-47:
+        latency-ms: 57.0
+  node-46:
+    location:
+      - 63.20834641629736
+      - 144.83180554235864
+    producers:
+      node-10:
+        latency-ms: 51.0
+      node-11:
+        latency-ms: 13.0
+      node-18:
+        latency-ms: 9.0
+      node-3:
+        latency-ms: 25.0
+      node-33:
+        latency-ms: 5.0
+      node-42:
+        latency-ms: 82.0
+      node-48:
+        latency-ms: 39.0
+      node-49:
+        latency-ms: 39.0
+      node-8:
+        latency-ms: 66.0
+  node-47:
+    location:
+      - 35.20729705395175
+      - 106.29176191242895
+    producers:
+      node-1:
+        latency-ms: 23.0
+      node-2:
+        latency-ms: 25.0
+      node-20:
+        latency-ms: 5.0
+      node-28:
+        latency-ms: 20.0
+      node-42:
+        latency-ms: 66.0
+      node-45:
+        latency-ms: 57.0
+      node-6:
+        latency-ms: 32.0
+  node-48:
+    location:
+      - 3.6189350065227615
+      - 84.45784737603792
+    producers:
+      node-0:
+        latency-ms: 16.0
+      node-1:
+        latency-ms: 3.0
+      node-13:
+        latency-ms: 27.0
+      node-16:
+        latency-ms: 16.0
+      node-22:
+        latency-ms: 41.0
+      node-27:
+        latency-ms: 23.0
+      node-38:
+        latency-ms: 45.0
+      node-46:
+        latency-ms: 39.0
+      node-9:
+        latency-ms: 43.0
+  node-49:
+    location:
+      - -6.480783445127173
+      - 172.52068670644027
+    producers:
+      node-19:
+        latency-ms: 4.0
+      node-27:
+        latency-ms: 30.0
+      node-33:
+        latency-ms: 43.0
+      node-37:
+        latency-ms: 9.0
+      node-46:
+        latency-ms: 39.0
+  node-5:
+    stake: 28279807213150
+    location:
+      - 50.857806464560724
+      - 176.56526606977556
+    producers:
+      node-20:
+        latency-ms: 32.0
+      node-29:
+        latency-ms: 28.0
+      node-32:
+        latency-ms: 87.0
+      node-37:
+        latency-ms: 21.0
+      node-44:
+        latency-ms: 28.0
+  node-6:
+    stake: 145423905935036
+    location:
+      - 74.55648434955052
+      - 3.418589114626971
+    producers:
+      node-22:
+        latency-ms: 3.0
+      node-23:
+        latency-ms: 43.0
+      node-24:
+        latency-ms: 48.0
+      node-26:
+        latency-ms: 71.0
+      node-29:
+        latency-ms: 13.0
+      node-36:
+        latency-ms: 34.0
+      node-38:
+        latency-ms: 87.0
+      node-44:
+        latency-ms: 23.0
+      node-47:
+        latency-ms: 32.0
+  node-7:
+    stake: 595610764894074
+    location:
+      - -10.547453243844814
+      - 27.864479684167435
+    producers:
+      node-23:
+        latency-ms: 6.0
+      node-24:
+        latency-ms: 2.0
+      node-30:
+        latency-ms: 10.0
+      node-34:
+        latency-ms: 70.0
+      node-37:
+        latency-ms: 77.0
+      node-39:
+        latency-ms: 3.0
+      node-40:
+        latency-ms: 32.0
+      node-41:
+        latency-ms: 16.0
+  node-8:
+    stake: 2052842042678311
+    location:
+      - -36.73092041592641
+      - 51.97183002598685
+    producers:
+      node-23:
+        latency-ms: 18.0
+      node-35:
+        latency-ms: 22.0
+      node-39:
+        latency-ms: 18.0
+      node-41:
+        latency-ms: 9.0
+      node-46:
+        latency-ms: 66.0
+  node-9:
+    stake: 6180644687509340
+    location:
+      - 20.551748175915407
+      - 1.9013282124105535
+    producers:
+      node-21:
+        latency-ms: 55.0
+      node-22:
+        latency-ms: 28.0
+      node-39:
+        latency-ms: 21.0
+      node-41:
+        latency-ms: 35.0
+      node-44:
+        latency-ms: 39.0
+      node-48:
+        latency-ms: 43.0

@@ -20,16 +20,14 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
         let mut prev_x = -1.0;
         for i in 0..data.len() {
             let (x, y) = data[i];
-            if y != prev_y {
+            if x == prev_x {
+                data[pos - 1] = (x, y);
+            } else if y != prev_y {
                 data[pos] = (x, y);
-                prev_y = y;
                 pos += 1;
             }
-            if x == prev_x {
-                web_sys::console::log_2(&"duplicate x".into(), &format!("{:?}", data).into());
-                panic!("duplicate x");
-            }
             prev_x = x;
+            prev_y = y;
         }
         data.truncate(pos);
     }

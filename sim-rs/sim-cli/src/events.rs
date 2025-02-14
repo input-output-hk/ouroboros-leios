@@ -31,10 +31,10 @@ struct OutputEvent {
     message: Event,
 }
 
-#[derive(clap::ValueEnum, Clone, Copy)]
-pub enum OutputFormat {
-    EventStream,
-    SlotStream,
+#[derive(Clone, Copy)]
+enum OutputFormat {
+    JsonStream,
+    CborStream,
 }
 
 pub struct EventMonitor {
@@ -44,7 +44,6 @@ pub struct EventMonitor {
     maximum_ib_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
-    output_format: OutputFormat,
 }
 
 impl EventMonitor {
@@ -52,7 +51,6 @@ impl EventMonitor {
         config: &SimConfiguration,
         events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
         output_path: Option<PathBuf>,
-        output_format: Option<OutputFormat>,
     ) -> Self {
         let node_ids = config.nodes.iter().map(|p| p.id).collect();
         let pool_ids = config
@@ -69,7 +67,6 @@ impl EventMonitor {
             maximum_ib_age,
             events_source,
             output_path,
-            output_format: output_format.unwrap_or(OutputFormat::EventStream),
         }
     }
 
@@ -106,6 +103,7 @@ impl EventMonitor {
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
         let mut leios_txs = 0u64;
+        let mut unique_leios_txs = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
@@ -127,12 +125,18 @@ impl EventMonitor {
         let mut output = match self.output_path {
             Some(ref path) => {
                 let file = File::create(path).await?;
-                match self.output_format {
-                    OutputFormat::EventStream => OutputTarget::EventStream(BufWriter::new(file)),
-                    OutputFormat::SlotStream => OutputTarget::SlotStream {
-                        file: BufWriter::new(file),
-                        next: None,
-                    },
+                let format = if path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext == "cbor")
+                {
+                    OutputFormat::CborStream
+                } else {
+                    OutputFormat::JsonStream
+                };
+                OutputTarget::EventStream {
+                    format,
+                    file: BufWriter::new(file),
                 }
             }
             None => OutputTarget::None,
@@ -165,7 +169,6 @@ impl EventMonitor {
                 Event::CpuTaskScheduled { .. } => {}
                 Event::CpuTaskFinished { .. } => {}
                 Event::CpuSubtaskStarted { .. } => {}
-                Event::CpuSubtaskFinished { .. } => {}
                 Event::TransactionGenerated { id, bytes, .. } => {
                     txs.insert(id, Transaction::new(bytes, time));
                     pending_txs.insert(id);
@@ -183,6 +186,7 @@ impl EventMonitor {
                     vrf,
                     endorsement,
                     transactions,
+                    ..
                 } => {
                     let mut all_txs = transactions;
                     info!(
@@ -193,20 +197,24 @@ impl EventMonitor {
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
-                        let mut block_leios_txs: Vec<_> = eb_ibs
+                        let block_leios_txs: Vec<_> = eb_ibs
                             .get(&endorsement.eb)
                             .unwrap()
                             .iter()
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
                             .copied()
-                            .dedup()
                             .collect();
+
+                        let mut unique_block_leios_txs: Vec<_> =
+                            block_leios_txs.iter().copied().sorted().dedup().collect();
                         info!(
-                            "This block had an additional {} leios tx(s).",
-                            block_leios_txs.len()
+                            "This block had an additional {} leios tx(s) ({} unique).",
+                            block_leios_txs.len(),
+                            unique_block_leios_txs.len()
                         );
                         leios_txs += block_leios_txs.len() as u64;
-                        all_txs.append(&mut block_leios_txs);
+                        unique_leios_txs += unique_block_leios_txs.len() as u64;
+                        all_txs.append(&mut unique_block_leios_txs);
                     }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
                         if *old_vrf > vrf {
@@ -233,14 +241,18 @@ impl EventMonitor {
                 Event::PraosBlockSent { .. } => {}
                 Event::PraosBlockReceived { .. } => {}
                 Event::InputBlockLotteryWon { .. } => {}
-                Event::InputBlockGenerated { id, transactions } => {
+                Event::InputBlockGenerated {
+                    id,
+                    header_bytes,
+                    transactions,
+                } => {
                     generated_ibs += 1;
                     if transactions.is_empty() {
                         empty_ibs += 1;
                     }
                     pending_ibs.insert(id.clone());
                     ib_txs.insert(id.clone(), transactions.clone());
-                    let mut ib_bytes = 0;
+                    let mut ib_bytes = header_bytes;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(id.clone()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
@@ -268,7 +280,9 @@ impl EventMonitor {
                     *seen_ibs.entry(recipient.id).or_default() += 1.;
                 }
                 Event::EndorserBlockLotteryWon { .. } => {}
-                Event::EndorserBlockGenerated { id, input_blocks } => {
+                Event::EndorserBlockGenerated {
+                    id, input_blocks, ..
+                } => {
                     generated_ebs += 1;
                     eb_ibs.insert(id.clone(), input_blocks.clone());
                     for ib_id in &input_blocks {
@@ -296,7 +310,7 @@ impl EventMonitor {
                     eb_messages.received += 1;
                 }
                 Event::VoteLotteryWon { .. } => {}
-                Event::VotesGenerated { id, votes } => {
+                Event::VotesGenerated { id, votes, .. } => {
                     for (eb, count) in votes.0 {
                         total_votes += count as u64;
                         *votes_per_bundle.entry(id.clone()).or_default() += count as f64;
@@ -323,7 +337,7 @@ impl EventMonitor {
                 "{} slot(s) had no naive praos blocks.",
                 total_slots - blocks.len() as u64
             );
-            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + leios_txs, pretty_bytes(published_bytes, pbo.clone()));
+            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + unique_leios_txs, pretty_bytes(published_bytes, pbo.clone()));
             info!(
                 "{} transaction(s) ({}) did not reach a naive praos block.",
                 pending_txs.len(),
@@ -453,8 +467,9 @@ impl EventMonitor {
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
-            info!("{} tx(s) were referenced by a Leios endorsement.", leios_txs);
+            info!("{} tx(s) were referenced by a Leios endorsement.", unique_leios_txs);
             info!("{} tx(s) were included directly in a Praos block.", praos_txs);
+            info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", leios_txs - unique_leios_txs, (leios_txs - unique_leios_txs) as f64 / leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
                 ib_time_stats.mean, ib_time_stats.std_dev,
@@ -528,61 +543,46 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
 }
 
 enum OutputTarget {
-    EventStream(BufWriter<File>),
-    SlotStream {
+    EventStream {
+        format: OutputFormat,
         file: BufWriter<File>,
-        next: Option<SlotEvents>,
     },
     None,
 }
 
-#[derive(Serialize)]
-struct SlotEvents {
-    slot: u64,
-    start_time: Timestamp,
-    events: Vec<OutputEvent>,
-}
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
         match self {
-            Self::EventStream(file) => {
-                Self::write_line(file, event).await?;
-            }
-            Self::SlotStream { file, next } => {
-                if let Event::Slot { number } = &event.message {
-                    if let Some(slot) = next.take() {
-                        Self::write_line(file, slot).await?;
-                    }
-                    *next = Some(SlotEvents {
-                        slot: *number,
-                        start_time: event.time,
-                        events: vec![],
-                    });
-                } else if let Some(slot) = next.as_mut() {
-                    slot.events.push(event);
-                }
+            Self::EventStream { format, file } => {
+                Self::write_line(*format, file, event).await?;
             }
             Self::None => {}
         }
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(file: &mut BufWriter<File>, event: T) -> Result<()> {
-        let mut string = serde_json::to_string(&event)?;
-        string.push('\n');
-        file.write_all(string.as_bytes()).await?;
+    async fn write_line<T: Serialize>(
+        format: OutputFormat,
+        file: &mut BufWriter<File>,
+        event: T,
+    ) -> Result<()> {
+        match format {
+            OutputFormat::JsonStream => {
+                let mut string = serde_json::to_string(&event)?;
+                string.push('\n');
+                file.write_all(string.as_bytes()).await?;
+            }
+            OutputFormat::CborStream => {
+                let bytes = serde_cbor::to_vec(&event)?;
+                file.write_all(&bytes).await?;
+            }
+        }
         Ok(())
     }
 
     async fn flush(self) -> Result<()> {
         match self {
-            Self::EventStream(mut file) => {
-                file.flush().await?;
-            }
-            Self::SlotStream { mut file, mut next } => {
-                if let Some(slot) = next.take() {
-                    Self::write_line(&mut file, slot).await?;
-                }
+            Self::EventStream { mut file, .. } => {
                 file.flush().await?;
             }
             Self::None => {}

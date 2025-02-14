@@ -11,6 +11,7 @@
 
 module LeiosProtocol.Common (
   module PraosProtocol.Common,
+  module TaskMultiQueue,
   RankingBlockHeader,
   RankingBlockBody (..),
   RankingBlock,
@@ -38,17 +39,22 @@ module LeiosProtocol.Common (
 )
 where
 
-import ChanTCP
+import Chan.TCP
 import Control.Exception (assert)
 import Control.Monad (guard)
+import Data.Aeson
+import Data.Aeson.Types (Parser, unexpected)
 import Data.Coerce
 import Data.Hashable
 import Data.Map (Map)
+import qualified Data.Text as T
 import Data.Word (Word64, Word8)
 import GHC.Generics
 import GHC.Records
 import PraosProtocol.Common
 import SimTypes
+import TaskMultiQueue
+import Text.Read (readMaybe)
 
 {-
   Note [size of blocks/messages]: we add a `size` field to most
@@ -231,6 +237,11 @@ instance MessageSize VoteMsg where
 mkStringId :: (HasField "node" a NodeId, HasField "num" a Int) => a -> String
 mkStringId x = concat [show (coerce @_ @Int x.node), "-", show x.num]
 
+readStringId :: String -> Maybe (NodeId, Int)
+readStringId s = do
+  (node_s, '-' : i_s) <- pure $ break (== '-') s
+  (,) <$> (NodeId <$> readMaybe node_s) <*> readMaybe i_s
+
 instance HasField "stringId" InputBlockHeader String where
   getField = mkStringId . (.id)
 
@@ -245,3 +256,23 @@ instance HasField "stringId" VoteMsg String where
 
 instance HasField "stringId" EndorseBlock String where
   getField = mkStringId . (.id)
+
+instance ToJSON InputBlockId where
+  toJSON = toJSON . mkStringId
+
+instance FromJSON InputBlockId where
+  parseJSON = parseStringId InputBlockId
+
+instance ToJSON EndorseBlockId where
+  toJSON = toJSON . mkStringId
+instance FromJSON EndorseBlockId where
+  parseJSON = parseStringId EndorseBlockId
+
+instance ToJSON VoteId where
+  toJSON = toJSON . mkStringId
+instance FromJSON VoteId where
+  parseJSON = parseStringId VoteId
+
+parseStringId :: (NodeId -> Int -> a) -> Value -> Parser a
+parseStringId c (String s) = maybe (fail "string id not readable") (pure . uncurry c) $ readStringId (T.unpack s)
+parseStringId _ v = unexpected v

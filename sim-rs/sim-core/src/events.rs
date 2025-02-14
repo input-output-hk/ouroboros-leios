@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, sync::Arc, time::Duration};
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use tokio::sync::mpsc;
 use tracing::warn;
 
@@ -72,10 +72,8 @@ pub enum Event {
     CpuSubtaskStarted {
         task: CpuTaskId<Node>,
         subtask_id: u64,
-    },
-    CpuSubtaskFinished {
-        task: CpuTaskId<Node>,
-        subtask_id: u64,
+        #[serde(serialize_with = "duration_as_secs")]
+        duration: Duration,
     },
     TransactionGenerated {
         id: TransactionId,
@@ -100,6 +98,7 @@ pub enum Event {
         slot: u64,
         producer: Node,
         vrf: u64,
+        header_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
@@ -120,6 +119,7 @@ pub enum Event {
     InputBlockGenerated {
         #[serde(flatten)]
         id: InputBlockId<Node>,
+        header_bytes: u64,
         transactions: Vec<TransactionId>,
     },
     InputBlockSent {
@@ -141,6 +141,7 @@ pub enum Event {
     EndorserBlockGenerated {
         #[serde(flatten)]
         id: EndorserBlockId<Node>,
+        bytes: u64,
         input_blocks: Vec<InputBlockId<Node>>,
     },
     EndorserBlockSent {
@@ -162,6 +163,7 @@ pub enum Event {
     VotesGenerated {
         #[serde(flatten)]
         id: VoteBundleId<Node>,
+        bytes: u64,
         votes: Votes<Node>,
     },
     NoVote {
@@ -240,17 +242,16 @@ impl EventTracker {
         });
     }
 
-    pub fn track_cpu_subtask_started(&self, task_id: CpuTaskId, subtask_id: u64) {
+    pub fn track_cpu_subtask_started(
+        &self,
+        task_id: CpuTaskId,
+        subtask_id: u64,
+        duration: Duration,
+    ) {
         self.send(Event::CpuSubtaskStarted {
             task: self.to_task(task_id),
             subtask_id,
-        });
-    }
-
-    pub fn track_cpu_subtask_finished(&self, task_id: CpuTaskId, subtask_id: u64) {
-        self.send(Event::CpuSubtaskFinished {
-            task: self.to_task(task_id),
-            subtask_id,
+            duration,
         });
     }
 
@@ -266,8 +267,10 @@ impl EventTracker {
             slot: block.slot,
             producer: self.to_node(block.producer),
             vrf: block.vrf,
+            header_bytes: block.header_bytes,
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
                 eb: self.to_endorser_block(e.eb),
+                bytes: e.bytes,
                 votes: e.votes.iter().map(|n| self.to_node(*n)).collect(),
             }),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
@@ -323,6 +326,7 @@ impl EventTracker {
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
         self.send(Event::InputBlockGenerated {
             id: self.to_input_block(block.header.id),
+            header_bytes: block.header.bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }
@@ -352,6 +356,7 @@ impl EventTracker {
     pub fn track_eb_generated(&self, block: &crate::model::EndorserBlock) {
         self.send(Event::EndorserBlockGenerated {
             id: self.to_endorser_block(block.id()),
+            bytes: block.bytes,
             input_blocks: block
                 .ibs
                 .iter()
@@ -385,6 +390,7 @@ impl EventTracker {
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VotesGenerated {
             id: self.to_vote_bundle(votes.id),
+            bytes: votes.bytes,
             votes: Votes(
                 votes
                     .ebs
@@ -467,4 +473,8 @@ impl EventTracker {
             name: self.node_names.get(&id).unwrap().clone(),
         }
     }
+}
+
+fn duration_as_secs<S: Serializer>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_f32(duration.as_secs_f32())
 }

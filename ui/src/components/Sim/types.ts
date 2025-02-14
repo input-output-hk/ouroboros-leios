@@ -1,10 +1,11 @@
 export interface INode {
+  id: string;
   location: number[];
   stake?: number;
 }
 
 export interface ILink {
-  nodes: number[];
+  nodes: string[];
 }
 
 export interface IServerNodeMap {
@@ -95,6 +96,7 @@ export interface IInputBlockGenerated {
   index: number;
   vrf: number;
   timestamp: number;
+  header_bytes: number
   transactions: number[];
 }
 
@@ -128,12 +130,15 @@ export interface IPraosBlockGenerated {
   id: string;
   slot: number;
   producer: number;
+  header_bytes: number;
   endorsement: IEndorsement | null;
   transactions: number[];
 }
 
 export interface IEndorsement {
   eb: { id: string }
+  bytes: number;
+  votes: {}
 }
 
 export interface IPraosBlockReceived {
@@ -157,6 +162,7 @@ export interface IEndorserBlockGenerated {
   id: string;
   slot: number;
   producer: number;
+  bytes: number;
   input_blocks: IInputBlock[]
 }
 
@@ -185,6 +191,7 @@ export interface IVotesGenerated {
   id: string;
   slot: number;
   producer: string;
+  bytes: number;
   votes: any[] // @todo
 }
 

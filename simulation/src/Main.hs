@@ -13,16 +13,16 @@ import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
-import qualified Data.Traversable as Traversable
+import Data.Maybe (fromMaybe, listToMaybe)
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
+import LeiosProtocol.Common (BlockBody, PraosConfig)
 import qualified LeiosProtocol.Config as OnDisk
 import qualified LeiosProtocol.Short.VizSim as VizShortLeios
 import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
-import ModelTCP (Bytes (..))
+import ModelTCP (Bytes (..), kilobytes)
 import Options.Applicative (
   Alternative ((<|>)),
   HasValue,
@@ -30,6 +30,7 @@ import Options.Applicative (
   Parser,
   ParserInfo,
   ParserPrefs,
+  asum,
   auto,
   command,
   commandGroup,
@@ -57,18 +58,17 @@ import Options.Applicative (
   (<**>),
  )
 import Options.Applicative.Types (ReadM)
-import P2P (P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import qualified PraosProtocol.ExamplesPraosP2P as VizPraosP2P
 import qualified PraosProtocol.VizSimBlockFetch as VizBlockFetch
 import qualified PraosProtocol.VizSimChainSync as VizChainSync
 import qualified PraosProtocol.VizSimPraos as VizPraos
-import SimTCPLinks (kilobytes)
 import SimTypes
 import System.Exit (exitFailure)
+import System.FilePath
 import System.IO (hPutStrLn, stderr)
 import qualified System.Random as Random
 import TimeCompat
-import Topology
+import Topology hiding (topologyOptions)
 import Viz
 
 main :: IO ()
@@ -107,7 +107,7 @@ parserOptions =
         progDesc "Convert from a benchmark topology and a latency database to a topology with clusters."
     , command "convert-cluster-topology" . info (CliCommand <$> parserCliLayoutTopology <**> helper) $
         progDesc "Convert from a topology with clusters to a topology with location coordinates."
-    , command "generate-topology" . info (CliCommand <$> parserCliGenTopology <**> helper) $
+    , command "generate-topology" . info (CliCommand <$> parserCliGenerateTopology <**> helper) $
         progDesc "Generate a topology from a world shape and expected links. Other parameters are fixed and meant to be edited after the fact."
     ]
 
@@ -200,16 +200,19 @@ data VizSubCommand
   | VizPraos1
   | VizPraosP2P1
       { seed :: Int
-      , optionalConfigFile :: Maybe FilePath
-      , topographyOptions :: TopographyOptions
-      , overrideUnlimitedBps :: Bytes
+      , configOptions :: ConfigOptions
+      , topologyOptions :: TopologyOptions
       }
   | VizPraosP2P2
   | VizRelayTest1
   | VizRelayTest2
   | VizRelayTest3
   | VizShortLeios1
-  | VizShortLeiosP2P1 {seed :: Int, configFile :: FilePath, topographyOptions :: TopographyOptions, overrideUnlimitedBps :: Bytes}
+  | VizShortLeiosP2P1
+      { seed :: Int
+      , configOptions :: ConfigOptions
+      , topologyOptions :: TopologyOptions
+      }
 
 parserVizSubCommand :: Parser VizSubCommand
 parserVizSubCommand =
@@ -263,9 +266,8 @@ parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
   VizPraosP2P1
     <$> parserSeed
-    <*> optional parserLeiosConfigFile
-    <*> parserTopographyOptions
-    <*> parserOverrideUnlimited
+    <*> parserConfigOptions
+    <*> parserTopologyOptions
 
 parserSeed :: Parser Int
 parserSeed =
@@ -287,9 +289,8 @@ parserShortLeiosP2P1 =
           <> help "The seed for the random number generator."
           <> shownDefValue 0
       )
-    <*> parserLeiosConfigFile
-    <*> parserTopographyOptions
-    <*> parserOverrideUnlimited
+    <*> parserConfigOptions
+    <*> parserTopologyOptions
 
 vizOptionsToViz :: VizCommand -> IO Visualization
 vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
@@ -306,8 +307,8 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizPraosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    cfg <- fromMaybe def <$> traverse (fmap VizPraosP2P.convertConfig . OnDisk.readConfig) optionalConfigFile
+    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    cfg <- execConfigOptions configOptions
     pure $ VizPraosP2P.example1 rng2 cfg p2pNetwork
   VizPraosP2P2 -> pure VizPraosP2P.example2
   VizRelayTest1 -> pure VizSimTestRelay.example1
@@ -317,9 +318,9 @@ vizOptionsToViz VizCommandWithOptions{..} = case vizSubCommand of
   VizShortLeiosP2P1{..} -> do
     let rng0 = Random.mkStdGen seed
     let (rng1, rng2) = Random.split rng0
-    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    config <- OnDisk.readConfig configFile
-    pure $ VizShortLeiosP2P.example2 rng2 config p2pNetwork
+    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    cfg <- execConfigOptions configOptions
+    pure $ VizShortLeiosP2P.example2 rng2 cfg p2pNetwork
 
 type VizSize = (Int, Int)
 
@@ -346,27 +347,35 @@ vizSizeOptions =
 -- Simulation Commands
 --------------------------------------------------------------------------------
 
-runSimOptions :: SimOptions -> IO ()
-runSimOptions SimOptions{..} = case simCommand of
-  SimPraosDiffusion{..} -> do
-    let rng0 = Random.mkStdGen seed
-    let (rng1, rng2) = Random.split rng0
-    mconfig <- Traversable.traverse OnDisk.readConfig optionalConfigFile
-    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    -- let bandwidth = 10 * 125_000_000 :: Bytes -- 10 Gbps TODO: set in config
-    VizPraosP2P.example1000Diffusion rng2 mconfig p2pNetwork simOutputSeconds simOutputFile
-  SimShortLeios{..} -> do
-    let rng0 = Random.mkStdGen seed
-    let (rng1, rng2) = Random.split rng0
-    config <- OnDisk.readConfig configFile
-    p2pNetwork <- execTopographyOptions rng1 overrideUnlimitedBps topographyOptions
-    VizShortLeiosP2P.exampleSim rng2 config p2pNetwork emitControl simOutputSeconds simOutputFile
-
 data SimOptions = SimOptions
   { simCommand :: SimCommand
   , simOutputSeconds :: Time
   , simOutputFile :: FilePath
   }
+
+runSimOptions :: SimOptions -> IO ()
+runSimOptions SimOptions{..} = case simCommand of
+  SimPraosDiffusion{..} -> do
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    config <- execConfigOptions configOptions
+    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    -- let bandwidth = 10 * 125_000_000 :: Bytes -- 10 Gbps TODO: set in config
+    VizPraosP2P.example1000Diffusion rng2 config p2pNetwork simOutputSeconds simOutputFile
+  SimShortLeios{..} -> do
+    let rng0 = Random.mkStdGen seed
+    let (rng1, rng2) = Random.split rng0
+    config <- execConfigOptions configOptions
+    p2pNetwork <- execTopologyOptions rng1 topologyOptions
+    let outputCfg =
+          VizShortLeiosP2P.SimOutputConfig
+            { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | not skipLog]
+            , emitControl
+            , dataFile = Just simOutputFile
+            , analize
+            , stop = simOutputSeconds
+            }
+    VizShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
 parserSimOptions :: Parser SimOptions
 parserSimOptions =
@@ -391,16 +400,16 @@ parserSimOptions =
 data SimCommand
   = SimPraosDiffusion
       { seed :: Int
-      , optionalConfigFile :: Maybe FilePath
-      , topographyOptions :: TopographyOptions
-      , overrideUnlimitedBps :: Bytes
+      , configOptions :: ConfigOptions
+      , topologyOptions :: TopologyOptions
       }
   | SimShortLeios
       { seed :: Int
-      , configFile :: FilePath
-      , topographyOptions :: TopographyOptions
-      , overrideUnlimitedBps :: Bytes
+      , configOptions :: ConfigOptions
+      , topologyOptions :: TopologyOptions
       , emitControl :: Bool
+      , skipLog :: Bool
+      , analize :: Bool
       }
 
 parserSimCommand :: Parser SimCommand
@@ -417,18 +426,37 @@ parserSimPraosDiffusion :: Parser SimCommand
 parserSimPraosDiffusion =
   SimPraosDiffusion
     <$> parserSeed
-    <*> optional parserLeiosConfigFile
-    <*> parserTopographyOptions
-    <*> parserOverrideUnlimited
+    <*> parserConfigOptions
+    <*> parserTopologyOptions
 
 parserShortLeios :: Parser SimCommand
 parserShortLeios =
   SimShortLeios
     <$> parserSeed
-    <*> parserLeiosConfigFile
-    <*> parserTopographyOptions
-    <*> parserOverrideUnlimited
+    <*> parserConfigOptions
+    <*> parserTopologyOptions
     <*> switch (long "log-control" <> help "Include control messages in log.")
+    <*> switch (long "no-log" <> help "Do not output event log.")
+    <*> switch (long "analize" <> help "Calculate metrics and statistics.")
+
+data ConfigOptions
+  = LeiosConfigFile FilePath
+  | LeiosConfig OnDisk.Config
+
+execConfigOptions :: ConfigOptions -> IO OnDisk.Config
+execConfigOptions = \case
+  LeiosConfigFile configFile -> OnDisk.readConfig configFile
+  LeiosConfig config -> pure config
+
+execConfigOptionsForPraos :: ConfigOptions -> IO (PraosConfig BlockBody)
+execConfigOptionsForPraos = fmap VizPraosP2P.convertConfig . execConfigOptions
+
+parserConfigOptions :: Parser ConfigOptions
+parserConfigOptions =
+  asum
+    [ LeiosConfigFile <$> parserLeiosConfigFile
+    , pure $ LeiosConfig def
+    ]
 
 parserLeiosConfigFile :: Parser FilePath
 parserLeiosConfigFile =
@@ -453,11 +481,18 @@ parserOverrideUnlimited =
 -- Utility Commands
 --------------------------------------------------------------------------------
 
+data CliCommand
+  = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
+  | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
+  | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
+
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
+  -- Convert from a benchmark topology to the shared topology format
   CliConvertBenchTopology{..} -> do
     topologyCluster <- readTopologyFromBenchTopology inputBenchTopologyFile inputBenchLatenciesFile 1
     writeTopology outputTopologyFile (SomeTopology SCLUSTER topologyCluster)
+  -- Convert from a topology with cluster names to a toplogy with coordinates
   CliLayoutTopology{..} -> do
     readTopology inputTopologyFile >>= \case
       Left errMsg -> do
@@ -469,22 +504,12 @@ runCliOptions = \case
       Right (SomeTopology SCLUSTER topologyCluster) -> do
         topologyCoord2D <- layoutTopology defaultParams topologyCluster
         writeTopology outputTopologyFile (SomeTopology SCOORD2D topologyCoord2D)
-  CliGenTopology{..} -> do
-    let topographyOptions = either TopographyCharacteristicsFile TopographyCharacteristics inputCharacteristics
+  -- Generate a random topology using the topology characteristics
+  CliGenerateTopology{..} -> do
     let rng = Random.mkStdGen seed
-    let bps = kilobytes 1000
-    p2pNetwork@P2PNetwork{p2pNodes} <- execTopographyOptions rng bps topographyOptions
+    p2pNetwork@P2PNetwork{..} <- execTopologyGenerationOptions rng topologyGenerationOptions
     let totalStake = fromIntegral $ 100 * Map.size p2pNodes
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
-
-data CliCommand
-  = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
-  | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
-  | CliGenTopology
-      { seed :: Int
-      , inputCharacteristics :: Either FilePath P2PTopographyCharacteristics
-      , outputTopologyFile :: FilePath
-      }
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -524,11 +549,11 @@ parserCliLayoutTopology =
           <> help "The output topology file."
       )
 
-parserCliGenTopology :: Parser CliCommand
-parserCliGenTopology =
-  CliGenTopology
+parserCliGenerateTopology :: Parser CliCommand
+parserCliGenerateTopology =
+  CliGenerateTopology
     <$> parserSeed
-    <*> ((Left <$> parserTopographyCharacteristicsFile) <|> (Right <$> parserTopographyCharacteristics))
+    <*> parserTopologyGenerationOptions
     <*> strOption
       ( long "output-topology"
           <> short 'o'
@@ -540,86 +565,100 @@ parserCliGenTopology =
 -- Parsing Topography Options
 --------------------------------------------------------------------------------
 
-execTopographyOptions :: Random.RandomGen g => g -> Bytes -> TopographyOptions -> IO P2PNetwork
-execTopographyOptions rng bandwidth_bps = checkNetwork <=< go
- where
-  go = \case
-    SimpleTopologyFile simpleTopologyFile -> do
-      -- TODO: infer world size from latencies
-      let world = World (1200, 1000) Rectangle
-      overrideUnlimitedBandwidth bandwidth_bps <$> readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
-    TopographyCharacteristicsFile p2pTopographyCharacteristicsFile -> do
-      eitherP2PTopographyCharacteristics <- eitherDecodeFileStrict' p2pTopographyCharacteristicsFile
-      case eitherP2PTopographyCharacteristics of
-        Right p2pTopographyCharacteristics ->
-          pure $ topologyToNetwork (Just bandwidth_bps) $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
-        Left errorMessage ->
-          fail $ "Could not decode P2PTopographyCharacteristics from '" <> p2pTopographyCharacteristicsFile <> "':\n" <> errorMessage
-    TopographyCharacteristics p2pTopographyCharacteristics -> do
-      pure $ topologyToNetwork (Just bandwidth_bps) $ genArbitraryP2PTopography p2pTopographyCharacteristics rng
-  checkNetwork net = do
-    let node_triplets = triangleInequalityCheck p2pLinks
-         where
-          P2PTopography{p2pLinks} = networkToTopology net
-    unless (null node_triplets) $ do
-      putStr $
-        unlines $
-          "Latencies do not respect triangle inequalities for these nodes:" : map show node_triplets
-    return net
+execTopologyOptions :: Random.RandomGen g => g -> TopologyOptions -> IO P2PNetwork
+execTopologyOptions rng = \case
+  TopologyFile simpleTopologyFile -> do
+    -- TODO: infer world size from latencies
+    let world = World (1200, 1000) Rectangle
+    validateP2PNetwork =<< readP2PTopographyFromSomeTopology defaultParams world simpleTopologyFile
+  TopologyGenerationOptions topologyGenerationOptions -> execTopologyGenerationOptions rng topologyGenerationOptions
 
-data TopographyOptions
-  = SimpleTopologyFile FilePath
-  | TopographyCharacteristicsFile FilePath
-  | TopographyCharacteristics P2PTopographyCharacteristics
+execTopologyGenerationOptions :: Random.RandomGen g => g -> TopologyGenerationOptions -> IO P2PNetwork
+execTopologyGenerationOptions rng =
+  validateP2PNetwork <=< \case
+    TopologyGenerationStrategyFile topologyGenerationStrategyFile ->
+      eitherDecodeFileStrict' topologyGenerationStrategyFile >>= \case
+        Right topologyGenerationStrategy -> execTopologyGenerationOptions rng (TopologyGenerationStrategy topologyGenerationStrategy)
+        Left errorMessage -> fail $ "Could not decode P2PTopographyCharacteristics from '" <> topologyGenerationStrategyFile <> "':\n" <> errorMessage
+    TopologyGenerationStrategy topologyGenerationStrategy -> generateTopology rng topologyGenerationStrategy
 
-parserTopographyOptions :: Parser TopographyOptions
-parserTopographyOptions =
-  parserSimpleTopologyFile
-    <|> (TopographyCharacteristicsFile <$> parserTopographyCharacteristicsFile)
-    <|> (TopographyCharacteristics <$> parserTopographyCharacteristics)
- where
-  parserSimpleTopologyFile =
-    SimpleTopologyFile
-      <$> strOption
-        ( short 't'
-            <> long "topology-file"
-            <> metavar "FILE"
-            <> help "A topology file describing the world topology."
-        )
+data TopologyOptions
+  = TopologyFile FilePath
+  | TopologyGenerationOptions TopologyGenerationOptions
 
-parserTopographyCharacteristicsFile :: Parser FilePath
-parserTopographyCharacteristicsFile =
+instance Default TopologyOptions where
+  def = TopologyGenerationOptions def
+
+parserTopologyOptions :: Parser TopologyOptions
+parserTopologyOptions =
+  asum
+    [ TopologyFile <$> parserTopologyFile
+    , TopologyGenerationOptions <$> parserTopologyGenerationOptions
+    , pure def
+    ]
+
+parserTopologyFile :: Parser FilePath
+parserTopologyFile =
   strOption
-    ( long "tc"
-        <> long "topology-characteristics-file"
+    ( short 't'
+        <> long "topology-file"
         <> metavar "FILE"
-        <> help "A file describing the characteristics of the world topology."
+        <> help "A topology file describing the world topology."
     )
 
-parserTopographyCharacteristics :: Parser P2PTopographyCharacteristics
-parserTopographyCharacteristics =
-  P2PTopographyCharacteristics
+data TopologyGenerationOptions
+  = TopologyGenerationStrategyFile FilePath
+  | TopologyGenerationStrategy TopologyGenerationStrategy
+
+instance Default TopologyGenerationOptions where
+  def = TopologyGenerationStrategy def
+
+parserTopologyGenerationOptions :: Parser TopologyGenerationOptions
+parserTopologyGenerationOptions =
+  (TopologyGenerationStrategyFile <$> parserTopologyGenerationStrategyFile)
+    <|> (TopologyGenerationStrategy <$> parserTopologyGenerationStrategy)
+
+parserTopologyGenerationStrategyFile :: Parser FilePath
+parserTopologyGenerationStrategyFile =
+  strOption
+    ( long "tg"
+        <> long "topology-generation-strategy-file"
+        <> metavar "FILE"
+        <> help "A file describing the topology generation strategy."
+    )
+
+parserTopologyGenerationStrategy :: Parser TopologyGenerationStrategy
+parserTopologyGenerationStrategy =
+  subparser . mconcat $
+    [ commandGroup "Available topology generation strategies:"
+    , command "close-and-random" . info (PickLinksCloseAndRandom <$> parserPickLinksCloseAndRandomOptions <**> helper) $
+        progDesc "Pick links to close and random nodes."
+    ]
+
+parserPickLinksCloseAndRandomOptions :: Parser PickLinksCloseAndRandomOptions
+parserPickLinksCloseAndRandomOptions =
+  PickLinksCloseAndRandomOptions
     <$> parserWorld
     <*> option
       auto
-      ( long "tc-num-nodes"
+      ( long "tg-num-nodes"
           <> metavar "NUMBER"
           <> help "The number of nodes."
-          <> shownDefValue (p2pNumNodes def)
+          <> shownDefValue (numNodes def)
       )
     <*> option
       auto
-      ( long "tc-num-links-close"
+      ( long "tg-num-links-close"
           <> metavar "NUMBER"
           <> help "The number of links to close peers for each node."
-          <> shownDefValue (p2pNodeLinksClose def)
+          <> shownDefValue (numCloseLinksPerNode def)
       )
     <*> option
       auto
-      ( long "tc-num-links-random"
+      ( long "tg-num-links-random"
           <> metavar "NUMBER"
           <> help "The number of links to random peers for each node."
-          <> shownDefValue (p2pNodeLinksRandom def)
+          <> shownDefValue (numRandomLinksPerNode def)
       )
 
 parserWorld :: Parser World
@@ -632,7 +671,7 @@ parserWorldShape :: Parser WorldShape
 parserWorldShape =
   option
     readWorldShape
-    ( long "tc-world-shape"
+    ( long "tg-world-shape"
         <> metavar "SHAPE"
         <> help "The shape of the generated world. Supported shapes are rectangle and cylinder."
         <> value def
@@ -648,7 +687,7 @@ readWorldShape = eitherReader $ \txt ->
 showWorldShape :: WorldShape -> String
 showWorldShape s = case find ((== s) . snd) worldShapeLabels of
   Just (txt, _) -> txt
-  Nothing -> "Error, Unknown worldshape: " ++ show s
+  Nothing -> "Error: Unknown worldshape '" <> show s <> "'"
 
 worldShapeLabels :: [(String, WorldShape)]
 worldShapeLabels = [("rectangle", Rectangle), ("cylinder", Cylinder)]
@@ -658,15 +697,15 @@ parserWorldDimensions =
   (,)
     <$> option
       auto
-      ( long "tc-world-width"
+      ( long "tg-world-width"
           <> metavar "SECONDS"
           <> help "The east-west size of the generated world."
           <> shownDefValue (fst $ worldDimensions def)
       )
     <*> option
       auto
-      ( long "tc-world-height"
+      ( long "tg-world-height"
           <> metavar "SECONDS"
-          <> help "The north-south length of the generated world."
+          <> help "The north-south size of the generated world."
           <> shownDefValue (snd $ worldDimensions def)
       )

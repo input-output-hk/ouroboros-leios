@@ -163,11 +163,11 @@ impl HasBytesSize for SimulationMessage {
 
             Self::RollForward(_) => 8,
             Self::RequestBlock(_) => 8,
-            Self::Block(block) => block.transactions.iter().map(|t| t.bytes).sum(),
+            Self::Block(block) => block.bytes(),
 
             Self::AnnounceIBHeader(_) => 8,
             Self::RequestIBHeader(_) => 8,
-            Self::IBHeader(_, _) => 32,
+            Self::IBHeader(header, _) => header.bytes,
 
             Self::AnnounceIB(_) => 8,
             Self::RequestIB(_) => 8,
@@ -175,7 +175,7 @@ impl HasBytesSize for SimulationMessage {
 
             Self::AnnounceEB(_) => 8,
             Self::RequestEB(_) => 8,
-            Self::EB(_) => 32,
+            Self::EB(eb) => eb.bytes,
 
             Self::AnnounceVotes(_) => 8,
             Self::RequestVotes(_) => 8,

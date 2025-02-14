@@ -2,14 +2,14 @@ use std::{fs, path::PathBuf, process};
 
 use anyhow::Result;
 use clap::Parser;
-use events::{EventMonitor, OutputFormat};
+use events::EventMonitor;
 use figment::{
     providers::{Format as _, Yaml},
     Figment,
 };
 use sim_core::{
     clock::ClockCoordinator,
-    config::{NodeId, RawLegacyTopology, RawParameters, RawTopology, SimConfiguration, Topology},
+    config::{NodeId, RawParameters, RawTopology, SimConfiguration, Topology},
     events::EventTracker,
     sim::Simulation,
 };
@@ -30,8 +30,6 @@ struct Args {
     #[clap(short, long)]
     parameters: Vec<PathBuf>,
     #[clap(short, long)]
-    format: Option<OutputFormat>,
-    #[clap(short, long)]
     timescale: Option<f64>,
     #[clap(long)]
     trace_node: Vec<usize>,
@@ -41,11 +39,7 @@ struct Args {
 
 fn read_config(args: &Args) -> Result<SimConfiguration> {
     let topology_str = fs::read_to_string(&args.topology)?;
-    let topology_ext = args.topology.extension().and_then(|ext| ext.to_str());
-    let topology: Topology = if topology_ext == Some("toml") {
-        let raw_topology: RawLegacyTopology = toml::from_str(&topology_str)?;
-        raw_topology.into()
-    } else {
+    let topology: Topology = {
         let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
         raw_topology.into()
     };
@@ -101,8 +95,7 @@ async fn main() -> Result<()> {
     let config = read_config(&args)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
-    let monitor =
-        tokio::spawn(EventMonitor::new(&config, events_source, args.output, args.format).run());
+    let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
     let clock_coordinator = ClockCoordinator::new();
@@ -136,7 +129,6 @@ mod tests {
                 topology: topology?.path(),
                 output: None,
                 parameters: vec![],
-                format: None,
                 timescale: None,
                 trace_node: vec![],
                 slots: None,

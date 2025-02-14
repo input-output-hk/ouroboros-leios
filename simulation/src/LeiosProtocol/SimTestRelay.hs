@@ -11,8 +11,7 @@
 module LeiosProtocol.SimTestRelay where
 
 import Chan
-import ChanMux
-import ChanTCP
+import Chan.TCP (newConnectionTCP)
 import Control.Category ((>>>))
 import Control.Exception (assert)
 import Control.Monad (forever, when)
@@ -138,10 +137,13 @@ relayNode
     let relayConsumerConfig =
           RelayConsumerConfig
             { relay = relayConfig
+            , shouldIgnore = atomically $ do
+                rb <- readTVar relayBufferVar
+                return $ \hd -> RB.member (testHeaderId hd) rb
             , -- sequential validation of headers
               validateHeaders = map (const 0.1) >>> sum >>> \d -> when (d >= 0) $ threadDelay d
             , headerId = testHeaderId
-            , prioritize = sortOn (Down . testHeaderExpiry) . Map.elems
+            , prioritize = \m _ -> sortOn (Down . testHeaderExpiry) . Map.elems $ m
             , submitPolicy = SubmitAll
             , maxHeadersToRequest = relayConfig.maxWindowSize.value
             , maxBodiesToRequest = 1 -- let pipelining stream them.
@@ -253,15 +255,16 @@ newtype TestRelayBundle f = TestRelayBundle
   { testMsg :: f TestBlockRelayMessage
   }
 
-instance MuxBundle TestRelayBundle where
-  type MuxMsg TestRelayBundle = TestBlockRelayMessage
+instance ConnectionBundle TestRelayBundle where
+  type BundleMsg TestRelayBundle = TestBlockRelayMessage
+  type BundleConstraint TestRelayBundle = MessageSize
 
-  toFromMuxMsgBundle =
+  toFromBundleMsgBundle =
     TestRelayBundle
-      { testMsg = ToFromMuxMsg id id
+      { testMsg = ToFromBundleMsg id id
       }
 
-  traverseMuxBundle f TestRelayBundle{..} =
+  traverseConnectionBundle f TestRelayBundle{..} =
     TestRelayBundle
       <$> f testMsg
 

@@ -81,3 +81,9 @@ processCPUTasks (Finite n) tracer queue = newBoundedWorkerPool n [taskSource l |
           m
     -- TODO: read from var and log exception.
     return $ Task action var
+
+defaultQueueBound :: NumCores -> Natural
+defaultQueueBound processingCores = do
+  fromIntegral $ case processingCores of
+    Infinite -> 100
+    Finite n -> n * 2

@@ -10,8 +10,7 @@ module PraosProtocol.PraosNode (
 )
 where
 
-import ChanDriver (protocolMessage)
-import ChanMux
+import Chan
 import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Monad.Class.MonadFork
@@ -52,14 +51,15 @@ praosMessageLabel (PraosMessage d) =
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
 
-instance MuxBundle (Praos body) where
-  type MuxMsg (Praos body) = PraosMessage body
-  toFromMuxMsgBundle =
+instance MessageSize body => ConnectionBundle (Praos body) where
+  type BundleMsg (Praos body) = PraosMessage body
+  type BundleConstraint (Praos body) = MessageSize
+  toFromBundleMsgBundle =
     coerce $
       Praos
-        (ToFromMuxMsg Left $ fromLeft $ error "MuxBundle Praos: fromLeft")
-        (ToFromMuxMsg Right $ fromRight $ error "MuxBundle Praos: fromRight")
-  traverseMuxBundle f (Praos x y) = Praos <$> f x <*> f y
+        (ToFromBundleMsg Left $ fromLeft $ error "ConnectionBundle Praos: fromLeft")
+        (ToFromBundleMsg Right $ fromRight $ error "ConnectionBundle Praos: fromRight")
+  traverseConnectionBundle f (Praos x y) = Praos <$> f x <*> f y
 
 data PraosNodeState body m = PraosNodeState
   { blockFetchControllerState :: BlockFetchControllerState body m
@@ -161,11 +161,10 @@ setupPraosThreads tracer cfg queue st0 followers peers = do
   (ts, f) <- BlockFetch.setupValidatorThreads cfg st0.blockFetchControllerState queue
   let valHeader h = assert (blockInvariant h) $ do
         let !delay = cfg.headerValidationDelay h
-        atomically $
-          curry
-            queue
-            (CPUTask delay $ T.pack $ "ValidateHeader " ++ show (coerce @_ @Int $ blockHash h))
-            (return ())
+        curry
+          (queueAndWait (atomically . queue))
+          (CPUTask delay $ T.pack $ "ValidateHeader " ++ show (coerce @_ @Int $ blockHash h))
+          (return ())
   (map Concurrently ts ++) <$> setupPraosThreads' tracer cfg valHeader f st0 followers peers
 
 setupPraosThreads' ::
@@ -181,7 +180,7 @@ setupPraosThreads' ::
 setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM (addPeer valHeader) (length peers) st1
-  let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
+  let controllerThread = Concurrently $ blockFetchController tracer cfg st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer tracer cfg submitFetchedBlock st2) peerIds peers
   return (controllerThread : concat followerThreads <> concat peerThreads)
@@ -208,7 +207,7 @@ praosNode ::
   m [m ()]
 praosNode tracer cfg followers peers = do
   st0 <- PraosNodeState <$> newBlockFetchControllerState cfg.chain <*> pure Map.empty
-  taskQueue <- atomically $ newTaskMultiQueue @() 100
+  taskQueue <- atomically $ newTaskMultiQueue @() (defaultQueueBound cfg.processingCores)
   let queue = writeTMQueue taskQueue ()
   praosThreads <- setupPraosThreads tracer cfg.praosConfig queue st0 followers peers
   let cpuTasksProcessors = processCPUTasks cfg.processingCores (contramap PraosNodeEventCPU tracer) taskQueue
@@ -221,5 +220,17 @@ praosNode tracer cfg followers peers = do
           cfg.blockMarker
           st0.blockFetchControllerState.cpsVar
           (BlockFetch.addProducedBlock st0.blockFetchControllerState)
-          (atomically . queue)
+          (queueAndWait (atomically . queue))
   return $ cpuTasksProcessors : generationThread : map runConcurrently praosThreads
+
+queueAndWait ::
+  MonadSTM m =>
+  ((a, m ()) -> m ()) ->
+  (a, m ()) ->
+  m ()
+queueAndWait queue (d, m) = do
+  sem <- newEmptyTMVarIO
+  curry queue d $ do
+    m
+    atomically $ putTMVar sem ()
+  atomically $ takeTMVar sem

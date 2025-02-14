@@ -59,10 +59,13 @@ fn delta_q(input: &mut &str) -> PResult<DeltaQExpr> {
 
         loop {
             let snap = input.checkpoint();
-            let Ok(op) = alt((
-                op_seq.map(|(names, mult)| Op::Seq { names, mult }),
-                (num, "<>", num).map(|(l, _, r)| Op::Choice(l, r)),
-            ))
+            let Ok(op) = preceded(
+                ws,
+                alt((
+                    op_seq.map(|(names, mult)| Op::Seq { names, mult }),
+                    (num, "<>", num).map(|(l, _, r)| Op::Choice(l, r)),
+                )),
+            )
             .parse_next(input) else {
                 break;
             };

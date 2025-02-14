@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
@@ -14,16 +15,18 @@
 
 module LeiosProtocol.Config where
 
+import Data.Aeson (Options (allNullaryToStringTag), defaultOptions, genericToEncoding, genericToJSON)
 import Data.Aeson.Encoding (pairs)
-import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Parser, ToJSON (..), Value (..), object, typeMismatch, withObject, (.:))
+import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (constructorTagModifier), Parser, ToJSON (..), Value (..), genericParseJSON, object, typeMismatch, withObject, (.:))
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
 import Data.Text (Text)
+import Data.Word
 import Data.Yaml (ParseException)
 import qualified Data.Yaml as Yaml
 import GHC.Exception (displayException)
 import GHC.Generics (Generic)
-import JSONCompat (Getter, always, get, omitDefault, parseFieldOrDefault)
+import JSONCompat (Getter, always, camelToKebab, get, omitDefault, parseFieldOrDefault)
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, stderr)
 
@@ -40,9 +43,27 @@ data Distribution
   | LogNormal {mu :: Double, sigma :: Double}
   deriving (Show, Eq, Generic)
 
+data DiffusionStrategy
+  = -- | use same order as relay peer
+    PeerOrder
+  | -- | request message with highest slot
+    FreshestFirst
+  | -- | request message with lowest slot
+    OldestFirst
+  deriving (Show, Eq, Generic)
+
+data RelayStrategy
+  = RequestFromFirst
+  | RequestFromAll
+  deriving (Show, Eq, Generic)
+
 data Config = Config
-  { leiosStageLengthSlots :: Word
+  { relayStrategy :: RelayStrategy
+  , tcpCongestionControl :: Bool
+  , multiplexMiniProtocols :: Bool
+  , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
+  , leiosVoteSendRecvStages :: Bool
   , txGenerationDistribution :: Distribution
   , txSizeBytesDistribution :: Distribution
   , txValidationCpuTimeMs :: DurationMs
@@ -63,19 +84,30 @@ data Config = Config
   , ibBodyValidationCpuTimeMsPerByte :: DurationMs
   , ibBodyMaxSizeBytes :: SizeBytes
   , ibBodyAvgSizeBytes :: SizeBytes
+  , ibDiffusionStrategy :: DiffusionStrategy
+  , ibDiffusionMaxWindowSize :: Word16
+  , ibDiffusionMaxHeadersToRequest :: Word16
+  , ibDiffusionMaxBodiesToRequest :: Word16
   , ebGenerationProbability :: Double
   , ebGenerationCpuTimeMs :: DurationMs
   , ebValidationCpuTimeMs :: DurationMs
   , ebSizeBytesConstant :: SizeBytes
   , ebSizeBytesPerIb :: SizeBytes
+  , ebDiffusionStrategy :: DiffusionStrategy
+  , ebDiffusionMaxWindowSize :: Word16
+  , ebDiffusionMaxHeadersToRequest :: Word16
+  , ebDiffusionMaxBodiesToRequest :: Word16
   , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
   , voteValidationCpuTimeMs :: DurationMs
   , voteThreshold :: Word
-  , voteOneEbPerVrfWin :: Bool
   , voteBundleSizeBytesConstant :: SizeBytes
   , voteBundleSizeBytesPerEb :: SizeBytes
+  , voteDiffusionStrategy :: DiffusionStrategy
+  , voteDiffusionMaxWindowSize :: Word16
+  , voteDiffusionMaxHeadersToRequest :: Word16
+  , voteDiffusionMaxBodiesToRequest :: Word16
   , certGenerationCpuTimeMsConstant :: DurationMs
   , certGenerationCpuTimeMsPerNode :: DurationMs
   , certValidationCpuTimeMsConstant :: DurationMs
@@ -89,8 +121,12 @@ instance Default Config where
   def :: Config
   def =
     Config
-      { leiosStageLengthSlots = 20
+      { relayStrategy = RequestFromFirst
+      , tcpCongestionControl = True
+      , multiplexMiniProtocols = True
+      , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
+      , leiosVoteSendRecvStages = False
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
       , txSizeBytesDistribution = LogNormal{mu = 6.833, sigma = 1.127}
       , txValidationCpuTimeMs = 1.5
@@ -103,7 +139,7 @@ instance Default Config where
       , rbBodyLegacyPraosPayloadValidationCpuTimeMsConstant = 50.0
       , rbBodyLegacyPraosPayloadValidationCpuTimeMsPerByte = 0.0005
       , rbBodyLegacyPraosPayloadAvgSizeBytes = 0
-      , ibGenerationProbability = 0.5
+      , ibGenerationProbability = 5
       , ibGenerationCpuTimeMs = 300.0
       , ibHeadSizeBytes = 32
       , ibHeadValidationCpuTimeMs = 1.0
@@ -111,19 +147,30 @@ instance Default Config where
       , ibBodyValidationCpuTimeMsPerByte = 0.0005
       , ibBodyMaxSizeBytes = 327680
       , ibBodyAvgSizeBytes = 327680
+      , ibDiffusionStrategy = FreshestFirst
+      , ibDiffusionMaxWindowSize = 100
+      , ibDiffusionMaxHeadersToRequest = 100
+      , ibDiffusionMaxBodiesToRequest = 1
       , ebGenerationProbability = 5.0
       , ebGenerationCpuTimeMs = 300.0
       , ebValidationCpuTimeMs = 1.0
       , ebSizeBytesConstant = 32
       , ebSizeBytesPerIb = 32
+      , ebDiffusionStrategy = PeerOrder
+      , ebDiffusionMaxWindowSize = 100
+      , ebDiffusionMaxHeadersToRequest = 100
+      , ebDiffusionMaxBodiesToRequest = 1
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 1.0
       , voteGenerationCpuTimeMsPerIb = 1.0
       , voteValidationCpuTimeMs = 3.0
       , voteThreshold = 150
-      , voteOneEbPerVrfWin = False
       , voteBundleSizeBytesConstant = 32
       , voteBundleSizeBytesPerEb = 32
+      , voteDiffusionStrategy = PeerOrder
+      , voteDiffusionMaxWindowSize = 100
+      , voteDiffusionMaxHeadersToRequest = 100
+      , voteDiffusionMaxBodiesToRequest = 1
       , certGenerationCpuTimeMsConstant = 50.0
       , certGenerationCpuTimeMsPerNode = 1.0
       , certValidationCpuTimeMsConstant = 50.0
@@ -141,8 +188,12 @@ configToEncodingWith getter = pairs . mconcat . configToKVsWith getter
 configToKVsWith :: KeyValue e kv => Getter Config -> Config -> [kv]
 configToKVsWith getter cfg =
   catMaybes
-    [ get @"leiosStageLengthSlots" getter cfg
+    [ get @"relayStrategy" getter cfg
+    , get @"tcpCongestionControl" getter cfg
+    , get @"multiplexMiniProtocols" getter cfg
+    , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
+    , get @"leiosVoteSendRecvStages" getter cfg
     , get @"txGenerationDistribution" getter cfg
     , get @"txSizeBytesDistribution" getter cfg
     , get @"txValidationCpuTimeMs" getter cfg
@@ -163,19 +214,30 @@ configToKVsWith getter cfg =
     , get @"ibBodyValidationCpuTimeMsPerByte" getter cfg
     , get @"ibBodyMaxSizeBytes" getter cfg
     , get @"ibBodyAvgSizeBytes" getter cfg
+    , get @"ibDiffusionStrategy" getter cfg
+    , get @"ibDiffusionMaxWindowSize" getter cfg
+    , get @"ibDiffusionMaxHeadersToRequest" getter cfg
+    , get @"ibDiffusionMaxBodiesToRequest" getter cfg
     , get @"ebGenerationProbability" getter cfg
     , get @"ebGenerationCpuTimeMs" getter cfg
     , get @"ebValidationCpuTimeMs" getter cfg
     , get @"ebSizeBytesConstant" getter cfg
     , get @"ebSizeBytesPerIb" getter cfg
+    , get @"ebDiffusionStrategy" getter cfg
+    , get @"ebDiffusionMaxWindowSize" getter cfg
+    , get @"ebDiffusionMaxHeadersToRequest" getter cfg
+    , get @"ebDiffusionMaxBodiesToRequest" getter cfg
     , get @"voteGenerationProbability" getter cfg
     , get @"voteGenerationCpuTimeMsConstant" getter cfg
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
     , get @"voteValidationCpuTimeMs" getter cfg
     , get @"voteThreshold" getter cfg
-    , get @"voteOneEbPerVrfWin" getter cfg
     , get @"voteBundleSizeBytesConstant" getter cfg
     , get @"voteBundleSizeBytesPerEb" getter cfg
+    , get @"voteDiffusionStrategy" getter cfg
+    , get @"voteDiffusionMaxWindowSize" getter cfg
+    , get @"voteDiffusionMaxHeadersToRequest" getter cfg
+    , get @"voteDiffusionMaxBodiesToRequest" getter cfg
     , get @"certGenerationCpuTimeMsConstant" getter cfg
     , get @"certGenerationCpuTimeMsPerNode" getter cfg
     , get @"certValidationCpuTimeMsConstant" getter cfg
@@ -203,8 +265,12 @@ instance ToJSON (OmitDefault Config) where
 
 instance FromJSON Config where
   parseJSON = withObject "Config" $ \obj -> do
+    relayStrategy <- parseFieldOrDefault @Config @"relayStrategy" obj
+    tcpCongestionControl <- parseFieldOrDefault @Config @"tcpCongestionControl" obj
+    multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
+    leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
     txGenerationDistribution <- parseFieldOrDefault @Config @"txGenerationDistribution" obj
     txSizeBytesDistribution <- parseFieldOrDefault @Config @"txSizeBytesDistribution" obj
     txValidationCpuTimeMs <- parseFieldOrDefault @Config @"txValidationCpuTimeMs" obj
@@ -225,19 +291,30 @@ instance FromJSON Config where
     ibBodyValidationCpuTimeMsPerByte <- parseFieldOrDefault @Config @"ibBodyValidationCpuTimeMsPerByte" obj
     ibBodyMaxSizeBytes <- parseFieldOrDefault @Config @"ibBodyMaxSizeBytes" obj
     ibBodyAvgSizeBytes <- parseFieldOrDefault @Config @"ibBodyAvgSizeBytes" obj
+    ibDiffusionStrategy <- parseFieldOrDefault @Config @"ibDiffusionStrategy" obj
+    ibDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ibDiffusionMaxWindowSize" obj
+    ibDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxHeadersToRequest" obj
+    ibDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxBodiesToRequest" obj
     ebGenerationProbability <- parseFieldOrDefault @Config @"ebGenerationProbability" obj
     ebGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ebGenerationCpuTimeMs" obj
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
     ebSizeBytesConstant <- parseFieldOrDefault @Config @"ebSizeBytesConstant" obj
     ebSizeBytesPerIb <- parseFieldOrDefault @Config @"ebSizeBytesPerIb" obj
+    ebDiffusionStrategy <- parseFieldOrDefault @Config @"ebDiffusionStrategy" obj
+    ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
+    ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj
+    ebDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxBodiesToRequest" obj
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj
     voteValidationCpuTimeMs <- parseFieldOrDefault @Config @"voteValidationCpuTimeMs" obj
     voteThreshold <- parseFieldOrDefault @Config @"voteThreshold" obj
-    voteOneEbPerVrfWin <- parseFieldOrDefault @Config @"voteOneEbPerVrfWin" obj
     voteBundleSizeBytesConstant <- parseFieldOrDefault @Config @"voteBundleSizeBytesConstant" obj
     voteBundleSizeBytesPerEb <- parseFieldOrDefault @Config @"voteBundleSizeBytesPerEb" obj
+    voteDiffusionStrategy <- parseFieldOrDefault @Config @"voteDiffusionStrategy" obj
+    voteDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"voteDiffusionMaxWindowSize" obj
+    voteDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"voteDiffusionMaxHeadersToRequest" obj
+    voteDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"voteDiffusionMaxBodiesToRequest" obj
     certGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsConstant" obj
     certGenerationCpuTimeMsPerNode <- parseFieldOrDefault @Config @"certGenerationCpuTimeMsPerNode" obj
     certValidationCpuTimeMsConstant <- parseFieldOrDefault @Config @"certValidationCpuTimeMsConstant" obj
@@ -289,6 +366,27 @@ instance FromJSON Distribution where
           pure LogNormal{..}
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
+
+defaultEnumOptions :: Options
+defaultEnumOptions =
+  defaultOptions
+    { constructorTagModifier = camelToKebab
+    , allNullaryToStringTag = True
+    }
+
+instance FromJSON DiffusionStrategy where
+  parseJSON = genericParseJSON defaultEnumOptions
+
+instance ToJSON DiffusionStrategy where
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
+
+instance FromJSON RelayStrategy where
+  parseJSON = genericParseJSON defaultEnumOptions
+
+instance ToJSON RelayStrategy where
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
 
 -- | Create a 'Config' from a file.
 readConfigEither :: FilePath -> IO (Either ParseException Config)

@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
@@ -39,7 +40,8 @@ module PraosProtocol.Common (
   mkScheduler,
 ) where
 
-import ChanTCP (Bytes, MessageSize (..))
+import Chan (ConnectionConfig, mkConnectionConfig)
+import Chan.TCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad.State
 import Data.Coerce (coerce)
@@ -48,12 +50,13 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
 import GHC.Word (Word64)
+import LeiosProtocol.Config (RelayStrategy (RequestFromFirst))
+import ModelTCP (kilobytes)
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
 import PraosProtocol.Common.ConcreteBlock as ConcreteBlock
 import STMCompat
-import SimTCPLinks (kilobytes)
 import SimTypes (CPUTask (..))
 import System.Random (StdGen, mkStdGen, uniform, uniformR)
 import TimeCompat
@@ -151,6 +154,8 @@ data PraosConfig body = PraosConfig
   , headerSize :: !Bytes
   , bodySize :: !(body -> Bytes)
   , bodyMaxSize :: !Bytes
+  , configureConnection :: DiffTime -> Maybe Bytes -> ConnectionConfig
+  , relayStrategy :: RelayStrategy
   }
 
 defaultPraosConfig :: PraosConfig body
@@ -163,6 +168,8 @@ defaultPraosConfig =
     , headerSize = kilobytes 1
     , bodySize = const $ kilobytes 95
     , bodyMaxSize = kilobytes 96
+    , configureConnection = mkConnectionConfig True True
+    , relayStrategy = RequestFromFirst
     }
 
 instance Default (PraosConfig body) where
@@ -203,7 +210,11 @@ waitNextSlot slotConfig targetSlot = do
   threadDelayNDT (tgt `diffUTCTime` now)
   return slot
 
-mkScheduler :: MonadSTM m => StdGen -> (SlotNo -> [(a, Maybe (Double -> Word64))]) -> m (SlotNo -> m [(a, Word64)])
+mkScheduler ::
+  MonadSTM m =>
+  StdGen ->
+  (SlotNo -> m [(a, Maybe (Double -> Word64))]) ->
+  m (SlotNo -> m [(a, Word64)])
 mkScheduler rng0 rates = do
   let
     sampleRates (_role, Nothing) = return []
@@ -213,9 +224,11 @@ mkScheduler rng0 rates = do
       let wins = f sample
       return [(role, wins) | wins >= 1]
   rngVar <- newTVarIO rng0
-  let sched slot = atomically $ do
-        rng <- readTVar rngVar
-        let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rates slot
-        writeTVar rngVar rng1
-        return acts
+  let sched slot = do
+        rs <- rates slot
+        atomically $ do
+          rng <- readTVar rngVar
+          let (acts, rng1) = flip runState rng . fmap concat . mapM sampleRates $ rs
+          writeTVar rngVar rng1
+          return acts
   return sched

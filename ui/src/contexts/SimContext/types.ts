@@ -25,6 +25,8 @@ export interface ISimulationAggregatedTotalData {
 }
 
 export interface ISimulationAggregatedData {
+  bytesSent: number;
+  bytesReceived: number;
   txGenerated: number;
   txSent: number;
   txReceived: number;
@@ -55,19 +57,27 @@ export interface ISimulationTransaction {
 export interface ISimulationInputBlock {
   id: string;
   slot: number;
+  headerBytes: number;
   txs: ISimulationTransaction[];
 }
 
 export interface ISimulationEndorsementBlock {
   id: string;
   slot: number;
+  bytes: number;
   ibs: ISimulationInputBlock[];
+}
+
+export interface ISimulationCertificate {
+  bytes: number;
+  eb: ISimulationEndorsementBlock;
 }
 
 export interface ISimulationBlock {
   slot: number;
   txs: ISimulationTransaction[];
-  endorsement: ISimulationEndorsementBlock | null;
+  headerBytes: number;
+  cert: ISimulationCertificate | null;
 }
 
 export interface ISimulationAggregatedDataState {
@@ -80,11 +90,13 @@ export interface ISimulationAggregatedDataState {
 
 export interface ISimulationIntermediateInputBlock {
   slot: number;
+  headerBytes: number;
   txs: number[];
 }
 
 export interface ISimulationIntermediateEndorsementBlock {
   slot: number;
+  bytes: number;
   ibs: string[];
 }
 
@@ -92,6 +104,7 @@ export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
   ibs: Map<string, ISimulationIntermediateInputBlock>;
   ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
+  bytes: Map<string, number>,
 }
 
 export interface IGraphContextState {

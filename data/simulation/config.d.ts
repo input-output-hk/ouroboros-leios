@@ -2,14 +2,32 @@
 
 /** A configuration for a Leios simulation. */
 export interface Config {
+  // Simulation Configuration
+  "relay-strategy": RelayStrategy;
+  /** Only supported by Haskell simulation. */
+  "tcp-congestion-control": boolean;
+  /** Only supported by Haskell simulation. */
+  "multiplex-mini-protocols": boolean;
+
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
   "leios-stage-active-voting-slots": bigint;
+  /**
+   * Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.
+   * If this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`
+   * to be equal to `leios-stage-length-slots`.
+   *
+   * Only supported by Haskell simulation. */
+  "leios-vote-send-recv-stages": boolean;
 
   // Transaction Configuration
+  /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
+  /** Only supported by Rust simulation. */
   "tx-size-bytes-distribution": Distribution;
+  /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
+  /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
 
   // Ranking Block Configuration
@@ -20,17 +38,29 @@ export interface Config {
   "rb-body-max-size-bytes": bigint;
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": number;
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": number;
+  /** Only supported by Haskell simulation. */
   "rb-body-legacy-praos-payload-avg-size-bytes": bigint;
 
   // Input Block Configuration
   "ib-generation-probability": number;
   "ib-generation-cpu-time-ms": number;
+  /** Only supported by Rust simulation. */
+  "ib-shards": number;
   "ib-head-size-bytes": bigint;
   "ib-head-validation-cpu-time-ms": number;
   "ib-body-validation-cpu-time-ms-constant": number;
   "ib-body-validation-cpu-time-ms-per-byte": number;
-  "ib-body-max-size-bytes": bigint;
+  /** Only supported by Haskell simulation. */
   "ib-body-avg-size-bytes": bigint;
+  /** Only supported by Rust simulation. */
+  "ib-body-max-size-bytes": bigint;
+  "ib-diffusion-strategy": DiffusionStrategy;
+  /** Only supported by Haskell simulation. */
+  "ib-diffusion-max-window-size": bigint;
+  /** Only supported by Haskell simulation. */
+  "ib-diffusion-max-headers-to-request": bigint;
+  /** Only supported by Haskell simulation. */
+  "ib-diffusion-max-bodies-to-request": bigint;
 
   // Endorsement Block Configuration
   "eb-generation-probability": number;
@@ -38,6 +68,14 @@ export interface Config {
   "eb-validation-cpu-time-ms": number;
   "eb-size-bytes-constant": bigint;
   "eb-size-bytes-per-ib": bigint;
+  /** Only supported by Haskell simulation. */
+  "eb-diffusion-strategy": DiffusionStrategy;
+  /** Only supported by Haskell simulation. */
+  "eb-diffusion-max-window-size": bigint;
+  /** Only supported by Haskell simulation. */
+  "eb-diffusion-max-headers-to-request": bigint;
+  /** Only supported by Haskell simulation. */
+  "eb-diffusion-max-bodies-to-request": bigint;
 
   // Vote Configuration
   "vote-generation-probability": number;
@@ -47,9 +85,14 @@ export interface Config {
   "vote-threshold": bigint;
   "vote-bundle-size-bytes-constant": bigint;
   "vote-bundle-size-bytes-per-eb": bigint;
-
-  // deprecated:
-  // "vote-one-eb-per-vrf-win": boolean;
+  /** Only supported by Haskell simulation. */
+  "vote-diffusion-strategy": DiffusionStrategy;
+  /** Only supported by Haskell simulation. */
+  "vote-diffusion-max-window-size": bigint;
+  /** Only supported by Haskell simulation. */
+  "vote-diffusion-max-headers-to-request": bigint;
+  /** Only supported by Haskell simulation. */
+  "vote-diffusion-max-bodies-to-request": bigint;
 
   // Certificate Configuration
   "cert-generation-cpu-time-ms-constant": number;
@@ -63,7 +106,8 @@ export interface Config {
 export type Distribution =
   | NormalDistribution
   | ExpDistribution
-  | LogNormalDistribution;
+  | LogNormalDistribution
+  | ConstantDistribution;
 
 export interface NormalDistribution {
   distribution: "normal";
@@ -81,4 +125,20 @@ export interface LogNormalDistribution {
   distribution: "log-normal";
   mu: number;
   sigma: number;
+}
+
+export interface ConstantDistribution {
+  distribution: "constant";
+  value: number;
+}
+
+export enum DiffusionStrategy {
+  PeerOrder = "peer-order",
+  FreshestFirst = "freshest-first",
+  OldestFirst = "oldest-first",
+}
+
+export enum RelayStrategy {
+  RequestFromAll = "request-from-all",
+  RequestFromFirst = "request-from-first",
 }

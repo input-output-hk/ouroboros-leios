@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
@@ -8,7 +9,7 @@
 
 module LeiosProtocol.Short.VizSim where
 
-import ChanDriver
+import Chan.Driver
 import Control.Exception (assert)
 import Data.Coerce (coerce)
 import qualified Data.Foldable as Foldable
@@ -98,6 +99,7 @@ data LeiosSimVizState
   = LeiosSimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
+  , vizNodeStakes :: !(Map NodeId StakeFraction)
   , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
   , vizMsgsInTransit ::
       !( Map
@@ -134,8 +136,8 @@ data LeiosSimVizState
   }
 
 newtype DataTransmitted = DataTransmitted
-  { messagesTransmitted :: IntervalMap DiffTime Bytes
-  -- ^ the total bandwidth used by the various mini-protocol.
+  { messagesTransmitted :: IntervalMap DiffTime [Bytes]
+  -- ^ the total bandwidth used by the various mini-protocols.
   }
 
 initDataTransmitted :: DataTransmitted
@@ -194,9 +196,21 @@ accumNodeCpuUsage ::
   CPUTask ->
   Map NodeId (IntervalMap DiffTime Int) ->
   Map NodeId (IntervalMap DiffTime Int)
-accumNodeCpuUsage (Time now) nid task =
-  Map.insertWith ILMap.union nid (ILMap.singleton (ClosedInterval now (now + cpuTaskDuration task)) 1)
+accumNodeCpuUsage = accumNodeCpuUsage' id
 
+accumNodeCpuUsage' ::
+  (Num a, Ord a) =>
+  (DiffTime -> a) ->
+  Time ->
+  NodeId ->
+  CPUTask ->
+  Map NodeId (IntervalMap a Int) ->
+  Map NodeId (IntervalMap a Int)
+accumNodeCpuUsage' f (Time now') nid task =
+  Map.insertWith (ILMap.unionWith (+)) nid (ILMap.singleton (IntervalCO now (now + d)) 1)
+ where
+  now = f now'
+  d = f (cpuTaskDuration task)
 type ChainsMap = IntMap (Chain RankingBlock)
 
 accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
@@ -205,7 +219,7 @@ accumChains _ (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventNewT
 accumChains _ _ = id
 
 type DiffusionLatencyMap = DiffusionLatencyMap' (HeaderHash RankingBlockHeader) RankingBlockHeader
-type DiffusionLatencyMap' id msg = Map id (msg, NodeId, Time, [Time])
+type DiffusionLatencyMap' id msg = Map id (msg, NodeId, Time, [(NodeId, Time)])
 
 accumDiffusionLatency :: Time -> LeiosEvent -> DiffusionLatencyMap -> DiffusionLatencyMap
 accumDiffusionLatency now (LeiosEventNode (LabelNode n (PraosNodeEvent e))) =
@@ -230,12 +244,12 @@ accumDiffusionLatency' now nid Generate msgid msg vs =
   assert (not (msgid `Map.member` vs)) $
     Map.insert
       msgid
-      (msg, nid, now, [now])
+      (msg, nid, now, [(nid, now)])
       vs
-accumDiffusionLatency' now _nid EnterState msgid _msg vs =
+accumDiffusionLatency' now nid EnterState msgid _msg vs =
   Map.adjust
     ( \(hdr, nid', created, arrivals) ->
-        (hdr, nid', created, now : arrivals)
+        (hdr, nid', created, (nid, now) : arrivals)
     )
     msgid
     vs
@@ -264,6 +278,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     LeiosSimVizState
       { vizWorld = World (0, 0) Rectangle
       , vizNodePos = Map.empty
+      , vizNodeStakes = Map.empty
       , vizNodeLinks = Map.empty
       , vizMsgsInTransit = Map.empty
       , vizNodeTip = Map.empty
@@ -291,10 +306,11 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     LeiosEvent ->
     LeiosSimVizState ->
     LeiosSimVizState
-  accumEventVizState _now (LeiosEventSetup shape nodes links) vs =
+  accumEventVizState _now (LeiosEventSetup shape nodes stakes links) vs =
     vs
       { vizWorld = shape
       , vizNodePos = nodes
+      , vizNodeStakes = stakes
       , vizNodeLinks =
           Map.fromSet
             ( \(n1, n2) ->
@@ -343,7 +359,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
           assert (not (blockHash blk `Map.member` vizMsgsDiffusionLatency vs)) $
             Map.insert
               (blockHash blk)
-              (blockHeader blk, nid, now, [now])
+              (blockHeader blk, nid, now, [(nid, now)])
               (vizMsgsDiffusionLatency vs)
       , ibsInRBs = accumIBsInRBs (Left blk) vs.ibsInRBs
       }
@@ -378,7 +394,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
       , vizMsgsDiffusionLatency =
           Map.adjust
             ( \(hdr, nid', created, arrivals) ->
-                (hdr, nid', created, now : arrivals)
+                (hdr, nid', created, (nid, now) : arrivals)
             )
             (blockHash blk)
             (vizMsgsDiffusionLatency vs)
@@ -454,17 +470,20 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
 accumDataTransmitted :: LeiosMessage -> TcpMsgForecast -> DataTransmitted -> DataTransmitted
 accumDataTransmitted msg forecast DataTransmitted{..} =
   DataTransmitted
-    { messagesTransmitted = (ILMap.insert interval $! msgSize forecast) messagesTransmitted
+    { messagesTransmitted = ILMap.insertWith (++) interval [msize] messagesTransmitted
     }
  where
+  !msize = msgSize forecast
   interval :: ILMap.Interval DiffTime
   interval =
-    ILMap.ClosedInterval
+    ILMap.IntervalCO
       (coerce forecast.msgSendLeadingEdge)
       (coerce forecast.msgSendTrailingEdge)
   -- could be interesting to compare to "useful" data.
   _accumPayloadAndBlocksTransmitted (payload0, blocks0) =
-    (maybe id (ILMap.insert interval) payload payload0, maybe id (ILMap.insert interval) block blocks0)
+    ( maybe id (ILMap.insertWith (++) interval . (: [])) payload payload0
+    , maybe id (ILMap.insertWith (++) interval . (: [])) block blocks0
+    )
    where
     payloadIB ::
       HasField "size" body Bytes =>

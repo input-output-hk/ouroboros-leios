@@ -1,21 +1,25 @@
 import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/types';
+import cx from "classnames";
 import { FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
+
+import { printBytes } from '@/utils';
+import classes from "./styles.module.css";
 
 export interface IBlockContentsProps {
   block: ISimulationBlock;
 }
 
 interface IBoxProps extends PropsWithChildren {
+  className?: string;
   selected?: boolean;
   proportion?: number;
   onClick?: (e: MouseEvent) => void;
 }
 
-const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children }) => {
+const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, className }) => {
   const color = selected ? "border-black" : "border-gray-400";
-  const cursor = onClick ? "cursor-pointer" : "";
   return (
-    <span onClick={onClick} className={`border-2 border-solid ${color} w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center ${cursor}`} style={{
+    <span onClick={onClick} className={cx("border-2 border-solid w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center", color, { 'cursor-pointer': !!onClick }, className)} style={{
       height: 32 * proportion
     }}>
       {children}
@@ -26,27 +30,33 @@ const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children }) => 
 interface ITXStats {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
+  breakdown: [string, number][];
 }
 
 interface IStatsProps {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
+  breakdown: [string, number][];
   position: [number, number];
 }
 
-const Stats: FC<IStatsProps> = ({ name, slot, txs, position: [left, top] }) => {
-  const count = txs.length;
-  const size = txs.reduce((sum, tx) => sum + tx.bytes, 0);
+const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {
+  const txBytes = txs?.reduce((sum, tx) => sum + tx.bytes, 0) ?? 0;
+  const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
     <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
-      <div className={`flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]`}>
+      <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
         <div className="border-2 border-black rounded p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{count}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Total size (bytes): <span>{size}</span></h4>
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{txs.length}</span></h4>}
+          {breakdown.map(([name, bytes]) => (
+            <h4 key={name} className="flex items-center justify-between gap-4">{name}: <span>{printBytes(bytes)}</span></h4>
+          ))}
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction size: <span>{printBytes(txBytes)}</span></h4>}
+          {txs && <h4 className="flex items-center justify-between gap-4">Total size: <span>{printBytes(totalBytes)}</span></h4>}
         </div>
       </div>
     </div>
@@ -61,10 +71,34 @@ interface SelectState {
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
-    result.set("block", { name: "L1 Block", slot: block.slot, txs: block.txs });
-    if (block.endorsement) {
-      for (const ib of block.endorsement.ibs) {
-        result.set(ib.id, { name: "Input Block", slot: ib.slot, txs: ib.txs });
+    const breakdown: [string, number][] = [
+      ["Header size", block.headerBytes],
+    ];
+    if (block.cert) {
+      breakdown.push(["Certificate size", block.cert.bytes]);
+    }
+    result.set("block", {
+      name: "Block",
+      slot: block.slot,
+      txs: block.txs,
+      breakdown,
+    });
+    if (block.cert) {
+      result.set("eb", {
+        name: "Endorsement Block",
+        slot: block.cert.eb.slot,
+        txs: null,
+        breakdown: [["Size", block.cert.eb.bytes]],
+      });
+      for (const ib of block.cert.eb.ibs) {
+        result.set(ib.id, {
+          name: "Input Block",
+          slot: ib.slot,
+          txs: ib.txs,
+          breakdown: [
+            ["Header size", ib.headerBytes],
+          ],
+        });
       }
     }
     return result;
@@ -83,8 +117,8 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
     }
   };
 
-  const eb = block.endorsement;
-  const ibs = block.endorsement?.ibs ?? [];
+  const eb = block.cert?.eb;
+  const ibs = block.cert?.eb?.ibs ?? [];
 
   return (
     <>
@@ -92,29 +126,37 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
 
       <div className='flex flex-col w-full h-3/5 items-center' onClick={selectBox(null)}>
         <h2 className='font-bold text-xl'>Block Transactions</h2>
-        <div className="flex w-full h-full gap-8 items-center justify-center">
+        <div className="flex w-full h-full items-center justify-center">
           {ibs.length ? (
-            <div className="flex flex-col gap-2">
-              {ibs.map(ib => {
-                const isSelected = selected?.key === ib.id;
-                const proportion = 2 * ib.txs.length / block.txs.length;
-                return (
-                  <Box key={ib.id} selected={isSelected} proportion={proportion} onClick={selectBox(ib.id)}>
-                    Input Block
-                    <span className="text-sm">Slot {ib.slot}, {ib.txs.length} TX</span>
-                  </Box>
-                );
-              })}
+            <div className={cx("pr-6 border-r-2 border-black")}>
+              <div className="flex flex-col gap-2">
+                {ibs.map(ib => {
+                  const isSelected = selected?.key === ib.id;
+                  const proportion = 2 * ib.txs.length / block.txs.length;
+                  return (
+                    <Box key={ib.id} selected={isSelected} proportion={proportion} onClick={selectBox(ib.id)} className={classes.input}>
+                      Input Block
+                      <span className="text-sm">Slot {ib.slot}, {ib.txs.length} TX</span>
+                    </Box>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
-          {eb && <Box proportion={1}>
-            Endorsement Block
-            <span className='text-sm'>Slot {eb.slot}</span>
-          </Box>}
-          <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
-            Block
-            <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
-          </Box>
+          {eb && (
+            <div className={cx('pr-4 pl-6', classes.endorser, { [classes['has-ibs']]: ibs.length })}>
+              <Box selected={selected?.key === "eb"} proportion={1} onClick={selectBox("eb")}>
+                Endorsement Block
+                <span className='text-sm'>Slot {eb.slot}</span>
+              </Box>
+            </div>
+          )}
+          <div className={cx('pl-4', classes.block, { [classes['has-eb']]: !!eb })}>
+            <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
+              Block
+              <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
+            </Box>
+          </div>
         </div>
 
       </div>

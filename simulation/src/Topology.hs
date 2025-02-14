@@ -26,11 +26,11 @@ module Topology where
 import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
 import Control.Exception (Exception (displayException), assert)
-import Control.Monad (forM_, guard, (<=<))
+import Control.Monad (forM_, guard, unless, (<=<))
 import Data.Aeson (withObject)
 import qualified Data.Aeson as Json
 import qualified Data.Aeson.KeyMap as KeyMap
-import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, KeyValue ((.=)), Options (..), Parser, ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, pairs, typeMismatch, (.:))
+import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, KeyValue ((.=)), Options (..), Parser, ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, pairs, typeMismatch, (.!=), (.:), (.:?))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Coerce (Coercible, coerce)
 import Data.Default (Default (..))
@@ -61,13 +61,14 @@ import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
 import JSONCompat (Getter, always, get, omitDefault, parseField, parseFieldOrDefault)
-import ModelTCP (Bytes)
-import P2P (Latency, P2PTopography (..))
+import ModelTCP (Bytes, kilobytes)
+import P2P (Latency, P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
 import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose, hPutStrLn, stderr)
 import System.IO.Temp (withTempFile)
+import System.Random (RandomGen)
 import Text.Printf (PrintfArg, printf)
 
 --------------------------------------------------------------------------------
@@ -597,19 +598,28 @@ forgetNodeInfo :: Gr (NodeInfo lk, a) b -> Gr a b
 forgetNodeInfo = G.nemap snd id
 
 --------------------------------------------------------------------------------
--- Conversion between FGL Graph and P2PTopography
+-- Conversion between FGL Graph and P2PNetwork
 --------------------------------------------------------------------------------
 
-type BandwidthPerSecond = Bytes
+type BandwidthBytesPerSecond = Bytes
+
 data P2PNetwork = P2PNetwork
   { p2pNodes :: !(Map NodeId Point)
   , p2pNodeNames :: !(Map NodeId Text)
   , p2pNodeCores :: !(Map NodeId NumCores)
   , p2pNodeStakes :: !(Map NodeId StakeFraction)
-  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe Bytes))
+  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic)
+
+validateP2PNetwork :: P2PNetwork -> IO P2PNetwork
+validateP2PNetwork net = do
+  let P2PTopography{..} = networkToTopology net
+  let node_triplets = triangleInequalityCheck p2pLinks
+  unless (null node_triplets) . putStr . unlines $
+    "Latencies do not respect triangle inequalities for these nodes:" : map show node_triplets
+  return net
 
 latencyFromSecondsToMiliseconds ::
   Gr a Latency ->
@@ -673,13 +683,15 @@ p2pNetworkToSomeTopology totalStake = SomeTopology SCOORD2D . grToTopology . p2p
 networkToTopology :: P2PNetwork -> P2PTopography
 networkToTopology P2PNetwork{..} = P2PTopography{p2pLinks = Map.map fst p2pLinks, ..}
 
-topologyToNetwork :: Maybe Bytes -> P2PTopography -> P2PNetwork
-topologyToNetwork bw P2PTopography{..} = P2PNetwork{p2pLinks = Map.map (,bw) p2pLinks, ..}
+topologyToNetwork :: P2PTopography -> P2PNetwork
+topologyToNetwork P2PTopography{..} = P2PNetwork{p2pLinks = fmap (,defaultBandwidthBps) p2pLinks, ..}
  where
   p2pNodeNames = Map.mapWithKey (\(NodeId n) _ -> T.pack $ "node-" ++ show n) p2pNodes
   p2pNodeCores = Map.map (const Infinite) p2pNodes
   p2pNodeStakes = Map.map (const $ StakeFraction $ 1 / numNodes) p2pNodes
   numNodes = fromIntegral $ Map.size p2pNodes
+  -- TODO: unrestricted bandwidth is unsupported
+  defaultBandwidthBps = Just (kilobytes 1000)
 
 overrideUnlimitedBandwidth :: Bytes -> P2PNetwork -> P2PNetwork
 overrideUnlimitedBandwidth x P2PNetwork{..} =
@@ -864,3 +876,58 @@ triangleInequalityCheck mls = do
   let l3 = ((middle, t), mt)
   guard (st > (sm + mt))
   return (l1, l2, l3)
+
+--------------------------------------------------------------------------------
+-- Topology generation
+--------------------------------------------------------------------------------
+
+data PickLinksCloseAndRandomOptions = PickLinksCloseAndRandomOptions
+  { world :: !World
+  , numNodes :: !Int
+  , numCloseLinksPerNode :: !Int
+  , numRandomLinksPerNode :: !Int
+  }
+  deriving (Eq, Show, Generic)
+
+instance Default PickLinksCloseAndRandomOptions where
+  def =
+    PickLinksCloseAndRandomOptions
+      { world = def
+      , numNodes = 10
+      , numCloseLinksPerNode = 5
+      , numRandomLinksPerNode = 5
+      }
+
+data TopologyGenerationStrategy
+  = PickLinksCloseAndRandom !PickLinksCloseAndRandomOptions
+  deriving (Eq, Show, Generic)
+
+instance Default TopologyGenerationStrategy where
+  def = PickLinksCloseAndRandom def
+
+generateTopology :: RandomGen g => g -> TopologyGenerationStrategy -> IO P2PNetwork
+generateTopology rng0 = \case
+  PickLinksCloseAndRandom PickLinksCloseAndRandomOptions{..} -> do
+    let p2pTopographyCharacteristics = P2PTopographyCharacteristics world numNodes numCloseLinksPerNode numRandomLinksPerNode
+    let p2pTopography = genArbitraryP2PTopography p2pTopographyCharacteristics rng0
+    let p2pNetwork = topologyToNetwork p2pTopography
+    pure p2pNetwork
+
+instance ToJSON TopologyGenerationStrategy where
+  toJSON :: TopologyGenerationStrategy -> Value
+  toJSON (PickLinksCloseAndRandom PickLinksCloseAndRandomOptions{..}) =
+    object
+      [ "world" .= world
+      , "num_nodes" .= numNodes
+      , "num_close_links_per_node" .= numCloseLinksPerNode
+      , "num_random_links_per_node" .= numRandomLinksPerNode
+      ]
+
+instance FromJSON TopologyGenerationStrategy where
+  parseJSON :: Value -> Parser TopologyGenerationStrategy
+  parseJSON = withObject "PickLinksCloseAndRandom" $ \o -> do
+    world <- o .:? "world" .!= def
+    numNodes <- o .:? "num_nodes" .!= 100
+    numCloseLinksPerNode <- o .:? "num_close_links_per_node" .!= 5
+    numRandomLinksPerNode <- o .:? "num_random_links_per_node" .!= 5
+    pure $ PickLinksCloseAndRandom PickLinksCloseAndRandomOptions{..}

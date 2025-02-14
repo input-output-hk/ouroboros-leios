@@ -8,11 +8,20 @@
 # the Haskell simulation (`simulation/`) and the Rust simulation (`sim-rs/`).
 #
 ################################################################################
+# Simulation Configuration
+################################################################################
+
+relay-strategy: "request-from-first"
+tcp-congestion-control: true
+multiplex-mini-protocols: true
+
+################################################################################
 # Leios Protocol Configuration
 ################################################################################
 
 leios-stage-length-slots: 20
 leios-stage-active-voting-slots: 1
+leios-vote-send-recv-stages: false
 
 ################################################################################
 # Transaction Configuration
@@ -49,12 +58,19 @@ rb-body-legacy-praos-payload-avg-size-bytes: 0
 
 ib-generation-probability: 5.0
 ib-generation-cpu-time-ms: 300.0
+ib-shards: 1
 ib-head-size-bytes: 32
 ib-head-validation-cpu-time-ms: 1.0
 ib-body-validation-cpu-time-ms-constant: 50.0
 ib-body-validation-cpu-time-ms-per-byte: 0.0005
 ib-body-max-size-bytes: 327680
 ib-body-avg-size-bytes: 327680
+ib-diffusion-strategy: "freshest-first"
+
+# Haskell prototype relay mini-protocol parameters.
+ib-diffusion-max-bodies-to-request: 1
+ib-diffusion-max-headers-to-request: 100
+ib-diffusion-max-window-size: 100
 
 ################################################################################
 # Endorsement Block Configuration
@@ -65,6 +81,12 @@ eb-generation-cpu-time-ms: 300.0
 eb-validation-cpu-time-ms: 1.0
 eb-size-bytes-constant: 32
 eb-size-bytes-per-ib: 32
+eb-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+eb-diffusion-max-bodies-to-request: 1
+eb-diffusion-max-headers-to-request: 100
+eb-diffusion-max-window-size: 100
 
 ################################################################################
 # Vote Configuration
@@ -77,6 +99,12 @@ vote-validation-cpu-time-ms: 3.0
 vote-threshold: 150
 vote-bundle-size-bytes-constant: 32
 vote-bundle-size-bytes-per-eb: 32
+vote-diffusion-strategy: "peer-order"
+
+# Haskell prototype relay mini-protocol parameters.
+vote-diffusion-max-bodies-to-request: 1
+vote-diffusion-max-headers-to-request: 100
+vote-diffusion-max-window-size: 100
 
 ################################################################################
 # Certificate Configuration

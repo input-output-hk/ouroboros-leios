@@ -3,12 +3,43 @@ name = "leios_crypto_benchmarks"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+bench = false
+
+[[bin]]
+name = "leios_crypto_benchmarks"
+path = "src/main.rs"
+bench = false
+
 [dependencies]
+bitvec = "1.0.1"
 blst = "0.3.13"
+clap = { version = "4.5.28", features = ["derive"] }
 criterion = "0.5.1"
+hex = "0.4.3"
+num-bigint = { version = "0.4.6", features = ["serde"] }
+num-rational = "0.4.2"
+num-traits = "0.2.19"
+pallas = "0.32.0"
+quickcheck = "1.0.3"
+quickcheck_macros = "1.0.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-rustc_apfloat = "0.2.2"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_cbor = "0.11.2"
+statrs = "0.18.0"
+
+[[bench]]
+name = "serialization_bench"
+harness = false
+
+[[bench]]
+name = "fait_accompli_bench"
+harness = false
+
+[[bench]]
+name = "vote_bench"
+harness = false
 
 [[bench]]
 name = "sortition_bench"
@@ -16,8 +47,4 @@ harness = false
 
 [[bench]]
 name = "vrf_bench"
-harness = false
-
-[[bench]]
-name = "vote_bench"
 harness = false

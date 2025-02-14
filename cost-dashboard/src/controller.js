@@ -142,8 +142,9 @@ export async function calculate() {
   const costVcpu = vcpu * getFloat(uiVcpu)
   uiCostVcpu.innerText = costVcpu.toFixed(2)
 
+  uiAmortized.style.textDecoration = uiAmortize.checked ? "none" : "line-through"
   const discount = getFloat(uiDiscount) / 100 / 12                                                  //  1/month
-  const perpetual = (1 + discount) / discount                                                       //  1
+  const perpetual = uiAmortize.checked ? (1 + discount) / discount : 1                              //  1
   const compression = 1 - getFloat(uiCompression) / 100                                             //  1
   const storage = nodes * compression * (getFloat(uiRbLedger) + resources.disk / gigabyte * month)  //  GB/month
   uiTotalStorage.innerText = storage.toFixed(2)
@@ -186,9 +187,26 @@ export async function calculate() {
   
 }
 
+export async function hyperscaleCosts() {
+  uiVcpu.value = "20"
+  uiStorage.value = "0.12"
+  uiIops.value = "0.05"
+  uiEgress.value = "0.09"
+  calculate()
+}
+
+export async function discountCosts() {
+  uiVcpu.value = "20"
+  uiStorage.value = "0.10"
+  uiIops.value = "0.00"
+  uiEgress.value = "0.00"
+  calculate()
+}
+
 export async function initialize() {
   [
     uiAda
+  , uiAmortize
   , uiCertBuild
   , uiCertIo
   , uiCertRate

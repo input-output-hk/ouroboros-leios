@@ -4,7 +4,7 @@
 module SimTCPLinks where
 
 import Chan
-import ChanTCP
+import Chan.TCP (newConnectionTCP)
 import Control.Monad (replicateM_)
 import Control.Monad.Class.MonadAsync (
   Concurrently (Concurrently, runConcurrently),
@@ -25,7 +25,6 @@ import Control.Tracer as Tracer (
  )
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
-import ModelTCP
 import STMCompat
 import SimTypes
 import TimeCompat
@@ -64,32 +63,6 @@ type MsgId = Int
 
 instance MessageSize TestMessage where
   messageSizeBytes (TestMessage _ bytes) = bytes
-
-mkTcpConnProps ::
-  -- | latency in seconds
-  DiffTime ->
-  -- | sender serialisation bandwidth in bytes per sec, @Nothing@ for unlimited
-  Bytes ->
-  TcpConnProps
-mkTcpConnProps latency bandwidth =
-  TcpConnProps
-    { tcpLatency = latency
-    , tcpBandwidth = bandwidth
-    , tcpReceiverWindow = max (segments 10) recvwnd
-    }
- where
-  -- set it big enough to not constrain the bandwidth
-  recvwnd = Bytes (ceiling (fromIntegral (fromBytes bandwidth) * latency * 2))
-
-kilobytes :: Int -> Bytes
-kilobytes kb = Bytes kb * 1024
-
-segments :: Int -> Bytes
-segments s = Bytes s * segmentSize
-
--- | Rounds down.
-bytesToKb :: Bytes -> Int
-bytesToKb (Bytes b) = b `div` 1024
 
 -- | A discription of a flow of test messages over a single TCP link.
 -- Used in test setups.

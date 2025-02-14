@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Result};
-use num_traits::One as _;
 use serde::{Deserialize, Serialize};
 
 use crate::probability::FloatDistribution;
@@ -32,6 +31,7 @@ pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
     Exp { lambda: f64, scale: Option<f64> },
     LogNormal { mu: f64, sigma: f64 },
+    Constant { value: f64 },
 }
 impl From<DistributionConfig> for FloatDistribution {
     fn from(value: DistributionConfig) -> Self {
@@ -43,6 +43,7 @@ impl From<DistributionConfig> for FloatDistribution {
                 FloatDistribution::scaled_exp(lambda, scale.unwrap_or(1.))
             }
             DistributionConfig::LogNormal { mu, sigma } => FloatDistribution::log_normal(mu, sigma),
+            DistributionConfig::Constant { value } => FloatDistribution::constant(value),
         }
     }
 }
@@ -50,6 +51,9 @@ impl From<DistributionConfig> for FloatDistribution {
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
+    // Simulation Configuration
+    pub relay_strategy: RelayStrategy,
+
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
     pub leios_stage_active_voting_slots: u64,
@@ -64,7 +68,7 @@ pub struct RawParameters {
     pub rb_generation_probability: f64,
     pub rb_generation_cpu_time_ms: f64,
     pub rb_head_validation_cpu_time_ms: f64,
-    // pub rb_head_size_bytes: u64,
+    pub rb_head_size_bytes: u64,
     pub rb_body_max_size_bytes: u64,
 
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
@@ -73,20 +77,20 @@ pub struct RawParameters {
     // Input block configuration
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
-    // pub ib_head_size_bytes: u64,
+    pub ib_shards: u64,
+    pub ib_head_size_bytes: u64,
     pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
     pub ib_body_validation_cpu_time_ms_per_byte: f64,
     pub ib_body_max_size_bytes: u64,
-    #[serde(default = "u64::one")]
-    pub ib_shards: u64,
+    pub ib_diffusion_strategy: DiffusionStrategy,
 
     // Endorsement block configuration
     pub eb_generation_probability: f64,
     pub eb_generation_cpu_time_ms: f64,
     pub eb_validation_cpu_time_ms: f64,
-    // pub eb_size_bytes_constant: u64,
-    // pub eb_size_bytes_per_ib: u64,
+    pub eb_size_bytes_constant: u64,
+    pub eb_size_bytes_per_ib: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -94,51 +98,63 @@ pub struct RawParameters {
     pub vote_generation_cpu_time_ms_per_ib: f64,
     pub vote_validation_cpu_time_ms: f64,
     pub vote_threshold: u64,
-    // pub vote_size_bytes_constant: u64,
-    // pub vote_size_bytes_per_node: u64,
+    pub vote_bundle_size_bytes_constant: u64,
+    pub vote_bundle_size_bytes_per_eb: u64,
 
     // Certificate configuration
     pub cert_generation_cpu_time_ms_constant: f64,
     pub cert_generation_cpu_time_ms_per_node: f64,
     pub cert_validation_cpu_time_ms_constant: f64,
     pub cert_validation_cpu_time_ms_per_node: f64,
-    // pub cert_size_bytes_constant: u64,
-    // pub cert_size_bytes_per_node: u64,
+    pub cert_size_bytes_constant: u64,
+    pub cert_size_bytes_per_node: u64,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DiffusionStrategy {
+    PeerOrder,
+    FreshestFirst,
+    OldestFirst,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum RelayStrategy {
+    RequestFromAll,
+    RequestFromFirst,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RawLegacyTopology {
-    pub nodes: Vec<RawNodeConfig>,
-    pub links: Vec<RawLinkConfig>,
-}
-
-#[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawTopology {
     pub nodes: BTreeMap<String, RawNode>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawNode {
-    stake: Option<u64>,
-    // location: RawNodeLocation,
-    cpu_core_count: Option<u64>,
-    producers: BTreeMap<String, RawLinkInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stake: Option<u64>,
+    pub location: RawNodeLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_core_count: Option<u64>,
+    pub producers: BTreeMap<String, RawLinkInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case", untagged)]
 pub enum RawNodeLocation {
     Cluster { cluster: String },
     Coords((f64, f64)),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RawLinkInfo {
-    latency_ms: f64,
-    // bandwidth_bytes_per_second: Option<u64>,
+    pub latency_ms: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bandwidth_bytes_per_second: Option<u64>,
 }
 
 pub struct Topology {
@@ -160,7 +176,7 @@ impl Topology {
         frontier.push_back(first_node);
         while let Some(node) = frontier.pop_front() {
             if connected_nodes.insert(node.id) {
-                for peer_id in &node.peers {
+                for peer_id in &node.consumers {
                     if node.id == *peer_id {
                         self_connected_nodes.push(node.id);
                     }
@@ -185,92 +201,53 @@ impl Topology {
     }
 }
 
-impl From<RawLegacyTopology> for Topology {
-    fn from(value: RawLegacyTopology) -> Self {
-        let mut nodes: Vec<NodeConfiguration> = value
-            .nodes
-            .into_iter()
-            .enumerate()
-            .map(|(index, raw)| NodeConfiguration {
-                id: NodeId::new(index),
-                name: format!("node-{index}"),
-                stake: raw.stake.unwrap_or_default(),
-                cpu_multiplier: raw.cpu_multiplier,
-                cores: raw.cores,
-                peers: vec![],
-            })
-            .collect();
-        let mut links = vec![];
-        for link in value.links {
-            let (id1, id2) = link.nodes;
-            nodes[id1].peers.push(NodeId::new(id2));
-            nodes[id2].peers.push(NodeId::new(id1));
-            links.push(LinkConfiguration {
-                nodes: (NodeId::new(id1), NodeId::new(id2)),
-                latency: Duration::from_millis(link.latency_ms),
-            });
-        }
-        Self { nodes, links }
-    }
-}
-
 impl From<RawTopology> for Topology {
     fn from(value: RawTopology) -> Self {
         let mut node_ids = BTreeMap::new();
-        for (id, name) in value.nodes.keys().enumerate() {
-            node_ids.insert(name.clone(), NodeId::new(id));
-        }
-        let mut nodes = vec![];
-        let mut links = BTreeMap::new();
-        for (name, raw_node) in value.nodes.into_iter() {
-            let id = *node_ids.get(&name).unwrap();
-            let mut node = NodeConfiguration {
+        let mut nodes = BTreeMap::new();
+        for (index, (name, node)) in value.nodes.iter().enumerate() {
+            let id = NodeId::new(index);
+            node_ids.insert(name.clone(), id);
+            nodes.insert(
                 id,
-                name,
-                stake: raw_node.stake.unwrap_or_default(),
-                cpu_multiplier: 1.0,
-                cores: raw_node.cpu_core_count,
-                peers: vec![],
-            };
-            for (peer_name, peer_info) in raw_node.producers {
-                let peer_id = *node_ids.get(&peer_name).unwrap();
-                node.peers.push(peer_id);
-                let mut ids = [id, peer_id];
+                NodeConfiguration {
+                    id,
+                    name: name.clone(),
+                    stake: node.stake.unwrap_or_default(),
+                    cpu_multiplier: 1.0,
+                    cores: node.cpu_core_count,
+                    consumers: vec![],
+                },
+            );
+        }
+        let mut links = BTreeMap::new();
+        for (consumer_name, raw_node) in value.nodes.into_iter() {
+            let consumer_id = *node_ids.get(&consumer_name).unwrap();
+
+            for (producer_name, producer_info) in raw_node.producers {
+                let producer_id = *node_ids.get(&producer_name).unwrap();
+                nodes
+                    .get_mut(&producer_id)
+                    .unwrap()
+                    .consumers
+                    .push(consumer_id);
+                let mut ids = [consumer_id, producer_id];
                 ids.sort();
                 links.insert(
                     ids,
                     LinkConfiguration {
                         nodes: (ids[0], ids[1]),
-                        latency: duration_ms(peer_info.latency_ms),
+                        latency: duration_ms(producer_info.latency_ms),
                     },
                 );
             }
-            nodes.push(node);
-        }
-        for [from, to] in links.keys() {
-            nodes[from.to_inner()].peers.push(*to);
-            nodes[to.to_inner()].peers.push(*from);
         }
         let links = links.into_values().collect();
-        Self { nodes, links }
+        Self {
+            nodes: nodes.into_values().collect(),
+            links,
+        }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RawNodeConfig {
-    pub location: (f64, f64),
-    pub stake: Option<u64>,
-    pub region: Option<String>,
-    #[serde(default = "f64::one", skip_serializing_if = "f64::is_one")]
-    pub cpu_multiplier: f64,
-    #[serde(default)]
-    pub cores: Option<u64>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RawLinkConfig {
-    pub nodes: (usize, usize),
-    pub latency_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -327,6 +304,45 @@ impl CpuTimeConfig {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct BlockSizeConfig {
+    pub block_header: u64,
+    cert_constant: u64,
+    cert_per_node: u64,
+    pub ib_header: u64,
+    eb_constant: u64,
+    eb_per_ib: u64,
+    vote_constant: u64,
+    vote_per_eb: u64,
+}
+
+impl BlockSizeConfig {
+    fn new(params: &RawParameters) -> Self {
+        Self {
+            block_header: params.rb_head_size_bytes,
+            cert_constant: params.cert_size_bytes_constant,
+            cert_per_node: params.cert_size_bytes_per_node,
+            ib_header: params.ib_head_size_bytes,
+            eb_constant: params.eb_size_bytes_constant,
+            eb_per_ib: params.eb_size_bytes_per_ib,
+            vote_constant: params.vote_bundle_size_bytes_constant,
+            vote_per_eb: params.vote_bundle_size_bytes_per_eb,
+        }
+    }
+
+    pub fn cert(&self, nodes: usize) -> u64 {
+        self.cert_constant + self.cert_per_node * nodes as u64
+    }
+
+    pub fn eb(&self, ibs: usize) -> u64 {
+        self.eb_constant + self.eb_per_ib * ibs as u64
+    }
+
+    pub fn vote_bundle(&self, ebs: usize) -> u64 {
+        self.vote_constant + self.vote_per_eb * ebs as u64
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
@@ -334,6 +350,7 @@ pub struct SimConfiguration {
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub stage_length: u64,
+    pub(crate) relay_strategy: RelayStrategy,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
@@ -343,9 +360,11 @@ pub struct SimConfiguration {
     pub(crate) max_block_size: u64,
     pub(crate) max_tx_size: u64,
     pub(crate) max_ib_size: u64,
+    pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
     pub(crate) cpu_times: CpuTimeConfig,
+    pub(crate) sizes: BlockSizeConfig,
     pub(crate) transaction_frequency_ms: FloatDistribution,
     pub(crate) transaction_size_bytes: FloatDistribution,
 }
@@ -358,6 +377,7 @@ impl SimConfiguration {
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
             links: topology.links,
+            relay_strategy: params.relay_strategy,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,
@@ -368,9 +388,11 @@ impl SimConfiguration {
             max_tx_size: params.tx_max_size_bytes,
             stage_length: params.leios_stage_length_slots,
             max_ib_size: params.ib_body_max_size_bytes,
+            ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
             cpu_times: CpuTimeConfig::new(&params),
+            sizes: BlockSizeConfig::new(&params),
             transaction_frequency_ms: params.tx_generation_distribution.into(),
             transaction_size_bytes: params.tx_size_bytes_distribution.into(),
         }
@@ -388,7 +410,7 @@ pub struct NodeConfiguration {
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
-    pub peers: Vec<NodeId>,
+    pub consumers: Vec<NodeId>,
 }
 
 #[derive(Debug, Clone)]

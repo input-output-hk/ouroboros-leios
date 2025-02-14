@@ -1,160 +1,134 @@
-use crate::bls::*;
 use blst::min_sig::*;
-use blst::*;
-use rand::RngCore;
+use quickcheck::{Arbitrary, Gen};
+use serde::{Deserialize, Serialize};
 
-const EMPTY: [u8; 0] = [];
+use crate::bls_vote;
+use crate::key::{PubKey, SecKey, Sig};
+use crate::primitive::{arbitrary_poolkeyhash, CoinFraction, EbHash, Eid, PoolKeyhash};
+use crate::registry::*;
+use crate::sortition::*;
+use crate::util::*;
 
-const DST: &[u8; 5] = b"Leios";
-
-pub fn gen_key() -> SecretKey {
-    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
-    let mut ikm: [u8; 32] = [0u8; 32];
-    rng.fill_bytes(&mut ikm);
-    let info = b"";
-    SecretKey::key_gen(&ikm, info).unwrap()
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+pub enum Vote {
+    Persistent {
+        persistent: PersistentId, //   2 bytes
+        eid: Eid,                 //   8 bytes
+        eb: EbHash,               //  32 bytes
+        sigma_m: Sig,             //  48 bytes
+    }, //  90 bytes
+    Nonpersistent {
+        pool: PoolKeyhash, //  28 bytes
+        eid: Eid,          //   8 bytes
+        eb: EbHash,        //  32 bytes
+        sigma_eid: Sig,    //  48 bytes
+        sigma_m: Sig,      //  48 bytes
+    }, // 164 bytes
 }
 
-pub fn make_pop(sk: &SecretKey) -> (Signature, Signature) {
-    let m1: [u8; 192] = sk.sk_to_pk().serialize();
-    let m2 = EMPTY;
-    (sk.sign(&m1, DST, b"PoP"), sk.sign(&m2, DST, &EMPTY))
-}
-
-pub fn check_pop(pk: &PublicKey, mu1: &Signature, mu2: &Signature) -> bool {
-    let m1: [u8; 192] = pk.serialize();
-    let m2 = EMPTY;
-    let result1 = mu1.verify(true, &m1, DST, b"PoP", pk, true);
-    let result2 = mu2.verify(true, &m2, DST, &EMPTY, pk, true);
-    result1 == BLST_ERROR::BLST_SUCCESS && result2 == BLST_ERROR::BLST_SUCCESS
-}
-
-pub struct VoteSignature {
-    pub sigma_eid: Signature,
-    pub sigma_m: Signature,
-}
-
-pub fn gen_vote(sk: &SecretKey, eid: &[u8], m: &[u8]) -> VoteSignature {
-    VoteSignature {
-        sigma_eid: sk.sign(&EMPTY, DST, eid),
-        sigma_m: sk.sign(m, DST, eid),
-    }
-}
-
-pub fn verify_vote(pk: &PublicKey, eid: &[u8], m: &[u8], vs: &VoteSignature) -> bool {
-    let result_eid = vs.sigma_eid.verify(true, &EMPTY, DST, eid, pk, true);
-    let result_m = vs.sigma_m.verify(true, m, DST, eid, pk, false);
-    result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
-}
-
-pub struct CertSignature {
-    pub sigma_tilde_eid: Signature,
-    pub sigma_tilde_m: Signature,
-}
-
-fn hash_sigs(vss: &[&VoteSignature]) -> [u8; 32] {
-    fn serialise_vs(vs: &VoteSignature) -> Vec<u8> {
-        [vs.sigma_eid, vs.sigma_m]
-            .iter()
-            .flat_map(|s| s.serialize())
-            .collect()
-    }
-    let msg: Vec<u8> = vss.iter().flat_map(|vs| serialise_vs(vs)).collect();
-
-    unsafe {
-        let mut out: [u8; 32] = [0; 32];
-        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
-        out
-    }
-}
-
-fn hash_index(i: i32, h: &[u8; 32]) -> [u8; 32] {
-    let mut msg: [u8; 36] = [0; 36];
-    let ii: [u8; 4] = i.to_ne_bytes();
-    msg[0..32].copy_from_slice(h);
-    msg[32..36].copy_from_slice(&ii);
-
-    unsafe {
-        let mut out: [u8; 32] = [0; 32];
-        blst_sha256(out.as_mut_ptr(), msg.as_ptr(), msg.len());
-        let mut sca: blst_scalar = blst_scalar::default();
-        blst_scalar_from_bendian(&mut sca, out.as_ptr());
-        out
-    }
-}
-
-pub fn gen_cert(vss: &[&VoteSignature]) -> Result<CertSignature, BLST_ERROR> {
-    let h: [u8; 32] = hash_sigs(vss);
-    let f = |i: usize| {
-        move |point: blst_p1| {
-            let hi: [u8; 32] = hash_index(i as i32, &h);
-            let mut point1: blst_p1 = blst_p1::default();
-            unsafe {
-                blst_p1_mult(&mut point1, &point, hi.as_ptr(), 8 * h.len());
+impl Arbitrary for Vote {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let sk: SecretKey = SecKey::arbitrary(g).0;
+        let eid: [u8; 8] = arbitrary_fixed_bytes(g);
+        let msg: [u8; 10] = arbitrary_fixed_bytes(g);
+        if bool::arbitrary(g) {
+            let sigma_m = bls_vote::gen_sig(&sk, &eid, &msg);
+            Vote::Persistent {
+                persistent: PersistentId::arbitrary(g),
+                eid: Eid::arbitrary(g),
+                eb: EbHash::arbitrary(g),
+                sigma_m: Sig(sigma_m),
             }
-            point1
+        } else {
+            let (sigma_eid, sigma_m) = bls_vote::gen_vote(&sk, &eid, &msg);
+            Vote::Nonpersistent {
+                pool: arbitrary_poolkeyhash(g),
+                eid: Eid::arbitrary(g),
+                eb: EbHash::arbitrary(g),
+                sigma_eid: Sig(sigma_eid),
+                sigma_m: Sig(sigma_m),
+            }
         }
-    };
-
-    let sigmas_eid: Vec<Signature> = vss
-        .iter()
-        .enumerate()
-        .map(|(i, vs)| sig_transform(&f(i), &vs.sigma_eid))
-        .collect();
-    let sigma_eid_refs: Vec<&Signature> = sigmas_eid.iter().collect();
-    let result_eid = AggregateSignature::aggregate(&sigma_eid_refs, true);
-
-    let sigmas_m: Vec<&Signature> = vss.iter().map(|vs| &vs.sigma_m).collect();
-    let result_m = AggregateSignature::aggregate(&sigmas_m, true);
-
-    match (result_eid, result_m) {
-        (Ok(sig_eid), Ok(sig_m)) => Ok(CertSignature {
-            sigma_tilde_eid: sig_eid.to_signature(),
-            sigma_tilde_m: sig_m.to_signature(),
-        }),
-        (Err(err), _) => Err(err),
-        (_, Err(err)) => Err(err),
     }
 }
 
-pub fn verify_cert(
-    pks: &[&PublicKey],
-    eid: &[u8],
-    m: &[u8],
-    vss: &[&VoteSignature],
-    cs: &CertSignature,
-) -> bool {
-    let h: [u8; 32] = hash_sigs(vss);
-    let f = |i: usize| {
-        move |point: blst_p2| {
-            let hi: [u8; 32] = hash_index(i as i32, &h);
-            let mut point1: blst_p2 = blst_p2::default();
-            unsafe {
-                blst_p2_mult(&mut point1, &point, hi.as_ptr(), 8 * h.len());
-            }
-            point1
-        }
-    };
+pub fn gen_sigma_eid(eid: &Eid, sk: &SecKey) -> Sig {
+    Sig(bls_vote::gen_sigma_eid(&sk.0, &eid.bytes()))
+}
 
-    let pks1: Vec<PublicKey> = pks
-        .iter()
-        .enumerate()
-        .map(|(i, pk)| pk_transform(&f(i), pk))
-        .collect();
-    let pk1_refs: Vec<&PublicKey> = pks1.iter().collect();
-
-    let result_pk = AggregatePublicKey::aggregate(pks, true);
-    let result_pk1 = AggregatePublicKey::aggregate(&pk1_refs, true);
-    match (result_pk, result_pk1) {
-        (Ok(pk), Ok(pk1)) => {
-            let result_eid =
-                cs.sigma_tilde_eid
-                    .verify(true, &EMPTY, DST, eid, &pk1.to_public_key(), true);
-            let result_m = cs
-                .sigma_tilde_m
-                .verify(true, m, DST, eid, &pk.to_public_key(), true);
-            result_eid == BLST_ERROR::BLST_SUCCESS && result_m == BLST_ERROR::BLST_SUCCESS
-        }
-        _ => false,
+pub fn gen_vote_persistent(peristent: &PersistentId, eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
+    let sigma_m = bls_vote::gen_sig(&sk.0, &eid.bytes(), &m.bytes());
+    Vote::Persistent {
+        persistent: peristent.clone(),
+        eid: eid.clone(),
+        eb: m.clone(),
+        sigma_m: Sig(sigma_m),
     }
+}
+
+pub fn gen_vote_nonpersistent(pool: &PoolKeyhash, eid: &Eid, m: &EbHash, sk: &SecKey) -> Vote {
+    let (sigma_eid, sigma_m) = bls_vote::gen_vote(&sk.0, &eid.bytes(), &m.bytes());
+    Vote::Nonpersistent {
+        pool: *pool,
+        eid: eid.clone(),
+        eb: m.clone(),
+        sigma_eid: Sig(sigma_eid),
+        sigma_m: Sig(sigma_m),
+    }
+}
+
+pub fn verify_vote(mvk: &PubKey, vote: &Vote) -> bool {
+    match vote {
+        Vote::Persistent {
+            persistent: _,
+            eid,
+            eb,
+            sigma_m,
+        } => bls_vote::verify_sig(&mvk.0, &eid.bytes(), &eb.bytes(), &sigma_m.0),
+        Vote::Nonpersistent {
+            pool: _,
+            eid,
+            eb,
+            sigma_eid,
+            sigma_m,
+        } => bls_vote::verify_vote(&mvk.0, &eid.bytes(), &eb.bytes(), &(sigma_eid.0, sigma_m.0)),
+    }
+}
+
+pub fn do_voting(reg: &Registry, eid: &Eid, eb: &EbHash) -> Vec<Vote> {
+    let mut votes = Vec::new();
+    reg.info.values().for_each(|info| {
+        if reg.persistent_id.contains_key(&info.reg.pool) {
+            votes.push(gen_vote_persistent(
+                &reg.persistent_id[&info.reg.pool],
+                eid,
+                eb,
+                &info.secret,
+            ));
+        } else if info.stake > 0 {
+            let vote = gen_vote_nonpersistent(&info.reg.pool, eid, eb, &info.secret);
+            if let Vote::Nonpersistent {
+                pool: _,
+                eid: _,
+                eb: _,
+                sigma_eid,
+                sigma_m: _,
+            } = vote.clone()
+            {
+                let p = sigma_eid.to_rational();
+                let s = CoinFraction::from_coins(info.stake, 1).to_ratio()
+                    / reg.nonpersistent_stake.to_ratio();
+                if voter_check(reg.voters, &s, &p) > 0 {
+                    votes.push(vote);
+                }
+            }
+        }
+    });
+    votes
+}
+
+pub fn arbitrary_votes(g: &mut Gen, reg: &Registry) -> Vec<Vote> {
+    let eid = Eid::arbitrary(g);
+    let eb = EbHash::arbitrary(g);
+    do_voting(reg, &eid, &eb)
 }

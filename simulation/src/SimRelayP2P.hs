@@ -19,7 +19,8 @@ import qualified Data.Map.Strict as Map
 import System.Random (StdGen, split)
 import TimeCompat
 
-import ChanTCP
+import Chan
+import Chan.TCP (newConnectionTCP)
 import SimRelay
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes

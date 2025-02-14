@@ -8,8 +8,8 @@ export const Progress: FC = () => {
 
   const percent = (aggregatedData.progress / maxTime) * 100;
 
-  const minutes = Math.floor(aggregatedData.progress / 60_000);
-  const seconds = (aggregatedData.progress / 1000 % 60).toFixed(3);
+  const minutes = Math.floor(aggregatedData.progress / 60);
+  const seconds = (aggregatedData.progress % 60).toFixed(3);
   const time = minutes ? `${minutes}m${seconds}s` : `${seconds}s`;
 
   return (

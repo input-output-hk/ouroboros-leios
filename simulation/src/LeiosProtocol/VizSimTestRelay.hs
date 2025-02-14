@@ -4,7 +4,7 @@
 
 module LeiosProtocol.VizSimTestRelay where
 
-import ChanDriver (ProtocolMessage (..))
+import Chan.Driver (ProtocolMessage (..))
 import Control.Exception (assert)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
@@ -18,7 +18,6 @@ import LeiosProtocol.SimTestRelay
 import ModelTCP
 import Network.TypedProtocol (SomeMessage (..))
 import P2P (linkPathLatenciesSquared)
-import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
 import System.Random.Stateful (uniform)

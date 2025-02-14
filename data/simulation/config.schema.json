@@ -1,6 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "ConstantDistribution": {
+      "properties": {
+        "distribution": {
+          "const": "constant",
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "DiffusionStrategy": {
+      "enum": ["peer-order", "freshest-first", "oldest-first"],
+      "type": "string"
+    },
     "Distribution": {
       "anyOf": [
         {
@@ -11,6 +27,9 @@
         },
         {
           "$ref": "#/definitions/LogNormalDistribution"
+        },
+        {
+          "$ref": "#/definitions/ConstantDistribution"
         }
       ]
     },
@@ -58,6 +77,10 @@
         }
       },
       "type": "object"
+    },
+    "RelayStrategy": {
+      "enum": ["request-from-all", "request-from-first"],
+      "type": "string"
     }
   },
   "description": "A configuration for a Leios simulation.",
@@ -84,6 +107,28 @@
     "cert-validation-cpu-time-ms-per-node": {
       "type": "number"
     },
+    "eb-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "eb-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "eb-diffusion-max-window-size": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "eb-diffusion-strategy": {
+      "$ref": "#/definitions/DiffusionStrategy",
+      "description": "Only supported by Haskell simulation."
+    },
     "eb-generation-cpu-time-ms": {
       "type": "number"
     },
@@ -105,11 +150,13 @@
     },
     "ib-body-avg-size-bytes": {
       "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
     "ib-body-max-size-bytes": {
       "additionalProperties": false,
+      "description": "Only supported by Rust simulation.",
       "properties": {},
       "type": "number"
     },
@@ -118,6 +165,27 @@
     },
     "ib-body-validation-cpu-time-ms-per-byte": {
       "type": "number"
+    },
+    "ib-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "ib-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "ib-diffusion-max-window-size": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "ib-diffusion-strategy": {
+      "$ref": "#/definitions/DiffusionStrategy"
     },
     "ib-generation-cpu-time-ms": {
       "type": "number"
@@ -133,6 +201,10 @@
     "ib-head-validation-cpu-time-ms": {
       "type": "number"
     },
+    "ib-shards": {
+      "description": "Only supported by Rust simulation.",
+      "type": "number"
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
@@ -143,8 +215,17 @@
       "properties": {},
       "type": "number"
     },
+    "leios-vote-send-recv-stages": {
+      "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",
+      "type": "boolean"
+    },
+    "multiplex-mini-protocols": {
+      "description": "Only supported by Haskell simulation.",
+      "type": "boolean"
+    },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -173,18 +254,29 @@
     "rb-head-validation-cpu-time-ms": {
       "type": "number"
     },
+    "relay-strategy": {
+      "$ref": "#/definitions/RelayStrategy"
+    },
+    "tcp-congestion-control": {
+      "description": "Only supported by Haskell simulation.",
+      "type": "boolean"
+    },
     "tx-generation-distribution": {
-      "$ref": "#/definitions/Distribution"
+      "$ref": "#/definitions/Distribution",
+      "description": "Only supported by Rust simulation."
     },
     "tx-max-size-bytes": {
       "additionalProperties": false,
+      "description": "Only supported by Rust simulation.",
       "properties": {},
       "type": "number"
     },
     "tx-size-bytes-distribution": {
-      "$ref": "#/definitions/Distribution"
+      "$ref": "#/definitions/Distribution",
+      "description": "Only supported by Rust simulation."
     },
     "tx-validation-cpu-time-ms": {
+      "description": "Only supported by Rust simulation.",
       "type": "number"
     },
     "vote-bundle-size-bytes-constant": {
@@ -196,6 +288,28 @@
       "additionalProperties": false,
       "properties": {},
       "type": "number"
+    },
+    "vote-diffusion-max-bodies-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-max-headers-to-request": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-max-window-size": {
+      "additionalProperties": false,
+      "description": "Only supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
+    "vote-diffusion-strategy": {
+      "$ref": "#/definitions/DiffusionStrategy",
+      "description": "Only supported by Haskell simulation."
     },
     "vote-generation-cpu-time-ms-constant": {
       "type": "number"

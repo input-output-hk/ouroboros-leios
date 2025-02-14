@@ -3,8 +3,8 @@
 module PraosProtocol.SimBlockFetch where
 
 import Chan (Chan)
-import ChanDriver (ProtocolMessage)
-import ChanTCP
+import Chan.Driver (ProtocolMessage)
+import Chan.TCP
 import Control.Monad
 import Control.Monad.Class.MonadAsync (
   MonadAsync (..),
@@ -21,6 +21,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import ModelTCP (mkTcpConnProps)
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
 import STMCompat
@@ -91,7 +92,7 @@ traceRelayLink1 tcpprops =
     concurrently_ processingThread $
       concurrently_ (mapConcurrently_ id ts) $
         concurrently_
-          ( blockFetchController nullTracer st
+          ( blockFetchController nullTracer praosConfig st
           )
           ( runBlockFetchConsumer nullTracer praosConfig chan $
               initBlockFetchConsumerStateForPeerId nullTracer peerId st submitFetchedBlock

@@ -32,10 +32,11 @@ runSampleModel ::
   [(Time, event)] ->
   IO ()
 runSampleModel traceFile logEvent =
-  runSampleModel' traceFile (fmap toEncoding . logEvent)
+  runSampleModel' (Just traceFile) (fmap toEncoding . logEvent)
 
 runSampleModel' ::
-  FilePath ->
+  forall event state.
+  Maybe FilePath ->
   (event -> Maybe Encoding) ->
   SampleModel event state ->
   Time ->
@@ -44,16 +45,21 @@ runSampleModel' ::
 runSampleModel' traceFile logEvent (SampleModel s0 accum render) stop =
   process . flip SimVizModel s0 . takeWhile (\(t, _) -> t <= stop)
  where
-  process m = withFile traceFile WriteMode (`go` m)
-  go h m = case stepSimViz 10000 m of
+  process m
+    | Just f <- traceFile =
+        withFile f WriteMode $ (`go` m) . writeEvents
+    | otherwise = go (const $ pure ()) m
+  go :: ([(Time, event)] -> IO ()) -> SimVizModel event state -> IO ()
+  go w m = case stepSimViz 10000 m of
     (before, m'@(SimVizModel ((now, _) : _) _)) -> do
-      writeEvents h before
+      w before
       putStrLn $ "time reached: " ++ show now
       hFlush stdout
-      go h m'
+      go w m'
     (before, SimVizModel [] s) -> do
-      writeEvents h before
+      w before
       putStrLn "done."
+      hFlush stdout
       render s
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
