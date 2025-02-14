@@ -47,11 +47,11 @@ impl TransactionProducer {
         let mut rng = &mut self.rng;
         loop {
             let id = TransactionId::new(next_tx_id);
-            let shard = rng.gen_range(0..self.ib_shards);
+            let shard = rng.random_range(0..self.ib_shards);
             let bytes = (self.size_bytes.sample(&mut rng) as u64).min(self.max_size);
             let tx = Transaction { id, shard, bytes };
 
-            let node_index = rng.gen_range(0..node_count);
+            let node_index = rng.random_range(0..node_count);
             let node_id = NodeId::new(node_index);
 
             self.node_tx_sinks

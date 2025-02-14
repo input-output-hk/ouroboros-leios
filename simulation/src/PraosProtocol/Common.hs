@@ -40,7 +40,8 @@ module PraosProtocol.Common (
   mkScheduler,
 ) where
 
-import ChanTCP (Bytes, MessageSize (..))
+import Chan (ConnectionConfig, mkConnectionConfig)
+import Chan.TCP (Bytes, MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad.State
 import Data.Coerce (coerce)
@@ -49,12 +50,13 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Word (Word8)
 import GHC.Word (Word64)
+import LeiosProtocol.Config (RelayStrategy (RequestFromFirst))
+import ModelTCP (kilobytes)
 import Ouroboros.Network.Mock.ProducerState as ProducerState
 import PraosProtocol.Common.AnchoredFragment (Anchor (..), AnchoredFragment)
 import PraosProtocol.Common.Chain (Chain (..), foldChain, pointOnChain)
 import PraosProtocol.Common.ConcreteBlock as ConcreteBlock
 import STMCompat
-import SimTCPLinks (kilobytes)
 import SimTypes (CPUTask (..))
 import System.Random (StdGen, mkStdGen, uniform, uniformR)
 import TimeCompat
@@ -152,6 +154,8 @@ data PraosConfig body = PraosConfig
   , headerSize :: !Bytes
   , bodySize :: !(body -> Bytes)
   , bodyMaxSize :: !Bytes
+  , configureConnection :: DiffTime -> Maybe Bytes -> ConnectionConfig
+  , relayStrategy :: RelayStrategy
   }
 
 defaultPraosConfig :: PraosConfig body
@@ -164,6 +168,8 @@ defaultPraosConfig =
     , headerSize = kilobytes 1
     , bodySize = const $ kilobytes 95
     , bodyMaxSize = kilobytes 96
+    , configureConnection = mkConnectionConfig True True
+    , relayStrategy = RequestFromFirst
     }
 
 instance Default (PraosConfig body) where

@@ -10,8 +10,7 @@ module PraosProtocol.PraosNode (
 )
 where
 
-import ChanDriver (protocolMessage)
-import ChanMux
+import Chan
 import Control.Exception (assert)
 import Control.Monad.Class.MonadAsync (Concurrently (..), MonadAsync (..))
 import Control.Monad.Class.MonadFork
@@ -52,14 +51,15 @@ praosMessageLabel (PraosMessage d) =
 instance MessageSize body => MessageSize (PraosMessage body) where
   messageSizeBytes (PraosMessage d) = either messageSizeBytes messageSizeBytes d
 
-instance MuxBundle (Praos body) where
-  type MuxMsg (Praos body) = PraosMessage body
-  toFromMuxMsgBundle =
+instance MessageSize body => ConnectionBundle (Praos body) where
+  type BundleMsg (Praos body) = PraosMessage body
+  type BundleConstraint (Praos body) = MessageSize
+  toFromBundleMsgBundle =
     coerce $
       Praos
-        (ToFromMuxMsg Left $ fromLeft $ error "MuxBundle Praos: fromLeft")
-        (ToFromMuxMsg Right $ fromRight $ error "MuxBundle Praos: fromRight")
-  traverseMuxBundle f (Praos x y) = Praos <$> f x <*> f y
+        (ToFromBundleMsg Left $ fromLeft $ error "ConnectionBundle Praos: fromLeft")
+        (ToFromBundleMsg Right $ fromRight $ error "ConnectionBundle Praos: fromRight")
+  traverseConnectionBundle f (Praos x y) = Praos <$> f x <*> f y
 
 data PraosNodeState body m = PraosNodeState
   { blockFetchControllerState :: BlockFetchControllerState body m
@@ -180,7 +180,7 @@ setupPraosThreads' ::
 setupPraosThreads' tracer cfg valHeader submitFetchedBlock st0 followers peers = do
   (st1, followerIds) <- repeatM addFollower (length followers) st0
   (st2, peerIds) <- repeatM (addPeer valHeader) (length peers) st1
-  let controllerThread = Concurrently $ blockFetchController tracer st2.blockFetchControllerState
+  let controllerThread = Concurrently $ blockFetchController tracer cfg st2.blockFetchControllerState
   let followerThreads = zipWith (runFollower st2) followerIds followers
   let peerThreads = zipWith (runPeer tracer cfg submitFetchedBlock st2) peerIds peers
   return (controllerThread : concat followerThreads <> concat peerThreads)

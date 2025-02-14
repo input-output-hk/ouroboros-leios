@@ -2,6 +2,7 @@ import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/
 import cx from "classnames";
 import { FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
 
+import { printBytes } from '@/utils';
 import classes from "./styles.module.css";
 
 export interface IBlockContentsProps {
@@ -29,31 +30,33 @@ const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, class
 interface ITXStats {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
+  breakdown: [string, number][];
 }
 
 interface IStatsProps {
   name: string;
   slot: number;
-  txs: ISimulationTransaction[];
+  txs: ISimulationTransaction[] | null;
+  breakdown: [string, number][];
   position: [number, number];
 }
 
-const Stats: FC<IStatsProps> = ({ name, slot, txs, position: [left, top] }) => {
-  const count = txs.length;
-  const bytes = txs.reduce((sum, tx) => sum + tx.bytes, 0);
-  const size =
-    (bytes >= 1024 * 1024) ? `${(bytes / 1024 / 1024).toFixed(3)} MB` :
-      (bytes >= 1024) ? `${(bytes / 1024).toFixed(3)} KB` :
-        `${bytes} bytes`;
+const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {
+  const txBytes = txs?.reduce((sum, tx) => sum + tx.bytes, 0) ?? 0;
+  const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
     <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
       <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
         <div className="border-2 border-black rounded p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{count}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Total size: <span>{size}</span></h4>
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{txs.length}</span></h4>}
+          {breakdown.map(([name, bytes]) => (
+            <h4 key={name} className="flex items-center justify-between gap-4">{name}: <span>{printBytes(bytes)}</span></h4>
+          ))}
+          {txs && <h4 className="flex items-center justify-between gap-4">Transaction size: <span>{printBytes(txBytes)}</span></h4>}
+          {txs && <h4 className="flex items-center justify-between gap-4">Total size: <span>{printBytes(totalBytes)}</span></h4>}
         </div>
       </div>
     </div>
@@ -68,10 +71,34 @@ interface SelectState {
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
-    result.set("block", { name: "Block", slot: block.slot, txs: block.txs });
-    if (block.endorsement) {
-      for (const ib of block.endorsement.ibs) {
-        result.set(ib.id, { name: "Input Block", slot: ib.slot, txs: ib.txs });
+    const breakdown: [string, number][] = [
+      ["Header size", block.headerBytes],
+    ];
+    if (block.cert) {
+      breakdown.push(["Certificate size", block.cert.bytes]);
+    }
+    result.set("block", {
+      name: "Block",
+      slot: block.slot,
+      txs: block.txs,
+      breakdown,
+    });
+    if (block.cert) {
+      result.set("eb", {
+        name: "Endorsement Block",
+        slot: block.cert.eb.slot,
+        txs: null,
+        breakdown: [["Size", block.cert.eb.bytes]],
+      });
+      for (const ib of block.cert.eb.ibs) {
+        result.set(ib.id, {
+          name: "Input Block",
+          slot: ib.slot,
+          txs: ib.txs,
+          breakdown: [
+            ["Header size", ib.headerBytes],
+          ],
+        });
       }
     }
     return result;
@@ -90,8 +117,8 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
     }
   };
 
-  const eb = block.endorsement;
-  const ibs = block.endorsement?.ibs ?? [];
+  const eb = block.cert?.eb;
+  const ibs = block.cert?.eb?.ibs ?? [];
 
   return (
     <>
@@ -118,7 +145,7 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
           ) : null}
           {eb && (
             <div className={cx('pr-4 pl-6', classes.endorser, { [classes['has-ibs']]: ibs.length })}>
-              <Box proportion={1}>
+              <Box selected={selected?.key === "eb"} proportion={1} onClick={selectBox("eb")}>
                 Endorsement Block
                 <span className='text-sm'>Slot {eb.slot}</span>
               </Box>

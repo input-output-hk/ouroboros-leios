@@ -14,9 +14,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
-module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..))
-where
+module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..)) where
 
+import Chan (mkConnectionConfig)
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Kind
@@ -29,6 +29,7 @@ import Data.Maybe (
   maybeToList,
  )
 import Data.Ord
+import Data.Word (Word16)
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
@@ -73,13 +74,19 @@ prioritize ::
   [header]
 prioritize PeerOrder _ = \_ hs -> hs
 prioritize FreshestFirst sl = \m _ -> sortOn (Down . sl) . Map.elems $ m
+prioritize OldestFirst sl = \m _ -> sortOn sl . Map.elems $ m
 
 data SingPipeline (p :: Pipeline) where
   SingSingleVote :: SingPipeline SingleVote
   SingSplitVote :: SingPipeline SplitVote
 
--- TODO: add feature flags to generalize from (Uniform) Short leios to other variants.
---       Would need to rework def. of Stage to accomodate different pipeline shapes.
+data RelayDiffusionConfig = RelayDiffusionConfig
+  { strategy :: !DiffusionStrategy
+  , maxWindowSize :: !Word16
+  , maxHeadersToRequest :: !Word16
+  , maxBodiesToRequest :: !Word16
+  }
+
 data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   { praos :: PraosConfig RankingBlockBody
   , pipeline :: SingPipeline p
@@ -96,33 +103,61 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , votesForCertificate :: Int
   , sizes :: SizesConfig
   , delays :: LeiosDelays
-  , ibDiffusionStrategy :: DiffusionStrategy
-  , ebDiffusionStrategy :: DiffusionStrategy
-  , voteDiffusionStrategy :: DiffusionStrategy
+  , ibDiffusion :: RelayDiffusionConfig
+  , ebDiffusion :: RelayDiffusionConfig
+  , voteDiffusion :: RelayDiffusionConfig
+  , relayStrategy :: RelayStrategy
   }
+
+data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
 
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  LeiosConfig
-    { praos
-    , pipeline = SingSingleVote
-    , sliceLength = fromIntegral disk.leiosStageLengthSlots
-    , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-    , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-    , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-    , votingFrequencyPerStage = disk.voteGenerationProbability
-    , votesForCertificate = fromIntegral disk.voteThreshold
-    , voteSendStage = Vote
-    , sizes
-    , delays
-    , ibDiffusionStrategy = disk.ibDiffusionStrategy
-    , ebDiffusionStrategy = PeerOrder
-    , voteDiffusionStrategy = PeerOrder
-    }
+  case voting of
+    SomeStage pipeline voteSendStage ->
+      LeiosConfig
+        { praos
+        , pipeline
+        , voteSendStage
+        , sliceLength = fromIntegral disk.leiosStageLengthSlots
+        , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+        , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+        , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+        , votingFrequencyPerStage = disk.voteGenerationProbability
+        , votesForCertificate = fromIntegral disk.voteThreshold
+        , sizes
+        , delays
+        , ibDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ibDiffusionStrategy
+              , maxWindowSize = disk.ibDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+              }
+        , ebDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ebDiffusionStrategy
+              , maxWindowSize = disk.ebDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+              }
+        , voteDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.voteDiffusionStrategy
+              , maxWindowSize = disk.voteDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+              }
+        , relayStrategy = disk.relayStrategy
+        }
  where
   forEach n xs = n * fromIntegral (length xs)
   forEachKey n m = n * fromIntegral (Map.size m)
   durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
+  voting =
+    if disk.leiosVoteSendRecvStages
+      then SomeStage SingSplitVote VoteSend
+      else SomeStage SingSingleVote Vote
   praos =
     PraosConfig
       { blockFrequencyPerSlot = disk.rbGenerationProbability
@@ -145,6 +180,8 @@ convertConfig disk =
       , blockGenerationDelay = \(Block _ body) ->
           durationMsToDiffTime disk.rbGenerationCpuTimeMs
             + sum (map (certificateGeneration . snd) body.endorseBlocks)
+      , configureConnection = mkConnectionConfig (tcpCongestionControl disk) (multiplexMiniProtocols disk)
+      , relayStrategy = disk.relayStrategy
       }
   certificateSize (Certificate votesMap) =
     fromIntegral $
@@ -315,9 +352,13 @@ stageRangeOf :: forall p. IsPipeline p => LeiosConfig -> PipelineNo -> Stage p -
 stageRangeOf cfg pl stage =
   fromMaybe
     undefined
-    (stageRange cfg minBound (toEnum (fromEnum pl * pLength)) stage)
- where
-  pLength = length $ allStages @p
+    (stageRange cfg minBound (toEnum (fromEnum pl * cfg.sliceLength)) stage)
+
+pipelineOf :: forall p. IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> PipelineNo
+pipelineOf cfg stage sl =
+  toEnum $
+    fromMaybe undefined (fromEnum <$> stageStart cfg stage sl minBound)
+      `div` cfg.sliceLength
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -472,6 +513,9 @@ endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slot ibs ebs =
   let cond = shouldVoteOnEB cfg slot ibs
    in filter cond $
         maybe [] ebs.validEndorseBlocks (stageRange cfg voteSendStage slot Endorse)
+
+endorseBlockPipeline :: LeiosConfig -> EndorseBlock -> PipelineNo
+endorseBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} eb = pipelineOf @p cfg Endorse eb.slot
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.

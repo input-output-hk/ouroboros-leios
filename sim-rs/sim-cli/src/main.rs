@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf, process};
 
 use anyhow::Result;
 use clap::Parser;
-use events::{EventMonitor, OutputFormat};
+use events::EventMonitor;
 use figment::{
     providers::{Format as _, Yaml},
     Figment,
@@ -29,8 +29,6 @@ struct Args {
     output: Option<PathBuf>,
     #[clap(short, long)]
     parameters: Vec<PathBuf>,
-    #[clap(short, long)]
-    format: Option<OutputFormat>,
     #[clap(short, long)]
     timescale: Option<f64>,
     #[clap(long)]
@@ -97,8 +95,7 @@ async fn main() -> Result<()> {
     let config = read_config(&args)?;
 
     let (events_sink, events_source) = mpsc::unbounded_channel();
-    let monitor =
-        tokio::spawn(EventMonitor::new(&config, events_source, args.output, args.format).run());
+    let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
     let clock_coordinator = ClockCoordinator::new();
@@ -132,7 +129,6 @@ mod tests {
                 topology: topology?.path(),
                 output: None,
                 parameters: vec![],
-                format: None,
                 timescale: None,
                 trace_node: vec![],
                 slots: None,

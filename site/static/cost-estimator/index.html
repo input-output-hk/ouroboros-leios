@@ -10,7 +10,7 @@
     <div id="uiHeader">
       <div>
         <h1>Ouroborous Leios cost estimator</h1>
-        <h2>v0.3, <small><a href="https://drive.google.com/file/d/1pH1GYRInevlKcrkpFRJYIvRqFtcv3yFd/view?usp=sharing">video tutorial</a></small></h2>
+        <h2>v0.4, <small><a href="https://drive.google.com/file/d/1pH1GYRInevlKcrkpFRJYIvRqFtcv3yFd/view?usp=sharing">video tutorial</a></small></h2>
       </div>
       <p><em>Explore the costs and benefits of Ouroborous Leios</em></p>
       <p><span style="color:red">WARNING:</span> This is a <em>very preliminary</em> tool for estimating the costs of running Leios nodes. At this point, it is really just useful for structuring thinking about Leios costs and making some very rough calculations for guiding further study. The Leios R&amp;D task aims to refine both the inputs to models like this and the cost model itself. Also note that the design of the Leios protocol itself is under revision. Ask questions <a href="https://discord.com/channels/826816523368005654/1247688618621927505">on Discord</a> or report problems on <a href="https://github.com/input-output-hk/ouroboros-leios/issues">GitHub</a>.</p>
@@ -48,12 +48,12 @@
           </tr>
           <tr>
             <th colspan="2">IB rate <span title="Total rate (not per pipeline) at which Input Blocks are produced.">ⓘ</span></th>
-            <td><input id="uiIbRate" type="number" min="0" max="1" value="0.25" step="0.01"/></td>
+            <td><input id="uiIbRate" type="number" min="0.01" max="20" value="1.50" step="0.01"/></td>
             <td>IB/slot</td>
           </tr>
           <tr>
             <th colspan="2">EB rate <span title="Number of Endorser Blocks produced by each pipeline. Fixed at one for Short Leios.">ⓘ</span></th>
-            <td><input id="uiEbRate" type="number" min="0" max="1" value="0.80" step="0.01"/></td>
+            <td><input id="uiEbRate" type="number" min="0.01" max="5" value="2.50" step="0.01"/></td>
             <td>EB/pipeline</td>
           </tr>
           <tr>
@@ -96,7 +96,7 @@
           <tr>
             <th rowspan="5">EB <span title="Leios Endorser Blocks store references to Input Blocks.">ⓘ</span></th>
             <th>IB reference <span title="Size of a reference to an Input Block.">ⓘ</span></th>
-            <td><input id="uiIbRef" type="number" min="0" max="20" value="1.2" step="0.1"/></td>
+            <td><input id="uiIbRef" type="number" min="0" max="20" value="0.8" step="0.1"/></td>
             <td>kB/IB</td>
           </tr>
           <tr>
@@ -122,7 +122,7 @@
           <tr>
             <th rowspan="4">Vote <span title="A committee of SPOs votes on whether each Endorser Block was correctly constructed.">ⓘ</span></th>
             <th>Size <span title="Size of a vote.">ⓘ</span></th>
-            <td><input id="uiVoteSize" type="number" min="0" max="2" value="0.250" step="0.001"/></td>
+            <td><input id="uiVoteSize" type="number" min="0" max="2" value="0.200" step="0.001"/></td>
             <td>kB/vote</td>
           </tr>
           <tr>
@@ -143,7 +143,7 @@
           <tr>
             <th rowspan="4">Certificate <span title="A Leios certificate records a successful vote for an Endorser Block.">ⓘ</span></th>
             <th>Size <span title="Size of a certificate.">ⓘ</span></th>
-            <td><input id="uiCertSize" type="number" min="0" max="200" value="75" step="1"/></td>
+            <td><input id="uiCertSize" type="number" min="0" max="200" value="15" step="1"/></td>
             <td>kB/cert</td>
           </tr>
           <tr>
@@ -214,29 +214,33 @@
             <td>GB</td>
           </tr>
           <tr>
-            <th rowspan="5">Costs</th>
+            <th rowspan="5">Costs<br/>
+              <br/><input type="button" value="hyperscale provider" onclick="Controller.hyperscaleCosts()"/> <span title="Set costs to values typical of the largest cloud providers">ⓘ</span>
+              <br/><input type="button" value="discount provider" onclick="Controller.discountCosts()"/> <span title="Set costs to values typical of a discount cloud provider">ⓘ</span>
+            </th>
             <th colspan="2">vCPU <span title="Monthly cost of a virtual CPU.">ⓘ</span></th>
             <td><input id="uiVcpu" type="number" min="0" max="100" value="20" step="0.01"/></td>
             <td>USD/vCPU/month</td>
           </tr>
           <tr>
             <th colspan="2">Storage <span title="Monthly cost of cloud disk attached to a virtual machine.">ⓘ</span></th>
-            <td><input id="uiStorage" type="number" min="0" max="1" value="0.12" step="0.01"/></td>
+            <td><input id="uiStorage" type="number" min="0" max="1" value="0.10" step="0.01"/></td>
             <td>USD/GB/month</td>
           </tr>
           <tr>
             <th colspan="2">IOPS <span title="Monthly cost of cloud input/output operation capacity.">ⓘ</span></th>
-            <td><input id="uiIops" type="number" min="0" max="0.5" value="0.05" step="0.001"/></td>
+            <td><input id="uiIops" type="number" min="0" max="0.5" value="0.00" step="0.001"/></td>
             <td>USD/(IO/s)/month</td>
           </tr>
           <tr>
             <th colspan="2">Network egress <span title="Monthly cost of cloud network egress.">ⓘ</span></th>
-            <td><input id="uiEgress" type="number" min="0" max="1" value="0.10" step="0.01"/></td>
+            <td><input id="uiEgress" type="number" min="0" max="1" value="0.00" step="0.01"/></td>
             <td>USD/GB</td>
           </tr>
           <tr>
-            <th colspan="2">Discount rate <span title="Annual rate at which cloud-computing costs decrease.">ⓘ</span></th>
-            <td><input id="uiDiscount" type="number" min="0" max="50" value="15" step="0.1"/></td>
+            <th colspan="1">Discount rate <span title="Annual rate at which cloud-computing costs decrease.">ⓘ</span></th>
+            <th>Amortize? <span title="Whether to compute perpetual storage cost.">ⓘ</span><input id="uiAmortize" type="checkbox"/></th>
+            <td><input id="uiDiscount" type="number" min="0" max="50" value="15" step="0.1" disabled="true"/></td>
             <td>%/year</td>
           </tr>
           <tr>
@@ -247,7 +251,7 @@
           </tr>
           <tr>
             <th colspan="2">Relays <span title="Number of relay nodes operated by the stake pool.">ⓘ</span></th>
-            <td><input id="uiRelays" type="number" min="0" max="10" value="2" step="1"/></td>
+            <td><input id="uiRelays" type="number" min="0" max="10" value="1" step="1"/></td>
             <td>nodes</td>
           </tr>
           <tr>
@@ -294,7 +298,7 @@
           </tr>
           <tr>
             <th colspan="2">Storage compression <span title="Percentage by which each node's disk storage space is reduced by using data compression or a compressed file system.">ⓘ</span></th>
-            <td><input id="uiCompression" type="number" min="0" max="100" value="75" step="0.1"/></td>
+            <td><input id="uiCompression" type="number" min="0" max="100" value="50" step="0.1"/></td>
             <td>%</td>
           </tr>
           <tr>
@@ -344,7 +348,7 @@
             <td>USD/month</td>
           </tr>
           <tr>
-            <th>Disk (amortized) <span title="The stake pool's monthly cost of perpetually storing the month's transactions on disk.">ⓘ</span></th>
+            <th>Disk <span id="uiAmortized">(amortized)</span> <span title="The stake pool's monthly cost of perpetually storing the month's transactions on disk.">ⓘ</span></th>
             <td id="uiCostStorage">?</td>
             <td>USD/month</td>
           </tr>

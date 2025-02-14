@@ -12,9 +12,7 @@
 
 module LeiosProtocol.Short.Sim where
 
-import ChanDriver
-import ChanMux
-import ChanTCP
+import Chan
 import Control.Exception (assert)
 import Control.Monad (forever)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
@@ -33,6 +31,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import GHC.Records
 import LeiosProtocol.Common hiding (Point)
+import LeiosProtocol.Config
 import LeiosProtocol.Relay (Message (..), RelayMessage, relayMessageLabel)
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
@@ -64,7 +63,7 @@ logLeiosEvent nodeNames emitControl e = case e of
   LeiosEventSetup{} -> Nothing
   LeiosEventNode (LabelNode nid x) -> do
     pairs <$> logNode nid x
-  LeiosEventTcp (LabelLink from to (TcpSendMsg msg _ _)) -> do
+  LeiosEventTcp (LabelLink from to (TcpSendMsg msg forecast _)) -> do
     ps <- logMsg msg
     pure $
       pairs $
@@ -72,6 +71,7 @@ logLeiosEvent nodeNames emitControl e = case e of
           <> "sender" .= from
           <> "receipient" .= to
           <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
+          <> "sending_s" .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> ps
  where
   node nid = "node" .= nid <> "node_name" .= nodeNames Map.! nid
@@ -98,6 +98,9 @@ logLeiosEvent nodeNames emitControl e = case e of
               [ "slot" .= ib.header.slot
               , "payload_bytes" .= fromBytes ib.body.size
               , "size_bytes" .= fromBytes (messageSizeBytes ib)
+              , "rb_ref" .= case (ib.header.rankingBlock) of
+                  GenesisHash -> "genesis"
+                  BlockHash x -> show (coerce x :: Int)
               ]
           EventEB eb ->
             mconcat
@@ -129,6 +132,7 @@ logLeiosEvent nodeNames emitControl e = case e of
         , "id" .= show (coerce @_ @Int (blockHash blk))
         , "size_bytes" .= fromBytes (messageSizeBytes h + messageSizeBytes b)
         , node nid
+        , "endorsed" .= map fst b.endorseBlocks
         ]
   logPraos nid (PraosNodeEventReceived blk) =
     Just $
@@ -165,12 +169,12 @@ messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
 messages trace = [(t, LabelLink x y msg) | (t, LeiosEventTcp (LabelLink x y (TcpSendMsg msg _ _))) <- trace]
 
 exampleTrace1 :: LeiosTrace
-exampleTrace1 = traceRelayLink1 $ mkTcpConnProps 0.1 1000000
+exampleTrace1 = traceRelayLink1 (0.1, Just 1000000)
 
 traceRelayLink1 ::
-  TcpConnProps ->
+  (DiffTime, Maybe Bytes) ->
   LeiosTrace
-traceRelayLink1 tcpprops =
+traceRelayLink1 connectionOptions =
   selectTimedEvents $
     runSimTrace $ do
       traceWith tracer $
@@ -193,7 +197,7 @@ traceRelayLink1 tcpprops =
               [(nodeA, nodeB), (nodeB, nodeA)]
           )
       slotConfig <- slotConfigFromNow
-      let praosConfig = defaultPraosConfig
+      let praosConfig@PraosConfig{configureConnection} = defaultPraosConfig
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
@@ -233,9 +237,10 @@ traceRelayLink1 tcpprops =
                     , voteMsgGeneration = const (const 0)
                     , certificateValidation = const 0
                     }
-              , ibDiffusionStrategy = FreshestFirst
-              , ebDiffusionStrategy = PeerOrder
-              , voteDiffusionStrategy = PeerOrder
+              , ibDiffusion = RelayDiffusionConfig FreshestFirst 100 100 1
+              , ebDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
+              , voteDiffusion = RelayDiffusionConfig PeerOrder 100 100 1
+              , relayStrategy = RequestFromAll
               }
       let leiosNodeConfig nodeId@(NodeId i) =
             LeiosNodeConfig
@@ -250,9 +255,8 @@ traceRelayLink1 tcpprops =
               , processingCores = Infinite
               , ..
               }
-
-      (pA, cB) <- newConnectionBundleTCP (leiosTracer nodeA nodeB) tcpprops
-      (cA, pB) <- newConnectionBundleTCP (leiosTracer nodeA nodeB) tcpprops
+      (pA, cB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
+      (cA, pB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
       threads <-
         (++)
           <$> leiosNode (nodeTracer nodeA) (leiosNodeConfig nodeA) [pA] [cA]

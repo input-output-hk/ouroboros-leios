@@ -22,10 +22,16 @@ function HomepageHeader() {
                     <p className="hero__subtitle">{siteConfig.tagline}</p>
                     <div className={styles.buttons}>
                         <Link
-                            className="button button--secondary button--lg"
-                            to="/docs/intro"
+                            className="button button--secondary button--lg margin-right--md"
+                            to="/docs/overview"
                         >
-                            Get Started 🚀
+                            Start here 🚀
+                        </Link>
+                        <Link
+                            className="button button--secondary button--lg"
+                            to="/docs/faq"
+                        >
+                            FAQ 💭
                         </Link>
                     </div>
                 </div>
@@ -62,73 +68,6 @@ function VideoSection() {
     );
 }
 
-type FAQItem = {
-    question: string;
-    answer: string;
-};
-
-const faqItems: FAQItem[] = [
-    {
-        question: "What are downstream effects of deploying Leios?",
-        answer:
-            "Ongoing internal discussions - we will publish an answer/link here to our findings.",
-    },
-    {
-        question: "Could the mempool be sized to the throughput of the system?",
-        answer:
-            "That's already the case. Default mempool size is a small multiple of current block size.",
-    },
-    {
-        question:
-            "Can the system be sharded according to resources (small nodes vs. big nodes)?",
-        answer:
-            "Leios' current design does not involve sharding in a sense of different resource " +
-            "requirements for different nodes. In short, the Leios design does not involve sharding. " +
-            "These are ideas in research and require more work. As of now, each node has to validate " +
-            "all blocks, hence in a traditional sense, adding more nodes does not increase " +
-            "throughput. Each node must cope with the throughput of the whole system.",
-    },
-    {
-        question:
-            "Can the system self-regulate instead of manually fine tuning?",
-        answer:
-            "The current system's load is imposed on each node through the protocol parameters. Thus, " +
-            "it remains a democratic vote, not a choice made locally by nodes or automatically. " +
-            "Given that the load is imposed on each node through the choice of the protocol " +
-            "parameters, it remains a democratic vote to drive adaptation. In a sharded approach this " +
-            "could be different. But in the current system there is no local or automatic choice " +
-            "to be made by individual nodes.",
-    },
-];
-
-function FAQSection() {
-    return (
-        <section className={clsx(styles.faqSection, styles.borderTop)}>
-            <div className="container">
-                <div className="row">
-                    <div className="col col--8 col--offset-2">
-                        <h2 className="text--center">
-                            Frequently Asked Questions
-                        </h2>
-                        <div className={styles.faqWrapper}>
-                            {faqItems.map((item, index) => (
-                                <details key={index} className={styles.faqItem}>
-                                    <summary className={styles.faqQuestion}>
-                                        <span>{item.question}</span>
-                                    </summary>
-                                    <div className={styles.faqAnswer}>
-                                        {item.answer}
-                                    </div>
-                                </details>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
-}
-
 export default function Home(): JSX.Element {
     const { siteConfig } = useDocusaurusContext();
     return (
@@ -140,7 +79,6 @@ export default function Home(): JSX.Element {
             <main>
                 <HomepageFeatures />
                 <VideoSection />
-                <FAQSection />
             </main>
         </Layout>
     );

@@ -4,7 +4,7 @@
 
 module PraosProtocol.VizSimChainSync where
 
-import ChanDriver
+import Chan.Driver
 import Data.Coerce (coerce)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map

@@ -26,8 +26,7 @@ module RelayProtocol (
   relayClient,
 ) where
 
-import Chan (Chan (readChan, writeChan))
-import ChanTCP (MessageSize (..))
+import Chan (Chan (readChan, writeChan), MessageSize (..))
 import Control.Exception (assert)
 import Control.Monad (when)
 import Data.FingerTree (FingerTree)

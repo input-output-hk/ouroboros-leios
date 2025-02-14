@@ -682,6 +682,22 @@ mod tests {
     }
 
     #[test]
+    fn test_compact_redundant_x() {
+        let data = vec![(0.5, 0.1), (0.5, 0.2), (1.0, 1.0)];
+        let mut data1 = data.clone();
+        f32::compact(&mut data1, CompactionMode::default(), DEFAULT_MAX_SIZE);
+        assert_eq!(data1, vec![(0.5, 0.2), (1.0, 1.0)]);
+    }
+
+    #[test]
+    fn test_compact_redundant_y() {
+        let data = vec![(0.5, 0.1), (0.6, 0.1), (1.0, 1.0)];
+        let mut data1 = data.clone();
+        f32::compact(&mut data1, CompactionMode::default(), DEFAULT_MAX_SIZE);
+        assert_eq!(data1, vec![(0.5, 0.1), (1.0, 1.0)]);
+    }
+
+    #[test]
     fn test_at() {
         let sf = StepFunction::from_str("[(0.5, 0.1), (1, 1)]").unwrap();
         assert_eq!(sf.at(-1.0), 0.0);

@@ -1,8 +1,140 @@
 # Leios logbook
 
+## 2025-02-13
+
+### Certificate CPU benchmarks as a function of number of voters
+
+In support of the Haskell and Rust simulations, we've benchmarked certificate operations as a function of the number of voters. A realistic distribution of stake is used in these measurements.
+
+| Number of pools | Number of committee seats | Generate certificate | Verify certificate | Weigh certificate |
+|----------------:|--------------------------:|---------------------:|-------------------:|------------------:|
+|            2500 |                       500 |              63.4 ms |           104.8 ms |           10.6 ms |
+|            2500 |                       600 |              71.1 ms |           116.9 ms |           12.0 ms |
+|            2500 |                       700 |              77.4 ms |           125.5 ms |           12.3 ms |
+|            2500 |                       800 |              83.5 ms |           134.4 ms |           12.8 ms |
+|            2500 |                       900 |              88.2 ms |           141.1 ms |           12.4 ms |
+|            2500 |                      1000 |              92.5 ms |           144.9 ms |           12.3 ms |
+
+Serialization and deserialization likely also exhibit the same trend.
+
+A recipe for parallelizing parts of the certificate operations has been added to the [Specification for BLS certificates](crypto-benchmarks.rs/Specification.md).
+
+## 2025-02-12
+
+### Added BLS crypto to CI
+
+The CI job [crypto-benchmarks-rs](.github/workflows/crypto-benchmarks-rs.yaml) does the following:
+
+- Runs the tests for the BLS reference implementation
+- Runs the BLS vote and certificate benchmarks
+
+## 2025-02-11
+
+### Reference implementation and benchmarking BLS certificates
+
+The [BLS benchmarking Rust code for Leios](crypto-benchmarks.rs/) was overhauled and expanded with the following capabilities:
+
+- Reference implementation of every aspect of a viable BLS certificate scheme for Leios.
+- Property-based tests providing basic coverage of all functionality.
+- Benchmarks for the inputs to the Leios and Haskell, Rust, and DeltaQ simulations.
+- CBOR serialization and deserialization of Leios messages.
+- Command-line interface (with example) for trying out Leios's cryptography: create and verity votes, certificates, etc.
+* Document specifying the algorithms and tabulating benchmark results.
+
+Note that this BLS scheme is just one viable option for Leios. Ongoing work and ALBA, MUSEN, and SNARKs might result in schemes superior to this BLS approach. The key drawback is the need for periodic registration of ephemeral keys. Overall, this scheme provides the following:
+
+- Certificates smaller than 10 kB.
+- Certificate generation and verification in 90 ms and 130 ms, respectively.
+- Votes smaller than 200 bytes.
+
+## 2025-02-07
+
+### Haskell simulation
+
+- Added support for:
+  - Send and Receive Voting stages, rather than just a single Vote stage.
+    - See `leios-vote-send-recv-stages` config.
+    - If used, should also set `leios-stage-active-voting-slots` to length of
+      stage.
+  - oldest-first diffusion strategy, and strategy configuration for EBs and
+    votes.
+    - See `ib-diffusion-strategy`, `eb-diffusion-strategy`, and
+      `vote-diffusion-strategy`.
+- Added `data/simulation/small` scenario with config for 100 nodes with 2000kBs
+  links.
+  - The IB size and generation rate is tuned to utilize a third of 2000kBs, as
+    Short-Leios targets.
+  - One config file for single-stage and one for send-recv voting (also covering
+    5 and 20 stage lengths).
+  - Other size and timing parameters are mostly the defaults, which should be
+    reviewed.
+- Used trace and metrics from `small` scenario to investigate simulation
+  behaviour.
+  - Added more details to block generation and `Sent` events.
+  - Fixed block generation so own blocks are considered on-par with validated
+    blocks a node received.
+  - Made sure an EB cannot be included more than once in the base chain.
+  - Confirmed trace shows EBs are regularly included in RBs that are generated
+    more than 5s after votes start diffusing.
+- Main difference observed between single-stage and send-recv is the former
+  shows a longer tail in the CPU usage CDF when simulation is run with unlimited
+  cores.
+
+### Reference implementation and benchmarking of Leios cryptography
+
+The Rust benchmarks for Leios cryptography were redesigned and throroughly
+revised so that they are a reference implementation for a viable realization of
+Leios.
+
+- Implemented the Fait Accompli sortition
+- Sortition now uses rational arithmetic instead of quad-precision floats, and
+  is independent of machine precision
+- Quickcheck tests for all capabilities
+- Benchmarks for serialization
+- Squeezed more bytes out of the votes and certificate
+
+The package still needs documentation and a few more benchmarks.
+
+### Formal Methods
+
+- Initial conformance testing is setup using quickcheck-dynamic with the
+  executable spec of Short Leios as model. Next steps are conformance testing
+  the Leios simulators
+- Performance improvements of the proofs in the executable spec module
+
+### Refresh of throughput simulator
+
+The
+[Cardano througput simulatior](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3)
+has been updated with the latest cloud-computing cost model, synchronized with
+the assumptions in the
+[online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/).
+
+### Rust simulation
+
+- Minor fixes to new graph generation strategy
+- Planned out a roadmap for visualization work; next steps will be to show more
+  about the lifecycle of Leios transactions
+
+## 2025-02-06
+
+### Enhancements to online cost calculator
+
+In response to queries and suggestions, the
+[online Leios cost calculator](https://leios.cardano-scaling.org/cost-estimator/)
+has been enhanced:
+
+- Users can select costs for either hyperscale providers (like AWS, Azure, and
+  GCP) or discount providers (Hetzner, OVH Cloud, etc.).
+- Costs default to that of a discount provider.
+- Users can optionally amortize ledger storage costs perpetually vs compute a
+  first-month snapshot of storage costs.
+- Deployments default to a single relay instead of two.
+- The disk compression default was reduced to a conservative 50%.
+
 ## 2025-01-31
 
-## Formal Methods
+### Formal Methods
 
 - Finalizing executable specifications for Simplified and Short Leios
 - Short Leios spec extracted to Haskell for conformance testing

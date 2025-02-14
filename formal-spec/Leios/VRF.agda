@@ -53,5 +53,13 @@ record LeiosVRF : Type₁ where
   canProduceV1 : ℕ → PrivKey → ℕ → Type
   canProduceV1 slot k stake = proj₁ (eval k (genV1Input slot)) < stake
 
+  Dec-canProduceV1 : ∀ {slot k stake} → Dec (canProduceV1 slot k stake)
+  Dec-canProduceV1 {slot} {k} {stake} with eval k (genV1Input slot)
+  ... | (val , pf) = ¿ val < stake ¿
+
   canProduceV2 : ℕ → PrivKey → ℕ → Type
   canProduceV2 slot k stake = proj₁ (eval k (genV2Input slot)) < stake
+
+  Dec-canProduceV2 : ∀ {slot k stake} → Dec (canProduceV2 slot k stake)
+  Dec-canProduceV2 {slot} {k} {stake} with eval k (genV2Input slot)
+  ... | (val , pf) = ¿ val < stake ¿

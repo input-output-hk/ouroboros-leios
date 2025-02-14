@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Result};
 use clap::Parser;
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{seq::SliceRandom, Rng};
 
 use crate::strategy::utils::GraphBuilder;
 
@@ -30,7 +30,7 @@ pub fn organic(args: &OrganicArgs) -> Result<GraphBuilder> {
     let relay_count = args.node_count - args.stake_pool_count;
 
     let stakes = distribute_stake(args.stake_pool_count);
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     let mut graph = GraphBuilder::new();
 
@@ -39,16 +39,16 @@ pub fn organic(args: &OrganicArgs) -> Result<GraphBuilder> {
     let mut clusters: Vec<Cluster> = vec![];
     for index in 0..args.stake_pool_count {
         let create_new_cluster = clusters.is_empty()
-            || (clusters.len() < relay_count && !rng.gen_bool(args.cluster_probability));
+            || (clusters.len() < relay_count && !rng.random_bool(args.cluster_probability));
         let cluster = if create_new_cluster {
             clusters.push(Cluster {
-                location: (rng.gen_range(-90.0..90.0), rng.gen_range(0.0..180.0)),
+                location: (rng.random_range(-90.0..90.0), rng.random_range(0.0..180.0)),
                 pool_ids: vec![],
                 relay_ids: vec![],
             });
             clusters.last_mut().unwrap()
         } else {
-            let cluster_index = rng.gen_range(0..clusters.len());
+            let cluster_index = rng.random_range(0..clusters.len());
             clusters.get_mut(cluster_index).unwrap()
         };
         let id = graph.add(RawNodeConfig {
@@ -75,7 +75,7 @@ pub fn organic(args: &OrganicArgs) -> Result<GraphBuilder> {
 
     // Assign any leftover relay nodes randomly.
     for index in (args.stake_pool_count + clusters.len())..args.node_count {
-        let cluster_index = rng.gen_range(0..clusters.len());
+        let cluster_index = rng.random_range(0..clusters.len());
         let cluster = &mut clusters[cluster_index];
         let id = graph.add(RawNodeConfig {
             name: format!("relay-{index}"),
@@ -112,10 +112,10 @@ pub fn organic(args: &OrganicArgs) -> Result<GraphBuilder> {
         .chain(cluster_ids.first().copied());
     for (cluster_id, producer_cluster_id) in from_clusters.zip(to_clusters) {
         let from_relays = &clusters[cluster_id].relay_ids;
-        let node = from_relays[rng.gen_range(0..from_relays.len())];
+        let node = from_relays[rng.random_range(0..from_relays.len())];
 
         let to_relays = &clusters[producer_cluster_id].relay_ids;
-        let producer = to_relays[rng.gen_range(0..to_relays.len())];
+        let producer = to_relays[rng.random_range(0..to_relays.len())];
 
         graph.link(node, producer, None);
     }
@@ -151,8 +151,8 @@ fn nearby<R: Rng>(rng: &mut R, location: (f64, f64), dist: f64) -> (f64, f64) {
     let min_long = (location.1 - dist).max(0.0);
     let max_long = (location.1 + dist).min(180.0);
     (
-        rng.gen_range(min_lat..max_lat),
-        rng.gen_range(min_long..max_long),
+        rng.random_range(min_lat..max_lat),
+        rng.random_range(min_long..max_long),
     )
 }
 

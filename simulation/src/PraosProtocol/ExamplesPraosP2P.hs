@@ -12,13 +12,14 @@
 
 module PraosProtocol.ExamplesPraosP2P where
 
-import ChanDriver
-import ChanTCP
+import Chan.Driver
+import Chan.TCP
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.ByteString.Char8 as BS8
 import Data.Coerce (coerce)
+import Data.Default (Default (..))
 import Data.Fixed
 import Data.Functor.Contravariant (Contravariant (contramap))
 import qualified Data.IntMap.Strict as IMap
@@ -38,21 +39,20 @@ import PraosProtocol.SimPraosP2P
 import PraosProtocol.VizSimPraos (ChainsMap, DiffusionLatencyMap, PraosVizConfig' (blockFetchMessageColor), accumChains, accumDiffusionLatency, examplesPraosSimVizConfig, praosSimVizModel)
 import PraosProtocol.VizSimPraosP2P
 import Sample
-import SimTCPLinks (mkTcpConnProps)
 import SimTypes
 import System.FilePath
 import System.Random (StdGen, mkStdGen)
 import qualified Topology as P2P
 import Viz
 
-example1 :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> Visualization
+example1 :: StdGen -> OnDisk.Config -> P2P.P2PNetwork -> Visualization
 example1 _rng0 _cfg _p2pNetwork@P2P.P2PNetwork{p2pLinks, p2pNodeStakes}
   | not $ null [() | (_, Nothing) <- Map.elems p2pLinks] =
       error "Only finite bandwidth for this vizualization"
   | length (List.group $ Map.elems p2pNodeStakes) /= 1 =
       error "Only uniform stake supported for this vizualization"
 example1 rng0 cfg p2pNetwork =
-  Viz (praosSimVizModel (example1Trace rng0 cfg p2pNetwork)) $
+  Viz (praosSimVizModel (example1Trace rng0 (convertConfig cfg) p2pNetwork)) $
     LayoutAbove
       [ layoutLabelTime
       , LayoutBeside
@@ -243,7 +243,7 @@ convertConfig disk = praos
  where
   durationMsToDiffTime (OnDisk.DurationMs d) = secondsToDiffTime $ d / 1000
   praos =
-    PraosConfig
+    def
       { blockFrequencyPerSlot = disk.rbGenerationProbability
       , headerSize = fromIntegral disk.ibHeadSizeBytes
       , bodySize = \_ -> fromIntegral disk.rbBodyLegacyPraosPayloadAvgSizeBytes
@@ -260,7 +260,7 @@ convertConfig disk = praos
 -- | Diffusion example with 1000 nodes.
 example1000Diffusion ::
   StdGen ->
-  Maybe OnDisk.Config ->
+  OnDisk.Config ->
   P2P.P2PNetwork ->
   -- | when to stop simulation.
   Time ->
@@ -296,13 +296,13 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCo
   logMsg ((PraosMessage _)) = Nothing
 
   traceFile = dropExtension fp <.> "log"
-  praosConfig = maybe defaultPraosConfig convertConfig cfg
   stake nid = maybe undefined coerce $ Map.lookup nid p2pNodeStakes
+  praosConfig@PraosConfig{configureConnection} = convertConfig cfg
   trace =
     tracePraosP2P
       rng0
       p2pNetwork
-      (\latency -> mkTcpConnProps latency . fromMaybe (error "Only finite bandwidth supported for this sim."))
+      configureConnection
       ( \slotConfig nid rng ->
           PraosNodeConfig
             { rng
@@ -315,11 +315,11 @@ example1000Diffusion rng0 cfg p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCo
       )
 
 example1Trace :: StdGen -> PraosConfig BlockBody -> P2P.P2PNetwork -> PraosTrace
-example1Trace rng0 praosConfig p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCores} =
+example1Trace rng0 praosConfig@PraosConfig{configureConnection} p2pNetwork@P2P.P2PNetwork{p2pNodeStakes, p2pNodeCores} =
   tracePraosP2P
     rng0
     p2pNetwork
-    (\latency -> mkTcpConnProps latency . fromMaybe undefined)
+    configureConnection
     ( \slotConfig nid rng ->
         PraosNodeConfig
           { rng
@@ -390,15 +390,16 @@ example2 =
   model p2pTopographyCharacteristics =
     praosSimVizModel trace
    where
+    praosConfig@PraosConfig{configureConnection} = defaultPraosConfig{blockFrequencyPerSlot = 5 / fromIntegral p2pNumNodes}
     trace =
       tracePraosP2P
         rng0
-        (P2P.topologyToNetwork (Just (kilobytes 1000)) p2pTopography)
-        (\latency -> mkTcpConnProps latency . fromMaybe undefined)
+        (P2P.topologyToNetwork p2pTopography)
+        configureConnection
         ( \slotConfig nid rng ->
             PraosNodeConfig
               { rng
-              , praosConfig = defaultPraosConfig{blockFrequencyPerSlot = 5 / fromIntegral p2pNumNodes}
+              , praosConfig = praosConfig
               , slotConfig
               , chain = Genesis
               , blockMarker = BS8.pack $ show nid ++ ": "

@@ -7,13 +7,16 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 
-module ChanDriver where
+module Chan.Driver (
+  ProtocolMessage (..),
+  protocolMessage,
+  chanDriver,
+) where
 
-import Chan
-import ChanTCP
-import Data.Type.Equality
+import Chan.Core (Chan (readChan, writeChan))
+import Chan.TCP (MessageSize (..))
+import Data.Type.Equality (type (:~:) (..))
 import Network.TypedProtocol (
   ActiveState,
   Driver (..),
@@ -49,27 +52,27 @@ chanDriver ::
   Driver ps pr () m
 chanDriver cmp ch =
   Driver
-    { sendMessage = sendMessage
-    , recvMessage = recvMessage
+    { sendMessage = sendMessage'
+    , recvMessage = recvMessage'
     , initialDState = ()
     }
  where
-  sendMessage ::
+  sendMessage' ::
     forall (st :: ps) (st' :: ps).
     (StateTokenI st, StateTokenI st', ActiveState st) =>
     WeHaveAgencyProof pr st ->
     Message ps st st' ->
     m ()
-  sendMessage _prf msg =
+  sendMessage' _prf msg =
     writeChan ch (ProtocolMessage (SomeMessage msg))
 
-  recvMessage ::
+  recvMessage' ::
     forall (st :: ps).
     (StateTokenI st, ActiveState st) =>
     TheyHaveAgencyProof pr st ->
     () ->
     m (SomeMessage st, ())
-  recvMessage _prf () = do
+  recvMessage' _prf () = do
     ProtocolMessage smsg <- readChan ch
     case smsg of
       SomeMessage (msg :: Message ps st' st1) -> case cmp @st @st' of

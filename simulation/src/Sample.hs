@@ -59,6 +59,7 @@ runSampleModel' traceFile logEvent (SampleModel s0 accum render) stop =
     (before, SimVizModel [] s) -> do
       w before
       putStrLn "done."
+      hFlush stdout
       render s
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)

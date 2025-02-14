@@ -33,3 +33,14 @@ module _ (STS : S → I → O → S → Type) where
       comp22⇒comp : Computational STS' Err
       comp22⇒comp .Computational.computeProof (s , i)          = computeProof s i
       comp22⇒comp .Computational.completeness (s , i) (o , s') = completeness s i o s'
+
+module _ {STS : S → I → O → S → Type} ⦃ _ : Computational22 STS Err ⦄ where
+  open Computational22 it
+
+  -- basically `traverse`
+  computeTrace : S → List I → ComputationResult Err (List O × S)
+  computeTrace s [] = success ([] , s)
+  computeTrace s (x ∷ is) = do
+    (o , s')   ← compute s x
+    (os , s'') ← computeTrace s' is
+    return (o ∷ os , s'')
