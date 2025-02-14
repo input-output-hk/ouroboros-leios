@@ -1,0 +1,321 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "anyOf": [
+    {
+      "$ref": "#/definitions/CpuEvent"
+    },
+    {
+      "$ref": "#/definitions/InputBlockEvent"
+    },
+    {
+      "$ref": "#/definitions/EndorserBlockEvent"
+    },
+    {
+      "$ref": "#/definitions/PraosBlockEvent"
+    },
+    {
+      "$ref": "#/definitions/TransactionEvent"
+    },
+    {
+      "$ref": "#/definitions/VoteEvent"
+    },
+    {
+      "$ref": "#/definitions/SlotEvent"
+    }
+  ],
+  "definitions": {
+    "BaseBlockEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "CpuEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "extra": {
+              "type": "string"
+            },
+            "subtask_id": {
+              "type": "number"
+            },
+            "subtasks": {
+              "type": "number"
+            },
+            "task": {
+              "$ref": "#/definitions/TaskInfo"
+            },
+            "task_type": {
+              "$ref": "#/definitions/CpuTaskType"
+            },
+            "type": {
+              "enum": [
+                "CpuSubtaskFinished",
+                "CpuSubtaskStarted",
+                "CpuTaskFinished",
+                "CpuTaskScheduled"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "CpuTaskType": {
+      "enum": [
+        "EndorserBlockGenerated",
+        "EndorserBlockValidated",
+        "InputBlockGenerated",
+        "InputBlockValidated",
+        "PraosBlockGenerated",
+        "PraosBlockValidated",
+        "TransactionValidated",
+        "VoteBundleGenerated",
+        "VoteBundleValidated"
+      ],
+      "type": "string"
+    },
+    "EndorserBlockEvent": {
+      "properties": {
+        "message": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BaseBlockEvent"
+            },
+            {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "EndorserBlockGenerated",
+                    "EndorserBlockLotteryWon",
+                    "EndorserBlockReceived",
+                    "EndorserBlockSent"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "InputBlockEvent": {
+      "properties": {
+        "message": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BaseBlockEvent"
+            },
+            {
+              "properties": {
+                "header_bytes": {
+                  "type": "number"
+                },
+                "index": {
+                  "type": "number"
+                },
+                "transactions": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "enum": [
+                    "InputBlockGenerated",
+                    "InputBlockLotteryWon",
+                    "InputBlockReceived",
+                    "InputBlockSent"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "PraosBlockEvent": {
+      "properties": {
+        "message": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BaseBlockEvent"
+            },
+            {
+              "properties": {
+                "endorsement": {},
+                "header_bytes": {
+                  "type": "number"
+                },
+                "transactions": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "enum": [
+                    "PraosBlockGenerated",
+                    "PraosBlockLotteryWon",
+                    "PraosBlockReceived",
+                    "PraosBlockSent"
+                  ],
+                  "type": "string"
+                },
+                "vrf": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "Record<string,number>": {
+      "type": "object"
+    },
+    "SlotEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "number": {
+              "type": "number"
+            },
+            "type": {
+              "const": "Slot",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "TaskInfo": {
+      "properties": {
+        "index": {
+          "type": "number"
+        },
+        "node": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TransactionEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "bytes": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string"
+            },
+            "publisher": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "TransactionGenerated",
+                "TransactionReceived",
+                "TransactionSent"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "VoteEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "producer": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "string"
+            },
+            "slot": {
+              "type": "number"
+            },
+            "type": {
+              "enum": [
+                "VoteLotteryWon",
+                "VotesGenerated",
+                "VotesReceived",
+                "VotesSent"
+              ],
+              "type": "string"
+            },
+            "votes": {
+              "$ref": "#/definitions/Record<string,number>"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  }
+}
