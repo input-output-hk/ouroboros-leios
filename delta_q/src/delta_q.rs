@@ -1180,7 +1180,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("single"),
                     ),
                     100.0,
@@ -1191,7 +1190,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model2"),
                     ),
                     100.0,
@@ -1202,7 +1200,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model3"),
                     ),
                     100.0,
@@ -1213,7 +1210,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model4"),
                     ),
                     100.0,
@@ -1234,7 +1230,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("base"),
-                        LoadUpdate::default(),
                         DeltaQ::name("recursive"),
                     ),
                     1.0,

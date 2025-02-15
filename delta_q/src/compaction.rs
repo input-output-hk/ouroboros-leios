@@ -130,6 +130,7 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
             data[d.idx] = new_data;
             data[neighbour].1 = -1.0;
 
+            // left in as a debugging tool to visualise the compaction process
             // let curr_cdf = data
             //     .iter()
             //     .filter(|(_, y)| *y >= 0.0)
