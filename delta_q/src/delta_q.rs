@@ -455,7 +455,19 @@ impl DeltaQ {
     }
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
-    pub fn seq(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
+    pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Seq(
+                first.expr,
+                LoadUpdate::default(),
+                second.expr,
+            )),
+            expanded: OnceLock::new(),
+        }
+    }
+
+    /// Create a new DeltaQ from the convolution of two DeltaQs.
+    pub fn seq_update(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Seq(first.expr, load, second.expr)),
             expanded: OnceLock::new(),
@@ -1068,7 +1080,7 @@ mod tests {
     fn test_display_seq() {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
-        let seq = DeltaQ::seq(dq1, LoadUpdate::default(), dq2);
+        let seq = DeltaQ::seq_update(dq1, LoadUpdate::default(), dq2);
         assert_eq!(seq.to_string(), "A ->- B");
         assert_eq!(seq, "A ->- B".parse().unwrap());
     }
@@ -1105,10 +1117,10 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
-        let nested_seq = DeltaQ::seq(
+        let nested_seq = DeltaQ::seq_update(
             dq1,
             LoadUpdate::default(),
-            DeltaQ::seq(dq2, LoadUpdate::default(), dq3),
+            DeltaQ::seq_update(dq2, LoadUpdate::default(), dq3),
         );
         assert_eq!(nested_seq.to_string(), "A ->- B ->- C");
         assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
@@ -1134,7 +1146,7 @@ mod tests {
         let dq4 = DeltaQ::name("D");
         let nested_for_all = DeltaQ::for_all(
             DeltaQ::for_all(dq1, dq2),
-            DeltaQ::seq(dq3, LoadUpdate::default(), dq4),
+            DeltaQ::seq_update(dq3, LoadUpdate::default(), dq4),
         );
         assert_eq!(nested_for_all.to_string(), "∀(∀(A | B) | C ->- D)");
         assert_eq!(nested_for_all, "∀(∀(A | B) | C ->- D)".parse().unwrap());
