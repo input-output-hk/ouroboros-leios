@@ -30,8 +30,14 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
     let mut hops = BTreeMap::new();
     hops.insert(0, 0);
 
+    let mut latency_at_hop = BTreeMap::<usize, Vec<Latency>>::new();
+
     for node in reversed_topology.nodes.keys() {
         let sp = crate::analysis::shortest_paths(&reversed_topology, node);
+
+        for (hops, latency) in sp.values().map(|info| (info.hops, info.latency)) {
+            latency_at_hop.entry(hops).or_default().push(latency);
+        }
 
         let (near_cdf, far_cdf) = get_near_far_latencies(&sp);
         near = near
@@ -48,6 +54,18 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
         completion_count += 1.0;
 
         get_completion_hops(&sp, &mut hops);
+    }
+
+    // disabled using .take(0), but left in as a research tool
+    for (hops, mut latencies) in latency_at_hop.into_iter().take(0) {
+        latencies.sort();
+        let latencies = latencies
+            .into_iter()
+            .enumerate()
+            .map(|(i, latency)| (latency.as_f32(), (i + 1) as f32))
+            .collect::<Vec<_>>();
+        let plot = plot_steps(&latencies, 200, 100);
+        writeln!(report, "{}\nlatency distribution at {} hops", plot, hops).ok();
     }
 
     let near_compact = near
@@ -224,6 +242,15 @@ fn plot_cdf<'a>(cdf: impl IntoIterator<Item = &'a CDF> + 'a) -> String {
     format!("{}", chart)
 }
 
+fn plot_steps(steps: &[(f32, f32)], width: u32, height: u32) -> String {
+    let mut chart = Chart::new(width, height, 0.0, 100.0);
+    let shape = Shape::Steps(steps);
+    chart.lineplot(&shape);
+    chart.axis();
+    chart.figures();
+    format!("{}", chart)
+}
+
 #[derive(Debug, Clone)]
 pub struct CompletionModel {
     pub near: DeltaQ,
@@ -232,13 +259,13 @@ pub struct CompletionModel {
 }
 
 impl CompletionModel {
-    const NEAR_COMPONENTS: usize = 3;
-    const FAR_COMPONENTS: usize = 3;
+    const NEAR_COMPONENTS: usize = 2;
+    const FAR_COMPONENTS: usize = 2;
 
     pub fn bounds() -> (Vec<f32>, Vec<f32>) {
         (
             vec![0.0; Self::NEAR_COMPONENTS + Self::FAR_COMPONENTS],
-            vec![1.0; Self::NEAR_COMPONENTS + Self::FAR_COMPONENTS],
+            vec![1.0, 10.0, 1.0, 1.0],
         )
     }
 
@@ -253,45 +280,35 @@ impl CompletionModel {
         const FAR_START: usize = CompletionModel::NEAR_COMPONENTS;
         const FAR_END: usize = FAR_START + CompletionModel::FAR_COMPONENTS;
 
-        let mut near = DeltaQ::name(near_name);
-        for &top_weight in param[0..FAR_START].iter().rev() {
-            if top_weight > 0.9999 {
-                // unconditional completion, so simplify away the choice operator;
-                // sequence with TOP is a no-op
-                near = DeltaQ::name(near_name);
-            } else if top_weight < 0.0001 {
-                // completion not possible, so sequence with unconditional hop
-                near = DeltaQ::seq(DeltaQ::name(near_name), near);
-            } else {
-                // otherwise, sequence with hop and choice of completion
-                near = DeltaQ::seq(
-                    DeltaQ::name(near_name),
-                    DeltaQ::choice(DeltaQ::top(), top_weight, near, 1.0 - top_weight),
-                );
-            }
+        let near_completion = param[0];
+        let near_count = param[1] as usize;
+        let near_final_weight = 1.0 - (param[1] - (near_count as f32));
+
+        let mut near = mk_choice(
+            || DeltaQ::top(),
+            near_final_weight,
+            || DeltaQ::name(near_name),
+        );
+        for top_weight in (0..near_count)
+            .rev()
+            .map(|i| if i != 0 { near_completion } else { 0.0 })
+        {
+            near = mk_choice(
+                || DeltaQ::top(),
+                top_weight,
+                || DeltaQ::seq(DeltaQ::name(near_name), near),
+            );
         }
 
         let mut far = DeltaQ::name(far_name);
         for &top_weight in param[FAR_START + 1..FAR_END].iter().rev() {
-            if top_weight > 0.9999 {
-                far = DeltaQ::name(far_name);
-            } else if top_weight < 0.0001 {
-                far = DeltaQ::seq(DeltaQ::name(far_name), far);
-            } else {
-                far = DeltaQ::seq(
-                    DeltaQ::name(far_name),
-                    DeltaQ::choice(DeltaQ::top(), top_weight, far, 1.0 - top_weight),
-                );
-            }
+            far = DeltaQ::seq(
+                DeltaQ::name(far_name),
+                mk_choice(|| DeltaQ::top(), top_weight, || far),
+            );
         }
         // in contrast to the near component, the far component permits zero hops
-        far = if param[FAR_START] > 0.9999 {
-            DeltaQ::top()
-        } else if param[FAR_START] < 0.0001 {
-            DeltaQ::seq(DeltaQ::name(far_name), far)
-        } else {
-            DeltaQ::choice(DeltaQ::top(), param[FAR_START], far, 1.0 - param[FAR_START])
-        };
+        far = mk_choice(|| DeltaQ::top(), param[FAR_START], || far);
 
         DeltaQ::seq(near, far)
     }
@@ -317,6 +334,16 @@ impl CompletionModel {
             .eval("gossip")
             .map_err(|e| argmin::core::Error::new(e))?
             .cdf)
+    }
+}
+
+fn mk_choice(top: impl FnOnce() -> DeltaQ, weight: f32, bottom: impl FnOnce() -> DeltaQ) -> DeltaQ {
+    if weight > 0.9999 {
+        top()
+    } else if weight < 0.0001 {
+        bottom()
+    } else {
+        DeltaQ::choice(top(), weight, bottom(), 1.0 - weight)
     }
 }
 
