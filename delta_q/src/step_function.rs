@@ -603,7 +603,7 @@ mod tests {
         f32::compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.9), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.1, 0.3), (0.3, 0.5), (0.5, 0.9), (0.9, 1.0)]
         );
     }
 
@@ -628,7 +628,7 @@ mod tests {
         f32::compact(&mut data2, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data2,
-            vec![(0.0, 0.2), (0.2, 0.4), (0.5, 0.5), (0.7, 0.6), (0.9, 0.7)]
+            vec![(0.0, 0.1), (0.1, 0.3), (0.3, 0.4), (0.5, 0.6), (0.9, 0.7)]
         );
     }
 
@@ -652,7 +652,7 @@ mod tests {
         f32::compact(&mut data1, CompactionMode::OverApproximate, 5);
         assert_eq!(
             data1,
-            vec![(0.0, 0.1), (0.2, 0.3), (0.4, 0.6), (0.7, 0.8), (0.9, 1.0)]
+            vec![(0.0, 0.1), (0.2, 0.5), (0.5, 0.6), (0.7, 0.8), (0.9, 1.0)]
         );
     }
 

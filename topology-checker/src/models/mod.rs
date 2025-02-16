@@ -1,6 +1,9 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+mod latency;
+pub use latency::Latency;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     Error = 0,
@@ -25,7 +28,7 @@ pub enum Location {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Producer {
     #[serde(rename = "latency-ms")]
-    pub latency_ms: f64,
+    pub latency_ms: Latency,
     #[serde(rename = "bandwidth-bytes-per-second")]
     #[serde(default)]
     #[allow(dead_code)]

@@ -1,11 +1,14 @@
-use crate::analysis::{analyze_all_paths, reverse_topology};
 use crate::analysis::{
-    analyze_network_stats, analyze_stake_distribution, basic::analyze_hop_stats,
-    check_triangle_inequality,
+    analyze_network_stats, analyze_stake_distribution, check_triangle_inequality, delta_q_analysis,
 };
 use crate::models::{Severity, Topology};
-use std::fmt::Write;
-pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&str>) -> String {
+
+pub fn generate_report(
+    topology: &Topology,
+    filename: &str,
+    delta_q: bool,
+    verbose: bool,
+) -> String {
     let mut report = String::new();
     let mut issues = Vec::new();
 
@@ -137,59 +140,8 @@ pub fn generate_report(topology: &Topology, filename: &str, start_node: Option<&
     }
 
     // Add hop analysis section if a start node is provided
-    if let Some(node) = start_node {
-        let hop_stats = analyze_hop_stats(&reverse_topology(topology), node);
-
-        report.push_str("\n### Raw Latencies per Hop\n\n");
-        for stats in &hop_stats {
-            report.push_str(&format!("Hop {}: CDF[", stats.hop_number));
-            let scale = 1.0 / stats.latencies.len() as f64;
-            let mut steps = stats
-                .latencies
-                .iter()
-                .enumerate()
-                .map(|(y_idx, x)| {
-                    (
-                        format!("{:.3}", x),
-                        format!("{:.3}", (y_idx + 1) as f64 * scale),
-                    )
-                })
-                .collect::<Vec<_>>();
-            steps.reverse();
-            let mut prev_x = "-1".to_owned();
-            steps.retain(|(x, _y)| {
-                if *x != prev_x {
-                    prev_x = x.clone();
-                    true
-                } else {
-                    false
-                }
-            });
-            for (idx, (x, y)) in steps.iter().rev().enumerate() {
-                if idx > 0 {
-                    report.push_str(",");
-                }
-                report.push_str(&format!("({}, {})", x, y));
-            }
-            report.push_str("]\n\n");
-        }
-    } else {
-        let all_path_stats = analyze_all_paths(topology);
-        report.push_str("## All Paths Analysis\n\n");
-        report.push_str("| Hop |  Min  |  Avg  |  Max  |\n");
-        report.push_str("|-----|-------|-------|-------|\n");
-        for (idx, stats) in all_path_stats.iter().enumerate() {
-            report.push_str(&format!(
-                "| {:3} | {:5.2} | {:5.2} | {:5.2} |\n",
-                idx, stats.reached_min, stats.reached_avg, stats.reached_max
-            ));
-        }
-        report.push_str("\n");
-        for (idx, stats) in all_path_stats.iter().enumerate() {
-            writeln!(report, "hop{idx}_min := {}", stats.latency_min).ok();
-            writeln!(report, "hop{idx}_avg := {}", stats.latency_avg).ok();
-            writeln!(report, "hop{idx}_max := {}", stats.latency_max).ok();
-        }
+    if delta_q {
+        delta_q_analysis(topology, &mut report, verbose);
     }
 
     report
