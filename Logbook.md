@@ -2,6 +2,12 @@
 
 ## 2025-02-14
 
+### Formal methods
+
+- Added conformance testing client of the executable Short Leios specification that
+  is tested against the model using the executable Short Leios specification as well.
+- Merged executable specification for Simplified Leios into main
+
 ### Haskell simulation
 
 - Updated config defaults for block sizes and timings, PR waiting for
