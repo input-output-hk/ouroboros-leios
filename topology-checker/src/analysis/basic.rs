@@ -369,6 +369,7 @@ pub struct ShortestPathLink {
     pub node: String,
     pub latency: Latency,
     pub total: Latency,
+    pub hops: usize,
 }
 
 pub fn shortest_paths(
@@ -384,9 +385,9 @@ pub fn shortest_paths(
 
     // Initialize the distance to the start node as 0 and push it to the heap
     distances.insert(start_node.to_string(), Latency::zero());
-    heap.push(Reverse((Latency::zero(), start_node.to_string())));
+    heap.push(Reverse((Latency::zero(), 0usize, start_node.to_string())));
 
-    while let Some(Reverse((current_dist, current_node))) = heap.pop() {
+    while let Some(Reverse((current_dist, current_hops, current_node))) = heap.pop() {
         // If we've already found a better path, skip processing this node
         if current_dist > distances[&current_node] {
             continue;
@@ -400,7 +401,7 @@ pub fn shortest_paths(
                 // If a shorter path to the neighbor is found
                 if new_dist < *distances.get(neighbor).unwrap_or(&Latency::infinity()) {
                     distances.insert(neighbor.clone(), new_dist);
-                    heap.push(Reverse((new_dist, neighbor.clone())));
+                    heap.push(Reverse((new_dist, current_hops + 1, neighbor.clone())));
 
                     // Record the path
                     shortest_paths.insert(
@@ -409,6 +410,7 @@ pub fn shortest_paths(
                             node: current_node.clone(),
                             latency: producer.latency_ms,
                             total: new_dist,
+                            hops: current_hops + 1,
                         },
                     );
                 }

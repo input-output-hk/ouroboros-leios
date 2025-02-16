@@ -9,13 +9,14 @@ use argmin::{
 };
 use argmin_observer_slog::SlogLogger;
 use delta_q::{CompactionMode, DeltaQ, PersistentContext, CDF};
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Write,
+};
 use terminal_size::{terminal_size, Height, Width};
 use textplots::{Chart, Plot, Shape};
 
 pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool) {
-    use std::fmt::Write;
-
     let reversed_topology = reverse_topology(topology);
 
     let mut near = CDF::bottom();
@@ -25,6 +26,9 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
 
     let mut completion = CDF::bottom();
     let mut completion_count = 0f32;
+
+    let mut hops = BTreeMap::new();
+    hops.insert(0, 0);
 
     for node in reversed_topology.nodes.keys() {
         let sp = crate::analysis::shortest_paths(&reversed_topology, node);
@@ -42,6 +46,8 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
             .choice(completion_count / (completion_count + 1.0), &completion_cdf)
             .unwrap();
         completion_count += 1.0;
+
+        get_completion_hops(&sp, &mut hops);
     }
 
     let near_compact = near
@@ -68,6 +74,7 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
         .unwrap();
 
     writeln!(report, "{}", result).ok();
+    add_hops_histogram(report, hops);
 
     let param = result.state.get_best_param().unwrap().position.as_slice();
     let mut ctx = observation.mk_ctx(param);
@@ -90,9 +97,27 @@ pub fn delta_q_analysis(topology: &Topology, report: &mut String, verbose: bool)
         ctx.set_constraint("far_send", Some("obs_far".into()));
     }
 
-    writeln!(report, "{}", ctx).ok();
+    writeln!(report, "\nDeltaQ model:\n\n{}\n", ctx).ok();
     writeln!(report, "{}", plot_cdf([&completion, &cdf])).ok();
     writeln!(report, "Check that the two lines mostly coincide. The smooth line is the topology shortest path diffusion and the more zigzag line is the fitted model.\nUse -v to include model comparison to observation in the ΔQ context.").ok();
+}
+
+fn add_hops_histogram(report: &mut String, mut hops: BTreeMap<usize, usize>) {
+    if let Some(e) = hops.last_entry() {
+        let key = *e.key();
+        hops.insert(key + 1, 0);
+    }
+    let hops = hops
+        .into_iter()
+        .map(|(hops, count)| (hops as f32, count as f32))
+        .collect::<Vec<_>>();
+    let mut graph = Chart::new(100, 70, 0.0, 10.0);
+    let hop_shape = Shape::Bars(&hops);
+    graph.lineplot(&hop_shape);
+    graph.axis();
+    graph.figures();
+    writeln!(report, "{}", graph).ok();
+    writeln!(report, "distance distribution in hops ({hops:?})").ok();
 }
 
 fn get_near_far_latencies(sp: &HashMap<String, ShortestPathLink>) -> (CDF, CDF) {
@@ -158,6 +183,15 @@ fn get_completion_cdf(sp: &HashMap<String, ShortestPathLink>) -> CDF {
     latencies.into_iter().rev().collect()
 }
 
+fn get_completion_hops(
+    sp: &HashMap<String, ShortestPathLink>,
+    result: &mut BTreeMap<usize, usize>,
+) {
+    for info in sp.values() {
+        *result.entry(info.hops).or_default() += 1;
+    }
+}
+
 fn line_point_dist(line_start: (f32, f32), line_end: (f32, f32), point: (f32, f32)) -> f32 {
     let a = line_end.0 - line_start.0;
     let b = line_end.1 - line_start.1;
@@ -202,7 +236,10 @@ impl CompletionModel {
     const FAR_COMPONENTS: usize = 3;
 
     pub fn bounds() -> (Vec<f32>, Vec<f32>) {
-        (vec![0.0; 6], vec![1.0; 6])
+        (
+            vec![0.0; Self::NEAR_COMPONENTS + Self::FAR_COMPONENTS],
+            vec![1.0; Self::NEAR_COMPONENTS + Self::FAR_COMPONENTS],
+        )
     }
 
     /// Create the DeltaQ model from a list of parameters.
@@ -248,7 +285,13 @@ impl CompletionModel {
             }
         }
         // in contrast to the near component, the far component permits zero hops
-        far = DeltaQ::choice(DeltaQ::top(), param[FAR_START], far, 1.0 - param[FAR_START]);
+        far = if param[FAR_START] > 0.9999 {
+            DeltaQ::top()
+        } else if param[FAR_START] < 0.0001 {
+            DeltaQ::seq(DeltaQ::name(far_name), far)
+        } else {
+            DeltaQ::choice(DeltaQ::top(), param[FAR_START], far, 1.0 - param[FAR_START])
+        };
 
         DeltaQ::seq(near, far)
     }
@@ -283,6 +326,6 @@ impl CostFunction for CompletionModel {
 
     fn cost(&self, param: &Self::Param) -> Result<Self::Output, argmin::core::Error> {
         let result = self.eval(param)?;
-        Ok(self.completion.diff_area(&result))
+        Ok(self.completion.diff2_area(&result))
     }
 }
