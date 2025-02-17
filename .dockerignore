@@ -3,6 +3,7 @@
 !sim-rs/
 !simulation/
 !data/simulation/*.yaml
+!cabal.project
 
 # Ignore unnecessary files even in sim-rs
 sim-rs/target/
