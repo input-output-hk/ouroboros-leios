@@ -3,5 +3,5 @@ module Lib (
   module Lib,
 ) where
 
-import MAlonzo.Code.Leios.Foreign.Export as X
-import MAlonzo.Code.Leios.Foreign.HSTypes as X
+import MAlonzo.Code.Leios.Foreign.HsTypes as X
+import MAlonzo.Code.Leios.Foreign.Types as X

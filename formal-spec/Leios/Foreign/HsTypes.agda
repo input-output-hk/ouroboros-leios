@@ -1,4 +1,4 @@
-module Leios.Foreign.HSTypes where
+module Leios.Foreign.HsTypes where
 
 {-# FOREIGN GHC
   {-# LANGUAGE DeriveGeneric #-}

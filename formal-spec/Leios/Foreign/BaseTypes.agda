@@ -18,7 +18,7 @@ open import Class.Convertible
 open import Class.Decidable.Instances
 open import Class.HasHsType
 
-open import Leios.Foreign.HSTypes as F
+open import Leios.Foreign.HsTypes as F
 open import Leios.Foreign.Util
 open import Foreign.Haskell
 

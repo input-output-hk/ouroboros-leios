@@ -12,10 +12,10 @@ open import Leios.Prelude
 open import Leios.Foreign.Defaults
   renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda) --  LeiosState to LeiosStateAgda)
 open import Leios.Foreign.BaseTypes
-open import Leios.Foreign.HSTypes
+open import Leios.Foreign.HsTypes
 open import Leios.Foreign.Util
 
-module Leios.Foreign.Export where
+module Leios.Foreign.Types where
 
 {-# FOREIGN GHC
   {-# LANGUAGE DuplicateRecordFields #-}
