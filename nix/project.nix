@@ -9,7 +9,7 @@ let
       isCross = pkgs.stdenv.hostPlatform != pkgs.stdenv.buildPlatform;
     in
     {
-      src = ../leios-conformance;
+      src = ../.;
       shell.withHoogle = false;
       inputMap = {
         "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;

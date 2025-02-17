@@ -30,7 +30,7 @@ library
     , bytestring
     , containers
     , data-default
-   -- , leios-spec
+    , leios-spec
     , mtl
     , pretty
     , QuickCheck
