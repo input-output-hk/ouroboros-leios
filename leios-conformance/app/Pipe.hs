@@ -15,7 +15,7 @@ import Data.ByteString.Lazy.Char8 qualified as LBS8
 import Data.Default (def)
 import Data.Map qualified as Map (fromList)
 import Data.Set qualified as Set (fromList)
-import Data.Text (unpack)
+import Data.Text (Text, unpack)
 import Data.Version (showVersion)
 import Options.Applicative qualified as O
 import Paths_leios_conformance (version)
@@ -60,6 +60,9 @@ main =
      in
       go =<< pure initialModelState
 
+makeTxs :: LeiosState -> ComputationResult Text (LeiosOutput, LeiosState)
+makeTxs = flip step (I_SUBMIT (Right [0 .. 10])) -- FIXME: where to get txs from?
+
 handle :: MonadIO m => MonadSTM m => NodeModel -> NodeRequest -> m (NodeResponse, NodeModel)
 handle node =
   \case
@@ -72,7 +75,7 @@ handle node =
               , inEBs = inEBs ffd ++ e
               , inVTs = inVTs ffd ++ v
               }
-       in case makeStep' (node{fFDState = ffd'}) of
+       in case makeStep' (node{fFDState = ffd', toPropose = [0 .. 10]}) of -- FIXME: see makeTxs above
             Success (_, node') ->
               let ibs' = (outIBs $ fFDState node') \\ (outIBs $ fFDState node)
                   ebs' = (outEBs $ fFDState node') \\ (outEBs $ fFDState node)

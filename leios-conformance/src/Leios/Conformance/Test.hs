@@ -10,7 +10,9 @@
 
 module Leios.Conformance.Test where
 
+import Data.List (sort)
 import Data.Maybe (isJust)
+import Data.Text (Text, intercalate, pack)
 import Test.QuickCheck (
   Arbitrary (..),
   Gen,
@@ -44,7 +46,7 @@ import Leios.Conformance.Model (
   InputBlock (..),
   LeiosState (..),
   NodeModel (..),
-  Vote (..),
+  Vote,
   initialModelState,
   transition,
  )
@@ -82,17 +84,24 @@ genSlot = genPositiveInteger
 genProducer :: Gen Integer
 genProducer = pure 0 -- FIXME: different parties
 
-instance Arbitrary IBHeader where
-  arbitrary = IBHeader <$> genSlot <*> genProducer
-
-instance Arbitrary IBBody where
-  arbitrary = IBBody <$> arbitrary
+genSortedList :: Gen [Integer]
+genSortedList = sort <$> arbitrary
 
 instance Arbitrary InputBlock where
-  arbitrary = InputBlock <$> arbitrary <*> arbitrary
+  arbitrary = do
+    b <- IBBody <$> genSortedList
+    let t = hash (txs b)
+    h <- IBHeader <$> genSlot <*> genProducer <*> pure t
+    pure $ InputBlock h b
+   where
+    hash :: [Integer] -> Text
+    hash = intercalate "#" . map (pack . show)
 
 instance Arbitrary EndorserBlock where
-  arbitrary = EndorserBlock <$> genSlot <*> genProducer <*> arbitrary
+  arbitrary =
+    let ibs = arbitrary :: Gen [InputBlock]
+        ibRefs = map (bodyHash . header) <$> ibs
+     in EndorserBlock <$> genSlot <*> genProducer <*> ibRefs
 
 instance StateModel NetworkModel where
   data Action NetworkModel a where
@@ -107,7 +116,7 @@ instance StateModel NetworkModel where
   arbitraryAction _ NetworkModel{nodeModel = LeiosState{..}} = do
     fmap (Some . Step) . frequency $
       [(1, pure Tick)]
-        ++ fmap (1,) [NewIB <$> arbitrary]
+        ++ fmap (10,) [NewIB <$> arbitrary]
         ++ fmap (1,) [NewEB <$> arbitrary]
         ++ fmap (1,) [NewVote <$> arbitrary]
 

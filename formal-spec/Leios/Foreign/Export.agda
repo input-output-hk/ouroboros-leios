@@ -28,9 +28,10 @@ instance
 record IBHeader : Type where
   field slotNumber : Int
         producerID : Int
+        bodyHash : String
 
 {-# FOREIGN GHC
-data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer}
+data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer, bodyHash :: Data.Text.Text }
   deriving (Show, Eq, Generic)
 #-}
 
@@ -40,13 +41,13 @@ instance
   HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
   Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
-    { to = λ (record { slotNumber = sl ; producerID = pid }) → record { slotNumber = + sl ; producerID = + toℕ pid }
-    ; from = λ (record { slotNumber = sl ; producerID = pid }) →
+    { to = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) → record { slotNumber = + sl ; producerID = + toℕ pid ; bodyHash = h}
+    ; from = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) →
                   record
                     { slotNumber = ∣ sl ∣
                     ; producerID = zero
                     ; lotteryPf = tt
-                    ; bodyHash = tt
+                    ; bodyHash = h
                     ; signature = tt
                     }
     }
@@ -72,10 +73,10 @@ instance
 record EndorserBlock : Type where
   field slotNumber : Int
         producerID : Int
-        ibRefs     : List Int
+        ibRefs     : List String
 
 {-# FOREIGN GHC
-data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Integer, ibRefs :: [Integer] }
+data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Integer, ibRefs :: [Data.Text.Text] }
   deriving (Show, Eq, Generic)
 #-}
 
@@ -88,12 +89,12 @@ instance
   Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
   Conv-EndorserBlock =
     record
-      { to = λ (record { slotNumber = sl ; producerID = pid }) → record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = [] }
-      ; from = λ (record { slotNumber = sl ; producerID = pid }) →
+      { to = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) → record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = refs }
+      ; from = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) →
                     record
                       { slotNumber = ∣ sl ∣
                       ; producerID = zero
-                      ; ibRefs = []
+                      ; ibRefs = refs
                       ; ebRefs = []
                       ; lotteryPf = tt
                       ; signature = tt

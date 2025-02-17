@@ -5,6 +5,9 @@ open import Leios.Abstract
 open import Leios.SpecStructure
 open import Axiom.Set.Properties th
 
+open import Data.Nat.Show as N
+open import Data.Integer
+open import Data.String as S using (intersperse)
 open import Data.Fin
 open import Function.Related.TypeIsomorphisms
 open import Relation.Binary.Structures
@@ -18,19 +21,19 @@ open Equivalence
 module Leios.Trace where
 
 instance
-  htx : Hashable (List ⊤) ⊤
-  htx = record { hash = λ _ → tt }
+  htx : Hashable (List ℕ) String
+  htx = record { hash = S.intersperse "#" ∘ L.map N.show }
 
 d-Abstract : LeiosAbstract
 d-Abstract =
   record
-    { Tx = ⊤
+    { Tx = ℕ
     ; PoolID = Fin 1
     ; BodyHash = ⊤
     ; VrfPf = ⊤
     ; PrivKey = ⊤
     ; Sig = ⊤
-    ; Hash = ⊤
+    ; Hash = String
     ; Vote = ⊤
     ; vote = λ _ _ → tt
     ; sign = λ _ _ → tt
@@ -98,11 +101,11 @@ instance
       ; lotteryPf = λ _ → tt
       }
 
-  hhs : ∀ {b} → Hashable (IBHeaderOSig b) ⊤
-  hhs = record { hash = λ _ → tt }
+  hhs : ∀ {b} → Hashable (IBHeaderOSig b) String
+  hhs = record { hash = IBHeaderOSig.bodyHash }
 
-  hpe : Hashable PreEndorserBlock ⊤
-  hpe = record { hash = λ x → tt }
+  hpe : Hashable PreEndorserBlock String
+  hpe = record { hash = S.intersperse "#" ∘ EndorserBlockOSig.ibRefs }
 
 record FFDState : Type where
   field inIBs : List InputBlock
@@ -229,106 +232,3 @@ sd = record
 
 s₀ : LeiosState
 s₀ = initLeiosState tt sd tt
-
-{-
-open import Leios.Traces st _-⟦_/_⟧⇀_
-
--- i) Same slot
-
-ftch-step : s₀ ⇉ s₀
-ftch-step = (FTCH-LDG , FTCH-LDG []) , Ftch
-
-trace : s₀ ⇉⋆ s₀
-trace = 1 , (s₀ , (ftch-step , refl))
-
--- ii) Slot transition
-
-t₁ : LeiosState
-t₁ = addUpkeep s₀ IB-Role
-
-t₂ : LeiosState
-t₂ = addUpkeep t₁ EB-Role
-
-t₃ : LeiosState
-t₃ = addUpkeep t₂ V-Role
-
-t₄ : LeiosState
-t₄ = addUpkeep t₃ Base
-
-s₁ : LeiosState
-s₁ = let open LeiosState t₄ in
-  record t₄
-    { FFDState = record { inIBs = [] }
-    ; BaseState = tt
-    ; Ledger = []
-    ; IBs = []
-    ; IBHeaders = []
-    ; IBBodies = []
-    ; EBs = []
-    ; Vs = []
-    ; slot = suc slot
-    ; Upkeep = ∅
-    }
-
-open TotalMap
-
-stake≡1 : TotalMap.lookup (LeiosState.SD s₀) (SpecStructure.id st) ≡ 1
-stake≡1 = ∈-rel⇒lookup-≡ (LeiosState.SD s₀) {a = zero} {b = 1} (to ∈-singleton refl)
-
-ib-step : s₀ ⇉ t₁
-ib-step = (SLOT , EMPTY) , Roles (IB-Role {π = tt} uk π-IB ?)
-  where
-    uk : IB-Role ∉ LeiosState.Upkeep s₀
-    uk = λ x → ∉-∅ x
-
-    π-IB : canProduceIB (LeiosState.slot s₀) tt (stake s₀) tt
-    π-IB rewrite stake≡1 = s≤s z≤n , refl
-
-lem1 : ∀ {A} {a : A} {B C : ℙ A} → a ∉ B → a ∉ C → a ∉ B ∪ C
-lem1 {_} {_} {B} {C} x y = Data.Sum.[ x , y ] ∘ ∈-∪⁻ {X = B} {Y = C}
-
-lem2 : ∀ {A} {a : A} {B : ℙ A} → a ∉ B → a ∉ ∅ ∪ B
-lem2 {_} {_} {B} = lem1 {B = ∅} {C = B} ∉-∅
-
-lem3 : ∀ {A} {a b : A} → a ≢ b → a ∉ singleton b
-lem3 = to (¬-cong-⇔ ∈-singleton)
-
-eb-step : t₁ ⇉ t₂
-eb-step = (SLOT , EMPTY) , Roles (EB-Role {π = tt} uk π-EB ?)
-  where
-    uk : EB-Role ∉ ∅ ∪ ❴ IB-Role ❵
-    uk = lem2 (lem3 (λ ()))
-
-    π-EB : canProduceEB (LeiosState.slot s₀) tt (stake s₀) tt
-    π-EB rewrite stake≡1 = s≤s z≤n , refl
-
-v-step : t₂ ⇉ t₃
-v-step = (SLOT , EMPTY) , Roles (V-Role uk π-V ?)
-  where
-    uk : V-Role ∉ (∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵
-    uk = lem1 (lem2 (lem3 λ ())) (lem3 λ ())
-
-    π-V : canProduceV (LeiosState.slot s₀) tt (stake s₀)
-    π-V rewrite stake≡1 = s≤s z≤n
-
-base-step : t₃ ⇉ t₄
-base-step = (SLOT , EMPTY) , Base₂b uk refl tt
-  where
-    uk : Base ∉ ((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵
-    uk = lem1 (lem1 (lem2 (lem3 λ ())) (lem3 λ ())) (lem3 λ ())
-
-open IsEquivalence (≡ᵉ-isEquivalence {SlotUpkeep}) renaming (refl to ≡ᵉ-refl)
-
-slot-step : t₄ ⇉ s₁
-slot-step = (SLOT , EMPTY) , Slot {rbs = []} {msgs = []} ≡ᵉ-refl tt tt
-
-slot-transition-trace : s₀ ⇉⋆ s₁
-slot-transition-trace = 5
-  , t₁ , ib-step
-  , t₂ , eb-step
-  , t₃ , v-step
-  , t₄ , base-step
-  , s₁ , slot-step
-  , refl
-
--}
