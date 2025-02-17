@@ -36,7 +36,6 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-rs
             ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim
           tags: |
             type=ref,event=tag
             type=raw,value=latest
@@ -61,15 +60,4 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs:${{ github.ref_name }}
             ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs:latest
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Build and push combined image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          target: all
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim:latest
           labels: ${{ steps.meta.outputs.labels }}
