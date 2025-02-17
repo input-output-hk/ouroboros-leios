@@ -18,7 +18,7 @@ open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
-module Leios.Trace where
+module Leios.Foreign.Defaults where
 
 instance
   htx : Hashable (List ℕ) String

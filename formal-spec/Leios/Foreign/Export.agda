@@ -10,7 +10,7 @@ open import Tactic.Derive.Convertible
 open import Tactic.Derive.HsType
 
 open import Leios.Prelude
-open import Leios.Trace renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
+open import Leios.Foreign.Defaults renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HSTypes
 open import Leios.Foreign.Util
