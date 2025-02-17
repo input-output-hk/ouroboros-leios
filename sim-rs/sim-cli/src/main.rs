@@ -23,6 +23,13 @@ use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, Env
 
 mod events;
 
+const DEFAULT_CONFIG_PATHS: &[&str] = &[
+    // Docker/production path
+    "/usr/local/share/sim-rs/config.default.yaml",
+    // Development paths
+    "../../data/simulation/config.default.yaml",
+];
+
 #[derive(Parser)]
 struct Args {
     topology: PathBuf,
@@ -37,6 +44,26 @@ struct Args {
     slots: Option<u64>,
 }
 
+fn get_default_config() -> Result<String> {
+    let mut last_error = None;
+
+    // Try each possible config location
+    for path in DEFAULT_CONFIG_PATHS {
+        match fs::read_to_string(path) {
+            Ok(content) => return Ok(content),
+            Err(e) => last_error = Some((path, e)),
+        }
+    }
+
+    // If we get here, none of the paths worked
+    let (path, error) = last_error.unwrap();
+    Err(anyhow::anyhow!(
+        "Could not find default config file in any location. Last attempt '{}' failed: {}",
+        path,
+        error
+    ))
+}
+
 fn read_config(args: &Args) -> Result<SimConfiguration> {
     let topology_str = fs::read_to_string(&args.topology)?;
     let topology: Topology = {
@@ -45,9 +72,7 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     };
     topology.validate()?;
 
-    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
-        "../../../data/simulation/config.default.yaml"
-    )));
+    let mut raw_params = Figment::new().merge(Yaml::string(&get_default_config()?));
 
     for params_file in &args.parameters {
         raw_params = raw_params.merge(Yaml::file_exact(params_file));

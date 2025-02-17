@@ -1,0 +1,11 @@
+# Ignore everything
+*
+!sim-rs/
+!data/simulation/config.default.yaml
+
+# Ignore unnecessary files even in sim-rs
+sim-rs/target/
+sim-rs/.git/
+sim-rs/output/
+**/*.rs.bk
+**/.DS_Store 

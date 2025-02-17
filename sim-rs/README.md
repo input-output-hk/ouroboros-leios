@@ -30,3 +30,30 @@ Assuming an output file `simplified.json`:
 ```
 
 This will output a ΔQ expression for use with the `delta_q` web tool corresponding to the probabilistic choice between all diffusion traces contained in the JSON file.
+
+## Using Docker
+
+You can run the simulation using Docker. To build the Docker image:
+
+```sh
+docker build -t ouroboros-leios/sim-rs:latest -f sim-rs/Dockerfile .
+```
+
+To run the simulation using Docker:
+
+```sh
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest
+```
+
+By default, the simulation will:
+- Use the medium-sized network topology
+- Run for 1000 slots
+- Output results to `/output/simulation.jsonl` (which is mapped to `./output` on your host machine)
+
+You can override these defaults by passing arguments to the container:
+
+```sh
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest /path/to/topology.yaml --parameters /path/to/config.yaml --slots 500
+```
+
+Note: Make sure to mount any custom configuration files into the container if you want to use them.
