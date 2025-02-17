@@ -20,6 +20,12 @@ open Equivalence
 -- that allow to build examples for traces for the different Leios variants
 module Leios.Foreign.Defaults where
 
+numberOfParties : ℕ
+numberOfParties = 1
+
+SUT-id : Fin numberOfParties
+SUT-id = zero
+
 instance
   htx : Hashable (List ℕ) String
   htx = record { hash = S.intersperse "#" ∘ L.map N.show }
@@ -28,7 +34,7 @@ d-Abstract : LeiosAbstract
 d-Abstract =
   record
     { Tx = ℕ
-    ; PoolID = Fin 1
+    ; PoolID = Fin numberOfParties
     ; BodyHash = ⊤
     ; VrfPf = ⊤
     ; PrivKey = ⊤
@@ -178,7 +184,7 @@ d-VotingAbstract-2 =
 st : SpecStructure 1
 st = record
       { a = d-Abstract
-      ; id = zero
+      ; id = SUT-id
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
       ; sk-IB = tt
@@ -198,7 +204,7 @@ st = record
 st-2 : SpecStructure 2
 st-2 = record
       { a = d-Abstract
-      ; id = zero
+      ; id = SUT-id
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
       ; sk-IB = tt
@@ -217,9 +223,9 @@ st-2 = record
 
 open import Leios.Short st public
 
-sd : TotalMap (Fin 1) ℕ
+sd : TotalMap (Fin numberOfParties) ℕ
 sd = record
-  { rel = singleton (zero , 1)
+  { rel = singleton (SUT-id , 1) -- FIXME
   ; left-unique-rel = λ x y →
       let a = cong proj₂ (from ∈-singleton x)
           b = cong proj₂ (from ∈-singleton y)

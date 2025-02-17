@@ -1,6 +1,6 @@
 open import Data.Char.Base as C using (Char)
 import Data.String as S
-open import Data.Fin using (Fin; toℕ; zero)
+open import Data.Fin using (Fin; toℕ; zero; #_)
 open import Data.Integer using (+_; ∣_∣)
 
 open import Class.Convertible
@@ -9,7 +9,8 @@ open import Tactic.Derive.Convertible
 open import Tactic.Derive.HsType
 
 open import Leios.Prelude
-open import Leios.Foreign.Defaults renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
+open import Leios.Foreign.Defaults
+  renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda) --  LeiosState to LeiosStateAgda)
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HSTypes
 open import Leios.Foreign.Util
@@ -31,8 +32,8 @@ instance
   Conv-SlotUpkeep = autoConvert SlotUpkeep
 
 record IBHeader : Type where
-  field slotNumber : ℤ
-        producerID : ℤ
+  field slotNumber : ℕ
+        producerID : ℕ
         bodyHash : String
 
 {-# FOREIGN GHC
@@ -46,10 +47,12 @@ instance
   HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
   Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
-    { to = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) →
-        record { slotNumber = + sl ; producerID = + toℕ pid ; bodyHash = h}
-    ; from = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) →
-        record { slotNumber = ∣ sl ∣ ; producerID = zero ; lotteryPf = tt ; bodyHash = h ; signature = tt }
+    { to = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
+        record { slotNumber = s ; producerID = toℕ p ; bodyHash = h}
+    ; from = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
+        case p <? numberOfParties of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; bodyHash = h ; signature = tt }
+          (no _) → error "Conversion to Fin not possible!"
     }
 
   HsTy-IBBody = autoHsType IBBody
@@ -58,21 +61,12 @@ instance
   HsTy-InputBlock = autoHsType InputBlock
   Conv-InputBlock = autoConvert InputBlock
 
-  HsTy-Fin = MkHsType PoolID ℕ
-
-  Conv-Fin : HsConvertible PoolID
-  Conv-Fin =
-    record
-      { to = Data.Fin.toℕ
-      ; from = λ _ → zero
-      }
-
   Conv-ℕ : HsConvertible ℕ
   Conv-ℕ = Convertible-Refl
 
 record EndorserBlock : Type where
-  field slotNumber : ℤ
-        producerID : ℤ
+  field slotNumber : ℕ
+        producerID : ℕ
         ibRefs     : List String
 
 {-# FOREIGN GHC
@@ -89,24 +83,38 @@ instance
   Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
   Conv-EndorserBlock =
     record
-      { to = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) →
-          record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = refs }
-      ; from = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) →
-          record { slotNumber = ∣ sl ∣ ; producerID = zero ; ibRefs = refs ; ebRefs = [] ; lotteryPf = tt ; signature = tt }
+      { to = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
+          record { slotNumber = s ; producerID = toℕ p ; ibRefs = refs }
+      ; from = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
+        case p <? numberOfParties of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
+          (no _) → error "Conversion to Fin not possible!"
       }
 
-  Listable-Fin : Listable (Fin 1)
+  Listable-Fin : Listable (Fin numberOfParties)
   Listable-Fin =
     record
       { listing = singleton zero
       ; complete = λ {a} → (Equivalence.to ∈-singleton) a≡zero
       }
     where
-      a≡zero : ∀ {a : Fin 1} → a ≡ zero
+      a≡zero : ∀ {a : Fin numberOfParties} → a ≡ zero
       a≡zero {zero} = refl
 
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
+
+  HsTy-Fin = MkHsType (Fin numberOfParties) ℕ
+
+  Conv-Fin : HsConvertible (Fin numberOfParties)
+  Conv-Fin =
+    record
+      { to = Data.Fin.toℕ
+      ; from = λ p →
+                 case p <? numberOfParties of λ where
+                   (yes q) → #_ p {numberOfParties} {fromWitness q}
+                   (no _) → error "Conversion to Fin not possible!"
+      }
 
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
