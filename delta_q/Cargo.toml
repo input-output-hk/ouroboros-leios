@@ -13,6 +13,7 @@ js-sys = { version = "0.3.70" }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128" }
 smallstr = { version = "0.3.0", features = ["std", "serde"] }
+textplots = "0.8.6"
 tracing = "0.1.40"
 wasm-bindgen = { version = "0.2.93" }
 wasm-bindgen-futures = { version = "0.4.43" }

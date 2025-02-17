@@ -1,6 +1,90 @@
 # Leios logbook
 
+## 2025-02-16
+
+### DeltaQ Update
+
+The `topology-checker` has been upgraded with a new option to perform a ΔQSD analysis:
+it will extract inter-node latencies from the given topology, classify them into near/far components, and use these to build a parameterised ΔQ model.
+This model is then fitted against the distribution of minimal completion latencies as obtained with the Dijkstra algorithm, averaging over the distributions obtained by using each node as starting point.
+The resulting completion outcome is plotted to the terminal together with the extracted completion latency distribution to give a visual impression of the quality of the model fit.
+
+Learnings from this exercise:
+
+- latencies within the topologies examined (from the topology generator as well as the “realistic” set from the Rust simulation) very clearly consist of differing near/far components (there’s a “knee” in the graphs)
+- latency-weighted Dijkstra shortest paths are _extremely long_ in terms of hop count, much longer than I expected (mean 4–5, max 8 for the topology-100; min 8, max 20 for the “realistic” topology)
+- composing a ΔQ model as a sequence of some number of near hops (with early exit probabilities) and some number of far hops (also with early exit) yields models that roughly fit the overall shape, which is dominated by the `far` component of latencies, but there always is a significant deviation at low latencies
+- the deviation is that observed completion starts out much slower than the model would predict, so the model goes faster first, then “pauses” for 100ms or so, crossing the observed CDF again, then catching up — thereafter the high latency behaviour works out quite well
+
+My hope had been to use a model that can be understood behaviourally, not just statistically, so that the resource usage tracking features of the `delta_q` library could be brought to bear.
+**This has not yet been achieved.**
+While the timeliness graph can be made to match to some degree, doing this results in a ΔQ expression for which at least I no longer understand the load multiplication factors that should be applied — in other words, how many peer connections are supposedly used at each step of the process.
+The remaining part of this week’s plan was to be able to use the fitted model to obtain a formula for creating such models algebraically;
+this has been put on hold because it seems easier to just generate a topology with the desired properties and then use the `topology-checker` to get the corresponding ΔQSD model.
+
+In any case, the `topology-checker` now outputs the fitted ΔQSD model in the syntax needed for the `delta_q` web app, so that you can directly play with the results.
+
+## 2025-02-14
+
+### Formal methods
+
+- Added conformance testing client of the executable Short Leios specification that
+  is tested against the model using the executable Short Leios specification as well.
+- Merged executable specification for Simplified Leios into main
+
+### Haskell simulation
+
+- Updated config defaults for block sizes and timings, PR waiting for
+  additional reviews by research.
+- Added support for idealized simulation conditions
+  - realism features that can be individually dropped:
+    - requesting block body from a single peer.
+    - tcp congestion window modeling
+      - also supports unlimited bandwidth links.
+    - mini-protocol multiplexing
+  - see data/simulation/config-idealised.yaml
+- Started work on comparison to idealised diffusion report.
+  - simulation final output includes `raw` field containing the
+    accumulated data and simulation parameters.
+    - other stats can be computed from this field.
+  - implemented extraction of block diffusion cdf for required
+    percentiles.
+    - TODO: expose it as a command that takes `raw` field as input
+  - small gnuplot script to plot multiple cdfs at once (y axis in logscale).
+
+### Rust simulation
+
+- Optimized decoding the CBOR stream in the visualization
+- Added total TX count to the visualization's view of blocks
+- Added total CPU time to TaskFinished events
+
 ## 2025-02-13
+
+### Brainstorming succinct schemes for Leios BLS key registration and witnessing
+
+Recall that we have the following situation/requirements:
+
+- We want to evolve the BLS keys and have forward security.
+- We don't want a registration process (commitment) that involves a big message.
+- We also don't want the proof of possession to involve a large message.
+- Individual votes must be small and contain no redundancy: i.e., we don't want to include a large witness for the proof of possession.
+
+Here's a snapshot of one recent proposal, but much discussion is underway.
+
+- Every 90 days, as part of its operational certificate each SPO includes a commitment to Leios keys: let's say that Leios keys evolve every epoch or KES period, so we'd need 18 or 60 commitments, respectively.  This commitment is only 124 bytes if KZG commitments are used.
+- Before the start of a new key evolution period, each SPOs diffuses a message opening their keys for the new period.
+  - This message would have to be 316 bytes:
+    - 28 bytes for the pool ID
+    - 96 bytes for the public key
+    - 96 bytes for the opening
+    - 2 * 48 = 96 bytes for the proof of possession
+  - 316 bytes/pool * 3000 pools = 948 kB would have to be stored permanently, so that syncing from genesis is possible.
+    - This is a lot of data to squeeze into RBs.
+    - However, It's not clear if it is safe to put it into IBs or a non-RB block.
+  - Instead of storing this on the ledger, would could a single SNARK attest to the following?
+    - Input is (ID of key evolution period, pool ID, public key)
+    - Output is whether the proof of possession exists.
+- Certificates are really small because we've already recorded the proofs of possession at the start of the key evolution period.
 
 ### Certificate CPU benchmarks as a function of number of voters
 
@@ -19,6 +103,17 @@ Serialization and deserialization likely also exhibit the same trend.
 
 A recipe for parallelizing parts of the certificate operations has been added to the [Specification for BLS certificates](crypto-benchmarks.rs/Specification.md).
 
+### Rust simulation
+
+Updated event format to more closely match standards:
+
+- Timestamps are in seconds instead of nanoseconds.
+- CPU subtasks have a duration attached to the "started" event, and no "finished" event.
+
+Started tracking vote bundle sizes to display in visualization.
+
+Added support for CBOR output (with identical schema to JSON output).
+
 ## 2025-02-12
 
 ### Added BLS crypto to CI
@@ -27,6 +122,12 @@ The CI job [crypto-benchmarks-rs](.github/workflows/crypto-benchmarks-rs.yaml) d
 
 - Runs the tests for the BLS reference implementation
 - Runs the BLS vote and certificate benchmarks
+
+### Rust simulation
+
+Minor build fixes (specify a MSRV, use a fixed toolchain version in CI)
+
+Visualization now displays a breakdown of the size of each block, as well as total bytes sent/received by each node.
 
 ## 2025-02-11
 
@@ -39,6 +140,7 @@ The [BLS benchmarking Rust code for Leios](crypto-benchmarks.rs/) was overhauled
 - Benchmarks for the inputs to the Leios and Haskell, Rust, and DeltaQ simulations.
 - CBOR serialization and deserialization of Leios messages.
 - Command-line interface (with example) for trying out Leios's cryptography: create and verity votes, certificates, etc.
+
 * Document specifying the algorithms and tabulating benchmark results.
 
 Note that this BLS scheme is just one viable option for Leios. Ongoing work and ALBA, MUSEN, and SNARKs might result in schemes superior to this BLS approach. The key drawback is the need for periodic registration of ephemeral keys. Overall, this scheme provides the following:
@@ -46,6 +148,12 @@ Note that this BLS scheme is just one viable option for Leios. Ongoing work and 
 - Certificates smaller than 10 kB.
 - Certificate generation and verification in 90 ms and 130 ms, respectively.
 - Votes smaller than 200 bytes.
+
+### Rust simulation
+
+Added support for `ib-diffusion-strategy` (freshest-first, oldest-first, or peer-order). Unlike the Haskell sim, this doesn't affect EB or vote diffusion; nodes can download an unlimited number of EBs or vote bundles from any given peer.
+
+Added support for `relay-strategy`: it affects TXs, IBs, EBs, votes, and RBs.
 
 ## 2025-02-07
 

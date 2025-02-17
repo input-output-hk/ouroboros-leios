@@ -1,6 +1,7 @@
 use crate::{StepValue, CDF};
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BinaryHeap, mem};
+use textplots::{Chart, Plot, Shape};
 
 #[derive(Debug, PartialEq, Default, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum CompactionMode {
@@ -46,6 +47,7 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
         idx: usize,
         dist: f32,
         use_left: bool,
+        p: (f32, f32),
     }
     impl Eq for D {}
     impl PartialOrd for D {
@@ -61,11 +63,12 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
                 .then_with(|| self.idx.cmp(&other.idx))
         }
     }
-    let mk_d = |dist: f32, idx: usize, use_left: bool| D {
+    let mk_d = |dist: f32, idx: usize, use_left: bool, p: (f32, f32)| D {
         bin: (dist / granularity) as i16,
         idx,
         dist,
         use_left,
+        p,
     };
 
     // use a binary heap to pull the closest pairs, identifying them by their x coordinate and sorting them by the distance to their right neighbor.
@@ -83,24 +86,18 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
             } else {
                 return None;
             };
-            let dist = if use_left { c.0 - b.0 } else { b.0 - a.0 };
-            Some(mk_d(dist, idx + 1, use_left))
+            let dist = c.0 - b.0;
+            Some(mk_d(dist, idx + 1, use_left, (b.0, b.1)))
         })
         .collect::<BinaryHeap<_>>();
 
     let mut to_remove = data.len() - max_size;
-    let mut last_bin = -1;
     while let Some(d) = heap.pop() {
-        if d.bin == last_bin {
-            last_bin = -1;
-            continue;
-        } else {
-            last_bin = d.bin;
-        }
         // skip points that have already been removed
         if data[d.idx].1 < 0.0 {
             continue;
         }
+        assert_eq!(d.p, data[d.idx]);
 
         // just remove this point, meaning that the left neighbour needs to be updated
         let mut neighbours = data[..d.idx]
@@ -110,35 +107,47 @@ pub(crate) fn compact(data: &mut Vec<(f32, f32)>, mode: CompactionMode, max_size
             .filter_map(|(i, (_x, y))| (*y >= 0.0).then_some(i));
 
         if let Some(neighbour) = neighbours.next() {
+            let new_data = if d.use_left {
+                data[neighbour]
+            } else {
+                (data[neighbour].0, data[d.idx].1)
+            };
+
             if let Some(n2) = neighbours.next() {
                 // only push to heap if the next neighbour is in the opposite quadrant
-                if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[d.idx].1) <= 0.0 {
+                if (data[n2].1 - data[neighbour].1) * (data[neighbour].1 - data[d.idx].1) >= 0.0 {
                     heap.push(mk_d(
                         data[d.idx].0 - data[neighbour].0 + d.dist,
                         d.idx,
                         d.use_left,
+                        new_data,
                     ));
                 }
             }
+
             // since we cannot remove the now changed neighbour from the heap, we mark it as removed instead
             // and move the neighbour to our position
-            if d.use_left {
-                data[d.idx] = data[neighbour];
-            } else {
-                data[d.idx].0 = data[neighbour].0;
-            }
+            data[d.idx] = new_data;
             data[neighbour].1 = -1.0;
+
+            // left in as a debugging tool to visualise the compaction process
+            // let curr_cdf = data
+            //     .iter()
+            //     .filter(|(_, y)| *y >= 0.0)
+            //     .map(|(x, y)| (*x, *y))
+            //     .collect::<CDF>();
+            // eprintln!("{curr_cdf}");
+            // eprintln!("{}", plot_cdf([&orig_cdf, &curr_cdf]));
+            // std::io::stdin().read_line(&mut String::new()).unwrap();
+
+            to_remove -= 1;
         }
 
-        to_remove -= 1;
         if to_remove == 0 {
             break;
         }
     }
     data.retain(|x| x.1 >= 0.0);
-
-    // skipping every other occurrence of the same bin may end up draining the heap, so check whether we need to run a second pass
-    compact(data, mode, max_size);
 }
 
 pub(crate) fn compact_cdf(data: &mut Vec<(f32, CDF)>, mode: CompactionMode, max_size: usize) {
@@ -220,4 +229,23 @@ fn quantise(cdf: CDF) -> CDF {
             keep
         })
         .collect()
+}
+
+#[allow(dead_code)]
+fn plot_cdf<'a>(cdf: impl IntoIterator<Item = &'a CDF> + 'a) -> String {
+    let mut iter = cdf.into_iter().peekable();
+    let mut chart = Chart::new(100, 60, 0.0, iter.peek().unwrap().width() * 1.1);
+    let shapes = iter
+        .map(|cdf| {
+            eprintln!("{:?}", cdf.steps().data());
+            Shape::Points(&cdf.steps().data())
+        })
+        .collect::<Vec<_>>();
+    let mut chart = &mut chart;
+    for shape in &shapes {
+        chart = chart.lineplot(shape);
+    }
+    chart.axis();
+    chart.figures();
+    format!("{}", chart)
 }

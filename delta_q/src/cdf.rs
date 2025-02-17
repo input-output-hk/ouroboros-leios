@@ -277,6 +277,38 @@ impl CDF {
             .with_mode(self.steps.mode())
             .with_max_size(self.steps.max_size())
     }
+
+    pub fn compact(&self, mode: CompactionMode, max_size: usize) -> Self {
+        let mut data = self.steps.data().to_vec();
+        f32::compact(&mut data, mode, max_size);
+        Self::from_step_function(
+            StepFunction::try_from(data)
+                .expect("step function error")
+                .with_mode(self.steps.mode())
+                .with_max_size(self.steps.max_size()),
+        )
+        .unwrap()
+    }
+
+    pub fn diff_area(&self, other: &Self) -> f32 {
+        assert_eq!(self.steps.at(f32::INFINITY), other.steps.at(f32::INFINITY));
+        self.steps
+            .zip(&other.steps)
+            .map(|(x, (&l, &r))| (x, (l - r).abs()))
+            .tuple_windows()
+            .map(|((lx, ld), (rx, _rd))| (rx - lx) * ld)
+            .sum()
+    }
+
+    pub fn diff2_area(&self, other: &Self) -> f32 {
+        assert_eq!(self.steps.at(f32::INFINITY), other.steps.at(f32::INFINITY));
+        self.steps
+            .zip(&other.steps)
+            .map(|(x, (&l, &r))| (x, (l - r).powi(2)))
+            .tuple_windows()
+            .map(|((lx, ld), (rx, _rd))| (rx - lx) * ld)
+            .sum()
+    }
 }
 
 impl FromIterator<(f32, f32)> for CDF {

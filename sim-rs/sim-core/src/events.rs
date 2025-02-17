@@ -67,6 +67,8 @@ pub enum Event {
     CpuTaskFinished {
         task: CpuTaskId<Node>,
         task_type: String,
+        #[serde(serialize_with = "duration_as_secs")]
+        cpu_time: Duration,
         extra: String,
     },
     CpuSubtaskStarted {
@@ -234,10 +236,17 @@ impl EventTracker {
         });
     }
 
-    pub fn track_cpu_task_finished(&self, task_id: CpuTaskId, task_type: String, extra: String) {
+    pub fn track_cpu_task_finished(
+        &self,
+        task_id: CpuTaskId,
+        task_type: String,
+        cpu_time: Duration,
+        extra: String,
+    ) {
         self.send(Event::CpuTaskFinished {
             task: self.to_task(task_id),
             task_type,
+            cpu_time,
             extra,
         });
     }

@@ -2,7 +2,7 @@ use crate::{parser::eval_ctx, CDFError, CompactionMode, Outcome, CDF, DEFAULT_MA
 use itertools::Itertools;
 use smallstr::SmallString;
 use std::{
-    cell::{Cell, OnceCell, RefCell},
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display},
     str::FromStr,
@@ -201,7 +201,7 @@ pub struct DeltaQ {
     #[serde(with = "delta_q_serde")]
     expr: Arc<DeltaQExpr>,
     #[serde(skip)]
-    expanded: OnceCell<Result<Arc<DeltaQExpr>, DeltaQError>>,
+    expanded: OnceLock<Result<Arc<DeltaQExpr>, DeltaQError>>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -329,7 +329,7 @@ impl From<DeltaQExpr> for DeltaQ {
     fn from(expr: DeltaQExpr) -> Self {
         DeltaQ {
             expr: Arc::new(expr),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 }
@@ -338,7 +338,7 @@ impl From<Arc<DeltaQExpr>> for DeltaQ {
     fn from(expr: Arc<DeltaQExpr>) -> Self {
         DeltaQ {
             expr,
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 }
@@ -418,7 +418,7 @@ impl DeltaQ {
         let expr = TOP
             .get_or_init(|| Arc::new(DeltaQExpr::Outcome(Outcome::top())))
             .clone();
-        let expanded = OnceCell::new();
+        let expanded = OnceLock::new();
         expanded.set(Ok(expr.clone())).unwrap();
         DeltaQ { expr, expanded }
     }
@@ -435,14 +435,14 @@ impl DeltaQ {
     pub fn name(name: &str) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Name(name.into(), None)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
     pub fn name_rec(name: &str, rec: Option<usize>) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Name(name.into(), rec)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -450,15 +450,27 @@ impl DeltaQ {
     pub fn cdf(cdf: CDF) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Outcome(Outcome::new(cdf))),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
     /// Create a new DeltaQ from the convolution of two DeltaQs.
-    pub fn seq(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
+    pub fn seq(first: DeltaQ, second: DeltaQ) -> DeltaQ {
+        DeltaQ {
+            expr: Arc::new(DeltaQExpr::Seq(
+                first.expr,
+                LoadUpdate::default(),
+                second.expr,
+            )),
+            expanded: OnceLock::new(),
+        }
+    }
+
+    /// Create a new DeltaQ from the convolution of two DeltaQs.
+    pub fn seq_update(first: DeltaQ, load: LoadUpdate, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::Seq(first.expr, load, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -471,7 +483,7 @@ impl DeltaQ {
                 second.expr,
                 second_weight,
             )),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -479,7 +491,7 @@ impl DeltaQ {
     pub fn for_all(first: DeltaQ, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::ForAll(first.expr, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -487,7 +499,7 @@ impl DeltaQ {
     pub fn for_some(first: DeltaQ, second: DeltaQ) -> DeltaQ {
         DeltaQ {
             expr: Arc::new(DeltaQExpr::ForSome(first.expr, second.expr)),
-            expanded: OnceCell::new(),
+            expanded: OnceLock::new(),
         }
     }
 
@@ -1068,7 +1080,7 @@ mod tests {
     fn test_display_seq() {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
-        let seq = DeltaQ::seq(dq1, LoadUpdate::default(), dq2);
+        let seq = DeltaQ::seq_update(dq1, LoadUpdate::default(), dq2);
         assert_eq!(seq.to_string(), "A ->- B");
         assert_eq!(seq, "A ->- B".parse().unwrap());
     }
@@ -1105,10 +1117,10 @@ mod tests {
         let dq1 = DeltaQ::name("A");
         let dq2 = DeltaQ::name("B");
         let dq3 = DeltaQ::name("C");
-        let nested_seq = DeltaQ::seq(
+        let nested_seq = DeltaQ::seq_update(
             dq1,
             LoadUpdate::default(),
-            DeltaQ::seq(dq2, LoadUpdate::default(), dq3),
+            DeltaQ::seq_update(dq2, LoadUpdate::default(), dq3),
         );
         assert_eq!(nested_seq.to_string(), "A ->- B ->- C");
         assert_eq!(nested_seq, "A ->- (B ->- C)".parse().unwrap());
@@ -1134,7 +1146,7 @@ mod tests {
         let dq4 = DeltaQ::name("D");
         let nested_for_all = DeltaQ::for_all(
             DeltaQ::for_all(dq1, dq2),
-            DeltaQ::seq(dq3, LoadUpdate::default(), dq4),
+            DeltaQ::seq_update(dq3, LoadUpdate::default(), dq4),
         );
         assert_eq!(nested_for_all.to_string(), "∀(∀(A | B) | C ->- D)");
         assert_eq!(nested_for_all, "∀(∀(A | B) | C ->- D)".parse().unwrap());
@@ -1168,7 +1180,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("single"),
                     ),
                     100.0,
@@ -1179,7 +1190,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model2"),
                     ),
                     100.0,
@@ -1190,7 +1200,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model3"),
                     ),
                     100.0,
@@ -1201,7 +1210,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("single"),
-                        LoadUpdate::default(),
                         DeltaQ::name("model4"),
                     ),
                     100.0,
@@ -1222,7 +1230,6 @@ mod tests {
                     1.0,
                     DeltaQ::seq(
                         DeltaQ::name("base"),
-                        LoadUpdate::default(),
                         DeltaQ::name("recursive"),
                     ),
                     1.0,

@@ -159,7 +159,7 @@ pub fn name_component(props: &NameProps) -> Html {
                         <input type="text" value={(*new_name).clone()} {oninput} />
                     </form>
                     <button onclick={cloned!(on_change, name, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQ::name(&name), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq_update(DeltaQ::name(&name), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
                     <button onclick={cloned!(on_change, name, ctx;
                         move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQ::name(&name), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc())))) }>{ "make choice" }</button>
                     <button onclick={cloned!(on_change, name, ctx;
@@ -207,7 +207,7 @@ pub fn cdf_component(props: &CdfProps) -> Html {
                 <div class={classes!("popup")}>
                     <button onclick={cloned!(popup; move |_| popup.set(false))}>{ "abort" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
-                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq(DeltaQExpr::Outcome(outcome.clone()).into(), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
+                        move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::seq_update(DeltaQExpr::Outcome(outcome.clone()).into(), LoadUpdate::default(), DeltaQExpr::BlackBox.into()).arc())))) }>{ "append" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;
                         move |_| on_change.emit((ctx.name.clone(), Some(DeltaQ::choice(DeltaQExpr::Outcome(outcome.clone()).into(), 1.0, DeltaQExpr::BlackBox.into(), 1.0).arc())))) }>{ "make choice" }</button>
                     <button onclick={cloned!(on_change, outcome, ctx;

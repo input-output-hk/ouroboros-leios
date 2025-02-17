@@ -52,7 +52,7 @@ pub fn check_triangle_inequality(topology: &Topology) -> Vec<Issue> {
                             suggestion: format!(
                                 "Review latency of direct connection {}->{} as a {:.1}% shorter path exists through node {}",
                                 node_id, producer_id,
-                                (direct_dist - shortest_indirect) / direct_dist * 100.0,
+                                (direct_dist - *shortest_indirect) / direct_dist * 100.0,
                                 intermediate_id
                             ),
                         });
@@ -83,14 +83,14 @@ mod tests {
         frankfurt_producers.insert(
             "sydney".to_string(),
             Producer {
-                latency_ms: 100.0,
+                latency_ms: 100.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
         frankfurt_producers.insert(
             "ashburn".to_string(),
             Producer {
-                latency_ms: 300.0, // This is too high, should be around 80ms
+                latency_ms: 300.0.try_into().unwrap(), // This is too high, should be around 80ms
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -99,7 +99,7 @@ mod tests {
         sydney_producers.insert(
             "ashburn".to_string(),
             Producer {
-                latency_ms: 100.0,
+                latency_ms: 100.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
@@ -108,7 +108,7 @@ mod tests {
         ashburn_producers.insert(
             "frankfurt".to_string(),
             Producer {
-                latency_ms: 300.0,
+                latency_ms: 300.0.try_into().unwrap(),
                 bandwidth_bytes_per_second: None,
             },
         );
