@@ -61,8 +61,8 @@ source-repository-package
 
 source-repository-package
     type: git
-    location: https://github.com/yveshauser/leios-formal-spec.git
-    tag: 094dc4d8c7138fa8910a3c55d25c2dad4720272d
-    --sha256: xXrnOYNAGpMJWoIs0+XDgmpHZ7nx0bhbBhhufUNl9lI=
+    location: https://github.com/input-output-hk/ouroboros-leios-formal-spec.git
+    tag: 026256f141acfef7f3d7b2d048d571223bbee30d
+    --sha256: WFEmGcnCdEXmo2MCC5g+C3laGjFaBnFksgHbFeAZUQo=
     subdir:
       generated
