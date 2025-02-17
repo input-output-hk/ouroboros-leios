@@ -19,7 +19,10 @@ While the simulation is running, it will log what's going on to the console. You
 
 The simulation runs in realtime (1 slot every second), but you can speed it up by passing e.g. `-t 16` to run 16 times faster.
 
-## using traces in model comparisons
+> [!NOTE]
+> For instructions on running the simulation using Docker, please refer to the Docker Simulation section in the root README.md.
+
+## Using traces in model comparisons
 
 ### Transaction diffusion
 
@@ -30,30 +33,3 @@ Assuming an output file `simplified.json`:
 ```
 
 This will output a ΔQ expression for use with the `delta_q` web tool corresponding to the probabilistic choice between all diffusion traces contained in the JSON file.
-
-## Using Docker
-
-You can run the simulation using Docker. To build the Docker image:
-
-```sh
-docker build -t ouroboros-leios/sim-rs:latest -f sim-rs/Dockerfile .
-```
-
-To run the simulation using Docker:
-
-```sh
-docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest
-```
-
-By default, the simulation will:
-- Use the medium-sized network topology
-- Run for 1000 slots
-- Output results to `/output/simulation.jsonl` (which is mapped to `./output` on your host machine)
-
-You can override these defaults by passing arguments to the container:
-
-```sh
-docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest /path/to/topology.yaml --parameters /path/to/config.yaml --slots 500
-```
-
-Note: Make sure to mount any custom configuration files into the container if you want to use them.
