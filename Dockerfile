@@ -153,37 +153,4 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"\n\
 mv "$TEMP_FILE" "$OUTPUT_FILE"' > /usr/local/bin/entrypoint-hs.sh && chmod +x /usr/local/bin/entrypoint-hs.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint-hs.sh"]
-CMD []
-
-# Create combined image with both simulations
-FROM base AS all
-WORKDIR /output
-
-# Copy both binaries
-COPY --from=rs-builder /usr/src/sim-rs/target/release/sim-cli /usr/local/bin/
-COPY --from=hs-builder /build/dist-newstyle/build/aarch64-linux/ghc-9.8.2/ouroboros-leios-sim-0.1.0.0/x/ols/build/ols/ols /usr/local/bin/
-
-# Copy both entrypoint scripts
-COPY --from=rs /usr/local/bin/entrypoint-rs.sh /usr/local/bin/
-COPY --from=hs /usr/local/bin/entrypoint-hs.sh /usr/local/bin/
-
-# Create wrapper entrypoint script
-RUN echo '#!/bin/sh\n\
-set -e\n\
-\n\
-# Check which simulation to run\n\
-if [ "$1" = "rs" ]; then\n\
-    shift\n\
-    exec /usr/local/bin/entrypoint-rs.sh "$@"\n\
-elif [ "$1" = "hs" ]; then\n\
-    shift\n\
-    exec /usr/local/bin/entrypoint-hs.sh "$@"\n\
-else\n\
-    echo "Usage: docker run ... [rs|hs] [simulation args...]"\n\
-    echo "  rs: Run Rust simulation"\n\
-    echo "  hs: Run Haskell simulation"\n\
-    exit 1\n\
-fi' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD [] 

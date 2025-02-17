@@ -26,39 +26,32 @@ More documentation about Leios can be found in the [web site](https://leios.card
 
 ## Docker Simulation
 
-You can run the Rust simulation using Docker to generate simulation trace logs. Note that this Docker image is for trace generation only - it does not include visualization capabilities.
+You can run both the Rust and Haskell simulations using Docker to generate simulation trace logs.
 
-> [!NOTE]
-> The Rust simulation in Docker generates JSONL trace files that can be visualized using the web-based UI in the `ui` directory.
-> This is different from the Haskell simulation (`simulation` directory) which has built-in visualization capabilities through its `viz` command option.
-> 
-> To visualize Rust simulation traces:
-> 1. Generate a trace file using this Docker container
-> 2. Use the web UI in the `ui` directory to load and visualize the trace
->
-> For Haskell simulation visualization, use the `viz` command option directly in the Haskell simulation binary.
-
-### Building the Docker Image
+### Building the Docker Images
 
 ```bash
-# Build the Docker image
-docker build -t ouroboros-leios/sim-rs:latest -f Dockerfile .
+# Build the Rust simulation image
+docker build --target rs -t ouroboros-leios/sim-rs:latest -f Dockerfile .
+
+# Build the Haskell simulation image
+docker build --target hs -t ouroboros-leios/sim-hs:latest -f Dockerfile .
 ```
 
-### Running the Simulation
+### Running the Rust Simulation
 
-The simulation can be run in several ways to generate trace logs:
+The Rust simulation generates JSONL trace files that can be visualized using the web-based UI:
 
 #### Basic Usage (Default Settings)
 ```bash
-# Run with default settings - generates trace file
-docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs
+# Run with default settings
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest
 ```
 
 #### Specifying Output File
 ```bash
 # Run with custom output file location
-docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs /output/simulation.jsonl
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest /output/simulation.jsonl
 ```
 
 #### Using Custom Topology and Config Files
@@ -67,16 +60,62 @@ docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs /output/simulation.js
 docker run \
   -v $(pwd)/output:/output \
   -v $(pwd)/data/simulation:/config \
-  ouroboros-leios/sim-rs /config/topology-dense-52.yaml /output/simulation.jsonl -s 20 -p /config/config.default.yaml
+  ouroboros-leios/sim-rs:latest /config/topology-dense-52.yaml /output/simulation.jsonl -s 20 -p /config/config.default.yaml
 ```
 
-Common arguments:
+Common arguments for Rust simulation:
 - `-s NUMBER`: Number of slots to simulate
 - `-p PATH`: Path to custom parameters file
 - `--trace-node NODE_ID`: Enable tracing for specific node
 - `--timescale SCALE`: Adjust simulation speed (e.g., 16 for 16x faster)
 
-The simulation output will be written to the specified output file in JSONL format, which can then be loaded into the web UI (`ui` directory) for visualization and analysis.
+### Running the Haskell Simulation
+
+The Haskell simulation generates log files with simulation data:
+
+#### Basic Usage (Default Settings)
+```bash
+# Run with default settings (40 seconds)
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-hs:latest
+```
+
+#### Custom Duration and Output File
+```bash
+# Run for 120 seconds with specific output file
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-hs:latest \
+    --output-seconds 120 \
+    --output-file /output/my-simulation.log
+```
+
+#### Using Custom Configuration
+```bash
+# Run with custom topology and config files
+docker run \
+    -v $(pwd)/output:/output \
+    -v $(pwd)/data/simulation:/config \
+    ouroboros-leios/sim-hs:latest \
+    --topology /config/topology-dense-52.yaml \
+    --config /config/config.default.yaml \
+    --output-seconds 60 \
+    --seed 12345
+```
+
+Common arguments for Haskell simulation:
+- `--output-seconds NUMBER`: Duration of simulation in seconds (default: 40)
+- `--seed NUMBER`: Random seed for reproducible runs
+- `--topology PATH`: Custom topology file
+- `--config PATH`: Custom configuration file
+- `--output-file PATH`: Custom output file location
+
+> [!NOTE]
+> The Rust simulation generates JSONL trace files that can be visualized using the web-based UI in the `ui` directory.
+> The Haskell simulation generates log files in its own format.
+> 
+> To visualize Rust simulation traces:
+> 1. Generate a trace file using the Rust simulation
+> 2. Use the web UI in the `ui` directory to load and visualize the trace
+>
+> For Haskell simulation visualization, use the `viz` command option directly in the Haskell simulation binary (not available in Docker).
 
 ## Specification
 
