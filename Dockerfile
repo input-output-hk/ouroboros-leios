@@ -1,5 +1,6 @@
 FROM debian:bookworm-slim AS base
 
+# Create shared directories and install dependencies in one layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libgmp10 \
@@ -8,11 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /usr/local/share/leios \
+    && mkdir -p /output
 
-# Create shared directories
-RUN mkdir -p /usr/local/share/leios
-RUN mkdir -p /output
 VOLUME /output
 
 # Copy shared configuration files
@@ -47,11 +47,10 @@ RUN apt-get update && \
 # Copy project files
 COPY . .
 
-# Build our simulation with verbose output
+# Build simulation
 WORKDIR /build/simulation
 RUN cabal update && \
-    cabal build -v3 all && \
-    find /build -name "ols" -type f -executable
+    cabal build all
 
 # Create Rust simulation image
 FROM base AS rs
