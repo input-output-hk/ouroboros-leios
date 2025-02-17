@@ -15,7 +15,7 @@
             <pubDate>Mon, 10 Feb 2025 00:00:00 GMT</pubDate>
             <description><![CDATA[High-level summary]]></description>
             <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#high-level-summary">​</a></h2>
-<p>This week, the Leios team made significant progress across multiple areas. Major developments included detailed DeltaQ analysis of network topologies, extensive BLS cryptography benchmarking, and improvements to both simulations. The team also explored succinct schemes for BLS key registration and conducted detailed certificate performance analysis. Both Haskell and Rust simulations received substantial updates to improve visualization and support more realistic testing conditions.</p>
+<p>This week, the Leios team made significant progress across multiple areas. Major developments included detailed DeltaQ analysis of network topologies, extensive BLS cryptography benchmarking, and improvements to both simulations. The team also explored succinct schemes for BLS key registration and conducted a detailed certificate performance analysis. Both Haskell and Rust simulations received substantial updates to improve visualization and support more realistic testing conditions.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-analysis">DeltaQ analysis<a class="hash-link" aria-label="Direct link to DeltaQ analysis" title="Direct link to DeltaQ analysis" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#deltaq-analysis">​</a></h2>
 <ul>
 <li>Enhanced the <code>topology-checker</code> with ΔQSD analysis capabilities:<!-- -->
@@ -29,14 +29,14 @@
 <li>Key findings from topology analysis:<!-- -->
 <ul>
 <li>Clear distinction between near/far components in examined topologies</li>
-<li>Unexpectedly high hop counts in latency-weighted Dijkstra paths<!-- -->
+<li>Unexpectedly high hop counts in latency-weighted Dijkstra paths:<!-- -->
 <ul>
-<li>Mean 4-5, max 8 for topology-100</li>
-<li>Min 8, max 20 for "realistic" topology</li>
+<li>Min 4-5, max 8 for topology - 100</li>
+<li>Min 8, max 20 for 'realistic' topology</li>
 </ul>
 </li>
 <li>Model fitting achieved rough shape matching but showed significant deviations at low latencies</li>
-<li>Resource usage tracking goals remain unachieved due to complexity in understanding load multiplication factors</li>
+<li>Resource usage tracking goals remain unmet due to complexity in understanding load multiplication factors.</li>
 </ul>
 </li>
 </ul>
@@ -57,13 +57,13 @@
 <li>Investigated SNARK-based alternatives for proof of possession</li>
 </ul>
 </li>
-<li>Added BLS crypto to CI pipeline with automated testing</li>
-<li>Documented parallelization strategies for certificate operations</li>
+<li>Added BLS crypto to the CI pipeline with automated testing</li>
+<li>Documented parallelization strategies for certificate operations.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#formal-methods">​</a></h2>
 <ul>
-<li>Added conformance testing client for the executable Short Leios specification</li>
-<li>Successfully merged the executable specification for Simplified Leios into main</li>
+<li>Added a conformance testing client for the executable Short Leios specification</li>
+<li>Successfully merged the executable specification for Simplified Leios into main.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary#haskell-simulation">​</a></h2>
 <ul>
@@ -80,7 +80,7 @@
 <ul>
 <li>Added raw field for accumulated data</li>
 <li>Implemented block diffusion CDF extraction</li>
-<li>Created multi-CDF plotting capabilities</li>
+<li>Created multi-CDF plotting capabilities.</li>
 </ul>
 </li>
 </ul>
@@ -104,7 +104,7 @@
 <ul>
 <li>Implemented <code>ib-diffusion-strategy</code> (freshest-first, oldest-first, peer-order)</li>
 <li>Added <code>relay-strategy</code> affecting TXs, IBs, EBs, votes, and RBs</li>
-<li>Enabled unlimited EB and vote bundle downloads from peers</li>
+<li>Enabled unlimited EB and vote bundle downloads from peers.</li>
 </ul>
 </li>
 </ul>]]></content:encoded>
