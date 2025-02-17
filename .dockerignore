@@ -1,7 +1,8 @@
 # Ignore everything
 *
 !sim-rs/
-!data/simulation/config.default.yaml
+!simulation/
+!data/simulation/*.yaml
 
 # Ignore unnecessary files even in sim-rs
 sim-rs/target/
