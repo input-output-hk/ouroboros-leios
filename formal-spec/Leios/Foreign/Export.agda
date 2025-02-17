@@ -1,7 +1,6 @@
-open import Agda.Builtin.Int
-open import Data.Fin
+open import Data.Char.Base as C using (Char)
 import Data.String as S
-open import Data.Char.Base as Char using (Char)
+open import Data.Fin using (Fin; toℕ; zero)
 open import Data.Integer using (+_; ∣_∣)
 
 open import Class.Convertible
@@ -21,13 +20,19 @@ module Leios.Foreign.Export where
   {-# LANGUAGE DuplicateRecordFields #-}
 #-}
 
+dropDash : S.String → S.String
+dropDash = S.concat ∘ (S.wordsByᵇ ('-' C.≈ᵇ_))
+
+prefix : S.String → S.String → S.String
+prefix p = p S.++_
+
 instance
-  HsTy-SlotUpkeep = autoHsType SlotUpkeep ⊣ onConstructors (S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  HsTy-SlotUpkeep = autoHsType SlotUpkeep ⊣ onConstructors dropDash
   Conv-SlotUpkeep = autoConvert SlotUpkeep
 
 record IBHeader : Type where
-  field slotNumber : Int
-        producerID : Int
+  field slotNumber : ℤ
+        producerID : ℤ
         bodyHash : String
 
 {-# FOREIGN GHC
@@ -41,15 +46,10 @@ instance
   HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
   Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
-    { to = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) → record { slotNumber = + sl ; producerID = + toℕ pid ; bodyHash = h}
+    { to = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) →
+        record { slotNumber = + sl ; producerID = + toℕ pid ; bodyHash = h}
     ; from = λ (record { slotNumber = sl ; producerID = pid ; bodyHash = h }) →
-                  record
-                    { slotNumber = ∣ sl ∣
-                    ; producerID = zero
-                    ; lotteryPf = tt
-                    ; bodyHash = h
-                    ; signature = tt
-                    }
+        record { slotNumber = ∣ sl ∣ ; producerID = zero ; lotteryPf = tt ; bodyHash = h ; signature = tt }
     }
 
   HsTy-IBBody = autoHsType IBBody
@@ -71,8 +71,8 @@ instance
   Conv-ℕ = Convertible-Refl
 
 record EndorserBlock : Type where
-  field slotNumber : Int
-        producerID : Int
+  field slotNumber : ℤ
+        producerID : ℤ
         ibRefs     : List String
 
 {-# FOREIGN GHC
@@ -89,16 +89,10 @@ instance
   Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
   Conv-EndorserBlock =
     record
-      { to = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) → record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = refs }
+      { to = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) →
+          record { slotNumber = + sl ; producerID = + toℕ pid ; ibRefs = refs }
       ; from = λ (record { slotNumber = sl ; producerID = pid ; ibRefs = refs }) →
-                    record
-                      { slotNumber = ∣ sl ∣
-                      ; producerID = zero
-                      ; ibRefs = refs
-                      ; ebRefs = []
-                      ; lotteryPf = tt
-                      ; signature = tt
-                      }
+          record { slotNumber = ∣ sl ∣ ; producerID = zero ; ibRefs = refs ; ebRefs = [] ; lotteryPf = tt ; signature = tt }
       }
 
   Listable-Fin : Listable (Fin 1)
@@ -117,10 +111,10 @@ instance
   HsTy-LeiosState = autoHsType LeiosState
   Conv-LeiosState = autoConvert LeiosState
 
-  HsTy-LeiosInput = autoHsType LeiosInput ⊣ onConstructors (("I_" S.++_) ∘ S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  HsTy-LeiosInput = autoHsType LeiosInput ⊣ onConstructors (prefix "I_" ∘ dropDash)
   Conv-LeiosInput = autoConvert LeiosInput
 
-  HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (("O_" S.++_) ∘ S.concat ∘ (S.wordsByᵇ ('-' Char.≈ᵇ_)))
+  HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (prefix "O_" ∘ dropDash)
   Conv-LeiosOutput = autoConvert LeiosOutput
 
 open import Class.Computational as C
