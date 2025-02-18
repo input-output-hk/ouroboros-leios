@@ -19,7 +19,10 @@ While the simulation is running, it will log what's going on to the console. You
 
 The simulation runs in realtime (1 slot every second), but you can speed it up by passing e.g. `-t 16` to run 16 times faster.
 
-## using traces in model comparisons
+> [!NOTE]
+> For instructions on running the simulation using Docker, please refer to the Docker Simulation section in the root README.md.
+
+## Using traces in model comparisons
 
 ### Transaction diffusion
 
