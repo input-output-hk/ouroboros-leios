@@ -23,9 +23,26 @@ use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, Env
 
 mod events;
 
+const DEFAULT_CONFIG_PATHS: &[&str] = &[
+    // Docker/production path
+    "/usr/local/share/leios/config.default.yaml",
+    // Development paths
+    "../../data/simulation/config.default.yaml",
+    "../data/simulation/config.default.yaml",
+];
+
+const DEFAULT_TOPOLOGY_PATHS: &[&str] = &[
+    // Docker/production path
+    "/usr/local/share/leios/topology.default.yaml",
+    // Development paths
+    "../../data/simulation/topo-default-100.yaml",
+    "../data/simulation/topo-default-100.yaml",
+];
+
 #[derive(Parser)]
 struct Args {
-    topology: PathBuf,
+    #[clap(default_value = None)]
+    topology: Option<PathBuf>,
     output: Option<PathBuf>,
     #[clap(short, long)]
     parameters: Vec<PathBuf>,
@@ -37,17 +54,58 @@ struct Args {
     slots: Option<u64>,
 }
 
+fn get_default_config() -> Result<String> {
+    let mut last_error = None;
+
+    // Try each possible config location
+    for path in DEFAULT_CONFIG_PATHS {
+        match fs::read_to_string(path) {
+            Ok(content) => return Ok(content),
+            Err(e) => last_error = Some((path, e)),
+        }
+    }
+
+    // If we get here, none of the paths worked
+    let (path, error) = last_error.unwrap();
+    Err(anyhow::anyhow!(
+        "Could not find default config file in any location. Last attempt '{}' failed: {}",
+        path,
+        error
+    ))
+}
+
+fn get_default_topology() -> Result<String> {
+    let mut last_error = None;
+
+    // Try each possible topology location
+    for path in DEFAULT_TOPOLOGY_PATHS {
+        match fs::read_to_string(path) {
+            Ok(content) => return Ok(content),
+            Err(e) => last_error = Some((path, e)),
+        }
+    }
+
+    // If we get here, none of the paths worked
+    let (path, error) = last_error.unwrap();
+    Err(anyhow::anyhow!(
+        "Could not find default topology file in any location. Last attempt '{}' failed: {}",
+        path,
+        error
+    ))
+}
+
 fn read_config(args: &Args) -> Result<SimConfiguration> {
-    let topology_str = fs::read_to_string(&args.topology)?;
+    let topology_str = match &args.topology {
+        Some(path) => fs::read_to_string(path)?,
+        None => get_default_topology()?,
+    };
     let topology: Topology = {
         let raw_topology: RawTopology = serde_yaml::from_str(&topology_str)?;
         raw_topology.into()
     };
     topology.validate()?;
 
-    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
-        "../../../data/simulation/config.default.yaml"
-    )));
+    let mut raw_params = Figment::new().merge(Yaml::string(&get_default_config()?));
 
     for params_file in &args.parameters {
         raw_params = raw_params.merge(Yaml::file_exact(params_file));
@@ -126,7 +184,7 @@ mod tests {
         let topology_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../test_data");
         for topology in fs::read_dir(topology_dir)? {
             let args = Args {
-                topology: topology?.path(),
+                topology: Some(topology?.path()),
                 output: None,
                 parameters: vec![],
                 timescale: None,
