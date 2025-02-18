@@ -4,14 +4,13 @@ export interface HaskellTraceEvent {
     event: HaskellEvent;
 }
 
-type MessageKind = "IB" | "EB" | "RB" | "VT";
+type BlockKind = "IB" | "EB" | "RB" | "VT";
+type BlockAction = "Generated" | "EnteredState";
 
 type HaskellEvent =
     | HaskellCpuEvent
-    | HaskellGeneratedEvent
-    | HaskellSentEvent
-    | HaskellReceivedEvent
-    | HaskellStateEvent;
+    | HaskellBlockEvent // Unified block event type
+    | HaskellNetworkEvent; // Combine Sent/Received into network events
 
 interface HaskellCpuEvent {
     tag: "Cpu";
@@ -23,67 +22,52 @@ interface HaskellCpuEvent {
     task_label: string; // e.g., "ValIB: 6-29" or "ValRH: 6253064077348247640"
 }
 
-type HaskellGeneratedEvent =
-    | HaskellGeneratedIBEvent
-    | HaskellGeneratedEBEvent
-    | HaskellGeneratedRBEvent
-    | HaskellGeneratedVTEvent;
-
-interface HaskellGeneratedBaseEvent {
-    tag: "generated";
-    node: number;
+// Base block event interface
+interface BaseBlockEvent {
+    type: `${BlockKind}${BlockAction}`;
+    node: string;
     node_name: string;
+    id: string;
     size_bytes: number;
 }
 
-interface HaskellGeneratedIBEvent extends HaskellGeneratedBaseEvent {
+interface InputBlockEvent extends BaseBlockEvent {
     kind: "IB";
-    id: string;
     slot: number;
     payload_bytes: number;
-    rb_ref: string;
+    rb_ref: string; // Reference to ranking block
 }
 
-interface HaskellGeneratedEBEvent extends HaskellGeneratedBaseEvent {
+interface EndorserBlockEvent extends BaseBlockEvent {
     kind: "EB";
-    id: string;
-    input_blocks: string[];
+    slot: number;
+    input_blocks: string[]; // References to input blocks
 }
 
-interface HaskellGeneratedRBEvent extends HaskellGeneratedBaseEvent {
+interface RankingBlockEvent extends BaseBlockEvent {
     kind: "RB";
-    id: string;
+    slot: number;
 }
 
-interface HaskellGeneratedVTEvent extends HaskellGeneratedBaseEvent {
+interface VoteEvent extends BaseBlockEvent {
     kind: "VT";
-    id: string;
     votes: number;
-    endorse_blocks: string[];
+    endorse_blocks: string[]; // References to endorser blocks
 }
 
-interface HaskellSentEvent {
-    tag: "Sent";
-    sender: number;
-    receipient: number;
+type HaskellBlockEvent =
+    | InputBlockEvent
+    | EndorserBlockEvent
+    | RankingBlockEvent
+    | VoteEvent;
+
+interface HaskellNetworkEvent {
+    type: "NetworkMessage";
+    action: "Sent" | "Received"; // Added to distinguish direction
+    sender: string;
+    recipient: string;
+    block_kind: BlockKind;
     msg_size_bytes: number;
     sending_s: number;
-    kind: MessageKind;
     ids: string[];
-}
-
-interface HaskellReceivedEvent {
-    tag: "received";
-    kind: MessageKind;
-    id: string;
-    node: number;
-    node_name: string;
-}
-
-interface HaskellStateEvent {
-    tag: "enteredstate";
-    kind: MessageKind;
-    id: string;
-    node: number;
-    node_name: string;
 }
