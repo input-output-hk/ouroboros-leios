@@ -2,7 +2,7 @@
 
 // Base types
 interface RustBaseEvent {
-    time: number; // nanoseconds
+    time_s: number;
     message: {
         type: string;
         [key: string]: any;
@@ -35,6 +35,8 @@ interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
         task_type?: RustCpuTaskType;
         subtasks?: number;
         subtask_id?: number;
+        duration_s?: number;
+        cpu_time_s?: number;
         extra?: string;
     };
 }
