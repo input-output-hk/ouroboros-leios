@@ -15,7 +15,7 @@ let
         "https://chap.intersectmbo.org/" = inputs.iogx.inputs.CHaP;
       };
       name = "ouroboros-leios";
-      compiler-nix-name = lib.mkDefault "ghc96";
+      compiler-nix-name = lib.mkDefault "ghc98";
       # modules = [{ packages = { }; } { packages = { }; } ];
     });
 
