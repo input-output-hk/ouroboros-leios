@@ -6,9 +6,6 @@
   "license": "MIT",
   "private": true,
   "main": "src/controller.js",
-  "dependencies": {
-    "d3": "^7.9.0"
-  },
   "devDependencies": {
     "eslint": "^8.27.0",
     "webpack": "^5.75.0",

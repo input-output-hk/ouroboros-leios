@@ -2,9 +2,6 @@
 'use strict'
 
 
-import * as d3  from "d3"
-
-
 const millisecond = 0.001                 //  s/ms
 const bit = 1 / 8                         //  B/b
 const kilobyte = 1024                     //  B/kB
