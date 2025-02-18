@@ -46,7 +46,11 @@ pub fn sig_transform(f: &dyn Fn(blst_p1) -> blst_p1, sig: &Signature) -> Signatu
 
 pub fn sig_to_rational(sig: &Signature) -> Ratio<BigInt> {
     let bytes: [u8; 48] = sig.to_bytes();
-    let numer = BigInt::from_bytes_be(Sign::Plus, &bytes);
+    let mut hashed: [u8; 32] = [0; 32];
+    unsafe {
+        blst_sha256(hashed.as_mut_ptr(), bytes.as_ptr(), bytes.len());
+    }
+    let numer = BigInt::from_bytes_be(Sign::Plus, &hashed);
     let denom: BigInt = BigInt::from_u128(2u128 ^ 127u128).unwrap();
     Ratio::new(numer % denom.clone(), denom)
 }
