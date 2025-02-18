@@ -21,21 +21,26 @@ behavior, it is a red flag.
 ### Input Block (IB) Parameters
 
 - Are smaller-sized, more frequent IBs better or worse than larger-sized, less frequent IBs?
-- How does IB generation frequency relate to IB network dissemination time?
+- How does IB generation frequency and size relate to IB network dissemination time?
     - How does this time relate to the time described in the network functionality in the Leios paper?
     - What is the induced network capacity?
 - Explore windowed versions of the freshest-first policy (recent IBs are downloaded oldest-first, older IBs are downloaded freshest first).
-- How rapidly or gradually does efficiency degrade as throughput increases?
+- How rapidly or gradually does efficiency/latency degrade as throughput increases?
 - Do RBs propagate back to IB producers in time for the ledger update to be available when the IB is produced?
+- Are IBs referenced by main-chain RBs available in time for legder construction?
 
 ### Endoser Block (EB) Parameters
 - How does EB generation frequency relate to having zero or duplicate EBs as candidates for certification in the RB?
+- How large should the EB stage be so that honest EB dissemination completes in time for voting? Similarly, how large should the voting stage be for timely vote arrival?
 
 ### Resources
 
 - What are the peak CPU resources required as a function of throughput?
     - What operations create CPU bottlenecks?
     - How much free CPU is available?
+ 
+### Relation to theoretical work
+- What is the probability that all honest IBs of a pipeline are delivered by the end of stage deliver 1 w.r.t. deliver 1's length? Similarly, about the probabilty that a certified EB containing all honest IBs being produced.
 
 ## Test Cases
 
