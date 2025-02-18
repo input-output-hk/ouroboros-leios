@@ -16,7 +16,7 @@ interface RustTaskInfo {
 
 // CPU Events
 type BlockOrTaskType =
-    | "PraosBlock"
+    | "RankingBlock"
     | "EndorserBlock"
     | "VoteBundle"
     | "InputBlock"
@@ -50,7 +50,7 @@ interface RustBaseBlockEvent {
     recipient?: string;
 }
 
-type BlockType = "Input" | "Endorser" | "Praos";
+type BlockType = "Input" | "Endorser" | "Ranking";
 type BlockAction = "Sent" | "Received" | "LotteryWon" | "Generated";
 type RustBlockMessageType = `${BlockType}Block${BlockAction}`;
 
