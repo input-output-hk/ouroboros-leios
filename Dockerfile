@@ -50,7 +50,9 @@ COPY . .
 # Build simulation
 WORKDIR /build/simulation
 RUN cabal update && \
-    cabal build all
+    cabal build all && \
+    # Find the actual binary path and copy it to a known location
+    find /build/dist-newstyle -type f -name "ols" -exec cp {} /build/ols \;
 
 # Create Rust simulation image
 FROM base AS rs
@@ -86,7 +88,7 @@ FROM base AS hs
 WORKDIR /output
 
 # Copy the ols binary and necessary files
-COPY --from=hs-builder /build/dist-newstyle/build/aarch64-linux/ghc-9.8.2/ouroboros-leios-sim-0.1.0.0/x/ols/build/ols/ols /usr/local/bin/
+COPY --from=hs-builder /build/ols /usr/local/bin/
 
 # Create entrypoint script for Haskell simulation
 RUN echo '#!/bin/sh\n\
