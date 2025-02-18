@@ -2,7 +2,7 @@
 
 // Base types
 interface RustBaseEvent {
-    time_s: number; // Changed: time in seconds with microsecond precision
+    time_s: number;
     message: {
         type: string;
         [key: string]: any;
