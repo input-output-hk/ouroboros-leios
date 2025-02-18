@@ -15,7 +15,6 @@ type HaskellEvent =
 interface HaskellCpuEvent {
     tag: "Cpu";
     node: string;
-    node_name: string;
     duration_s: number;
     cpu_time_s: number;
     // CPU task types: Block validation (ValIB, ValEB, ValRB), Header validation (ValIH, ValRH), Vote validation (ValVote). Format: "<task_type>: <id>"
@@ -26,7 +25,6 @@ interface HaskellCpuEvent {
 interface BaseBlockEvent {
     type: `${BlockKind}${BlockAction}`;
     node: string;
-    node_name: string;
     id: string;
     size_bytes: number;
 }
