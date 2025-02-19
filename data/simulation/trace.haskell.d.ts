@@ -26,21 +26,19 @@ interface BaseBlockEvent {
     node: string;
     id: string;
     size_bytes: number;
+    slot: number;
 }
 
 interface InputBlockEvent extends BaseBlockEvent {
-    slot: number;
     payload_bytes: number;
     rb_ref: string; // Reference to ranking block
 }
 
 interface EndorserBlockEvent extends BaseBlockEvent {
-    slot: number;
     input_blocks: string[]; // References to input blocks
 }
 
 interface RankingBlockEvent extends BaseBlockEvent {
-    slot: number;
     endorse_blocks: string[]; // References to certified endorser blocks
     payload_bytes: number; // Size of directly included transactions
 }
