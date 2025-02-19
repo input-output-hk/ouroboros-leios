@@ -11,6 +11,7 @@ import Control.Exception (Exception (displayException))
 import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
+import Data.Fixed
 import Data.List (find)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, listToMaybe)
@@ -25,12 +26,13 @@ import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import ModelTCP (kilobytes)
 import Options.Applicative (
-  Alternative ((<|>)),
+  Alternative (many, (<|>)),
   HasValue,
   Mod,
   Parser,
   ParserInfo,
   ParserPrefs,
+  argument,
   asum,
   auto,
   command,
@@ -52,6 +54,7 @@ import Options.Applicative (
   showDefault,
   showDefaultWith,
   showHelpOnEmpty,
+  strArgument,
   strOption,
   subparser,
   switch,
@@ -110,6 +113,8 @@ parserOptions =
         progDesc "Convert from a topology with clusters to a topology with location coordinates."
     , command "generate-topology" . info (CliCommand <$> parserCliGenerateTopology <**> helper) $
         progDesc "Generate a topology from a world shape and expected links. Other parameters are fixed and meant to be edited after the fact."
+    , command "report-data" . info (CliCommand <$> parserReportData <**> helper) $
+        progDesc "Outputs diffusion data as .csv. Either from simulation output or idealized graph diffusion."
     ]
 
 --------------------------------------------------------------------------------
@@ -486,6 +491,7 @@ data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
   | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
+  | CliReportData {outputPrefix :: Maybe FilePath, simDataFile :: FilePath, stakeFractions :: [Micro]}
 
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
@@ -511,6 +517,9 @@ runCliOptions = \case
     p2pNetwork@P2PNetwork{..} <- execTopologyGenerationOptions rng topologyGenerationOptions
     let totalStake = fromIntegral $ 100 * Map.size p2pNodes
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
+  CliReportData{..} -> do
+    let prefix = fromMaybe (dropExtension simDataFile) outputPrefix
+    DataShortLeiosP2P.reportLeiosData prefix simDataFile stakeFractions
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -561,6 +570,13 @@ parserCliGenerateTopology =
           <> metavar "FILE"
           <> help "The output topology file."
       )
+
+parserReportData :: Parser CliCommand
+parserReportData =
+  CliReportData
+    <$> optional (strOption $ short 'p' <> long "prefix")
+    <*> strArgument (metavar "SIMDATA")
+    <*> many (argument auto (metavar "STAKEF"))
 
 --------------------------------------------------------------------------------
 -- Parsing Topography Options
