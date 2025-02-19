@@ -1,0 +1,53 @@
+% -*- fill-column: 80 -*-
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{todonotes}
+\usepackage{microtype}
+\usepackage{amssymb,amsmath}
+\usepackage{mathpazo}
+\usepackage{longtable,booktabs}
+\usepackage{dcolumn}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{hyperref}
+\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
+\hypersetup{
+  pdftitle={Storing the Cardano ledger state on disk: analysis and design options},
+  pdfborder={0 0 0},
+  breaklinks=true
+}
+
+\begin{document}
+
+\title{Ouroboros Leios simulation: \\
+       building confidence in the performance results \\
+       {\large \sc An IOHK technical report}
+  }
+\date{Version 1.0, April 2021}
+\author{Andrea Vezzosi     \\ {\small \texttt{andrea@well-typed.com}} \\
+   \and Wen Kokke          \\ {\small \texttt{wen@well-typed.com}} \\
+   \and Duncan Coutts      \\ {\small \texttt{duncan@well-typed.com}}
+   }
+
+\maketitle
+
+\section{Introduction}
+\label{introduction}
+
+
+\tableofcontents
+
+\listoftodos
+
+\section{Summary}
+\label{summary}
+
+
+\addcontentsline{toc}{section}{References}
+\bibliographystyle{plainnat}
+\bibliography{sim-realism}
+
+\end{document}
