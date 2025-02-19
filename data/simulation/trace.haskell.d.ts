@@ -41,6 +41,8 @@ interface EndorserBlockEvent extends BaseBlockEvent {
 
 interface RankingBlockEvent extends BaseBlockEvent {
     slot: number;
+    endorse_blocks: string[]; // References to certified endorser blocks
+    payload_bytes: number; // Size of directly included transactions
 }
 
 interface VoteEvent extends BaseBlockEvent {
