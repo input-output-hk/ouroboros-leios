@@ -1,0 +1,63 @@
+name: Docker Build and Publish
+
+on:
+  push:
+    tags:
+      - "leios-[0-9][0-9][0-9][0-9]w[0-9][0-9]"
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: input-output-hk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-rs
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest
+
+      - name: Build and push Rust simulation image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: rs
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-rs:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-rs:latest
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Build and push Haskell simulation image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: hs
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ouroboros-leios-sim-hs:latest
+          labels: ${{ steps.meta.outputs.labels }}

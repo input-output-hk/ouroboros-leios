@@ -1,5 +1,27 @@
 # Leios logbook
 
+## 2025-02-18
+
+### CPS-0018
+
+[CIPS-0018 "Greater Transaction Throughput"](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) has been officially approved and merged into the Cardano Foundation's CIP/CPS repository. This Cardano Problem Statement motivates the need for higher transaction throughput on Cardano and provides evidence for its urgency. It also defines goals for initiatives like Leios, summarizes use cases, and identifies open questions.
+
+### Docker Support for Simulations
+
+Added Docker support for both the Rust and Haskell simulations, making it easier to run and generate simulation traces without setting up the development environment. The Docker images are built using a multi-stage Dockerfile that creates optimized images for both simulations.
+
+Basic usage examples:
+
+```bash
+# Run Rust simulation with default settings
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-rs:latest
+
+# Run Haskell simulation for 120 seconds
+docker run -v $(pwd)/output:/output ouroboros-leios/sim-hs:latest --output-seconds 120
+```
+
+See the [Docker Simulation section in README.md](README.md#docker-simulation) for detailed usage instructions, including how to use custom topology files and configuration options.
+
 ## 2025-02-16
 
 ### DeltaQ Update

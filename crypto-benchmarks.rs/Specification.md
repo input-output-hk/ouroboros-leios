@@ -1,7 +1,7 @@
 # BLS certificates for Leios
 
 
-The present write-up documents that BLS certificates based on the Fait Accompli sortition scheme comprise a viable option for Leios, with certificates being smaller that 15 kB. The downside of BLS approaches like this is that new keys must be registered and occasionally rotated.
+The present write-up documents that BLS certificates based on the Fait Accompli sortition scheme comprise a viable option for Leios, with certificates being smaller that 10 kB. The downside of BLS approaches like this is that new keys must be registered and occasionally rotated.
 
 The January 27 IOG R&D Seminar entitled "ALBA" summarizes recent developments for the ALBA algorithm and indicates that new variants of ALBA may be suitable for compactly storing Peras certificates, perhaps even using existing Praos VRF and KES keys. Similarly, progress has also been made on certificate compression via SNARKs. However, if any of the ALBA- and/or SNARK-based voting and certificate schemes meet the following conditions, they would be superior to the BLS-based scheme outlined later in this document.
 
@@ -23,7 +23,7 @@ Consider the following voting and certificate scheme for Leios:
 
 1. Stake pools register BLS keys for use in voting and prove possession of those keys.
 2. Nodes verify the proofs of possession of the keys they receive.
-3. Those keys are replaced periodically, perhaps every KES period (currently 36 hours) or in every operational certificate (currently 90 days).
+3. Those keys are not replaced periodically because forward security is not needed for IBs, EBs, or votes. (If forward security were required, then the Pixel family of algorithms is a good candidate because of its succinctness.)
 4. For each epoch, the [Fait Accompli](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/) scheme wFA<sup>F</sup> is applied to the stake distribution in order to determine the *persistent voters* for the epoch.
     1. Persistent voters should vote in every election during the epoch.
     2. A different supplement of *non-persistent voters* are selected at random for each election during the epoch using the *local sortition* algorithm.
@@ -39,9 +39,7 @@ The key registration records the public key and the proof of its possession.
 3. The proof of possession for the secret key is the pair $\left(H_{\mathbb{G}_1}(\text{``PoP''} \parallel \mathit{mvk})^\mathit{sk}, g_1^\mathit{sk}\right)$, where $\mathit{sk}$ is the secret key and $H$ hashes to points in $\mathbb{G}_1$. This pair will occupy 96 bytes with compression.
 4. The KES signature for the above will add another 448 bytes.
 
-Altogether, a key registration occupies $28 + 96 + 2 * 48 + 448 = 668$ bytes. This type is implemented in Rust as [`key::Reg`](src/key.rs).
-
-Sadly, this registration needs to be recorded on chain so that certificates can be later verified independently. However, cryptographic compression may reduce the overall size of the registration data.
+Altogether, a key registration occupies $28 + 96 + 2 \times 48 + 448 = 668$ bytes. This type is implemented in Rust as [`key::Reg`](src/key.rs). This registration needs to be recorded on chain so that certificates can be later verified independently. Ideally, the BLS keys would be registered as part of the SPO's *operational certificate*, which is renewed every ninety days.
 
 
 ### Sortition
@@ -50,7 +48,7 @@ Figure 7 of the [Fait Accompli paper](https://iohk.io/en/research/library/papers
 
 [The Leios sortition](../docs/technical-report-1.md#sortition) for input blocks (IB), endorser blocks (EB), and votes allows the possibility that a block-producing node may be elected several times in the same slot (for IBs) or pipeline (for EBs and votes).
 
-The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is 
+The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the SHA-256 hash of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is 
 
 $$
 \mathcal{P}(k) := \frac{(n \cdot \sigma)^k \cdot e^{- n \cdot \sigma}}{k!}
@@ -106,10 +104,10 @@ The certificate must contain the following information:
 Thus the total certificate size is
 
 $$
-\text{certificate bytes} = 136 + \left\lceil \frac{m}{8} \right\rceil + 76 \cdot (n - m)
+\text{certificate bytes} = 136 + \left\lceil \frac{m}{8} \right\rceil + 76 \times (n - m)
 $$
 
-but not including any minor overhead arising from CBOR serialization. As noted previously, only a quorum of votes actually needs to be recorded. This type is implemented in Rust as [`cert::Cert`](src/cert.rs).
+but not including any minor overhead arising from CBOR serialization. As noted previously, only a quorum of votes actually needs to be recorded, but the full set might need to be recorded in order for any voting rewards to be computed. This type is implemented in Rust as [`cert::Cert`](src/cert.rs).
 
 
 ### Benchmarks in Rust
