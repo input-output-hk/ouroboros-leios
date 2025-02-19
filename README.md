@@ -119,21 +119,7 @@ Common arguments for Haskell simulation:
 
 ## Specification
 
-Build the Agda specification for Leios using either
-
-```console
-$ nix build --no-link --accept-flake-config .#leiosSpec
-```
-
-or
-
-```console
-$ nix develop
-
-$ cd formal-spec
-
-$ agda Leios/SimpleSpec.agda
-```
+The formal specification of the Leios protocol in Agda is refrenced from the repository: https://github.com/input-output-hk/ouroboros-leios-formal-spec
 
 ## Archive
 
