@@ -7,9 +7,7 @@
       url = "github:input-output-hk/iogx";
     };
 
-    # Agda version 2.7
-    agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=7438ebd9431243aa0b01502fae89c022e4facb0c";
-
+    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?ref=52f107c70dfa8281982b0125af51fb7063f99349";
   };
 
 
