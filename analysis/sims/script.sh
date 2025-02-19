@@ -1,60 +1,27 @@
 #!/usr/bin/env bash
 
-`which time` --verbose \
-cabal run exe:ols -- sim short-leios \
-                  --leios-config-file data/simulation/config.default.yaml \
-                  --topology-file data/simulation/topo-default-100.yaml \
-                  --output-file z.json \
-                  --output-seconds 120
+HOST=thelio
+DB=leios
 
-mongoimport --host thelio \
-            --db leios \
-            --collection raw \
-            --drop \
-            z.log
+if [[ ! -p sim.log ]]
+then
+  mkfifo sim.log
+fi
 
-mongo --host thelio leios << EOI
+mongo --host "$HOST" "$DB" reset.js
 
-db.raw.aggregate([
-  { $group: { _id: "$event.tag" } },
-])
+for ibRate in 0.05 0.10 0.20 0.30 0.50 1.00 2.00 3.00 5.00 10.00 20.00 30.00 50.00 100.00
+do
+  yaml2json config.default.yaml \
+  | jq '."ib-generation-probability" = '"$ibRate" \
+  > tmp.config.json
+  echo 'const s = {"ib-generation-probability" : '"$ibRate"'}' > tmp.scenario.js
+  mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
+  cabal run exe:ols -- sim short-leios \
+                    --leios-config-file tmp.config.json \
+                    --topology-file topo-default-100.yaml \
+                    --output-file sim.json \
+                    --output-seconds 150
+  mongo --host "$HOST" "$DB" tmp.scenario.js ingest.js
+done
 
-db.raw.aggregate([
-  { $match: {
-    "event.tag": "generated",
-    "event.kind": "IB",
-  } },
-  { $project: {
-    _id: "$event.id",
-    time_s: 1,
-    size_bytes: "$event.size_bytes",
-  } },
-  { $out: "ibs"},
-])
-
-db.raw.aggregate([
-  { $match: {
-    "event.tag": "received",
-    "event.kind": "IB",
-  } },
-  { $project: {
-    ib: "$event.id",
-    node: "$event.node",
-    time_s: 1,
-  } },
-  { $lookup: {
-    from: "ibs",
-    localField: "ib",
-    foreignField: "_id",
-    as: "origin",
-  } },
-  { $project: {
-    ib: 1,
-    node: 1,
-    time_s: 1,
-    elapsed_s: { $subtract: [ "$time_s", { $arrayElemAt: ["$origin.time_s", 0] }] },
-  } },
-  { $out: "ibElapsed" },
-])
-
-EOI
