@@ -4,85 +4,71 @@ export interface HaskellTraceEvent {
     event: HaskellEvent;
 }
 
-type MessageKind = "IB" | "EB" | "RB" | "VT";
+type BlockKind = "IB" | "EB" | "RB" | "VT";
+type BlockAction = "Generated" | "EnteredState";
 
 type HaskellEvent =
     | HaskellCpuEvent
-    | HaskellGeneratedEvent
-    | HaskellSentEvent
-    | HaskellReceivedEvent
-    | HaskellStateEvent;
+    | HaskellBlockEvent // Unified block event type
+    | HaskellNetworkEvent; // Combine Sent/Received into network events
 
 interface HaskellCpuEvent {
-    tag: "Cpu";
-    node: number;
-    node_name: string;
-    duration_s: number;
+    type: "Cpu";
+    node: string;
+    cpu_time_s: number;
     // CPU task types: Block validation (ValIB, ValEB, ValRB), Header validation (ValIH, ValRH), Vote validation (ValVote). Format: "<task_type>: <id>"
     task_label: string; // e.g., "ValIB: 6-29" or "ValRH: 6253064077348247640"
 }
 
-type HaskellGeneratedEvent =
-    | HaskellGeneratedIBEvent
-    | HaskellGeneratedEBEvent
-    | HaskellGeneratedRBEvent
-    | HaskellGeneratedVTEvent;
+// Base block event interface with just identification info
+interface BaseBlockEvent {
+    type: `${BlockKind}${BlockAction}`;
+    node: string;
+    id: string;
+    slot: number;
+}
 
-interface HaskellGeneratedBaseEvent {
-    tag: "generated";
-    node: number;
-    node_name: string;
+// Additional fields for Generated events
+interface GeneratedBlockEvent extends BaseBlockEvent {
     size_bytes: number;
 }
 
-interface HaskellGeneratedIBEvent extends HaskellGeneratedBaseEvent {
-    kind: "IB";
-    id: string;
-    slot: number;
+interface GeneratedInputBlock extends GeneratedBlockEvent {
     payload_bytes: number;
     rb_ref: string;
 }
 
-interface HaskellGeneratedEBEvent extends HaskellGeneratedBaseEvent {
-    kind: "EB";
-    id: string;
+interface GeneratedEndorserBlock extends GeneratedBlockEvent {
     input_blocks: string[];
 }
 
-interface HaskellGeneratedRBEvent extends HaskellGeneratedBaseEvent {
-    kind: "RB";
-    id: string;
+interface GeneratedRankingBlock extends GeneratedBlockEvent {
+    endorse_blocks: string[];
+    payload_bytes: number;
 }
 
-interface HaskellGeneratedVTEvent extends HaskellGeneratedBaseEvent {
-    kind: "VT";
-    id: string;
+interface GeneratedVote extends GeneratedBlockEvent {
     votes: number;
     endorse_blocks: string[];
 }
 
-interface HaskellSentEvent {
-    tag: "Sent";
-    sender: number;
-    receipient: number;
+// EnteredState events only need the base identification info
+type EnteredStateBlock = BaseBlockEvent;
+
+type HaskellBlockEvent =
+    | GeneratedInputBlock
+    | GeneratedEndorserBlock
+    | GeneratedRankingBlock
+    | GeneratedVote
+    | EnteredStateBlock;
+
+interface HaskellNetworkEvent {
+    type: "NetworkMessage";
+    action: "Sent" | "Received"; // Added to distinguish direction
+    sender: string;
+    recipient: string;
+    block_kind: BlockKind;
     msg_size_bytes: number;
     sending_s: number;
-    kind: MessageKind;
     ids: string[];
-}
-
-interface HaskellReceivedEvent {
-    tag: "received";
-    kind: MessageKind;
-    id: string;
-    node: number;
-    node_name: string;
-}
-
-interface HaskellStateEvent {
-    tag: "enteredstate";
-    kind: MessageKind;
-    id: string;
-    node: number;
-    node_name: string;
 }

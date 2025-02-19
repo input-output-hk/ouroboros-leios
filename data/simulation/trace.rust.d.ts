@@ -2,7 +2,7 @@
 
 // Base types
 interface RustBaseEvent {
-    time: number; // nanoseconds
+    time_s: number;
     message: {
         type: string;
         [key: string]: any;
@@ -16,10 +16,10 @@ interface RustTaskInfo {
 
 // CPU Events
 type BlockOrTaskType =
-    | "PraosBlock"
-    | "EndorserBlock"
-    | "VoteBundle"
-    | "InputBlock"
+    | "RBBlock"
+    | "EBBlock"
+    | "VTBundle"
+    | "IBBlock"
     | "Transaction";
 type Action = "Validated" | "Generated";
 type RustCpuTaskType = `${BlockOrTaskType}${Action}`;
@@ -35,6 +35,8 @@ interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
         task_type?: RustCpuTaskType;
         subtasks?: number;
         subtask_id?: number;
+        duration_s?: number;
+        cpu_time_s?: number;
         extra?: string;
     };
 }
@@ -48,9 +50,9 @@ interface RustBaseBlockEvent {
     recipient?: string;
 }
 
-type BlockType = "Input" | "Endorser" | "Praos";
+type BlockType = "IB" | "EB" | "RB";
 type BlockAction = "Sent" | "Received" | "LotteryWon" | "Generated";
-type RustBlockMessageType = `${BlockType}Block${BlockAction}`;
+type RustBlockMessageType = `${BlockType}${BlockAction}`;
 
 interface RustBlockEvent extends Omit<RustBaseEvent, "message"> {
     message: RustBaseBlockEvent & {
