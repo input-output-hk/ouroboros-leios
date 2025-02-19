@@ -13,7 +13,7 @@ type HaskellEvent =
     | HaskellNetworkEvent; // Combine Sent/Received into network events
 
 interface HaskellCpuEvent {
-    tag: "Cpu";
+    type: "Cpu";
     node: string;
     cpu_time_s: number;
     // CPU task types: Block validation (ValIB, ValEB, ValRB), Header validation (ValIH, ValRH), Vote validation (ValVote). Format: "<task_type>: <id>"
@@ -29,25 +29,21 @@ interface BaseBlockEvent {
 }
 
 interface InputBlockEvent extends BaseBlockEvent {
-    kind: "IB";
     slot: number;
     payload_bytes: number;
     rb_ref: string; // Reference to ranking block
 }
 
 interface EndorserBlockEvent extends BaseBlockEvent {
-    kind: "EB";
     slot: number;
     input_blocks: string[]; // References to input blocks
 }
 
 interface RankingBlockEvent extends BaseBlockEvent {
-    kind: "RB";
     slot: number;
 }
 
 interface VoteEvent extends BaseBlockEvent {
-    kind: "VT";
     votes: number;
     endorse_blocks: string[]; // References to endorser blocks
 }
