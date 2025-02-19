@@ -20,39 +20,47 @@ interface HaskellCpuEvent {
     task_label: string; // e.g., "ValIB: 6-29" or "ValRH: 6253064077348247640"
 }
 
-// Base block event interface
+// Base block event interface with just identification info
 interface BaseBlockEvent {
     type: `${BlockKind}${BlockAction}`;
     node: string;
     id: string;
-    size_bytes: number;
     slot: number;
 }
 
-interface InputBlockEvent extends BaseBlockEvent {
+// Additional fields for Generated events
+interface GeneratedBlockEvent extends BaseBlockEvent {
+    size_bytes: number;
+}
+
+interface GeneratedInputBlock extends GeneratedBlockEvent {
     payload_bytes: number;
-    rb_ref: string; // Reference to ranking block
+    rb_ref: string;
 }
 
-interface EndorserBlockEvent extends BaseBlockEvent {
-    input_blocks: string[]; // References to input blocks
+interface GeneratedEndorserBlock extends GeneratedBlockEvent {
+    input_blocks: string[];
 }
 
-interface RankingBlockEvent extends BaseBlockEvent {
-    endorse_blocks: string[]; // References to certified endorser blocks
-    payload_bytes: number; // Size of directly included transactions
+interface GeneratedRankingBlock extends GeneratedBlockEvent {
+    endorse_blocks: string[];
+    payload_bytes: number;
 }
 
-interface VoteEvent extends BaseBlockEvent {
+interface GeneratedVote extends GeneratedBlockEvent {
     votes: number;
-    endorse_blocks: string[]; // References to endorser blocks
+    endorse_blocks: string[];
 }
+
+// EnteredState events only need the base identification info
+type EnteredStateBlock = BaseBlockEvent;
 
 type HaskellBlockEvent =
-    | InputBlockEvent
-    | EndorserBlockEvent
-    | RankingBlockEvent
-    | VoteEvent;
+    | GeneratedInputBlock
+    | GeneratedEndorserBlock
+    | GeneratedRankingBlock
+    | GeneratedVote
+    | EnteredStateBlock;
 
 interface HaskellNetworkEvent {
     type: "NetworkMessage";
