@@ -83,14 +83,25 @@ const config: Config = {
                 },
                 { to: "/news", label: "Latest News", position: "right" },
                 {
-                    href:
-                        "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
-                    label: "Throughput Simulation",
+                    type: "dropdown",
+                    label: "Tools",
                     position: "right",
+                    items: [
+                        {
+                            href:
+                                "https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3",
+                            label: "Simulator",
+                        },
+                        {
+                            to: "https://leios.cardano-scaling.org/cost-estimator/",
+                            label: "Cost Estimator",
+                        },
+                    ],
                 },
                 {
-                    to: "pathname:///cost-estimator/",
-                    label: "Cost Estimator",
+                    href:
+                        "https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md",
+                    label: "CPS",
                     position: "right",
                 },
                 {
@@ -128,6 +139,11 @@ const config: Config = {
                         {
                             label: "Resources",
                             to: "/docs/resources",
+                        },
+                        {
+                            label: "CPS",
+                            href:
+                                "https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md",
                         },
                     ],
                 },

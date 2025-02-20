@@ -42,3 +42,9 @@
   --ifm-color-primary-lightest: #B5D4E3;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+/* Hide external link icons in navbar */
+.navbar .navbar__items a.navbar__item svg[class*="iconExternalLink"],
+.navbar .dropdown__menu a.dropdown__link svg[class*="iconExternalLink"] {
+  display: none;
+}
