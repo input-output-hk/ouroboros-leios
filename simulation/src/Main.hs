@@ -491,7 +491,7 @@ data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
   | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
-  | CliReportData {outputPrefix :: Maybe FilePath, simDataFile :: FilePath, stakeFractions :: [Micro]}
+  | CliReportData {outputDir :: Maybe FilePath, simDataFile :: FilePath, stakeFractions :: [Micro]}
 
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
@@ -518,8 +518,8 @@ runCliOptions = \case
     let totalStake = fromIntegral $ 100 * Map.size p2pNodes
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
   CliReportData{..} -> do
-    let prefix = fromMaybe (dropExtension simDataFile) outputPrefix
-    DataShortLeiosP2P.reportLeiosData prefix simDataFile stakeFractions
+    let prefixDir = fromMaybe (takeDirectory simDataFile) outputDir
+    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile stakeFractions
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -574,7 +574,7 @@ parserCliGenerateTopology =
 parserReportData :: Parser CliCommand
 parserReportData =
   CliReportData
-    <$> optional (strOption $ short 'p' <> long "prefix")
+    <$> optional (strOption $ short 'o' <> long "output-dir")
     <*> strArgument (metavar "SIMDATA")
     <*> many (argument auto (metavar "STAKEF"))
 
