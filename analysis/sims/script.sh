@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 HOST=thelio
-DB=leios
+DB=leios2025w08
 
 if [[ ! -p sim.log ]]
 then
