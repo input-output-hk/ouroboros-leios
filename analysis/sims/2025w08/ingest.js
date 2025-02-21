@@ -58,7 +58,8 @@ db.rawIbs.aggregate([
   {
     $project: {
       _id: 0,
-      scenario: { $literal: s },
+      scenario: { $literal: scenario },
+      simulator: { $literal: simulator },
       ib: 1,
       time_s: 1,
       size_bytes: 1,
@@ -73,7 +74,8 @@ db.rawIbsElapsed.aggregate([
   {
     $project: {
       _id: 0,
-      scenario: { $literal: s },
+      scenario: { $literal: scenario },
+      simulator: { $literal: simulator },
       ib: 1,
       node: 1,
       time_s: 1,

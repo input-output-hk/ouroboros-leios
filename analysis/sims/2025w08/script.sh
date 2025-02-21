@@ -15,7 +15,10 @@ do
   yaml2json config.default.yaml \
   | jq '."ib-generation-probability" = '"$ibRate" \
   > tmp.config.json
-  echo 'const s = {"ib-generation-probability" : '"$ibRate"'}' > tmp.scenario.js
+  cat << EOI > tmp.scenario.js
+const scenario = {"ib-generation-probability" : $ibRate};
+const simulator = "haskell";
+EOI
   mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
   cabal run exe:ols -- sim short-leios \
                     --leios-config-file tmp.config.json \
