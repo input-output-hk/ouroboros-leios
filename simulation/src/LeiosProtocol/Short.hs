@@ -33,6 +33,7 @@ import Data.Word (Word16)
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
+import qualified PraosProtocol.Common.Chain as Chain
 import Prelude hiding (id)
 
 -- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
@@ -360,6 +361,9 @@ pipelineOf cfg stage sl =
     fromMaybe undefined (fromEnum <$> stageStart cfg stage sl minBound)
       `div` cfg.sliceLength
 
+forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
+forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
+
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
@@ -392,9 +396,6 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
  where
   ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
-forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
-forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
-
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer inputBlocks =
@@ -403,6 +404,15 @@ mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer 
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
+mockFullEndorseBlock :: LeiosConfig -> EndorseBlock
+mockFullEndorseBlock cfg =
+  mkEndorseBlock
+    cfg
+    (EndorseBlockId (NodeId 0) 0)
+    0
+    (NodeId 0)
+    [InputBlockId (NodeId 0) i | i <- [0 .. cfg.sliceLength - 1]]
+
 mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
 mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
 
@@ -410,6 +420,47 @@ mkCertificate :: LeiosConfig -> Map VoteId Word64 -> Certificate
 mkCertificate cfg vs =
   assert (fromIntegral cfg.votesForCertificate <= sum (Map.elems vs)) $
     Certificate vs
+
+mockFullRankingBlock :: LeiosConfig -> RankingBlock
+mockFullRankingBlock cfg =
+  fixSize cfg $
+    fixupBlock (Chain.headAnchor @RankingBlock Genesis) $
+      mkPartialBlock 0 $
+        mkRankingBlockBody
+          cfg
+          (NodeId 0)
+          (Just (EndorseBlockId (NodeId 0) 0, mockFullCertificate cfg))
+          cfg.sizes.rankingBlockLegacyPraosPayloadAvgSize
+
+mockFullInputBlock :: LeiosConfig -> InputBlock
+mockFullInputBlock cfg =
+  mkInputBlock
+    cfg
+    (mkInputBlockHeader cfg (InputBlockId (NodeId 0) 0) 0 0 (NodeId 0) GenesisHash)
+    cfg.sizes.inputBlockBodyAvgSize
+
+mockFullVoteMsg :: LeiosConfig -> VoteMsg
+mockFullVoteMsg cfg =
+  mkVoteMsg
+    cfg
+    (VoteId (NodeId 0) 0)
+    0
+    (NodeId 0)
+    1
+    [EndorseBlockId (NodeId 0) i | i <- [0 .. ceiling cfg.endorseBlockFrequencyPerStage - 1]]
+
+mockFullCertificate :: LeiosConfig -> Certificate
+mockFullCertificate cfg =
+  mkCertificate
+    cfg
+    ( Map.fromList $
+        [ (VoteId (NodeId 0) i, 1)
+        | i <-
+            [ 0
+            .. cfg.votesForCertificate - 1
+            ]
+        ]
+    )
 
 ---------------------------------------------------------------------------------------
 ---- Selecting data to build blocks

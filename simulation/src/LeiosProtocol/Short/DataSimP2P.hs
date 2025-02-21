@@ -41,6 +41,7 @@ import Diffusion
 import GHC.Generics
 import LeiosProtocol.Common hiding (Point)
 import qualified LeiosProtocol.Config as OnDisk
+import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
 import LeiosProtocol.Short.SimP2P (exampleTrace2)
@@ -48,7 +49,7 @@ import LeiosProtocol.Short.VizSim
 import ModelTCP (TcpEvent (TcpSendMsg))
 import P2P
 import Sample
-import SimTypes (Bytes, LabelLink (LabelLink), LabelNode (LabelNode), NodeId (NodeId))
+import SimTypes (Bytes, LabelLink (LabelLink), LabelNode (LabelNode))
 import System.FilePath
 import System.Random (StdGen)
 import Topology
@@ -352,7 +353,7 @@ weightedSamplesToPmf :: (Ord v, Fractional r) => r -> [(v, r)] -> Map v r
 weightedSamplesToPmf total = Map.map (/ total) . Map.fromListWith (+)
 
 unitSamplesToPmf :: (Ord v, Fractional r) => r -> [v] -> Map v r
-unitSamplesToPmf total vs = Map.fromList [(v, 1 / total) | v <- vs]
+unitSamplesToPmf total vs = weightedSamplesToPmf total [(v, 1) | v <- vs]
 
 pmfToCdf :: (Ord v, Num r) => Map v r -> Map v r
 pmfToCdf pmf0 = Map.fromAscList $ zip (Map.keys pmf0) (scanl1 (+) $ Map.elems pmf0)
@@ -361,7 +362,7 @@ entriesToLatencyCdfs ::
   Map NodeId StakeFraction ->
   [DiffusionEntry id] ->
   Set.Set StakeFraction ->
-  Map StakeFraction (Map DiffTime Double)
+  Map StakeFraction (Map DiffTime Micro)
 entriesToLatencyCdfs stakes entries stakeBins =
   Map.map (pmfToCdf . unitSamplesToPmf numBlocks)
     . flip transposeLatenciesPerStake stakeBins
@@ -389,54 +390,120 @@ ibDiffusionCdfs
   , ebDiffusionCdfs
   , vtDiffusionCdfs
   , rbDiffusionCdfs ::
-    RawLeiosData -> Set.Set StakeFraction -> Map StakeFraction (Map DiffTime Double)
+    RawLeiosData -> Set.Set StakeFraction -> Map StakeFraction (Map DiffTime Micro)
 ibDiffusionCdfs raw stakes = entriesToLatencyCdfs raw.p2p_network.p2pNodeStakes raw.ib_diffusion_entries stakes
 ebDiffusionCdfs raw stakes = entriesToLatencyCdfs raw.p2p_network.p2pNodeStakes raw.eb_diffusion_entries stakes
 vtDiffusionCdfs raw stakes = entriesToLatencyCdfs raw.p2p_network.p2pNodeStakes raw.vt_diffusion_entries stakes
 rbDiffusionCdfs raw stakes = entriesToLatencyCdfs raw.p2p_network.p2pNodeStakes raw.rb_diffusion_entries stakes
 
-idealDiffusionTimes :: P2PNetwork -> DiffTime -> Bytes -> P2PIdealDiffusionTimes
-idealDiffusionTimes p2pNetwork@P2PNetwork{p2pLinks} procDelay bytes =
-  p2pGraphIdealDiffusionTimes (networkToTopology p2pNetwork) (const procDelay) $
-    \n1 n2 l ->
-      l * 3 + case fromMaybe undefined (Map.lookup (n1, n2) p2pLinks) of
-        (_, Just bps) -> secondsToDiffTime $ realToFrac bytes / realToFrac bps
-        (_, Nothing) -> 0
+data BlockDiffusionConfig = BlockDiffusionConfig
+  { generationDelay :: !DiffTime
+  , validationDelay :: !DiffTime
+  -- ^ both header and body, if it applies
+  , hops :: !Int
+  , size :: !Bytes
+  }
+  deriving (Show)
+
+idealDiffusionTimes :: P2PNetwork -> BlockDiffusionConfig -> P2PIdealDiffusionTimes
+idealDiffusionTimes p2pNetwork@P2PNetwork{p2pLinks} BlockDiffusionConfig{..} =
+  p2pGraphIdealDiffusionTimes (networkToTopology p2pNetwork) generationDelay validationDelay (\n1 n2 _ -> communicationDelay n1 n2)
+ where
+  communicationDelay n1 n2 = latency * fromIntegral hops + serialization + deserialization
+   where
+    (secondsToDiffTime -> latency, bandwidth) = fromMaybe undefined (Map.lookup (n1, n2) p2pLinks)
+    serialization = case bandwidth of
+      Nothing -> 0
+      Just bps -> secondsToDiffTime $ realToFrac size / realToFrac bps
+    deserialization = serialization
 
 idealEntry :: P2PIdealDiffusionTimes -> DiffusionEntry id -> DiffusionEntry id
 idealEntry idealTimes DiffusionEntry{..} =
   DiffusionEntry
     { adoptions = reverse $ p2pGraphIdealDiffusionTimesFromNode' idealTimes (NodeId node_id) -- TODO: remove some reverse
+    , created = 0
     , ..
     }
 
-idealEntries :: P2PNetwork -> DiffTime -> Bytes -> [DiffusionEntry id] -> [DiffusionEntry id]
-idealEntries p2pNetwork procDelay bytes es = map (idealEntry idealTimes) es
+idealEntries :: P2PNetwork -> BlockDiffusionConfig -> [DiffusionEntry id] -> [DiffusionEntry id]
+idealEntries p2pNetwork bdCfg es = map (idealEntry idealTimes) es
  where
-  idealTimes = idealDiffusionTimes p2pNetwork procDelay bytes
+  idealTimes = idealDiffusionTimes p2pNetwork bdCfg
 
-data SomeDiffusionEntries = forall id. Ord id => SomeDE [DiffusionEntry id]
+data SomeDiffusionEntries = forall id. (ToJSON id, Ord id) => SomeDE [DiffusionEntry id]
 
 reportLeiosData :: FilePath -> FilePath -> [Micro] -> IO ()
-reportLeiosData prefix simDataFile stakes = do
+reportLeiosData prefixDir simDataFile stakes = do
   Just simDataVal <- decodeFileStrict @Value simDataFile
   let
     !raw = either error id $ parseEither (withObject "Object" $ \o -> parseJSON @RawLeiosData =<< (o .: "raw")) simDataVal
-    stakesSet = Set.fromList $ map (StakeFraction . realToFrac) stakes
-    -- TODO: fill in values
+    !stakesSet = Set.fromList $ map (StakeFraction . realToFrac) stakes
+  let
+    leios = convertConfig raw.config
+    relayHops = 3
+    praosHops = 3
+    fullIB = mockFullInputBlock leios
+    fullEB = mockFullEndorseBlock leios
+    fullVT = mockFullVoteMsg leios
+    fullRB = mockFullRankingBlock leios
+    ibCfg =
+      BlockDiffusionConfig
+        { generationDelay = leios.delays.inputBlockGeneration fullIB
+        , validationDelay =
+            leios.delays.inputBlockHeaderValidation fullIB.header
+              + leios.delays.inputBlockValidation fullIB
+        , size = messageSizeBytes fullIB
+        , hops = relayHops
+        }
+    ebCfg =
+      BlockDiffusionConfig
+        { generationDelay = leios.delays.endorseBlockGeneration fullEB
+        , validationDelay = leios.delays.endorseBlockValidation fullEB
+        , size = messageSizeBytes fullEB
+        , hops = relayHops
+        }
+    vtCfg =
+      BlockDiffusionConfig
+        { generationDelay =
+            leios.delays.voteMsgGeneration
+              fullVT
+              [ EndorseBlock{id = id', ..}
+              | id' <- fullVT.endorseBlocks
+              , let EndorseBlock
+                      { slot
+                      , producer
+                      , inputBlocks
+                      , endorseBlocksEarlierStage
+                      , endorseBlocksEarlierPipeline
+                      , size
+                      } = fullEB
+              ]
+        , validationDelay = leios.delays.voteMsgValidation fullVT
+        , size = messageSizeBytes fullVT
+        , hops = praosHops
+        }
+    rbCfg =
+      BlockDiffusionConfig
+        { generationDelay = leios.praos.blockGenerationDelay fullRB
+        , validationDelay =
+            leios.praos.headerValidationDelay fullRB.blockHeader
+              + leios.praos.blockValidationDelay fullRB
+        , size = messageSizeBytes fullRB
+        , hops = relayHops
+        }
     rawEntries =
-      [ ("IB", 0.1, 1, SomeDE raw.ib_diffusion_entries)
-      , ("EB", 0.1, 1, SomeDE raw.eb_diffusion_entries)
-      , ("RB", 0.1, 1, SomeDE raw.rb_diffusion_entries)
-      , ("VT", 0.1, 1, SomeDE raw.vt_diffusion_entries)
+      [ ("IB", ibCfg, SomeDE raw.ib_diffusion_entries)
+      , ("EB", ebCfg, SomeDE raw.eb_diffusion_entries)
+      , ("VT", vtCfg, SomeDE raw.vt_diffusion_entries)
+      , ("RB", rbCfg, SomeDE raw.rb_diffusion_entries)
       ]
-  forM_ rawEntries $ reportDE prefix raw.p2p_network stakesSet
+  forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet
 
-reportDE :: FilePath -> P2PNetwork -> Set.Set StakeFraction -> (String, DiffTime, Bytes, SomeDiffusionEntries) -> IO ()
-reportDE prefix p2p_network stakes (tag, procDelay, blockSize, SomeDE simEntries) = do
+reportDE :: FilePath -> P2PNetwork -> Set.Set StakeFraction -> (String, BlockDiffusionConfig, SomeDiffusionEntries) -> IO ()
+reportDE prefixDir p2p_network stakes (tag, bdCfg, SomeDE simEntries) = do
   let mkCdfs es = entriesToLatencyCdfs p2p_network.p2pNodeStakes es stakes
-  let csvPath mid end (StakeFraction f) = prefix <> mid <> "-" <> show f <> end <.> "csv"
+  let csvPath mid end (StakeFraction f) = prefixDir </> mid <> "-" <> show f <> end <.> "csv"
       writeCsvFiles mkfn m = forM_ (Map.toList m) $ \(s, cdf) ->
         cdfToCsvFile (mkfn s) cdf
   writeCsvFiles (csvPath tag "") (mkCdfs simEntries)
-  writeCsvFiles (csvPath tag "-ideal") (mkCdfs (idealEntries p2p_network procDelay blockSize simEntries))
+  writeCsvFiles (csvPath tag "-ideal") (mkCdfs (idealEntries p2p_network bdCfg simEntries))
