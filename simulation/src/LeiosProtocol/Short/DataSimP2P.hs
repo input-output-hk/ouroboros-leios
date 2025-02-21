@@ -365,8 +365,9 @@ entriesToLatencyCdfs ::
 entriesToLatencyCdfs stakes entries stakeBins =
   Map.map (pmfToCdf . unitSamplesToPmf numBlocks)
     . flip transposeLatenciesPerStake stakeBins
-    $ [ diffusionLatencyPerStakeFraction stakes created adoptions
+    $ [ diffusionLatencyPerStakeFraction stakes slot_start adoptions
       | DiffusionEntry{..} <- entries
+      , let slot_start = fromIntegral (floor created :: Integer) -- assumes generation takes less than one second
       ]
  where
   numBlocks = fromIntegral (length entries)
