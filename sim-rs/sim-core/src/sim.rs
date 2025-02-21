@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Context, Result};
-use netsim_async::{Bandwidth, EdgePolicy, HasBytesSize, Latency};
+use netsim_async::HasBytesSize;
 use node::Node;
 use rand::RngCore;
 use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
@@ -53,12 +53,8 @@ impl Simulation {
             network.set_edge_policy(
                 link_config.nodes.0,
                 link_config.nodes.1,
-                EdgePolicy {
-                    latency: Latency::new(link_config.latency),
-                    bandwidth_down: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
-                    bandwidth_up: Bandwidth::bits_per(u64::MAX, Duration::from_millis(1)),
-                    ..EdgePolicy::default()
-                },
+                link_config.latency,
+                link_config.bandwidth_bps,
             )?;
         }
         for node_config in &config.nodes {
@@ -110,6 +106,9 @@ impl Simulation {
             _ = token.cancelled() => {}
             _ = self.slot_witness.run() => {}
             _ = self.clock_coordinator.run() => {}
+            result = self.network.run() => {
+                result?
+            }
             result = self.tx_producer.run() => {
                 result?;
             }

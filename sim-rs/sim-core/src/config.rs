@@ -238,6 +238,7 @@ impl From<RawTopology> for Topology {
                     LinkConfiguration {
                         nodes: (ids[0], ids[1]),
                         latency: duration_ms(producer_info.latency_ms),
+                        bandwidth_bps: producer_info.bandwidth_bytes_per_second,
                     },
                 );
             }
@@ -417,4 +418,5 @@ pub struct NodeConfiguration {
 pub struct LinkConfiguration {
     pub nodes: (NodeId, NodeId),
     pub latency: Duration,
+    pub bandwidth_bps: Option<u64>,
 }

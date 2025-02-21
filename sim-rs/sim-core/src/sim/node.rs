@@ -92,8 +92,6 @@ impl CpuTask {
 enum NodeEvent {
     /// A new slot has started.
     NewSlot(u64),
-    /// A message has been received.
-    MessageReceived(NodeId, SimulationMessage),
     /// A core has finished running some task, and is free to run another.
     CpuSubtaskCompleted(Subtask),
 }
@@ -371,11 +369,11 @@ impl Node {
         loop {
             select! {
                 maybe_msg = msg_source.recv() => {
-                    let Some((from, timestamp, msg)) = maybe_msg else {
+                    let Some((from, msg)) = maybe_msg else {
                         // sim has stopped running
                         break;
                     };
-                    self.events.push(FutureEvent(timestamp, NodeEvent::MessageReceived(from, msg)));
+                    self.handle_message(from, msg)?;
                     self.clock.finish_task();
                 }
                 maybe_tx = tx_source.recv() => {
@@ -388,7 +386,6 @@ impl Node {
                 event = self.next_event() => {
                     match event {
                         NodeEvent::NewSlot(slot) => self.handle_new_slot(slot)?,
-                        NodeEvent::MessageReceived(from, msg) => self.handle_message(from, msg)?,
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
                             let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
@@ -1278,7 +1275,8 @@ impl Node {
             );
         }
         self.clock.start_task();
-        self.msg_sink.send_to(to, msg)
+        self.msg_sink
+            .send_to(to, msg.bytes_size(), msg, self.clock.now())
     }
 }
 
