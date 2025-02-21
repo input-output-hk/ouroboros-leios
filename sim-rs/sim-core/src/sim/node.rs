@@ -524,11 +524,13 @@ impl Node {
 
     fn schedule_input_block_generation(&mut self, slot: u64) {
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
-        for next_p in vrf_probabilities(self.sim_config.ib_generation_probability) {
-            if let Some(vrf) = self.run_vrf(next_p) {
-                // IBs are generated at the start of any slot within this stage
-                let vrf_slot = slot + self.rng.random_range(0..self.sim_config.stage_length);
-                slot_vrfs.entry(vrf_slot).or_default().push(vrf);
+        // IBs are generated at the start of any slot within this stage
+        for stage_slot in slot..slot + self.sim_config.stage_length {
+            let vrfs: Vec<u64> = vrf_probabilities(self.sim_config.ib_generation_probability)
+                .filter_map(|p| self.run_vrf(p))
+                .collect();
+            if !vrfs.is_empty() {
+                slot_vrfs.insert(stage_slot, vrfs);
             }
         }
         for (slot, vrfs) in slot_vrfs {
