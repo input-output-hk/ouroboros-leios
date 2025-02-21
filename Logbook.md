@@ -6,6 +6,7 @@
 
 - The formal specification of the Leios protocol has been moved to [ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/)
 - Conformance testing (Short Leios against Short Leios) can be run as described in [running the test suite](conformance-testing/README.md#running-the-test-suite)
+- Began surveying network models used by different consensus projects in IO, to build one that can be used for Leios and ideally other projects as well
 
 ### PeerNet simulation
 
