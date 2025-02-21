@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2025-02-21
+
+### PeerNet simulation
+
+We ran simulation studies using [the Leios version](https://github.com/input-output-hk/leios-peernet/) of [PeerNet](https://github.com/PeerNet/PeerNet) and compared results to similar scenarios run using the Haskell simulator. The two implementations differ enough in their resolution, formulation, and input configurations that a precise comparison is not practical.
+
+- The two simulations have qualitatively similar, but not identical, distributions of block propagation time.
+- Both simulations exhibit a breakdown of the Leios protocol when the block production rate is so large that substantial network congestion occurs.
+
 ## 2025-02-18
 
 ### CPS-0018
