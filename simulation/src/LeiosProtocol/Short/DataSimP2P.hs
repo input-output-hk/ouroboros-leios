@@ -32,7 +32,7 @@ import qualified Data.IntMap as IMap
 import Data.IntervalMap (IntervalMap)
 import qualified Data.IntervalMap.Interval as ILMap
 import qualified Data.IntervalMap.Strict as ILMap
-import Data.List (group, sort, uncons)
+import Data.List (group, sort, sortOn, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -499,11 +499,17 @@ reportLeiosData prefixDir simDataFile stakes = do
       ]
   forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet
 
+normalizeEntry :: DiffusionEntry id -> DiffusionEntry id
+normalizeEntry DiffusionEntry{..} =
+  DiffusionEntry{created = 0, adoptions = reverse $ sortOn snd $ Map.toList $ Map.map (\x -> x - slot_start) $ Map.fromListWith min adoptions, ..}
+ where
+  slot_start = realToFrac (floor created :: Integer)
+
 reportDE :: FilePath -> P2PNetwork -> Set.Set StakeFraction -> (String, BlockDiffusionConfig, SomeDiffusionEntries) -> IO ()
-reportDE prefixDir p2p_network stakes (tag, bdCfg, SomeDE simEntries) = do
+reportDE prefixDir p2p_network stakes (tag, bdCfg, SomeDE (map normalizeEntry -> simEntries)) = do
   let mkCdfs es = entriesToLatencyCdfs p2p_network.p2pNodeStakes es stakes
   let csvPath mid end (StakeFraction f) = prefixDir </> mid <> "-" <> show f <> end <.> "csv"
-      writeCsvFiles mkfn m = forM_ (Map.toList m) $ \(s, cdf) ->
+      writeCsvFiles mkfn m = assert (Map.keysSet m == stakes) $ forM_ (Map.toList m) $ \(s, cdf) ->
         cdfToCsvFile (mkfn s) cdf
   writeCsvFiles (csvPath tag "") (mkCdfs simEntries)
   writeCsvFiles (csvPath tag "-ideal") (mkCdfs (idealEntries p2p_network bdCfg simEntries))
