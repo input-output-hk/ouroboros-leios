@@ -27,7 +27,7 @@ type VoteBundleId = sim_core::model::VoteBundleId<Node>;
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
-    time: Timestamp,
+    time_s: Timestamp,
     message: Event,
 }
 
@@ -144,7 +144,7 @@ impl EventMonitor {
         while let Some((event, time)) = self.events_source.recv().await {
             last_timestamp = time;
             let output_event = OutputEvent {
-                time,
+                time_s: time,
                 message: event.clone(),
             };
             output.write(output_event).await?;
@@ -179,8 +179,8 @@ impl EventMonitor {
                 Event::TransactionReceived { .. } => {
                     tx_messages.received += 1;
                 }
-                Event::PraosBlockLotteryWon { .. } => {}
-                Event::PraosBlockGenerated {
+                Event::RBLotteryWon { .. } => {}
+                Event::RBGenerated {
                     slot,
                     producer,
                     vrf,
@@ -238,10 +238,10 @@ impl EventMonitor {
                         pending_txs.remove(&published_tx);
                     }
                 }
-                Event::PraosBlockSent { .. } => {}
-                Event::PraosBlockReceived { .. } => {}
-                Event::InputBlockLotteryWon { .. } => {}
-                Event::InputBlockGenerated {
+                Event::RBSent { .. } => {}
+                Event::RBReceived { .. } => {}
+                Event::IBLotteryWon { .. } => {}
+                Event::IBGenerated {
                     id,
                     header_bytes,
                     transactions,
@@ -272,15 +272,15 @@ impl EventMonitor {
                         pretty_bytes(ib_bytes, pbo.clone()),
                     )
                 }
-                Event::InputBlockSent { .. } => {
+                Event::IBSent { .. } => {
                     ib_messages.sent += 1;
                 }
-                Event::InputBlockReceived { recipient, .. } => {
+                Event::IBReceived { recipient, .. } => {
                     ib_messages.received += 1;
                     *seen_ibs.entry(recipient.id).or_default() += 1.;
                 }
-                Event::EndorserBlockLotteryWon { .. } => {}
-                Event::EndorserBlockGenerated {
+                Event::EBLotteryWon { .. } => {}
+                Event::EBGenerated {
                     id, input_blocks, ..
                 } => {
                     generated_ebs += 1;
@@ -303,14 +303,14 @@ impl EventMonitor {
                         id.slot,
                     )
                 }
-                Event::EndorserBlockSent { .. } => {
+                Event::EBSent { .. } => {
                     eb_messages.sent += 1;
                 }
-                Event::EndorserBlockReceived { .. } => {
+                Event::EBReceived { .. } => {
                     eb_messages.received += 1;
                 }
-                Event::VoteLotteryWon { .. } => {}
-                Event::VotesGenerated { id, votes, .. } => {
+                Event::VTLotteryWon { .. } => {}
+                Event::VTBundleGenerated { id, votes, .. } => {
                     for (eb, count) in votes.0 {
                         total_votes += count as u64;
                         *votes_per_bundle.entry(id.clone()).or_default() += count as f64;
@@ -318,11 +318,11 @@ impl EventMonitor {
                         *votes_per_pool.entry(id.producer.id).or_default() += count as f64;
                     }
                 }
-                Event::NoVote { .. } => {}
-                Event::VotesSent { .. } => {
+                Event::VTBundleNotGenerated { .. } => {}
+                Event::VTBundleSent { .. } => {
                     vote_messages.sent += 1;
                 }
-                Event::VotesReceived { .. } => {
+                Event::VTBundleReceived { .. } => {
                     vote_messages.received += 1;
                 }
             }

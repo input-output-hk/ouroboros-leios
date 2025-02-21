@@ -77,7 +77,7 @@ const getJsonMaxTime = async (path: string): Promise<number> => {
       try {
         const event: IServerMessage = JSON.parse(raw);
         await handle.close();
-        return event.time;
+        return event.time_s;
       } catch (err) { }
       index = nl;
       nl = index == 0 ? -1 : text.lastIndexOf('\n', index - 1);
@@ -153,7 +153,7 @@ const getCborMaxTime = async (path: string): Promise<number> => {
       try {
         const event: IServerMessage = cbor.decode(raw);
         await handle.close();
-        return event.time;
+        return event.time_s;
       } catch (err) { }
       index = start;
     }
