@@ -26,3 +26,18 @@ This is inspired by, and takes into account the experience from, the work done i
     2. pull messages "received" from the SUT when they are expected
   * The adapter is meant to isolate the test driver and specification from particular choice of technology for the implementation
 * To ensure it can be tested, implementation of the Leios node should be structured in such a way as to be insulated from the details of the networking layers
+
+## Running the test suite
+
+The conformance tests run against an external implementation of the Leios protocol. In order to run the tests, named FIFOs for the communication between the testing framework and the external implementation have to be created:
+```bash
+mkfifo simin simout
+```
+The external implemenation has to be started:
+```bash
+cabal run leios-simulation-pipe < simin > simout
+```
+The tests are run as follows:
+```bash
+cabal run leios-conformance-test -- --external-input=simin --external-output=simout
+```
