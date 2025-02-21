@@ -2,6 +2,11 @@
 
 ## 2025-02-21
 
+### Formal methods
+
+- The formal specification of the Leios protocol has been moved to [ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/)
+- Conformance testing (Short Leios against Short Leios) can be run as described in [running the test suite](conformance-testing/README.md#running-the-test-suite)
+
 ### PeerNet simulation
 
 We ran simulation studies using [the Leios version](https://github.com/input-output-hk/leios-peernet/) of [PeerNet](https://github.com/PeerNet/PeerNet) and compared results to similar scenarios run using the Haskell simulator. The two implementations differ enough in their resolution, formulation, and input configurations that a precise comparison is not practical.
