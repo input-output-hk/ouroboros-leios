@@ -105,7 +105,8 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     };
     topology.validate()?;
 
-    let mut raw_params = Figment::new().merge(Yaml::string(&get_default_config()?));
+////let mut raw_params = Figment::new().merge(Yaml::string(&get_default_config()?));
+    let mut raw_params = Figment::new();
 
     for params_file in &args.parameters {
         raw_params = raw_params.merge(Yaml::file_exact(params_file));
