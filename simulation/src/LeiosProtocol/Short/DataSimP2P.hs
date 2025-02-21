@@ -409,13 +409,12 @@ idealDiffusionTimes :: P2PNetwork -> BlockDiffusionConfig -> P2PIdealDiffusionTi
 idealDiffusionTimes p2pNetwork@P2PNetwork{p2pLinks} BlockDiffusionConfig{..} =
   p2pGraphIdealDiffusionTimes (networkToTopology p2pNetwork) generationDelay validationDelay (\n1 n2 _ -> communicationDelay n1 n2)
  where
-  communicationDelay n1 n2 = latency * fromIntegral hops + serialization + deserialization
+  communicationDelay n1 n2 = latency * fromIntegral hops + serialization
    where
     (secondsToDiffTime -> latency, bandwidth) = fromMaybe undefined (Map.lookup (n1, n2) p2pLinks)
     serialization = case bandwidth of
       Nothing -> 0
       Just bps -> secondsToDiffTime $ realToFrac size / realToFrac bps
-    deserialization = serialization
 
 idealEntry :: P2PIdealDiffusionTimes -> DiffusionEntry id -> DiffusionEntry id
 idealEntry idealTimes DiffusionEntry{..} =
