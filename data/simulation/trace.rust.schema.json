@@ -1,0 +1,271 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "anyOf": [
+    {
+      "$ref": "#/definitions/RustCpuEvent"
+    },
+    {
+      "$ref": "#/definitions/RustBlockEvent"
+    },
+    {
+      "$ref": "#/definitions/RustTransactionEvent"
+    },
+    {
+      "$ref": "#/definitions/RustVoteEvent"
+    },
+    {
+      "$ref": "#/definitions/RustSlotEvent"
+    }
+  ],
+  "definitions": {
+    "Record<string,number>": {
+      "type": "object"
+    },
+    "RustBaseBlockEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustBlockEvent": {
+      "properties": {
+        "message": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RustBaseBlockEvent"
+            },
+            {
+              "properties": {
+                "endorsement": {},
+                "header_bytes": {
+                  "type": "number"
+                },
+                "index": {
+                  "type": "number"
+                },
+                "transactions": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "$ref": "#/definitions/RustBlockMessageType"
+                },
+                "vrf": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustBlockMessageType": {
+      "enum": [
+        "EndorserBlockGenerated",
+        "EndorserBlockLotteryWon",
+        "EndorserBlockReceived",
+        "EndorserBlockSent",
+        "InputBlockGenerated",
+        "InputBlockLotteryWon",
+        "InputBlockReceived",
+        "InputBlockSent",
+        "PraosBlockGenerated",
+        "PraosBlockLotteryWon",
+        "PraosBlockReceived",
+        "PraosBlockSent"
+      ],
+      "type": "string"
+    },
+    "RustCpuEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "extra": {
+              "type": "string"
+            },
+            "subtask_id": {
+              "type": "number"
+            },
+            "subtasks": {
+              "type": "number"
+            },
+            "task": {
+              "$ref": "#/definitions/RustTaskInfo"
+            },
+            "task_type": {
+              "$ref": "#/definitions/RustCpuTaskType"
+            },
+            "type": {
+              "$ref": "#/definitions/RustCpuMessageType"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustCpuMessageType": {
+      "enum": [
+        "CpuSubtaskFinished",
+        "CpuSubtaskScheduled",
+        "CpuSubtaskStarted",
+        "CpuTaskFinished",
+        "CpuTaskScheduled",
+        "CpuTaskStarted"
+      ],
+      "type": "string"
+    },
+    "RustCpuTaskType": {
+      "enum": [
+        "EndorserBlockGenerated",
+        "EndorserBlockValidated",
+        "InputBlockGenerated",
+        "InputBlockValidated",
+        "PraosBlockGenerated",
+        "PraosBlockValidated",
+        "TransactionGenerated",
+        "TransactionValidated",
+        "VoteBundleGenerated",
+        "VoteBundleValidated"
+      ],
+      "type": "string"
+    },
+    "RustSlotEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "number": {
+              "type": "number"
+            },
+            "type": {
+              "const": "Slot",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustTaskInfo": {
+      "properties": {
+        "index": {
+          "type": "number"
+        },
+        "node": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RustTransactionEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "bytes": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string"
+            },
+            "publisher": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "string"
+            },
+            "type": {
+              "$ref": "#/definitions/RustTransactionMessageType"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustTransactionMessageType": {
+      "enum": [
+        "TransactionGenerated",
+        "TransactionReceived",
+        "TransactionSent"
+      ],
+      "type": "string"
+    },
+    "RustVoteEvent": {
+      "properties": {
+        "message": {
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "producer": {
+              "type": "string"
+            },
+            "recipient": {
+              "type": "string"
+            },
+            "sender": {
+              "type": "string"
+            },
+            "slot": {
+              "type": "number"
+            },
+            "type": {
+              "$ref": "#/definitions/RustVoteMessageType"
+            },
+            "votes": {
+              "$ref": "#/definitions/Record<string,number>"
+            }
+          },
+          "type": "object"
+        },
+        "time": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "RustVoteMessageType": {
+      "enum": [
+        "VotesGenerated",
+        "VotesLotteryWon",
+        "VotesReceived",
+        "VotesSent"
+      ],
+      "type": "string"
+    }
+  }
+}

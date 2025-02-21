@@ -1,0 +1,22 @@
+{"time_s": 1.0, "event": {"tag": "Cpu", "node": 1, "node_name": "node1", "duration_s": 0.1, "task_label": "ValIB: 6-29"}}
+{"time_s": 1.2, "event": {"tag": "Cpu", "node": 1, "node_name": "node1", "duration_s": 0.05, "task_label": "ValIH: 6253064077348247640"}}
+{"time_s": 1.5, "event": {"tag": "Cpu", "node": 2, "node_name": "node2", "duration_s": 0.15, "task_label": "ValEB: 7-30"}}
+{"time_s": 1.8, "event": {"tag": "Cpu", "node": 2, "node_name": "node2", "duration_s": 0.08, "task_label": "ValRH: 7253064077348247641"}}
+{"time_s": 2.0, "event": {"tag": "Cpu", "node": 3, "node_name": "node3", "duration_s": 0.12, "task_label": "ValRB: 8-31"}}
+{"time_s": 2.3, "event": {"tag": "Cpu", "node": 3, "node_name": "node3", "duration_s": 0.03, "task_label": "ValVote: vote123"}}
+{"time_s": 3.0, "event": {"tag": "generated", "kind": "IB", "id": "block1", "node": 1, "node_name": "node1", "size_bytes": 1000, "slot": 1, "payload_bytes": 800, "rb_ref": "rb123"}}
+{"time_s": 3.1, "event": {"tag": "Sent", "sender": 1, "receipient": 2, "msg_size_bytes": 1000, "sending_s": 0.01, "kind": "IB", "ids": ["block1"]}}
+{"time_s": 3.2, "event": {"tag": "received", "kind": "IB", "id": "block1", "node": 2, "node_name": "node2"}}
+{"time_s": 3.3, "event": {"tag": "enteredstate", "kind": "IB", "id": "block1", "node": 2, "node_name": "node2"}}
+{"time_s": 4.0, "event": {"tag": "generated", "kind": "EB", "id": "eb1", "node": 2, "node_name": "node2", "size_bytes": 500, "input_blocks": ["block1"]}}
+{"time_s": 4.1, "event": {"tag": "Sent", "sender": 2, "receipient": 3, "msg_size_bytes": 500, "sending_s": 0.01, "kind": "EB", "ids": ["eb1"]}}
+{"time_s": 4.2, "event": {"tag": "received", "kind": "EB", "id": "eb1", "node": 3, "node_name": "node3"}}
+{"time_s": 4.3, "event": {"tag": "enteredstate", "kind": "EB", "id": "eb1", "node": 3, "node_name": "node3"}}
+{"time_s": 5.0, "event": {"tag": "generated", "kind": "RB", "id": "rb1", "node": 3, "node_name": "node3", "size_bytes": 300}}
+{"time_s": 5.1, "event": {"tag": "Sent", "sender": 3, "receipient": 1, "msg_size_bytes": 300, "sending_s": 0.01, "kind": "RB", "ids": ["rb1"]}}
+{"time_s": 5.2, "event": {"tag": "received", "kind": "RB", "id": "rb1", "node": 1, "node_name": "node1"}}
+{"time_s": 5.3, "event": {"tag": "enteredstate", "kind": "RB", "id": "rb1", "node": 1, "node_name": "node1"}}
+{"time_s": 6.0, "event": {"tag": "generated", "kind": "VT", "id": "vote1", "node": 1, "node_name": "node1", "size_bytes": 200, "votes": 1, "endorse_blocks": ["eb1"]}}
+{"time_s": 6.1, "event": {"tag": "Sent", "sender": 1, "receipient": 2, "msg_size_bytes": 200, "sending_s": 0.01, "kind": "VT", "ids": ["vote1"]}}
+{"time_s": 6.2, "event": {"tag": "received", "kind": "VT", "id": "vote1", "node": 2, "node_name": "node2"}}
+{"time_s": 6.3, "event": {"tag": "enteredstate", "kind": "VT", "id": "vote1", "node": 2, "node_name": "node2"}} 
