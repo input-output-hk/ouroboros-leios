@@ -4,6 +4,6 @@
 # Configuration for least realistic simulation
 ################################################################################
 
-relay-strategy: "request-from-first"
+relay-strategy: "request-from-all"
 tcp-congestion-control: false
 multiplex-mini-protocols: false

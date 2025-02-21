@@ -10,6 +10,16 @@ export interface Config {
   "multiplex-mini-protocols": boolean;
   /** Only supported by Rust simulation. */
   "simulate-transactions": boolean;
+  /**
+   * When `true`, any delays and message sizes are calculated as if
+   * each block contained as much data as the expected average, rounded up.
+   * In particular, for the sake of the above, we consider that:
+   *   - Each RB includes a certificate.
+   *   - Certificates contain votes from `vote-threshold` nodes.
+   *   - Vote bundles vote for `ceil eb-generation-probability` EBs.
+   *   - EBs reference `ceil (ib-generation-probability * leios-stage-length-slots)` IBs.
+   * Only supported by Haskell simulation. */
+  "treat-blocks-as-full": boolean;
 
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
