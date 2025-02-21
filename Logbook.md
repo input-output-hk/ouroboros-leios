@@ -31,6 +31,18 @@ We ran simulation studies using [the Leios version](https://github.com/input-out
 - The two simulations have qualitatively similar, but not identical, distributions of block propagation time.
 - Both simulations exhibit a breakdown of the Leios protocol when the block production rate is so large that substantial network congestion occurs.
 
+### Rust simulation
+
+Fixed issues #208 and #209 uncovered by Brian's cross-sim comparisons.
+
+Implemented bandwidth usage tracking, controlled by the `bandwidth-bytes-per-second` setting in topologies. Connections without bandwidth configured effectively have infinite bandwidth.
+
+## 2025-02-19
+
+### Rust simulation
+
+Started updating the visualization to look more professional, starting with the blocks view.
+
 ## 2025-02-18
 
 ### CPS-0018
