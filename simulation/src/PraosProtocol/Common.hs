@@ -71,6 +71,9 @@ instance MessageSize BlockBody where
 instance MessageSize BlockHeader where
   messageSizeBytes h = h.headerMessageSize
 
+instance MessageSize body => MessageSize (Block body) where
+  messageSizeBytes b = messageSizeBytes b.blockHeader + messageSizeBytes b.blockBody
+
 instance MessageSize SlotNo where
   messageSizeBytes _ = 8
 
