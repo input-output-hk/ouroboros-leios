@@ -114,43 +114,47 @@ data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
 
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  case voting of
-    SomeStage pipeline voteSendStage ->
-      LeiosConfig
-        { praos
-        , pipeline
-        , voteSendStage
-        , sliceLength = fromIntegral disk.leiosStageLengthSlots
-        , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-        , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-        , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-        , votingFrequencyPerStage = disk.voteGenerationProbability
-        , votesForCertificate = fromIntegral disk.voteThreshold
-        , sizes
-        , delays
-        , ibDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.ibDiffusionStrategy
-              , maxWindowSize = disk.ibDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
-              }
-        , ebDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.ebDiffusionStrategy
-              , maxWindowSize = disk.ebDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
-              }
-        , voteDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.voteDiffusionStrategy
-              , maxWindowSize = disk.voteDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
-              }
-        , relayStrategy = disk.relayStrategy
-        }
+  ( if disk.treatBlocksAsFull
+      then delaysAndSizesAsFull
+      else (\x -> x)
+  )
+    $ case voting of
+      SomeStage pipeline voteSendStage ->
+        LeiosConfig
+          { praos
+          , pipeline
+          , voteSendStage
+          , sliceLength = fromIntegral disk.leiosStageLengthSlots
+          , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+          , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+          , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+          , votingFrequencyPerStage = disk.voteGenerationProbability
+          , votesForCertificate = fromIntegral disk.voteThreshold
+          , sizes
+          , delays
+          , ibDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.ibDiffusionStrategy
+                , maxWindowSize = disk.ibDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+                }
+          , ebDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.ebDiffusionStrategy
+                , maxWindowSize = disk.ebDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+                }
+          , voteDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.voteDiffusionStrategy
+                , maxWindowSize = disk.voteDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+                }
+          , relayStrategy = disk.relayStrategy
+          }
  where
   forEach n xs = n * fromIntegral (length xs)
   forEachKey n m = n * fromIntegral (Map.size m)
@@ -236,6 +240,77 @@ convertConfig disk =
             disk.voteValidationCpuTimeMs `forEach` vm.endorseBlocks
       , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
       , certificateValidation = const $ error "certificateValidation delay included in RB validation"
+      }
+
+delaysAndSizesAsFull :: LeiosConfig -> LeiosConfig
+delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
+  -- Fields spelled out to more likely trigger an error and review when type changes.
+  LeiosConfig
+    { praos
+    , sizes
+    , delays
+    , pipeline = pipeline
+    , sliceLength = cfg.sliceLength
+    , inputBlockFrequencyPerSlot = cfg.inputBlockFrequencyPerSlot
+    , endorseBlockFrequencyPerStage = cfg.endorseBlockFrequencyPerStage
+    , activeVotingStageLength = cfg.activeVotingStageLength
+    , votingFrequencyPerStage = cfg.votingFrequencyPerStage
+    , voteSendStage = voteSendStage
+    , votesForCertificate = cfg.votesForCertificate
+    , ibDiffusion = cfg.ibDiffusion
+    , ebDiffusion = cfg.ebDiffusion
+    , voteDiffusion = cfg.voteDiffusion
+    , relayStrategy = cfg.relayStrategy
+    }
+ where
+  fullIB = mockFullInputBlock cfg
+  fullEB = mockFullEndorseBlock cfg
+  fullVT = mockFullVoteMsg cfg
+  fullEBsVotedFor =
+    [ EndorseBlock{id = id', ..}
+    | id' <- fullVT.endorseBlocks
+    , let EndorseBlock{..} = fullEB
+    ]
+  fullRB = mockFullRankingBlock cfg
+  fullCert = mockFullCertificate cfg
+  praos =
+    PraosConfig
+      { blockFrequencyPerSlot = cfg.praos.blockFrequencyPerSlot
+      , blockValidationDelay = const @DiffTime $ cfg.praos.blockValidationDelay fullRB
+      , headerValidationDelay = const @DiffTime $ cfg.praos.headerValidationDelay fullRB.blockHeader
+      , blockGenerationDelay = const @DiffTime $ cfg.praos.blockGenerationDelay fullRB
+      , headerSize = cfg.praos.headerSize :: Bytes
+      , bodySize = const @Bytes $ cfg.praos.bodySize fullRB.blockBody
+      , bodyMaxSize = cfg.praos.bodyMaxSize
+      , configureConnection = cfg.praos.configureConnection
+      , relayStrategy = cfg.praos.relayStrategy
+      }
+  sizes =
+    SizesConfig
+      { inputBlockHeader = cfg.sizes.inputBlockHeader :: Bytes
+      , inputBlockBodyAvgSize = cfg.sizes.inputBlockBodyAvgSize :: Bytes
+      , inputBlockBodyMaxSize = cfg.sizes.inputBlockBodyMaxSize :: Bytes
+      , endorseBlock = const @Bytes $ cfg.sizes.endorseBlock $ mockFullEndorseBlock cfg
+      , voteMsg = const @Bytes $ cfg.sizes.voteMsg $ mockFullVoteMsg cfg
+      , certificate = const @Bytes $ cfg.sizes.certificate $ mockFullCertificate cfg
+      , rankingBlockLegacyPraosPayloadAvgSize = cfg.sizes.rankingBlockLegacyPraosPayloadAvgSize
+      }
+  delays =
+    LeiosDelays
+      { inputBlockGeneration = const @DiffTime $ cfg.delays.inputBlockGeneration fullIB
+      , inputBlockHeaderValidation = const @DiffTime $ cfg.delays.inputBlockHeaderValidation $ fullIB.header
+      , inputBlockValidation = const @DiffTime $ cfg.delays.inputBlockValidation fullIB
+      , endorseBlockGeneration = const @DiffTime $ cfg.delays.endorseBlockGeneration fullEB
+      , endorseBlockValidation = const @DiffTime $ cfg.delays.endorseBlockValidation fullEB
+      , voteMsgGeneration =
+          const $
+            const @DiffTime $
+              cfg.delays.voteMsgGeneration
+                fullVT
+                fullEBsVotedFor
+      , voteMsgValidation = const @DiffTime $ cfg.delays.voteMsgValidation fullVT
+      , certificateGeneration = const @DiffTime $ cfg.delays.certificateGeneration fullCert
+      , certificateValidation = const @DiffTime $ cfg.delays.certificateValidation fullCert
       }
 
 class FixSize a where
