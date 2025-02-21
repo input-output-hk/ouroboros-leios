@@ -61,11 +61,10 @@ import LeiosProtocol.Short.VizSim (
 import Linear.V2
 import ModelTCP (Bytes, TcpMsgForecast (..))
 import Network.TypedProtocol
-import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import PraosProtocol.ExamplesPraosP2P ()
 import PraosProtocol.PraosNode (PraosMessage (..))
-import SimTypes (NodeId (..), Point (..), World (..))
+import SimTypes (Point (..), World (..))
 import System.Random (StdGen, uniformR)
 import System.Random.Stateful (mkStdGen)
 import Text.Printf (printf)
@@ -430,69 +429,6 @@ chartDiffusionLatency cfg@LeiosP2PSimVizConfig{nodeMessageColor} tag =
           ]
       }
 
--- TODO: handle non-uniform stakes
-chartDiffusionImperfection ::
-  P2PTopography ->
-  DiffTime ->
-  DiffTime ->
-  LeiosP2PSimVizConfig ->
-  VizRender LeiosSimVizModel
-chartDiffusionImperfection
-  p2ptopography@P2PTopography{p2pNodes}
-  processingDelay
-  serialisationDelay
-  LeiosP2PSimVizConfig{nodeMessageColor}
-    | Map.size p2pNodes > 100 =
-        nullVizRender
-    | otherwise =
-        chartVizRender 25 $
-          \_
-           _
-           (SimVizModel _ LeiosSimVizState{vizMsgsDiffusionLatency}) ->
-              (Chart.def :: Chart.Layout DiffTime DiffTime)
-                { Chart._layout_title = "Diffusion latency imperfection"
-                , Chart._layout_title_style = Chart.def{Chart._font_size = 15}
-                , Chart._layout_y_axis =
-                    Chart.def
-                      { Chart._laxis_title = "Time behind perfect (seconds)"
-                      }
-                , Chart._layout_x_axis =
-                    Chart.def
-                      { Chart._laxis_title = "Time (seconds)"
-                      }
-                , Chart._layout_plots =
-                    [ Chart.toPlot $
-                      Chart.def
-                        { Chart._plot_lines_values = [timeseries]
-                        , Chart._plot_lines_style =
-                            let (r, g, b) = nodeMessageColor blk
-                             in Chart.def
-                                  { Chart._line_color = Chart.opaque (Colour.sRGB r g b)
-                                  }
-                        }
-                    | (blk, nid, created, arrivals) <- Map.elems vizMsgsDiffusionLatency
-                    , let timeseries =
-                            [ (latencyActual, imperfection)
-                            | ((_, arrivalActual), latencyIdeal) <-
-                                zip
-                                  (reverse arrivals)
-                                  ( p2pGraphIdealDiffusionTimesFromNode
-                                      idealDiffusionTimes
-                                      nid
-                                  )
-                            , let !latencyActual = arrivalActual `diffTime` created
-                                  !imperfection = latencyActual - latencyIdeal
-                            ]
-                    ]
-                }
-   where
-    idealDiffusionTimes :: P2PIdealDiffusionTimes
-    idealDiffusionTimes =
-      p2pGraphIdealDiffusionTimes
-        p2ptopography
-        (const processingDelay)
-        (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
-
 chartBandwidth :: LeiosModelConfig -> VizRender LeiosSimVizModel
 chartBandwidth LeiosModelConfig{recentSpan} =
   chartVizRender 25 $
@@ -826,14 +762,7 @@ example2
                       [ LayoutReqSize 350 250 $
                         Layout $
                           chartDiffusionLatency config tag
-                      | -- , LayoutReqSize 350 300 $
-                      --     Layout $
-                      --       chartDiffusionImperfection
-                      --         p2pTopography
-                      --         0.1
-                      --         (96 / 1000)
-                      --         config
-                      tag <- [IB, EB, VT, RB]
+                      | tag <- [IB, EB, VT, RB]
                       ]
                   , LayoutAbove
                       [ LayoutReqSize 350 150 $

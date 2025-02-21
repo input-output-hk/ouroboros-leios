@@ -371,7 +371,8 @@ chartDiffusionImperfection
     idealDiffusionTimes =
       p2pGraphIdealDiffusionTimes
         p2ptopography
-        (\_ -> processingDelay)
+        0
+        processingDelay
         (\_ _ linkLatency -> 3 * linkLatency + serialisationDelay)
 
 chartBandwidth :: VizRender RelaySimVizModel
