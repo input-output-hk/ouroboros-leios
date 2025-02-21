@@ -8,6 +8,22 @@
 - Conformance testing (Short Leios against Short Leios) can be run as described in [running the test suite](conformance-testing/README.md#running-the-test-suite)
 - Began surveying network models used by different consensus projects in IO, to build one that can be used for Leios and ideally other projects as well
 
+### Simulation of varied IB production rate
+
+The folder [analysis/sims/2025w08/](analysis/sims/2025w08/) contains scripts and [an analysis](analysis/sims/2025w08/exploration.ipynb) of running the Haskell and Rust simulators for input-block production varying from 1 IB/s to 100 IB/s.
+
+- An ELT workflow was developed for ingesting and processing (via `mongodb`) the raw data from the simulations.
+- An R Jupyter notebook is used for analysis and plotting.
+- Three bugs ([#207](https://github.com/input-output-hk/ouroboros-leios/issues/207), [#208](https://github.com/input-output-hk/ouroboros-leios/issues/208), and [#209](https://github.com/input-output-hk/ouroboros-leios/issues/209)) were identified during the course of this work.
+
+The Haskell simulation results indicate that network congestion occurs at high IB production rates, causing both the average propagation time and the tail of extremely slow propagation to lengthen.
+
+![Histograms of elapsed time to receipt of IBs, as a function of IB production rate](analysis/sims/2025w08/ibelapsed-histogram-hs.png)
+
+In the particular scenario that was run (e.g., network topology and protocol parameters), at an production rate of approximately 40 IBs/s the network becomes so congested that the nodes do not receive input blocks in a timely fashion.
+
+![Fraction of IBs received with five seconds, as a function of IB production rate](analysis/sims/2025w08/ibperformance-5s-hs.png)
+
 ### PeerNet simulation
 
 We ran simulation studies using [the Leios version](https://github.com/input-output-hk/leios-peernet/) of [PeerNet](https://github.com/PeerNet/PeerNet) and compared results to similar scenarios run using the Haskell simulator. The two implementations differ enough in their resolution, formulation, and input configurations that a precise comparison is not practical.
