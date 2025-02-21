@@ -2,6 +2,13 @@
 
 HOST=thelio
 DB=leios2025w08
+HS_EXE=../../../dist-newstyle/build/x86_64-linux/ghc-9.8.3/ouroboros-leios-sim-0.1.0.0/x/ols/build/ols/ols
+RS_EXE=../../../sim-rs/target/release/sim-cli
+
+# FIXME: The Haskell simulation is broken for `< 1 IB/s`.
+IB_RATES="0.05 0.10 0.20 0.30 0.50 1.00 2.00 3.00 5.00 10.00 20.00 30.00 50.00 100.00"
+
+IB_RATES="1.00 2.00 3.00 5.00 10.00 20.00 30.00 50.00 100.00"
 
 if [[ ! -p sim.log ]]
 then
@@ -10,7 +17,9 @@ fi
 
 mongo --host "$HOST" "$DB" reset.js
 
-for ibRate in 0.05 0.10 0.20 0.30 0.50 1.00 2.00 3.00 5.00 10.00 20.00 30.00 50.00 100.00
+mongo --host "$HOST" "$DB" clear-hs.js
+
+for ibRate in $IB_RATES
 do
   yaml2json config.default.yaml \
   | jq '."ib-generation-probability" = '"$ibRate" \
@@ -20,11 +29,30 @@ const scenario = {"ib-generation-probability" : $ibRate};
 const simulator = "haskell";
 EOI
   mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
-  cabal run exe:ols -- sim short-leios \
-                    --leios-config-file tmp.config.json \
-                    --topology-file topo-default-100.yaml \
-                    --output-file sim.json \
-                    --output-seconds 150
-  mongo --host "$HOST" "$DB" tmp.scenario.js ingest.js
+  "$HS_EXE" sim short-leios \
+            --leios-config-file tmp.config.json \
+            --topology-file topo-default-100.yaml \
+            --output-file sim.json \
+            --output-seconds 150
+  mongo --host "$HOST" "$DB" tmp.scenario.js transform-hs.js injest.js
+done
+
+mongo --host "$HOST" "$DB" clear-rs.js
+
+for ibRate in $IB_RATES
+do
+  yaml2json config.default.yaml \
+  | jq '."ib-generation-probability" = '"$ibRate" \
+  > tmp.config.json
+  cat << EOI > tmp.scenario.js
+const scenario = {"ib-generation-probability" : $ibRate};
+const simulator = "rust";
+EOI
+  mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
+  "$RS_EXE" --parameters tmp.config.json \
+            topo-default-100.yaml \
+            --slots 150 \
+            sim.log
+  mongo --host "$HOST" "$DB" tmp.scenario.js transform-rs.js ingest.js
 done
 
