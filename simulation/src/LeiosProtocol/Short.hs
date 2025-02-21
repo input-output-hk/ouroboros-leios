@@ -532,10 +532,16 @@ splitIntoSubSlots (NetworkRate r)
         replicate q fq
 
 inputBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
-inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot, pipeline = _ :: SingPipeline p} stake = \slot ->
-  assert (isStage @p cfg Propose slot) $ Just f
+inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot, pipeline = _ :: SingPipeline p} stake
+  | inputBlockFrequencyPerSlot > 1 =
+      case sortition stake networkRate of
+        Sortition f -> checkSlot f
+  | otherwise =
+      case nodeRate stake networkRate of
+        NodeRate r -> checkSlot (\p -> if p <= r then 1 else 0)
  where
-  !(Sortition f) = sortition stake $ NetworkRate inputBlockFrequencyPerSlot
+  networkRate = NetworkRate inputBlockFrequencyPerSlot
+  checkSlot g slot = assert (isStage @p cfg Propose slot) $ Just g
 
 endorseBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
 endorseBlockRate cfg@LeiosConfig{pipeline = _ :: SingPipeline p} stake = \slot -> do
