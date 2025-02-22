@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-02-22
+
+### DeltaQ Update
+
+- extended the [Report](./delta_q/docs/Report%202025-01.md) with `topology-checker` work and findings as well as next steps
+
 ## 2025-02-21
 
 ### Formal methods
@@ -206,7 +212,7 @@ The [BLS benchmarking Rust code for Leios](crypto-benchmarks.rs/) was overhauled
 - CBOR serialization and deserialization of Leios messages.
 - Command-line interface (with example) for trying out Leios's cryptography: create and verity votes, certificates, etc.
 
-* Document specifying the algorithms and tabulating benchmark results.
+- Document specifying the algorithms and tabulating benchmark results.
 
 Note that this BLS scheme is just one viable option for Leios. Ongoing work and ALBA, MUSEN, and SNARKs might result in schemes superior to this BLS approach. The key drawback is the need for periodic registration of ephemeral keys. Overall, this scheme provides the following:
 
