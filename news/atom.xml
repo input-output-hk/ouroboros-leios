@@ -14,39 +14,39 @@
         <updated>2025-02-17T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[High-level summary]]></summary>
         <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#high-level-summary">​</a></h2>
-<p>This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of <a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.</p>
+<p>This week in Leios development, <a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> for transaction throughput was approved, along with improved Docker support for simulations and analysis of cross-simulation results. The team also examined input block (IB) production rates and their impact on network performance.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#protocol-development">​</a></h2>
 <ul>
-<li><a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> "Greater Transaction Throughput" officially approved:<!-- -->
+<li>CPS-0018 'Greater transaction throughput' officially approved:<!-- -->
 <ul>
 <li>Merged into Cardano Foundation's CIP/CPS repository</li>
 <li>Documents urgency of higher transaction throughput</li>
-<li>Defines goals for Leios initiative</li>
-<li>Identifies key open questions and use cases</li>
+<li>Defines goals for the Leios initiative</li>
+<li>Identifies key open questions and use cases.</li>
 </ul>
 </li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
 <ul>
-<li>Conducted comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/Logbook.md#simulation-of-varied-ib-production-rate" target="_blank" rel="noopener noreferrer">analysis</a> of IB production rates from 1 IB/s to 100 IB/s:<!-- -->
+<li>Conducted a comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/Logbook.md#simulation-of-varied-ib-production-rate" target="_blank" rel="noopener noreferrer">analysis</a> of IB production rates ranging from 1 IB/s to 100 IB/s:<!-- -->
 <ul>
-<li>Developed ELT workflow for data processing via MongoDB</li>
-<li>Created R Jupyter notebook for analysis and visualization</li>
+<li>Developed an ELT workflow for data processing via MongoDB</li>
+<li>Created an R Jupyter notebook for analysis and visualization</li>
 <li>Identified and addressed three significant bugs (<a href="https://github.com/input-output-hk/ouroboros-leios/issues/207" target="_blank" rel="noopener noreferrer">#207</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/208" target="_blank" rel="noopener noreferrer">#208</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/209" target="_blank" rel="noopener noreferrer">#209</a>)</li>
 </ul>
 </li>
-<li>Key findings from Haskell simulation:<!-- -->
+<li>Key findings from the Haskell simulation:<!-- -->
 <ul>
 <li>Network congestion emerges at high IB production rates</li>
 <li>Both average propagation time and slow propagation tail increase</li>
-<li>Critical threshold identified at ~40 IBs/s where network congestion severely impacts block reception</li>
+<li>A critical threshold of ~40 IBs/s was identified, beyond which network congestion severely impacts block reception</li>
 </ul>
 </li>
-<li>Compared PeerNet and Haskell simulations:<!-- -->
+<li>Comparison of PeerNet and Haskell simulations:<!-- -->
 <ul>
-<li>Qualitatively similar block propagation distributions</li>
+<li>Both exhibit qualitatively similar block propagation distributions</li>
 <li>Both demonstrate protocol breakdown under high block production rates</li>
-<li>Differences in resolution and configuration prevent exact comparison</li>
+<li>Differences in resolution and configuration prevent exact comparison.</li>
 </ul>
 </li>
 </ul>
@@ -54,10 +54,10 @@
 <ul>
 <li>Added comprehensive Docker support for both simulations:<!-- -->
 <ul>
-<li>Multi-stage Dockerfile optimization for both Haskell and Rust</li>
+<li>Optimized multi-stage Docker files for Haskell and Rust</li>
 <li>Simplified deployment process</li>
-<li>Easy configuration via volume mounts and parameters</li>
-<li>Documented usage in README.md</li>
+<li>Enabled easy configuration via volume mounts and parameters</li>
+<li>Documented usage in README.md.</li>
 </ul>
 </li>
 </ul>
@@ -67,22 +67,22 @@
 <ul>
 <li>Implemented bandwidth usage tracking</li>
 <li>Added configurable bandwidth limits per connection</li>
-<li>Fixed issues discovered during cross-simulation comparison</li>
-<li>Started professional visualization updates</li>
+<li>Fixed issues identified in cross-simulation comparisons</li>
+<li>Started updating visualizations for improved clarity.</li>
 </ul>
 </li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#haskell-simulation">​</a></h2>
 <ul>
 <li>Enhanced IB sortition handling for IB/slot &lt; 1</li>
-<li>Began integration of block expiration/diffusion-halt proposal</li>
+<li>Began integrating block expiration and diffusion-halt proposal</li>
 <li>Implemented ideal timing calculations for diffusion:<!-- -->
 <ul>
 <li>Added uniform block behavior configuration</li>
-<li>Identified Relay mini-protocol complexity:<!-- -->
+<li>Identified relay mini-protocol complexities:<!-- -->
 <ul>
 <li>Variable latency (3-4) for block transfer</li>
-<li>Dependent on traffic conditions and request handling method</li>
+<li>Latency depends on traffic conditions and request handling.</li>
 </ul>
 </li>
 </ul>
@@ -90,14 +90,14 @@
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#formal-methods">​</a></h2>
 <ul>
-<li>Relocated formal specification to <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" target="_blank" rel="noopener noreferrer">dedicated repository</a></li>
-<li>Established conformance testing framework:<!-- -->
+<li>Moved formal specification to a <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" target="_blank" rel="noopener noreferrer">dedicated repository</a></li>
+<li>Established a conformance testing framework:<!-- -->
 <ul>
 <li>Enabled testing between Short Leios implementations</li>
-<li>Documented test suite execution process</li>
+<li>Documented the test suite execution process</li>
 </ul>
 </li>
-<li>Initiated survey of network models across IO consensus projects</li>
+<li>Initiated a survey of network models across IO consensus projects.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
