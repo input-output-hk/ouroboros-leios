@@ -544,13 +544,20 @@ inputBlockRate cfg@LeiosConfig{inputBlockFrequencyPerSlot, pipeline = _ :: SingP
   checkSlot g slot = assert (isStage @p cfg Propose slot) $ Just g
 
 endorseBlockRate :: LeiosConfig -> StakeFraction -> SlotNo -> Maybe (Double -> Word64)
-endorseBlockRate cfg@LeiosConfig{pipeline = _ :: SingPipeline p} stake = \slot -> do
-  guard $ isStage @p cfg Endorse slot
-  startEndorse <- stageStart @p cfg Endorse slot Endorse
-  guard $ startEndorse == slot
-  return $ min 1 . f
+endorseBlockRate cfg@LeiosConfig{pipeline = _ :: SingPipeline p} stake
+  | cfg.endorseBlockFrequencyPerStage > 1 =
+      case sortition stake networkRate of
+        Sortition f -> checkSlot f
+  | otherwise =
+      case nodeRate stake networkRate of
+        NodeRate r -> checkSlot (\p -> if p <= r then 1 else 0)
  where
-  !(Sortition f) = sortition stake $ NetworkRate cfg.endorseBlockFrequencyPerStage
+  networkRate = NetworkRate cfg.endorseBlockFrequencyPerStage
+  checkSlot f = \slot -> do
+    guard $ isStage @p cfg Endorse slot
+    startEndorse <- stageStart @p cfg Endorse slot Endorse
+    guard $ startEndorse == slot
+    return $ min 1 . f
 
 votingRanges :: LeiosConfig -> [(SlotNo, SlotNo)]
 votingRanges cfg@LeiosConfig{voteSendStage} = go 0
