@@ -2,6 +2,7 @@
 *
 !sim-rs/
 !simulation/
+!conformance-testing/
 !data/simulation/*.yaml
 !cabal.project
 
