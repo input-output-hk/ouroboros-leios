@@ -1,5 +1,20 @@
 # Leios logbook
 
+## 2025-02-24
+
+### Haskell Simulation
+
+- Fixed IB sortition for IB/slot < 1.
+- Reviewed and started integration of block expiration/diffusion-halt proposal.
+- Implemented calculation of ideal timings for diffusion and started
+  comparing to simulation with idealized config.
+  - added `treat-blocks-as-full` config parameter to have blocks behave uniformly wrt network and cpu usage.
+  - preliminary results are promising.
+    - One complication is that Relay mini-protocol can require either
+    3 or 4 latencies to transfer a new block, since headers can be
+    requested in either blocking or non-blocking way, depending on
+    traffic.
+
 ## 2025-02-22
 
 ### DeltaQ Update
