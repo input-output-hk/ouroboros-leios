@@ -22,9 +22,9 @@ Leios offers several significant advantages:
 
 Leios uses three distinct block types:
 
-- IB (input block): a block that contains transactions. Produced by nodes that win the IB sortition lottery.
-- EB (endorser block): a block that references one or more IBs, providing endorsements. Produced by nodes that win the EB sortition lottery.
-- RB (ranking block): a block that ranks or orders other blocks as part of the consensus mechanism.
+- **IB (input block):** a block that contains transactions. Produced by nodes that win the IB sortition lottery.
+- **EB (endorser block):** a block that references one or more IBs, providing endorsements. Produced by nodes that win the EB sortition lottery.
+- **RB (ranking block):** a block that ranks or orders other blocks as part of the consensus mechanism.
 
 Each block type plays a distinct role in moving transactions from submission to final confirmation.
 
@@ -32,8 +32,8 @@ Each block type plays a distinct role in moving transactions from submission to 
 
 Leios finalizes blocks through a structured voting mechanism. Nodes may adopt:
 
-- Single-stage voting: all votes are broadcast in one phase, possibly resulting in a longer CPU usage 'tail' during high throughput.
-- Send-recv (two-stage) voting: votes are first sent, then a follow-up receive phase ensures broader propagation before final tallies.
+- **Single-stage voting:** all votes are broadcast in one phase, possibly resulting in a longer CPU usage 'tail' during high throughput.
+- **Send-recv (two-stage) voting:** votes are first sent, then a follow-up receive phase ensures broader propagation before final tallies.
 
 You can configure voting through parameters such as leios-vote-send-recv-stages in simulation environments.
 
@@ -45,9 +45,9 @@ Sortition is a probabilistic method for selecting nodes (based on stake) to prod
 
 Leios supports multiple strategies for propagating blocks and votes:
 
-- Oldest-first: prioritizes older blocks or transactions
-- Freshest-first: focuses on the newest blocks or transactions first
-- Peer-order: requests blocks in the order peers announce them
+- **Oldest-first:** prioritizes older blocks or transactions
+- **Freshest-first:** focuses on the newest blocks or transactions first
+- **Peer-order:** requests blocks in the order peers announce them
 
 Your choice of strategy can affect latency, network load, and overall throughput.
 
@@ -69,10 +69,10 @@ Recent benchmarking shows that aggregated BLS verification significantly speeds 
 
 Leios provides an online cost calculator that considers:
 
-- CPU usage and the number of cores
-- Bandwidth consumption
-- Storage (including the default assumption of 50% disk compression)
-- Perpetual storage cost amortization
+- **CPU usage and the number of cores**
+- **Bandwidth consumption**
+- **Storage** (including the default assumption of 50% disk compression)
+- **Perpetual storage cost amortization**
 
 It also supports hyperscale and discount cloud providers. For example, you can model single-relay or multi-relay deployments at variable bandwidths.
 
@@ -91,9 +91,9 @@ Developers continually refine these simulations based on real-world data.
 
 Based on preliminary internal testing and simulations:
 
-- Block size: commonly set to about one-third of the available link capacity for IBs
-- Voting stages: choose single-stage or send-recv, depending on reliability and speed requirements
-- Diffusion strategy: many operators use 'freshest-first,' though 'peer-order' may help maintain compatibility with older setups
+- **Block size:** commonly set to about one-third of the available link capacity for IBs
+- **Voting stages:** choose single-stage or send-recv, depending on reliability and speed requirements
+- **Diffusion strategy:** many operators use 'freshest-first,' though 'peer-order' may help maintain compatibility with older setups
 
 Operators can adjust these parameters, which evolve through community votes.
 
@@ -112,9 +112,9 @@ These resources provide transparency and regular updates on ongoing development.
 
 Leios changes how transactions are validated and how blocks and memory pools operate, potentially affecting:
 
-- Wallets and SDKs, which need to accommodate new block types (IBs and EBs)
-- Explorers, which must handle higher throughput and multi-block referencing
-- Indexers and APIs, which will see more granular block and vote data
+- **Wallets and SDKs,** which need to accommodate new block types (IBs and EBs)
+- **Explorers,** which must handle higher throughput and multi-block referencing
+- **Indexers and APIs,** which will see more granular block and vote data
 
 Weekly progress updates provide deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.
 
