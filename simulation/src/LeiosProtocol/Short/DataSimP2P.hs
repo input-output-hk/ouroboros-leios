@@ -17,6 +17,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE NoFieldSelectors #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module LeiosProtocol.Short.DataSimP2P where
 
@@ -57,31 +58,70 @@ import System.IO
 import System.Random (StdGen)
 import Topology
 
+deriving instance Generic (ILMap.Interval a)
+deriving instance ToJSON a => ToJSON (ILMap.Interval a)
+deriving instance FromJSON a => FromJSON (ILMap.Interval a)
+
+instance (ToJSON a, ToJSON b) => ToJSON (IntervalMap a b) where
+  toEncoding = toEncoding . ILMap.toList
+  toJSON = toJSON . ILMap.toList
+
+instance (Ord a, FromJSON a, FromJSON b) => FromJSON (IntervalMap a b) where
+  parseJSON = fmap ILMap.fromList . parseJSON
+
 data RawLeiosData = RawLeiosData
-  { network :: SomeTopology
-  , p2p_network :: P2PNetwork
-  , config :: OnDisk.Config
-  , ib_diffusion_entries :: [DiffusionEntry InputBlockId]
-  , eb_diffusion_entries :: [DiffusionEntry EndorseBlockId]
-  , vt_diffusion_entries :: [DiffusionEntry VoteId]
-  , rb_diffusion_entries :: [DiffusionEntry Int]
-  , stable_chain_hashes :: [Int]
-  , cpuUseSegments :: Map.Map NodeId [(Int, Micro)]
-  -- ^ cpu usage as a step function: [(cpu#,duration)]
-  , transmittedBpsSegments :: !(Map NodeId [(Double, Micro)])
-  -- ^ network bandwidth usage as a step function: [(bps,duration)]
-  , transmittedMsgsSegments :: Map.Map NodeId [(Int, Micro)]
-  -- ^ network msgs sent as a step function: [(msg#,duration)]
-  , stop :: Time
+  { network :: !SomeTopology
+  , p2p_network :: !P2PNetwork
+  , config :: !OnDisk.Config
+  , ib_diffusion_entries :: ![DiffusionEntry InputBlockId]
+  , eb_diffusion_entries :: ![DiffusionEntry EndorseBlockId]
+  , vt_diffusion_entries :: ![DiffusionEntry VoteId]
+  , rb_diffusion_entries :: ![DiffusionEntry Int]
+  , stable_chain_hashes :: ![Int]
+  , nodeCpuUsage :: NodeCpuUsage
+  , messagesTransmitted :: MessagesTransmitted
+  , stop :: !Time
   }
   deriving (Generic, ToJSON, FromJSON)
 
+data SmallRawLeiosData = SmallRawLeiosData
+  { network :: !SomeTopology
+  , p2p_network :: !P2PNetwork
+  , config :: !OnDisk.Config
+  , ib_diffusion_entries :: ![DiffusionEntry InputBlockId]
+  , eb_diffusion_entries :: ![DiffusionEntry EndorseBlockId]
+  , vt_diffusion_entries :: ![DiffusionEntry VoteId]
+  , rb_diffusion_entries :: ![DiffusionEntry Int]
+  , stop :: !Time
+  }
+  deriving (Generic, ToJSON, FromJSON)
+
+newtype NodeCpuUsage = NodeCpuUsage {nodeCpuUsageMap :: (Map NodeId (IntervalMap Micro Int))}
+newtype MessagesTransmitted = MessagesTransmitted {messagesTransmitted :: (Map NodeId (IntervalMap DiffTime [Bytes]))}
+
+instance ToJSON NodeCpuUsage where
+  toJSON = toJSON . Map.toList . (.nodeCpuUsageMap)
+  toEncoding = toEncoding . Map.toList . (.nodeCpuUsageMap)
+instance ToJSON MessagesTransmitted where
+  toJSON = toJSON . Map.toList . (.messagesTransmitted)
+  toEncoding = toEncoding . Map.toList . (.messagesTransmitted)
+instance FromJSON NodeCpuUsage where
+  parseJSON v = NodeCpuUsage . Map.fromList <$> parseJSON v
+instance FromJSON MessagesTransmitted where
+  parseJSON v = MessagesTransmitted . Map.fromList <$> parseJSON v
+
 data LeiosData = LeiosData
-  { raw :: RawLeiosData
-  , ib_diffusion :: DiffusionData InputBlockId
-  , eb_diffusion :: DiffusionData EndorseBlockId
-  , vt_diffusion :: DiffusionData VoteId
-  , rb_diffusion :: DiffusionData Int
+  { raw :: !RawLeiosData
+  , ib_diffusion :: !(DiffusionData InputBlockId)
+  , eb_diffusion :: !(DiffusionData EndorseBlockId)
+  , vt_diffusion :: !(DiffusionData VoteId)
+  , rb_diffusion :: !(DiffusionData Int)
+  , cpuUseSegments :: !(Map.Map NodeId [(Int, Micro)])
+  -- ^ cpu usage as a step function: [(cpu#,duration)]
+  , transmittedBpsSegments :: !(Map NodeId [(Double, Micro)])
+  -- ^ network bandwidth usage as a step function: [(bps,duration)]
+  , transmittedMsgsSegments :: !(Map.Map NodeId [(Int, Micro)])
+  -- ^ network msgs sent as a step function: [(msg#,duration)]
   , cpuUseCdfAvg :: ![(Int, Micro)]
   , transmittedBpsCdfAvg :: ![(Double, Micro)]
   , transmittedMsgsCdfAvg :: ![(Int, Micro)]
@@ -100,15 +140,16 @@ data LeiosSimState = LeiosSimState
   deriving (Generic)
 
 accumLeiosSimState ::
+  OnDisk.Config ->
   Time ->
   LeiosEvent ->
   LeiosSimState ->
   LeiosSimState
-accumLeiosSimState _now (LeiosEventSetup{}) vs =
+accumLeiosSimState _cfg _now (LeiosEventSetup{}) vs =
   vs
-accumLeiosSimState _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventNewTip _tip)))) vs =
+accumLeiosSimState _cfg _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventNewTip _tip)))) vs =
   vs
-accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) LeiosSimState{..} =
+accumLeiosSimState _cfg now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk))) LeiosSimState{..} =
   case blk of
     EventIB x ->
       LeiosSimState
@@ -125,7 +166,7 @@ accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEvent event blk)
         { voteDiffusionLatency = accumDiffusionLatency' now nid event x.id x voteDiffusionLatency
         , ..
         }
-accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
+accumLeiosSimState _cfg now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventGenerate blk)))) vs =
   vs
     { rbDiffusionLatency =
         assert (not (blockHash blk `Map.member` vs.rbDiffusionLatency)) $
@@ -134,9 +175,9 @@ accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNode
             (blockHeader blk, nid, now, [(nid, now)])
             vs.rbDiffusionLatency
     }
-accumLeiosSimState _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventReceived _blk)))) vs =
+accumLeiosSimState _cfg _now (LeiosEventNode (LabelNode _nid (PraosNodeEvent (PraosNodeEventReceived _blk)))) vs =
   vs
-accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventEnterState blk)))) vs =
+accumLeiosSimState _cfg now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNodeEventEnterState blk)))) vs =
   vs
     { rbDiffusionLatency =
         Map.adjust
@@ -147,6 +188,7 @@ accumLeiosSimState now (LeiosEventNode (LabelNode nid (PraosNodeEvent (PraosNode
           vs.rbDiffusionLatency
     }
 accumLeiosSimState
+  cfg
   _now
   ( LeiosEventTcp
       ( LabelLink
@@ -155,17 +197,22 @@ accumLeiosSimState
           (TcpSendMsg msg msgforecast _msgforecasts)
         )
     )
-  LeiosSimState{..} =
-    LeiosSimState
-      { dataTransmittedPerNode = Map.alter (Just . accumDataTransmitted msg msgforecast . fromMaybe initDataTransmitted) nfrom dataTransmittedPerNode
-      , ..
-      }
-accumLeiosSimState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) LeiosSimState{..} =
-  LeiosSimState
-    { nodeCpuUsage = accumNodeCpuUsage' @Micro (MkFixed . round . (* 1e6)) now nid task nodeCpuUsage
-    , ..
-    }
+  vs@LeiosSimState{..}
+    | OnDisk.RequestFromFirst <- cfg.relayStrategy =
+        LeiosSimState
+          { dataTransmittedPerNode = Map.alter (Just . accumDataTransmitted msg msgforecast . fromMaybe initDataTransmitted) nfrom dataTransmittedPerNode
+          , ..
+          }
+    | otherwise = vs
+accumLeiosSimState cfg now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) vs@LeiosSimState{..}
+  | OnDisk.RequestFromFirst <- cfg.relayStrategy =
+      LeiosSimState
+        { nodeCpuUsage = accumNodeCpuUsage' @Micro (MkFixed . round . (* 1e6)) now nid task nodeCpuUsage
+        , ..
+        }
+  | otherwise = vs
 accumLeiosSimState
+  _cfg
   _now
   ( LeiosEventNode
       (LabelNode _nodeId (PraosNodeEvent (PraosNodeEventCPU _task)))
@@ -181,32 +228,18 @@ data SimOutputConfig = SimOutputConfig
   }
 
 rawDataFromState :: OnDisk.Config -> P2PNetwork -> LeiosSimState -> Time -> RawLeiosData
-rawDataFromState config p2p_network@P2PNetwork{..} LeiosSimState{..} stop@(Time stop') = RawLeiosData{..}
+rawDataFromState config p2p_network@P2PNetwork{..} LeiosSimState{..} stop = RawLeiosData{nodeCpuUsage = coerce nodeCpuUsage, ..}
  where
+  messagesTransmitted = MessagesTransmitted $ coerce dataTransmittedPerNode
   ib_diffusion_entries = diffusionEntries ibDiffusionLatency
   eb_diffusion_entries = diffusionEntries ebDiffusionLatency
   vt_diffusion_entries = diffusionEntries voteDiffusionLatency
   rb_diffusion_entries = coerce $ diffusionEntries rbDiffusionLatency
   stable_chain_hashes = coerce $ stableChainHashes chains
   network = p2pNetworkToSomeTopology (fromIntegral $ Map.size p2pNodeStakes * 1000) p2p_network
-  cpuUseSegments =
-    intervalsToSegments
-      (sum . ILMap.elems . fst)
-      (realToFrac stop')
-      nodeCpuUsage
-  transmittedBpsSegments =
-    intervalsToSegments
-      (\(im, i) -> assert (all (`ILMap.subsumes` i) $ ILMap.keys im) $ msgsTransmittedToBps . fst $ (im, i))
-      stop'
-      (Map.map (.messagesTransmitted) dataTransmittedPerNode)
-  transmittedMsgsSegments =
-    intervalsToSegments
-      (length . ILMap.elems . fst)
-      stop'
-      (Map.map (.messagesTransmitted) dataTransmittedPerNode)
 
 maybeAnalizeRawData :: Bool -> RawLeiosData -> LeiosData
-maybeAnalizeRawData analize raw@RawLeiosData{..} = LeiosData{..}
+maybeAnalizeRawData analize raw@RawLeiosData{messagesTransmitted = MessagesTransmitted messagesTransmitted, nodeCpuUsage = NodeCpuUsage nodeCpuUsage, ..} = LeiosData{..}
  where
   Time stop' = stop
   P2PNetwork{..} = p2p_network
@@ -214,8 +247,26 @@ maybeAnalizeRawData analize raw@RawLeiosData{..} = LeiosData{..}
   eb_diffusion = diffusionDataFromEntries analize p2pNodeStakes eb_diffusion_entries
   vt_diffusion = diffusionDataFromEntries analize p2pNodeStakes vt_diffusion_entries
   rb_diffusion = diffusionDataFromEntries analize p2pNodeStakes rb_diffusion_entries
-  maybeDoAnalysis :: [a] -> [a]
-  maybeDoAnalysis = if analize then id else (const [])
+  maybeDoAnalysis :: Monoid a => a -> a
+  maybeDoAnalysis = if analize then id else const mempty
+  cpuUseSegments =
+    maybeDoAnalysis $
+      intervalsToSegments
+        (sum . ILMap.elems . fst)
+        (realToFrac stop')
+        nodeCpuUsage
+  transmittedBpsSegments =
+    maybeDoAnalysis $
+      intervalsToSegments
+        (\(im, i) -> assert (all (`ILMap.subsumes` i) $ ILMap.keys im) $ msgsTransmittedToBps . fst $ (im, i))
+        stop'
+        messagesTransmitted
+  transmittedMsgsSegments =
+    maybeDoAnalysis $
+      intervalsToSegments
+        (length . ILMap.elems . fst)
+        stop'
+        messagesTransmitted
   cpuUseCdfAvg =
     maybeDoAnalysis $
       Map.toAscList $
@@ -245,7 +296,7 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
       runModel
         SampleModel
           { initState = LeiosSimState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
-          , accumState = \t e s -> accumLeiosSimState t e s{chains = accumChains t e s.chains}
+          , accumState = \t e s -> accumLeiosSimState cfg t e s{chains = accumChains t e s.chains}
           , renderState = renderState fp
           }
     Nothing ->
