@@ -16,11 +16,10 @@ mongo --host "$HOST" "$DB" reset.js
 
 mongo --host "$HOST" "$DB" clear-hs.js
 
-for ibRate in 10 #$IB_RATES
+for ibRate in $IB_RATES
 do
   yaml2json config.default.yaml \
   | jq '."ib-generation-probability" = '"$ibRate" \
-  | jq '."tx-generation-distribution.value" = '"$((7 * $ibRate))" \
   > tmp.config.json
   cat << EOI > tmp.scenario.js
 const scenario = {"ib-generation-probability" : $ibRate};
@@ -41,7 +40,8 @@ for ibRate in $IB_RATES
 do
   yaml2json config.default.yaml \
   | jq '."ib-generation-probability" = '"$ibRate" \
-  | jq '."tx-generation-distribution" = {distribution: "constant", value: '"0$(echo "scale=8; 1000 / 7 / $ibRate" | bc)"'}' \
+  | jq '."tx-generation-distribution" = {distribution: "constant", value: 1000000}' \
+  | jq '."ib-head-size-bytes" = 102704' \
   > tmp.config.json
   cat << EOI > tmp.scenario.js
 const scenario = {"ib-generation-probability" : $ibRate};
