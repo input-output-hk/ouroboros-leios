@@ -12,11 +12,11 @@ Ouroboros Leios is a next-generation blockchain consensus protocol designed to i
 
 Leios offers several significant advantages:
 
-- Higher throughput and lower latency. By splitting transaction processing into IB and EB stages, Leios handles more transactions in parallel.
-- Flexible diffusion strategies. Nodes can choose different block-propagation methods, such as 'freshest-first' or 'oldest-first.'
-- Enhanced cryptography. Leios uses BLS (Boneh–Lynn–Shacham) signatures for aggregated verification and verifiable random functions (VRFs) for leader selection.
-- Robust simulations and formal methods. Rust and Haskell simulations measure real-world performance, and executable specifications help ensure correctness.
-- Scalable cost model. A cost calculator enables node operators to estimate expenses (for example, storage amortization and CPU usage).
+- **Higher throughput and lower latency.** By splitting transaction processing into IB and EB stages, Leios handles more transactions in parallel.
+- **Flexible diffusion strategies.** Nodes can choose different block-propagation methods, such as 'freshest-first' or 'oldest-first.'
+- **Enhanced cryptography.** Leios uses BLS (Boneh–Lynn–Shacham) signatures for aggregated verification and verifiable random functions (VRFs) for leader selection.
+- **Robust simulations and formal methods.** Rust and Haskell simulations measure real-world performance, and executable specifications help ensure correctness.
+- **Scalable cost model.** A cost calculator enables node operators to estimate expenses (for example, storage amortization and CPU usage).
 
 ## What are IBs, EBs, and RBs in Leios?
 
