@@ -17,7 +17,7 @@
 <p>This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of <a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#protocol-development">​</a></h2>
 <ul>
-<li>CPS-0018 "Greater Transaction Throughput" officially approved:<!-- -->
+<li><a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> "Greater Transaction Throughput" officially approved:<!-- -->
 <ul>
 <li>Merged into Cardano Foundation's CIP/CPS repository</li>
 <li>Documents urgency of higher transaction throughput</li>
