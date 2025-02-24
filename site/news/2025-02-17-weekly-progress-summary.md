@@ -12,7 +12,7 @@ This week marked significant progress in multiple areas of the Leios project. Ma
 
 ## Protocol development
 
-- CPS-0018 "Greater Transaction Throughput" officially approved:
+- [CPS-0018](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) "Greater Transaction Throughput" officially approved:
   - Merged into Cardano Foundation's CIP/CPS repository
   - Documents urgency of higher transaction throughput
   - Defines goals for Leios initiative
