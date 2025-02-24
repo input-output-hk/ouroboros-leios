@@ -7,7 +7,7 @@ tags: [progress, update, weekly]
 
 ## High-level summary
 
-This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of CPS-0018 for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.
+This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of [CPS-0018](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.
 
 
 ## Protocol development
@@ -24,7 +24,7 @@ This week marked significant progress in multiple areas of the Leios project. Ma
 - Conducted comprehensive [analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/Logbook.md#simulation-of-varied-ib-production-rate) of IB production rates from 1 IB/s to 100 IB/s:
   - Developed ELT workflow for data processing via MongoDB
   - Created R Jupyter notebook for analysis and visualization
-  - Identified and addressed three significant bugs (#207, #208, #209)
+  - Identified and addressed three significant bugs ([#207](https://github.com/input-output-hk/ouroboros-leios/issues/207), [#208](https://github.com/input-output-hk/ouroboros-leios/issues/208), [#209](https://github.com/input-output-hk/ouroboros-leios/issues/209))
 - Key findings from Haskell simulation:
   - Network congestion emerges at high IB production rates
   - Both average propagation time and slow propagation tail increase
