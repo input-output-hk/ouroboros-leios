@@ -1,30 +1,19 @@
 import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/types';
-import cx from "classnames";
-import { FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
-
 import { printBytes } from '@/utils';
-import classes from "./styles.module.css";
+import Highcharts from 'highcharts';
+import HighchartsReact from 'highcharts-react-official';
+import { FC, useMemo, useState } from "react";
+
+// highcharts modules can only load client-side
+if (typeof window === 'object') {
+  await import('highcharts/modules/sankey');
+  await import('highcharts/modules/organization');
+}
+
+type NodeOptions = Highcharts.SeriesSankeyNodesOptionsObject & { width?: number };
 
 export interface IBlockContentsProps {
   block: ISimulationBlock;
-}
-
-interface IBoxProps extends PropsWithChildren {
-  className?: string;
-  selected?: boolean;
-  proportion?: number;
-  onClick?: (e: MouseEvent) => void;
-}
-
-const Box: FC<IBoxProps> = ({ selected, proportion = 1, onClick, children, className }) => {
-  const color = selected ? "border-black" : "border-gray-400";
-  return (
-    <span onClick={onClick} className={cx("border-2 border-solid w-48 min-h-16 max-h-48 flex flex-col items-center justify-center text-center", color, { 'cursor-pointer': !!onClick }, className)} style={{
-      height: 32 * proportion
-    }}>
-      {children}
-    </span>
-  )
 }
 
 interface ITXStats {
@@ -117,62 +106,114 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   }, [block]);
 
   const [selected, setSelected] = useState<SelectState | null>(null);
-  const selectBox = (box: string | null) => (e: MouseEvent) => {
-    e.stopPropagation();
-    if (box) {
-      setSelected({
-        key: box,
-        position: [e.pageX, e.pageY],
-      });
-    } else {
-      setSelected(null);
-    }
-  };
 
-  const eb = block.cert?.eb;
-  const ibs = block.cert?.eb?.ibs ?? [];
+  const options = useMemo(() => {
+    const eb = block.cert?.eb;
+    const ibs = block.cert?.eb?.ibs ?? [];
+
+    const nodes: NodeOptions[] = [
+      {
+        id: 'block',
+        name: 'Block',
+        title: `Slot ${block.slot}, ${block.txs.length} TX(s)`,
+        width: 200,
+        height: 100,
+      }
+    ];
+    const edges: Highcharts.SeriesSankeyPointOptionsObject[] = [
+      { from: 'block' },
+    ];
+
+    if (eb) {
+      nodes.push({
+        id: 'eb',
+        name: 'Endorsement Block',
+        title: `Slot ${eb.slot}`,
+        width: 200,
+      });
+      edges.push({ from: 'block', to: 'eb' });
+    }
+
+    for (const ib of ibs) {
+      const node: NodeOptions = {
+        id: ib.id,
+        name: 'Input Block',
+        title: `Slot ${ib.slot}, ${ib.txs.length} TX(s)`,
+        height: Math.max(50, 100 * Math.min(ib.txs.length / block.txs.length, 200)),
+      };
+      if (ibs.length <= 3) {
+        node.width = 200;
+      }
+      nodes.push(node);
+      edges.push({ from: 'eb', to: ib.id });
+    }
+
+    const series: Highcharts.SeriesOrganizationOptions = {
+      type: 'organization',
+      data: edges,
+      levels: [
+        {
+          level: 0,
+          color: '#8884d8'
+        },
+        {
+          level: 1,
+          color: '#cccccc'
+        },
+        {
+          level: 2,
+          color: '#82ca9d'
+        }
+      ],
+      nodes,
+      colorByPoint: false,
+      nodeWidth: 100,
+      events: {
+        click(event: any) {
+          const id = event.point.id as string;
+          event.stopPropagation();
+          setSelected({
+            key: id,
+            position: [event.pageX, event.pageY],
+          });
+        }
+      }
+    };
+
+    const title = 'Block Transactions';
+    const subtitle = allTxs.size === 1 ? `1 transaction` : `${allTxs.size} transactions`;
+    const options: Highcharts.Options = {
+      chart: {
+        inverted: true,
+        width: 640,
+        height: 500,
+        events: {
+          click() {
+            setSelected(null);
+          }
+        },
+      },
+      title: {
+        text: `<h2 class="font-bold text-xl">${title}</h2><h3 class="font-bold text-l">${subtitle}</h3>`,
+        useHTML: true,
+      },
+      tooltip: {
+        enabled: false,
+      },
+      series: [series],
+    };
+    return options;
+  }, [block]);
+
 
   return (
     <>
       {selected && <Stats {...stats.get(selected.key)!} position={selected.position} />}
-
-      <div className='flex flex-col w-full h-3/5 items-center' onClick={selectBox(null)}>
-        <h2 className='font-bold text-xl'>Block Transactions</h2>
-        <h2 className='font-bold text-l'>{allTxs.size} transaction{allTxs.size === 1 ? '' : 's'} total</h2>
-        <div className="flex w-full h-full items-center justify-center">
-          {ibs.length ? (
-            <div className={cx("pr-6 border-r-2 border-black")}>
-              <div className="flex flex-col gap-2">
-                {ibs.map(ib => {
-                  const isSelected = selected?.key === ib.id;
-                  const proportion = 2 * ib.txs.length / block.txs.length;
-                  return (
-                    <Box key={ib.id} selected={isSelected} proportion={proportion} onClick={selectBox(ib.id)} className={classes.input}>
-                      Input Block
-                      <span className="text-sm">Slot {ib.slot}, {ib.txs.length} TX</span>
-                    </Box>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-          {eb && (
-            <div className={cx('pr-4 pl-6', classes.endorser, { [classes['has-ibs']]: ibs.length })}>
-              <Box selected={selected?.key === "eb"} proportion={1} onClick={selectBox("eb")}>
-                Endorsement Block
-                <span className='text-sm'>Slot {eb.slot}</span>
-              </Box>
-            </div>
-          )}
-          <div className={cx('pl-4', classes.block, { [classes['has-eb']]: !!eb })}>
-            <Box selected={selected?.key === "block"} proportion={2} onClick={selectBox("block")}>
-              Block
-              <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
-            </Box>
-          </div>
-        </div>
-
-      </div>
+      <HighchartsReact
+        highcharts={Highcharts}
+        options={options}
+        allowChartUpdate={false}
+      />
     </>
   );
 }

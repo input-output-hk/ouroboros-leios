@@ -1,5 +1,69 @@
 # Leios logbook
 
+## 2025-02-24
+
+### Haskell Simulation
+
+- Fixed IB sortition for IB/slot < 1.
+- Reviewed and started integration of block expiration/diffusion-halt proposal.
+- Implemented calculation of ideal timings for diffusion and started
+  comparing to simulation with idealized config.
+  - added `treat-blocks-as-full` config parameter to have blocks behave uniformly wrt network and cpu usage.
+  - preliminary results are promising.
+    - One complication is that Relay mini-protocol can require either
+    3 or 4 latencies to transfer a new block, since headers can be
+    requested in either blocking or non-blocking way, depending on
+    traffic.
+
+## 2025-02-22
+
+### DeltaQ Update
+
+- extended the [Report](./delta_q/docs/Report%202025-01.md) with `topology-checker` work and findings as well as next steps
+
+## 2025-02-21
+
+### Formal methods
+
+- The formal specification of the Leios protocol has been moved to [ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/)
+- Conformance testing (Short Leios against Short Leios) can be run as described in [running the test suite](conformance-testing/README.md#running-the-test-suite)
+- Began surveying network models used by different consensus projects in IO, to build one that can be used for Leios and ideally other projects as well
+
+### Simulation of varied IB production rate
+
+The folder [analysis/sims/2025w08/](analysis/sims/2025w08/) contains scripts and [an analysis](analysis/sims/2025w08/exploration.ipynb) of running the Haskell and Rust simulators for input-block production varying from 1 IB/s to 100 IB/s.
+
+- An ELT workflow was developed for ingesting and processing (via `mongodb`) the raw data from the simulations.
+- An R Jupyter notebook is used for analysis and plotting.
+- Three bugs ([#207](https://github.com/input-output-hk/ouroboros-leios/issues/207), [#208](https://github.com/input-output-hk/ouroboros-leios/issues/208), and [#209](https://github.com/input-output-hk/ouroboros-leios/issues/209)) were identified during the course of this work.
+
+The Haskell simulation results indicate that network congestion occurs at high IB production rates, causing both the average propagation time and the tail of extremely slow propagation to lengthen.
+
+![Histograms of elapsed time to receipt of IBs, as a function of IB production rate](analysis/sims/2025w08/ibelapsed-histogram-hs.png)
+
+In the particular scenario that was run (e.g., network topology and protocol parameters), at an production rate of approximately 40 IBs/s the network becomes so congested that the nodes do not receive input blocks in a timely fashion.
+
+![Fraction of IBs received with five seconds, as a function of IB production rate](analysis/sims/2025w08/ibperformance-5s-hs.png)
+
+### PeerNet simulation
+
+We ran simulation studies using [the Leios version](https://github.com/input-output-hk/leios-peernet/) of [PeerNet](https://github.com/PeerNet/PeerNet) and compared results to similar scenarios run using the Haskell simulator. The two implementations differ enough in their resolution, formulation, and input configurations that a precise comparison is not practical.
+
+- The two simulations have qualitatively similar, but not identical, distributions of block propagation time.
+- Both simulations exhibit a breakdown of the Leios protocol when the block production rate is so large that substantial network congestion occurs.
+
+### Rust simulation
+
+Fixed issues #208 and #209 uncovered by Brian's cross-sim comparisons.
+
+Implemented bandwidth usage tracking, controlled by the `bandwidth-bytes-per-second` setting in topologies. Connections without bandwidth configured effectively have infinite bandwidth.
+
+## 2025-02-19
+
+### Rust simulation
+
+Started updating the visualization to look more professional, starting with the blocks view.
+
 ## 2025-02-18
 
 ### CPS-0018
@@ -163,7 +227,7 @@ The [BLS benchmarking Rust code for Leios](crypto-benchmarks.rs/) was overhauled
 - CBOR serialization and deserialization of Leios messages.
 - Command-line interface (with example) for trying out Leios's cryptography: create and verity votes, certificates, etc.
 
-* Document specifying the algorithms and tabulating benchmark results.
+- Document specifying the algorithms and tabulating benchmark results.
 
 Note that this BLS scheme is just one viable option for Leios. Ongoing work and ALBA, MUSEN, and SNARKs might result in schemes superior to this BLS approach. The key drawback is the need for periodic registration of ephemeral keys. Overall, this scheme provides the following:
 

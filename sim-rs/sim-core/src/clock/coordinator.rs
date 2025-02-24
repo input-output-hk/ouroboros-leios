@@ -134,15 +134,13 @@ mod tests {
         let run_future = coordinator.run();
         pin!(run_future);
 
-        let wait1 = actor1.wait_until(t1);
-        pin!(wait1);
+        let mut wait1 = actor1.wait_until(t1);
         assert_eq!(poll!(&mut wait1), Poll::Pending); // the wait is pending
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(clock.now(), t0); // no time has passed
         assert_eq!(poll!(&mut wait1), Poll::Pending); // the 5ms wait is still pending, because clock 2 isn't finished
 
-        let wait2 = actor2.wait_until(t2);
-        pin!(wait2);
+        let mut wait2 = actor2.wait_until(t2);
         assert_eq!(poll!(&mut wait2), Poll::Pending);
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(clock.now(), t1); // 5ms have passed
@@ -164,7 +162,6 @@ mod tests {
 
         {
             let wait1 = actor1.wait_until(t1);
-            pin!(wait1);
             assert_eq!(poll!(wait1), Poll::Pending); // the wait is pending
                                                      // and now it goes out of scope and gets dropped
         }
@@ -172,8 +169,7 @@ mod tests {
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(clock.now(), t0); // no time has passed
 
-        let wait2 = actor2.wait_until(t1);
-        pin!(wait2);
+        let mut wait2 = actor2.wait_until(t1);
         assert_eq!(poll!(&mut wait2), Poll::Pending);
         assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
         assert_eq!(clock.now(), t0); // no time has passed
@@ -196,18 +192,15 @@ mod tests {
         // make actor 1 wait for a short time, then cancel it, then wait for a long time
         {
             let wait1 = actor1.wait_until(t1);
-            pin!(wait1);
             assert_eq!(poll!(wait1), Poll::Pending);
         }
-        let wait1 = actor1.wait_until(t2);
-        pin!(wait1);
+        let mut wait1 = actor1.wait_until(t2);
         assert_eq!(poll!(&mut wait1), Poll::Pending);
         assert_eq!(poll!(&mut run_future), Poll::Pending);
         assert_eq!(clock.now(), t0); // no time has passed
         assert_eq!(poll!(&mut wait1), Poll::Pending);
 
         let wait2 = actor2.wait_until(t2);
-        pin!(wait2);
         assert_eq!(poll!(wait2), Poll::Pending);
         while let Poll::Pending = poll!(&mut wait1) {
             assert_eq!(poll!(&mut run_future), Poll::Pending);

@@ -1,10 +1,14 @@
 use std::{
     cmp::Reverse,
+    future::Future,
+    pin::Pin,
     sync::{atomic::AtomicUsize, Arc},
+    task::{Context, Poll},
 };
 
 pub use coordinator::ClockCoordinator;
 use coordinator::ClockEvent;
+use futures::FutureExt;
 use timestamp::AtomicTimestamp;
 pub use timestamp::Timestamp;
 use tokio::sync::{mpsc, oneshot};
@@ -93,40 +97,57 @@ impl ClockBarrier {
         let _ = self.tx.send(ClockEvent::FinishTask);
     }
 
-    pub async fn wait_until(&mut self, timestamp: Timestamp) {
-        if self.now() == timestamp {
-            return;
-        }
+    pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter {
         let (tx, rx) = oneshot::channel();
-        if self
-            .tx
-            .send(ClockEvent::Wait {
-                actor: self.id,
-                until: timestamp,
-                done: tx,
-            })
-            .is_err()
-        {
-            return;
-        }
+        let done = self.now() == timestamp
+            || self
+                .tx
+                .send(ClockEvent::Wait {
+                    actor: self.id,
+                    until: timestamp,
+                    done: tx,
+                })
+                .is_err();
 
-        struct Guard<'a> {
-            id: usize,
-            tx: &'a mpsc::UnboundedSender<ClockEvent>,
-        }
-        impl Drop for Guard<'_> {
-            fn drop(&mut self) {
-                let _ = self.tx.send(ClockEvent::CancelWait { actor: self.id });
-            }
-        }
-
-        let guard = Guard {
+        Waiter {
             id: self.id,
             tx: &self.tx,
-        };
-        if rx.await.is_ok() {
-            assert_eq!(self.now(), timestamp);
-            std::mem::forget(guard);
+            rx,
+            done,
+        }
+    }
+}
+
+pub struct Waiter<'a> {
+    id: usize,
+    tx: &'a mpsc::UnboundedSender<ClockEvent>,
+    rx: oneshot::Receiver<()>,
+    done: bool,
+}
+
+impl Future for Waiter<'_> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.done {
+            return Poll::Ready(());
+        }
+        match self.rx.poll_unpin(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                if result.is_ok() {
+                    self.done = true;
+                }
+                Poll::Ready(())
+            }
+        }
+    }
+}
+
+impl Drop for Waiter<'_> {
+    fn drop(&mut self) {
+        if !self.done {
+            let _ = self.tx.send(ClockEvent::CancelWait { actor: self.id });
         }
     }
 }

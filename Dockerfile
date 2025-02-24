@@ -23,6 +23,7 @@ COPY data/simulation/topo-default-100.yaml /usr/local/share/leios/topology.defau
 FROM rust:1.82-slim AS rs-builder
 WORKDIR /usr/src/sim-rs
 COPY sim-rs/ .
+COPY /data/simulation/config.default.yaml parameters/
 RUN cargo build --release
 
 # Build Haskell simulation

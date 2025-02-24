@@ -23,14 +23,6 @@ use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt, Env
 
 mod events;
 
-const DEFAULT_CONFIG_PATHS: &[&str] = &[
-    // Docker/production path
-    "/usr/local/share/leios/config.default.yaml",
-    // Development paths
-    "../../data/simulation/config.default.yaml",
-    "../data/simulation/config.default.yaml",
-];
-
 const DEFAULT_TOPOLOGY_PATHS: &[&str] = &[
     // Docker/production path
     "/usr/local/share/leios/topology.default.yaml",
@@ -52,26 +44,6 @@ struct Args {
     trace_node: Vec<usize>,
     #[clap(short, long)]
     slots: Option<u64>,
-}
-
-fn get_default_config() -> Result<String> {
-    let mut last_error = None;
-
-    // Try each possible config location
-    for path in DEFAULT_CONFIG_PATHS {
-        match fs::read_to_string(path) {
-            Ok(content) => return Ok(content),
-            Err(e) => last_error = Some((path, e)),
-        }
-    }
-
-    // If we get here, none of the paths worked
-    let (path, error) = last_error.unwrap();
-    Err(anyhow::anyhow!(
-        "Could not find default config file in any location. Last attempt '{}' failed: {}",
-        path,
-        error
-    ))
 }
 
 fn get_default_topology() -> Result<String> {
@@ -105,7 +77,9 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     };
     topology.validate()?;
 
-    let mut raw_params = Figment::new().merge(Yaml::string(&get_default_config()?));
+    let mut raw_params = Figment::new().merge(Yaml::string(include_str!(
+        "../../parameters/config.default.yaml"
+    )));
 
     for params_file in &args.parameters {
         raw_params = raw_params.merge(Yaml::file_exact(params_file));

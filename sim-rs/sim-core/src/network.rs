@@ -1,57 +1,68 @@
-use std::{collections::HashMap, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use anyhow::{bail, Result};
-use netsim_async::EdgePolicy;
+use coordinator::{EdgeConfig, Message, NetworkCoordinator};
 use tokio::sync::mpsc;
 
 use crate::{
-    clock::{Clock, Timestamp},
+    clock::{Clock, ClockBarrier, Timestamp},
     config::NodeId,
 };
 
+mod connection;
+mod coordinator;
+
 pub struct Network<T> {
-    sources: HashMap<NodeId, NetworkSource<T>>,
-    sinks: HashMap<NodeId, NetworkSink<T>>,
-    clock: Clock,
+    clock: ClockBarrier,
+    coordinator: NetworkCoordinator<T>,
+    sink: mpsc::UnboundedSender<Message<T>>,
 }
 
-impl<T> Network<T> {
+impl<T: Debug> Network<T> {
     pub fn new(clock: Clock) -> Self {
+        let (sink, source) = mpsc::unbounded_channel();
         Self {
-            sources: HashMap::new(),
-            sinks: HashMap::new(),
-            clock,
+            clock: clock.barrier(),
+            coordinator: NetworkCoordinator::new(source),
+            sink,
         }
     }
 
-    pub fn set_edge_policy(&mut self, from: NodeId, to: NodeId, policy: EdgePolicy) -> Result<()> {
-        self.add_edge(from, to, policy.latency.to_duration());
-        self.add_edge(to, from, policy.latency.to_duration());
+    pub fn set_edge_policy(
+        &mut self,
+        from: NodeId,
+        to: NodeId,
+        latency: Duration,
+        bandwidth_bps: Option<u64>,
+    ) -> Result<()> {
+        self.coordinator.add_edge(EdgeConfig {
+            from,
+            to,
+            latency,
+            bandwidth_bps,
+        });
+        self.coordinator.add_edge(EdgeConfig {
+            from: to,
+            to: from,
+            latency,
+            bandwidth_bps,
+        });
         Ok(())
     }
 
-    fn add_edge(&mut self, from: NodeId, to: NodeId, latency: Duration) {
-        let to_source = self
-            .sources
-            .entry(to)
-            .or_insert_with(|| NetworkSource::new());
-        let from_sink = self
-            .sinks
-            .entry(from)
-            .or_insert_with(|| NetworkSink::new(from, self.clock.clone()));
-        from_sink
-            .channels
-            .insert(to, (to_source.sink.clone(), latency));
-    }
-
-    pub fn open(&mut self, node_id: NodeId) -> Result<(NetworkSink<T>, NetworkSource<T>)> {
-        let Some(sink) = self.sinks.remove(&node_id) else {
-            bail!("Node has no edges")
+    pub fn open(&mut self, id: NodeId) -> Result<(NetworkSink<T>, NetworkSource<T>)> {
+        let sink = NetworkSink {
+            id,
+            sink: self.sink.clone(),
         };
-        let Some(source) = self.sources.remove(&node_id) else {
-            bail!("Node has no edges")
+        let source = NetworkSource {
+            source: self.coordinator.listen(id),
         };
         Ok((sink, source))
+    }
+
+    pub async fn run(&mut self) -> Result<()> {
+        self.coordinator.run(&mut self.clock).await
     }
 
     pub fn shutdown(self) -> Result<()> {
@@ -60,46 +71,30 @@ impl<T> Network<T> {
 }
 
 pub struct NetworkSource<T> {
-    source: mpsc::UnboundedReceiver<Message<T>>,
-    sink: mpsc::UnboundedSender<Message<T>>,
+    source: mpsc::UnboundedReceiver<(NodeId, T)>,
 }
 
 impl<T> NetworkSource<T> {
-    pub(crate) fn new() -> Self {
-        let (sink, source) = mpsc::unbounded_channel();
-        Self { source, sink }
-    }
-
-    pub async fn recv(&mut self) -> Option<(NodeId, Timestamp, T)> {
-        let msg = self.source.recv().await?;
-        Some((msg.from, msg.departure + msg.latency, msg.body))
+    pub async fn recv(&mut self) -> Option<(NodeId, T)> {
+        self.source.recv().await
     }
 }
 
 pub struct NetworkSink<T> {
     id: NodeId,
-    channels: HashMap<NodeId, (mpsc::UnboundedSender<Message<T>>, Duration)>,
-    clock: Clock,
+    sink: mpsc::UnboundedSender<Message<T>>,
 }
 
 impl<T> NetworkSink<T> {
-    fn new(id: NodeId, clock: Clock) -> Self {
-        Self {
-            id,
-            channels: HashMap::new(),
-            clock,
-        }
-    }
-    pub fn send_to(&self, to: NodeId, msg: T) -> Result<()> {
-        let Some((sink, latency)) = self.channels.get(&to) else {
-            bail!("Invalid connection")
-        };
-        if sink
+    pub fn send_to(&self, to: NodeId, bytes: u64, message: T, sent: Timestamp) -> Result<()> {
+        if self
+            .sink
             .send(Message {
                 from: self.id,
-                departure: self.clock.now(),
-                latency: *latency,
-                body: msg,
+                to,
+                body: message,
+                bytes,
+                sent,
             })
             .is_err()
         {
@@ -107,11 +102,4 @@ impl<T> NetworkSink<T> {
         }
         Ok(())
     }
-}
-
-struct Message<T> {
-    from: NodeId,
-    departure: Timestamp,
-    latency: Duration,
-    body: T,
 }

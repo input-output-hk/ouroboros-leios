@@ -1,5 +1,7 @@
 This repository is home of the _Leios R&D project_ whose purpose is to define a specification of the Ouroboros Leios protocol.
 
+This project aims to address the challenges outlined in [CPS-0018](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md), which focuses on improving transaction throughput in the Cardano network.
+
 > [!CAUTION]
 > This project is in its very early stage and is mostly
 > experimental and exploratory. All contributions and feedbacks are
@@ -119,21 +121,7 @@ Common arguments for Haskell simulation:
 
 ## Specification
 
-Build the Agda specification for Leios using either
-
-```console
-$ nix build --no-link --accept-flake-config .#leiosSpec
-```
-
-or
-
-```console
-$ nix develop
-
-$ cd formal-spec
-
-$ agda Leios/SimpleSpec.agda
-```
+The formal specification of the Leios protocol in Agda is refrenced from the repository: https://github.com/input-output-hk/ouroboros-leios-formal-spec
 
 ## Archive
 
