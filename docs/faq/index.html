@@ -9,7 +9,7 @@
 
 
 <script src="https://plausible.io/js/script.js" defer="defer" data-domain="leios.cardano-scaling.org"></script><link rel="stylesheet" href="/assets/css/styles.cd13c272.css">
-<script src="/assets/js/runtime~main.bc076a5f.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.053a2646.js" defer="defer"></script>
 <script src="/assets/js/main.316d9228.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -28,16 +28,16 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-are-ibs-ebs-and-rbs-in-leios">What are IBs, EBs, and RBs in Leios?<a class="hash-link" aria-label="Direct link to What are IBs, EBs, and RBs in Leios?" title="Direct link to What are IBs, EBs, and RBs in Leios?" href="/docs/faq#what-are-ibs-ebs-and-rbs-in-leios">​</a></h2>
 <p>Leios uses three distinct block types:</p>
 <ul>
-<li>IB (input block): a block that contains transactions. Produced by nodes that win the IB sortition lottery.</li>
-<li>EB (endorser block): a block that references one or more IBs, providing endorsements. Produced by nodes that win the EB sortition lottery.</li>
-<li>RB (ranking block): a block that ranks or orders other blocks as part of the consensus mechanism.</li>
+<li><strong>IB (input block):</strong> a block that contains transactions. Produced by nodes that win the IB sortition lottery.</li>
+<li><strong>EB (endorser block):</strong> a block that references one or more IBs, providing endorsements. Produced by nodes that win the EB sortition lottery.</li>
+<li><strong>RB (ranking block):</strong> a block that ranks or orders other blocks as part of the consensus mechanism.</li>
 </ul>
 <p>Each block type plays a distinct role in moving transactions from submission to final confirmation.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="how-does-leios-handle-voting-stages-and-what-is-send-recv-voting">How does Leios handle voting stages, and what is &#x27;send-recv&#x27; voting?<a class="hash-link" aria-label="Direct link to How does Leios handle voting stages, and what is &#x27;send-recv&#x27; voting?" title="Direct link to How does Leios handle voting stages, and what is &#x27;send-recv&#x27; voting?" href="/docs/faq#how-does-leios-handle-voting-stages-and-what-is-send-recv-voting">​</a></h2>
 <p>Leios finalizes blocks through a structured voting mechanism. Nodes may adopt:</p>
 <ul>
-<li>Single-stage voting: all votes are broadcast in one phase, possibly resulting in a longer CPU usage &#x27;tail&#x27; during high throughput.</li>
-<li>Send-recv (two-stage) voting: votes are first sent, then a follow-up receive phase ensures broader propagation before final tallies.</li>
+<li><strong>Single-stage voting:</strong> all votes are broadcast in one phase, possibly resulting in a longer CPU usage &#x27;tail&#x27; during high throughput.</li>
+<li><strong>Send-recv (two-stage) voting:</strong> votes are first sent, then a follow-up receive phase ensures broader propagation before final tallies.</li>
 </ul>
 <p>You can configure voting through parameters such as leios-vote-send-recv-stages in simulation environments.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-is-sortition-in-leios-and-how-does-fait-accompli-sortition-work">What is sortition in Leios, and how does &#x27;Fait Accompli sortition&#x27; work?<a class="hash-link" aria-label="Direct link to What is sortition in Leios, and how does &#x27;Fait Accompli sortition&#x27; work?" title="Direct link to What is sortition in Leios, and how does &#x27;Fait Accompli sortition&#x27; work?" href="/docs/faq#what-is-sortition-in-leios-and-how-does-fait-accompli-sortition-work">​</a></h2>
@@ -45,9 +45,9 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-are-the-different-block-diffusion-strategies-and-why-do-they-matter">What are the different block diffusion strategies, and why do they matter?<a class="hash-link" aria-label="Direct link to What are the different block diffusion strategies, and why do they matter?" title="Direct link to What are the different block diffusion strategies, and why do they matter?" href="/docs/faq#what-are-the-different-block-diffusion-strategies-and-why-do-they-matter">​</a></h2>
 <p>Leios supports multiple strategies for propagating blocks and votes:</p>
 <ul>
-<li>Oldest-first: prioritizes older blocks or transactions</li>
-<li>Freshest-first: focuses on the newest blocks or transactions first</li>
-<li>Peer-order: requests blocks in the order peers announce them</li>
+<li><strong>Oldest-first:</strong> prioritizes older blocks or transactions</li>
+<li><strong>Freshest-first:</strong> focuses on the newest blocks or transactions first</li>
+<li><strong>Peer-order:</strong> requests blocks in the order peers announce them</li>
 </ul>
 <p>Your choice of strategy can affect latency, network load, and overall throughput.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="can-the-system-be-sharded-or-self-regulate">Can the system be sharded or self-regulate?<a class="hash-link" aria-label="Direct link to Can the system be sharded or self-regulate?" title="Direct link to Can the system be sharded or self-regulate?" href="/docs/faq#can-the-system-be-sharded-or-self-regulate">​</a></h2>
@@ -63,10 +63,10 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="how-do-i-estimate-node-operating-costs-for-leios">How do I estimate node operating costs for Leios?<a class="hash-link" aria-label="Direct link to How do I estimate node operating costs for Leios?" title="Direct link to How do I estimate node operating costs for Leios?" href="/docs/faq#how-do-i-estimate-node-operating-costs-for-leios">​</a></h2>
 <p>Leios provides an online cost calculator that considers:</p>
 <ul>
-<li>CPU usage and the number of cores</li>
-<li>Bandwidth consumption</li>
-<li>Storage (including the default assumption of 50% disk compression)</li>
-<li>Perpetual storage cost amortization</li>
+<li><strong>CPU usage and the number of cores</strong></li>
+<li><strong>Bandwidth consumption</strong></li>
+<li><strong>Storage</strong> (including the default assumption of 50% disk compression)</li>
+<li><strong>Perpetual storage cost amortization</strong></li>
 </ul>
 <p>It also supports hyperscale and discount cloud providers. For example, you can model single-relay or multi-relay deployments at variable bandwidths.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-is-the-current-status-of-leios-simulations">What is the current status of Leios simulations?<a class="hash-link" aria-label="Direct link to What is the current status of Leios simulations?" title="Direct link to What is the current status of Leios simulations?" href="/docs/faq#what-is-the-current-status-of-leios-simulations">​</a></h2>
@@ -81,9 +81,9 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="are-there-recommended-parameters-for-running-leios-nodes">Are there recommended parameters for running Leios nodes?<a class="hash-link" aria-label="Direct link to Are there recommended parameters for running Leios nodes?" title="Direct link to Are there recommended parameters for running Leios nodes?" href="/docs/faq#are-there-recommended-parameters-for-running-leios-nodes">​</a></h2>
 <p>Based on preliminary internal testing and simulations:</p>
 <ul>
-<li>Block size: commonly set to about one-third of the available link capacity for IBs</li>
-<li>Voting stages: choose single-stage or send-recv, depending on reliability and speed requirements</li>
-<li>Diffusion strategy: many operators use &#x27;freshest-first,&#x27; though &#x27;peer-order&#x27; may help maintain compatibility with older setups</li>
+<li><strong>Block size:</strong> commonly set to about one-third of the available link capacity for IBs</li>
+<li><strong>Voting stages:</strong> choose single-stage or send-recv, depending on reliability and speed requirements</li>
+<li><strong>Diffusion strategy:</strong> many operators use &#x27;freshest-first,&#x27; though &#x27;peer-order&#x27; may help maintain compatibility with older setups</li>
 </ul>
 <p>Operators can adjust these parameters, which evolve through community votes.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="how-do-i-keep-track-of-leioss-progress-and-updates">How do I keep track of Leios&#x27;s progress and updates?<a class="hash-link" aria-label="Direct link to How do I keep track of Leios&#x27;s progress and updates?" title="Direct link to How do I keep track of Leios&#x27;s progress and updates?" href="/docs/faq#how-do-i-keep-track-of-leioss-progress-and-updates">​</a></h2>
@@ -98,9 +98,9 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-are-downstream-effects-of-deploying-leios">What are downstream effects of deploying Leios?<a class="hash-link" aria-label="Direct link to What are downstream effects of deploying Leios?" title="Direct link to What are downstream effects of deploying Leios?" href="/docs/faq#what-are-downstream-effects-of-deploying-leios">​</a></h2>
 <p>Leios changes how transactions are validated and how blocks and memory pools operate, potentially affecting:</p>
 <ul>
-<li>Wallets and SDKs, which need to accommodate new block types (IBs and EBs)</li>
-<li>Explorers, which must handle higher throughput and multi-block referencing</li>
-<li>Indexers and APIs, which will see more granular block and vote data</li>
+<li><strong>Wallets and SDKs,</strong> which need to accommodate new block types (IBs and EBs)</li>
+<li><strong>Explorers,</strong> which must handle higher throughput and multi-block referencing</li>
+<li><strong>Indexers and APIs,</strong> which will see more granular block and vote data</li>
 </ul>
 <p>Weekly progress updates provide deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="could-the-mempool-be-sized-to-the-throughput-of-the-system">Could the mempool be sized to the throughput of the system?<a class="hash-link" aria-label="Direct link to Could the mempool be sized to the throughput of the system?" title="Direct link to Could the mempool be sized to the throughput of the system?" href="/docs/faq#could-the-mempool-be-sized-to-the-throughput-of-the-system">​</a></h2>
