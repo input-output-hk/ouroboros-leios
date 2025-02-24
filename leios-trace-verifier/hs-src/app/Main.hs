@@ -1,8 +1,8 @@
 module Main where
 
+import Data.ByteString.Lazy as BSL
 import LeiosEvents
 import Lib
-import Data.ByteString.Lazy as BSL
 
 logFile :: FilePath
 logFile = "leios-trace.log"

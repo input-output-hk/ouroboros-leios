@@ -99,6 +99,8 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   -- ^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
   , activeVotingStageLength :: Int
   -- ^ prefix of the voting stage where new votes are generated, <= sliceLength.
+  , maxEndorseBlockAgeSlots :: Int
+  -- ^ maximum age of a certified endorsement block before it expires
   , votingFrequencyPerStage :: Double
   , voteSendStage :: Stage p
   , votesForCertificate :: Int
@@ -127,6 +129,7 @@ convertConfig disk =
           , sliceLength = fromIntegral disk.leiosStageLengthSlots
           , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
           , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+          , maxEndorseBlockAgeSlots = fromIntegral disk.ebMaxAgeSlots
           , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
           , votingFrequencyPerStage = disk.voteGenerationProbability
           , votesForCertificate = fromIntegral disk.voteThreshold
@@ -253,6 +256,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , sliceLength = cfg.sliceLength
     , inputBlockFrequencyPerSlot = cfg.inputBlockFrequencyPerSlot
     , endorseBlockFrequencyPerStage = cfg.endorseBlockFrequencyPerStage
+    , maxEndorseBlockAgeSlots = cfg.maxEndorseBlockAgeSlots
     , activeVotingStageLength = cfg.activeVotingStageLength
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
     , voteSendStage = voteSendStage
@@ -355,9 +359,13 @@ instance FixSize body => FixSize (Block body) where
 data Pipeline = SingleVote | SplitVote
 
 data Stage :: Pipeline -> Type where
-  Propose, Deliver1, Deliver2, Endorse :: Stage a
+  Propose :: Stage a
+  Deliver1 :: Stage a
+  Deliver2 :: Stage a
+  Endorse :: Stage a
   Vote :: Stage SingleVote
-  VoteSend, VoteRecv :: Stage SplitVote
+  VoteSend :: Stage SplitVote
+  VoteRecv :: Stage SplitVote
 
 deriving instance Eq (Stage a)
 deriving instance Ord (Stage a)
@@ -438,6 +446,24 @@ pipelineOf cfg stage sl =
 
 forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
 forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
+
+lastVoteSend :: LeiosConfig -> PipelineNo -> SlotNo
+lastVoteSend leios@LeiosConfig{pipeline} pipelineNo = case pipeline of
+  SingSingleVote -> snd (stageRangeOf leios pipelineNo Vote)
+  SingSplitVote -> snd (stageRangeOf leios pipelineNo VoteSend)
+
+lastVoteRecv :: LeiosConfig -> PipelineNo -> SlotNo
+lastVoteRecv leios@LeiosConfig{pipeline} pipelineNo = case pipeline of
+  SingSingleVote -> snd (stageRangeOf leios pipelineNo Vote)
+  SingSplitVote -> snd (stageRangeOf leios pipelineNo VoteRecv)
+
+endorseRange :: LeiosConfig -> PipelineNo -> (SlotNo, SlotNo)
+endorseRange cfg@LeiosConfig{pipeline = (_ :: SingPipeline p)} p =
+  stageRangeOf @p cfg p Endorse
+
+lastUnadoptedEB :: LeiosConfig -> PipelineNo -> SlotNo
+lastUnadoptedEB leios@LeiosConfig{pipeline = (_ :: SingPipeline p), maxEndorseBlockAgeSlots} pipelineNo =
+  lastVoteRecv leios pipelineNo + toEnum maxEndorseBlockAgeSlots
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
