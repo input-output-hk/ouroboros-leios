@@ -8,7 +8,7 @@ This page provides a collection of resources on Ouroboros Leios, including techn
 
 ## Technical documentation
 
-- [Leios CPS](https://github.com/cardano-foundation/CPS/pull/18)
+- [Leios CPS](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md)
 
 - [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/379) – the Cardano
   Improvement Proposal by Duncan Coutts, providing the rationale and a high-level
