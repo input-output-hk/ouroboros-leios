@@ -446,6 +446,8 @@ leiosNode tracer cfg followers peers = do
       , pruningThreads
       ]
 
+-- | After the last vote-receiving slot of each pipeline,
+--   prune all votes from before the last vote-sending slot.
 pruneVoteBuffer ::
   (Monad m, MonadDelay m, MonadTime m, MonadSTM m) =>
   Tracer m LeiosNodeEvent ->
@@ -455,14 +457,15 @@ pruneVoteBuffer ::
 pruneVoteBuffer _tracer cfg st = go (toEnum 0)
  where
   go p = do
-    let last_vote_send = snd $ stageRangeOf cfg.leios p VoteSend
-    let last_vote_recv = snd $ stageRangeOf cfg.leios p VoteRecv
-    let pruneTo = succ last_vote_send
-    _ <- waitNextSlot cfg.slotConfig (succ last_vote_recv)
+    let lastVoteSend = snd $ stageRangeOf cfg.leios p VoteSend
+    let lastVoteRecv = snd $ stageRangeOf cfg.leios p VoteRecv
+    let pruneTo = succ lastVoteSend
+    _ <- waitNextSlot cfg.slotConfig (succ lastVoteRecv)
     atomically $ do
       modifyTVar' st.relayVoteState.relayBufferVar $
-        RB.filter $
-          \RB.EntryWithTicket{value} -> (snd value).slot >= pruneTo
+        RB.filter $ \vote ->
+          let voteSlot = (snd vote.value).slot
+           in voteSlot >= pruneTo
       writeTVar st.prunedVoteStateToVar $! pruneTo
     go (succ p)
 
