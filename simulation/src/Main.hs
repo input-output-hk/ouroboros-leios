@@ -11,10 +11,10 @@ import Control.Exception (Exception (displayException))
 import Control.Monad
 import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
-import Data.Fixed
 import Data.List (find)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, listToMaybe)
+import qualified Data.Yaml as Yaml
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
@@ -26,13 +26,12 @@ import qualified LeiosProtocol.Short.VizSimP2P as VizShortLeiosP2P
 import qualified LeiosProtocol.VizSimTestRelay as VizSimTestRelay
 import ModelTCP (kilobytes)
 import Options.Applicative (
-  Alternative (many, (<|>)),
+  Alternative ((<|>)),
   HasValue,
   Mod,
   Parser,
   ParserInfo,
   ParserPrefs,
-  argument,
   asum,
   auto,
   command,
@@ -491,7 +490,7 @@ data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
   | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
-  | CliReportData {outputDir :: Maybe FilePath, simDataFile :: FilePath, stakeFractions :: [Micro]}
+  | CliReportData {outputDir :: Maybe FilePath, reportConfigFile :: FilePath, simDataFile :: FilePath}
 
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
@@ -519,7 +518,8 @@ runCliOptions = \case
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
   CliReportData{..} -> do
     let prefixDir = fromMaybe (takeDirectory simDataFile) outputDir
-    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile stakeFractions
+    reportConfig <- Yaml.decodeFileThrow reportConfigFile
+    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile reportConfig
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -575,8 +575,8 @@ parserReportData :: Parser CliCommand
 parserReportData =
   CliReportData
     <$> optional (strOption $ short 'o' <> long "output-dir")
+    <*> strOption (short 'c' <> long "report-config")
     <*> strArgument (metavar "SIMDATA")
-    <*> many (argument auto (metavar "STAKEF"))
 
 --------------------------------------------------------------------------------
 -- Parsing Topography Options
