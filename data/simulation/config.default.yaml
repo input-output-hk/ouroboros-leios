@@ -131,6 +131,9 @@ eb-diffusion-max-bodies-to-request: 1
 eb-diffusion-max-headers-to-request: 100
 eb-diffusion-max-window-size: 100
 
+# The maximum age of EBs included in RBs.
+eb-max-age-slots: 20 # TODO: sensible default
+
 ################################################################################
 # Vote Configuration
 ################################################################################

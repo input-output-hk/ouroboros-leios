@@ -133,6 +133,7 @@ logLeiosEvent nodeNames emitControl e = case e of
       Generate -> "generated"
       Received -> "received"
       EnterState -> "enteredstate"
+      Pruned -> "pruned"
     kindAndId = case blk of
       EventIB ib -> mconcat [ibKind, "id" .= ib.stringId]
       EventEB eb -> mconcat [ebKind, "id" .= eb.stringId]
@@ -341,6 +342,7 @@ traceRelayLink1 connectionOptions =
               , voteSendStage = Vote
               , votingFrequencyPerStage = 4
               , votesForCertificate = 1 -- just two nodes available to vote!
+              , maxEndorseBlockAgeSlots = 50
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig

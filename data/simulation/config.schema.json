@@ -135,6 +135,12 @@
     "eb-generation-probability": {
       "type": "number"
     },
+    "eb-max-age-slots": {
+      "additionalProperties": false,
+      "description": "The maximum age of EBs included in RBs.\n\nOnly supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
     "eb-size-bytes-constant": {
       "additionalProperties": false,
       "properties": {},

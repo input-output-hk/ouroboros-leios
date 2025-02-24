@@ -47,7 +47,7 @@ import Test.QuickCheck.StateModel (
   runActions,
  )
 
-import Text.PrettyPrint (hang, vcat, (<+>))
+import Text.PrettyPrint ((<+>))
 import Text.PrettyPrint.HughesPJClass (Pretty (pPrint))
 
 import Prelude hiding (round)
@@ -103,7 +103,7 @@ callSUT RunState{hReader, hWriter} req =
 type Runtime = StateT RunState IO
 
 instance Realized IO ([InputBlock], [EndorserBlock], [[Vote]]) ~ ([InputBlock], [EndorserBlock], [[Vote]]) => RunModel NetworkModel Runtime where
-  perform NetworkModel{nodeModel = LeiosState{..}} (Step a) _ = case a of
+  perform NetworkModel{nodeModel = LeiosState{}} (Step a) _ = case a of
     Tick -> do
       rs@RunState{..} <- get
       modify $ \rs' -> rs'{unfetchedIBs = mempty, unfetchedEBs = mempty, unfetchedVotes = mempty}

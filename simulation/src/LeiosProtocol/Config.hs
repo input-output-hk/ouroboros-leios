@@ -100,6 +100,7 @@ data Config = Config
   , ebDiffusionMaxWindowSize :: Word16
   , ebDiffusionMaxHeadersToRequest :: Word16
   , ebDiffusionMaxBodiesToRequest :: Word16
+  , ebMaxAgeSlots :: Word16
   , voteGenerationProbability :: Double
   , voteGenerationCpuTimeMsConstant :: DurationMs
   , voteGenerationCpuTimeMsPerIb :: DurationMs
@@ -164,6 +165,7 @@ instance Default Config where
       , ebDiffusionMaxWindowSize = 100
       , ebDiffusionMaxHeadersToRequest = 100
       , ebDiffusionMaxBodiesToRequest = 1
+      , ebMaxAgeSlots = 20
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 0.164
       , voteGenerationCpuTimeMsPerIb = 0.0
@@ -232,6 +234,7 @@ configToKVsWith getter cfg =
     , get @"ebDiffusionMaxWindowSize" getter cfg
     , get @"ebDiffusionMaxHeadersToRequest" getter cfg
     , get @"ebDiffusionMaxBodiesToRequest" getter cfg
+    , get @"ebMaxAgeSlots" getter cfg
     , get @"voteGenerationProbability" getter cfg
     , get @"voteGenerationCpuTimeMsConstant" getter cfg
     , get @"voteGenerationCpuTimeMsPerIb" getter cfg
@@ -310,6 +313,7 @@ instance FromJSON Config where
     ebDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ebDiffusionMaxWindowSize" obj
     ebDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxHeadersToRequest" obj
     ebDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ebDiffusionMaxBodiesToRequest" obj
+    ebMaxAgeSlots <- parseFieldOrDefault @Config @"ebMaxAgeSlots" obj
     voteGenerationProbability <- parseFieldOrDefault @Config @"voteGenerationProbability" obj
     voteGenerationCpuTimeMsConstant <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsConstant" obj
     voteGenerationCpuTimeMsPerIb <- parseFieldOrDefault @Config @"voteGenerationCpuTimeMsPerIb" obj

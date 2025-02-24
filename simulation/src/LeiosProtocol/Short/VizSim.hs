@@ -592,6 +592,8 @@ accumLeiosMsgs now nid EnterState blk vs =
     , msgsAtNodeTotalBuffer =
         Map.insertWith (+) nid 1 (msgsAtNodeTotalBuffer vs)
     }
+accumLeiosMsgs _now _nid Pruned _blk vs =
+  vs
 
 pruneLeiosMsgsState ::
   (Eq id, HasField "id" msg id) =>

@@ -86,6 +86,11 @@ export interface Config {
   "eb-diffusion-max-headers-to-request": bigint;
   /** Only supported by Haskell simulation. */
   "eb-diffusion-max-bodies-to-request": bigint;
+  /**
+   * The maximum age of EBs included in RBs.
+   *
+   * Only supported by Haskell simulation. */
+  "eb-max-age-slots": bigint;
 
   // Vote Configuration
   "vote-generation-probability": number;
