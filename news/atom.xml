@@ -14,7 +14,7 @@
         <updated>2025-02-17T00:00:00.000Z</updated>
         <summary type="html"><![CDATA[High-level summary]]></summary>
         <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#high-level-summary">​</a></h2>
-<p>This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of CPS-0018 for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.</p>
+<p>This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of <a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer">CPS-0018</a> for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#protocol-development">​</a></h2>
 <ul>
 <li>CPS-0018 "Greater Transaction Throughput" officially approved:<!-- -->
@@ -32,7 +32,7 @@
 <ul>
 <li>Developed ELT workflow for data processing via MongoDB</li>
 <li>Created R Jupyter notebook for analysis and visualization</li>
-<li>Identified and addressed three significant bugs (#207, #208, #209)</li>
+<li>Identified and addressed three significant bugs (<a href="https://github.com/input-output-hk/ouroboros-leios/issues/207" target="_blank" rel="noopener noreferrer">#207</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/208" target="_blank" rel="noopener noreferrer">#208</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/issues/209" target="_blank" rel="noopener noreferrer">#209</a>)</li>
 </ul>
 </li>
 <li>Key findings from Haskell simulation:<!-- -->
