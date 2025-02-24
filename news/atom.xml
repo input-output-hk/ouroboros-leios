@@ -2,11 +2,111 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-02-10T00:00:00.000Z</updated>
+    <updated>2025-02-17T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly progress summary – February 17, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary"/>
+        <updated>2025-02-17T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[High-level summary]]></summary>
+        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#high-level-summary">​</a></h2>
+<p>This week marked significant progress in multiple areas of the Leios project. Major developments included the approval of CPS-0018 for transaction throughput, enhanced Docker support for simulations, and important findings from cross-simulation comparisons. The team also made strides in analyzing IB production rates and their impact on network performance.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-development">Protocol development<a class="hash-link" aria-label="Direct link to Protocol development" title="Direct link to Protocol development" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#protocol-development">​</a></h2>
+<ul>
+<li>CPS-0018 "Greater Transaction Throughput" officially approved:<!-- -->
+<ul>
+<li>Merged into Cardano Foundation's CIP/CPS repository</li>
+<li>Documents urgency of higher transaction throughput</li>
+<li>Defines goals for Leios initiative</li>
+<li>Identifies key open questions and use cases</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
+<ul>
+<li>Conducted comprehensive <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/Logbook.md#simulation-of-varied-ib-production-rate" target="_blank" rel="noopener noreferrer">analysis</a> of IB production rates from 1 IB/s to 100 IB/s:<!-- -->
+<ul>
+<li>Developed ELT workflow for data processing via MongoDB</li>
+<li>Created R Jupyter notebook for analysis and visualization</li>
+<li>Identified and addressed three significant bugs (#207, #208, #209)</li>
+</ul>
+</li>
+<li>Key findings from Haskell simulation:<!-- -->
+<ul>
+<li>Network congestion emerges at high IB production rates</li>
+<li>Both average propagation time and slow propagation tail increase</li>
+<li>Critical threshold identified at ~40 IBs/s where network congestion severely impacts block reception</li>
+</ul>
+</li>
+<li>Compared PeerNet and Haskell simulations:<!-- -->
+<ul>
+<li>Qualitatively similar block propagation distributions</li>
+<li>Both demonstrate protocol breakdown under high block production rates</li>
+<li>Differences in resolution and configuration prevent exact comparison</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="infrastructure-improvements">Infrastructure improvements<a class="hash-link" aria-label="Direct link to Infrastructure improvements" title="Direct link to Infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#infrastructure-improvements">​</a></h2>
+<ul>
+<li>Added comprehensive Docker support for both simulations:<!-- -->
+<ul>
+<li>Multi-stage Dockerfile optimization for both Haskell and Rust</li>
+<li>Simplified deployment process</li>
+<li>Easy configuration via volume mounts and parameters</li>
+<li>Documented usage in README.md</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#rust-simulation">​</a></h2>
+<ul>
+<li>Enhanced Rust simulation capabilities:<!-- -->
+<ul>
+<li>Implemented bandwidth usage tracking</li>
+<li>Added configurable bandwidth limits per connection</li>
+<li>Fixed issues discovered during cross-simulation comparison</li>
+<li>Started professional visualization updates</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#haskell-simulation">​</a></h2>
+<ul>
+<li>Enhanced IB sortition handling for IB/slot &lt; 1</li>
+<li>Began integration of block expiration/diffusion-halt proposal</li>
+<li>Implemented ideal timing calculations for diffusion:<!-- -->
+<ul>
+<li>Added uniform block behavior configuration</li>
+<li>Identified Relay mini-protocol complexity:<!-- -->
+<ul>
+<li>Variable latency (3-4) for block transfer</li>
+<li>Dependent on traffic conditions and request handling method</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary#formal-methods">​</a></h2>
+<ul>
+<li>Relocated formal specification to <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" target="_blank" rel="noopener noreferrer">dedicated repository</a></li>
+<li>Established conformance testing framework:<!-- -->
+<ul>
+<li>Enabled testing between Short Leios implementations</li>
+<li>Documented test suite execution process</li>
+</ul>
+</li>
+<li>Initiated survey of network models across IO consensus projects</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly progress summary – February 10, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/02/10/weekly-progress-summary</id>
@@ -866,25 +966,5 @@ coding standards.</li>
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Community Round-Table on Leios]]></title>
-        <id>https://leios.cardano-scaling.org/news/2024/06/18/community-space</id>
-        <link href="https://leios.cardano-scaling.org/news/2024/06/18/community-space"/>
-        <updated>2024-06-18T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[On the 14th of June, 2024, along with Pi Lanningham, I was honoured to be invited to the very first Round-Table organised by the Cardano Community group. The discussion was facilitated by Denicio Bernier and Rick McCracken, and was meant to provide a broad overview of Leios, the protocol and the R&D project we have just started working on.]]></summary>
-        <content type="html"><![CDATA[<p>On the 14th of June, 2024, along with <a href="https://x.com/Quantumplation" target="_blank" rel="noopener noreferrer">Pi Lanningham</a>, I was honoured to be invited to the very first <em>Round-Table</em> organised by the <a href="https://x.com/Cardano" target="_blank" rel="noopener noreferrer">Cardano Community</a> group. The discussion was facilitated by <a href="https://x.com/DenicioBernier" target="_blank" rel="noopener noreferrer">Denicio Bernier</a> and <a href="https://x.com/RichardMcCrackn" target="_blank" rel="noopener noreferrer">Rick McCracken</a>, and was meant to provide a broad overview of <em>Leios</em>, the protocol and the R&amp;D project we have just started working on.</p>
-<p>We first went through Pi's presentation, recalling how <em>Ouroboros Praos</em> works in broad terms and the problem Leios provides a solution for, namely the low throughput of the network. This low throughput is a necessity imposed by diffusion delays across a world spanning network, and constraints of the stake-based sortition algorithm that's used to select block-forging leader. By deconnecting the data diffusion and validation process from the blockchain extension process, trading throughput for latency, Leios aims at dramatically increase the number of transactions that can be processed by Cardano.</p>
-<p>We then took questions from the audience, detailing some aspects of the protocol, while answering expectations from the community like the expected throughput and availability of benchmarks, the anticipated timeline for Leios, its possible usage for transient data diffusion, and its relationship with other expected Ouroboros extensions like <a href="https://peras.cardano-scaling.org/" target="_blank" rel="noopener noreferrer">Peras</a>.</p>
-<ul>
-<li>Original <a href="https://cardano.org/news/2024-06-14-media-understanding-leios-with-pi-lanningham-arnaud-bailly/" target="_blank" rel="noopener noreferrer">blog post</a> on Cardano.org</li>
-<li><a href="https://x.com/Cardano/status/1802717851544915972" target="_blank" rel="noopener noreferrer">X/Twitter</a> thread</li>
-<li>Discussion recording on <a href="https://www.youtube.com/watch?v=vpXS9lgL6BA&amp;t=3s" target="_blank" rel="noopener noreferrer">YouTube</a>.</li>
-</ul>]]></content>
-        <author>
-            <name>Arnaud Bailly</name>
-            <uri>https://github.com/abailly-iohk</uri>
-        </author>
-        <category label="education" term="education"/>
     </entry>
 </feed>
