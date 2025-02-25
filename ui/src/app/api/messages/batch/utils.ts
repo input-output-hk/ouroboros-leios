@@ -72,7 +72,7 @@ export const processMessage = (
       "txReceived",
       `tx-${message.id}`,
     );
-  } else if (message.type === EMessageType.InputBlockGenerated) {
+  } else if (message.type === EMessageType.IBGenerated) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -86,7 +86,7 @@ export const processMessage = (
       headerBytes: message.header_bytes,
       txs: message.transactions,
     });
-  } else if (message.type === EMessageType.InputBlockSent) {
+  } else if (message.type === EMessageType.IBSent) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -94,7 +94,7 @@ export const processMessage = (
       "ibSent",
       `ib-${message.id}`,
     );
-  } else if (message.type === EMessageType.InputBlockReceived) {
+  } else if (message.type === EMessageType.IBReceived) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -102,7 +102,7 @@ export const processMessage = (
       "ibReceived",
       `ib-${message.id}`,
     );
-  } else if (message.type === EMessageType.PraosBlockGenerated) {
+  } else if (message.type === EMessageType.RBGenerated) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -147,7 +147,7 @@ export const processMessage = (
     aggregatedData.global.praosTxOnChain += praosTx;
     aggregatedData.global.leiosTxOnChain += leiosTx;
     aggregatedData.blocks.push(block);
-  } else if (message.type === EMessageType.PraosBlockSent) {
+  } else if (message.type === EMessageType.RBSent) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -155,7 +155,7 @@ export const processMessage = (
       "pbSent",
       `pb-${message.id}`,
     );
-  } else if (message.type === EMessageType.PraosBlockReceived) {
+  } else if (message.type === EMessageType.RBReceived) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -163,7 +163,7 @@ export const processMessage = (
       "pbReceived",
       `pb-${message.id}`,
     );
-  } else if (message.type === EMessageType.EndorserBlockGenerated) {
+  } else if (message.type === EMessageType.EBGenerated) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -177,7 +177,7 @@ export const processMessage = (
       bytes: message.bytes,
       ibs,
     });
-  } else if (message.type === EMessageType.EndorserBlockSent) {
+  } else if (message.type === EMessageType.EBSent) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -185,7 +185,7 @@ export const processMessage = (
       "ebSent",
       `eb-${message.id}`,
     );
-  } else if (message.type === EMessageType.EndorserBlockReceived) {
+  } else if (message.type === EMessageType.EBReceived) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -193,7 +193,7 @@ export const processMessage = (
       "ebReceived",
       `eb-${message.id}`,
     );
-  } else if (message.type === EMessageType.VotesGenerated) {
+  } else if (message.type === EMessageType.VTBundleGenerated) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -201,7 +201,7 @@ export const processMessage = (
       "votesGenerated",
     );
     intermediate.bytes.set(`votes-${message.id}`, message.bytes);
-  } else if (message.type === EMessageType.VotesSent) {
+  } else if (message.type === EMessageType.VTBundleSent) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
@@ -209,7 +209,7 @@ export const processMessage = (
       "votesSent",
       `votes-${message.id}`,
     );
-  } else if (message.type === EMessageType.VotesReceived) {
+  } else if (message.type === EMessageType.VTBundleReceived) {
     incrementNodeAggregationData(
       aggregatedData,
       intermediate,
