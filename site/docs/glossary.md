@@ -14,18 +14,18 @@ sidebar_position: 5
 
 - **Certificate**: A cryptographic proof that attests to the validity of blocks or transactions.
 
-- **Decentralization Parameter**: A measure of how distributed the control of the network is among its participants.
+- **Decentralization parameter**: A measure of how distributed the control of the network is among its participants.
 
 - **DeltaQ model**: A framework for analyzing and predicting network quality of service (QoS) used to assess delay, loss, and other performance factors.
 
 - **Diffusion strategy**: The method used to propagate blocks and votes through the network. Strategies include:
   - Oldest-first strategy – prioritizes older blocks for diffusion
   - Freshest-first strategy – prioritizes newer blocks for diffusion
-  - Peer-order strategy – requests blocks in the order they were announced by peers
+  - Peer-order strategy – requests blocks in the order they were announced by peers.
 
-- **Endorser Block (EB)**: A block that references IBs and is produced by nodes that win the EB sortition lottery.
+- **Endorser block (EB)**: A block that references IBs and is produced by nodes that win the EB sortition lottery.
 
-- **Epoch**: A fixed period in the blockchain during which certain processes or calculations are performed.
+- **Epoch**: A fixed period in the blockchain during which specific processes or calculations are performed.
 
 - **Equivocation**: The act of producing conflicting blocks or messages in a blockchain network.
 
@@ -33,11 +33,11 @@ sidebar_position: 5
 
 - **Fait accompli sortition**: A cryptographic selection process that ensures fairness and verifiability when choosing validators.
 
-- **Freshest First**: A policy for prioritizing newer blocks or transactions over older ones.
+- **Freshest first**: A policy for prioritizing newer blocks or transactions over older ones.
 
 - **Haskell simulation**: A parallel simulation of the Leios protocol in Haskell, used for latency measurement, event logging, and parameter tuning.
 
-- **Input Block (IB)**: A block that contains transactions and is produced by nodes that win the IB sortition lottery.
+- **Input block (IB)**: A block that contains transactions and is produced by nodes that win the IB sortition lottery.
 
 - **Latency**: The delay between the submission of a transaction and its confirmation on the blockchain.
 
@@ -63,7 +63,7 @@ sidebar_position: 5
 
 - **Quorum**: The minimum number of votes required to certify a block or decision.
 
-- **Ranking Block (RB)**: A block that ranks other blocks and is part of the consensus mechanism.
+- **Ranking block (RB)**: A block that ranks other blocks and is part of the consensus mechanism.
 
 - **Rational arithmetic**: A method used in Leios sortition to replace quad-precision floating-point calculations, improving precision and computational efficiency.
 
@@ -75,9 +75,9 @@ sidebar_position: 5
 
 - **Short-Leios simulation**: A version of the Leios simulation that models ranking block intervals and outputs diffusion latency data.
 
-- **Sortition**: A probabilistic method for selecting nodes to perform certain roles, based on their stake.
+- **Sortition**: A probabilistic method for selecting nodes to perform specific roles based on their stake.
 
-- **Stake**: The amount of cryptocurrency held by a node, which influences its probability of being selected in sortition.
+- **Stake**: The amount of cryptocurrency a node holds, which influences its probability of being selected in sortition.
 
 - **Storage cost amortization**: A feature in the cost calculator that spreads storage costs over time, reducing upfront expenses.
 
