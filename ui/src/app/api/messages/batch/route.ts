@@ -46,25 +46,25 @@ export async function GET(req: Request, res: Response) {
             break;
           }
           if (
-            value.message.type === EMessageType.EndorserBlockGenerated ||
-            value.message.type === EMessageType.InputBlockGenerated ||
-            value.message.type === EMessageType.PraosBlockGenerated ||
+            value.message.type === EMessageType.EBGenerated ||
+            value.message.type === EMessageType.IBGenerated ||
+            value.message.type === EMessageType.RBGenerated ||
             value.message.type === EMessageType.TransactionGenerated
           ) {
             nodesUpdated.add(value.message.id);
           } else if (
-            value.message.type === EMessageType.EndorserBlockReceived ||
-            value.message.type === EMessageType.InputBlockReceived ||
-            value.message.type === EMessageType.PraosBlockReceived ||
-            value.message.type === EMessageType.VotesReceived ||
+            value.message.type === EMessageType.EBReceived ||
+            value.message.type === EMessageType.IBReceived ||
+            value.message.type === EMessageType.RBReceived ||
+            value.message.type === EMessageType.VTBundleReceived ||
             value.message.type === EMessageType.TransactionReceived
           ) {
             nodesUpdated.add(value.message.recipient.toString())
           } else if (
-            value.message.type === EMessageType.EndorserBlockSent ||
-            value.message.type === EMessageType.InputBlockSent ||
-            value.message.type === EMessageType.PraosBlockSent ||
-            value.message.type === EMessageType.VotesSent ||
+            value.message.type === EMessageType.EBSent ||
+            value.message.type === EMessageType.IBSent ||
+            value.message.type === EMessageType.RBSent ||
+            value.message.type === EMessageType.VTBundleSent ||
             value.message.type === EMessageType.TransactionSent
           ) {
             nodesUpdated.add(value.message.sender.toString())
@@ -77,7 +77,7 @@ export async function GET(req: Request, res: Response) {
         if (batch.length) {
           const serializedData = {
             ...aggregatedData,
-            progress: batch[batch.length - 1].time,
+            progress: batch[batch.length - 1].time_s,
             nodes: Array.from(aggregatedData.nodes.entries()),
             lastNodesUpdated: [...nodesUpdated],
           };

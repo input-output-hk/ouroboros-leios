@@ -52,18 +52,18 @@ export enum EMessageType {
   TransactionGenerated = "TransactionGenerated",
   TransactionReceived = "TransactionReceived",
   TransactionSent = "TransactionSent",
-  InputBlockGenerated = "InputBlockGenerated",
-  InputBlockReceived = "InputBlockReceived",
-  InputBlockSent = "InputBlockSent",
-  PraosBlockGenerated = "PraosBlockGenerated",
-  PraosBlockReceived = "PraosBlockReceived",
-  PraosBlockSent = "PraosBlockSent",
-  EndorserBlockGenerated = "EndorserBlockGenerated",
-  EndorserBlockReceived = "EndorserBlockReceived",
-  EndorserBlockSent = "EndorserBlockSent",
-  VotesGenerated = "VotesGenerated",
-  VotesReceived = "VotesReceived",
-  VotesSent = "VotesSent",
+  IBGenerated = "IBGenerated",
+  IBReceived = "IBReceived",
+  IBSent = "IBSent",
+  RBGenerated = "RBGenerated",
+  RBReceived = "RBReceived",
+  RBSent = "RBSent",
+  EBGenerated = "EBGenerated",
+  EBReceived = "EBReceived",
+  EBSent = "EBSent",
+  VTBundleGenerated = "VTBundleGenerated",
+  VTBundleReceived = "VTBundleReceived",
+  VTBundleSent = "VTBundleSent",
   Slot = "Slot",
 }
 
@@ -89,7 +89,7 @@ export interface ITransactionSent {
 }
 
 export interface IInputBlockGenerated {
-  type: EMessageType.InputBlockGenerated;
+  type: EMessageType.IBGenerated;
   id: string;
   slot: number;
   producer: number;
@@ -101,7 +101,7 @@ export interface IInputBlockGenerated {
 }
 
 export interface IInputBlockReceived {
-  type: EMessageType.InputBlockReceived;
+  type: EMessageType.IBReceived;
   id: string;
   slot: number;
   producer: number;
@@ -111,7 +111,7 @@ export interface IInputBlockReceived {
 }
 
 export interface IInputBlockSent {
-  type: EMessageType.InputBlockSent;
+  type: EMessageType.IBSent;
   id: string;
   slot: number;
   producer: number;
@@ -126,7 +126,7 @@ export interface ISlot {
 }
 
 export interface IPraosBlockGenerated {
-  type: EMessageType.PraosBlockGenerated;
+  type: EMessageType.RBGenerated;
   id: string;
   slot: number;
   producer: number;
@@ -142,7 +142,7 @@ export interface IEndorsement {
 }
 
 export interface IPraosBlockReceived {
-  type: EMessageType.PraosBlockReceived;
+  type: EMessageType.RBReceived;
   id: string;
   slot: number;
   sender: number;
@@ -150,7 +150,7 @@ export interface IPraosBlockReceived {
 }
 
 export interface IPraosBlockSent {
-  type: EMessageType.PraosBlockSent;
+  type: EMessageType.RBSent;
   slot: number;
   id: string;
   sender: number;
@@ -158,7 +158,7 @@ export interface IPraosBlockSent {
 }
 
 export interface IEndorserBlockGenerated {
-  type: EMessageType.EndorserBlockGenerated;
+  type: EMessageType.EBGenerated;
   id: string;
   slot: number;
   producer: number;
@@ -171,7 +171,7 @@ export interface IInputBlock {
 }
 
 export interface IEndorserBlockReceived {
-  type: EMessageType.EndorserBlockReceived;
+  type: EMessageType.EBReceived;
   id: string;
   slot: number;
   sender: number;
@@ -179,7 +179,7 @@ export interface IEndorserBlockReceived {
 }
 
 export interface IEndorserBlockSent {
-  type: EMessageType.EndorserBlockSent;
+  type: EMessageType.EBSent;
   slot: number;
   id: string;
   sender: number;
@@ -187,7 +187,7 @@ export interface IEndorserBlockSent {
 }
 
 export interface IVotesGenerated {
-  type: EMessageType.VotesGenerated;
+  type: EMessageType.VTBundleGenerated;
   id: string;
   slot: number;
   producer: string;
@@ -196,7 +196,7 @@ export interface IVotesGenerated {
 }
 
 export interface IVotesReceived {
-  type: EMessageType.VotesReceived;
+  type: EMessageType.VTBundleReceived;
   id: string;
   slot: number;
   sender: number;
@@ -204,7 +204,7 @@ export interface IVotesReceived {
 }
 
 export interface IVotesSent {
-  type: EMessageType.VotesSent;
+  type: EMessageType.VTBundleSent;
   slot: number;
   id: string;
   sender: number;
@@ -230,7 +230,7 @@ export type TMessageType =
   | ITransactionSent;
 
 export interface IServerMessage<T = TMessageType> {
-  time: number;
+  time_s: number;
   message: T;
 }
 

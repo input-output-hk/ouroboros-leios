@@ -40,35 +40,35 @@ enum CpuTask {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A Praos block has been generated and is ready to propagate
-    PraosBlockGenerated(Block),
+    RBBlockGenerated(Block),
     /// A Praos block has been received and validated, and is ready to propagate
-    PraosBlockValidated(NodeId, Arc<Block>),
+    RBBlockValidated(NodeId, Arc<Block>),
     /// An input block has been generated and is ready to propagate
-    InputBlockGenerated(InputBlock),
+    IBBlockGenerated(InputBlock),
     /// An input block has been received and validated, and is ready to propagate
-    InputBlockValidated(NodeId, Arc<InputBlock>),
+    IBBlockValidated(NodeId, Arc<InputBlock>),
     /// An endorser block has been generated and is ready to propagate
-    EndorserBlockGenerated(EndorserBlock),
+    EBBlockGenerated(EndorserBlock),
     /// An endorser block has been received and validated, and is ready to propagate
-    EndorserBlockValidated(NodeId, Arc<EndorserBlock>),
+    EBBlockValidated(NodeId, Arc<EndorserBlock>),
     /// A bundle of votes has been generated and is ready to propagate
-    VoteBundleGenerated(VoteBundle),
+    VTBundleGenerated(VoteBundle),
     /// A bundle of votes has been received and validated, and is ready to propagate
-    VoteBundleValidated(NodeId, Arc<VoteBundle>),
+    VTBundleValidated(NodeId, Arc<VoteBundle>),
 }
 
 impl CpuTask {
     fn task_type(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "TransactionValidated",
-            Self::PraosBlockGenerated(_) => "PraosBlockGenerated",
-            Self::PraosBlockValidated(_, _) => "PraosBlockValidated",
-            Self::InputBlockGenerated(_) => "InputBlockGenerated",
-            Self::InputBlockValidated(_, _) => "InputBlockValidated",
-            Self::EndorserBlockGenerated(_) => "EndorserBlockGenerated",
-            Self::EndorserBlockValidated(_, _) => "EndorserBlockValidated",
-            Self::VoteBundleGenerated(_) => "VoteBundleGenerated",
-            Self::VoteBundleValidated(_, _) => "VoteBundleValidated",
+            Self::RBBlockGenerated(_) => "PraosBlockGenerated",
+            Self::RBBlockValidated(_, _) => "PraosBlockValidated",
+            Self::IBBlockGenerated(_) => "InputBlockGenerated",
+            Self::IBBlockValidated(_, _) => "InputBlockValidated",
+            Self::EBBlockGenerated(_) => "EndorserBlockGenerated",
+            Self::EBBlockValidated(_, _) => "EndorserBlockValidated",
+            Self::VTBundleGenerated(_) => "VoteBundleGenerated",
+            Self::VTBundleValidated(_, _) => "VoteBundleValidated",
         }
         .to_string()
     }
@@ -76,14 +76,14 @@ impl CpuTask {
     fn extra(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "".to_string(),
-            Self::PraosBlockGenerated(_) => "".to_string(),
-            Self::PraosBlockValidated(_, _) => "".to_string(),
-            Self::InputBlockGenerated(id) => id.header.id.to_string(),
-            Self::InputBlockValidated(_, id) => id.header.id.to_string(),
-            Self::EndorserBlockGenerated(_) => "".to_string(),
-            Self::EndorserBlockValidated(_, _) => "".to_string(),
-            Self::VoteBundleGenerated(_) => "".to_string(),
-            Self::VoteBundleValidated(_, _) => "".to_string(),
+            Self::RBBlockGenerated(_) => "".to_string(),
+            Self::RBBlockValidated(_, _) => "".to_string(),
+            Self::IBBlockGenerated(id) => id.header.id.to_string(),
+            Self::IBBlockValidated(_, id) => id.header.id.to_string(),
+            Self::EBBlockGenerated(_) => "".to_string(),
+            Self::EBBlockValidated(_, _) => "".to_string(),
+            Self::VTBundleGenerated(_) => "".to_string(),
+            Self::VTBundleValidated(_, _) => "".to_string(),
         }
     }
 }
@@ -305,7 +305,7 @@ impl Node {
         let cpu_times = &self.sim_config.cpu_times;
         match task {
             CpuTask::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
-            CpuTask::PraosBlockGenerated(block) => {
+            CpuTask::RBBlockGenerated(block) => {
                 let mut time = cpu_times.rb_generation;
                 if let Some(endorsement) = &block.endorsement {
                     let nodes = endorsement
@@ -319,7 +319,7 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::PraosBlockValidated(_, rb) => {
+            CpuTask::RBBlockValidated(_, rb) => {
                 let mut time = cpu_times.rb_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += cpu_times.rb_validation_per_byte * (bytes as u32);
@@ -335,15 +335,15 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::InputBlockGenerated(_) => vec![cpu_times.ib_generation],
-            CpuTask::InputBlockValidated(_, ib) => vec![
+            CpuTask::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTask::IBBlockValidated(_, ib) => vec![
                 cpu_times.ib_head_validation
                     + cpu_times.ib_body_validation_constant
                     + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
             ],
-            CpuTask::EndorserBlockGenerated(_) => vec![cpu_times.eb_generation],
-            CpuTask::EndorserBlockValidated(_, _) => vec![cpu_times.eb_validation],
-            CpuTask::VoteBundleGenerated(votes) => votes
+            CpuTask::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
+            CpuTask::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
+            CpuTask::VTBundleGenerated(votes) => votes
                 .ebs
                 .keys()
                 .map(|eb_id| {
@@ -354,7 +354,7 @@ impl Node {
                         + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
                 })
                 .collect(),
-            CpuTask::VoteBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
+            CpuTask::VTBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
                 .take(votes.ebs.len())
                 .collect(),
         }
@@ -398,14 +398,14 @@ impl Node {
                             self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, task.extra());
                             match task {
                                 CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
-                                CpuTask::PraosBlockGenerated(block) => self.finish_generating_block(block)?,
-                                CpuTask::PraosBlockValidated(from, block) => self.finish_validating_block(from, block)?,
-                                CpuTask::InputBlockGenerated(ib) => self.finish_generating_ib(ib)?,
-                                CpuTask::InputBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
-                                CpuTask::EndorserBlockGenerated(eb) => self.finish_generating_eb(eb)?,
-                                CpuTask::EndorserBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
-                                CpuTask::VoteBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
-                                CpuTask::VoteBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
+                                CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block)?,
+                                CpuTask::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
+                                CpuTask::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTask::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
+                                CpuTask::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
+                                CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                                CpuTask::VTBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
+                                CpuTask::VTBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
                             }
                         }
                     }
@@ -564,7 +564,7 @@ impl Node {
                     bytes,
                     ibs,
                 };
-                self.schedule_cpu_task(CpuTask::EndorserBlockGenerated(eb));
+                self.schedule_cpu_task(CpuTask::EBBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
                 return;
             }
@@ -630,7 +630,7 @@ impl Node {
             ebs: ebs.into_iter().map(|eb| (eb, votes_allowed)).collect(),
         };
         if !votes.ebs.is_empty() {
-            self.schedule_cpu_task(CpuTask::VoteBundleGenerated(votes));
+            self.schedule_cpu_task(CpuTask::VTBundleGenerated(votes));
         }
     }
 
@@ -645,7 +645,7 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            self.schedule_cpu_task(CpuTask::InputBlockGenerated(ib));
+            self.schedule_cpu_task(CpuTask::IBBlockGenerated(ib));
         }
     }
 
@@ -696,7 +696,7 @@ impl Node {
             transactions,
         };
         self.tracker.track_praos_block_lottery_won(&block);
-        self.schedule_cpu_task(CpuTask::PraosBlockGenerated(block));
+        self.schedule_cpu_task(CpuTask::RBBlockGenerated(block));
 
         Ok(())
     }
@@ -847,7 +847,7 @@ impl Node {
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
-        self.schedule_cpu_task(CpuTask::PraosBlockValidated(from, block));
+        self.schedule_cpu_task(CpuTask::RBBlockValidated(from, block));
     }
 
     fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
@@ -960,7 +960,7 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
-        self.schedule_cpu_task(CpuTask::InputBlockValidated(from, ib));
+        self.schedule_cpu_task(CpuTask::IBBlockValidated(from, ib));
     }
 
     fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
@@ -1043,7 +1043,7 @@ impl Node {
 
     fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         self.tracker.track_eb_received(eb.id(), from, self.id);
-        self.schedule_cpu_task(CpuTask::EndorserBlockValidated(from, eb));
+        self.schedule_cpu_task(CpuTask::EBBlockValidated(from, eb));
     }
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
@@ -1088,7 +1088,7 @@ impl Node {
 
     fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
         self.tracker.track_votes_received(&votes, from, self.id);
-        self.schedule_cpu_task(CpuTask::VoteBundleValidated(from, votes));
+        self.schedule_cpu_task(CpuTask::VTBundleValidated(from, votes));
     }
 
     fn finish_validating_vote_bundle(
