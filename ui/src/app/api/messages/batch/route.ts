@@ -26,6 +26,8 @@ export async function GET(req: Request, res: Response) {
     };
     const intermediate: ISimulationIntermediateDataState = {
       txs: [],
+      leiosTxs: new Set(),
+      praosTxs: new Set(),
       ibs: new Map(),
       ebs: new Map(),
       bytes: new Map(),

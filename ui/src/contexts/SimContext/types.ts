@@ -102,6 +102,8 @@ export interface ISimulationIntermediateEndorsementBlock {
 
 export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
+  praosTxs: Set<number>;
+  leiosTxs: Set<number>;
   ibs: Map<string, ISimulationIntermediateInputBlock>;
   ebs: Map<string, ISimulationIntermediateEndorsementBlock>;
   bytes: Map<string, number>,

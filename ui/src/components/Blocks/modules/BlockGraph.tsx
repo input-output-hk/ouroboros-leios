@@ -14,8 +14,8 @@ export const BlockGraph: FC = ({ }) => {
 
   const data = useMemo(() => {
     return blocks.map(b => {
-      const praosTx = b.txs.length;
-      const leiosTx = b.cert?.eb.ibs.reduce((sum, ib) => sum + ib.txs.length, 0) ?? 0;
+      const praosTx = b.txs.reduce((txs, tx) => { txs.add(tx.id); return txs; }, new Set()).size;
+      const leiosTx = b.cert?.eb.ibs.reduce((txs, ib) => { ib.txs.forEach(tx => txs.add(tx.id)); return txs }, new Set()).size ?? 0;
       return {
         name: `Slot ${b.slot}`,
         praosTx,

@@ -116,15 +116,20 @@ export const processMessage = (
       txs: message.transactions.map(id => intermediate.txs[id]),
       cert: null,
     };
-    const praosTx = message.transactions.length;
-    let leiosTx = 0;
+    for (const id of message.transactions) {
+      intermediate.praosTxs.add(id);
+    }
     if (message.endorsement != null) {
       bytes += message.endorsement.bytes;
       const ebId = message.endorsement.eb.id;
       const eb = intermediate.ebs.get(ebId)!;
       const ibs = eb.ibs.map(id => {
         const ib = intermediate.ibs.get(id)!;
-        leiosTx += ib.txs.length;
+        for (const tx of ib.txs) {
+          if (!intermediate.praosTxs.has(tx)) {
+            intermediate.leiosTxs.add(tx);
+          }
+        }
         const txs = ib.txs.map(tx => intermediate.txs[tx]);
         return {
           id,
@@ -144,8 +149,8 @@ export const processMessage = (
       }
     }
     intermediate.bytes.set(`pb-${message.id}`, bytes);
-    aggregatedData.global.praosTxOnChain += praosTx;
-    aggregatedData.global.leiosTxOnChain += leiosTx;
+    aggregatedData.global.praosTxOnChain = intermediate.praosTxs.size;
+    aggregatedData.global.leiosTxOnChain = intermediate.leiosTxs.size;
     aggregatedData.blocks.push(block);
   } else if (message.type === EMessageType.RBSent) {
     incrementNodeAggregationData(
