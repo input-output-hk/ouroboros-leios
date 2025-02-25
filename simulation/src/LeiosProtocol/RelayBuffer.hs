@@ -11,6 +11,7 @@ module LeiosProtocol.RelayBuffer where
 import Data.FingerTree (FingerTree)
 import qualified Data.FingerTree as FingerTree
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -131,6 +132,13 @@ filter p RelayBuffer{..} =
     }
  where
   filtered = Prelude.filter p $ Foldable.toList entries
+
+partition :: Ord key => (EntryWithTicket key value -> Bool) -> RelayBuffer key value -> (RelayBuffer key value, RelayBuffer key value)
+partition p RelayBuffer{..} = (rebuildRelayBufferFor entryListTrue, rebuildRelayBufferFor entryListFalse)
+ where
+  (entryListTrue, entryListFalse) = List.partition p (Foldable.toList entries)
+  restrictedIndexFor = Map.restrictKeys index . Set.fromList . map (.key)
+  rebuildRelayBufferFor entryList = RelayBuffer{entries = FingerTree.fromList entryList, index = restrictedIndexFor entryList, nextTicket}
 
 values :: Ord key => RelayBuffer key value -> [value]
 values = map value . toList
