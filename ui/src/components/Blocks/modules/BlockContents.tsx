@@ -1,19 +1,30 @@
 import { ISimulationBlock, ISimulationTransaction } from '@/contexts/SimContext/types';
+import cx from "classnames";
+import { CSSProperties, FC, MouseEvent, PropsWithChildren, useMemo, useState } from "react";
+
 import { printBytes } from '@/utils';
-import Highcharts from 'highcharts';
-import HighchartsReact from 'highcharts-react-official';
-import { FC, useMemo, useState } from "react";
-
-// highcharts modules can only load client-side
-if (typeof window === 'object') {
-  await import('highcharts/modules/sankey');
-  await import('highcharts/modules/organization');
-}
-
-type NodeOptions = Highcharts.SeriesSankeyNodesOptionsObject & { width?: number };
+import classes from "./styles.module.css";
 
 export interface IBlockContentsProps {
   block: ISimulationBlock;
+}
+
+interface IBoxProps extends PropsWithChildren {
+  className?: string;
+  style?: CSSProperties;
+  selected?: boolean;
+  select?: (e: MouseEvent) => void;
+}
+
+const Box: FC<IBoxProps> = ({ selected, select, children, className, style }) => {
+  const color = selected ? "border-black" : "border-gray-400";
+  return (
+    <span className={cx("border-2 border-solid min-h-24 max-h-48 w-48 flex flex-col items-center justify-center text-center", color, { 'cursor-pointer': !!select }, { [classes.selected]: selected }, className)} style={style}
+      onMouseEnter={select}
+      onMouseMove={select} >
+      {children}
+    </span >
+  )
 }
 
 interface ITXStats {
@@ -29,13 +40,14 @@ interface IStatsProps {
   txs: ISimulationTransaction[] | null;
   breakdown: [string, number][];
   position: [number, number];
+  onMouseMove: (event: MouseEvent) => void;
 }
 
-const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top] }) => {
+const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, top], onMouseMove }) => {
   const txBytes = txs?.reduce((sum, tx) => sum + tx.bytes, 0) ?? 0;
   const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
-    <div className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
+    <div onMouseMove={onMouseMove} className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
       <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
         <div className="border-2 border-black rounded p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
@@ -58,18 +70,6 @@ interface SelectState {
 }
 
 export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
-  const allTxs = useMemo(() => {
-    const txs = new Set<number>();
-    for (const tx of block.txs) {
-      txs.add(tx.id);
-    }
-    for (const ib of block.cert?.eb.ibs ?? []) {
-      for (const tx of ib.txs) {
-        txs.add(tx.id);
-      }
-    }
-    return txs;
-  }, [block])
   const stats = useMemo(() => {
     const result: Map<string, ITXStats> = new Map();
     const breakdown: [string, number][] = [
@@ -106,114 +106,62 @@ export const BlockContents: FC<IBlockContentsProps> = ({ block }) => {
   }, [block]);
 
   const [selected, setSelected] = useState<SelectState | null>(null);
-
-  const options = useMemo(() => {
-    const eb = block.cert?.eb;
-    const ibs = block.cert?.eb?.ibs ?? [];
-
-    const nodes: NodeOptions[] = [
-      {
-        id: 'block',
-        name: 'Block',
-        title: `Slot ${block.slot}, ${block.txs.length} TX(s)`,
-        width: 200,
-        height: 100,
-      }
-    ];
-    const edges: Highcharts.SeriesSankeyPointOptionsObject[] = [
-      { from: 'block' },
-    ];
-
-    if (eb) {
-      nodes.push({
-        id: 'eb',
-        name: 'Endorsement Block',
-        title: `Slot ${eb.slot}`,
-        width: 200,
+  const selectBox = (box: string | null) => (e: MouseEvent) => {
+    e.stopPropagation();
+    if (box) {
+      setSelected({
+        key: box,
+        position: [e.pageX, e.pageY],
       });
-      edges.push({ from: 'block', to: 'eb' });
+    } else {
+      setSelected(null);
     }
+  };
 
-    for (const ib of ibs) {
-      const node: NodeOptions = {
-        id: ib.id,
-        name: 'Input Block',
-        title: `Slot ${ib.slot}, ${ib.txs.length} TX(s)`,
-        height: Math.max(50, 100 * Math.min(ib.txs.length / block.txs.length, 200)),
-      };
-      if (ibs.length <= 3) {
-        node.width = 200;
-      }
-      nodes.push(node);
-      edges.push({ from: 'eb', to: ib.id });
-    }
-
-    const series: Highcharts.SeriesOrganizationOptions = {
-      type: 'organization',
-      data: edges,
-      levels: [
-        {
-          level: 0,
-          color: '#8884d8'
-        },
-        {
-          level: 1,
-          color: '#cccccc'
-        },
-        {
-          level: 2,
-          color: '#82ca9d'
-        }
-      ],
-      nodes,
-      colorByPoint: false,
-      nodeWidth: 100,
-      events: {
-        click(event: any) {
-          const id = event.point.id as string;
-          event.stopPropagation();
-          setSelected({
-            key: id,
-            position: [event.pageX, event.pageY],
-          });
-        }
-      }
-    };
-
-    const title = 'Block Transactions';
-    const subtitle = allTxs.size === 1 ? `1 transaction` : `${allTxs.size} transactions`;
-    const options: Highcharts.Options = {
-      chart: {
-        inverted: true,
-        width: 640,
-        height: 500,
-        events: {
-          click() {
-            setSelected(null);
-          }
-        },
-      },
-      title: {
-        text: `<h2 class="font-bold text-xl">${title}</h2><h3 class="font-bold text-l">${subtitle}</h3>`,
-        useHTML: true,
-      },
-      tooltip: {
-        enabled: false,
-      },
-      series: [series],
-    };
-    return options;
-  }, [block]);
-
+  const eb = block.cert?.eb;
+  const ibs = block.cert?.eb?.ibs ?? [];
 
   return (
     <>
-      {selected && <Stats {...stats.get(selected.key)!} position={selected.position} />}
-      <HighchartsReact
-        highcharts={Highcharts}
-        options={options}
-        allowChartUpdate={false}
-      />
+      {selected && <Stats {...stats.get(selected.key)!} position={selected.position} onMouseMove={selectBox(selected.key)} />}
+
+      <div className='flex flex-col w-full h-3/5 items-center' onMouseMove={selectBox(null)}>
+        <h2 className='font-bold text-xl'>Block Transactions</h2>
+        <div className="flex flex-col w-full h-full items-center justify-center">
+          <div className={classes.block}>
+            <Box selected={selected?.key === "block"} select={selectBox("block")}>
+              Block
+              <span className='text-sm'>Slot {block.slot}, {block.txs.length} TX</span>
+            </Box>
+          </div>
+          {eb && (<span className="flex flex-none w-[2px] h-[50px] bg-black" />)}
+          {eb && (
+            <div className={classes.endorser}>
+              <Box selected={selected?.key === "eb"} select={selectBox("eb")}>
+                Endorsement Block
+                <span className='text-sm'>Slot {eb.slot}</span>
+              </Box>
+            </div>
+          )}
+          {ibs.length ? <>
+            <span className="flex flex-none w-[2px] h-[25px] bg-black" />
+            <div className={cx("border-2 p-[25px] border-black max-w-[80vw] overflow-scroll")}>
+              <div className="flex gap-2">
+                {ibs.map(ib => {
+                  const isSelected = selected?.key === ib.id;
+                  const proportion = Math.min(100, ib.txs.length * 1000 / block.txs.length);
+                  return (
+                    <Box key={ib.id} style={{ backgroundColor: `color-mix(in hsl, white, #82ca9d ${proportion}%)` }} selected={isSelected} select={selectBox(ib.id)} className={classes.input}>
+                      {isSelected ? 'Input Block' : 'IB'}
+                      <span className="text-sm">Slot&nbsp;{ib.slot}, {ib.txs.length}&nbsp;TX</span>
+                    </Box>
+                  );
+                })}
+              </div>
+            </div>
+          </> : null}
+        </div>
+      </div>
     </>
   );
 }

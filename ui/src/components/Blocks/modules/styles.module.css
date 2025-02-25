@@ -2,43 +2,19 @@
   position: relative;
 }
 
-.endorser.has-ibs::before {
-  background: black;
-  display: block;
-  position: absolute;
-  content: "";
-  top: calc(50% - 3px);
-  right: calc(100% - 1.5rem);
-  height: 2px;
-  width: 1.5rem;
-}
-
 .block {
   position: relative;
-}
-
-.block.has-eb::before {
-  background: black;
-  display: block;
-  position: absolute;
-  content: "";
-  top: calc(50% - 3px);
-  right: calc(100% - 1rem);
-  height: 2px;
-  width: 2rem;
+  background-color: #8884d8;
 }
 
 .input {
   position: relative;
+  transition-property: flex-shrink;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0, 0, 0.0, 1.0);
+  flex-shrink: 1;
 }
 
-.input::after {
-  background: black;
-  display: block;
-  position: absolute;
-  content: "";
-  top: calc(50% - 3px);
-  left: 100%;
-  height: 2px;
-  width: calc(1.5rem + 2px);
+.input.selected {
+  flex-shrink: 0;
 }
