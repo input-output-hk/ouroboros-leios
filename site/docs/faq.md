@@ -8,13 +8,13 @@ sidebar_position: 6
 
 Ouroboros Leios is a next-generation blockchain consensus protocol designed to improve transaction throughput and reduce latency by using a pipelined endorsing process. It builds upon the core Ouroboros principles (as used by Cardano), introducing separate input blocks (IBs) for transactions and endorser blocks (EBs) that reference those transactions, thus enhancing scalability.
 
-## What are the key benefits of Leios compared with traditional Ouroboros?
+## What are the key benefits of Leios over other Ouroboros protocols?
 
 Leios offers several significant advantages:
 
 - **Higher throughput and lower latency.** By splitting transaction processing into IB and EB stages, Leios handles more transactions in parallel.
 - **Flexible diffusion strategies.** Nodes can choose different block-propagation methods, such as 'freshest-first' or 'oldest-first.'
-- **Enhanced cryptography.** Leios uses BLS (Boneh–Lynn–Shacham) signatures for aggregated verification and verifiable random functions (VRFs) for leader selection.
+- **Enhanced cryptography.** Leios uses Boneh–Lynn–Shacham (BLS) signatures for aggregated verification and verifiable random functions (VRFs) for leader selection.
 - **Robust simulations and formal methods.** Rust and Haskell simulations measure real-world performance, and executable specifications help ensure correctness.
 - **Scalable cost model.** A cost calculator enables node operators to estimate expenses (for example, storage amortization and CPU usage).
 
@@ -47,11 +47,11 @@ Leios supports multiple strategies for propagating blocks and votes:
 
 - **Oldest-first:** prioritizes older blocks or transactions
 - **Freshest-first:** focuses on the newest blocks or transactions first
-- **Peer-order:** requests blocks in the order peers announce them
+- **Peer-order:** requests blocks in the order peers announce them.
 
 Your choice of strategy can affect latency, network load, and overall throughput.
 
-## Can the system be sharded or self-regulate?
+## Can the system be sharded or self-regulated?
 
 Not in its current design. Every node validates the entire chain. Thus, adding more nodes does not inherently increase throughput in the same way sharded protocols do. The community votes on protocol parameters (for example, block size), and the system's load is the same for all. Future research may explore sharding, but it is not yet part of Leios.
 
@@ -72,7 +72,7 @@ Leios provides an online cost calculator that considers:
 - **CPU usage and the number of cores**
 - **Bandwidth consumption**
 - **Storage** (including the default assumption of 50% disk compression)
-- **Perpetual storage cost amortization**
+- **Perpetual storage cost amortization**.
 
 It also supports hyperscale and discount cloud providers. For example, you can model single-relay or multi-relay deployments at variable bandwidths.
 
@@ -83,7 +83,7 @@ Two primary simulation frameworks (Rust and Haskell) are maintained to:
 - Test network topologies and measure real or simulated latencies (using the DeltaQ model)
 - Evaluate CPU usage for blocks and transactions under varying loads
 - Visualize block diffusion (IBs, EBs, and RBs) using different strategies
-- Compare ideal conditions vs realistic mainnet-like topologies
+- Compare ideal conditions vs realistic mainnet-like topologies.
 
 Developers continually refine these simulations based on real-world data.
 
@@ -93,7 +93,7 @@ Based on preliminary internal testing and simulations:
 
 - **Block size:** commonly set to about one-third of the available link capacity for IBs
 - **Voting stages:** choose single-stage or send-recv, depending on reliability and speed requirements
-- **Diffusion strategy:** many operators use 'freshest-first,' though 'peer-order' may help maintain compatibility with older setups
+- **Diffusion strategy:** many operators use 'freshest-first,' though 'peer-order' may help maintain compatibility with older setups.
 
 Operators can adjust these parameters, which evolve through community votes.
 
@@ -108,19 +108,19 @@ You can follow:
 
 These resources provide transparency and regular updates on ongoing development.
 
-## What are downstream effects of deploying Leios?
+## What are the downstream effects of deploying Leios?
 
 Leios changes how transactions are validated and how blocks and memory pools operate, potentially affecting:
 
 - **Wallets and SDKs,** which need to accommodate new block types (IBs and EBs)
 - **Explorers,** which must handle higher throughput and multi-block referencing
-- **Indexers and APIs,** which will see more granular block and vote data
+- **Indexers and APIs,** which will see more granular block and vote data.
 
-Weekly progress updates provide deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.
+Weekly progress updates provide a deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.
 
-## Could the mempool be sized to the throughput of the system?
+## Could the mempool be sized according to the system's throughput?
 
-That's already the case. Default mempool size is a small multiple of current block size.
+That's already the case. The default mempool size is a small multiple of the current block size.
 
 ## Is Leios production-ready?
 
