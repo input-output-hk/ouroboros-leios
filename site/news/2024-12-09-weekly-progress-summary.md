@@ -1,5 +1,5 @@
 ---
-title: Weekly progress summary – December 9, 2024
+title: Weekly Summary – December 9, 2024
 authors:
 - will
 tags: [progress, update, weekly]

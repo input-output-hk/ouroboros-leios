@@ -1,5 +1,5 @@
 ---
-title: Weekly progress summary – January 6, 2025
+title: Weekly Summary – January 6, 2025
 authors:
 - will
 tags: [progress, update, weekly]

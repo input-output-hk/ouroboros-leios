@@ -48,7 +48,7 @@ const config: Config = {
                     path: "news/",
                     routeBasePath: "news",
                     blogTitle: "News",
-                    blogSidebarTitle: "Latest News",
+                    blogSidebarTitle: "Weekly updates",
                     sortPosts: "descending",
                     showReadingTime: true,
                     authorsMapPath: "../authors.yaml",
@@ -81,7 +81,7 @@ const config: Config = {
                     position: "left",
                     label: "Documentation",
                 },
-                { to: "/news", label: "Latest News", position: "right" },
+                { to: "/news", label: "Weekly updates", position: "right" },
                 {
                     type: "dropdown",
                     label: "Tools",

@@ -1,5 +1,5 @@
 ---
-title: Weekly Progress Summary - November 18, 2024
+title: Weekly Summary - November 18, 2024
 authors:
 - will
 tags: [progress, update, weekly]

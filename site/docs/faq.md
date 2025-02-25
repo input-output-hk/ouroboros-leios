@@ -101,7 +101,7 @@ Operators can adjust these parameters, which evolve through community votes.
 
 You can follow:
 
-- Weekly progress updates on the Ouroboros Leios site
+- Weekly updates on the Ouroboros Leios site
 - Technical reports for deeper insights
 - Leios glossary for definitions of commonly used terms
 - Public GitHub repositories that host source code and simulations
@@ -116,7 +116,7 @@ Leios changes how transactions are validated and how blocks and memory pools ope
 - **Explorers,** which must handle higher throughput and multi-block referencing
 - **Indexers and APIs,** which will see more granular block and vote data.
 
-Weekly progress updates provide a deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.
+Weekly updates provide a deeper analysis of these topics, including how advanced indexing and potential sharding solutions might eventually mitigate challenges.
 
 ## Could the mempool be sized according to the system's throughput?
 
@@ -124,4 +124,4 @@ That's already the case. The default mempool size is a small multiple of the cur
 
 ## Is Leios production-ready?
 
-Leios remains an active research and development protocol. It is backed by a robust formal methods framework and two major simulation environments. However, it has not reached full production status. Watch the official progress updates and technical reports for major release announcements.
+Leios remains an active research and development protocol. It is backed by a robust formal methods framework and two major simulation environments. However, it has not reached full production status. Watch the official updates and technical reports for major release announcements.

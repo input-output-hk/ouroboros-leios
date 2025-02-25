@@ -1,5 +1,5 @@
 ---
-title: Weekly Progress Summary - October 21, 2024
+title: Weekly Summary - October 21, 2024
 authors:
 - will
 tags: [progress, update, weekly]

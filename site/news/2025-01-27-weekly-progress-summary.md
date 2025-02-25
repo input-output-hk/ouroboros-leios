@@ -1,5 +1,5 @@
 ---
-title: Weekly progress summary – January 27, 2025
+title: Weekly Summary – January 27, 2025
 authors:
 - will
 tags: [progress, update, weekly]

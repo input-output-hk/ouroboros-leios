@@ -1,5 +1,5 @@
 ---
-title: Weekly Progress Summary - December 2, 2024
+title: Weekly Summary - December 2, 2024
 authors:
 - will
 tags: [progress, update, weekly]

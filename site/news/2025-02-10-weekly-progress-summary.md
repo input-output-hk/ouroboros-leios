@@ -1,5 +1,5 @@
 ---
-title: Weekly progress summary – February 10, 2025
+title: Weekly Summary – February 10, 2025
 authors:
 - will
 tags: [progress, update, weekly]
