@@ -47,8 +47,30 @@
 \section{Summary}
 \label{summary}
 
-\todo{List/name scenarios}
-\section{Scenario 1}
+Most idealized setting for the simulation:
+\begin{itemize}
+\item Nodes request block bodies from every peer.
+\item Mini-protocols are each run on a dedicated connection.
+\item The network model is a simplified one where packets are sent in-order and
+  limited only by latency and bandwidth.
+\item An unbounded number of CPU intensive tasks, like validation, are simulated to run in parallel.
+\item Delays and sizes for blocks are kept uniform.
+\end{itemize}
+
+Scenarios proceed from most idealized and gradually turn one more realism feature:
+\begin{enumerate}
+\item \label{sc:most-idealized} most idealized.
+\item \label{sc:request-from-first} nodes request block bodies from first peer available.
+\item \label{sc:multiplexing} mini-protocols are multiplexed over one connection.
+\item \label{sc:tcp} network layer more closely models TCP, in particular acks
+  and congestion window collapse/restart.
+\item \label{sc:boundedcpu} nodes simulate CPU tasks with a finite number of worker threads.
+\item \label{sc:order} request IB bodies in oldest-first order.
+\end{enumerate}
+The last scenario is not strictly about realism, but we rather want to
+investigate the impact of deviating from the freshest-first default.
+
+\section{Scenario \ref{sc:most-idealized}}
 \label{scenario1}
 The least realistic scenario. Config:
 \lstinputlisting[firstline=7]{scenario1/config.yaml}
@@ -131,7 +153,7 @@ Votes all get sent at the start of the slice, with default configuration at leas
         \label{scenario1:rb0.98}
     \end{subfigure}
 
-    \caption{Scenario 1, diffusion latencies from slot start (300s run with default seed).}
+    \caption{Scenario \ref{sc:most-idealized}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1}
 \end{figure}
 
@@ -139,7 +161,7 @@ Votes all get sent at the start of the slice, with default configuration at leas
 The diffusion latencies, in Fig. \ref{fig:scenario1-send-recv}, stay very
 similar when the simulation is set to generate votes across the whole stage
 rather than only in the first slot.
-From second $80$ to $300$ we have $\tilde1100$ vote messages, for an average of $\tilde5$
+From second $80$ to $300$ we have $\sim 1100$ vote messages, for an average of $\sim 5$
 VT/s, same as IBs. The traffic pattern then does not seem a factor in the observed behaviour.
 \begin{figure}[htbp]
     \centering
@@ -156,7 +178,7 @@ VT/s, same as IBs. The traffic pattern then does not seem a factor in the observ
         \caption{VT diffusion to $0.98$ stake.}
         \label{scenario1-send-recv:vt0.98}
     \end{subfigure}
-    \caption{Scenario 1 with \textbf{uniform voting}, diffusion latencies from slot start (300s run with default seed).}
+    \caption{Scenario \ref{sc:most-idealized} with \textbf{uniform voting}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1-send-recv}
 \end{figure}
 
@@ -165,7 +187,7 @@ The diffusion latencies, in Fig. \ref{fig:scenario1-big-votes} and
 \ref{fig:scenario1-big-votes-send-recv}, are collected for votes set to the size
 of input blocks. With start-of-stage voting (the default) we see diffusion running
 slightly slower than ideal with $4$ latencies, while uniform voting has a very
-close fit. The delay in the former is possibly due to the $\tilde0.05s$
+close fit. The delay in the former is possibly due to the $\sim 0.05s$
 serialization time causing blocks to queue behind each other when they are all
 generated at once: the volume of data, $102400*100$, is $5$ times the bandwidth
 of any given link, and nodes are requesting bodies from everyone.
@@ -185,7 +207,7 @@ of any given link, and nodes are requesting bodies from everyone.
         \caption{VT diffusion to $0.98$ stake.}
         \label{scenario1-big-votes:vt0.98}
     \end{subfigure}
-    \caption{Scenario 1 with \textbf{large votes, start-of-stage voting}, diffusion latencies from slot start (300s run with default seed).}
+    \caption{Scenario \ref{sc:most-idealized} with \textbf{large votes, start-of-stage voting}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1-big-votes}
 \end{figure}
 \begin{figure}[htbp]
@@ -203,7 +225,7 @@ of any given link, and nodes are requesting bodies from everyone.
         \caption{VT diffusion to $0.98$ stake.}
         \label{scenario1-big-votes-send-recv:vt0.98}
     \end{subfigure}
-    \caption{Scenario 1 with \textbf{large votes, uniform voting}, diffusion latencies from slot start (300s run with default seed).}
+    \caption{Scenario \ref{sc:most-idealized} with \textbf{large votes, uniform voting}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1-big-votes-send-recv}
 \end{figure}
 

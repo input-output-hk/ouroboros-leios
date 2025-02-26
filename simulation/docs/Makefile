@@ -28,13 +28,14 @@ CDFSSCRIPT = ../gnuplot/latency_cdfs.gp
 CDFSPLOT = gnuplot -e "set terminal postscript eps enhanced color; set output '$@'" -c $(CDFSSCRIPT)
 
 
-
 SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$@" short-leios --no-log
 
 %/sim-data.json: %/config.yaml %/topology.yaml
 	$(SHORT_LEIOS) -l "$(word 1, $^)" -t "$(word 2, $^)" +RTS -s
 
 %/sim-data.json: SIM_SECONDS=300
+
+all_sims: $(shell ls */report-config.yaml | sed -e's/report-config.yaml/sim-data.json/')
 
 SCENARIOS = $(shell ls */report-config.yaml | sed -e's/report-config.yaml//')
 
@@ -47,7 +48,7 @@ endef
 
 $(foreach s,$(SCENARIOS),$(eval $(call scenario_template,$(s))))
 
-.PRECIOUS: %/.ran-report-data
+.PRECIOUS:
 %/.ran-report-data: %/report-config.yaml %/sim-data.json
 	cabal run ols -- report-data -o "$(dir $@)" -c $^
 	touch "$@"
