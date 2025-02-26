@@ -8,6 +8,8 @@ export interface Config {
   "tcp-congestion-control": boolean;
   /** Only supported by Haskell simulation. */
   "multiplex-mini-protocols": boolean;
+  /** Only supported by Rust simulation. */
+  "simulate-transactions": boolean;
 
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
@@ -38,7 +40,6 @@ export interface Config {
   "rb-body-max-size-bytes": bigint;
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-constant": number;
   "rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte": number;
-  /** Only supported by Haskell simulation. */
   "rb-body-legacy-praos-payload-avg-size-bytes": bigint;
 
   // Input Block Configuration
@@ -50,7 +51,6 @@ export interface Config {
   "ib-head-validation-cpu-time-ms": number;
   "ib-body-validation-cpu-time-ms-constant": number;
   "ib-body-validation-cpu-time-ms-per-byte": number;
-  /** Only supported by Haskell simulation. */
   "ib-body-avg-size-bytes": bigint;
   /** Only supported by Rust simulation. */
   "ib-body-max-size-bytes": bigint;

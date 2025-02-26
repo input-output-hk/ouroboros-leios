@@ -14,6 +14,7 @@
 relay-strategy: "request-from-first"
 tcp-congestion-control: true
 multiplex-mini-protocols: true
+simulate-transactions: true
 
 ################################################################################
 # Leios Protocol Configuration

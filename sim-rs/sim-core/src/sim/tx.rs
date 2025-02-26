@@ -7,9 +7,8 @@ use tokio::sync::mpsc;
 
 use crate::{
     clock::{ClockBarrier, Timestamp},
-    config::{NodeId, SimConfiguration},
+    config::{NodeId, RealTransactionConfig, SimConfiguration, TransactionConfig},
     model::{Transaction, TransactionId},
-    probability::FloatDistribution,
 };
 
 pub struct TransactionProducer {
@@ -17,9 +16,7 @@ pub struct TransactionProducer {
     clock: ClockBarrier,
     node_tx_sinks: HashMap<NodeId, mpsc::UnboundedSender<Arc<Transaction>>>,
     ib_shards: u64,
-    frequency_ms: FloatDistribution,
-    size_bytes: FloatDistribution,
-    max_size: u64,
+    config: Option<RealTransactionConfig>,
 }
 
 impl TransactionProducer {
@@ -34,13 +31,18 @@ impl TransactionProducer {
             clock,
             node_tx_sinks,
             ib_shards: config.ib_shards,
-            frequency_ms: config.transaction_frequency_ms,
-            size_bytes: config.transaction_size_bytes,
-            max_size: config.max_tx_size,
+            config: match &config.transactions {
+                TransactionConfig::Real(config) => Some(config.clone()),
+                _ => None,
+            },
         }
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        let Some(config) = self.config.take() else {
+            self.clock.wait_forever().await;
+            return Ok(());
+        };
         let node_count = self.node_tx_sinks.len();
         let mut next_tx_id = 0;
         let mut next_tx_at = Timestamp::zero();
@@ -48,7 +50,7 @@ impl TransactionProducer {
         loop {
             let id = TransactionId::new(next_tx_id);
             let shard = rng.random_range(0..self.ib_shards);
-            let bytes = (self.size_bytes.sample(&mut rng) as u64).min(self.max_size);
+            let bytes = (config.size_bytes.sample(&mut rng) as u64).min(config.max_size);
             let tx = Transaction { id, shard, bytes };
 
             let node_index = rng.random_range(0..node_count);
@@ -60,7 +62,7 @@ impl TransactionProducer {
                 .send(Arc::new(tx))?;
 
             next_tx_id += 1;
-            let millis_until_tx = self.frequency_ms.sample(&mut rng) as u64;
+            let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
             next_tx_at = next_tx_at + Duration::from_millis(millis_until_tx);
 
             self.clock.wait_until(next_tx_at).await;

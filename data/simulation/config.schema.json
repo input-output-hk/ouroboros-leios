@@ -150,7 +150,6 @@
     },
     "ib-body-avg-size-bytes": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -225,7 +224,6 @@
     },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },
@@ -256,6 +254,10 @@
     },
     "relay-strategy": {
       "$ref": "#/definitions/RelayStrategy"
+    },
+    "simulate-transactions": {
+      "description": "Only supported by Rust simulation.",
+      "type": "boolean"
     },
     "tcp-congestion-control": {
       "description": "Only supported by Haskell simulation.",

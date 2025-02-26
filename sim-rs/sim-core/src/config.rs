@@ -1,13 +1,14 @@
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
+    sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
 
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::probability::FloatDistribution;
+use crate::{model::TransactionId, probability::FloatDistribution};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
@@ -25,7 +26,7 @@ impl NodeId {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(tag = "distribution", rename_all = "kebab-case")]
 pub enum DistributionConfig {
     Normal { mean: f64, std_dev: f64 },
@@ -53,6 +54,7 @@ impl From<DistributionConfig> for FloatDistribution {
 pub struct RawParameters {
     // Simulation Configuration
     pub relay_strategy: RelayStrategy,
+    pub simulate_transactions: bool,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -73,6 +75,7 @@ pub struct RawParameters {
 
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_constant: f64,
     pub rb_body_legacy_praos_payload_validation_cpu_time_ms_per_byte: f64,
+    pub rb_body_legacy_praos_payload_avg_size_bytes: u64,
 
     // Input block configuration
     pub ib_generation_probability: f64,
@@ -82,6 +85,7 @@ pub struct RawParameters {
     pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
     pub ib_body_validation_cpu_time_ms_per_byte: f64,
+    pub ib_body_avg_size_bytes: u64,
     pub ib_body_max_size_bytes: u64,
     pub ib_diffusion_strategy: DiffusionStrategy,
 
@@ -344,6 +348,53 @@ impl BlockSizeConfig {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum TransactionConfig {
+    Real(RealTransactionConfig),
+    Mock(MockTransactionConfig),
+}
+
+impl TransactionConfig {
+    fn new(params: &RawParameters) -> Self {
+        if params.simulate_transactions {
+            Self::Real(RealTransactionConfig {
+                max_size: params.tx_max_size_bytes,
+                frequency_ms: params.tx_generation_distribution.into(),
+                size_bytes: params.tx_size_bytes_distribution.into(),
+            })
+        } else {
+            Self::Mock(MockTransactionConfig {
+                next_id: Arc::new(AtomicU64::new(0)),
+                ib_size: params.ib_body_avg_size_bytes,
+                rb_size: params.rb_body_legacy_praos_payload_avg_size_bytes,
+            })
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RealTransactionConfig {
+    pub max_size: u64,
+    pub frequency_ms: FloatDistribution,
+    pub size_bytes: FloatDistribution,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct MockTransactionConfig {
+    next_id: Arc<AtomicU64>,
+    pub ib_size: u64,
+    pub rb_size: u64,
+}
+
+impl MockTransactionConfig {
+    pub fn next_id(&self) -> TransactionId {
+        let id = self
+            .next_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        TransactionId::new(id)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
@@ -359,15 +410,13 @@ pub struct SimConfiguration {
     pub(crate) vote_threshold: u64,
     pub(crate) vote_slot_length: u64,
     pub(crate) max_block_size: u64,
-    pub(crate) max_tx_size: u64,
     pub(crate) max_ib_size: u64,
     pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
     pub(crate) cpu_times: CpuTimeConfig,
     pub(crate) sizes: BlockSizeConfig,
-    pub(crate) transaction_frequency_ms: FloatDistribution,
-    pub(crate) transaction_size_bytes: FloatDistribution,
+    pub(crate) transactions: TransactionConfig,
 }
 
 impl SimConfiguration {
@@ -386,7 +435,6 @@ impl SimConfiguration {
             vote_threshold: params.vote_threshold,
             vote_slot_length: params.leios_stage_active_voting_slots,
             max_block_size: params.rb_body_max_size_bytes,
-            max_tx_size: params.tx_max_size_bytes,
             stage_length: params.leios_stage_length_slots,
             max_ib_size: params.ib_body_max_size_bytes,
             ib_diffusion_strategy: params.ib_diffusion_strategy,
@@ -394,8 +442,7 @@ impl SimConfiguration {
             ib_shards: params.ib_shards,
             cpu_times: CpuTimeConfig::new(&params),
             sizes: BlockSizeConfig::new(&params),
-            transaction_frequency_ms: params.tx_generation_distribution.into(),
-            transaction_size_bytes: params.tx_size_bytes_distribution.into(),
+            transactions: TransactionConfig::new(&params),
         }
     }
 }

@@ -16,7 +16,10 @@ use tracing::{info, trace};
 
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
-    config::{DiffusionStrategy, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration},
+    config::{
+        DiffusionStrategy, NodeConfiguration, NodeId, RelayStrategy, SimConfiguration,
+        TransactionConfig,
+    },
     events::EventTracker,
     model::{
         Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
@@ -675,16 +678,27 @@ impl Node {
             }
         }
 
-        // Fill a block with as many pending transactions as can fit
-        let mut size = 0;
         let mut transactions = vec![];
-        while let Some((id, tx)) = self.praos.mempool.first_key_value() {
-            if size + tx.bytes > self.sim_config.max_block_size {
-                break;
+        if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
+            // Add one transaction, the right size for the extra RB payload
+            let tx = Transaction {
+                id: config.next_id(),
+                shard: 0,
+                bytes: config.rb_size,
+            };
+            self.tracker.track_transaction_generated(&tx, self.id);
+            transactions.push(Arc::new(tx));
+        } else {
+            let mut size = 0;
+            // Fill a block with as many pending transactions as can fit
+            while let Some((id, tx)) = self.praos.mempool.first_key_value() {
+                if size + tx.bytes > self.sim_config.max_block_size {
+                    break;
+                }
+                size += tx.bytes;
+                let id = *id;
+                transactions.push(self.praos.mempool.remove(&id).unwrap());
             }
-            size += tx.bytes;
-            let id = *id;
-            transactions.push(self.praos.mempool.remove(&id).unwrap());
         }
 
         let block = Block {
@@ -1123,6 +1137,17 @@ impl Node {
     }
 
     fn try_filling_ib(&mut self, ib: &mut InputBlock) {
+        if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
+            let tx = Transaction {
+                id: config.next_id(),
+                shard: 0,
+                bytes: config.ib_size,
+            };
+            self.tracker.track_transaction_generated(&tx, self.id);
+            ib.transactions.push(Arc::new(tx));
+            return;
+        }
+
         let shard = ib.header.vrf % self.sim_config.ib_shards;
         let candidate_txs: Vec<_> = self
             .leios
