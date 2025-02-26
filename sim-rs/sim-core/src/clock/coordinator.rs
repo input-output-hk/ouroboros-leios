@@ -60,7 +60,9 @@ impl ClockCoordinator {
                         panic!("An actor has somehow managed to wait twice");
                     }
                     running -= 1;
-                    queue.entry(until).or_default().push(actor);
+                    if let Some(timestamp) = until {
+                        queue.entry(timestamp).or_default().push(actor);
+                    }
                     while running == 0 && open_tasks == 0 {
                         // advance time
                         let (timestamp, waiter_ids) = queue.pop_first().unwrap();
@@ -70,7 +72,7 @@ impl ClockCoordinator {
                             let Some(waiter) = waiters[id].take() else {
                                 continue;
                             };
-                            if waiter.until == timestamp {
+                            if waiter.until.is_some_and(|ts| ts == timestamp) {
                                 running += 1;
                                 let _ = waiter.done.send(());
                             }
@@ -94,7 +96,7 @@ impl ClockCoordinator {
 }
 
 struct Waiter {
-    until: Timestamp,
+    until: Option<Timestamp>,
     done: oneshot::Sender<()>,
 }
 
@@ -102,7 +104,7 @@ struct Waiter {
 pub enum ClockEvent {
     Wait {
         actor: usize,
-        until: Timestamp,
+        until: Option<Timestamp>,
         done: oneshot::Sender<()>,
     },
     CancelWait {
@@ -207,5 +209,31 @@ mod tests {
         }
         // We expect a long time to have passed, because the "short" wait was cancelled
         assert_eq!(clock.now(), t2);
+    }
+
+    #[tokio::test]
+    async fn should_allow_waiting_forever() {
+        let mut coordinator = ClockCoordinator::new();
+        let clock = coordinator.clock();
+        let t0 = clock.now();
+        let t1 = t0 + Duration::from_millis(5);
+        let mut actor1 = clock.barrier();
+        let mut actor2 = clock.barrier();
+
+        let run_future = coordinator.run();
+        pin!(run_future);
+
+        let mut wait1 = actor1.wait_until(t1);
+        assert_eq!(poll!(&mut wait1), Poll::Pending); // the wait is pending
+        assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
+        assert_eq!(clock.now(), t0); // no time has passed
+        assert_eq!(poll!(&mut wait1), Poll::Pending); // the 5ms wait is still pending, because clock 2 isn't finished
+
+        let mut wait2 = actor2.wait_forever();
+        assert_eq!(poll!(&mut wait2), Poll::Pending);
+        assert_eq!(poll!(&mut run_future), Poll::Pending); // try advancing time
+        assert_eq!(clock.now(), t1); // 5ms have passed
+        assert_eq!(poll!(&mut wait2), Poll::Pending); // the eternal wait is still pending
+        assert_eq!(poll!(wait1), Poll::Ready(())); // the 5ms wait is done
     }
 }

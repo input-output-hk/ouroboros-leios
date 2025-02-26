@@ -98,13 +98,21 @@ impl ClockBarrier {
     }
 
     pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter {
+        self.wait(Some(timestamp))
+    }
+
+    pub fn wait_forever(&mut self) -> Waiter {
+        self.wait(None)
+    }
+
+    fn wait(&mut self, until: Option<Timestamp>) -> Waiter {
         let (tx, rx) = oneshot::channel();
-        let done = self.now() == timestamp
+        let done = until.is_some_and(|ts| ts == self.now())
             || self
                 .tx
                 .send(ClockEvent::Wait {
                     actor: self.id,
-                    until: timestamp,
+                    until,
                     done: tx,
                 })
                 .is_err();

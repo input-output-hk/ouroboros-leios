@@ -58,10 +58,12 @@ impl<T: Debug> NetworkCoordinator<T> {
 
     pub async fn run(&mut self, clock: &mut ClockBarrier) -> Result<()> {
         loop {
-            let next_event_at = self.events.peek().map(|(_, time)| time.0);
-            let wait_for = next_event_at.unwrap_or(clock.now() + Duration::from_secs(525_600 * 60));
+            let waiter = match self.events.peek() {
+                Some((_, Reverse(timestamp))) => clock.wait_until(*timestamp),
+                None => clock.wait_forever(),
+            };
             select! {
-                () = clock.wait_until(wait_for) => {
+                () = waiter => {
                     let (link, Reverse(timestamp)) = self.events.pop().unwrap();
                     assert_eq!(clock.now(), timestamp);
                     let connection = self.connections.get_mut(&link).unwrap();
