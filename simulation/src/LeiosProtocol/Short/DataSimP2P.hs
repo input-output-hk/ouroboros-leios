@@ -484,19 +484,32 @@ idealEntries p2pNetwork bdCfg es = map (idealEntry idealTimes) es
   idealTimes = idealDiffusionTimes p2pNetwork bdCfg
 
 data SomeDiffusionEntries = forall id. (ToJSON id, Ord id) => SomeDE [DiffusionEntry id]
-
-data ReportConfig = ReportConfig
-  { stakes :: [Micro]
-  , output_ideal :: Bool
-  , ideal_ib_hops :: Double
-  , ideal_eb_hops :: Double
-  , ideal_vt_hops :: Double
-  , ideal_rb_hops :: Double
+data IdealConfig = IdealConfig
+  { ib_hops :: Double
+  , eb_hops :: Double
+  , vt_hops :: Double
+  , rb_hops :: Double
   }
   deriving (Generic, ToJSON, FromJSON)
 
-reportLeiosData :: FilePath -> FilePath -> ReportConfig -> IO ()
-reportLeiosData prefixDir simDataFile ReportConfig{..} = do
+data ReportConfig = ReportConfig
+  { stakes :: [Micro]
+  , ideals :: Map String IdealConfig
+  }
+  deriving (Generic, ToJSON, FromJSON)
+
+reportLeiosData :: FilePath -> FilePath -> ReportConfig -> Bool -> IO ()
+reportLeiosData prefixDir _simDataFile ReportConfig{..} True = do
+  let tags = ["IB", "EB", "VT", "RB"]
+  putStrLn $
+    unwords $
+      concat $
+        [ sim : map ideal_path (Map.keys ideals)
+        | tag <- tags
+        , stake <- stakes
+        , let (sim, ideal_path) = csvPaths prefixDir tag (StakeFraction $ realToFrac stake)
+        ]
+reportLeiosData prefixDir simDataFile ReportConfig{..} _printTargets = do
   hSetBuffering stdout LineBuffering
   putStrLn $ "Reading " ++ simDataFile
   Just !simDataVal <- decodeFileStrict @Value simDataFile
@@ -515,23 +528,23 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} = do
     fullEB = mockFullEndorseBlock leios
     fullVT = mockFullVoteMsg leios
     fullRB = mockFullRankingBlock leios
-    ibCfg =
+    ibCfg ic =
       BlockDiffusionConfig
         { generationDelay = leios.delays.inputBlockGeneration fullIB
         , validationDelay =
             leios.delays.inputBlockHeaderValidation fullIB.header
               + leios.delays.inputBlockValidation fullIB
         , size = messageSizeBytes fullIB
-        , hops = ideal_ib_hops
+        , hops = ic.ib_hops
         }
-    ebCfg =
+    ebCfg ic =
       BlockDiffusionConfig
         { generationDelay = leios.delays.endorseBlockGeneration fullEB
         , validationDelay = leios.delays.endorseBlockValidation fullEB
         , size = messageSizeBytes fullEB
-        , hops = ideal_eb_hops
+        , hops = ic.eb_hops
         }
-    vtCfg =
+    vtCfg ic =
       BlockDiffusionConfig
         { generationDelay =
             leios.delays.voteMsgGeneration
@@ -549,16 +562,16 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} = do
               ]
         , validationDelay = leios.delays.voteMsgValidation fullVT
         , size = messageSizeBytes fullVT
-        , hops = ideal_vt_hops
+        , hops = ic.vt_hops
         }
-    rbCfg =
+    rbCfg ic =
       BlockDiffusionConfig
         { generationDelay = leios.praos.blockGenerationDelay fullRB
         , validationDelay =
             leios.praos.headerValidationDelay fullRB.blockHeader
               + leios.praos.blockValidationDelay fullRB
         , size = messageSizeBytes fullRB
-        , hops = ideal_rb_hops
+        , hops = ic.rb_hops
         }
     rawEntries =
       [ ("IB", ibCfg, SomeDE raw.ib_diffusion_entries)
@@ -566,7 +579,7 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} = do
       , ("VT", vtCfg, SomeDE raw.vt_diffusion_entries)
       , ("RB", rbCfg, SomeDE raw.rb_diffusion_entries)
       ]
-  forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet output_ideal
+  forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet ideals
 
 normalizeEntry :: DiffusionEntry id -> DiffusionEntry id
 normalizeEntry DiffusionEntry{..} =
@@ -586,16 +599,18 @@ normalizeEntry DiffusionEntry{..} =
   merge xs@((nid, _) : _) = (nid, minimum (map snd xs))
 
 reportDE ::
-  FilePath -> P2PNetwork -> Set.Set StakeFraction -> Bool -> (String, BlockDiffusionConfig, SomeDiffusionEntries) -> IO ()
-reportDE prefixDir p2p_network stakes output_ideal (tag, bdCfg, SomeDE (map normalizeEntry -> simEntries)) = do
+  FilePath -> P2PNetwork -> Set.Set StakeFraction -> Map String IdealConfig -> (String, IdealConfig -> BlockDiffusionConfig, SomeDiffusionEntries) -> IO ()
+reportDE prefixDir p2p_network stakes ideals (tag, bdCfg, SomeDE (map normalizeEntry -> simEntries)) = do
   let mkCdfs es = entriesToLatencyCdfs p2p_network.p2pNodeStakes es stakes
       writeCsvFiles mkfn m = assert (Map.keysSet m == stakes) $ forM_ (Map.toList m) $ \(s, cdf) ->
         cdfToCsvFile (mkfn s) cdf
   writeCsvFiles (fst . csvPaths prefixDir tag) (mkCdfs simEntries)
-  when output_ideal $ do
-    writeCsvFiles (snd . csvPaths prefixDir tag) (mkCdfs (idealEntries p2p_network bdCfg simEntries))
+  forM_ (Map.toList ideals) $ \(ideal_name, ic) -> do
+    writeCsvFiles
+      (($ ideal_name) . snd . csvPaths prefixDir tag)
+      (mkCdfs (idealEntries p2p_network (bdCfg ic) simEntries))
 
-csvPaths :: FilePath -> FilePath -> StakeFraction -> (FilePath, FilePath)
-csvPaths prefixDir tag stake = (csvPath tag "" stake, csvPath tag "-ideal" stake)
+csvPaths :: FilePath -> String -> StakeFraction -> (FilePath, String -> FilePath)
+csvPaths prefixDir tag stake = (csvPath tag "" stake, \ideal_name -> csvPath tag ("-" <> ideal_name) stake)
  where
   csvPath mid end (StakeFraction f) = prefixDir </> mid <> "-" <> show f <> end <.> "csv"

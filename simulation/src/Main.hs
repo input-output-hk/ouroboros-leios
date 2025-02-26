@@ -490,7 +490,7 @@ data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
   | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
-  | CliReportData {outputDir :: Maybe FilePath, reportConfigFile :: FilePath, simDataFile :: FilePath}
+  | CliReportData {outputDir :: Maybe FilePath, reportConfigFile :: FilePath, printTargetsOnly :: Bool, simDataFile :: FilePath}
 
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
@@ -519,7 +519,7 @@ runCliOptions = \case
   CliReportData{..} -> do
     let prefixDir = fromMaybe (takeDirectory simDataFile) outputDir
     reportConfig <- Yaml.decodeFileThrow reportConfigFile
-    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile reportConfig
+    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile reportConfig printTargetsOnly
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -576,6 +576,7 @@ parserReportData =
   CliReportData
     <$> optional (strOption $ short 'o' <> long "output-dir")
     <*> strOption (short 'c' <> long "report-config")
+    <*> switch (long "print-targets-only")
     <*> strArgument (metavar "SIMDATA")
 
 --------------------------------------------------------------------------------

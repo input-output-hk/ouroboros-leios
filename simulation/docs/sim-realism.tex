@@ -66,20 +66,19 @@ it can take $4$ latencies to receive the body. When blocks are more sporadic,
 like for EBs and RBs, the consumer has likely already sent a blocking request
 for more headers, so $3$ latencies are enough.
 Votes all get sent at the start of the slice, with default configuration at least, so we can expect consumers to reach the blocking stage again by the next burst. However, due to the large traffic, the $4$ latencies path likely sees some use too. This mix of behaviours can explain the better fit using $3.5$ latencies.
-\todo{Compare with the more uniform voting pattern setting}
 
 \begin{figure}[htbp]
     \centering
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{IB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/IB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{IB diffusion to $0.50$ stake.}
         \label{scenario1:ib0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{IB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/IB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{IB diffusion to $0.98$ stake.}
         \label{scenario1:ib0.98}
     \end{subfigure}
@@ -88,14 +87,14 @@ Votes all get sent at the start of the slice, with default configuration at leas
     
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{EB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/EB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{EB diffusion to $0.50$ stake.}
         \label{scenario1:eb0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{EB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/EB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{EB diffusion to $0.98$ stake.}
         \label{scenario1:eb0.98}
     \end{subfigure}
@@ -104,14 +103,14 @@ Votes all get sent at the start of the slice, with default configuration at leas
     
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{VT-0.5-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/VT-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{VT diffusion to $0.50$ stake.}
         \label{scenario1:vt0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{VT-0.98-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/VT-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{VT diffusion to $0.98$ stake.}
         \label{scenario1:vt0.98}
     \end{subfigure}
@@ -120,20 +119,92 @@ Votes all get sent at the start of the slice, with default configuration at leas
     
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{RB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/RB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{RB diffusion to $0.50$ stake.}
         \label{scenario1:rb0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{RB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \includegraphics[width=\textwidth]{scenario1/RB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{RB diffusion to $0.98$ stake.}
         \label{scenario1:rb0.98}
     \end{subfigure}
 
     \caption{Scenario 1, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1}
+\end{figure}
+
+\subsection{Uniform Voting stage}
+The diffusion latencies, in Fig. \ref{fig:scenario1-send-recv}, stay very
+similar when the simulation is set to generate votes across the whole stage
+rather than only in the first slot.
+From second $80$ to $300$ we have $\tilde1100$ vote messages, for an average of $\tilde5$
+VT/s, same as IBs. The traffic pattern then does not seem a factor in the observed behaviour.
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1/VT-0.5-vs-ideal-vs-fitted-fig.eps}
+        \caption{VT diffusion to $0.50$ stake.}
+        \label{scenario1-send-recv:vt0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1/VT-0.98-vs-ideal-vs-fitted-fig.eps}
+        \caption{VT diffusion to $0.98$ stake.}
+        \label{scenario1-send-recv:vt0.98}
+    \end{subfigure}
+    \caption{Scenario 1 with \textbf{uniform voting}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:scenario1-send-recv}
+\end{figure}
+
+\subsection{Large votes}
+The diffusion latencies, in Fig. \ref{fig:scenario1-big-votes} and
+\ref{fig:scenario1-big-votes-send-recv}, are collected for votes set to the size
+of input blocks. With start-of-stage voting (the default) we see diffusion running
+slightly slower than ideal with $4$ latencies, while uniform voting has a very
+close fit. The delay in the former is possibly due to the $\tilde0.05s$
+serialization time causing blocks to queue behind each other when they are all
+generated at once: the volume of data, $102400*100$, is $5$ times the bandwidth
+of any given link, and nodes are requesting bodies from everyone.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1-big-votes/VT-0.5-vs-ideal-4-hops-fig.eps}
+        \caption{VT diffusion to $0.50$ stake.}
+        \label{scenario1-big-votes:vt0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1-big-votes/VT-0.98-vs-ideal-4-hops-fig.eps}
+        \caption{VT diffusion to $0.98$ stake.}
+        \label{scenario1-big-votes:vt0.98}
+    \end{subfigure}
+    \caption{Scenario 1 with \textbf{large votes, start-of-stage voting}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:scenario1-big-votes}
+\end{figure}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1-big-votes-send-recv/VT-0.5-vs-ideal-4-hops-fig.eps}
+        \caption{VT diffusion to $0.50$ stake.}
+        \label{scenario1-big-votes-send-recv:vt0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario1-big-votes-send-recv/VT-0.98-vs-ideal-4-hops-fig.eps}
+        \caption{VT diffusion to $0.98$ stake.}
+        \label{scenario1-big-votes-send-recv:vt0.98}
+    \end{subfigure}
+    \caption{Scenario 1 with \textbf{large votes, uniform voting}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:scenario1-big-votes-send-recv}
 \end{figure}
 
 \addcontentsline{toc}{section}{References}

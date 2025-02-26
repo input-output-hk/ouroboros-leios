@@ -5,8 +5,8 @@ ideals:
     eb_hops: 3
     vt_hops: 3
     rb_hops: 3
-  ideal-fitted:
+  ideal-4-hops:
     ib_hops: 4
     eb_hops: 3
-    vt_hops: 3.5
+    vt_hops: 4
     rb_hops: 3
