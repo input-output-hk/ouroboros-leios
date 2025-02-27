@@ -18,7 +18,7 @@ The current research areas include:
 - **Infrastructure improvements.** Enhancing tools and workflows, such as adding Docker support for simulations, developing new topology generators, and refining cost models for deployment scenarios.
 
 :::info
-Stay informed on the latest developments by visiting the ‘Weekly updates’ page. Development updates cover additional simulation scenarios, parameter tuning, and ongoing research focuses.
+Stay informed on the latest developments by visiting the [Weekly updates](https://leios.cardano-scaling.org/news) page. Development updates cover additional simulation scenarios, parameter tuning, and ongoing research focuses.
 :::
 
 ## Roadmap snapshot
