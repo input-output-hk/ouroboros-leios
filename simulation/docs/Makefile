@@ -24,6 +24,21 @@ sim-realism.pdf: scenario1/IB-0.5-vs-ideal-vs-fitted-fig.eps  \
 clean:
 	latexmk -CA
 
+MAIN_SCENARIOS=scenario1 scenario2 scenario3 scenario4 scenario5 scenario6
+
+define main_scenario_template =
+sim-realism.pdf: $(1)/IB-0.5-vs-ideal-vs-fitted-fig.eps \
+                 $(1)/IB-0.98-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/EB-0.5-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/EB-0.98-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/VT-0.5-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/VT-0.98-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/RB-0.5-vs-ideal-vs-fitted-fig.eps \
+		 $(1)/RB-0.98-vs-ideal-vs-fitted-fig.eps
+endef
+
+$(foreach s,$(MAIN_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
+
 CDFSSCRIPT = ../gnuplot/latency_cdfs.gp
 CDFSPLOT = gnuplot -e "set terminal postscript eps enhanced color; set output '$@'" -c $(CDFSSCRIPT)
 
@@ -43,7 +58,7 @@ SCENARIOS = $(shell ls */report-config.yaml | sed -e's/report-config.yaml//')
 ## TODO: cache targets?
 define scenario_template =
  .PRECIOUS:
- $(shell cabal run -v0 ols -- report-data -o $(1) -c $(1)/report-config.yaml --print-targets-only dummy) : $(1).ran-report-data
+ $(shell cabal run -v0 ols -- report-data -o $(1) -c $(1)report-config.yaml --print-targets-only dummy) : $(1).ran-report-data
 endef
 
 $(foreach s,$(SCENARIOS),$(eval $(call scenario_template,$(s))))

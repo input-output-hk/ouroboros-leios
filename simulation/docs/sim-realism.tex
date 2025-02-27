@@ -22,6 +22,77 @@
 \usepackage{subcaption}
 \usepackage{listings}
 
+\newcommand{\scenarioVsIdealFigure}[2]{
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/IB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \caption{IB diffusion to $0.50$ stake.}
+        \label{{#1}:ib0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/IB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \caption{IB diffusion to $0.98$ stake.}
+        \label{{#1}:ib0.98}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/EB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \caption{EB diffusion to $0.50$ stake.}
+        \label{{#1}:eb0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/EB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \caption{EB diffusion to $0.98$ stake.}
+        \label{{#1}:eb0.98}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/VT-0.5-vs-ideal-vs-fitted-fig.eps}
+        \caption{VT diffusion to $0.50$ stake.}
+        \label{{#1}:vt0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/VT-0.98-vs-ideal-vs-fitted-fig.eps}
+        \caption{VT diffusion to $0.98$ stake.}
+        \label{{#1}:vt0.98}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/RB-0.5-vs-ideal-vs-fitted-fig.eps}
+        \caption{RB diffusion to $0.50$ stake.}
+        \label{{#1}:rb0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{{#1}/RB-0.98-vs-ideal-vs-fitted-fig.eps}
+        \caption{RB diffusion to $0.98$ stake.}
+        \label{{#1}:rb0.98}
+    \end{subfigure}
+
+    \caption{Scenario \ref{#2}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:{#1}}
+\end{figure}
+}
+
+
 \begin{document}
 
 \title{Ouroboros Leios simulation: \\
@@ -228,6 +299,28 @@ of any given link, and nodes are requesting bodies from everyone.
     \caption{Scenario \ref{sc:most-idealized} with \textbf{large votes, uniform voting}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:scenario1-big-votes-send-recv}
 \end{figure}
+
+\section{Scenario \ref{sc:request-from-first}}
+\label{scenario2}
+\todo{compare to previous plot rather than ideal? Same for later sections.}
+\scenarioVsIdealFigure{scenario2}{sc:request-from-first}
+
+\section{Scenario \ref{sc:multiplexing}}
+\label{scenario3}
+\scenarioVsIdealFigure{scenario3}{sc:multiplexing}
+
+\section{Scenario \ref{sc:tcp}}
+\label{scenario4}
+\scenarioVsIdealFigure{scenario4}{sc:tcp}
+
+\section{Scenario \ref{sc:boundedcpu}}
+\label{scenario5}
+\scenarioVsIdealFigure{scenario5}{sc:boundedcpu}
+
+\section{Scenario \ref{sc:order}}
+\label{scenario6}
+\scenarioVsIdealFigure{scenario6}{sc:order}
+
 
 \addcontentsline{toc}{section}{References}
 \bibliographystyle{plainnat}
