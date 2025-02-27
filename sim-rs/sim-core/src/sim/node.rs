@@ -645,6 +645,15 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
+            // FIXME(@bwbush): temporary hack to set body size to a fixed value from the configuration file.
+            {
+              let shard = ib.header.vrf % self.sim_config.ib_shards;
+              ib.transactions = [Arc::new(Transaction{
+                id: TransactionId::new(0),
+                shard, 
+                bytes: self.sim_config.sizes.ib_body},
+              )].to_vec();
+            }
             self.schedule_cpu_task(CpuTask::InputBlockGenerated(ib));
         }
     }

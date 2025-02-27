@@ -148,6 +148,7 @@ impl EventMonitor {
                 message: event.clone(),
             };
             output.write(output_event).await?;
+            /*
             match event {
                 Event::Slot { number } => {
                     info!("Slot {number} has begun.");
@@ -325,7 +326,7 @@ impl EventMonitor {
                 Event::VotesReceived { .. } => {
                     vote_messages.received += 1;
                 }
-            }
+            }*/
         }
 
         output.flush().await?;
