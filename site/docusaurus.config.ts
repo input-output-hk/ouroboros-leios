@@ -77,9 +77,15 @@ const config: Config = {
             items: [
                 {
                     type: "docSidebar",
-                    sidebarId: "tutorialSidebar",
+                    sidebarId: "documentationSidebar",
                     position: "left",
                     label: "Documentation",
+                },
+                {
+                    type: "docSidebar",
+                    sidebarId: "developmentSidebar",
+                    position: "left",
+                    label: "Development",
                 },
                 { to: "/news", label: "Weekly updates", position: "right" },
                 {
