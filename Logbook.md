@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-02-27
+
+### Analysis of simulations at tag `leios-2025w09`
+
+The folder [analysis/sims/2025w09/](analysis/sims/2025w09) contains the artifications of analyzing the Haskell and Rust simulations at tag `leios-2025w09`. Notable outcomes follow . . .
+
+1. The ELT ("extract/load/transform") workflow for processing simulation data was refactored so that complete logs from both simulations are organized for simpler querying.
+2. The Rust simulator was temporarily modified to generate IBs of fixed size, which is what the Haskell simulator does, so that output from the two can be compared.
+3. Discrepancies between congestion metrics for two simulators were partially resolved.
+4. Analyses of the elapsed time from IB generation to receipt at the various nodes and also of time-in-flight over node-to-node links were developed.
+5. It appears that both network bandwidth and CPU bottlenecks play a role in congestion at very high transaction throughput, but this needs more detailed investigation.
+
 ## 2025-02-24
 
 ### Haskell Simulation
