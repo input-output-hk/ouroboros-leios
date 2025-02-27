@@ -43,7 +43,7 @@ SCENARIOS = $(shell ls */report-config.yaml | sed -e's/report-config.yaml//')
 ## TODO: cache targets?
 define scenario_template =
  .PRECIOUS:
- $(shell cabal run ols -- report-data -o $(1) -c $(1)/report-config.yaml --print-targets-only dummy) : $(1).ran-report-data
+ $(shell cabal run -v0 ols -- report-data -o $(1) -c $(1)/report-config.yaml --print-targets-only dummy) : $(1).ran-report-data
 endef
 
 $(foreach s,$(SCENARIOS),$(eval $(call scenario_template,$(s))))
