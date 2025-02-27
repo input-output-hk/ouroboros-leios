@@ -15,7 +15,7 @@
 \usepackage{hyperref}
 \usepackage[capitalise,noabbrev,nameinlink]{cleveref}
 \hypersetup{
-  pdftitle={Storing the Cardano ledger state on disk: analysis and design options},
+  pdftitle={Ouroboros Leios simulation: building confidence in the performance results},
   pdfborder={0 0 0},
   breaklinks=true
 }
@@ -29,14 +29,14 @@
         \centering
         \includegraphics[width=\textwidth]{{#1}/IB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{IB diffusion to $0.50$ stake.}
-        \label{{#1}:ib0.5}
+        \label{#1:ib0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{{#1}/IB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{IB diffusion to $0.98$ stake.}
-        \label{{#1}:ib0.98}
+        \label{#1:ib0.98}
     \end{subfigure}
     
     \vspace{1em}
@@ -45,14 +45,14 @@
         \centering
         \includegraphics[width=\textwidth]{{#1}/EB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{EB diffusion to $0.50$ stake.}
-        \label{{#1}:eb0.5}
+        \label{#1:eb0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{{#1}/EB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{EB diffusion to $0.98$ stake.}
-        \label{{#1}:eb0.98}
+        \label{#1:eb0.98}
     \end{subfigure}
     
     \vspace{1em}
@@ -61,14 +61,14 @@
         \centering
         \includegraphics[width=\textwidth]{{#1}/VT-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{VT diffusion to $0.50$ stake.}
-        \label{{#1}:vt0.5}
+        \label{#1:vt0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{{#1}/VT-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{VT diffusion to $0.98$ stake.}
-        \label{{#1}:vt0.98}
+        \label{#1:vt0.98}
     \end{subfigure}
     
     \vspace{1em}
@@ -77,18 +77,18 @@
         \centering
         \includegraphics[width=\textwidth]{{#1}/RB-0.5-vs-ideal-vs-fitted-fig.eps}
         \caption{RB diffusion to $0.50$ stake.}
-        \label{{#1}:rb0.5}
+        \label{#1:rb0.5}
     \end{subfigure}
     \hfill
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{{#1}/RB-0.98-vs-ideal-vs-fitted-fig.eps}
         \caption{RB diffusion to $0.98$ stake.}
-        \label{{#1}:rb0.98}
+        \label{#1:rb0.98}
     \end{subfigure}
 
     \caption{Scenario \ref{#2}, diffusion latencies from slot start (300s run with default seed).}
-    \label{fig:{#1}}
+    \label{fig:#1}
 \end{figure}
 }
 
@@ -302,24 +302,29 @@ of any given link, and nodes are requesting bodies from everyone.
 
 \section{Scenario \ref{sc:request-from-first}}
 \label{scenario2}
+Fig.~\ref{fig:scenario2}
+\scenarioVsIdealFigure{scenario2}{scenario2}
 \todo{compare to previous plot rather than ideal? Same for later sections.}
-\scenarioVsIdealFigure{scenario2}{sc:request-from-first}
 
 \section{Scenario \ref{sc:multiplexing}}
 \label{scenario3}
-\scenarioVsIdealFigure{scenario3}{sc:multiplexing}
+Fig.~\ref{fig:scenario3}
+\scenarioVsIdealFigure{scenario3}{scenario3}
 
 \section{Scenario \ref{sc:tcp}}
 \label{scenario4}
-\scenarioVsIdealFigure{scenario4}{sc:tcp}
+Fig.~\ref{fig:scenario4}
+\scenarioVsIdealFigure{scenario4}{scenario4}
 
 \section{Scenario \ref{sc:boundedcpu}}
 \label{scenario5}
-\scenarioVsIdealFigure{scenario5}{sc:boundedcpu}
+Fig.~\ref{fig:scenario5}
+\scenarioVsIdealFigure{scenario5}{scenario5}
 
 \section{Scenario \ref{sc:order}}
 \label{scenario6}
-\scenarioVsIdealFigure{scenario6}{sc:order}
+Fig.~\ref{fig:scenario6}
+\scenarioVsIdealFigure{scenario6}{scenario6}
 
 
 \addcontentsline{toc}{section}{References}
