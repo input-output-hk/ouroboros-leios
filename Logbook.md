@@ -12,6 +12,24 @@ The folder [analysis/sims/2025w09/](analysis/sims/2025w09) contains the artifica
 4. Analyses of the elapsed time from IB generation to receipt at the various nodes and also of time-in-flight over node-to-node links were developed.
 5. It appears that both network bandwidth and CPU bottlenecks play a role in congestion at very high transaction throughput, but this needs more detailed investigation.
 
+### Initial sketch for protocol dashboard
+
+We are considering developing an interactive "protocol dashboard" web application for Leios that would have the following functionality:
+
+1. Set protocol parameters (block rates, voting, pipeline length, etc.)
+2. Set stake distribution (uniformity, number of pools, etc.)
+3. View plots of performance
+    - Efficiency of block arrival within protocol limits
+    - Duplication of transactions
+    - Rewards for various Leios operations
+    - Compute resources
+4. View plots of security
+    - Failure to reach quorum
+    - Adversary forges a certificate
+    - Adversarial block included on preferred chain
+
+![Initial sketch for protocol dashboard](images/protocol-dashboard-deisgn-0.png)
+
 ## 2025-02-24
 
 ### Haskell Simulation
