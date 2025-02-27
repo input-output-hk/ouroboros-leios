@@ -80,9 +80,9 @@ ib-shards: 1
 #       would instead more than double the total to 668.
 #       And even 828 including Op Cert.
 ib-head-size-bytes: 304
-# 100kB, using praos max size as ballpark estimate.
-ib-body-avg-size-bytes: 102400
-ib-body-max-size-bytes: 102400
+# 98KB to optimize for 3 TCP round trips
+ib-body-avg-size-bytes: 98304
+ib-body-max-size-bytes: 98304
 # Here we also use praos blocks as ballpark estimate.
 # Sec 2.3 Forging, of the benchmark cluster report, lists
 #   * Slot start to announced: 0.12975s
