@@ -30,7 +30,7 @@ impl SlotWitness {
             }
             self.tracker.track_slot(slot);
             slot += 1;
-            next_slot_at = next_slot_at + Duration::from_secs(1);
+            next_slot_at += Duration::from_secs(1);
             self.clock.wait_until(next_slot_at).await;
         }
     }

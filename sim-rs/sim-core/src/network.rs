@@ -1,4 +1,4 @@
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, hash::Hash, time::Duration};
 
 use anyhow::{bail, Result};
 use coordinator::{EdgeConfig, Message, NetworkCoordinator};
@@ -12,13 +12,13 @@ use crate::{
 mod connection;
 mod coordinator;
 
-pub struct Network<T> {
+pub struct Network<TProtocol, TMessage> {
     clock: ClockBarrier,
-    coordinator: NetworkCoordinator<T>,
-    sink: mpsc::UnboundedSender<Message<T>>,
+    coordinator: NetworkCoordinator<TProtocol, TMessage>,
+    sink: mpsc::UnboundedSender<Message<TProtocol, TMessage>>,
 }
 
-impl<T: Debug> Network<T> {
+impl<TProtocol: Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage> {
     pub fn new(clock: Clock) -> Self {
         let (sink, source) = mpsc::unbounded_channel();
         Self {
@@ -50,7 +50,10 @@ impl<T: Debug> Network<T> {
         Ok(())
     }
 
-    pub fn open(&mut self, id: NodeId) -> Result<(NetworkSink<T>, NetworkSource<T>)> {
+    pub fn open(
+        &mut self,
+        id: NodeId,
+    ) -> Result<(NetworkSink<TProtocol, TMessage>, NetworkSource<TMessage>)> {
         let sink = NetworkSink {
             id,
             sink: self.sink.clone(),
@@ -80,13 +83,20 @@ impl<T> NetworkSource<T> {
     }
 }
 
-pub struct NetworkSink<T> {
+pub struct NetworkSink<TProtocol, TMessage> {
     id: NodeId,
-    sink: mpsc::UnboundedSender<Message<T>>,
+    sink: mpsc::UnboundedSender<Message<TProtocol, TMessage>>,
 }
 
-impl<T> NetworkSink<T> {
-    pub fn send_to(&self, to: NodeId, bytes: u64, message: T, sent: Timestamp) -> Result<()> {
+impl<TProtocol, TMessage> NetworkSink<TProtocol, TMessage> {
+    pub fn send_to(
+        &self,
+        to: NodeId,
+        bytes: u64,
+        protocol: TProtocol,
+        message: TMessage,
+        sent: Timestamp,
+    ) -> Result<()> {
         if self
             .sink
             .send(Message {
@@ -94,6 +104,7 @@ impl<T> NetworkSink<T> {
                 to,
                 body: message,
                 bytes,
+                protocol,
                 sent,
             })
             .is_err()

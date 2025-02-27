@@ -1,4 +1,4 @@
-use std::{cmp::Reverse, collections::HashMap, fmt::Debug, time::Duration};
+use std::{cmp::Reverse, collections::HashMap, fmt::Debug, hash::Hash, time::Duration};
 
 use anyhow::Result;
 use priority_queue::PriorityQueue;
@@ -11,10 +11,10 @@ use crate::{
 
 use super::connection::Connection;
 
-pub struct NetworkCoordinator<T> {
-    source: mpsc::UnboundedReceiver<Message<T>>,
-    sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, T)>>,
-    connections: HashMap<Link, Connection<T>>,
+pub struct NetworkCoordinator<TProtocol, TMessage> {
+    source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>,
+    sinks: HashMap<NodeId, mpsc::UnboundedSender<(NodeId, TMessage)>>,
+    connections: HashMap<Link, Connection<TProtocol, TMessage>>,
     events: PriorityQueue<Link, Reverse<Timestamp>>,
 }
 
@@ -31,8 +31,8 @@ pub struct EdgeConfig {
     pub bandwidth_bps: Option<u64>,
 }
 
-impl<T: Debug> NetworkCoordinator<T> {
-    pub fn new(source: mpsc::UnboundedReceiver<Message<T>>) -> Self {
+impl<TProtocol: Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol, TMessage> {
+    pub fn new(source: mpsc::UnboundedReceiver<Message<TProtocol, TMessage>>) -> Self {
         Self {
             source,
             sinks: HashMap::new(),
@@ -41,7 +41,7 @@ impl<T: Debug> NetworkCoordinator<T> {
         }
     }
 
-    pub fn listen(&mut self, to: NodeId) -> mpsc::UnboundedReceiver<(NodeId, T)> {
+    pub fn listen(&mut self, to: NodeId) -> mpsc::UnboundedReceiver<(NodeId, TMessage)> {
         let (sink, source) = mpsc::unbounded_channel();
         self.sinks.insert(to, sink);
         source
@@ -86,23 +86,24 @@ impl<T: Debug> NetworkCoordinator<T> {
         }
     }
 
-    fn schedule_message(&mut self, message: Message<T>) {
+    fn schedule_message(&mut self, message: Message<TProtocol, TMessage>) {
         let link = Link {
             from: message.from,
             to: message.to,
         };
         let connection = self.connections.get_mut(&link).unwrap();
-        connection.send(message.body, message.bytes, message.sent);
+        connection.send(message.body, message.bytes, message.protocol, message.sent);
         if let Some(timestamp) = connection.next_arrival_time() {
             self.events.push(link, Reverse(timestamp));
         }
     }
 }
 
-pub struct Message<T> {
+pub struct Message<TProtocol, TMessage> {
     pub from: NodeId,
     pub to: NodeId,
-    pub body: T,
+    pub protocol: TProtocol,
+    pub body: TMessage,
     pub bytes: u64,
     pub sent: Timestamp,
 }

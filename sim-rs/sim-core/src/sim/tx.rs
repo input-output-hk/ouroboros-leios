@@ -63,7 +63,7 @@ impl TransactionProducer {
 
             next_tx_id += 1;
             let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
-            next_tx_at = next_tx_at + Duration::from_millis(millis_until_tx);
+            next_tx_at += Duration::from_millis(millis_until_tx);
 
             self.clock.wait_until(next_tx_at).await;
         }

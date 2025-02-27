@@ -28,7 +28,7 @@ mod tx;
 
 pub struct Simulation {
     clock_coordinator: ClockCoordinator,
-    network: Network<SimulationMessage>,
+    network: Network<MiniProtocol, SimulationMessage>,
     tx_producer: TransactionProducer,
     slot_witness: SlotWitness,
     nodes: Vec<Node>,
@@ -181,4 +181,43 @@ impl HasBytesSize for SimulationMessage {
             Self::Votes(v) => 8 * v.ebs.len() as u64,
         }
     }
+}
+
+impl SimulationMessage {
+    pub fn protocol(&self) -> MiniProtocol {
+        match self {
+            Self::AnnounceTx(_) => MiniProtocol::Tx,
+            Self::RequestTx(_) => MiniProtocol::Tx,
+            Self::Tx(_) => MiniProtocol::Tx,
+
+            Self::RollForward(_) => MiniProtocol::Block,
+            Self::RequestBlock(_) => MiniProtocol::Block,
+            Self::Block(_) => MiniProtocol::Block,
+
+            Self::AnnounceIBHeader(_) => MiniProtocol::IB,
+            Self::RequestIBHeader(_) => MiniProtocol::IB,
+            Self::IBHeader(_, _) => MiniProtocol::IB,
+
+            Self::AnnounceIB(_) => MiniProtocol::IB,
+            Self::RequestIB(_) => MiniProtocol::IB,
+            Self::IB(_) => MiniProtocol::IB,
+
+            Self::AnnounceEB(_) => MiniProtocol::EB,
+            Self::RequestEB(_) => MiniProtocol::EB,
+            Self::EB(_) => MiniProtocol::EB,
+
+            Self::AnnounceVotes(_) => MiniProtocol::Vote,
+            Self::RequestVotes(_) => MiniProtocol::Vote,
+            Self::Votes(_) => MiniProtocol::Vote,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash)]
+pub enum MiniProtocol {
+    Tx,
+    Block,
+    IB,
+    EB,
+    Vote,
 }

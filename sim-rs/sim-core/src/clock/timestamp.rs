@@ -1,5 +1,5 @@
 use std::{
-    ops::{Add, Sub},
+    ops::{Add, AddAssign, Sub},
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
@@ -27,6 +27,12 @@ impl Add<Duration> for Timestamp {
 
     fn add(self, rhs: Duration) -> Self::Output {
         Timestamp(self.0 + rhs)
+    }
+}
+
+impl AddAssign<Duration> for Timestamp {
+    fn add_assign(&mut self, rhs: Duration) {
+        self.0 += rhs;
     }
 }
 

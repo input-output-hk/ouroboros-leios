@@ -31,7 +31,7 @@ use crate::{
 
 use super::{
     cpu::{CpuTaskQueue, Subtask},
-    SimulationMessage,
+    MiniProtocol, SimulationMessage,
 };
 
 enum TransactionView {
@@ -105,7 +105,7 @@ pub struct Node {
     trace: bool,
     sim_config: Arc<SimConfiguration>,
     msg_source: Option<NetworkSource<SimulationMessage>>,
-    msg_sink: NetworkSink<SimulationMessage>,
+    msg_sink: NetworkSink<MiniProtocol, SimulationMessage>,
     tx_source: Option<mpsc::UnboundedReceiver<Arc<Transaction>>>,
     events: BinaryHeap<FutureEvent<NodeEvent>>,
     tracker: EventTracker,
@@ -230,7 +230,7 @@ impl Node {
         sim_config: Arc<SimConfiguration>,
         total_stake: u64,
         msg_source: NetworkSource<SimulationMessage>,
-        msg_sink: NetworkSink<SimulationMessage>,
+        msg_sink: NetworkSink<MiniProtocol, SimulationMessage>,
         tx_source: mpsc::UnboundedReceiver<Arc<Transaction>>,
         tracker: EventTracker,
         rng: ChaChaRng,
@@ -1301,7 +1301,7 @@ impl Node {
         }
         self.clock.start_task();
         self.msg_sink
-            .send_to(to, msg.bytes_size(), msg, self.clock.now())
+            .send_to(to, msg.bytes_size(), msg.protocol(), msg, self.clock.now())
     }
 }
 
