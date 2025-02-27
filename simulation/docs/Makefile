@@ -54,14 +54,15 @@ all_sims: $(shell ls */report-config.yaml | sed -e's/report-config.yaml/sim-data
 
 SCENARIOS = $(shell ls */report-config.yaml | sed -e's/report-config.yaml//')
 
-## Would be great to use a grouped targets rule, but that requires make 4.3.
-## TODO: cache targets?
 define scenario_template =
- .PRECIOUS:
- $(shell cabal run -v0 ols -- report-data -o $(1) -c $(1)report-config.yaml --print-targets-only dummy) : $(1).ran-report-data
+.PRECIOUS:
+$(1) : $(2)/targets.d $(2)/.ran-report-data
 endef
 
-$(foreach s,$(SCENARIOS),$(eval $(call scenario_template,$(s))))
+%/targets.d : %/report-config.yaml
+	$(file > $@,$(call scenario_template,$(shell cabal run -v0 ols -- report-data -o $* -c $*/report-config.yaml --print-targets-only dummy),$*))
+
+include $(foreach s,$(SCENARIOS),$(s)targets.d)
 
 .PRECIOUS:
 %/.ran-report-data: %/report-config.yaml %/sim-data.json
