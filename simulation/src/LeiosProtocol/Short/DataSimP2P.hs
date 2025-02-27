@@ -509,6 +509,8 @@ data IdealConfig = IdealConfig
 data ReportConfig = ReportConfig
   { stakes :: [Micro]
   , ideals :: Map String IdealConfig
+  , drop_from_start :: Maybe Micro
+  , drop_from_end :: Maybe Micro
   }
   deriving (Generic, ToJSON, FromJSON)
 
@@ -587,11 +589,22 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} _printTargets = do
         , size = messageSizeBytes fullRB
         , hops = ic.rb_hops
         }
+    filterEntries :: forall id. [DiffusionEntry id] -> [DiffusionEntry id]
+    filterEntries
+      | isNothing drop_from_start && isNothing drop_from_end = id
+      | otherwise = filter (\(e :: DiffusionEntry id) -> px e.created && py e.created)
+     where
+      px = case drop_from_start of
+        Just i -> (realToFrac @Micro @DiffTime i <=)
+        Nothing -> const True
+      py = case drop_from_end of
+        Just i -> (<= raw.stop.unTime - realToFrac @Micro @DiffTime i)
+        Nothing -> const True
     rawEntries =
-      [ ("IB", ibCfg, SomeDE raw.ib_diffusion_entries)
-      , ("EB", ebCfg, SomeDE raw.eb_diffusion_entries)
-      , ("VT", vtCfg, SomeDE raw.vt_diffusion_entries)
-      , ("RB", rbCfg, SomeDE raw.rb_diffusion_entries)
+      [ ("IB", ibCfg, SomeDE $ filterEntries raw.ib_diffusion_entries)
+      , ("EB", ebCfg, SomeDE $ filterEntries raw.eb_diffusion_entries)
+      , ("VT", vtCfg, SomeDE $ filterEntries raw.vt_diffusion_entries)
+      , ("RB", rbCfg, SomeDE $ filterEntries raw.rb_diffusion_entries)
       ]
   forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet ideals
 
