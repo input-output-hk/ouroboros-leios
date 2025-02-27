@@ -218,10 +218,10 @@ accumNodeCpuUsage' ::
   Map NodeId (IntervalMap a Int) ->
   Map NodeId (IntervalMap a Int)
 accumNodeCpuUsage' f (Time now') nid task =
-  Map.insertWith (ILMap.unionWith (+)) nid (ILMap.singleton (IntervalCO now (now + d)) 1)
+  Map.insertWith (ILMap.unionWith (+)) nid (ILMap.singleton (IntervalCO now end) 1)
  where
-  now = f now'
-  d = f (cpuTaskDuration task)
+  !now = f now'
+  !end = now + f (cpuTaskDuration task)
 type ChainsMap = IntMap (Chain RankingBlock)
 
 accumChains :: Time -> LeiosEvent -> ChainsMap -> ChainsMap
@@ -479,17 +479,17 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
     secondsAgo30 = addTime (-30) now
 
 accumDataTransmitted :: LeiosMessage -> TcpMsgForecast -> DataTransmitted -> DataTransmitted
-accumDataTransmitted msg forecast DataTransmitted{..} =
+accumDataTransmitted msg TcpMsgForecast{..} DataTransmitted{..} =
   DataTransmitted
     { messagesTransmitted = ILMap.insertWith (++) interval [msize] messagesTransmitted
     }
  where
-  !msize = msgSize forecast
+  !msize = msgSize
   interval :: ILMap.Interval DiffTime
   interval =
     ILMap.IntervalCO
-      (coerce forecast.msgSendLeadingEdge)
-      (coerce forecast.msgSendTrailingEdge)
+      (coerce msgSendLeadingEdge)
+      (coerce msgSendTrailingEdge)
   -- could be interesting to compare to "useful" data.
   _accumPayloadAndBlocksTransmitted (payload0, blocks0) =
     ( maybe id (ILMap.insertWith (++) interval . (: [])) payload payload0
