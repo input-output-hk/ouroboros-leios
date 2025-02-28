@@ -66,6 +66,7 @@ library
     LeiosProtocol.Short.VizSimP2P
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
+    LeiosEvents
     ModelTCP
     JSONCompat
     P2P
