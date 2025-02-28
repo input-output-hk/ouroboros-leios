@@ -53,7 +53,11 @@ SCENARIOS := $(shell ls */report-config.yaml | sed -e's/report-config.yaml//')
 %/.ran-report-data: %/report-config.yaml %/sim-data.json
 	cabal run ols -- report-data -o "$(dir $@)" -c $^
 	touch "$@"
+
+## No need to rerun if missing.
 .INTERMEDIATE: $(foreach s,$(SCENARIOS),$(s).ran-report-data)
+## Do not want to rerun if missing, but should keep it.
+.SECONDARY: $(foreach s,$(SCENARIOS),$(s)sim-data.json)
 
 ## The list of .csv to build is generated dinamically, based on
 ## report-config.yaml in the scenario directory.
