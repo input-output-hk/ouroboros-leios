@@ -1,56 +1,38 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "HaskellCpuEvent": {
+    "BaseBlockEvent": {
       "properties": {
-        "duration_s": {
-          "type": "number"
+        "id": {
+          "type": "string"
         },
         "node": {
+          "type": "string"
+        },
+        "slot": {
           "type": "number"
         },
-        "node_name": {
-          "type": "string"
-        },
-        "tag": {
-          "const": "Cpu",
-          "type": "string"
-        },
-        "task_label": {
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTEnteredState",
+            "VTGenerated"
+          ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "HaskellEvent": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/HaskellCpuEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellGeneratedIBEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellGeneratedEBEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellGeneratedRBEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellGeneratedVTEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellSentEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellReceivedEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellStateEvent"
-        }
-      ]
+    "BlockKind": {
+      "enum": ["EB", "IB", "RB", "VT"],
+      "type": "string"
     },
-    "HaskellGeneratedEBEvent": {
+    "GeneratedEndorserBlock": {
       "properties": {
         "id": {
           "type": "string"
@@ -61,39 +43,37 @@
           },
           "type": "array"
         },
-        "kind": {
-          "const": "EB",
-          "type": "string"
-        },
         "node": {
-          "type": "number"
-        },
-        "node_name": {
           "type": "string"
         },
         "size_bytes": {
           "type": "number"
         },
-        "tag": {
-          "const": "generated",
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTEnteredState",
+            "VTGenerated"
+          ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "HaskellGeneratedIBEvent": {
+    "GeneratedInputBlock": {
       "properties": {
         "id": {
           "type": "string"
         },
-        "kind": {
-          "const": "IB",
-          "type": "string"
-        },
         "node": {
-          "type": "number"
-        },
-        "node_name": {
           "type": "string"
         },
         "payload_bytes": {
@@ -108,39 +88,23 @@
         "slot": {
           "type": "number"
         },
-        "tag": {
-          "const": "generated",
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTEnteredState",
+            "VTGenerated"
+          ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "HaskellGeneratedRBEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "const": "RB",
-          "type": "string"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "tag": {
-          "const": "generated",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellGeneratedVTEvent": {
+    "GeneratedRankingBlock": {
       "properties": {
         "endorse_blocks": {
           "items": {
@@ -151,21 +115,65 @@
         "id": {
           "type": "string"
         },
-        "kind": {
-          "const": "VT",
+        "node": {
+          "type": "string"
+        },
+        "payload_bytes": {
+          "type": "number"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTEnteredState",
+            "VTGenerated"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GeneratedVote": {
+      "properties": {
+        "endorse_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
           "type": "string"
         },
         "node": {
-          "type": "number"
-        },
-        "node_name": {
           "type": "string"
         },
         "size_bytes": {
           "type": "number"
         },
-        "tag": {
-          "const": "generated",
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTEnteredState",
+            "VTGenerated"
+          ],
           "type": "string"
         },
         "votes": {
@@ -174,81 +182,82 @@
       },
       "type": "object"
     },
-    "HaskellReceivedEvent": {
+    "HaskellCpuEvent": {
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
-        "node": {
+        "cpu_time_s": {
           "type": "number"
         },
-        "node_name": {
+        "node": {
           "type": "string"
         },
-        "tag": {
-          "const": "received",
+        "task_label": {
+          "type": "string"
+        },
+        "type": {
+          "const": "Cpu",
           "type": "string"
         }
       },
       "type": "object"
     },
-    "HaskellSentEvent": {
+    "HaskellEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/HaskellCpuEvent"
+        },
+        {
+          "$ref": "#/definitions/GeneratedInputBlock"
+        },
+        {
+          "$ref": "#/definitions/BaseBlockEvent"
+        },
+        {
+          "$ref": "#/definitions/GeneratedEndorserBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedRankingBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedVote"
+        },
+        {
+          "$ref": "#/definitions/HaskellNetworkEvent"
+        }
+      ]
+    },
+    "HaskellNetworkEvent": {
       "properties": {
+        "action": {
+          "enum": ["Received", "Sent"],
+          "type": "string"
+        },
+        "block_kind": {
+          "$ref": "#/definitions/BlockKind"
+        },
         "ids": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
         "msg_size_bytes": {
           "type": "number"
         },
-        "receipient": {
-          "type": "number"
+        "recipient": {
+          "type": "string"
         },
         "sender": {
-          "type": "number"
+          "type": "string"
         },
         "sending_s": {
           "type": "number"
         },
-        "tag": {
-          "const": "Sent",
+        "type": {
+          "const": "NetworkMessage",
           "type": "string"
         }
       },
       "type": "object"
-    },
-    "HaskellStateEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "tag": {
-          "const": "enteredstate",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "MessageKind": {
-      "enum": ["EB", "IB", "RB", "VT"],
-      "type": "string"
     }
   },
   "description": "Haskell simulation trace format",
