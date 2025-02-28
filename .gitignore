@@ -11,3 +11,9 @@ dist-newstyle/
 _build
 *.log
 .DS_Store
+simulation/docs/*/.ran-report-data
+simulation/docs/*/targets.d
+simulation/docs/*/*.pdf
+simulation/docs/sim-realism.pdf
+simulation/docs/sim-realism.bbl
+simulation/docs/sim-realism.tdo
