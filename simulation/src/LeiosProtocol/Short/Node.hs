@@ -37,7 +37,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Traversable
 import Data.Tuple (swap)
-import Debug.Trace (trace)
 import LeiosProtocol.Common
 import LeiosProtocol.Config
 import LeiosProtocol.Relay
@@ -54,9 +53,8 @@ import PraosProtocol.BlockFetch (
 import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
-import SimTypes (NodeId (..), cpuTask)
+import SimTypes (cpuTask)
 import System.Random
-import Text.Printf (printf)
 
 --------------------------------------------------------------
 ---- Events
@@ -473,7 +471,6 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = 
   go p = do
     let (endorseStart, endorseEnd) = endorseRange leios p
     let pruneTo = succ (lastUnadoptedEB leios p)
-    trace (printf "Node %d will prune unadopted EBs at slot #%d" (coerce @_ @Int nodeId) pruneTo.unSlotNo) $ pure ()
     _ <- waitNextSlot slotConfig pruneTo
     chain <- atomically $ PraosNode.preferredChain st.praosState
     let rbsOnChain = takeWhile (\rb -> rb.blockHeader.headerSlot > endorseStart) . Chain.toNewestFirst $ chain
@@ -523,7 +520,7 @@ pruneExpiredUncertifiedEBs ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, nodeId, slotConfig} st = go (toEnum 0)
  where
   go :: PipelineNo -> m ()
   go p = do
@@ -543,8 +540,7 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (to
           fmap Map.keysSet . stateTVar st.votesForEBVar . Map.partitionWithKey $ \ebId votesForEB -> do
             let maybeEBSlot = (.slot) . fst <$> RB.lookup ebRelayBuffer ebId
             let ebInCurrentPipeline ebSlot = endorseStart <= ebSlot && ebSlot <= endorseEnd
-            -- FIXME: see tryCertify, you want 'fromIntegral . sum . Map.elems $ votesForEB'
-            let ebCertified = Map.size votesForEB >= leios.votesForCertificate
+            let ebCertified = (fromIntegral . sum . Map.elems) votesForEB >= leios.votesForCertificate
             maybe True ebInCurrentPipeline maybeEBSlot && not ebCertified
         -- Prune st.relayEBState.relayBufferVar by removing the EBs in ebIdsToPrune.
         let (ebsPruned, prunedEBRelayBuffer) =
