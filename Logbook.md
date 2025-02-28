@@ -7,6 +7,15 @@
 Started work on the trace verifier in Agda
 - Adding decidability to the propositions used in the relational specification of Short Leios Protocol, which allows to generate execution traces without proof obligations (proof by computation), an idea that was successfully applied in the [Streamlet](https://github.com/input-output-hk/formal-streamlet/) formalization.
 
+## 2025-02-28
+
+### Haskell simulation
+
+- Completed setup of scenarios and simulations for comparison to idealized model.
+  - `make` in `simulation/docs` builds very WIP report.
+- Opened PR with types and JSON,CBOR encodings for new trace schema.
+  - Module defined in its own package for reuse by conformance testing.
+
 ## 2025-02-27
 
 ### Analysis of simulations at tag `leios-2025w09`
