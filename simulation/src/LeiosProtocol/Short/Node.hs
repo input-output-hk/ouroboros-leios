@@ -279,6 +279,7 @@ relayEBConfig _tracer cfg submitBlocks st =
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     , shouldIgnore = do
+        -- FIXME: we want to ignore EBs that we pruned.
         buff <- readTVarIO st.relayBufferVar
         return $ flip RB.member buff . (.id)
     }
@@ -491,8 +492,10 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = 
             RB.partition $ \ebEntry -> do
               let ebId = (snd ebEntry.value).id
               let ebSlot = (fst ebEntry.value).slot
+              -- FIXME: we are doing this after the pipeline in question, so `Current` is a bit misleading, `ebInAgedOutPipeline` maybe?.
               let ebInCurrentPipeline = endorseStart <= ebSlot && ebSlot <= endorseEnd
               let ebAdopted = ebId `Set.member` ebIdsOnChain
+              -- FIXME: check if they are certified: i.e. they have enough votes in st.votesForEBVar.
               ebInCurrentPipeline && not ebAdopted
         -- Create set of EB ids to prune:
         let ebIdsToPrune = Set.fromList [eb.id | eb <- ebsPruned]
@@ -525,18 +528,22 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (to
   go :: PipelineNo -> m ()
   go p = do
     let (endorseStart, endorseEnd) = endorseRange leios p
+    -- FIXME: intent would be more clear by using lastVoteRecv here.
     let pruneTo = succ (lastUncertifiedEB leios p)
     _ <- waitNextSlot slotConfig pruneTo
     ebsPruned <-
       atomically $ do
         -- TODO: add SlotNo to st.votesForEBVar to ease the pruning code?
         ebRelayBuffer <- readTVar st.relayEBState.relayBufferVar
+        -- FIXME: current misleading as above.
         -- Prune st.votesForEBVar for uncertified EBs in the current pipeline,
         -- return the set of pruned EB ids:
+        -- FIXME: votesForEBVar does not contain EBs for which we have no votes, we have to partition the relayBuffer while using votesForEB to filter.
         ebIdsToPrune <-
           fmap Map.keysSet . stateTVar st.votesForEBVar . Map.partitionWithKey $ \ebId votesForEB -> do
             let maybeEBSlot = (.slot) . fst <$> RB.lookup ebRelayBuffer ebId
             let ebInCurrentPipeline ebSlot = endorseStart <= ebSlot && ebSlot <= endorseEnd
+            -- FIXME: see tryCertify, you want 'fromIntegral . sum . Map.elems $ votesForEB'
             let ebCertified = Map.size votesForEB >= leios.votesForCertificate
             maybe True ebInCurrentPipeline maybeEBSlot && not ebCertified
         -- Prune st.relayEBState.relayBufferVar by removing the EBs in ebIdsToPrune.
