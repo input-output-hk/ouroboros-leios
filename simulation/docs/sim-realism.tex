@@ -21,10 +21,12 @@
 }
 \usepackage{subcaption}
 \usepackage{listings}
-
+%%\newcommand{\debug}[1]{}
+\newcommand{\debug}[1]{#1}
 \newcommand{\scenarioVsIdealFigure}[2]{
 \begin{figure}[htbp]
     \centering
+    \debug{\textbf{Label: #2} \\}
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{{#1}/IB-0.5-vs-ideal-vs-fitted-fig.eps}
@@ -160,73 +162,7 @@ like for EBs and RBs, the consumer has likely already sent a blocking request
 for more headers, so $3$ latencies are enough.
 Votes all get sent at the start of the slice, with default configuration at least, so we can expect consumers to reach the blocking stage again by the next burst. However, due to the large traffic, the $4$ latencies path likely sees some use too. This mix of behaviours can explain the better fit using $3.5$ latencies.
 
-\begin{figure}[htbp]
-    \centering
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/IB-0.5-vs-ideal-vs-fitted-fig.eps}
-        \caption{IB diffusion to $0.50$ stake.}
-        \label{scenario1:ib0.5}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/IB-0.98-vs-ideal-vs-fitted-fig.eps}
-        \caption{IB diffusion to $0.98$ stake.}
-        \label{scenario1:ib0.98}
-    \end{subfigure}
-    
-    \vspace{1em}
-    
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/EB-0.5-vs-ideal-vs-fitted-fig.eps}
-        \caption{EB diffusion to $0.50$ stake.}
-        \label{scenario1:eb0.5}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/EB-0.98-vs-ideal-vs-fitted-fig.eps}
-        \caption{EB diffusion to $0.98$ stake.}
-        \label{scenario1:eb0.98}
-    \end{subfigure}
-    
-    \vspace{1em}
-    
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/VT-0.5-vs-ideal-vs-fitted-fig.eps}
-        \caption{VT diffusion to $0.50$ stake.}
-        \label{scenario1:vt0.5}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/VT-0.98-vs-ideal-vs-fitted-fig.eps}
-        \caption{VT diffusion to $0.98$ stake.}
-        \label{scenario1:vt0.98}
-    \end{subfigure}
-    
-    \vspace{1em}
-    
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/RB-0.5-vs-ideal-vs-fitted-fig.eps}
-        \caption{RB diffusion to $0.50$ stake.}
-        \label{scenario1:rb0.5}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.45\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{scenario1/RB-0.98-vs-ideal-vs-fitted-fig.eps}
-        \caption{RB diffusion to $0.98$ stake.}
-        \label{scenario1:rb0.98}
-    \end{subfigure}
-
-    \caption{Scenario \ref{sc:most-idealized}, diffusion latencies from slot start (300s run with default seed).}
-    \label{fig:scenario1}
-\end{figure}
+\scenarioVsIdealFigure{scenario1}{sc:most-idealized}
 
 \subsection{Uniform Voting stage}
 The diffusion latencies, in Fig. \ref{fig:scenario1-send-recv}, stay very
