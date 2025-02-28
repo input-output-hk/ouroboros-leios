@@ -2,18 +2,25 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module LeiosEvents where
 
+import Codec.CBOR.JSON
+import Codec.CBOR.Read
+import Codec.CBOR.Write
+import Control.Exception
 import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Fixed
 import Data.Maybe (mapMaybe)
-import Data.Text
+import Data.String ()
+import Data.Text (Text)
 import Data.Word
 import GHC.Generics
 
@@ -115,3 +122,23 @@ type EventLog = [TraceEvent]
 -- | Discards lines that do not parse.
 decodeJSONL :: BSL8.ByteString -> [TraceEvent]
 decodeJSONL = mapMaybe decode . BSL8.lines
+
+encodeJSONL :: [TraceEvent] -> BSL8.ByteString
+encodeJSONL = BSL8.unlines . map encode
+
+-- | Throws exception on CBOR decoding errors, skips values that do not decode as TraceEvent.
+--   WARNING: seems not to be compatible with CBOR format produced by rust-sim.
+decodeCBOR :: BSL8.ByteString -> [TraceEvent]
+decodeCBOR = go
+ where
+  go s | BSL8.null s = []
+  go s =
+    case deserialiseFromBytes (decodeValue False) s of
+      Left e -> throw e
+      Right (s', v) -> case fromJSON v of
+        Success x -> x : go s'
+        Error _ -> go s'
+
+-- | Uses standard CBOR encoding of JSON values, encoded events are concatenated with no separator.
+encodeCBOR :: [TraceEvent] -> BSL8.ByteString
+encodeCBOR = BSL8.concat . map (toLazyByteString . encodeValue . toJSON)
