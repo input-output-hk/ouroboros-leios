@@ -1,7 +1,9 @@
 fixed = 2
 
 if (ARGC < fixed || (ARGC - fixed) % 2 != 0) {
-    print 'Usage: gnuplot -e \"set terminal TRM; set output 'FILE'\" -c script.gp plot_title y_label (data.csv line_title)+'
+    print (ARGC - fixed)
+    print ARGV
+    print "Usage: gnuplot -e \"set terminal TRM; set output 'FILE'\" -c script.gp plot_title y_label (data.csv line_title)+"
     print 'Expects data in \"latency, fraction\" format, latency on logscale y_axis.'
     exit
 }

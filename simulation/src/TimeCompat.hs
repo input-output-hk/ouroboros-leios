@@ -9,7 +9,7 @@ module TimeCompat (
   MonadDelay,
   MonadMonotonicTimeNSec,
   getMonotonicTime,
-  Time (Time),
+  Time (..),
   diffTimeToSeconds,
   secondsToDiffTime,
   addTime,
@@ -58,7 +58,7 @@ newtype DiffTime = DiffTime Seconds
 instance Show DiffTime where
   show d = showFixed True (realToFrac d :: Pico) ++ "s"
 
-newtype Time = Time DiffTime
+newtype Time = Time {unTime :: DiffTime}
   deriving newtype (Show, Eq, Ord)
   deriving newtype (ToJSON, FromJSON)
 

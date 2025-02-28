@@ -67,7 +67,9 @@ transport tracer SimpleConnProps{..} sendbuf recvbuf = go
     now <- getMonotonicTime
 
     let msgSize = messageSizeBytes msg
-        msgSerialisationTime = maybe 0 (fromIntegral . (msgSize `div`)) bandwidthBytesPerSecond
+        msgSerialisationTime = case bandwidthBytesPerSecond of
+          Nothing -> 0
+          Just bps -> fromIntegral msgSize / fromIntegral bps
         msgSendLeadingEdge = now
         msgSendTrailingEdge = msgSerialisationTime `addTime` now
         msgRecvLeadingEdge = latency `addTime` now

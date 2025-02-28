@@ -19,11 +19,11 @@ import Data.Array.ST as Array (
   runSTUArray,
   writeArray,
  )
-import Data.Array.Unboxed as Array (IArray (bounds), UArray, (!))
+import Data.Array.Unboxed as Array (IArray (bounds), UArray, amap, (!))
 import Data.Default (Default (..))
 import Data.Graph as Graph (Edge, Graph, Vertex, buildG, edges)
 import qualified Data.KdMap.Static as KdMap
-import Data.List (mapAccumL, sort, unfoldr)
+import Data.List (mapAccumL, sortOn, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Generics (Generic)
@@ -242,11 +242,20 @@ p2pGraphIdealDiffusionTimesFromNode ::
   -- | From this node to all other nodes
   NodeId ->
   [DiffTime]
-p2pGraphIdealDiffusionTimesFromNode
+p2pGraphIdealDiffusionTimesFromNode times nid =
+  map snd $ p2pGraphIdealDiffusionTimesFromNode' times nid
+
+p2pGraphIdealDiffusionTimesFromNode' ::
+  P2PIdealDiffusionTimes ->
+  -- | From this node to all other nodes
+  NodeId ->
+  [(NodeId, DiffTime)]
+p2pGraphIdealDiffusionTimesFromNode'
   (P2PIdealDiffusionTimes g latencies)
   (NodeId nid) =
-    sort
-      [ secondsToDiffTime (latencies ! (nid, nid'))
+    sortOn
+      snd
+      [ (NodeId nid', secondsToDiffTime (latencies ! (nid, nid')))
       | nid' <- range (bounds g)
       ]
 
@@ -260,31 +269,35 @@ p2pGraphIdealDiffusionTimesFromNode
 -- processing delays if approproate.
 p2pGraphIdealDiffusionTimes ::
   P2PTopography ->
-  -- | Per node processing time
-  (NodeId -> DiffTime) ->
+  -- | Generation time
+  DiffTime ->
+  -- | Processing time
+  DiffTime ->
   -- | Communication latency between nodes,
   -- given the link one-way link latency
   (NodeId -> NodeId -> DiffTime -> DiffTime) ->
   P2PIdealDiffusionTimes
 p2pGraphIdealDiffusionTimes
   P2PTopography{p2pNodes, p2pLinks}
+  generationDelay
   processingDelay
   communicationDelay =
     P2PIdealDiffusionTimes p2pGraph $
-      allPairsMinWeights
-        p2pGraph
-        ( \(a, b) ->
-            let linkLatency :: Latency
-                linkLatency = p2pLinks Map.! (NodeId a, NodeId b)
-                msgLatency :: DiffTime
-                msgLatency =
-                  communicationDelay
-                    (NodeId a)
-                    (NodeId b)
-                    (secondsToDiffTime linkLatency)
-             in realToFrac msgLatency
-        )
-        (realToFrac . processingDelay . NodeId)
+      amap (+ realToFrac generationDelay) $
+        allPairsMinWeights
+          p2pGraph
+          ( \(a, b) ->
+              let linkLatency :: Latency
+                  linkLatency = p2pLinks Map.! (NodeId a, NodeId b)
+                  msgLatency :: DiffTime
+                  msgLatency =
+                    communicationDelay
+                      (NodeId a)
+                      (NodeId b)
+                      (secondsToDiffTime linkLatency)
+               in realToFrac msgLatency + realToFrac processingDelay
+          )
+          (const 0)
    where
     p2pGraph :: Graph
     p2pGraph =

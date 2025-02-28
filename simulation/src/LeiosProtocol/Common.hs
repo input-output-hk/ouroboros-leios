@@ -28,7 +28,7 @@ module LeiosProtocol.Common (
   Certificate (..),
   slice,
   rankingBlockBodyInvariant,
-  NodeId,
+  NodeId (..),
   SubSlotNo (..),
   Word64,
   NetworkRate (..),

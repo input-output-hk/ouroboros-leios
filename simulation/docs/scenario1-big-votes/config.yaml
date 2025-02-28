@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=./config.schema.json
+
+################################################################################
+# Configuration for least realistic simulation
+################################################################################
+
+relay-strategy: "request-from-all"
+tcp-congestion-control: false
+multiplex-mini-protocols: false
+treat-blocks-as-full: true
+vote-bundle-size-bytes-constant: 102400
+vote-bundle-size-bytes-per-eb: 0

@@ -33,6 +33,7 @@ import Data.Word (Word16)
 import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
+import qualified PraosProtocol.Common.Chain as Chain
 import Prelude hiding (id)
 
 -- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
@@ -113,43 +114,47 @@ data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
 
 convertConfig :: OnDisk.Config -> LeiosConfig
 convertConfig disk =
-  case voting of
-    SomeStage pipeline voteSendStage ->
-      LeiosConfig
-        { praos
-        , pipeline
-        , voteSendStage
-        , sliceLength = fromIntegral disk.leiosStageLengthSlots
-        , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-        , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-        , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-        , votingFrequencyPerStage = disk.voteGenerationProbability
-        , votesForCertificate = fromIntegral disk.voteThreshold
-        , sizes
-        , delays
-        , ibDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.ibDiffusionStrategy
-              , maxWindowSize = disk.ibDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
-              }
-        , ebDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.ebDiffusionStrategy
-              , maxWindowSize = disk.ebDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
-              }
-        , voteDiffusion =
-            RelayDiffusionConfig
-              { strategy = disk.voteDiffusionStrategy
-              , maxWindowSize = disk.voteDiffusionMaxWindowSize
-              , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
-              , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
-              }
-        , relayStrategy = disk.relayStrategy
-        }
+  ( if disk.treatBlocksAsFull
+      then delaysAndSizesAsFull
+      else (\x -> x)
+  )
+    $ case voting of
+      SomeStage pipeline voteSendStage ->
+        LeiosConfig
+          { praos
+          , pipeline
+          , voteSendStage
+          , sliceLength = fromIntegral disk.leiosStageLengthSlots
+          , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+          , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+          , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+          , votingFrequencyPerStage = disk.voteGenerationProbability
+          , votesForCertificate = fromIntegral disk.voteThreshold
+          , sizes
+          , delays
+          , ibDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.ibDiffusionStrategy
+                , maxWindowSize = disk.ibDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+                }
+          , ebDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.ebDiffusionStrategy
+                , maxWindowSize = disk.ebDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+                }
+          , voteDiffusion =
+              RelayDiffusionConfig
+                { strategy = disk.voteDiffusionStrategy
+                , maxWindowSize = disk.voteDiffusionMaxWindowSize
+                , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+                , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+                }
+          , relayStrategy = disk.relayStrategy
+          }
  where
   forEach n xs = n * fromIntegral (length xs)
   forEachKey n m = n * fromIntegral (Map.size m)
@@ -235,6 +240,77 @@ convertConfig disk =
             disk.voteValidationCpuTimeMs `forEach` vm.endorseBlocks
       , certificateGeneration = const $ error "certificateGeneration delay included in RB generation"
       , certificateValidation = const $ error "certificateValidation delay included in RB validation"
+      }
+
+delaysAndSizesAsFull :: LeiosConfig -> LeiosConfig
+delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
+  -- Fields spelled out to more likely trigger an error and review when type changes.
+  LeiosConfig
+    { praos
+    , sizes
+    , delays
+    , pipeline = pipeline
+    , sliceLength = cfg.sliceLength
+    , inputBlockFrequencyPerSlot = cfg.inputBlockFrequencyPerSlot
+    , endorseBlockFrequencyPerStage = cfg.endorseBlockFrequencyPerStage
+    , activeVotingStageLength = cfg.activeVotingStageLength
+    , votingFrequencyPerStage = cfg.votingFrequencyPerStage
+    , voteSendStage = voteSendStage
+    , votesForCertificate = cfg.votesForCertificate
+    , ibDiffusion = cfg.ibDiffusion
+    , ebDiffusion = cfg.ebDiffusion
+    , voteDiffusion = cfg.voteDiffusion
+    , relayStrategy = cfg.relayStrategy
+    }
+ where
+  fullIB = mockFullInputBlock cfg
+  fullEB = mockFullEndorseBlock cfg
+  fullVT = mockFullVoteMsg cfg
+  fullEBsVotedFor =
+    [ EndorseBlock{id = id', ..}
+    | id' <- fullVT.endorseBlocks
+    , let EndorseBlock{..} = fullEB
+    ]
+  fullRB = mockFullRankingBlock cfg
+  fullCert = mockFullCertificate cfg
+  praos =
+    PraosConfig
+      { blockFrequencyPerSlot = cfg.praos.blockFrequencyPerSlot
+      , blockValidationDelay = const @DiffTime $ cfg.praos.blockValidationDelay fullRB
+      , headerValidationDelay = const @DiffTime $ cfg.praos.headerValidationDelay fullRB.blockHeader
+      , blockGenerationDelay = const @DiffTime $ cfg.praos.blockGenerationDelay fullRB
+      , headerSize = cfg.praos.headerSize :: Bytes
+      , bodySize = const @Bytes $ cfg.praos.bodySize fullRB.blockBody
+      , bodyMaxSize = cfg.praos.bodyMaxSize
+      , configureConnection = cfg.praos.configureConnection
+      , relayStrategy = cfg.praos.relayStrategy
+      }
+  sizes =
+    SizesConfig
+      { inputBlockHeader = cfg.sizes.inputBlockHeader :: Bytes
+      , inputBlockBodyAvgSize = cfg.sizes.inputBlockBodyAvgSize :: Bytes
+      , inputBlockBodyMaxSize = cfg.sizes.inputBlockBodyMaxSize :: Bytes
+      , endorseBlock = const @Bytes $ cfg.sizes.endorseBlock $ mockFullEndorseBlock cfg
+      , voteMsg = const @Bytes $ cfg.sizes.voteMsg $ mockFullVoteMsg cfg
+      , certificate = const @Bytes $ cfg.sizes.certificate $ mockFullCertificate cfg
+      , rankingBlockLegacyPraosPayloadAvgSize = cfg.sizes.rankingBlockLegacyPraosPayloadAvgSize
+      }
+  delays =
+    LeiosDelays
+      { inputBlockGeneration = const @DiffTime $ cfg.delays.inputBlockGeneration fullIB
+      , inputBlockHeaderValidation = const @DiffTime $ cfg.delays.inputBlockHeaderValidation $ fullIB.header
+      , inputBlockValidation = const @DiffTime $ cfg.delays.inputBlockValidation fullIB
+      , endorseBlockGeneration = const @DiffTime $ cfg.delays.endorseBlockGeneration fullEB
+      , endorseBlockValidation = const @DiffTime $ cfg.delays.endorseBlockValidation fullEB
+      , voteMsgGeneration =
+          const $
+            const @DiffTime $
+              cfg.delays.voteMsgGeneration
+                fullVT
+                fullEBsVotedFor
+      , voteMsgValidation = const @DiffTime $ cfg.delays.voteMsgValidation fullVT
+      , certificateGeneration = const @DiffTime $ cfg.delays.certificateGeneration fullCert
+      , certificateValidation = const @DiffTime $ cfg.delays.certificateValidation fullCert
       }
 
 class FixSize a where
@@ -360,6 +436,9 @@ pipelineOf cfg stage sl =
     fromMaybe undefined (fromEnum <$> stageStart cfg stage sl minBound)
       `div` cfg.sliceLength
 
+forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
+forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
+
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
@@ -392,9 +471,6 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
  where
   ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
-forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
-forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
-
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer inputBlocks =
@@ -403,6 +479,15 @@ mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer 
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
+mockFullEndorseBlock :: LeiosConfig -> EndorseBlock
+mockFullEndorseBlock cfg =
+  mkEndorseBlock
+    cfg
+    (EndorseBlockId (NodeId 0) 0)
+    0
+    (NodeId 0)
+    [InputBlockId (NodeId 0) i | i <- [0 .. cfg.sliceLength - 1]]
+
 mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
 mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
 
@@ -410,6 +495,47 @@ mkCertificate :: LeiosConfig -> Map VoteId Word64 -> Certificate
 mkCertificate cfg vs =
   assert (fromIntegral cfg.votesForCertificate <= sum (Map.elems vs)) $
     Certificate vs
+
+mockFullRankingBlock :: LeiosConfig -> RankingBlock
+mockFullRankingBlock cfg =
+  fixSize cfg $
+    fixupBlock (Chain.headAnchor @RankingBlock Genesis) $
+      mkPartialBlock 0 $
+        mkRankingBlockBody
+          cfg
+          (NodeId 0)
+          (Just (EndorseBlockId (NodeId 0) 0, mockFullCertificate cfg))
+          cfg.sizes.rankingBlockLegacyPraosPayloadAvgSize
+
+mockFullInputBlock :: LeiosConfig -> InputBlock
+mockFullInputBlock cfg =
+  mkInputBlock
+    cfg
+    (mkInputBlockHeader cfg (InputBlockId (NodeId 0) 0) 0 0 (NodeId 0) GenesisHash)
+    cfg.sizes.inputBlockBodyAvgSize
+
+mockFullVoteMsg :: LeiosConfig -> VoteMsg
+mockFullVoteMsg cfg =
+  mkVoteMsg
+    cfg
+    (VoteId (NodeId 0) 0)
+    0
+    (NodeId 0)
+    1
+    [EndorseBlockId (NodeId 0) i | i <- [0 .. ceiling cfg.endorseBlockFrequencyPerStage - 1]]
+
+mockFullCertificate :: LeiosConfig -> Certificate
+mockFullCertificate cfg =
+  mkCertificate
+    cfg
+    ( Map.fromList $
+        [ (VoteId (NodeId 0) i, 1)
+        | i <-
+            [ 0
+            .. cfg.votesForCertificate - 1
+            ]
+        ]
+    )
 
 ---------------------------------------------------------------------------------------
 ---- Selecting data to build blocks

@@ -263,6 +263,10 @@
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
     },
+    "treat-blocks-as-full": {
+      "description": "When `true`, any delays and message sizes are calculated as if\neach block contained as much data as the expected average, rounded up.\nIn particular, for the sake of the above, we consider that:\n  - Each RB includes a certificate.\n  - Certificates contain votes from `vote-threshold` nodes.\n  - Vote bundles vote for `ceil eb-generation-probability` EBs.\n  - EBs reference `ceil (ib-generation-probability * leios-stage-length-slots)` IBs.\nOnly supported by Haskell simulation.",
+      "type": "boolean"
+    },
     "tx-generation-distribution": {
       "$ref": "#/definitions/Distribution",
       "description": "Only supported by Rust simulation."

@@ -1,0 +1,12 @@
+stakes: [0.5,0.6,0.7,0.8,0.9,0.98]
+ideals:
+  ideal:
+    ib_hops: 3
+    eb_hops: 3
+    vt_hops: 3
+    rb_hops: 3
+  ideal-4-hops:
+    ib_hops: 4
+    eb_hops: 3
+    vt_hops: 4
+    rb_hops: 3

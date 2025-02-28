@@ -61,6 +61,7 @@ data Config = Config
   { relayStrategy :: RelayStrategy
   , tcpCongestionControl :: Bool
   , multiplexMiniProtocols :: Bool
+  , treatBlocksAsFull :: Bool
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
@@ -124,6 +125,7 @@ instance Default Config where
       { relayStrategy = RequestFromFirst
       , tcpCongestionControl = True
       , multiplexMiniProtocols = True
+      , treatBlocksAsFull = False
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
@@ -191,6 +193,7 @@ configToKVsWith getter cfg =
     [ get @"relayStrategy" getter cfg
     , get @"tcpCongestionControl" getter cfg
     , get @"multiplexMiniProtocols" getter cfg
+    , get @"treatBlocksAsFull" getter cfg
     , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
     , get @"leiosVoteSendRecvStages" getter cfg
@@ -268,6 +271,7 @@ instance FromJSON Config where
     relayStrategy <- parseFieldOrDefault @Config @"relayStrategy" obj
     tcpCongestionControl <- parseFieldOrDefault @Config @"tcpCongestionControl" obj
     multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
+    treatBlocksAsFull <- parseFieldOrDefault @Config @"treatBlocksAsFull" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj

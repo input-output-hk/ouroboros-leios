@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=./config.schema.json
+
+################################################################################
+# Configuration for least realistic simulation
+################################################################################
+
+relay-strategy: "request-from-first"
+tcp-congestion-control: false
+multiplex-mini-protocols: true
+treat-blocks-as-full: true

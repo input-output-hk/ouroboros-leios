@@ -14,6 +14,7 @@ import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, listToMaybe)
+import qualified Data.Yaml as Yaml
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
 import qualified ExamplesTCP
@@ -52,6 +53,7 @@ import Options.Applicative (
   showDefault,
   showDefaultWith,
   showHelpOnEmpty,
+  strArgument,
   strOption,
   subparser,
   switch,
@@ -110,6 +112,8 @@ parserOptions =
         progDesc "Convert from a topology with clusters to a topology with location coordinates."
     , command "generate-topology" . info (CliCommand <$> parserCliGenerateTopology <**> helper) $
         progDesc "Generate a topology from a world shape and expected links. Other parameters are fixed and meant to be edited after the fact."
+    , command "report-data" . info (CliCommand <$> parserReportData <**> helper) $
+        progDesc "Outputs diffusion data as .csv. Either from simulation output or idealized graph diffusion."
     ]
 
 --------------------------------------------------------------------------------
@@ -486,6 +490,7 @@ data CliCommand
   = CliConvertBenchTopology {inputBenchTopologyFile :: FilePath, inputBenchLatenciesFile :: FilePath, outputTopologyFile :: FilePath}
   | CliLayoutTopology {inputTopologyFile :: FilePath, outputTopologyFile :: FilePath}
   | CliGenerateTopology {seed :: Int, topologyGenerationOptions :: TopologyGenerationOptions, outputTopologyFile :: FilePath}
+  | CliReportData {outputDir :: Maybe FilePath, reportConfigFile :: FilePath, printTargetsOnly :: Bool, simDataFile :: FilePath}
 
 runCliOptions :: CliCommand -> IO ()
 runCliOptions = \case
@@ -511,6 +516,10 @@ runCliOptions = \case
     p2pNetwork@P2PNetwork{..} <- execTopologyGenerationOptions rng topologyGenerationOptions
     let totalStake = fromIntegral $ 100 * Map.size p2pNodes
     writeTopology outputTopologyFile $ p2pNetworkToSomeTopology totalStake p2pNetwork
+  CliReportData{..} -> do
+    let prefixDir = fromMaybe (takeDirectory simDataFile) outputDir
+    reportConfig <- Yaml.decodeFileThrow reportConfigFile
+    DataShortLeiosP2P.reportLeiosData prefixDir simDataFile reportConfig printTargetsOnly
 
 parserCliConvertBenchTopology :: Parser CliCommand
 parserCliConvertBenchTopology =
@@ -561,6 +570,14 @@ parserCliGenerateTopology =
           <> metavar "FILE"
           <> help "The output topology file."
       )
+
+parserReportData :: Parser CliCommand
+parserReportData =
+  CliReportData
+    <$> optional (strOption $ short 'o' <> long "output-dir")
+    <*> strOption (short 'c' <> long "report-config")
+    <*> switch (long "print-targets-only")
+    <*> strArgument (metavar "SIMDATA")
 
 --------------------------------------------------------------------------------
 -- Parsing Topography Options

@@ -30,8 +30,6 @@ import Data.Traversable
 import GHC.Generics
 import LeiosProtocol.Common hiding (Point)
 import qualified PraosProtocol.Common.Chain as Chain
-import PraosProtocol.ExamplesPraosP2P ()
-import SimTypes
 
 data DiffusionEntry id = DiffusionEntry
   { block_id :: !id
