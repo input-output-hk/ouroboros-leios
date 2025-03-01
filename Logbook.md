@@ -30,6 +30,22 @@ We are considering developing an interactive "protocol dashboard" web applicatio
 
 ![Initial sketch for protocol dashboard](images/protocol-dashboard-deisgn-0.png)
 
+## 2025-02-26
+
+### Rust simulation
+
+Updated bandwidth simulation so that messages from different miniprotocols can be sent in parallel. Bandwidth is evenly divided between each miniprotocol, and within a miniprotocol, messages are sent one-at-a-time.
+
+Added support for a `simulate-transactions` setting (default to `true`). When this setting is `false`, the rust simulation will not generate transactions randomly and will not propagate them across the network. It will generate IBs exactly the size of `ib-body-avg-size-bytes`, and RBs with exactly `rb-body-legacy-praos-payload-avg-size-bytes` bytes in the body.
+
+## 2025-02-25
+
+### Rust simulation
+
+Updated the simulation's output to match Haskell more closely.
+
+Corrected the transaction count in the UI, and updated the block view to make it easier to see blocks with dozens of IBs.
+
 ## 2025-02-24
 
 ### Haskell Simulation
@@ -44,6 +60,10 @@ We are considering developing an interactive "protocol dashboard" web applicatio
     3 or 4 latencies to transfer a new block, since headers can be
     requested in either blocking or non-blocking way, depending on
     traffic.
+
+### Rust simulation
+
+Updated bandwidth calculations to not parallelize any requests; all messages are now FIFO. This is still inaccurate, because bandwidth is split between all miniprotocols.
 
 ## 2025-02-22
 
