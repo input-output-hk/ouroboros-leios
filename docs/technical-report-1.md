@@ -77,7 +77,7 @@ understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Formal Specification for Short Leios
 
-![Overview for formal specification](../formal-spec/docs/overview.png)
+![Overview for formal specification](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios-formal-spec/refs/heads/main/formal-spec/docs/overview.png)
 
 ## Delta QSD network performance model
 
