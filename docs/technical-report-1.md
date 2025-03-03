@@ -410,7 +410,10 @@ appear before the next EB.
 > 
 > The sortition, voting, and certificate analyses in this report will be revised
 > as research proceeds and design details are settled. The material below is a
-> snapshot of the results from August through December 2024.
+> snapshot of the results from August through December 2024. The more recent
+> analysis [BLS certificates for Leios](../crypto-benchmarks.rs/Specification.md)
+> specifies one viable realizaiton of certificates for Leios that meets
+> resource, operational, and security requirements.
 
 The Leios protocols requires a subset of SPO nodes to vote on certifying each
 EB. The EB can only be certified if a threshold (a "quorum") of votes are cast
