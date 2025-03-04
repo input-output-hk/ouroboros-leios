@@ -376,7 +376,7 @@ runSimOptions SimOptions{..} = case simCommand of
           DataShortLeiosP2P.SimOutputConfig
             { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | not skipLog]
             , emitControl
-            , dataFile = Just simOutputFile
+            , dataFile = guard (takeExtension simOutputFile == ".json") >> pure simOutputFile
             , analize
             , stop = simOutputSeconds
             }

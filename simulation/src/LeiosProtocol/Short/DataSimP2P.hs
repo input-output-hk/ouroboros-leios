@@ -306,20 +306,24 @@ maybeAnalizeRawData analize raw@RawLeiosData{..} = LeiosData{..}
 exampleSim :: StdGen -> OnDisk.Config -> P2PNetwork -> SimOutputConfig -> IO ()
 exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
   case dataFile of
-    Just fp ->
+    Just fp -> do
+      putStrLn "Accumulating data."
       runModel
         SampleModel
           { initState = LeiosSimState IMap.empty Map.empty Map.empty Map.empty Map.empty Map.empty Map.empty
           , accumState = \t e s -> accumLeiosSimState cfg t e s{chains = accumChains t e s.chains}
           , renderState = renderState fp
           }
-    Nothing ->
+    Nothing | Just{} <- logFile -> do
+      putStrLn "Only outputting log."
       runModel
         SampleModel
           { initState = ()
           , accumState = \_ _ s -> s
           , renderState = const (return ())
           }
+    Nothing | Nothing <- logFile -> do
+      putStrLn "No output chosen, terminating."
  where
   runModel :: SampleModel LeiosEvent state -> IO ()
   runModel model =
