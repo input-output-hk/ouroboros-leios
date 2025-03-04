@@ -4,10 +4,85 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Mon, 17 Feb 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 24 Feb 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary – February 24, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary</guid>
+            <pubDate>Mon, 24 Feb 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[High-level summary]]></description>
+            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#high-level-summary">​</a></h2>
+<p>This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments included detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
+<ul>
+<li>Completed comprehensive analysis of simulations at tag <code>leios-2025w09</code>:<!-- -->
+<ul>
+<li>Refactored ELT workflow for improved simulation data processing</li>
+<li>Modified Rust simulator to generate fixed-size IBs for comparison with Haskell</li>
+<li>Partially resolved discrepancies in congestion metrics between simulators</li>
+<li>Developed detailed analyses of:<!-- -->
+<ul>
+<li>IB generation to receipt elapsed time</li>
+<li>Time-in-flight over node-to-node links</li>
+</ul>
+</li>
+<li>Identified dual role of network bandwidth and CPU bottlenecks in high throughput congestion</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-dashboard-initiative">Protocol dashboard initiative<a class="hash-link" aria-label="Direct link to Protocol dashboard initiative" title="Direct link to Protocol dashboard initiative" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#protocol-dashboard-initiative">​</a></h2>
+<ul>
+<li>Initiated design of an interactive protocol dashboard with planned features:<!-- -->
+<ul>
+<li>Protocol parameter configuration</li>
+<li>Stake distribution settings</li>
+<li>Performance visualization<!-- -->
+<ul>
+<li>Block arrival efficiency</li>
+<li>Transaction duplication</li>
+<li>Leios operation rewards</li>
+<li>Resource utilization</li>
+</ul>
+</li>
+<li>Security metrics visualization<!-- -->
+<ul>
+<li>Quorum failure analysis</li>
+<li>Certificate forgery detection</li>
+<li>Adversarial block tracking</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#rust-simulation">​</a></h2>
+<ul>
+<li>Enhanced parallel message handling capabilities:<!-- -->
+<ul>
+<li>Implemented parallel miniprotocol message transmission</li>
+<li>Added even bandwidth distribution between miniprotocols</li>
+<li>Introduced <code>simulate-transactions</code> configuration option</li>
+<li>Updated simulation output for better Haskell compatibility</li>
+<li>Improved block visualization for high IB count scenarios</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#formal-methods">​</a></h2>
+<ul>
+<li>Commenced trace verifier development in Agda:<!-- -->
+<ul>
+<li>Added decidability to Short Leios Protocol relational specification</li>
+<li>Implemented proof-by-computation approach for execution traces</li>
+<li>Applied successful methodology from Streamlet formalization</li>
+</ul>
+</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – February 17, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/02/17/weekly-progress-summary</link>
@@ -855,34 +930,6 @@ time.</li>
 <ul>
 <li>Sandro provided an introductory talk on Leios, explaining protocol decisions.</li>
 <li>Recording available for team review.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary - October 7, 2024]]></title>
-            <link>https://leios.cardano-scaling.org/news/2024/10/07/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2024/10/07/weekly-progress-summary</guid>
-            <pubDate>Mon, 07 Oct 2024 00:00:00 GMT</pubDate>
-            <description><![CDATA[Weekly Meeting]]></description>
-            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="weekly-meeting">Weekly Meeting<a class="hash-link" aria-label="Direct link to Weekly Meeting" title="Direct link to Weekly Meeting" href="https://leios.cardano-scaling.org/news/2024/10/07/weekly-progress-summary#weekly-meeting">​</a></h2>
-<ul>
-<li>Discussed Ethereum's blob approach and its relevance to Leios.</li>
-<li>Considered Leios for storing unstructured, transient data.</li>
-<li>Identified potential use cases and next steps for protocol modeling.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="meeting-with-spyros">Meeting with Spyros<a class="hash-link" aria-label="Direct link to Meeting with Spyros" title="Direct link to Meeting with Spyros" href="https://leios.cardano-scaling.org/news/2024/10/07/weekly-progress-summary#meeting-with-spyros">​</a></h2>
-<ul>
-<li>Spyros worked on network simulation for Leios using Peernet.</li>
-<li>Focused on bandwidth as a limiting factor and explored block generation
-frequency limits.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="structuring-repository-for-open-source">Structuring Repository for Open-source<a class="hash-link" aria-label="Direct link to Structuring Repository for Open-source" title="Direct link to Structuring Repository for Open-source" href="https://leios.cardano-scaling.org/news/2024/10/07/weekly-progress-summary#structuring-repository-for-open-source">​</a></h2>
-<ul>
-<li>Added basic instructions for Code of Conduct, Contribution guidelines, and
-coding standards.</li>
-<li>Restructured code to merge <code>leios</code> and <code>leios-sim</code> packages.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
