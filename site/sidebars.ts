@@ -28,7 +28,7 @@ const sidebars: SidebarsConfig = {
   developmentSidebar: [
     {
       type: "category",
-      label: "Research & Development",
+      label: "Research and Development",
       items: [
         "development/overview",
         "development/throughput-simulation",
