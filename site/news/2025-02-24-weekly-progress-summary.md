@@ -1,52 +1,31 @@
 ---
-title: Weekly Summary – February 24, 2025
+title: Weekly Progress Summary - 2025-02-24
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
+## Weekly Summary for 2025-02-24 to 2025-03-03
+
 ## High-level summary
 
-This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments included detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.
+This week in simulation analysis, the team focused on Haskell simulation advancements, updated the Rust simulation, and cleared up previous discrepancies in congestion metrics. Key accomplishments included resolving issues related to IB sortition, integrating a block expiration/diffusion-halt proposal, and updating bandwidth calculations in the Rust simulation.
 
-## Cross-simulation analysis
+## Haskell Simulation Analysis
 
-- Completed comprehensive analysis of simulations at tag `leios-2025w09`:
-  - Refactored ELT workflow for improved simulation data processing
-  - Modified Rust simulator to generate fixed-size IBs for comparison with Haskell
-  - Partially resolved discrepancies in congestion metrics between simulators
-  - Developed detailed analyses of:
-    - IB generation to receipt elapsed time
-    - Time-in-flight over node-to-node links
-  - Identified dual role of network bandwidth and CPU bottlenecks in high throughput congestion
+- Completed IB sortition fix for cases where `IB/slot < 1`.
+- Integrated block expiration/diffusion-halt proposal, allowing for comparison between idealized and simulated node configurations.
+  - Added `treat-blocks-as-full` config parameter to promote uniform block behavior network and CPU usage.
+  - Noted improvements in preliminary results: `treat-blocks-as-full` promises a better simulation environment, though Relay mini-protocol complications still exist.
+    - Relay can require either 3 or 4 latency messages to transfer a new block.
 
-## Protocol dashboard initiative
+## Rust Simulation Update
 
-- Initiated design of an interactive protocol dashboard with planned features:
-  - Protocol parameter configuration
-  - Stake distribution settings
-  - Performance visualization
-    - Block arrival efficiency
-    - Transaction duplication
-    - Leios operation rewards
-    - Resource utilization
-  - Security metrics visualization
-    - Quorum failure analysis
-    - Certificate forgery detection
-    - Adversarial block tracking
+- Updated bandwidth calculations to employ a strict First-In-First-Out (FIFO) configuration.
+  - Bandwidth is no longer divided between parallelized requests for individual mini-protocols. However, bandwidth splitting between all mini-programs is still inaccurate due to its current configuration.
 
-## Rust simulation
+## Lessons learned and Future work
 
-- Enhanced parallel message handling capabilities:
-  - Implemented parallel miniprotocol message transmission
-  - Added even bandwidth distribution between miniprotocols
-  - Introduced `simulate-transactions` configuration option
-  - Updated simulation output for better Haskell compatibility
-  - Improved block visualization for high IB count scenarios
-
-## Formal methods
-
-- Commenced trace verifier development in Agda:
-  - Added decidability to Short Leios Protocol relational specification
-  - Implemented proof-by-computation approach for execution traces
-  - Applied successful methodology from Streamlet formalization 
+- Continue testing IB sortition and block expiration/diffusion-halt proposal to promote further improvements in simulation outcomes.
+- Investigate potential modifications to bandwidth calculations in the Rust simulator to improve compatibility with network configurations.
+- Address and rectify issues concerning latency required for data to propagate through Relay mini-protocol.
