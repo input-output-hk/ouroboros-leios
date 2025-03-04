@@ -141,7 +141,7 @@ For more details on each parameter, refer to the comments in the [config.d.ts](d
 
 ## Specification
 
-The formal specification of the Leios protocol in Agda is refrenced from the repository: https://github.com/input-output-hk/ouroboros-leios-formal-spec
+The formal specification of the Leios protocol in Agda is referenced from the repository: https://github.com/input-output-hk/ouroboros-leios-formal-spec
 
 ## Docker Simulation
 
