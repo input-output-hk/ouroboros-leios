@@ -15,13 +15,13 @@
             <pubDate>Mon, 24 Feb 2025 00:00:00 GMT</pubDate>
             <description><![CDATA[High-level summary]]></description>
             <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#high-level-summary">​</a></h2>
-<p>This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments included detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.</p>
+<p>This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments include detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
 <ul>
-<li>Completed comprehensive analysis of simulations at tag <code>leios-2025w09</code>:<!-- -->
+<li>Completed a comprehensive analysis of simulations at tag <code>leios-2025w09</code>:<!-- -->
 <ul>
-<li>Refactored ELT workflow for improved simulation data processing</li>
-<li>Modified Rust simulator to generate fixed-size IBs for comparison with Haskell</li>
+<li>Refactored the ELT workflow to improve simulation data processing</li>
+<li>Modified the Rust simulator to generate fixed-size input blocks (IBs) for comparison with Haskell</li>
 <li>Partially resolved discrepancies in congestion metrics between simulators</li>
 <li>Developed detailed analyses of:<!-- -->
 <ul>
@@ -29,17 +29,17 @@
 <li>Time-in-flight over node-to-node links</li>
 </ul>
 </li>
-<li>Identified dual role of network bandwidth and CPU bottlenecks in high throughput congestion</li>
+<li>Identified the dual role of network bandwidth and CPU bottlenecks in high throughput congestion.</li>
 </ul>
 </li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-dashboard-initiative">Protocol dashboard initiative<a class="hash-link" aria-label="Direct link to Protocol dashboard initiative" title="Direct link to Protocol dashboard initiative" href="https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary#protocol-dashboard-initiative">​</a></h2>
 <ul>
-<li>Initiated design of an interactive protocol dashboard with planned features:<!-- -->
+<li>Initiated the design of an interactive protocol dashboard with planned features:<!-- -->
 <ul>
 <li>Protocol parameter configuration</li>
 <li>Stake distribution settings</li>
-<li>Performance visualization<!-- -->
+<li>Performance visualization:<!-- -->
 <ul>
 <li>Block arrival efficiency</li>
 <li>Transaction duplication</li>
@@ -47,11 +47,11 @@
 <li>Resource utilization</li>
 </ul>
 </li>
-<li>Security metrics visualization<!-- -->
+<li>Security metrics visualization:<!-- -->
 <ul>
 <li>Quorum failure analysis</li>
 <li>Certificate forgery detection</li>
-<li>Adversarial block tracking</li>
+<li>Adversarial block tracking.</li>
 </ul>
 </li>
 </ul>
@@ -61,11 +61,11 @@
 <ul>
 <li>Enhanced parallel message handling capabilities:<!-- -->
 <ul>
-<li>Implemented parallel miniprotocol message transmission</li>
-<li>Added even bandwidth distribution between miniprotocols</li>
-<li>Introduced <code>simulate-transactions</code> configuration option</li>
+<li>Implemented parallel mini-protocol message transmission</li>
+<li>Added even bandwidth distribution between mini-protocols</li>
+<li>Introduced the <code>simulate-transactions</code> configuration option</li>
 <li>Updated simulation output for better Haskell compatibility</li>
-<li>Improved block visualization for high IB count scenarios</li>
+<li>Improved block visualization for scenarios with high IB counts.</li>
 </ul>
 </li>
 </ul>
@@ -73,9 +73,9 @@
 <ul>
 <li>Commenced trace verifier development in Agda:<!-- -->
 <ul>
-<li>Added decidability to Short Leios Protocol relational specification</li>
-<li>Implemented proof-by-computation approach for execution traces</li>
-<li>Applied successful methodology from Streamlet formalization</li>
+<li>Added decidability to Short Leios protocol relational specification</li>
+<li>Implemented a proof-by-computation approach for execution traces</li>
+<li>Applied the successful methodology from Streamlet formalization.</li>
 </ul>
 </li>
 </ul>]]></content:encoded>
