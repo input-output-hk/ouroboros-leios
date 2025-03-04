@@ -1,6 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Test.Config where
@@ -11,6 +12,7 @@ import Data.Aeson
 import qualified Data.Aeson.KeyMap as KM
 import Data.Bifunctor (Bifunctor (..))
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.ByteString.Lazy.Char8 as BSL8
 import Data.Default
 import Data.String
 import qualified Data.Text as T
@@ -33,7 +35,15 @@ tests =
   testGroup
     "Config"
     [ testCaseSteps "test_defaultConfigOnDiskMatchesDef" test_defaultConfigOnDiskMatchesDef
+    , testCase "test_canParseConstantDistribution" test_canParseConstantDistribution
     ]
+
+test_canParseConstantDistribution :: Assertion
+test_canParseConstantDistribution =
+  uncurry assertBool $
+    either (,False) (const ("", True)) $
+      eitherDecode @Distribution $
+        BSL8.pack "{\"distribution\": \"constant\", \"value\": 1000000}"
 
 test_defaultConfigOnDiskMatchesDef :: (String -> IO ()) -> Assertion
 test_defaultConfigOnDiskMatchesDef step = do

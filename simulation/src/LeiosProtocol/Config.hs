@@ -15,6 +15,7 @@
 
 module LeiosProtocol.Config where
 
+import Control.Applicative ((<|>))
 import Data.Aeson (Options (allNullaryToStringTag), defaultOptions, genericToEncoding, genericToJSON)
 import Data.Aeson.Encoding (pairs)
 import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (constructorTagModifier), Parser, ToJSON (..), Value (..), genericParseJSON, object, typeMismatch, withObject, (.:))
@@ -41,6 +42,7 @@ data Distribution
   = Normal {mean :: Double, std_dev :: Double}
   | Exp {lambda :: Double, scale :: Maybe Double}
   | LogNormal {mu :: Double, sigma :: Double}
+  | Unknown Value
   deriving (Show, Eq, Generic)
 
 data DiffusionStrategy
@@ -327,33 +329,37 @@ instance FromJSON Config where
     certSizeBytesPerNode <- parseFieldOrDefault @Config @"certSizeBytesPerNode" obj
     pure Config{..}
 
-distributionToKVs :: KeyValue e kv => Distribution -> [kv]
+distributionToKVs :: KeyValue e kv => Distribution -> Either Value [kv]
 distributionToKVs Normal{..} =
-  [ "distribution" .= ("normal" :: Text)
-  , "mean" .= mean
-  , "std_dev" .= std_dev
-  ]
+  Right
+    [ "distribution" .= ("normal" :: Text)
+    , "mean" .= mean
+    , "std_dev" .= std_dev
+    ]
 distributionToKVs Exp{..} =
-  [ "distribution" .= ("exp" :: Text)
-  , "lambda" .= lambda
-  , "scale" .= scale
-  ]
+  Right
+    [ "distribution" .= ("exp" :: Text)
+    , "lambda" .= lambda
+    , "scale" .= scale
+    ]
 distributionToKVs LogNormal{..} =
-  [ "distribution" .= ("log-normal" :: Text)
-  , "mu" .= mu
-  , "sigma" .= sigma
-  ]
+  Right
+    [ "distribution" .= ("log-normal" :: Text)
+    , "mu" .= mu
+    , "sigma" .= sigma
+    ]
+distributionToKVs (Unknown v) = Left v
 
 instance ToJSON Distribution where
   toJSON :: Distribution -> Value
-  toJSON = object . distributionToKVs
+  toJSON = either id object . distributionToKVs
 
   toEncoding :: Distribution -> Encoding
-  toEncoding = pairs . mconcat . distributionToKVs
+  toEncoding = either toEncoding (pairs . mconcat) . distributionToKVs
 
 instance FromJSON Distribution where
   parseJSON :: Value -> Parser Distribution
-  parseJSON = withObject "Distribution" $ \o -> do
+  parseJSON = orUnknown $ withObject "Distribution" $ \o -> do
     (distribution :: Text) <- o .: "distribution"
     if
       | distribution == "normal" -> do
@@ -370,6 +376,8 @@ instance FromJSON Distribution where
           pure LogNormal{..}
       | otherwise -> do
           typeMismatch "Distribution" (Object o)
+   where
+    orUnknown k v = k v <|> pure (Unknown v)
 
 defaultEnumOptions :: Options
 defaultEnumOptions =
