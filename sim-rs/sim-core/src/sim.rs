@@ -213,7 +213,7 @@ impl SimulationMessage {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum MiniProtocol {
     Tx,
     Block,

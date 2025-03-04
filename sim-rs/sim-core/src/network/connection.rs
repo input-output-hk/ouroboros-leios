@@ -62,7 +62,7 @@ pub struct Connection<TProtocol, TMessage> {
 
 impl<TProtocol, TMessage> Connection<TProtocol, TMessage>
 where
-    TProtocol: Eq + Hash,
+    TProtocol: Clone + Eq + Hash,
 {
     pub fn new(latency: Duration, bandwidth_bps: Option<u64>) -> Self {
         Self {
@@ -97,8 +97,15 @@ where
             .values()
             .filter_map(|q| q.bytes_in_next_message())
             .min()?;
-        let bps = self.bandwidth_bps? / self.bandwidth_queues.len() as u64;
-        Some(self.last_event + compute_bandwidth_delay(bps, bytes_left) + self.latency)
+        Some(
+            self.last_event
+                + compute_bandwidth_delay(
+                    self.bandwidth_bps?,
+                    self.bandwidth_queues.len() as u64,
+                    bytes_left,
+                )
+                + self.latency,
+        )
     }
 
     pub fn recv(&mut self, now: Timestamp) -> TMessage {
@@ -127,29 +134,27 @@ where
         let mut messages_received = vec![];
         while bytes_to_consume > 0 && !self.bandwidth_queues.is_empty() {
             let queues = self.bandwidth_queues.len() as u64;
-            let bytes_per_queue = bytes_to_consume / queues;
-            let bps = total_bps / queues;
+            let bytes_per_queue = self.split_bytes_amongst_queues(bytes_to_consume);
+            let total_bytes_consumed = bytes_per_queue.values().copied().sum();
 
-            let bytes_to_consume_next = self
-                .bandwidth_queues
-                .values()
-                .fold(bytes_per_queue, |bytes, queue| bytes.min(queue.bytes()));
-
-            self.bandwidth_queues.retain(|_, queue| {
+            self.bandwidth_queues.retain(|key, queue| {
                 let mut bytes_consumed = 0;
+                let Some(&bytes_to_consume_next) = bytes_per_queue.get(key) else {
+                    return true;
+                };
                 for (message, size) in queue.consume(bytes_to_consume_next) {
                     bytes_consumed += size;
                     messages_received.push((
                         message,
                         self.last_event
-                            + compute_bandwidth_delay(bps, bytes_consumed)
+                            + compute_bandwidth_delay(total_bps, queues, bytes_consumed)
                             + self.latency,
                     ));
                 }
+                bytes_to_consume -= bytes_to_consume_next;
                 !queue.is_empty()
             });
-            self.last_event += compute_bandwidth_delay(bps, bytes_to_consume_next);
-            bytes_to_consume -= bytes_to_consume_next;
+            self.last_event += compute_bandwidth_delay(total_bps, 1, total_bytes_consumed);
         }
         messages_received.sort_by_key(|((id, _), ts)| (*ts, *id));
         for ((_, message), arrival) in messages_received {
@@ -158,10 +163,41 @@ where
 
         self.last_event = now;
     }
+
+    fn split_bytes_amongst_queues(&self, bytes: u64) -> HashMap<TProtocol, u64> {
+        let mut queue_bytes: Vec<(&TProtocol, u64)> = self
+            .bandwidth_queues
+            .iter()
+            .map(|(k, v)| (k, v.bytes()))
+            .collect();
+        queue_bytes.sort_by_key(|(_, bytes)| *bytes);
+        let queues = queue_bytes.len() as u64;
+        let target_bytes_per_queue = bytes / queues;
+        let bytes_per_queue = target_bytes_per_queue.min(queue_bytes[0].1);
+        if bytes_per_queue == target_bytes_per_queue {
+            let mut bytes_left = bytes % queues;
+            for (_, bytes) in queue_bytes.iter_mut() {
+                if bytes_left > 0 && *bytes > bytes_per_queue {
+                    bytes_left -= 1;
+                    *bytes = bytes_per_queue + 1;
+                } else {
+                    *bytes = bytes_per_queue;
+                }
+            }
+        } else {
+            for (_, bytes) in queue_bytes.iter_mut() {
+                *bytes = bytes_per_queue;
+            }
+        }
+        queue_bytes
+            .into_iter()
+            .filter_map(|(k, v)| (v > 0).then_some((k.clone(), v)))
+            .collect()
+    }
 }
 
-fn compute_bandwidth_delay(bps: u64, bytes: u64) -> Duration {
-    Duration::from_micros((bytes * 1_000_000) / bps)
+fn compute_bandwidth_delay(total_bps: u64, split: u64, bytes: u64) -> Duration {
+    Duration::from_micros((bytes * 1_000_000) * split / total_bps)
 }
 
 #[cfg(test)]
@@ -172,10 +208,11 @@ mod tests {
 
     use super::Connection;
 
-    #[derive(PartialEq, Eq, Hash)]
+    #[derive(Clone, PartialEq, Eq, Hash)]
     enum MiniProtocol {
         One,
         Two,
+        Three,
     }
 
     #[test]
@@ -281,6 +318,28 @@ mod tests {
     }
 
     #[test]
+    fn should_use_all_available_bandwidth() {
+        let latency = Duration::ZERO;
+        let bandwidth_bps = Some(4);
+        let mut conn = Connection::new(latency, bandwidth_bps);
+        assert_eq!(conn.next_arrival_time(), None);
+
+        let start = Timestamp::zero() + Duration::from_secs(1);
+        conn.send("message 1", 10, MiniProtocol::One, start);
+        conn.send("message 2", 10, MiniProtocol::Two, start);
+        conn.send("message 3", 10, MiniProtocol::Three, start);
+
+        let arrival_time = start + Duration::from_secs_f32(7.5);
+        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
+        assert_eq!(conn.recv(arrival_time), "message 1");
+        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
+        assert_eq!(conn.recv(arrival_time), "message 2");
+        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
+        assert_eq!(conn.recv(arrival_time), "message 3");
+        assert_eq!(conn.next_arrival_time(), None);
+    }
+
+    #[test]
     fn should_delay_second_message_if_first_one_is_in_flight() {
         let latency = Duration::ZERO;
         let bandwidth_bps = Some(1000);
@@ -320,6 +379,29 @@ mod tests {
         let second_arrival_time = first_arrival_time + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
         assert_eq!(conn.recv(second_arrival_time), "message 2");
+        assert_eq!(conn.next_arrival_time(), None);
+    }
+
+    #[test]
+    fn should_split_bandwidth_correctly_when_multiple_miniprotocols_complete_at_once() {
+        let latency = Duration::ZERO;
+        let bandwidth_bps = Some(1000);
+        let mut conn = Connection::new(latency, bandwidth_bps);
+        assert_eq!(conn.next_arrival_time(), None);
+
+        let start = Timestamp::zero() + Duration::from_secs(1);
+        conn.send("message 1", 1000, MiniProtocol::One, start);
+        conn.send("message 2", 1000, MiniProtocol::Two, start);
+        conn.send("message 3", 2000, MiniProtocol::Three, start);
+
+        let first_arrival_time = start + Duration::from_secs(3);
+        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
+        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
+        assert_eq!(conn.recv(first_arrival_time), "message 2");
+        let second_arrival_time = first_arrival_time + Duration::from_secs(1);
+        assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
+        assert_eq!(conn.recv(second_arrival_time), "message 3");
         assert_eq!(conn.next_arrival_time(), None);
     }
 

@@ -18,7 +18,7 @@ pub struct Network<TProtocol, TMessage> {
     sink: mpsc::UnboundedSender<Message<TProtocol, TMessage>>,
 }
 
-impl<TProtocol: Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage> {
+impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> Network<TProtocol, TMessage> {
     pub fn new(clock: Clock) -> Self {
         let (sink, source) = mpsc::unbounded_channel();
         Self {
