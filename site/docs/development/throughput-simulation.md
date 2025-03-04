@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Throughput simulation
 
-The [throughput simulator](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) is an interactive tool demonstrating how varying transaction volumes, ledger storage, and stake pool costs can influence Cardano’s future growth. It incorporates multiple variables and feedback loops to illustrate how transaction fees and rewards circulate among the treasury, reserve, and user wallets.
+The [**throughput simulator**](https://www.insightmaker.com/insight/4DU4kmFVCFDaq30ux29PCe/Cardano-Throughput-v0-3) is an interactive tool demonstrating how varying transaction volumes, ledger storage, and stake pool costs can influence Cardano’s future growth. It incorporates multiple variables and feedback loops to illustrate how transaction fees and rewards circulate among the treasury, reserve, and user wallets.
 
 ## Why it matters
 

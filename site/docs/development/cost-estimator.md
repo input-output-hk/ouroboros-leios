@@ -2,9 +2,9 @@
 sidebar_position: 4
 ---
 
-# Cost Estimator
+# Cost estimator
 
-The Leios [cost estimator tool](https://leios.cardano-scaling.org/cost-estimator/) provides detailed insights into node operating costs. Integrating data on resource usage, including CPU, disk, and network bandwidth effectively connects theoretical throughput growth with the actual monthly expenses that stake pool operators incur. This estimator aligns with the same parameters used in the throughput simulator – such as transaction rates, average block sizes, and compression settings – and translates these into projected bills for cloud servers or local hardware.
+The Leios [**cost estimator tool**](https://leios.cardano-scaling.org/cost-estimator/) provides detailed insights into node operating costs. Integrating data on resource usage, including CPU, disk, and network bandwidth effectively connects theoretical throughput growth with the actual monthly expenses that stake pool operators incur. This estimator aligns with the same parameters used in the throughput simulator – such as transaction rates, average block sizes, and compression settings – and translates these into projected bills for cloud servers or local hardware.
 
 ## How it works
 
