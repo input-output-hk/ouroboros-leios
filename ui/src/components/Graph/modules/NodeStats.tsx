@@ -1,6 +1,10 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { printBytes } from "@/utils";
 import { FC, useMemo, useRef } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+
+interface ILabelProps {
+}
 
 export const NodeStats: FC = () => {
   const {
@@ -62,6 +66,20 @@ export const NodeStats: FC = () => {
     };
   }, [currentNodeData, canvasScale, canvasOffsetX, canvasOffsetY]);
 
+  const getCounts = (type: string) => {
+    const sent = currentNodeStats?.sent?.[type]?.bytes ?? 0;
+    const received = currentNodeStats?.received?.[type]?.bytes ?? 0;
+    return { sent, received }
+  }
+
+  const data = [
+    { name: "Transactions", ...getCounts("tx"), color: '#26de81' },
+    { name: "Input Blocks", ...getCounts("ib"), color: '#2bcbba' },
+    { name: "Endorsement Blocks", ...getCounts("eb"), color: '#4b7bec' },
+    { name: "Votes", ...getCounts("votes"), color: '#2d98da' },
+    { name: "Blocks", ...getCounts("pb"), color: '#fc5c65' },
+  ]
+
   return (
     <div
       ref={ref}
@@ -75,26 +93,26 @@ export const NodeStats: FC = () => {
         Node Stats <span>{currentNode}</span>
       </h2>
       {currentNodeStats && (
-        <>
-          <h4 className="flex items-center justify-between gap-4">Sent: <span>{printBytes(currentNodeStats.bytesSent)}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Received: <span>{printBytes(currentNodeStats.bytesReceived)}</span></h4>
-          <br />
-          <h4 className="flex items-center justify-between gap-4">Tx Generated: <span>{currentNodeStats.txGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Tx Sent: <span>{currentNodeStats.txSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Tx Received: <span>{currentNodeStats.txReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Generated: <span>{currentNodeStats.ebGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Sent: <span>{currentNodeStats.ebSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">EB Received: <span>{currentNodeStats.ebReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Generated: <span>{currentNodeStats.ibGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Sent: <span>{currentNodeStats.ibSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">IB Received: <span>{currentNodeStats.ibReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Generated: <span>{currentNodeStats.pbGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Sent: <span>{currentNodeStats.pbSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">PB Received: <span>{currentNodeStats.pbReceived}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Generated: <span>{currentNodeStats.votesGenerated}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Sent: <span>{currentNodeStats.votesSent}</span></h4>
-          <h4 className="flex items-center justify-between gap-4">Votes Received: <span>{currentNodeStats.votesReceived}</span></h4>
-        </>
+        <div className="w-full h-full">
+          <h2 className="text-center">Bytes Sent: {printBytes(currentNodeStats.bytesSent)}</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie dataKey="sent" data={data}>
+                {data.map((d, index) => <Cell key={index} fill={d.color} />)}
+              </Pie>
+              <Tooltip formatter={printBytes} />
+            </PieChart>
+          </ResponsiveContainer>
+          <h2 className="text-center">Bytes Received: {printBytes(currentNodeStats.bytesReceived)}</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie dataKey="received" data={data}>
+                {data.map((d, index) => <Cell key={index} fill={d.color} />)}
+              </Pie>
+              <Tooltip formatter={printBytes} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       )}
     </div>
   );

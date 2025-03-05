@@ -2,8 +2,7 @@ import { FC } from "react";
 
 import { useSimContext } from "@/contexts/SimContext/context";
 import {
-  ISimulationAggregatedData,
-  ISimulationAggregatedTotalData,
+  ISimulationAggregatedTotalData
 } from "@/contexts/SimContext/types";
 
 export const Stats: FC = () => {
@@ -13,31 +12,11 @@ export const Stats: FC = () => {
 
   const totals = [...aggregatedData.nodes].reduce(
     (total, [_id, data]) => {
-      (
-        Object.entries(data) as unknown as [
-          keyof ISimulationAggregatedData,
-          number,
-        ][]
-      ).forEach(([key, value]) => {
-        if (
-          key === "txGenerated" ||
-          key === "ebGenerated" ||
-          key === "ibGenerated" ||
-          key === "pbGenerated" ||
-          key === "votesGenerated"
-        ) {
-          total[key] += value;
-        }
-
-        if (
-          key === "txReceived" ||
-          key === "ebReceived" ||
-          key === "ibReceived" ||
-          key === "pbReceived" ||
-          key === "votesReceived"
-        ) {
-          total[key.replace("Received", "Propagations") as keyof ISimulationAggregatedTotalData] += value;
-        }
+      (["tx", "pb", "ib", "eb", "votes"] as const).forEach(type => {
+        const generatedKey = (type + "Generated") as keyof ISimulationAggregatedTotalData;
+        total[generatedKey] += (data.generated[type] ?? 0);
+        const propagatedKey = (type + "Propagations") as keyof ISimulationAggregatedTotalData;
+        total[propagatedKey] += (data.received[type]?.count ?? 0);
       });
 
       return total;

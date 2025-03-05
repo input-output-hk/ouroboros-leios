@@ -70,29 +70,29 @@ export enum EMessageType {
 export interface ITransactionGenerated {
   type: EMessageType.TransactionGenerated;
   id: string;
-  publisher: number;
+  publisher: string;
   bytes: number;
 }
 
 export interface ITransactionReceived {
   type: EMessageType.TransactionReceived;
   id: string;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface ITransactionSent {
   type: EMessageType.TransactionSent;
   id: string;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IInputBlockGenerated {
   type: EMessageType.IBGenerated;
   id: string;
   slot: number;
-  producer: number;
+  producer: string;
   index: number;
   vrf: number;
   timestamp: number;
@@ -104,20 +104,20 @@ export interface IInputBlockReceived {
   type: EMessageType.IBReceived;
   id: string;
   slot: number;
-  producer: number;
+  producer: string;
   index: number;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IInputBlockSent {
   type: EMessageType.IBSent;
   id: string;
   slot: number;
-  producer: number;
+  producer: string;
   index: number;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface ISlot {
@@ -129,7 +129,7 @@ export interface IPraosBlockGenerated {
   type: EMessageType.RBGenerated;
   id: string;
   slot: number;
-  producer: number;
+  producer: string;
   header_bytes: number;
   endorsement: IEndorsement | null;
   transactions: number[];
@@ -145,23 +145,23 @@ export interface IPraosBlockReceived {
   type: EMessageType.RBReceived;
   id: string;
   slot: number;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IPraosBlockSent {
   type: EMessageType.RBSent;
   slot: number;
   id: string;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IEndorserBlockGenerated {
   type: EMessageType.EBGenerated;
   id: string;
   slot: number;
-  producer: number;
+  producer: string;
   bytes: number;
   input_blocks: IInputBlock[]
 }
@@ -174,16 +174,16 @@ export interface IEndorserBlockReceived {
   type: EMessageType.EBReceived;
   id: string;
   slot: number;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IEndorserBlockSent {
   type: EMessageType.EBSent;
   slot: number;
   id: string;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IVotesGenerated {
@@ -199,16 +199,16 @@ export interface IVotesReceived {
   type: EMessageType.VTBundleReceived;
   id: string;
   slot: number;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export interface IVotesSent {
   type: EMessageType.VTBundleSent;
   slot: number;
   id: string;
-  sender: number;
-  recipient: number;
+  sender: string;
+  recipient: string;
 }
 
 export type TMessageType =

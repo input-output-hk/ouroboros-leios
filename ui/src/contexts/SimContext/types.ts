@@ -27,21 +27,9 @@ export interface ISimulationAggregatedTotalData {
 export interface ISimulationAggregatedData {
   bytesSent: number;
   bytesReceived: number;
-  txGenerated: number;
-  txSent: number;
-  txReceived: number;
-  ibGenerated: number;
-  ibSent: number;
-  ibReceived: number;
-  ebGenerated: number;
-  ebSent: number;
-  ebReceived: number;
-  pbGenerated: number;
-  pbSent: number;
-  pbReceived: number;
-  votesGenerated: number;
-  votesReceived: number;
-  votesSent: number;
+  generated: { [type: string]: number };
+  sent: { [type: string]: { count: number, bytes: number } };
+  received: { [type: string]: { count: number, bytes: number } };
 }
 
 export interface ISimulationGlobalData {
