@@ -1,7 +1,23 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "BaseBlockEvent": {
+    "BlockRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Endorsement": {
+      "properties": {
+        "eb": {
+          "$ref": "#/definitions/BlockRef"
+        }
+      },
+      "type": "object"
+    },
+    "EnteredStateBlock": {
       "properties": {
         "id": {
           "type": "string"
@@ -20,30 +36,29 @@
             "IBGenerated",
             "RBEnteredState",
             "RBGenerated",
-            "VTEnteredState",
-            "VTGenerated"
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
           ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "BlockKind": {
-      "enum": ["EB", "IB", "RB", "VT"],
-      "type": "string"
-    },
     "GeneratedEndorserBlock": {
       "properties": {
+        "bytes": {
+          "type": "number"
+        },
         "id": {
           "type": "string"
         },
         "input_blocks": {
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/BlockRef"
           },
           "type": "array"
         },
-        "node": {
+        "producer": {
           "type": "string"
         },
         "size_bytes": {
@@ -60,8 +75,8 @@
             "IBGenerated",
             "RBEnteredState",
             "RBGenerated",
-            "VTEnteredState",
-            "VTGenerated"
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
           ],
           "type": "string"
         }
@@ -73,11 +88,11 @@
         "id": {
           "type": "string"
         },
-        "node": {
-          "type": "string"
-        },
         "payload_bytes": {
           "type": "number"
+        },
+        "producer": {
+          "type": "string"
         },
         "rb_ref": {
           "type": "string"
@@ -96,8 +111,8 @@
             "IBGenerated",
             "RBEnteredState",
             "RBGenerated",
-            "VTEnteredState",
-            "VTGenerated"
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
           ],
           "type": "string"
         }
@@ -106,20 +121,23 @@
     },
     "GeneratedRankingBlock": {
       "properties": {
-        "endorse_blocks": {
+        "endorsement": {
+          "$ref": "#/definitions/Endorsement"
+        },
+        "endorsements": {
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/Endorsement"
           },
           "type": "array"
         },
         "id": {
           "type": "string"
         },
-        "node": {
-          "type": "string"
-        },
         "payload_bytes": {
           "type": "number"
+        },
+        "producer": {
+          "type": "string"
         },
         "size_bytes": {
           "type": "number"
@@ -135,26 +153,26 @@
             "IBGenerated",
             "RBEnteredState",
             "RBGenerated",
-            "VTEnteredState",
-            "VTGenerated"
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
           ],
           "type": "string"
+        },
+        "vrf": {
+          "type": "number"
         }
       },
       "type": "object"
     },
     "GeneratedVote": {
       "properties": {
-        "endorse_blocks": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+        "bytes": {
+          "type": "number"
         },
         "id": {
           "type": "string"
         },
-        "node": {
+        "producer": {
           "type": "string"
         },
         "size_bytes": {
@@ -171,13 +189,13 @@
             "IBGenerated",
             "RBEnteredState",
             "RBGenerated",
-            "VTEnteredState",
-            "VTGenerated"
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
           ],
           "type": "string"
         },
         "votes": {
-          "type": "number"
+          "$ref": "#/definitions/Record<string,number>"
         }
       },
       "type": "object"
@@ -209,9 +227,6 @@
           "$ref": "#/definitions/GeneratedInputBlock"
         },
         {
-          "$ref": "#/definitions/BaseBlockEvent"
-        },
-        {
           "$ref": "#/definitions/GeneratedEndorserBlock"
         },
         {
@@ -221,18 +236,17 @@
           "$ref": "#/definitions/GeneratedVote"
         },
         {
+          "$ref": "#/definitions/EnteredStateBlock"
+        },
+        {
           "$ref": "#/definitions/HaskellNetworkEvent"
         }
       ]
     },
     "HaskellNetworkEvent": {
       "properties": {
-        "action": {
-          "enum": ["Received", "Sent"],
+        "id": {
           "type": "string"
-        },
-        "block_kind": {
-          "$ref": "#/definitions/BlockKind"
         },
         "ids": {
           "items": {
@@ -253,10 +267,22 @@
           "type": "number"
         },
         "type": {
-          "const": "NetworkMessage",
+          "enum": [
+            "EBReceived",
+            "EBSent",
+            "IBReceived",
+            "IBSent",
+            "RBReceived",
+            "RBSent",
+            "VTBundleReceived",
+            "VTBundleSent"
+          ],
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "Record<string,number>": {
       "type": "object"
     }
   },

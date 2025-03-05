@@ -4,7 +4,7 @@ export interface HaskellTraceEvent {
     event: HaskellEvent;
 }
 
-type BlockKind = "IB" | "EB" | "RB" | "VT";
+type BlockKind = "IB" | "EB" | "RB" | "VTBundle";
 type BlockAction = "Generated" | "EnteredState";
 
 type HaskellEvent =
@@ -23,37 +23,52 @@ interface HaskellCpuEvent {
 // Base block event interface with just identification info
 interface BaseBlockEvent {
     type: `${BlockKind}${BlockAction}`;
-    node: string;
-    id: string;
     slot: number;
 }
 
 // Additional fields for Generated events
 interface GeneratedBlockEvent extends BaseBlockEvent {
-    size_bytes: number;
+    size_bytes?: number;
+    producer: string;
 }
 
 interface GeneratedInputBlock extends GeneratedBlockEvent {
-    payload_bytes: number;
-    rb_ref: string;
+    id: string;
+    payload_bytes?: number;
+    rb_ref?: string;
+}
+interface BlockRef {
+  id : string;
+}
+interface Endorsement {
+  eb : BlockRef;
 }
 
 interface GeneratedEndorserBlock extends GeneratedBlockEvent {
-    input_blocks: string[];
+    id: string;
+    input_blocks: BlockRef[];
+    bytes: number;
 }
 
 interface GeneratedRankingBlock extends GeneratedBlockEvent {
-    endorse_blocks: string[];
-    payload_bytes: number;
+    endorsement?: Endorsement;
+    endorsements?: Endorsement[];
+    vrf? : number;
+    id? : string;
+    payload_bytes? : number;
 }
 
 interface GeneratedVote extends GeneratedBlockEvent {
-    votes: number;
-    endorse_blocks: string[];
+    id: string;
+    bytes: number;
+    votes: Record<string, number>;
 }
 
 // EnteredState events only need the base identification info
-type EnteredStateBlock = BaseBlockEvent;
+interface EnteredStateBlock extends BaseBlockEvent {
+    id: string;
+  node: string;
+}
 
 type HaskellBlockEvent =
     | GeneratedInputBlock
@@ -61,14 +76,13 @@ type HaskellBlockEvent =
     | GeneratedRankingBlock
     | GeneratedVote
     | EnteredStateBlock;
-
+type NetworkAction = "Sent" | "Received"
 interface HaskellNetworkEvent {
-    type: "NetworkMessage";
-    action: "Sent" | "Received"; // Added to distinguish direction
-    sender: string;
+    type: `${BlockKind}${NetworkAction}`;
+    sender?: string;
     recipient: string;
-    block_kind: BlockKind;
-    msg_size_bytes: number;
-    sending_s: number;
-    ids: string[];
+    msg_size_bytes?: number;
+    sending_s?: number;
+    id: string;
+    ids?: string[];
 }
