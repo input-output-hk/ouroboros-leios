@@ -230,6 +230,7 @@ data SimOutputConfig = SimOutputConfig
   , dataFile :: Maybe FilePath
   , analize :: Bool
   , stop :: Time
+  , sharedFormat :: Bool
   }
 
 rawDataFromState :: OnDisk.Config -> P2PNetwork -> LeiosSimState -> Time -> RawLeiosData
@@ -323,8 +324,11 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
  where
   runModel :: SampleModel LeiosEvent state -> IO ()
   runModel model =
-    runSampleModel' logFile (logLeiosEvent p2pNodeNames emitControl) model stop $
+    runSampleModel' logFile logEvent model stop $
       exampleTrace2 seed cfg p2pNetwork
+  logEvent = case sharedFormat of
+    False -> logLeiosTraceEvent p2pNodeNames emitControl
+    True -> (fmap toEncoding .) . sharedTraceEvent p2pNodeNames
   renderState fp st = do
     let diffusionData = maybeAnalizeRawData analize (rawDataFromState cfg p2pNetwork st stop)
     encodeFile fp diffusionData

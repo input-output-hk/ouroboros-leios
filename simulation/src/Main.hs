@@ -379,6 +379,7 @@ runSimOptions SimOptions{..} = case simCommand of
             , dataFile = Just simOutputFile
             , analize
             , stop = simOutputSeconds
+            , sharedFormat
             }
     DataShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
@@ -415,6 +416,7 @@ data SimCommand
       , emitControl :: Bool
       , skipLog :: Bool
       , analize :: Bool
+      , sharedFormat :: Bool
       }
 
 parserSimCommand :: Parser SimCommand
@@ -443,6 +445,7 @@ parserShortLeios =
     <*> switch (long "log-control" <> help "Include control messages in log.")
     <*> switch (long "no-log" <> help "Do not output event log.")
     <*> switch (long "analize" <> help "Calculate metrics and statistics.")
+    <*> switch (long "shared-log-format" <> help "Use log format documented in trace.haskell.d.ts")
 
 data ConfigOptions
   = LeiosConfigFile FilePath

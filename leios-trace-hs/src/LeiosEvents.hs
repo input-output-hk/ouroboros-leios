@@ -71,7 +71,7 @@ data Event where
     Event
   IBEnteredState
     , EBEnteredState
-    , VTEnteredState
+    , VTBundleEnteredState
     , RBEnteredState ::
     { node :: !Text
     , id :: !Text
