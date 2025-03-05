@@ -1,0 +1,32 @@
+cabal-version:      3.0
+name:               leios-trace-hs
+version:            0.1.0.0
+-- synopsis:
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Andrea Vezzosi
+maintainer:         andrea@well-typed.com
+-- copyright:
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:  LeiosEvents
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    
+      , aeson
+      , base
+      , bytestring
+      , cborg
+      , cborg-json
+      , containers
+      , text
+    hs-source-dirs:   src
+    default-language: Haskell2010

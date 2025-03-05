@@ -17,6 +17,7 @@ index-state:
 packages:
   simulation
   conformance-testing
+  leios-trace-hs
 
 tests: True
 

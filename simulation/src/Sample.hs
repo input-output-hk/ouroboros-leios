@@ -20,7 +20,7 @@ data SampleModel event state = SampleModel
   , renderState :: state -> IO ()
   }
 
-data SampleEvent e = SampleEvent {time :: Time, event :: e}
+data SampleEvent e = SampleEvent {time :: DiffTime, event :: e}
   deriving (Generic, ToJSON)
 
 runSampleModel ::
@@ -32,12 +32,12 @@ runSampleModel ::
   [(Time, event)] ->
   IO ()
 runSampleModel traceFile logEvent =
-  runSampleModel' (Just traceFile) (fmap toEncoding . logEvent)
+  runSampleModel' (Just traceFile) (\t -> fmap (toEncoding . SampleEvent t) . logEvent)
 
 runSampleModel' ::
   forall event state.
   Maybe FilePath ->
-  (event -> Maybe Encoding) ->
+  (DiffTime -> event -> Maybe Encoding) ->
   SampleModel event state ->
   Time ->
   [(Time, event)] ->
@@ -64,8 +64,8 @@ runSampleModel' traceFile logEvent (SampleModel s0 accum render) stop =
   stepSimViz n (SimVizModel es s) = case splitAt n es of
     (before, after) -> (,) before $ SimVizModel after (foldl' (\x (t, e) -> accum t e x) s before)
   writeEvents h es = forM_ es $ \(Time t, e) ->
-    case logEvent e of
+    case logEvent t e of
       Nothing -> return ()
       Just x -> do
-        BSL.hPutStr h (encodingToLazyByteString (pairs $ "time_s" .= t <> pair "event" x))
+        BSL.hPutStr h (encodingToLazyByteString x)
         BSL.hPutStr h "\n"

@@ -2,13 +2,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 
 module LeiosProtocol.Short.Sim where
 
@@ -23,13 +27,16 @@ import Control.Tracer as Tracer (
   traceWith,
  )
 import Data.Aeson
+import Data.Aeson.Encoding (pair)
 import Data.Coerce
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import GHC.Records
+import qualified LeiosEvents as Shared
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Config
 import LeiosProtocol.Relay (Message (..), RelayMessage, relayMessageLabel)
@@ -42,6 +49,7 @@ import PraosProtocol.PraosNode (PraosMessage (..), praosMessageLabel)
 import SimTCPLinks
 import SimTypes
 import System.Random (mkStdGen)
+import Prelude hiding (id)
 
 type LeiosTrace = [(Time, LeiosEvent)]
 
@@ -57,6 +65,11 @@ data LeiosEvent
   | -- | An event on a tcp link between two nodes
     LeiosEventTcp (LabelLink (TcpEvent LeiosMessage))
   deriving (Show)
+
+logLeiosTraceEvent :: Map NodeId T.Text -> Bool -> DiffTime -> LeiosEvent -> Maybe Encoding
+logLeiosTraceEvent m emitControl t e = do
+  x <- logLeiosEvent m emitControl e
+  pure $ (pairs $ "time_s" .= t <> pair "event" x)
 
 logLeiosEvent :: Map NodeId T.Text -> Bool -> LeiosEvent -> Maybe Encoding
 logLeiosEvent nodeNames emitControl e = case e of
@@ -167,6 +180,122 @@ logLeiosEvent nodeNames emitControl e = case e of
 
 messages :: [(a, LeiosEvent)] -> [(a, LabelLink LeiosMessage)]
 messages trace = [(t, LabelLink x y msg) | (t, LeiosEventTcp (LabelLink x y (TcpSendMsg msg _ _))) <- trace]
+sharedTraceEvent :: Map NodeId T.Text -> DiffTime -> LeiosEvent -> Maybe Shared.TraceEvent
+sharedTraceEvent m t e = Shared.TraceEvent (realToFrac t) <$> sharedEvent m e
+sharedEvent :: Map NodeId T.Text -> LeiosEvent -> Maybe Shared.Event
+sharedEvent nodeNames e = case e of
+  LeiosEventNode (LabelNode nid e') -> sharedNode (nodeName nid) e'
+  LeiosEventTcp (LabelLink from to (TcpSendMsg msg forecast _)) ->
+    sharedMsg (nodeName from) (nodeName to) (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime) (fromIntegral $ messageSizeBytes msg) msg
+  _ -> Nothing
+ where
+  nodeName nid = fromMaybe undefined $ Map.lookup nid nodeNames
+  blkId (EventIB ib) = mkStringId ib.id
+  blkId (EventEB eb) = mkStringId eb.id
+  blkId (EventVote vt) = mkStringId vt.id
+  blkSlot (EventIB ib) = fromIntegral . fromEnum $ ib.header.slot
+  blkSlot (EventEB eb) = fromIntegral . fromEnum $ eb.slot
+  blkSlot (EventVote vt) = fromIntegral . fromEnum $ vt.slot
+  sharedNode node (LeiosNodeEvent Generate blk) = Just $ sharedGenerated node (blkId blk) (blkSlot blk) blk
+  sharedNode node (LeiosNodeEvent Received blk) = Just $ sharedReceived node (blkId blk) blk
+  sharedNode node (LeiosNodeEvent EnterState blk) = Just $ sharedEnterState node (blkId blk) (blkSlot blk) blk
+  sharedNode node (LeiosNodeEventCPU CPUTask{..}) =
+    Just
+      Shared.Cpu
+        { cpu_time_s = realToFrac cpuTaskDuration
+        , task_label = cpuTaskLabel
+        , ..
+        }
+  sharedNode node (PraosNodeEvent pe) =
+    case pe of
+      PraosNodeEventGenerate blk ->
+        Just
+          Shared.RBGenerated
+            { producer = node
+            , block_id = Just (rbId blk)
+            , vrf = Nothing
+            , slot = fromIntegral . fromEnum $ blockSlot blk
+            , size_bytes = Nothing
+            , endorsement = Nothing
+            , endorsements = Just . map (Shared.Endorsement . Shared.BlockRef . T.pack . mkStringId . fst) $ blk.blockBody.endorseBlocks
+            , payload_bytes = Just . fromIntegral $ blk.blockBody.payload
+            , ..
+            }
+      PraosNodeEventReceived blk ->
+        Just
+          Shared.RBReceived
+            { sender = Nothing
+            , recipient = node
+            , block_id = Just (rbId blk)
+            , msg_size_bytes = Nothing
+            , sending_s = Nothing
+            , block_ids = Nothing
+            , ..
+            }
+      PraosNodeEventEnterState blk ->
+        Just
+          Shared.RBEnteredState
+            { id = rbId blk
+            , slot = fromIntegral . fromEnum $ blockSlot blk
+            , ..
+            }
+      PraosNodeEventCPU _ -> error "impossible"
+      _ -> Nothing
+   where
+    rbId blk = T.pack $ show (coerce @_ @Int (blockHash blk))
+  sharedNode _ _ = Nothing
+  blockIds xs = case map (T.pack . mkStringId . fst) xs of
+    [] -> (Nothing, Nothing)
+    (y : ys) -> (Just y, Just ys)
+  sharedMsg :: T.Text -> T.Text -> DiffTime -> Shared.Bytes -> LeiosMessage -> Maybe Shared.Event
+  sharedMsg (Just -> sender) recipient (Just . realToFrac @_ @Shared.Time -> sending_s) (Just . fromIntegral @_ @Shared.Bytes -> msg_size_bytes) = \case
+    RelayIB (ProtocolMessage (SomeMessage (MsgRespondBodies xs)))
+      | (block_id, block_ids) <- blockIds xs -> Just $ Shared.IBSent{..}
+    RelayEB (ProtocolMessage (SomeMessage (MsgRespondBodies xs)))
+      | (block_id, block_ids) <- blockIds xs -> Just $ Shared.EBSent{..}
+    RelayVote (ProtocolMessage (SomeMessage (MsgRespondBodies xs)))
+      | (block_id, block_ids) <- blockIds xs -> Just $ Shared.VTBundleSent{..}
+    (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) ->
+      Just $
+        Shared.RBSent{block_id = Just $ T.pack $ show hash, block_ids = Just [], ..}
+    _ -> Nothing
+
+  sharedGenerated :: T.Text -> String -> Word64 -> LeiosEventBlock -> Shared.Event
+  sharedGenerated producer (T.pack -> id) slot blk =
+    case blk of
+      EventIB ib ->
+        Shared.IBGenerated
+          { size_bytes = Just (fromIntegral $ messageSizeBytes ib)
+          , payload_bytes = Just (fromIntegral $ ib.body.size)
+          , rb_ref =
+              Just $
+                T.pack
+                  ( case (ib.header.rankingBlock) of
+                      GenesisHash -> "genesis"
+                      BlockHash x -> show (coerce x :: Int)
+                  )
+          , ..
+          }
+      EventEB eb -> Shared.EBGenerated{bytes = fromIntegral (messageSizeBytes eb), input_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.inputBlocks, ..}
+      EventVote vt -> Shared.VTBundleGenerated{bytes = fromIntegral (messageSizeBytes vt), votes = Map.fromList $ map ((,vt.votes) . T.pack . mkStringId) vt.endorseBlocks, ..}
+  sharedEnterState :: T.Text -> String -> Word64 -> LeiosEventBlock -> Shared.Event
+  sharedEnterState node (T.pack -> id) slot blk =
+    case blk of
+      EventIB _ -> Shared.IBEnteredState{..}
+      EventEB _ -> Shared.EBEnteredState{..}
+      EventVote _ -> Shared.VTBundleEnteredState{..}
+
+  sharedReceived :: T.Text -> String -> LeiosEventBlock -> Shared.Event
+  sharedReceived recipient (Just . T.pack -> block_id) blk =
+    case blk of
+      EventIB _ -> Shared.IBReceived{..}
+      EventEB _ -> Shared.EBReceived{..}
+      EventVote _ -> Shared.VTBundleReceived{..}
+   where
+    sender = Nothing
+    block_ids = Nothing
+    msg_size_bytes = Nothing
+    sending_s = Nothing
 
 exampleTrace1 :: LeiosTrace
 exampleTrace1 = traceRelayLink1 (0.1, Just 1000000)

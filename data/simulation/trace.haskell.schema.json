@@ -1,22 +1,218 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "BlockRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Endorsement": {
+      "properties": {
+        "eb": {
+          "$ref": "#/definitions/BlockRef"
+        }
+      },
+      "type": "object"
+    },
+    "EnteredStateBlock": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GeneratedEndorserBlock": {
+      "properties": {
+        "bytes": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "input_blocks": {
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GeneratedInputBlock": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "payload_bytes": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "rb_ref": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GeneratedRankingBlock": {
+      "properties": {
+        "endorsement": {
+          "$ref": "#/definitions/Endorsement"
+        },
+        "endorsements": {
+          "items": {
+            "$ref": "#/definitions/Endorsement"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "payload_bytes": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
+          ],
+          "type": "string"
+        },
+        "vrf": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "GeneratedVote": {
+      "properties": {
+        "bytes": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "EBEnteredState",
+            "EBGenerated",
+            "IBEnteredState",
+            "IBGenerated",
+            "RBEnteredState",
+            "RBGenerated",
+            "VTBundleEnteredState",
+            "VTBundleGenerated"
+          ],
+          "type": "string"
+        },
+        "votes": {
+          "$ref": "#/definitions/Record<string,number>"
+        }
+      },
+      "type": "object"
+    },
     "HaskellCpuEvent": {
       "properties": {
-        "duration_s": {
+        "cpu_time_s": {
           "type": "number"
         },
         "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "tag": {
-          "const": "Cpu",
           "type": "string"
         },
         "task_label": {
+          "type": "string"
+        },
+        "type": {
+          "const": "Cpu",
           "type": "string"
         }
       },
@@ -28,227 +224,66 @@
           "$ref": "#/definitions/HaskellCpuEvent"
         },
         {
-          "$ref": "#/definitions/HaskellGeneratedIBEvent"
+          "$ref": "#/definitions/GeneratedInputBlock"
         },
         {
-          "$ref": "#/definitions/HaskellGeneratedEBEvent"
+          "$ref": "#/definitions/GeneratedEndorserBlock"
         },
         {
-          "$ref": "#/definitions/HaskellGeneratedRBEvent"
+          "$ref": "#/definitions/GeneratedRankingBlock"
         },
         {
-          "$ref": "#/definitions/HaskellGeneratedVTEvent"
+          "$ref": "#/definitions/GeneratedVote"
         },
         {
-          "$ref": "#/definitions/HaskellSentEvent"
+          "$ref": "#/definitions/EnteredStateBlock"
         },
         {
-          "$ref": "#/definitions/HaskellReceivedEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellStateEvent"
+          "$ref": "#/definitions/HaskellNetworkEvent"
         }
       ]
     },
-    "HaskellGeneratedEBEvent": {
+    "HaskellNetworkEvent": {
       "properties": {
         "id": {
           "type": "string"
         },
-        "input_blocks": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "kind": {
-          "const": "EB",
-          "type": "string"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "tag": {
-          "const": "generated",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellGeneratedIBEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "const": "IB",
-          "type": "string"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "payload_bytes": {
-          "type": "number"
-        },
-        "rb_ref": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "slot": {
-          "type": "number"
-        },
-        "tag": {
-          "const": "generated",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellGeneratedRBEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "const": "RB",
-          "type": "string"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "tag": {
-          "const": "generated",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellGeneratedVTEvent": {
-      "properties": {
-        "endorse_blocks": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "const": "VT",
-          "type": "string"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "tag": {
-          "const": "generated",
-          "type": "string"
-        },
-        "votes": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellReceivedEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "tag": {
-          "const": "received",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "HaskellSentEvent": {
-      "properties": {
         "ids": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
         "msg_size_bytes": {
           "type": "number"
         },
-        "receipient": {
-          "type": "number"
+        "recipient": {
+          "type": "string"
         },
         "sender": {
-          "type": "number"
+          "type": "string"
         },
         "sending_s": {
           "type": "number"
         },
-        "tag": {
-          "const": "Sent",
+        "type": {
+          "enum": [
+            "EBReceived",
+            "EBSent",
+            "IBReceived",
+            "IBSent",
+            "RBReceived",
+            "RBSent",
+            "VTBundleReceived",
+            "VTBundleSent"
+          ],
           "type": "string"
         }
       },
       "type": "object"
     },
-    "HaskellStateEvent": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/definitions/MessageKind"
-        },
-        "node": {
-          "type": "number"
-        },
-        "node_name": {
-          "type": "string"
-        },
-        "tag": {
-          "const": "enteredstate",
-          "type": "string"
-        }
-      },
+    "Record<string,number>": {
       "type": "object"
-    },
-    "MessageKind": {
-      "enum": ["EB", "IB", "RB", "VT"],
-      "type": "string"
     }
   },
   "description": "Haskell simulation trace format",
