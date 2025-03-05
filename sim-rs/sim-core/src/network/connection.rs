@@ -428,4 +428,27 @@ mod tests {
         assert_eq!(conn.recv(second_arrival_time), "message 2");
         assert_eq!(conn.next_arrival_time(), None);
     }
+
+    #[test]
+    fn should_split_bandwidth_correctly_under_high_latency() {
+        let latency = Duration::from_millis(1000);
+        let bandwidth_bps = Some(900);
+        let mut conn = Connection::new(latency, bandwidth_bps);
+        assert_eq!(conn.next_arrival_time(), None);
+
+        let start = Timestamp::zero() + Duration::from_secs(1);
+        conn.send("message 1", 300, MiniProtocol::One, start);
+        conn.send("message 2", 300, MiniProtocol::Two, start);
+        conn.send("message 3", 1200, MiniProtocol::Three, start);
+
+        let first_arrival_time = start + Duration::from_secs(2);
+        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
+        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
+        assert_eq!(conn.recv(first_arrival_time), "message 2");
+        let second_arrival_time = first_arrival_time + Duration::from_secs(1);
+        assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
+        assert_eq!(conn.recv(second_arrival_time), "message 3");
+        assert_eq!(conn.next_arrival_time(), None);
+    }
 }
