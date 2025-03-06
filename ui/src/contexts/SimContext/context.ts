@@ -15,6 +15,8 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
 };
 
 export const defaultState: ISimContextState = {
+  allScenarios: [],
+  activeScenario: '',
   graph: {
     canvasRef: { current: null },
     canvasOffsetX: 0,
@@ -27,7 +29,8 @@ export const defaultState: ISimContextState = {
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   topography: { links: new Map(), nodes: new Map() },
-  topographyLoaded: false,
+  topologyPath: '',
+  topologyLoaded: false,
 }
 
 export const SimContext: Context<ISimContext> = createContext({

@@ -128,3 +128,8 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# don't commit these large files until we're ready
+public/scenarios.json
+public/topologies
+public/traces

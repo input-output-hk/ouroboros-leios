@@ -19,13 +19,6 @@ export const createEventStream = (path: string) => {
   return createJsonEventStream(path);
 };
 
-export const getMaxTime = (path: string) => {
-  if (path.endsWith('.cbor')) {
-    return getCborMaxTime(path);
-  }
-  return getJsonMaxTime(path);
-}
-
 const createJsonEventStream = (path: string): EventStream => {
   let handle: fs.FileHandle;
   let buffer = "";
@@ -58,34 +51,6 @@ const createJsonEventStream = (path: string): EventStream => {
       await handle.close();
     }
   });
-}
-
-const getJsonMaxTime = async (path: string): Promise<number> => {
-  const chunkSize = 1024;
-  const handle = await fs.open(path, "r");
-  const { size } = await handle.stat();
-  let filepos = size - chunkSize;
-  let text = "";
-  let index = 0;
-  while (filepos >= 0) {
-    let { buffer, bytesRead } = await handle.read({ position: filepos, length: chunkSize });
-    text = buffer.toString('utf-8', 0, bytesRead) + text;
-    index += bytesRead;
-    let nl = text.lastIndexOf('\n', index);
-    while (nl >= 0) {
-      const raw = text.substring(nl + 1, index);
-      try {
-        const event: IServerMessage = JSON.parse(raw);
-        await handle.close();
-        return event.time_s;
-      } catch (err) { }
-      index = nl;
-      nl = index == 0 ? -1 : text.lastIndexOf('\n', index - 1);
-    }
-    filepos -= chunkSize;
-  }
-  await handle.close();
-  throw new Error("Last line not found");
 }
 
 const createCborEventStream = (path: string): EventStream => {
@@ -128,37 +93,4 @@ const createCborEventStream = (path: string): EventStream => {
     }
   });
 
-}
-
-const getCborMaxTime = async (path: string): Promise<number> => {
-  const chunkSize = 1024;
-
-  // We identify the start of an event by looking for the start of a two-element map where the first key is named "time".
-  // This subsequence appears at the start of every event, and only there.
-  // It's hacky, but we can search for a different subsequence if the format changes.
-  const needle = Uint8Array.from([0xa2, 0x64, 0x74, 0x69, 0x6d, 0x65]);
-
-  const handle = await fs.open(path, "r");
-  const { size } = await handle.stat();
-  let filepos = size - chunkSize;
-  let buffer = Buffer.alloc(0);
-  let index = 0;
-  while (filepos >= 0) {
-    const { buffer: chunk, bytesRead } = await handle.read({ position: filepos, length: chunkSize });
-    buffer = Buffer.concat([chunk, buffer], buffer.length + bytesRead);
-    index += bytesRead;
-    let start = buffer.lastIndexOf(needle, index - 1);
-    while (start >= 0) {
-      const raw = buffer.subarray(start, index);
-      try {
-        const event: IServerMessage = cbor.decode(raw);
-        await handle.close();
-        return event.time_s;
-      } catch (err) { }
-      index = start;
-    }
-    filepos -= chunkSize;
-  }
-  await handle.close();
-  throw new Error("Last line not found");
 }

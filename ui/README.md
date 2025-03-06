@@ -18,14 +18,34 @@ Before you can run the UI, ensure you have the following installed:
 
 2. **Generate a Trace**
 
-   Before running the UI, you need to generate a trace using the `sim-rs`
-   simulation. Navigate to the `sim-rs` directory and run the following command:
+   Before running the UI, you need to prepare a scenario for it to visualize. Add the following to a file named `public/scenarios.json`:
 
-   ```bash
-   cargo run --release test_data/thousand.yaml output/messages.jsonl -s 30
+   ```json
+   {
+      "scenarios": [
+         {
+            "name": "My Scenario",
+            "topology": "topologies/thousand.yaml",
+            "duration": 30.0,
+            "trace": "traces/myscenario.jsonl"
+         }
+      ]
+   }
    ```
 
-   This command will generate a trace file at `output/messages.jsonl`.
+   Now add that topology to the public directory:
+
+   ```sh
+   mkdir -p public/topologies
+   cp ../sim-rs/test-data/thousand.yaml public/topologies
+   ```
+
+   And generate a trace to visualize from the `sim-rs` directory:
+
+   ```bash
+   mkdir -p ../ui/public/traces
+   cargo run --release test_data/thousand.yaml ../ui/public/traces/myscenario.jsonl -s 30
+   ```
 
 3. **Run the UI**
 
