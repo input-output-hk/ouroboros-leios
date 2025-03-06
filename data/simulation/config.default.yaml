@@ -112,7 +112,7 @@ eb-generation-probability: 1.5
 # Total       240
 #
 # See Note about signatures on ib-head-size-bytes.
-eb-size-bytes-constant: 32
+eb-size-bytes-constant: 240
 # IB hash
 eb-size-bytes-per-ib: 32
 # Collecting the IBs to reference and cryptography are the main tasks.

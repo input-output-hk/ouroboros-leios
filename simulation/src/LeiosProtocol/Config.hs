@@ -158,7 +158,7 @@ instance Default Config where
       , ebGenerationProbability = 1.5
       , ebGenerationCpuTimeMs = 75.0
       , ebValidationCpuTimeMs = 1.0
-      , ebSizeBytesConstant = 32
+      , ebSizeBytesConstant = 240
       , ebSizeBytesPerIb = 32
       , ebDiffusionStrategy = PeerOrder
       , ebDiffusionMaxWindowSize = 100
