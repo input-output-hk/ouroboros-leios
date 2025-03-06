@@ -156,7 +156,7 @@ convertConfig disk =
           , relayStrategy = disk.relayStrategy
           }
  where
-  forEach n xs = n * fromIntegral (length xs)
+  forEach n xs = n * fromIntegral (length @[] xs)
   forEachKey n m = n * fromIntegral (Map.size m)
   durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000
   voting =
@@ -486,7 +486,7 @@ mockFullEndorseBlock cfg =
     (EndorseBlockId (NodeId 0) 0)
     0
     (NodeId 0)
-    [InputBlockId (NodeId 0) i | i <- [0 .. cfg.sliceLength - 1]]
+    [InputBlockId (NodeId 0) i | i <- [0 .. cfg.sliceLength * (ceiling cfg.inputBlockFrequencyPerSlot) - 1]]
 
 mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
 mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
