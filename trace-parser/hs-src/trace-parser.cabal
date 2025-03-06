@@ -1,0 +1,56 @@
+cabal-version:      2.4
+name:               trace-parser
+version:            0.1.0.0
+synopsis:
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            NONE
+author:             Yves Hauser
+maintainer:         yves.hauser@iohk.io
+
+-- A copyright notice.
+-- copyright:
+-- category:
+
+common globalOptions
+    default-language: Haskell2010
+    build-depends:
+        base
+    default-extensions:
+        PolyKinds EmptyDataDecls EmptyCase ExistentialQuantification
+        ScopedTypeVariables NoMonomorphismRestriction RankNTypes
+        PatternSynonyms DeriveGeneric
+    ghc-options:
+        -Wno-overlapping-patterns
+
+executable parser
+    import: globalOptions
+    main-is: app/Main.hs
+    build-depends:
+      , base
+      , bytestring
+      , leios-trace-hs
+      , trace-parser
+
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+library
+    import: globalOptions
+    hs-source-dirs: src
+    exposed-modules: Lib
+    build-depends:
+      , aeson
+      , base
+      , bytestring
+      , containers
+      , text
+      , ieee
+      , leios-trace-hs
+-- This will be generated automatically when building with nix
+    other-modules:
