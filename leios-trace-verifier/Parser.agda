@@ -80,7 +80,7 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
--- FIXME: Impplementation
+-- FIXME: Implementation
 verifyTrace : List TraceEvent → Bool
 verifyTrace [] = false
 verifyTrace (_ ∷ _) = true
