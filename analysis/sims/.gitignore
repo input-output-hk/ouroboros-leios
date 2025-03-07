@@ -1,1 +1,5 @@
 .jupyter/
+.ipynb_checkpoints/
+ols
+sim-cli
+tmp/
