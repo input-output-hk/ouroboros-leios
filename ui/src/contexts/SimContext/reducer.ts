@@ -46,6 +46,10 @@ export const reducer = (
       return {
         ...state,
         activeTab: action.payload,
+        graph: {
+          ...state.graph,
+          currentNode: state.activeTab === action.payload ? state.graph.currentNode : undefined
+        },
         blocks: {
           currentBlock: undefined
         }

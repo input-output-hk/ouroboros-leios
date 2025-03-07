@@ -11,7 +11,11 @@ export const Scenario: FC = () => {
   useEffect(() => {
     (async () => {
       const response = await fetch("scenarios.json");
-      const { scenarios }: { scenarios: IScenario[] } = await response.json();
+      const body: { scenarios: IScenario[] } = await response.json();
+      const scenarios = body.scenarios.map(scenario => ({
+        ...scenario,
+        trace: new URL(scenario.trace, window.location.toString()).toString(),
+      }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });
     })();
   }, []);
