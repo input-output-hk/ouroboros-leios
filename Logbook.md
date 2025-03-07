@@ -1,5 +1,45 @@
 # Leios logbook
 
+## 2025-03-07
+
+### Analysis of simulations at tag `leios-2025w10`
+
+The Jupyter notebook [analysis/sims/2025w10/analysis.ipynb](analysis/sims/2025w10/analysis.ipynb) analyzes the Haskell simulation at tag [leios-2025w10](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w10). Two simulation studies were executed on the 100-node example network:
+
+1. Compare simulations with and without accounting for CPU usage.
+2. Vary key protocol parameters
+    - IB production rate
+    - IB size
+    - Length of Leios stages
+
+The second study (of protocol parameters) supported analysis of the following aspects of Leios:
+
+- Delay between the generation of an IB, EB, vote, or RB and its receipt at nodes.
+- Peak and mean CPU usage over time
+- Breakdown of CPU usage by type of task
+- Sizes of IBs, EBs, and RBs
+- Duplicate IB references in EBs
+- Reference to EBs from RBs
+- Number of IBs referenced by EB
+- Timing of references to IBs and EBs from EBs and RBs, respectively
+
+Overall, the analysis quantified the following for this particular 100-node network.
+
+- The protocol supports data rates up to 30 IB/s with input blocks up to 163 kB/IB.
+- Verification of IBs dominates CPU usage, except at low throughputs.
+- Short Leios includes the same IB in multiple EBs.
+- Short Leios sometimes discards IBs because not EB was produced.
+
+In the course of this work, several issues with the simulations were identified:
+
+- [#235: RB size does not reflect the presence of a certificate?](https://github.com/input-output-hk/ouroboros-leios/issues/235)
+- [#234: Fast transmission of large blocks at moderate IB rate?](https://github.com/input-output-hk/ouroboros-leios/issues/234)
+- [#232: Monotonicity of EB inclusion in RBs?](https://github.com/input-output-hk/ouroboros-leios/issues/232)
+- [#230: EBs not large enough to include their IBs?](https://github.com/input-output-hk/ouroboros-leios/issues/230)
+- [#229: Rust simulations panics from overflow](https://github.com/input-output-hk/ouroboros-leios/issues/229)
+
+See [read-me file](analysis/sims/2025w10/ReadMe.md) for technical details.
+
 ## 2025-03-02
 
 ### Formal methods
