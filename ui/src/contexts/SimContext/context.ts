@@ -28,6 +28,7 @@ export const defaultState: ISimContextState = {
   batchSize: 5000,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
+  tracePath: '',
   topography: { links: new Map(), nodes: new Map() },
   topologyPath: '',
   topologyLoaded: false,

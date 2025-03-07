@@ -129,6 +129,7 @@ export interface ISimContextState {
   activeTab: Tab;
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
+  tracePath: string;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;

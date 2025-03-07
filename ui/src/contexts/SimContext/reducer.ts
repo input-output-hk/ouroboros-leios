@@ -1,3 +1,4 @@
+import { defaultAggregatedData } from "./context";
 import { ISimContextState, TSimContextActions } from "./types";
 
 export const reducer = (
@@ -13,6 +14,7 @@ export const reducer = (
         allScenarios,
         activeScenario: scenario.name,
         maxTime: scenario.duration,
+        tracePath: scenario.trace,
         topologyPath: scenario.topology,
       }
     }
@@ -24,10 +26,19 @@ export const reducer = (
       }
       return {
         ...state,
+        aggregatedData: defaultAggregatedData,
         activeScenario: scenario.name,
         maxTime: scenario.duration,
+        tracePath: scenario.trace,
         topologyPath: scenario.topology,
         topologyLoaded: state.topologyLoaded && scenario.topology === state.topologyPath,
+        graph: {
+          ...state.graph,
+          currentNode: undefined,
+        },
+        blocks: {
+          currentBlock: undefined,
+        }
       }
     }
 
