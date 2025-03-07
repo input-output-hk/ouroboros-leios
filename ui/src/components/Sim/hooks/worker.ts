@@ -122,8 +122,8 @@ const consumeStream = async (
         lastNodesUpdated: [...nodesUpdated.values()],
       }
     } as TWorkerResponse);
-    postMessage({ type: "DONE", tracePath });
   }
+  postMessage({ type: "DONE", tracePath });
 }
 
 let controller = new AbortController();
