@@ -3,3 +3,5 @@
 ols
 sim-cli
 tmp/
+plots/
+results/
