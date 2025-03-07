@@ -2,6 +2,11 @@
 
 ## 2025-03-07
 
+### Formal methods
+
+- Progress with the trace verifier
+  - Parsing event traces using the Haskell module `leios-trace-hs`
+
 ### Skeletal draft of Leios CIP
 
 The markdown file [docs/leios-cip-draft.md](docs/leios-cip-draft.md) contains a skeletal draft CIP for Leios.
