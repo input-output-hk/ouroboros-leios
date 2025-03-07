@@ -2,6 +2,14 @@
 
 ## 2025-03-07
 
+### Skeletal draft of Leios CIP
+
+The markdown file [docs/leios-cip-draft.md](docs/leios-cip-draft.md) contains a skeletal draft CIP for Leios.
+
+- Conforms to the latest template for CIPs
+- Annotations for requirements of each CIP section
+- Appendix on BLS+FA voting
+
 ### Analysis of simulations at tag `leios-2025w10`
 
 The Jupyter notebook [analysis/sims/2025w10/analysis.ipynb](analysis/sims/2025w10/analysis.ipynb) analyzes the Haskell simulation at tag [leios-2025w10](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w10). Two simulation studies were executed on the 100-node example network:
