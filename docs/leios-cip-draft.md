@@ -1,5 +1,5 @@
 ---
-CIP: ?
+CIP: "?"
 Title: Ouroboros Leios - Greater transaction throughput
 Status: Active
 Category: One of the registered [categories](#categories) covering one area of the ecosystem.
@@ -74,7 +74,7 @@ License: Apache-2.0
 > 
 > In particular, an implementation that requires a hard-fork should explicitly mention it in its _'Implementation Plan'_.
 
-### Versioning
+## Versioning
 
 > [!NOTE]
 > 
@@ -87,21 +87,21 @@ License: Apache-2.0
 > A single Versioning scheme can be placed either as a subsection of the Specification section or in an optional Versioning top-level section near the end.  If the Specification contains multiple specification subsections, each of these can have a Versioning subsection within it.
 
 
-### References
+## References
 
 > [!NOTE]
 > 
 > Optional
 
 
-### Appendices
+## Appendices
 
 > [!NOTE]
 > 
 > Optional
 
 
-### Copyright
+## Copyright
 
 > [!NOTE]
 > 
