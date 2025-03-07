@@ -57,6 +57,22 @@ In the course of this work, several issues with the simulations were identified:
 
 See [read-me file](analysis/sims/2025w10/ReadMe.md) for technical details.
 
+### Rust simulation
+
+Update the visualization so that it can shows any of several predefined "scenarios" instead of a single hard-coded trace. Also move all logic out of the server and into (a web worker on) the client, so that it can be hosted as part of another website.
+
+## 2025-03-05
+
+### Rust simulation
+
+Visualize a breakdown of the different types of network traffic for each node.
+
+## 2025-03-04
+
+### Rust simulation
+
+Fix bug #229 causing time travel and crashes when simulating high-traffic high-latency connections.
+
 ## 2025-03-02
 
 ### Formal methods
