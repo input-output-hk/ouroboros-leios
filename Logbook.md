@@ -7,6 +7,10 @@
 - Progress with the trace verifier
   - Parsing event traces using the Haskell module `leios-trace-hs`
 
+### Full draft of first technical report
+
+The missing sections of the [Leios Technical Report #1](docs/technical-report-1.md) have been written and the report is ready for copy editing and review.
+
 ### Skeletal draft of Leios CIP
 
 The markdown file [docs/leios-cip-draft.md](docs/leios-cip-draft.md) contains a skeletal draft CIP for Leios.

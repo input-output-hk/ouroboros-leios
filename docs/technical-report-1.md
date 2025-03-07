@@ -2,6 +2,30 @@
 
 ## Executive summary
 
+This report captures a snapshot of the modeling, simulation, and analysis of the
+Leios protocol as of February 2024, approximately. Given that the Leios protocol
+design is still evolving, the observations, findings, and conclusions documented
+here are provisional and subject to future revision and contradiction. The
+report digs into the following topics:
+
+- Formal and informal specification of the Leios protocol
+- Models and simulations of Leios
+  - Delta QSD
+  - A high-performance simulation written in the Rust language
+  - A high-fidelity prototype written in the Haskell language
+- Analyses of sortition, voting, committee sizing, and certificate construction
+- Techno-economic estimates of the cost of running Leios nodes, under various
+  levels of transaction throughput
+- Quantification of the characteristics of the Cardano mainnet that are relevant
+  to Leios
+- Threat model for Leios
+
+Results so far indicate that Leios can achieve cost-effective throughput at 10
+input blocks per second or more, using affordable hardware or cloud
+provisioning. Further design and analysis of transaction sharding, memory pool
+management, and fee schedules are needed to estimate the effective transactions
+per second (TPS) and overall cost effectiveness of Leios.
+
 ## Introduction
 
 The Leios protocol represents a significant advancement in blockchain
@@ -71,39 +95,374 @@ understanding of blockchain concepts and the Cardano ecosystem.
 
 ## Informal description of Short Leios
 
-### Example schedule
+The paper
+[High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/)
+describes two variants of Leios, the Simplified Leios and the Full Leios. The
+innovation stream began working with a third variant, Short Leios, that differs
+from Full Leios by not allowing endorser blocks (EBs) to reference other
+endorser blocks. If an EB is not certified by a ranking block (RB), it and the
+input blocks (IBs) it references are not recorded in the ledger. The sketch
+below shows the relationship between Leios variants, but note that there are two
+Short Leios variants that differ in the number of voting stages.
+
+![Leios variants](../images/leios-variants.png)
+
+The diagram below illustrates the relationship between transactions, input
+blocks, endorser blocks, votes, and certificates in Short Leios.
+
+![Transactions, input blocks, endorser blocks, votes, and certificates in Short Leios](../images/short-leios-protocol.png)
+
+As in Full Leios, pipelines are staggered so that a node's CPU and network
+workload is spread out approximately uniformly.
 
 ![Example schedule for short-pipeline leios](../analysis/short-pipeline-leios-example-schedule.png)
 
-## Formal Specification for Short Leios
+## Formal Specification for Leios
+
+The formal specification for Leios is defined in
+[github:input-output-hk/ouroboros-leios-formal-spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec).
+That repository currently contains the following:
+
+- The formal relational specification for Simplified Leios and for Short Leios.
+- A deterministic executable specification for Short Leios.
+
+The specification formalizes variants of the Leios protocol, as described in the
+paper
+[High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/)
+and has the module dependencies shown below.
 
 ![Overview for formal specification](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios-formal-spec/refs/heads/main/formal-spec/docs/overview.png)
 
+The diagram below illustrates the approach being taken for using the Agda
+specification in conformance testing of the Haskell and Rust implementations.
+
+![Formal approach to conformance testing](../images/fm-conformance-testing.png)
+
 ## Delta QSD network performance model
+
+Delta QSD models for Leios were developed for providing fast analysis of Leios
+network load, for screening scenarios for deeper analysis, and checking the
+reasonableness of early results from the Rust simulator and the Haskell
+prototype. The Delta QSD models reside in the folder [delta_q](../delta_q/) and
+their usage and results are documented in the
+[read-me file](../delta_q/README.md), and
+[Towards Load Analysis](../delta_q/docs/Towards_Load_Analysis.md), and
+especially in the
+[comprehensive experience report](../delta_q/docs/Report%202025-01.md). The
+diagram below documents the software components and workflow.
 
 ![Overview of Delta QSD components](../delta_q/docs/overview.png)
 
-## Rust simulation
+## Simulations
+
+Both the Haskell and Rust simulations read in a network topology file that
+defines the nodes and their connections, along with a configuration file that
+controls various protocol parameters. The simulations then produce trace outputs
+that can be visualized to analyze the protocol's behavior. The Haskell
+simulation includes built-in visualization capabilities, while the Rust
+simulation generates JSONL traces that can be visualized using the web UI in the
+`ui` directory.
+
+### Configuration Parameters
+
+The Leios simulations (both Rust and Haskell) can be configured using YAML
+configuration files. The configuration schema is defined in
+[data/simulation/config.d.ts](../data/simulation/config.d.ts) and the default
+configuration is available in
+[data/simulation/config.default.yaml](data/simulation/config.default.yaml).
+
+Each parameter controls a specific aspect of the simulation, and some parameters
+are only supported by either the Rust or Haskell implementation:
+
+#### Simulation Configuration
+
+| Parameter                  | Description                           | Haskell | Rust |
+| -------------------------- | ------------------------------------- | :-----: | :--: |
+| `relay-strategy`           | Strategy for relaying blocks          |   ✅    |  ✅  |
+| `tcp-congestion-control`   | Enable TCP congestion control         |   ✅    |  ❌  |
+| `multiplex-mini-protocols` | Enable multiplexing of mini-protocols |   ✅    |  ❌  |
+
+#### Leios Protocol Configuration
+
+| Parameter                         | Description                                           | Haskell | Rust |
+| --------------------------------- | ----------------------------------------------------- | :-----: | :--: |
+| `leios-stage-length-slots`        | Number of slots in a Leios stage                      |   ✅    |  ✅  |
+| `leios-stage-active-voting-slots` | Number of slots for active voting                     |   ✅    |  ✅  |
+| `leios-vote-send-recv-stages`     | Whether to separate Vote Send and Vote Receive stages |   ✅    |  ❌  |
+
+#### Transaction Configuration
+
+| Parameter                    | Description                             | Haskell | Rust |
+| ---------------------------- | --------------------------------------- | :-----: | :--: |
+| `tx-generation-distribution` | Distribution for transaction generation |   ❌    |  ✅  |
+| `tx-size-bytes-distribution` | Distribution for transaction sizes      |   ❌    |  ✅  |
+| `tx-validation-cpu-time-ms`  | CPU time for transaction validation     |   ❌    |  ✅  |
+| `tx-max-size-bytes`          | Maximum transaction size                |   ❌    |  ✅  |
+
+#### Ranking Block Configuration
+
+| Parameter                                                      | Description                                           | Haskell | Rust |
+| -------------------------------------------------------------- | ----------------------------------------------------- | :-----: | :--: |
+| `rb-generation-probability`                                    | Probability of generating a ranking block             |   ✅    |  ✅  |
+| `rb-generation-cpu-time-ms`                                    | CPU time for generating a ranking block               |   ✅    |  ✅  |
+| `rb-head-validation-cpu-time-ms`                               | CPU time for validating a ranking block header        |   ✅    |  ✅  |
+| `rb-head-size-bytes`                                           | Size of a ranking block header                        |   ✅    |  ✅  |
+| `rb-body-max-size-bytes`                                       | Maximum size of a ranking block body                  |   ✅    |  ✅  |
+| `rb-body-legacy-praos-payload-validation-cpu-time-ms-constant` | Constant CPU time for validating legacy Praos payload |   ✅    |  ✅  |
+| `rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte` | Per-byte CPU time for validating legacy Praos payload |   ✅    |  ✅  |
+| `rb-body-legacy-praos-payload-avg-size-bytes`                  | Average size of legacy Praos payload                  |   ✅    |  ❌  |
+
+#### Input Block Configuration
+
+| Parameter                                 | Description                                           | Haskell | Rust |
+| ----------------------------------------- | ----------------------------------------------------- | :-----: | :--: |
+| `ib-generation-probability`               | Probability of generating an input block              |   ✅    |  ✅  |
+| `ib-generation-cpu-time-ms`               | CPU time for generating an input block                |   ✅    |  ✅  |
+| `ib-shards`                               | Number of shards for input blocks                     |   ❌    |  ✅  |
+| `ib-head-size-bytes`                      | Size of an input block header                         |   ✅    |  ✅  |
+| `ib-head-validation-cpu-time-ms`          | CPU time for validating an input block header         |   ✅    |  ✅  |
+| `ib-body-validation-cpu-time-ms-constant` | Constant CPU time for validating an input block body  |   ✅    |  ✅  |
+| `ib-body-validation-cpu-time-ms-per-byte` | Per-byte CPU time for validating an input block body  |   ✅    |  ✅  |
+| `ib-body-avg-size-bytes`                  | Average size of an input block body                   |   ✅    |  ❌  |
+| `ib-body-max-size-bytes`                  | Maximum size of an input block body                   |   ❌    |  ✅  |
+| `ib-diffusion-strategy`                   | Strategy for diffusing input blocks                   |   ✅    |  ✅  |
+| `ib-diffusion-max-window-size`            | Maximum window size for input block diffusion         |   ✅    |  ❌  |
+| `ib-diffusion-max-headers-to-request`     | Maximum number of headers to request for input blocks |   ✅    |  ❌  |
+| `ib-diffusion-max-bodies-to-request`      | Maximum number of bodies to request for input blocks  |   ✅    |  ❌  |
+
+#### Endorsement Block Configuration
+
+| Parameter                             | Description                                                 | Haskell | Rust |
+| ------------------------------------- | ----------------------------------------------------------- | :-----: | :--: |
+| `eb-generation-probability`           | Probability of generating an endorsement block              |   ✅    |  ✅  |
+| `eb-generation-cpu-time-ms`           | CPU time for generating an endorsement block                |   ✅    |  ✅  |
+| `eb-validation-cpu-time-ms`           | CPU time for validating an endorsement block                |   ✅    |  ✅  |
+| `eb-size-bytes-constant`              | Constant size of an endorsement block                       |   ✅    |  ✅  |
+| `eb-size-bytes-per-ib`                | Per-input-block size of an endorsement block                |   ✅    |  ✅  |
+| `eb-diffusion-strategy`               | Strategy for diffusing endorsement blocks                   |   ✅    |  ❌  |
+| `eb-diffusion-max-window-size`        | Maximum window size for endorsement block diffusion         |   ✅    |  ❌  |
+| `eb-diffusion-max-headers-to-request` | Maximum number of headers to request for endorsement blocks |   ✅    |  ❌  |
+| `eb-diffusion-max-bodies-to-request`  | Maximum number of bodies to request for endorsement blocks  |   ✅    |  ❌  |
+
+#### Vote Configuration
+
+| Parameter                               | Description                                    | Haskell | Rust |
+| --------------------------------------- | ---------------------------------------------- | :-----: | :--: |
+| `vote-generation-probability`           | Probability of generating a vote               |   ✅    |  ✅  |
+| `vote-generation-cpu-time-ms-constant`  | Constant CPU time for generating a vote        |   ✅    |  ✅  |
+| `vote-generation-cpu-time-ms-per-ib`    | Per-input-block CPU time for generating a vote |   ✅    |  ✅  |
+| `vote-validation-cpu-time-ms`           | CPU time for validating a vote                 |   ✅    |  ✅  |
+| `vote-threshold`                        | Threshold for vote acceptance                  |   ✅    |  ✅  |
+| `vote-bundle-size-bytes-constant`       | Constant size of a vote bundle                 |   ✅    |  ✅  |
+| `vote-bundle-size-bytes-per-eb`         | Per-endorsement-block size of a vote bundle    |   ✅    |  ✅  |
+| `vote-diffusion-strategy`               | Strategy for diffusing votes                   |   ✅    |  ❌  |
+| `vote-diffusion-max-window-size`        | Maximum window size for vote diffusion         |   ✅    |  ❌  |
+| `vote-diffusion-max-headers-to-request` | Maximum number of headers to request for votes |   ✅    |  ❌  |
+| `vote-diffusion-max-bodies-to-request`  | Maximum number of bodies to request for votes  |   ✅    |  ❌  |
+
+#### Certificate Configuration
+
+| Parameter                              | Description                                    | Haskell | Rust |
+| -------------------------------------- | ---------------------------------------------- | :-----: | :--: |
+| `cert-generation-cpu-time-ms-constant` | Constant CPU time for generating a certificate |   ✅    |  ✅  |
+| `cert-generation-cpu-time-ms-per-node` | Per-node CPU time for generating a certificate |   ✅    |  ✅  |
+| `cert-validation-cpu-time-ms-constant` | Constant CPU time for validating a certificate |   ✅    |  ✅  |
+| `cert-validation-cpu-time-ms-per-node` | Per-node CPU time for validating a certificate |   ✅    |  ✅  |
+| `cert-size-bytes-constant`             | Constant size of a certificate                 |   ✅    |  ✅  |
+| `cert-size-bytes-per-node`             | Per-node size of a certificate                 |   ✅    |  ✅  |
+
+For more details on each parameter, refer to the comments in the
+[config.d.ts](../data/simulation/config.d.ts) file and the default values in
+[config.default.yaml](../data/simulation/config.default.yaml).
+
+### Rust simulation
+
+The Rust simulator, found in the [sim-rs/](../sim-rs/) folder, contains the
+following crates.
+
+- The `sim-cli` crate provides a command-line interface for controlling the
+  simulation.
+- The `sim-core` crate implements the simulation itself.
 
 ![Container diagram of Rust simulation](../sim-rs/docs/container.png)
 
+The simulation is partitioned into components that deal with the protocol
+itself, network transport, event logging, and configuration.
+
 ![Component diagram of Rust simulation](../sim-rs/docs/component.png)
 
-![Transaction-protocol diagram of Rust simulation](../sim-rs/docs/tx-protocol.png)
+#### Running the simulator
 
-## Haskell prototype
+Execute the following in the [sim-rs/](../sim-rs/) folder to run the Rust
+simulation of Short Leios.
+
+```sh
+cargo run --release input_path [output_path] [-s slots] [-t timescale] [--trace-node <node id>]
+
+# for example...
+cargo run --release ./test_data/realistic.yaml output/out.jsonl
+```
+
+The `input_path` is a YAML file which describes the network topology. Input
+files for predefined scenarios are in the `test_data` directory.
+
+The default parameters for the simulation are defined in `data/simulation.yaml`
+in the root of this repository. To override parameters, pass
+`-p <path-to-parameters-file>` (you can pass this flag as many times as you'd
+like). Some predefined overrides are in the `parameters` directory.
+
+While the simulation is running, it will log what's going on to the console. You
+can stop it at any time with ctrl+c, and when you do it will save the stream of
+events to `output_path`. To only simulate e.g. 50 slots, pass `-s 50`.
+
+The simulation runs in realtime (1 slot every second), but you can speed it up
+by passing e.g. `-t 16` to run 16 times faster.
+
+> [!NOTE] For instructions on running the simulation using Docker, please refer
+> to the Docker Simulation section in the root README.md.
+
+### Haskell prototype
+
+The Haskell prototype, found in the [simulation/](../simulation/) folder, has
+more detail in its TCP implementation than the Rust simulator, but it runs more
+slowly because of that extra level of detail. The prototype both simulates the
+protocol and visualizes the results of the simulations.
 
 ![Container diagram of Haskell prototype](../simulation/docs/container.png)
 
+Internally, components of the prototype handle the network mini-protocols for
+Leios, the production of blocks, event logging, and visualization.
+
 ![Component diagram of Haskell prototype](../simulation/docs/component.png)
+
+#### Running the prototype
+
+The simulations are not completely configurable from the command line. The code
+for the simulation configurations needs to be adjusted or extended to be able to
+run different experiments.
+
+The current simulation covers a few examples:
+
+- Basic TCP examples
+- A simple block relaying protocol
+- A Leios-like traffic pattern for input blocks over a global-scale p2p network
+
+The tool supports two visualization output styles:
+
+- A live visualization using a Gtk+ window
+- Output of animation frames to .png files, to turn into a video
+
+For creating videos use a command like
+
+```sh
+ffmpeg -i example/frame-%d.png -vf format=yuv420p example.mp4
+```
+
+The main entry point for the simulation is the `ols` command, which exposes the
+`viz` subcommand for running visualisations, the `sim` subcommand for running
+headless simulations, as well as various utility commands.
+
+```
+$ cabal run ols -- --help
+
+Usage: ols COMMAND
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  viz                      Run a visualisation. See 'ols viz -h' for details.
+  sim                      Run a simulation. See 'ols sim -h' for details.
+  convert-bench-topology   Convert merge benchmark topology and latency files
+                           into a simple topology file.
+```
+
+The visualisation subcommand exposes a number of visualisations:
+
+```
+$ cabal run ols -- viz --help
+
+Usage: ols viz COMMAND [--frames-dir DIR] [--seconds SEC] [--skip-seconds SEC]
+               [--cpu-render] [--720p | --1080p | --resolution (W,H)]
+
+  Run a visualisation. See 'ols viz -h' for details.
+
+Available options:
+  --frames-dir DIR         Output animation frames to directory
+  --seconds SEC            Output N seconds of animation
+  --skip-seconds SEC       Skip the first N seconds of animation
+  --cpu-render             Use CPU-based client side Cairo rendering
+  --720p                   Use 720p resolution
+  --1080p                  Use 1080p resolution
+  --resolution (W,H)       Use a specific resolution
+  -h,--help                Show this help text
+
+Available visualisations:
+  tcp-1
+  tcp-2
+  tcp-3
+  relay-1
+  relay-2
+  p2p-1
+  p2p-2
+  pcs-1                    A simulation of two nodes running Praos chain-sync.
+  pbf-1                    A simulation of two nodes running Praos block-fetch.
+  praos-1                  A simulation of two nodes running Praos consensus.
+  praos-p2p-1              A simulation of 100 nodes running Praos consensus.
+  praos-p2p-2              A simulation of 100 nodes running Praos consensus,
+                           comparing a cylindrical world to a flat world.
+  relay-test-1
+  relay-test-2
+  relay-test-3
+  short-leios-1            A simulation of two nodes running Short Leios.
+  short-leios-p2p-1        A simulation of 100 nodes running Short Leios.
+```
+
+Some of these visualisations accept further arguments. For instance:
+
+```
+$ cabal run ols -- viz praos-p2p-1 --help
+
+Usage: ols viz praos-p2p-1 [--seed NUMBER] [--block-interval NUMBER]
+                           [--topology FILE]
+
+  A simulation of 100 nodes running Praos consensus.
+
+Available options:
+  --seed NUMBER            The seed for the random number generator.
+  --block-interval NUMBER  The interval at which blocks are generated.
+  --topology FILE          The file describing the network topology.
+  -h,--help                Show this help text
+```
+
+The simulation subcommand exposes a number of simulations:
+
+```
+$ cabal run ols -- sim --help
+
+Usage: ols sim COMMAND [--output-seconds SECONDS] --output-file FILE
+
+  Run a simulation. See 'ols sim -h' for details.
+
+Available options:
+  --output-seconds SECONDS Output N seconds of simulation.
+  --output-file FILE       Output simulation data to file.
+  -h,--help                Show this help text
+
+Available simulations:
+  praos-diffusion-10
+  praos-diffusion-20
+```
 
 ## Sortition
 
 > [!IMPORTANT]
-> 
-> The sortition, voting, and certificate analyses in this report will be revised
-> as research proceeds and design details are settled. The material below is a
-> snapshot of the results from August through December 2024.
+>
+> The sortition, voting, and certificate analyses in this report has been
+> revised and documented in the
+> [Appendix on Sortition](leios-cip-draft.md#sortiton) and will be further
+> revised as research proceeds and design details are settled. The material
+> below is a snapshot of the results from August through December 2024.
 
 In Leios stake-based sortition occurs for the selection of the producers of IBs,
 EBs, and votes. The selection of the producers of IBs, EBs, and votes occurs
@@ -226,12 +585,6 @@ $$
 where
 $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$,
 which implies a fractional benefit limited to $f \cdot \sigma / 2$.
-
-> [!NOTE]
->
-> - [ ] Do we need to include the derivation of
->       $h = 1 - \sqrt[\sigma]{1 + \sigma \cdot \log (1 - f)} = f \cdot ( 1 + \frac{1}{2} f \cdot \sigma) + \mathcal{O}(f^3)$?
-> - [ ] . . . perhaps in an appendix?
 
 The following plot shows this effect on splitting stake. The horizontal axis
 represents the production rate $f$, which would be per-slot for RBs or IBs and
@@ -362,15 +715,6 @@ appear before the next EB.
 
 ![Probability of the next RB prior to the next EB](../images/leios-eb-rb.svg)
 
-> [!IMPORTANT]
->
-> The above argument needs reworking because it doesn't account for various
-> effects like the EB being per-pipeline, propagation delays, and the RB being
-> per-slot or that there are multiple pipelines. There also may be ambiguities
-> in the specification for the case when several EBs are waiting for an RB:
-> presumably, the "freshest first" rule would be applied here, so the newest EB
-> would go into the RB. We might need simulation for this analysis.
-
 ### Insights regarding sortition
 
 - All of the sortition is based on Bernoulli trials for each stake of lovelace.
@@ -407,13 +751,12 @@ appear before the next EB.
 ## Voting and certificates
 
 > [!IMPORTANT]
-> 
-> The sortition, voting, and certificate analyses in this report will be revised
-> as research proceeds and design details are settled. The material below is a
-> snapshot of the results from August through December 2024. The more recent
-> analysis [BLS certificates for Leios](../crypto-benchmarks.rs/Specification.md)
-> specifies one viable realizaiton of certificates for Leios that meets
-> resource, operational, and security requirements.
+>
+> The sortition, voting, and certificate analyses in this report have been
+> revised and documented in the [Appendix on Votes](leios-cip-draft.md#votes)
+> and will be further revised as research proceeds and design details are
+> settled. The material below is a snapshot of the results from August through
+> December 2024.
 
 The Leios protocols requires a subset of SPO nodes to vote on certifying each
 EB. The EB can only be certified if a threshold (a "quorum") of votes are cast
@@ -1146,12 +1489,6 @@ The main findings confirm the insights from the system-dynamics siulation
 - The present fee structure for Cardano transaction is sufficient for Leios to
   be viable if there are more than 50 transactions per second.
 
-> [!CAUTION]
->
-> We need to account for the fact that many SPOs use cloud services that include
-> a large amount of bandwidth for VMs: the cost model should only bill for the
-> bandwidth used beyond that monthly allocation.
-
 ### Cost of storage
 
 Currently, there is no provision for archiving, sharding, or pruning the Cardano
@@ -1504,6 +1841,69 @@ would make it onto the ledger.
 3. Loss of rewards disincentivizes nuisance attacks.
 
 ## Findings and conclusions
+
+Provisional findings:
+
+- Leios protocol parameters can be selected to maximize throughput without
+  hampering efficiency.
+  - Careful selection of the IB production rate ensures a high probability of at
+    least one IB in each pipeline.
+  - Setting protocol parameters so that there is a high probability of an EB in
+    a pipeline makes the protocol more susceptible to influence by adversaries
+    with significant stake. However, the unevenness in stake distribution or
+    splitting of adversarial stake does not exacerbate the situation.
+- The pipeline length should be several multiples of the inverse of the
+  active-slot coefficient, in order that there is a high probability for an RB
+  to be available for an EB certificate.
+- The vote lottery can award multiple votes to the same node if they have a lot
+  of stake and are lucky.
+  - Nodes nearly saturated with stake have an appreciable chance of receiving
+    several votes.
+- It is critically important to keep the size of votes small.
+  - Large votes can mean large certificates, and votes should also fit in one
+    TCP MTU.
+  - Including KES signatures in votes means that votes will be 500-600 B in
+    size.
+- Neither ALBA, pure BLS, MUSEN, or their ZK variants are clear winners for the
+  best choice of certificate scheme for Leios.
+  - Each has at least one strength and one drawback related to certificate size,
+    proof time, or verification time.
+  - Combining BLS with Fait Accompli yields a viable voting scheme for Leios, as
+    described in the draft Leios CIP's
+    [Appendix on BLS+FA certificates for Leios](leios-cip-draft.md#appendix-on-bls+fa-certificates-for-leios).
+- At least 500 votes and a 60% quorum will be needed for Leios certificates.
+- Leios is viable from the perspective of the cost of operating nodes, but two
+  factors may increase the cost at Leios at high throughput.
+  - Cloud and network providers typically have pricey surcharges or limits on
+    high network egress.
+  - The cost of perpetually storing historical Leios blocks may necessitate the
+    use of sharding, archiving, and/or pruning.
+- Historically observed mainnet transaction sizes, transaction frequencies, and
+  stake distribution are reasonably well modeled by simple curve fits.
+- The Leios protocol already mitigates most of the threats identified.
+  - Anti-grinding for Leios depends upon the Praos anti-grinding R&D.
+  - Later work on Leios sharding, incentives/rewards/fees and memory pool design
+    will need to account for potential threats.
+  - Some attacks may reduce the efficiency and throughput of Leios, but not
+    threaten its security.
+- Short Leios is vulnerable to reduced efficiency in ways that Full Leios is
+  not.
+  - Simulation studies can measure the extent of this reduced efficiency as a
+    function of the intensity of the attack.
+  - Simulations of the behavior of the "freshest first" aspect of Leios are
+    required.
+
+Next steps:
+
+- Confidence building and comparison of the DeltaQSD, Haskell, and Rust
+  simulations of Leios.
+- Detailed analysis of the Leios performance using the Haskell and Rust
+  simulations.
+  - Does Leios degrade gracefully under adverse network conditions?
+  - What are optimal settings for Leios protocol parameters?
+- Memory pool design.
+- Design of fee and reward schedules.
+- Simulation and analysis of Full Leios.
 
 ## Appendix A: Glossary
 

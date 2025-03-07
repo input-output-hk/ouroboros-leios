@@ -101,7 +101,7 @@ License: Apache-2.0
 > Optional
 
 
-### BLS certificates for Leios
+### BLS+FA certificates for Leios
 
 
 This appendix documents that BLS certificates based on the Fait Accompli sortition scheme comprise a viable option for Leios, with certificates being smaller that 10 kB. The downside of BLS approaches like this is that new keys must be registered and occasionally rotated.
