@@ -59,16 +59,11 @@ ui-app: {
 
   backend: {
     class: component
-    label: "Backend API\n- Data Fetching\n- Trace Processing"
+    label: "Static Server"
 
-    api_routes: {
+    static_files: {
       class: subcomponent
-      label: "API Routes\n- /api/messages\n- /api/trace"
-    }
-
-    data_processing: {
-      class: subcomponent
-      label: "Data Processing\n- JSON Parsing\n- Data Transformation"
+      label: "Static React web page\nSimulation traces"
     }
   }
 }
@@ -87,4 +82,3 @@ external-systems: {
 ui-app.frontend -> ui-app.backend: "Fetches data from"
 ui-app.backend -> external-systems.sim-rs: "Reads trace data from"
 ui-app.frontend.components -> ui-app.frontend.state: "Uses for state management"
-ui-app.backend.api_routes -> ui-app.backend.data_processing: "Processes data for"

@@ -49,7 +49,7 @@ ui-web-app: {
 
   server: {
     class: component
-    label: "Backend Server\n- API Endpoints\n- Data Processing"
+    label: "Static backend server"
   }
 }
 
@@ -70,5 +70,5 @@ external-systems: {
 
 # Relationships
 ui-web-app.browser -> ui-web-app.server: "Requests data from"
-ui-web-app.server -> external-systems.trace-file: "Reads data from"
+ui-web-app.server -> external-systems.trace-file: "Serves data from"
 external-systems.sim-rs -> external-systems.trace-file: "Generates"

@@ -1,4 +1,4 @@
-import { defaultState } from "./context";
+import { defaultAggregatedData } from "./context";
 import { ISimContextState, TSimContextActions } from "./types";
 
 export const reducer = (
@@ -6,10 +6,50 @@ export const reducer = (
   action: TSimContextActions,
 ): ISimContextState => {
   switch (action.type) {
+    case "SET_SCENARIOS": {
+      const allScenarios = action.payload;
+      const scenario = allScenarios[0];
+      return {
+        ...state,
+        allScenarios,
+        activeScenario: scenario.name,
+        maxTime: scenario.duration,
+        tracePath: scenario.trace,
+        topologyPath: scenario.topology,
+      }
+    }
+
+    case "SET_SCENARIO": {
+      const scenario = state.allScenarios.find(s => s.name === action.payload);
+      if (!scenario) {
+        return state;
+      }
+      return {
+        ...state,
+        aggregatedData: defaultAggregatedData,
+        activeScenario: scenario.name,
+        maxTime: scenario.duration,
+        tracePath: scenario.trace,
+        topologyPath: scenario.topology,
+        topologyLoaded: state.topologyLoaded && scenario.topology === state.topologyPath,
+        graph: {
+          ...state.graph,
+          currentNode: undefined,
+        },
+        blocks: {
+          currentBlock: undefined,
+        }
+      }
+    }
+
     case "SET_ACTIVE_TAB": {
       return {
         ...state,
         activeTab: action.payload,
+        graph: {
+          ...state.graph,
+          currentNode: state.activeTab === action.payload ? state.graph.currentNode : undefined
+        },
         blocks: {
           currentBlock: undefined
         }
@@ -73,8 +113,23 @@ export const reducer = (
       };
     }
 
-    case "RESET_STATE":
-      return defaultState;
+    case "RESET_TOPOLOGY":
+      return {
+        ...state,
+        topography: { links: new Map(), nodes: new Map() },
+        topologyPath: action.payload,
+        topologyLoaded: false,
+      };
+
+    case "SET_TOPOLOGY":
+      if (action.payload.topologyPath != state.topologyPath) {
+        return state;
+      }
+      return {
+        ...state,
+        topography: action.payload.topology,
+        topologyLoaded: true,
+      }
 
     default:
       return state;

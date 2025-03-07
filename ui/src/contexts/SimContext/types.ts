@@ -114,18 +114,31 @@ export enum Tab {
   Blocks,
 }
 
+export interface IScenario {
+  name: string;
+  topology: string;
+  duration: number;
+  trace: string;
+}
+
 export interface ISimContextState {
+  allScenarios: IScenario[];
+  activeScenario: string;
   graph: IGraphContextState;
   blocks: IBlocksContextState;
   activeTab: Tab;
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
+  tracePath: string;
   topography: ITransformedNodeMap;
-  topographyLoaded: boolean;
+  topologyPath: string;
+  topologyLoaded: boolean;
   batchSize: number;
 }
 
 export type TSimContextActions =
+  | { type: "SET_SCENARIOS"; payload: IScenario[] }
+  | { type: "SET_SCENARIO", payload: string }
   | { type: "SET_ACTIVE_TAB"; payload: Tab }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "SET_CURRENT_BLOCK"; payload: number | undefined }
@@ -142,7 +155,13 @@ export type TSimContextActions =
     type: "BATCH_UPDATE";
     payload: Partial<ISimContextState>;
   }
-  | { type: "RESET_STATE" };
+  | { type: "RESET_TOPOLOGY", payload: string }
+  | {
+    type: "SET_TOPOLOGY", payload: {
+      topologyPath: string;
+      topology: ITransformedNodeMap
+    }
+  };
 
 export interface ISimContext {
   state: ISimContextState;

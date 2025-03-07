@@ -138,7 +138,7 @@ impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("EndorserBlockId", 4)?;
+        let mut obj = serializer.serialize_struct("EndorserBlockId", 3)?;
         obj.serialize_field("id", &self.to_string())?;
         obj.serialize_field("slot", &self.slot)?;
         obj.serialize_field("producer", &self.producer)?;
@@ -178,7 +178,7 @@ impl<Node: Display + Serialize> Serialize for VoteBundleId<Node> {
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("VoteBundleId", 4)?;
+        let mut obj = serializer.serialize_struct("VoteBundleId", 3)?;
         obj.serialize_field("id", &self.to_string())?;
         obj.serialize_field("slot", &self.slot)?;
         obj.serialize_field("producer", &self.producer)?;
@@ -204,5 +204,5 @@ pub enum NoVoteReason {
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,
     pub bytes: u64,
-    pub votes: Vec<Node>,
+    pub votes: BTreeMap<Node, usize>,
 }

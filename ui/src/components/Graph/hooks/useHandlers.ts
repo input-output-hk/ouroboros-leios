@@ -1,11 +1,7 @@
 import {
-  defaultAggregatedData,
-  useSimContext,
+  useSimContext
 } from "@/contexts/SimContext/context";
 import { useCallback } from "react";
-
-import { DEFAULT_SCALE } from "@/app/constants";
-import { getOffsetCoordinates } from "../utils";
 
 export const useHandlers = () => {
   const {
@@ -21,7 +17,6 @@ export const useHandlers = () => {
       maxTime,
       topography,
     },
-    dispatch,
   } = useSimContext();
 
   const drawTopography = useCallback(() => {
@@ -107,40 +102,7 @@ export const useHandlers = () => {
     canvasScale,
   ]);
 
-  const handleResetSim = useCallback(() => {
-    const canvas = canvasRef.current;
-
-    const width = canvas?.parentElement?.getBoundingClientRect().width || 1024;
-    const height = canvas?.parentElement?.getBoundingClientRect().height || 800;
-    const { offsetX, offsetY } = getOffsetCoordinates(
-      topography,
-      width,
-      height,
-      4,
-    );
-
-    dispatch({
-      type: "BATCH_UPDATE",
-      payload: {
-        aggregatedData: defaultAggregatedData,
-        graph: {
-          canvasRef,
-          currentNode: undefined,
-          canvasOffsetX: offsetX,
-          canvasOffsetY: offsetY,
-          canvasScale: DEFAULT_SCALE,
-        },
-        blocks: {
-          currentBlock: undefined,
-        }
-      },
-    });
-
-    drawTopography();
-  }, [topography]);
-
   return {
-    handleResetSim,
     drawTopography,
   };
 };

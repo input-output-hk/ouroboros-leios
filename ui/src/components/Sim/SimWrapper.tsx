@@ -2,13 +2,17 @@
 
 import { useSimContext } from "@/contexts/SimContext/context";
 import { Tab } from "@/contexts/SimContext/types";
-import { FC, useCallback } from "react";
+import { FC, useCallback, useEffect } from "react";
+import { parse } from "yaml";
+import { Coord2D, Node } from "../../../../data/simulation/topology";
 import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
 import { BatchSize } from "./modules/BatchSize";
 import { Controls } from "./modules/Controls";
+import { Scenario } from "./modules/Scenario";
 import { Progress } from "./modules/Slider";
 import { Stats } from "./modules/Stats";
+import { ITransformedNode } from "./types";
 
 interface ITabButtonProps {
   name: string;
@@ -26,12 +30,50 @@ export const SimWrapper: FC = ({
   const {
     state: {
       activeTab,
+      topologyPath,
+      topologyLoaded,
       blocks: {
         currentBlock,
       }
     },
     dispatch
   } = useSimContext();
+
+  // Load topology if it has changed
+  useEffect(() => {
+    dispatch({ type: "RESET_TOPOLOGY", payload: topologyPath });
+    if (!topologyPath) {
+      return;
+    }
+    (async () => {
+      const topographyRes = await fetch(topologyPath);
+      const topography = parse(await topographyRes.text());
+      const nodes = new Map<string, ITransformedNode>();
+      const links = new Map<string, { source: string, target: string }>();
+      for (const [id, node] of Object.entries<Node<Coord2D>>(topography.nodes)) {
+        nodes.set(id, {
+          data: {
+            location: node.location,
+            stake: node.stake as unknown as number,
+          },
+          fy: node.location[0],
+          fx: node.location[1],
+          id,
+        });
+        for (const peerId of Object.keys(node.producers)) {
+          const linkIds = [id, peerId].sort();
+          links.set(`${linkIds[0]}|${linkIds[1]}`, { source: linkIds[0], target: linkIds[1] });
+        }
+      }
+      dispatch({
+        type: "SET_TOPOLOGY", payload: {
+          topologyPath,
+          topology: { nodes, links },
+        }
+      })
+    })();
+  }, [topologyPath]);
+
   const setActiveTab = useCallback((tab: Tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }), [dispatch]);
   return (
     <>
@@ -39,7 +81,7 @@ export const SimWrapper: FC = ({
         <Stats />
       </div>
       <div className="flex items-center justify-center gap-4 relative h-screen w-screen">
-        {activeTab == Tab.Graph ? <GraphWrapper /> : null}
+        {activeTab == Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
         {activeTab == Tab.Blocks ? <BlocksView /> : null}
         <div className="absolute top-10 w-full">
           <div className="flex justify-center gap-4 min-w-[200px]">
@@ -48,6 +90,9 @@ export const SimWrapper: FC = ({
           </div>
         </div>
         <div className="absolute bottom-12 flex w-1/2 gap-4 justify-center">
+          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-sm">
+            <Scenario />
+          </div>
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-sm">
             <Controls />
             <Progress />
