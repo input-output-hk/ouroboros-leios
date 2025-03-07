@@ -280,7 +280,11 @@ impl EventTracker {
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
                 eb: self.to_endorser_block(e.eb),
                 bytes: e.bytes,
-                votes: e.votes.iter().map(|n| self.to_node(*n)).collect(),
+                votes: e
+                    .votes
+                    .iter()
+                    .map(|(k, v)| (self.to_node(*k), *v))
+                    .collect(),
             }),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });

@@ -573,7 +573,7 @@ impl OutputTarget {
                 file.write_all(string.as_bytes()).await?;
             }
             OutputFormat::CborStream => {
-                let bytes = serde_cbor::to_vec(&event)?;
+                let bytes = minicbor_serde::to_vec(&event)?;
                 file.write_all(&bytes).await?;
             }
         }

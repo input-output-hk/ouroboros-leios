@@ -138,7 +138,7 @@ struct NodeLeiosState {
     ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
     ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
     votes_to_generate: BTreeMap<u64, usize>,
-    votes_by_eb: BTreeMap<EndorserBlockId, Vec<NodeId>>,
+    votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
 }
 
@@ -311,12 +311,7 @@ impl Node {
             CpuTask::RBBlockGenerated(block) => {
                 let mut time = cpu_times.rb_generation;
                 if let Some(endorsement) = &block.endorsement {
-                    let nodes = endorsement
-                        .votes
-                        .iter()
-                        .copied()
-                        .collect::<HashSet<_>>()
-                        .len();
+                    let nodes = endorsement.votes.len();
                     time += cpu_times.cert_generation_constant
                         + (cpu_times.cert_generation_per_node * nodes as u32)
                 }
@@ -327,12 +322,7 @@ impl Node {
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += cpu_times.rb_validation_per_byte * (bytes as u32);
                 if let Some(endorsement) = &rb.endorsement {
-                    let nodes = endorsement
-                        .votes
-                        .iter()
-                        .copied()
-                        .collect::<HashSet<_>>()
-                        .len();
+                    let nodes = endorsement.votes.len();
                     time += cpu_times.cert_validation_constant
                         + (cpu_times.cert_validation_per_node * nodes as u32)
                 }
@@ -732,14 +722,17 @@ impl Node {
             .leios
             .votes_by_eb
             .iter()
-            .filter(|(eb, votes)| {
-                votes.len() as u64 >= vote_threshold && !forbidden_slots.contains(&eb.slot)
+            .filter_map(|(eb, votes)| {
+                let vote_count: usize = votes.values().sum();
+                if (vote_count as u64) < vote_threshold || forbidden_slots.contains(&eb.slot) {
+                    return None;
+                }
+                Some((eb, vote_count))
             })
-            .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), votes.len()))?;
+            .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), *votes))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
-        let nodes = votes.iter().collect::<HashSet<_>>().len();
-        let bytes = self.sim_config.sizes.cert(nodes);
+        let bytes = self.sim_config.sizes.cert(votes.len());
 
         Some(Endorsement {
             eb: block,
@@ -1120,11 +1113,13 @@ impl Node {
             return Ok(());
         }
         for (eb, count) in votes.ebs.iter() {
-            self.leios
+            *self
+                .leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .extend(std::iter::repeat(votes.id.producer).take(*count));
+                .entry(votes.id.producer)
+                .or_default() += count;
         }
         // We haven't seen these votes before, so propagate them to our neighbors
         for peer in &self.consumers {
@@ -1264,11 +1259,13 @@ impl Node {
     fn finish_generating_vote_bundle(&mut self, votes: VoteBundle) -> Result<()> {
         self.tracker.track_votes_generated(&votes);
         for (eb, count) in &votes.ebs {
-            self.leios
+            *self
+                .leios
                 .votes_by_eb
                 .entry(*eb)
                 .or_default()
-                .extend(std::iter::repeat(votes.id.producer).take(*count));
+                .entry(votes.id.producer)
+                .or_default() += count;
         }
         let votes = Arc::new(votes);
         self.leios
