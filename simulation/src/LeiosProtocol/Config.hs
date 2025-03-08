@@ -150,7 +150,7 @@ instance Default Config where
       , ibBodyValidationCpuTimeMsConstant = 50.0
       , ibBodyValidationCpuTimeMsPerByte = 0.0005
       , ibBodyMaxSizeBytes = 327680
-      , ibBodyAvgSizeBytes = 102400
+      , ibBodyAvgSizeBytes = 98304
       , ibDiffusionStrategy = FreshestFirst
       , ibDiffusionMaxWindowSize = 100
       , ibDiffusionMaxHeadersToRequest = 100
