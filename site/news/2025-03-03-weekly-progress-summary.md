@@ -30,23 +30,30 @@ This week in Leios development, the team focused on simulation analysis, formal 
 
 - Commenced trace verifier development in Agda:
   - Parsing event traces using the Haskell module `leios-trace-hs`
-- Established a working trace verifier for protocol analysis
-- Progressed on a proof-by-computation approach for execution traces
 
 ## Documentation and research
 
-- Full draft of the Leios Technical Report #1
-- Skeletal draft of Leios CIP (Consensus-Improvement Proposal)
+- Full draft of the [Leios Technical Report #1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md)
+- Skeletal [draft of Leios CIP](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md) (Consensus-Improvement Proposal)
 - Conformed to the latest template for CIPs
-- Developed a detailed analysis of simulations for the 100-node Leios network
+- Developed a [detailed analysis of simulations](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w10/analysis.ipynb) for the 100-node Leios network
 
 ## Programming and testing
 
 - Resolved several simulation issues:
-  - `[#235: RB size does not reflect the presence of a certificate?](https://github.com/input-output-hk/ouroboros-leios/issues/235)`
-  - `[#234: Fast transmission of large blocks at moderate IB rate?](https://github.com/input-output-hk/ouroboros-leios/issues/234)`
-  - `[#232: Monotonicity of EB inclusion in RBs?](https://github.com/input-output-hk/ouroboros-leios/issues/232)`
-  - `[#230: EB's not large enough to include their IBs?](https://github.com/input-output-hk/ouroboros-leios/issues/230)`
-  - `[#229: Rust simulations panics from overflow](https://github.com/input-output-hk/ouroboros-leios/issues/229)`
+  - [#235: RB size does not reflect the presence of a certificate?](https://github.com/input-output-hk/ouroboros-leios/issues/235)
+  - [#234: Fast transmission of large blocks at moderate IB rate?](https://github.com/input-output-hk/ouroboros-leios/issues/234)
+  - [#232: Monotonicity of EB inclusion in RBs?](https://github.com/input-output-hk/ouroboros-leios/issues/232)
+  - [#230: EB's not large enough to include their IBs?](https://github.com/input-output-hk/ouroboros-leios/issues/230)
+  - [#229: Rust simulations panics from overflow](https://github.com/input-output-hk/ouroboros-leios/issues/229)
 - Enabled the visualization of network traffic and logging messages for multiple predefined "scenarios" instead of a single hard-coded trace
 - Updated the visualization to display resource utilization in network traffic
+
+## Rust simulation visualization
+
+- Improved visualization capabilities:
+  - Added support for multiple predefined "scenarios" instead of single hard-coded trace
+  - Moved visualization logic to client-side web worker for better performance
+  - Added visualization of per-node network traffic breakdown by message type
+- Fixed critical simulation bugs:
+  - Resolved issue [#229](https://github.com/input-output-hk/ouroboros-leios/issues/229) causing time travel and crashes in high-traffic high-latency scenarios
