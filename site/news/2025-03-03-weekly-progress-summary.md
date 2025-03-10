@@ -1,5 +1,5 @@
 ---
-title: Weekly Summary - 2025-03-03
+title: Weekly Summary - March 3, 2025
 authors:
 - will
 tags: [progress, update, weekly]
