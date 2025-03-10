@@ -34,7 +34,7 @@ This week in Leios development, the team focused on simulation analysis, formal 
 ## Documentation and research
 
 - Full draft of the [Leios Technical Report #1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md)
-- Skeletal [draft of Leios CIP](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md) (Consensus-Improvement Proposal)
+- Skeletal [draft of Leios CIP](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md)
 - Conformed to the latest template for CIPs
 - Developed a [detailed analysis of simulations](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w10/analysis.ipynb) for the 100-node Leios network
 
