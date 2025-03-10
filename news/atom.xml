@@ -2,11 +2,97 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-02-24T00:00:00.000Z</updated>
+    <updated>2025-03-03T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary - 2025-03-03]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary"/>
+        <updated>2025-03-03T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[High-level summary]]></summary>
+        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#high-level-summary">​</a></h2>
+<p>This week in Leios development, the team focused on simulation analysis, formal methods, and documentation updates. Key accomplishments include in-depth analysis of simulations at tag <code>leios-2025w10</code>, advancements in formal methods through a working trace verifier, and development of technical reports.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
+<ul>
+<li>Completed a comprehensive analysis of simulations at tag <code>leios-2025w10</code>:<!-- -->
+<ul>
+<li>Analyzed Haskell simulation performance with and without accounting for CPU usage</li>
+<li>Varying key protocol parameters:<!-- -->
+<ul>
+<li>IB production rate</li>
+<li>IB size</li>
+<li>Length of Leios stages</li>
+</ul>
+</li>
+<li>Identified the following aspects of Leios:<!-- -->
+<ul>
+<li>Delay between IB generation and receipt at nodes</li>
+<li>Peak and mean CPU usage over time</li>
+<li>Breakdown of CPU usage by task type</li>
+<li>Sizes of IBs, EBs, and RBs</li>
+<li>Duplicate IB references in EBs</li>
+<li>Reference to EBs from RBs</li>
+<li>Resource utilization in network traffic</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-and-formal-methods">Protocol and formal methods<a class="hash-link" aria-label="Direct link to Protocol and formal methods" title="Direct link to Protocol and formal methods" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#protocol-and-formal-methods">​</a></h2>
+<ul>
+<li>Commenced trace verifier development in Agda:<!-- -->
+<ul>
+<li>Parsing event traces using the Haskell module <code>leios-trace-hs</code></li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="documentation-and-research">Documentation and research<a class="hash-link" aria-label="Direct link to Documentation and research" title="Direct link to Documentation and research" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#documentation-and-research">​</a></h2>
+<ul>
+<li>Full draft of the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md" target="_blank" rel="noopener noreferrer">Leios Technical Report #1</a></li>
+<li>Skeletal <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md" target="_blank" rel="noopener noreferrer">draft of Leios CIP</a> (Consensus-Improvement Proposal)</li>
+<li>Conformed to the latest template for CIPs</li>
+<li>Developed a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w10/analysis.ipynb" target="_blank" rel="noopener noreferrer">detailed analysis of simulations</a> for the 100-node Leios network</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="programming-and-testing">Programming and testing<a class="hash-link" aria-label="Direct link to Programming and testing" title="Direct link to Programming and testing" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#programming-and-testing">​</a></h2>
+<ul>
+<li>Resolved several simulation issues:<!-- -->
+<ul>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/235" target="_blank" rel="noopener noreferrer">#235: RB size does not reflect the presence of a certificate?</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/234" target="_blank" rel="noopener noreferrer">#234: Fast transmission of large blocks at moderate IB rate?</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/232" target="_blank" rel="noopener noreferrer">#232: Monotonicity of EB inclusion in RBs?</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/230" target="_blank" rel="noopener noreferrer">#230: EB's not large enough to include their IBs?</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/229" target="_blank" rel="noopener noreferrer">#229: Rust simulations panics from overflow</a></li>
+</ul>
+</li>
+<li>Enabled the visualization of network traffic and logging messages for multiple predefined "scenarios" instead of a single hard-coded trace</li>
+<li>Updated the visualization to display resource utilization in network traffic</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-visualization">Rust simulation visualization<a class="hash-link" aria-label="Direct link to Rust simulation visualization" title="Direct link to Rust simulation visualization" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#rust-simulation-visualization">​</a></h2>
+<ul>
+<li>Improved visualization capabilities:<!-- -->
+<ul>
+<li>Added support for multiple predefined "scenarios" instead of single hard-coded trace</li>
+<li>Moved visualization logic to client-side web worker for better performance</li>
+<li>Added visualization of per-node network traffic breakdown by message type</li>
+</ul>
+</li>
+<li>Fixed critical simulation bugs:<!-- -->
+<ul>
+<li>Resolved issue <a href="https://github.com/input-output-hk/ouroboros-leios/issues/229" target="_blank" rel="noopener noreferrer">#229</a> causing time travel and crashes in high-traffic high-latency scenarios</li>
+</ul>
+</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – February 24, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/02/24/weekly-progress-summary</id>
@@ -974,37 +1060,6 @@ plotting.</li>
 <li>Added basic instructions for Code of Conduct, Contribution guidelines, and
 coding standards.</li>
 <li>Restructured code to merge <code>leios</code> and <code>leios-sim</code> packages.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary - October 14, 2024]]></title>
-        <id>https://leios.cardano-scaling.org/news/2024/10/14/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2024/10/14/weekly-progress-summary"/>
-        <updated>2024-10-14T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[Network Simulation for Leios]]></summary>
-        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="network-simulation-for-leios">Network Simulation for Leios<a class="hash-link" aria-label="Direct link to Network Simulation for Leios" title="Direct link to Network Simulation for Leios" href="https://leios.cardano-scaling.org/news/2024/10/14/weekly-progress-summary#network-simulation-for-leios">​</a></h2>
-<ul>
-<li>Discussed early simulations for Leios with researchers.</li>
-<li>Simulated block diffusion with bandwidth constraints.</li>
-<li>Modeled block propagation among nodes and observed variations in diffusion
-time.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="team-meeting">Team Meeting<a class="hash-link" aria-label="Direct link to Team Meeting" title="Direct link to Team Meeting" href="https://leios.cardano-scaling.org/news/2024/10/14/weekly-progress-summary#team-meeting">​</a></h2>
-<ul>
-<li>Explored potential use cases for "Blob Leios" in governance and auctions.</li>
-<li>Discussed incentives for SPOs to serve data and compared with Filecoin.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="presentation-by-sandro">Presentation by Sandro<a class="hash-link" aria-label="Direct link to Presentation by Sandro" title="Direct link to Presentation by Sandro" href="https://leios.cardano-scaling.org/news/2024/10/14/weekly-progress-summary#presentation-by-sandro">​</a></h2>
-<ul>
-<li>Sandro provided an introductory talk on Leios, explaining protocol decisions.</li>
-<li>Recording available for team review.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
