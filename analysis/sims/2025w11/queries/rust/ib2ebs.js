@@ -1,11 +1,10 @@
-db.eb2rbs.deleteMany({simulator: "haskell"})
-db.haskell.aggregate(
+db.ib2ebs.deleteMany({simulator: "rust"})
+db.rust.aggregate(
 [
   {
     $match: {
       "scenario.label": "default",
-      "event.tag": "generated",
-      "event.kind": "RB"
+      "message.type": "EBGenerated"
     }
   },
   {
@@ -13,30 +12,30 @@ db.haskell.aggregate(
       _id: 0,
       scenario: 1,
       time: "$time_s",
-      rb: "$event.id",
-      eb: "$event.endorsed"
+      eb: "$message.id",
+      ib: "$message.input_blocks"
     }
   },
   {
-    $unwind: "$eb"
+    $unwind: "$ib"
   },
   {
     $group: {
       _id: {
-        simulator: "haskell",
+        simulator: "rust",
         scenario: "$scenario",
-        eb: "$eb"
+        ib: "$ib.id"
       },
-      rbs: {
+      ebs: {
         $push: {
-          rb: "$rb",
+          eb: "$eb",
           time: "$time"
         }
       }
     }
   },
   {
-    $merge: "eb2rbs"
+    $merge: "ib2ebs"
   }
 ]
 )

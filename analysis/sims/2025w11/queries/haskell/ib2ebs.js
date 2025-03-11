@@ -1,3 +1,4 @@
+db.ib2ebs.deleteMany({simulator: "haskell"})
 db.haskell.aggregate(
 [
   {
@@ -9,6 +10,7 @@ db.haskell.aggregate(
   },
   {
     $project: {
+      _id: 0,
       scenario: 1,
       time: "$time_s",
       eb: "$event.id",
@@ -34,7 +36,7 @@ db.haskell.aggregate(
     }
   },
   {
-    $out: "ib2ebs"
+    $merge: "ib2ebs"
   }
 ]
 )

@@ -1,3 +1,4 @@
+db.rbgen.deleteMany({simulator: "haskell"})
 db.haskell.aggregate(
 [
   {
@@ -28,7 +29,7 @@ db.haskell.aggregate(
     $unset: ["_id", "scenario"]
   },
   {
-    $out: "rbgen"
+    $merge: "rbgen"
   }
 ]
 )

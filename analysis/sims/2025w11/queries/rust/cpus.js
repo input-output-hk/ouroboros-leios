@@ -1,10 +1,12 @@
-db.cpus.deleteMany({simulator: "haskell"})
-db.haskell.aggregate(
+db.cpus.deleteMany({simulator: "rust"})
+db.rust.aggregate(
 [
   {
     $match: {
       "scenario.label": "default",
-      "event.tag": "Cpu"
+      "message.type": {
+        $regex: "^CpuTaskFinished"
+      }
     }
   },
   {
@@ -14,22 +16,15 @@ db.haskell.aggregate(
       slot: {
         $floor: ["$time_s"]
       },
-      node: "$event.node_name",
-      duration: "$event.duration_s",
-      task: {
-        $arrayElemAt: [
-          {
-            $split: ["$event.task_label", ":"]
-          },
-          0
-        ]
-      }
+      node: "$message.task.node",
+      duration: "$message.cpu_time_s",
+      task: "$message.task_type"
     }
   },
   {
     $group: {
       _id: {
-        simulator: "haskell",
+        simulator: "rust",
         scenario: "$scenario",
         node: "$node",
         slot: "$slot",

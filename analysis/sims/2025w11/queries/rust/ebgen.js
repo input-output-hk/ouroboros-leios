@@ -1,32 +1,31 @@
-db.ebgen.deleteMany({simulator: "haskell"})
-db.haskell.aggregate(
+db.ebgen.deleteMany({simulator: "rust"})
+db.rust.aggregate(
 [
   {
     $match: {
       "scenario.label": "default",
-      "event.tag": "generated",
-      "event.kind": "EB"
+      "message.type": "EBGenerated"
     }
   },
   {
     $group: {
       _id: {
-        simulator: "haskell",
+        simulator: "rust",
         scenario: "$scenario",
-        eb: "$event.id"
+        eb: "$message.id"
       },
       node: {
-        $first: "$event.node_name"
+        $first: "$message.producer"
       },
       time: {
         $first: "$time_s"
       },
       size: {
-        $first: "$event.size_bytes"
+        $first: "$message.bytes"
       },
       "ib-count": {
         $first: {
-          $size: "$event.input_blocks"
+          $size: "$message.input_blocks"
         }
       }
     }

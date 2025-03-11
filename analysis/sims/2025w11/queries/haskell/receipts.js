@@ -1,3 +1,4 @@
+db.receipts.deleteMany({simulator: "haskell"})
 db.haskell.aggregate(
 [
   {
@@ -9,6 +10,7 @@ db.haskell.aggregate(
   },
   {
     $project: {
+      _id: 0,
       scenario: 1,
       kind: "$event.kind",
       time: "$time_s",
@@ -95,7 +97,7 @@ db.haskell.aggregate(
     $unset: ["_id", "scenario"]
   },
   {
-    $out: "receipts"
+    $merge: "receipts"
   }
 ]
 )
