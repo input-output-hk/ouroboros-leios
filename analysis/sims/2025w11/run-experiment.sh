@@ -17,7 +17,6 @@ function mkScenario() {
   | jq '."ib-body-avg-size-bytes" = '"$ibSize" \
   | jq '."ib-body-max-size-bytes" = '"$ibSize" \
   | jq '."leios-stage-length-slots" = '"$stageLength" \
-  | jq '."tx-generation-distribution" = {distribution: "constant", value: 1000000}' \
   > tmp/config.json
   SCENARIO='{"label":"'"$label"'","network":"'"$NETWORK"'","ib-generation-probability":'"$ibRate"',"ib-body-avg-size-bytes":'"$ibSize"',"leios-stage-length-slots":'"$stageLength"'}'
   echo 'const scenario = '"$SCENARIO"';' > tmp/scenario.js
