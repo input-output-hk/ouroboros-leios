@@ -8,8 +8,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, CpuTaskId, Endorsement, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
-        TransactionId, VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, Endorsement, EndorserBlockId, InputBlockId, NoVoteReason,
+        Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
 };
 
@@ -93,24 +93,26 @@ pub enum Event {
         recipient: Node,
     },
     RBLotteryWon {
-        slot: u64,
-        producer: Node,
+        #[serde(flatten)]
+        id: BlockId<Node>,
     },
     RBGenerated {
-        slot: u64,
-        producer: Node,
+        #[serde(flatten)]
+        id: BlockId<Node>,
         vrf: u64,
         header_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
     RBSent {
-        slot: u64,
+        #[serde(flatten)]
+        id: BlockId<Node>,
         sender: Node,
         recipient: Node,
     },
     RBReceived {
-        slot: u64,
+        #[serde(flatten)]
+        id: BlockId<Node>,
         sender: Node,
         recipient: Node,
     },
@@ -266,15 +268,13 @@ impl EventTracker {
 
     pub fn track_praos_block_lottery_won(&self, block: &Block) {
         self.send(Event::RBLotteryWon {
-            slot: block.slot,
-            producer: self.to_node(block.producer),
+            id: self.to_block(block.id),
         });
     }
 
     pub fn track_praos_block_generated(&self, block: &Block) {
         self.send(Event::RBGenerated {
-            slot: block.slot,
-            producer: self.to_node(block.producer),
+            id: self.to_block(block.id),
             vrf: block.vrf,
             header_bytes: block.header_bytes,
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
@@ -292,7 +292,7 @@ impl EventTracker {
 
     pub fn track_praos_block_sent(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBSent {
-            slot: block.slot,
+            id: self.to_block(block.id),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });
@@ -300,7 +300,7 @@ impl EventTracker {
 
     pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBReceived {
-            slot: block.slot,
+            id: self.to_block(block.id),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });
@@ -455,6 +455,13 @@ impl EventTracker {
         CpuTaskId {
             node: self.to_node(id.node),
             index: id.index,
+        }
+    }
+
+    fn to_block(&self, id: BlockId) -> BlockId<Node> {
+        BlockId {
+            slot: id.slot,
+            producer: self.to_node(id.producer),
         }
     }
 

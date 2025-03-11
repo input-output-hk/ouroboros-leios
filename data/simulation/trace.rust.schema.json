@@ -74,7 +74,7 @@
             }
           ]
         },
-        "time": {
+        "time_s": {
           "type": "number"
         }
       },
@@ -82,18 +82,18 @@
     },
     "RustBlockMessageType": {
       "enum": [
-        "EndorserBlockGenerated",
-        "EndorserBlockLotteryWon",
-        "EndorserBlockReceived",
-        "EndorserBlockSent",
-        "InputBlockGenerated",
-        "InputBlockLotteryWon",
-        "InputBlockReceived",
-        "InputBlockSent",
-        "PraosBlockGenerated",
-        "PraosBlockLotteryWon",
-        "PraosBlockReceived",
-        "PraosBlockSent"
+        "EBGenerated",
+        "EBLotteryWon",
+        "EBReceived",
+        "EBSent",
+        "IBGenerated",
+        "IBLotteryWon",
+        "IBReceived",
+        "IBSent",
+        "RBGenerated",
+        "RBLotteryWon",
+        "RBReceived",
+        "RBSent"
       ],
       "type": "string"
     },
@@ -101,6 +101,12 @@
       "properties": {
         "message": {
           "properties": {
+            "cpu_time_s": {
+              "type": "number"
+            },
+            "duration_s": {
+              "type": "number"
+            },
             "extra": {
               "type": "string"
             },
@@ -122,7 +128,7 @@
           },
           "type": "object"
         },
-        "time": {
+        "time_s": {
           "type": "number"
         }
       },
@@ -141,16 +147,16 @@
     },
     "RustCpuTaskType": {
       "enum": [
-        "EndorserBlockGenerated",
-        "EndorserBlockValidated",
-        "InputBlockGenerated",
-        "InputBlockValidated",
-        "PraosBlockGenerated",
-        "PraosBlockValidated",
+        "EBBlockGenerated",
+        "EBBlockValidated",
+        "IBBlockGenerated",
+        "IBBlockValidated",
+        "RBBlockGenerated",
+        "RBBlockValidated",
         "TransactionGenerated",
         "TransactionValidated",
-        "VoteBundleGenerated",
-        "VoteBundleValidated"
+        "VTBundleGenerated",
+        "VTBundleValidated"
       ],
       "type": "string"
     },
@@ -168,7 +174,7 @@
           },
           "type": "object"
         },
-        "time": {
+        "time_s": {
           "type": "number"
         }
       },
@@ -210,7 +216,7 @@
           },
           "type": "object"
         },
-        "time": {
+        "time_s": {
           "type": "number"
         }
       },
@@ -252,7 +258,7 @@
           },
           "type": "object"
         },
-        "time": {
+        "time_s": {
           "type": "number"
         }
       },

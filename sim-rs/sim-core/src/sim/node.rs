@@ -22,7 +22,7 @@ use crate::{
     },
     events::EventTracker,
     model::{
-        Block, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
+        Block, BlockId, CpuTaskId, Endorsement, EndorserBlock, EndorserBlockId, InputBlock,
         InputBlockHeader, InputBlockId, NoVoteReason, Transaction, TransactionId, VoteBundle,
         VoteBundleId,
     },
@@ -692,8 +692,10 @@ impl Node {
         }
 
         let block = Block {
-            slot,
-            producer: self.id,
+            id: BlockId {
+                slot,
+                producer: self.id,
+            },
             vrf,
             header_bytes: self.sim_config.sizes.block_header,
             endorsement,
@@ -773,13 +775,13 @@ impl Node {
                 .praos
                 .peer_heads
                 .get(peer)
-                .is_none_or(|&s| s < block.slot)
+                .is_none_or(|&s| s < block.id.slot)
             {
-                self.send_to(*peer, SimulationMessage::RollForward(block.slot))?;
-                self.praos.peer_heads.insert(*peer, block.slot);
+                self.send_to(*peer, SimulationMessage::RollForward(block.id.slot))?;
+                self.praos.peer_heads.insert(*peer, block.id.slot);
             }
         }
-        self.praos.blocks.insert(block.slot, block);
+        self.praos.blocks.insert(block.id.slot, block);
         Ok(())
     }
 
@@ -858,18 +860,18 @@ impl Node {
     }
 
     fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
-        if let Some(old_block) = self.praos.blocks.get(&block.slot) {
+        if let Some(old_block) = self.praos.blocks.get(&block.id.slot) {
             // SLOT BATTLE!!! lower VRF wins
             if old_block.vrf <= block.vrf {
                 // We like our block better than this new one.
                 return Ok(());
             }
         }
-        self.praos.blocks.insert(block.slot, block.clone());
+        self.praos.blocks.insert(block.id.slot, block.clone());
 
         let head = self.praos.peer_heads.entry(from).or_default();
-        if *head < block.slot {
-            *head = block.slot
+        if *head < block.id.slot {
+            *head = block.id.slot
         }
         self.publish_block(block)?;
         Ok(())

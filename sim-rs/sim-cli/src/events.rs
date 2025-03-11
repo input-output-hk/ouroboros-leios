@@ -12,7 +12,7 @@ use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
     events::{Event, Node},
-    model::TransactionId,
+    model::{BlockId, TransactionId},
 };
 use tokio::{
     fs::{self, File},
@@ -181,8 +181,7 @@ impl EventMonitor {
                 }
                 Event::RBLotteryWon { .. } => {}
                 Event::RBGenerated {
-                    slot,
-                    producer,
+                    id: BlockId { slot, producer },
                     vrf,
                     endorsement,
                     transactions,

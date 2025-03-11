@@ -41,10 +41,34 @@ impl<Node: Display> Display for CpuTaskId<Node> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct BlockId<Node = NodeId> {
+    pub slot: u64,
+    pub producer: Node,
+}
+
+impl<Node: Display> Display for BlockId<Node> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
+    }
+}
+
+impl<Node: Display + Serialize> Serialize for BlockId<Node> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut obj = serializer.serialize_struct("BlockId", 3)?;
+        obj.serialize_field("id", &self.to_string())?;
+        obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("producer", &self.producer)?;
+        obj.end()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub slot: u64,
-    pub producer: NodeId,
+    pub id: BlockId,
     pub vrf: u64,
     pub header_bytes: u64,
     pub endorsement: Option<Endorsement>,
