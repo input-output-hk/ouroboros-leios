@@ -15,12 +15,12 @@
             <pubDate>Mon, 03 Mar 2025 00:00:00 GMT</pubDate>
             <description><![CDATA[High-level summary]]></description>
             <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="high-level-summary">High-level summary<a class="hash-link" aria-label="Direct link to High-level summary" title="Direct link to High-level summary" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#high-level-summary">​</a></h2>
-<p>This week in Leios development, the team focused on simulation analysis, formal methods, and documentation updates. Key accomplishments include in-depth analysis of simulations at tag <code>leios-2025w10</code>, advancements in formal methods through a working trace verifier, and development of technical reports.</p>
+<p>This week in Leios development, the team focused on simulation analysis, formal methods, and documentation updates. Key accomplishments include in-depth analysis of simulations at tag <code>leios-2025w10</code>, advancements in formal methods through a working trace verifier, and the development of technical reports.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="cross-simulation-analysis">Cross-simulation analysis<a class="hash-link" aria-label="Direct link to Cross-simulation analysis" title="Direct link to Cross-simulation analysis" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#cross-simulation-analysis">​</a></h2>
 <ul>
 <li>Completed a comprehensive analysis of simulations at tag <code>leios-2025w10</code>:<!-- -->
 <ul>
-<li>Analyzed Haskell simulation performance with and without accounting for CPU usage</li>
+<li>Analyzed Haskell simulation performance with and without CPU usage considerations</li>
 <li>Varying key protocol parameters:<!-- -->
 <ul>
 <li>IB production rate</li>
@@ -36,7 +36,7 @@
 <li>Sizes of IBs, EBs, and RBs</li>
 <li>Duplicate IB references in EBs</li>
 <li>Reference to EBs from RBs</li>
-<li>Resource utilization in network traffic</li>
+<li>Resource utilization in network traffic.</li>
 </ul>
 </li>
 </ul>
@@ -44,45 +44,45 @@
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-and-formal-methods">Protocol and formal methods<a class="hash-link" aria-label="Direct link to Protocol and formal methods" title="Direct link to Protocol and formal methods" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#protocol-and-formal-methods">​</a></h2>
 <ul>
-<li>Commenced trace verifier development in Agda:<!-- -->
+<li>Began developing a trace verifier in Agda:<!-- -->
 <ul>
-<li>Parsing event traces using the Haskell module <code>leios-trace-hs</code></li>
+<li>Implemented event trace parsing using the Haskell module <code>leios-trace-hs</code>.</li>
 </ul>
 </li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="documentation-and-research">Documentation and research<a class="hash-link" aria-label="Direct link to Documentation and research" title="Direct link to Documentation and research" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#documentation-and-research">​</a></h2>
 <ul>
-<li>Full draft of the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md" target="_blank" rel="noopener noreferrer">Leios Technical Report #1</a></li>
-<li>Skeletal <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md" target="_blank" rel="noopener noreferrer">draft of Leios CIP</a></li>
-<li>Conformed to the latest template for CIPs</li>
-<li>Developed a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w10/analysis.ipynb" target="_blank" rel="noopener noreferrer">detailed analysis of simulations</a> for the 100-node Leios network</li>
+<li>Completed the full draft of the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md" target="_blank" rel="noopener noreferrer">Leios technical report #1</a></li>
+<li>Created a skeletal <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/leios-cip-draft.md" target="_blank" rel="noopener noreferrer">draft of the Leios CIP</a></li>
+<li>Aligned with the latest CIP template</li>
+<li>Developed a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w10/analysis.ipynb" target="_blank" rel="noopener noreferrer">detailed simulation analysis </a> for the 100-node Leios network.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="programming-and-testing">Programming and testing<a class="hash-link" aria-label="Direct link to Programming and testing" title="Direct link to Programming and testing" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#programming-and-testing">​</a></h2>
 <ul>
 <li>Resolved several simulation issues:<!-- -->
 <ul>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/235" target="_blank" rel="noopener noreferrer">#235: RB size does not reflect the presence of a certificate?</a></li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/234" target="_blank" rel="noopener noreferrer">#234: Fast transmission of large blocks at moderate IB rate?</a></li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/232" target="_blank" rel="noopener noreferrer">#232: Monotonicity of EB inclusion in RBs?</a></li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/230" target="_blank" rel="noopener noreferrer">#230: EB's not large enough to include their IBs?</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/235" target="_blank" rel="noopener noreferrer">#235: RB size does not reflect the presence of a certificate</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/234" target="_blank" rel="noopener noreferrer">#234: Fast transmission of large blocks at moderate IB rate</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/232" target="_blank" rel="noopener noreferrer">#232: Monotonicity of EB inclusion in RBs</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/230" target="_blank" rel="noopener noreferrer">#230: EBs are not large enough to include their IBs</a></li>
 <li><a href="https://github.com/input-output-hk/ouroboros-leios/issues/229" target="_blank" rel="noopener noreferrer">#229: Rust simulations panics from overflow</a></li>
 </ul>
 </li>
-<li>Enabled the visualization of network traffic and logging messages for multiple predefined "scenarios" instead of a single hard-coded trace</li>
-<li>Updated the visualization to display resource utilization in network traffic</li>
+<li>Enabled the visualization of network traffic and logging messages for multiple predefined 'scenarios' instead of a single hard-coded trace</li>
+<li>Updated the visualization to display resource utilization in network traffic.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-visualization">Rust simulation visualization<a class="hash-link" aria-label="Direct link to Rust simulation visualization" title="Direct link to Rust simulation visualization" href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary#rust-simulation-visualization">​</a></h2>
 <ul>
 <li>Improved visualization capabilities:<!-- -->
 <ul>
-<li>Added support for multiple predefined "scenarios" instead of single hard-coded trace</li>
-<li>Moved visualization logic to client-side web worker for better performance</li>
-<li>Added visualization of per-node network traffic breakdown by message type</li>
+<li>Added support for multiple predefined 'scenarios' instead of single hard-coded trace</li>
+<li>Moved the visualization logic to the client-side web worker for better performance</li>
+<li>Added the visualization of per-node network traffic breakdown by message type</li>
 </ul>
 </li>
 <li>Fixed critical simulation bugs:<!-- -->
 <ul>
-<li>Resolved issue <a href="https://github.com/input-output-hk/ouroboros-leios/issues/229" target="_blank" rel="noopener noreferrer">#229</a> causing time travel and crashes in high-traffic high-latency scenarios</li>
+<li>Resolved issue <a href="https://github.com/input-output-hk/ouroboros-leios/issues/229" target="_blank" rel="noopener noreferrer">#229</a> causing time travel and crashes in high-traffic high-latency scenarios.</li>
 </ul>
 </li>
 </ul>]]></content:encoded>
