@@ -48,6 +48,7 @@ do
                 --topology-file topo-default-100.yaml \
                 --output-file sim.log \
                 --output-seconds "$MAX_SLOT"
+      echo "SCENARIO: $SIMULATOR | $label | $NETWORK | $ibRate | $ibSize | $stageLength"
       mongo --host "$HOST" "$DB" tmp/scenario.js queries/import.js
     done
   done
@@ -65,6 +66,7 @@ do
                 topo-default-100.yaml \
                 --slots "$MAX_SLOT" \
                 sim.log
+      echo "SCENARIO: $SIMULATOR | $label | $NETWORK | $ibRate | $ibSize | $stageLength"
       mongo --host "$HOST" "$DB" tmp/scenario.js queries/import.js
     done
   done
@@ -85,12 +87,14 @@ do
     do
       for ibSize in $IB_SIZES
       do
-        mkScenario rust
+        mkScenario haskell
         mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
-        "$RS_EXE" --parameters tmp/config.json \
-                  topo-default-100.yaml \
-                  --slots "$MAX_SLOT" \
-                  sim.log
+        "$HS_EXE" sim short-leios \
+                  --leios-config-file tmp/config.json \
+                  --topology-file topo-default-100.yaml \
+                  --output-file sim.log \
+                  --output-seconds "$MAX_SLOT"
+        echo "SCENARIO: $SIMULATOR | $label | $NETWORK | $ibRate | $ibSize | $stageLength"
         mongo --quiet --host "$HOST" "$DB" tmp/scenario.js queries/import.js
       done
     done
@@ -105,13 +109,13 @@ do
     do
       for ibSize in $IB_SIZES
       do
-        mkScenario haskell
+        mkScenario rust
         mongoimport --host "$HOST" --db "$DB" --collection raw --drop sim.log &
-        "$HS_EXE" sim short-leios \
-                  --leios-config-file tmp/config.json \
-                  --topology-file topo-default-100.yaml \
-                  --output-file sim.log \
-                  --output-seconds "$MAX_SLOT"
+        "$RS_EXE" --parameters tmp/config.json \
+                  topo-default-100.yaml \
+                  --slots "$MAX_SLOT" \
+                  sim.log
+        echo "SCENARIO: $SIMULATOR | $label | $NETWORK | $ibRate | $ibSize | $stageLength"
         mongo --quiet --host "$HOST" "$DB" tmp/scenario.js queries/import.js
       done
     done
