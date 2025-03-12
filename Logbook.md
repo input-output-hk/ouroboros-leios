@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-03-11
+
+### Simulation comparison
+
+The notebook [analysis/sims/2025w11/analysis.ipynb](analysis/sims/2025w11/analysis.ipynb) compares 90 scenarios of the Rust and Haskell simulations at tag [leios-2025w11](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w11). This is notable because recent fixes and adjustments to those simulations make it meaningful to compare them now and diagnose differences. Github issues will be created for any significant differences between the pairs of simulation results.
+
 ## 2025-03-07
 
 ### Formal methods
