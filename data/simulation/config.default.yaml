@@ -16,6 +16,7 @@ tcp-congestion-control: true
 multiplex-mini-protocols: true
 simulate-transactions: true
 treat-blocks-as-full: false
+cleanup-policies: ["cleanup-expired-vote"]
 
 ################################################################################
 # Leios Protocol Configuration

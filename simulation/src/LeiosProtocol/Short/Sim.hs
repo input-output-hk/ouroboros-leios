@@ -29,6 +29,7 @@ import Control.Tracer as Tracer (
 import Data.Aeson
 import Data.Aeson.Encoding (pair)
 import Data.Coerce
+import Data.Default (Default (..))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -331,13 +332,14 @@ traceRelayLink1 connectionOptions =
       let leiosConfig =
             LeiosConfig
               { praos = praosConfig
-              , sliceLength = 5 -- matching the interval between RBs
-              , -- \^ measured in slots, also stage length in Short leios.
-                inputBlockFrequencyPerSlot = 5
-              , -- \^ expected InputBlock generation rate per slot.
+              , -- measured in slots, also stage length in Short leios.
+                sliceLength = 5 -- matching the interval between RBs
+                -- expected InputBlock generation rate per slot.
+              , inputBlockFrequencyPerSlot = 5
+              , -- expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
                 endorseBlockFrequencyPerStage = 4
-              , -- \^ expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
-                activeVotingStageLength = 1
+              , cleanupPolicies = def
+              , activeVotingStageLength = 1
               , pipeline = SingSingleVote
               , voteSendStage = Vote
               , votingFrequencyPerStage = 4

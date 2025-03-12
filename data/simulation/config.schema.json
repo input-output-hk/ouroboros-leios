@@ -1,6 +1,30 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "CleanupPolicies": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/definitions/CleanupPolicy"
+          },
+          "type": "array"
+        },
+        {
+          "const": "all",
+          "type": "string"
+        }
+      ]
+    },
+    "CleanupPolicy": {
+      "enum": [
+        "cleanup-expired-certificate",
+        "cleanup-expired-ib",
+        "cleanup-expired-unadopted-eb",
+        "cleanup-expired-uncertified-eb",
+        "cleanup-expired-vote"
+      ],
+      "type": "string"
+    },
     "ConstantDistribution": {
       "properties": {
         "distribution": {
@@ -106,6 +130,10 @@
     },
     "cert-validation-cpu-time-ms-per-node": {
       "type": "number"
+    },
+    "cleanup-policies": {
+      "$ref": "#/definitions/CleanupPolicies",
+      "description": "Only supported by Haskell simulation."
     },
     "eb-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
