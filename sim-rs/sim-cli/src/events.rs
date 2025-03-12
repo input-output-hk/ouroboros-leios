@@ -40,8 +40,8 @@ enum OutputFormat {
 pub struct EventMonitor {
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
-    stage_length: u64,
     maximum_ib_age: u64,
+    maximum_eb_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
 }
@@ -63,8 +63,8 @@ impl EventMonitor {
         Self {
             node_ids,
             pool_ids,
-            stage_length,
             maximum_ib_age,
+            maximum_eb_age: config.max_eb_age,
             events_source,
             output_path,
         }
@@ -85,6 +85,7 @@ impl EventMonitor {
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
         let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
+        let mut pending_ebs: BTreeSet<EndorserBlockId> = BTreeSet::new();
         let mut votes_per_bundle: BTreeMap<VoteBundleId, f64> = BTreeMap::new();
         let mut votes_per_pool: BTreeMap<NodeId, f64> =
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
@@ -99,6 +100,7 @@ impl EventMonitor {
         let mut generated_ibs = 0u64;
         let mut empty_ibs = 0u64;
         let mut expired_ibs = 0u64;
+        let mut expired_ebs = 0u64;
         let mut generated_ebs = 0u64;
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
@@ -152,14 +154,19 @@ impl EventMonitor {
                 Event::Slot { number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
-                    if number % self.stage_length == 0 {
-                        let Some(oldest_live_stage) = number.checked_sub(self.maximum_ib_age)
-                        else {
-                            continue;
-                        };
+                    if let Some(oldest_live_ib_slot) = number.checked_sub(self.maximum_ib_age) {
                         pending_ibs.retain(|ib| {
-                            if ib.slot < oldest_live_stage {
+                            if ib.slot < oldest_live_ib_slot {
                                 expired_ibs += 1;
+                                return false;
+                            }
+                            true
+                        });
+                    }
+                    if let Some(oldest_live_eb_slot) = number.checked_sub(self.maximum_eb_age) {
+                        pending_ebs.retain(|eb| {
+                            if eb.slot < oldest_live_eb_slot {
+                                expired_ebs += 1;
                                 return false;
                             }
                             true
@@ -196,6 +203,8 @@ impl EventMonitor {
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
+                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.slot);
+
                         let block_leios_txs: Vec<_> = eb_ibs
                             .get(&endorsement.eb)
                             .unwrap()
@@ -283,6 +292,7 @@ impl EventMonitor {
                     id, input_blocks, ..
                 } => {
                     generated_ebs += 1;
+                    pending_ebs.insert(id.clone());
                     eb_ibs.insert(id.clone(), input_blocks.clone());
                     for ib_id in &input_blocks {
                         *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
@@ -453,6 +463,10 @@ impl EventMonitor {
             info!(
                 "{} out of {} IBs expired before they reached an EB.",
                 expired_ibs, generated_ibs,
+            );
+            info!(
+                "{} out of {} EBs expired before an EB from their stage reached an RB.",
+                expired_ebs, generated_ebs,
             );
             info!(
                 "{} out of {} transaction(s) were included in at least one EB.",

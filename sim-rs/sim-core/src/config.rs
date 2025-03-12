@@ -95,6 +95,7 @@ pub struct RawParameters {
     pub eb_validation_cpu_time_ms: f64,
     pub eb_size_bytes_constant: u64,
     pub eb_size_bytes_per_ib: u64,
+    pub eb_max_age_slots: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -402,6 +403,7 @@ pub struct SimConfiguration {
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
     pub stage_length: u64,
+    pub max_eb_age: u64,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -440,6 +442,7 @@ impl SimConfiguration {
             ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: 1,
             ib_shards: params.ib_shards,
+            max_eb_age: params.eb_max_age_slots,
             cpu_times: CpuTimeConfig::new(&params),
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),

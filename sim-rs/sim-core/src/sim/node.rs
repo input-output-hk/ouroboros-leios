@@ -649,7 +649,7 @@ impl Node {
         };
 
         // Let's see if we are minting an RB
-        let endorsement = self.choose_endorsed_block();
+        let endorsement = self.choose_endorsed_block(slot);
         if let Some(endorsement) = &endorsement {
             // If we are, get all referenced TXs out of the mempool
             let Some(eb) = self.leios.ebs.get(&endorsement.eb) else {
@@ -707,9 +707,11 @@ impl Node {
         Ok(())
     }
 
-    fn choose_endorsed_block(&mut self) -> Option<Endorsement> {
+    fn choose_endorsed_block(&mut self, slot: u64) -> Option<Endorsement> {
         // an EB is eligible for endorsement if it has this many votes
         let vote_threshold = self.sim_config.vote_threshold;
+        // and it is not older than this
+        let max_eb_age = self.sim_config.max_eb_age;
         // and if it is not in a pipeline already represented in the chain
         // (NB: all EBs produced in a pipeline are produced during the same slot)
         let forbidden_slots: HashSet<u64> = self
@@ -720,18 +722,25 @@ impl Node {
             .map(|e| e.eb.slot)
             .collect();
 
+        // Choose an EB based on, in order,
+        //  - the age of the EB (older EBs take priority)
+        //  - the TXs in the EB (more TXs take priority)
+        //  - the number of votes (more votes is better)
         let (&block, _) = self
             .leios
             .votes_by_eb
             .iter()
             .filter_map(|(eb, votes)| {
+                if slot - eb.slot > max_eb_age || forbidden_slots.contains(&eb.slot) {
+                    return None;
+                }
                 let vote_count: usize = votes.values().sum();
-                if (vote_count as u64) < vote_threshold || forbidden_slots.contains(&eb.slot) {
+                if (vote_count as u64) < vote_threshold {
                     return None;
                 }
                 Some((eb, vote_count))
             })
-            .max_by_key(|(eb, votes)| (self.count_txs_in_eb(eb), *votes))?;
+            .max_by_key(|(eb, votes)| (slot - eb.slot, self.count_txs_in_eb(eb), *votes))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
         let bytes = self.sim_config.sizes.cert(votes.len());

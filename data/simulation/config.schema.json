@@ -165,7 +165,7 @@
     },
     "eb-max-age-slots": {
       "additionalProperties": false,
-      "description": "The maximum age of EBs included in RBs:\nan EB from slot `s` can only be included in RBs\nup to slot `s+eb-max-age-slots`.\n\nOnly supported by Haskell simulation.",
+      "description": "The maximum age of EBs included in RBs:\nan EB from slot `s` can only be included in RBs\nup to slot `s+eb-max-age-slots`.",
       "properties": {},
       "type": "number"
     },

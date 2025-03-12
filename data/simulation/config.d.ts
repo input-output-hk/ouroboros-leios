@@ -91,9 +91,7 @@ export interface Config {
   /**
    * The maximum age of EBs included in RBs:
    * an EB from slot `s` can only be included in RBs
-   * up to slot `s+eb-max-age-slots`.
-   *
-   * Only supported by Haskell simulation. */
+   * up to slot `s+eb-max-age-slots`. */
   "eb-max-age-slots": bigint;
 
   // Vote Configuration
