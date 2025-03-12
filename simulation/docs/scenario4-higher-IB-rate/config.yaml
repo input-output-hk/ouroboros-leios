@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=./config.schema.json
+
+################################################################################
+# Configuration for least realistic simulation
+################################################################################
+
+relay-strategy: "request-from-first"
+tcp-congestion-control: true
+multiplex-mini-protocols: true
+treat-blocks-as-full: true
+ib-body-avg-size-bytes: 163840
+leios-stage-length-slots: 60
+
+ib-generation-probability: 15

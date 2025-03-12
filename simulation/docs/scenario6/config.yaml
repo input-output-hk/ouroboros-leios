@@ -9,3 +9,4 @@ tcp-congestion-control: true
 multiplex-mini-protocols: true
 treat-blocks-as-full: true
 ib-diffusion-order: "oldest-first"
+ib-generation-probability: 10

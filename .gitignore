@@ -24,3 +24,4 @@ _build
 /simulation/docs/sim-realism.blg
 /simulation/docs/sim-realism.fdb_latexmk
 /simulation/docs/scenario*/*.eps
+/simulation/docs/scenario*/sim-data.json

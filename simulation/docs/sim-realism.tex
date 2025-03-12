@@ -251,6 +251,23 @@ Fig.~\ref{fig:scenario3}
 \label{scenario4}
 Fig.~\ref{fig:scenario4}
 \scenarioVsIdealFigure{scenario4}{sc:tcp}
+\todo{do IBs which do not reference RBs do better?}
+
+\todo{clarify each scenario variation}
+scenario4-best-IB-rate Fig.~\ref{fig:scenario4-best-IB-rate}
+\scenarioVsIdealFigure{scenario4-best-IB-rate}{sc:tcp-opt}
+
+scenario4-higher-IB-rate Fig.~\ref{fig:scenario4-higher-IB-rate}
+\scenarioVsIdealFigure{scenario4-higher-IB-rate}{sc:tcp-higher-IB-rate}
+\todo{Use send-recv to see if voting diffusion improves with this much traffic}
+
+scenario4-lower-stage-length Fig.~\ref{fig:scenario4-lower-stage-length}
+\scenarioVsIdealFigure{scenario4-lower-stage-length}{sc:tcp-lower-stage-length}
+\todo{Try reducing validation times for IBs}
+
+
+scenario4-20IB-small Fig.~\ref{fig:scenario4-20IB-small}
+\scenarioVsIdealFigure{scenario4-20IB-small}{sc:tcp-20IB-small}
 
 \section{Scenario \ref{sc:boundedcpu}}
 \label{scenario5}
@@ -261,6 +278,60 @@ Fig.~\ref{fig:scenario5}
 \label{scenario6}
 Fig.~\ref{fig:scenario6}
 \scenarioVsIdealFigure{scenario6}{sc:order}
+
+Fix.~\ref{fig:oldest-vs-freshest}
+\begin{figure}[htbp]
+    \centering
+    \debug{\textbf{Label: oldest-vs-freshest} \\}
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.5-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.50$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.6-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.60$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.6}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.7-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.70$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.7}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.8-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.80$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.8}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.9-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.90$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.9}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.98-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.98$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.98}
+    \end{subfigure}
+
+    \caption{Scenario \ref{sc:order}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:oldest-vs-freshest}
+\end{figure}
 
 
 \addcontentsline{toc}{section}{References}
