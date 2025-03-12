@@ -19,6 +19,7 @@
       mongolite
       RPostgres
       R_utils
+      stringr
       svglite
     ];
   };
