@@ -101,6 +101,8 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   -- ^ prefix of the voting stage where new votes are generated, <= sliceLength.
   , maxEndorseBlockAgeSlots :: Int
   -- ^ maximum age of a certified endorsement block before it expires
+  , cleanupPolicies :: CleanupPolicies
+  -- ^ active cleanup policies
   , votingFrequencyPerStage :: Double
   , voteSendStage :: Stage p
   , votesForCertificate :: Int
@@ -130,6 +132,7 @@ convertConfig disk =
           , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
           , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
           , maxEndorseBlockAgeSlots = fromIntegral disk.ebMaxAgeSlots
+          , cleanupPolicies = disk.cleanupPolicies
           , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
           , votingFrequencyPerStage = disk.voteGenerationProbability
           , votesForCertificate = fromIntegral disk.voteThreshold
@@ -257,6 +260,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , inputBlockFrequencyPerSlot = cfg.inputBlockFrequencyPerSlot
     , endorseBlockFrequencyPerStage = cfg.endorseBlockFrequencyPerStage
     , maxEndorseBlockAgeSlots = cfg.maxEndorseBlockAgeSlots
+    , cleanupPolicies = cfg.cleanupPolicies
     , activeVotingStageLength = cfg.activeVotingStageLength
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
     , voteSendStage = voteSendStage

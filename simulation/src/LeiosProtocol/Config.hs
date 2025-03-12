@@ -21,6 +21,8 @@ import Data.Aeson.Encoding (pairs)
 import Data.Aeson.Types (Encoding, FromJSON (..), KeyValue ((.=)), Options (constructorTagModifier), Parser, ToJSON (..), Value (..), genericParseJSON, object, typeMismatch, withObject, (.:))
 import Data.Default (Default (..))
 import Data.Maybe (catMaybes)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import Data.Word
 import Data.Yaml (ParseException)
@@ -59,11 +61,36 @@ data RelayStrategy
   | RequestFromAll
   deriving (Show, Eq, Generic)
 
+-- | Data expiration.
+newtype CleanupPolicies = CleanupPolicies (Set CleanupPolicy)
+  deriving (Show, Eq, Ord, Monoid, Semigroup)
+
+-- | Data types for expiration policy.
+data CleanupPolicy
+  = CleanupExpiredIb
+  | CleanupExpiredUncertifiedEb
+  | CleanupExpiredUnadoptedEb
+  | CleanupExpiredVote
+  | CleanupExpiredCertificate
+  deriving (Show, Eq, Ord, Generic, Bounded, Enum)
+
+isEnabledIn :: CleanupPolicy -> CleanupPolicies -> Bool
+isEnabledIn cleanupPolicy (CleanupPolicies cleanupPolicies) =
+  cleanupPolicy `Set.member` cleanupPolicies
+
+instance Default CleanupPolicies where
+  def :: CleanupPolicies
+  def = CleanupPolicies $ Set.fromList [CleanupExpiredVote]
+
+allCleanupPolicies :: CleanupPolicies
+allCleanupPolicies = CleanupPolicies $ Set.fromList [minBound .. maxBound]
+
 data Config = Config
   { relayStrategy :: RelayStrategy
   , tcpCongestionControl :: Bool
   , multiplexMiniProtocols :: Bool
   , treatBlocksAsFull :: Bool
+  , cleanupPolicies :: CleanupPolicies
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
@@ -129,6 +156,7 @@ instance Default Config where
       , tcpCongestionControl = True
       , multiplexMiniProtocols = True
       , treatBlocksAsFull = False
+      , cleanupPolicies = def
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
@@ -198,6 +226,7 @@ configToKVsWith getter cfg =
     , get @"tcpCongestionControl" getter cfg
     , get @"multiplexMiniProtocols" getter cfg
     , get @"treatBlocksAsFull" getter cfg
+    , get @"cleanupPolicies" getter cfg
     , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
     , get @"leiosVoteSendRecvStages" getter cfg
@@ -277,6 +306,7 @@ instance FromJSON Config where
     tcpCongestionControl <- parseFieldOrDefault @Config @"tcpCongestionControl" obj
     multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
     treatBlocksAsFull <- parseFieldOrDefault @Config @"treatBlocksAsFull" obj
+    cleanupPolicies <- parseFieldOrDefault @Config @"cleanupPolicies" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
@@ -383,12 +413,31 @@ instance FromJSON Distribution where
    where
     orUnknown k v = k v <|> pure (Unknown v)
 
+instance FromJSON CleanupPolicies where
+  parseJSON cleanupPolicies@(Array _) =
+    CleanupPolicies . Set.fromList <$> parseJSONList cleanupPolicies
+  parseJSON (String cleanupPolicies)
+    | cleanupPolicies == "all" = pure allCleanupPolicies
+  parseJSON v = typeMismatch "CleanupPolicies" v
+
+instance ToJSON CleanupPolicies where
+  toJSON cleanupPolicies@(CleanupPolicies cleanupPolicySet)
+    | cleanupPolicies == allCleanupPolicies = String "all"
+    | otherwise = toJSONList $ Set.toAscList cleanupPolicySet
+
 defaultEnumOptions :: Options
 defaultEnumOptions =
   defaultOptions
     { constructorTagModifier = camelToKebab
     , allNullaryToStringTag = True
     }
+
+instance FromJSON CleanupPolicy where
+  parseJSON = genericParseJSON defaultEnumOptions
+
+instance ToJSON CleanupPolicy where
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
 
 instance FromJSON DiffusionStrategy where
   parseJSON = genericParseJSON defaultEnumOptions

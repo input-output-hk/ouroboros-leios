@@ -54,7 +54,7 @@ import PraosProtocol.BlockFetch (
 import qualified PraosProtocol.Common.Chain as Chain
 import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
-import SimTypes (NodeId (..), cpuTask)
+import SimTypes (cpuTask)
 import System.Random
 import Text.Printf (printf)
 
@@ -441,10 +441,17 @@ leiosNode tracer cfg followers peers = do
   -- TODO: expiration times to be decided. At least need EB/IBs to be
   -- around long enough to compute ledger state if they end in RB.
   let pruningThreads =
-        [ pruneExpiredVotes tracer cfg leiosState
-        , pruneExpiredUnadoptedEBs tracer cfg leiosState
-        , pruneExpiredUncertifiedEBs tracer cfg leiosState
-        ]
+        concat
+          [ [ pruneExpiredVotes tracer cfg leiosState
+            | CleanupExpiredVote `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
+          , [ pruneExpiredUncertifiedEBs tracer cfg leiosState
+            | CleanupExpiredUncertifiedEb `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
+          , [ pruneExpiredUnadoptedEBs tracer cfg leiosState
+            | CleanupExpiredUnadoptedEb `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
+          ]
 
   return $
     concat

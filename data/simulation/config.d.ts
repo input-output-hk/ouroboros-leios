@@ -20,6 +20,8 @@ export interface Config {
    *   - EBs reference `ceil (ib-generation-probability * leios-stage-length-slots)` IBs.
    * Only supported by Haskell simulation. */
   "treat-blocks-as-full": boolean;
+  /** Only supported by Haskell simulation. */
+  "cleanup-policies": CleanupPolicies;
 
   // Leios Protocol Configuration
   "leios-stage-length-slots": bigint;
@@ -117,6 +119,15 @@ export interface Config {
   "cert-size-bytes-constant": bigint;
   "cert-size-bytes-per-node": bigint;
 }
+
+export type CleanupPolicies = "all" | CleanupPolicy[];
+
+export type CleanupPolicy =
+  | "cleanup-expired-ib"
+  | "cleanup-expired-uncertified-eb"
+  | "cleanup-expired-unadopted-eb"
+  | "cleanup-expired-vote"
+  | "cleanup-expired-certificate";
 
 export type Distribution =
   | NormalDistribution
