@@ -46,13 +46,15 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY . .
+COPY simulation /build/simulation/
+COPY conformance-testing /build/conformance-testing/
+COPY leios-trace-hs /build/leios-trace-hs/
+COPY cabal.project /build/
 
 # Build simulation
-WORKDIR /build/simulation
+WORKDIR /build
 RUN cabal update && \
     cabal build all && \
-    # Find the actual binary path and copy it to a known location
     find /build/dist-newstyle -type f -name "ols" -exec cp {} /build/ols \;
 
 # Create Rust simulation image

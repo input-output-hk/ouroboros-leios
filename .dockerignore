@@ -4,6 +4,7 @@
 !simulation/
 !conformance-testing/
 !data/simulation/*.yaml
+!leios-trace-hs/
 !cabal.project
 
 # Ignore unnecessary files even in sim-rs
