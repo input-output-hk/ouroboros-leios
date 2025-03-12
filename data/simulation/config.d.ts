@@ -89,7 +89,9 @@ export interface Config {
   /** Only supported by Haskell simulation. */
   "eb-diffusion-max-bodies-to-request": bigint;
   /**
-   * The maximum age of EBs included in RBs.
+   * The maximum age of EBs included in RBs:
+   * an EB from slot `s` can only be included in RBs
+   * up to slot `s+eb-max-age-slots`.
    *
    * Only supported by Haskell simulation. */
   "eb-max-age-slots": bigint;

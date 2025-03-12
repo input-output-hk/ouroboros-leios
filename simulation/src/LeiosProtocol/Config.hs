@@ -193,7 +193,7 @@ instance Default Config where
       , ebDiffusionMaxWindowSize = 100
       , ebDiffusionMaxHeadersToRequest = 100
       , ebDiffusionMaxBodiesToRequest = 1
-      , ebMaxAgeSlots = 20
+      , ebMaxAgeSlots = 100
       , voteGenerationProbability = 500.0
       , voteGenerationCpuTimeMsConstant = 0.164
       , voteGenerationCpuTimeMsPerIb = 0.0

@@ -574,7 +574,7 @@ mockFullCertificate cfg =
 -- Buffers views, divided to avoid reading unneeded buffers.
 
 data NewRankingBlockData = NewRankingBlockData
-  { freshestCertifiedEB :: Maybe (EndorseBlockId, Certificate)
+  { certifiedEBforRBAt :: SlotNo -> Maybe (EndorseBlockId, Certificate)
   , txsPayload :: Bytes
   }
 

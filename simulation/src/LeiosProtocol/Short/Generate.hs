@@ -76,7 +76,7 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
   execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(DiffTime, a)]
   execute' slot Base _wins = do
     rbData <- lift $ atomically buffers.newRBData
-    let meb = rbData.freshestCertifiedEB
+    let meb = rbData.certifiedEBforRBAt slot
     let body = mkRankingBlockBody leios nodeId meb rbData.txsPayload
     let !rb = mkPartialBlock slot body
     let !task = leios.praos.blockGenerationDelay rb

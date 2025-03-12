@@ -794,17 +794,18 @@ mkBuffersView cfg st = BuffersView{..}
           guard (cfg.leios.votesForCertificate <= totalVotes votes)
           return $! (eb.id,) $! mkCertificate cfg.leios votes
 
-    -- TODO: cache index of EBs ordered by .slot descending?
-    let freshestCertifiedEB =
+    -- TODO: cache index of EBs ordered by .slot?
+    let certifiedEBforRBAt rbSlot =
           listToMaybe
             . mapMaybe tryCertify
-            . sortOn (Down . (.slot))
+            . dropWhile (\eb -> fromEnum eb.slot < fromEnum rbSlot - cfg.leios.maxEndorseBlockAgeSlots)
+            . sortOn (\eb -> (eb.slot, Down $ length eb.inputBlocks))
             . map snd
             . RB.values
             $ bufferEB
     return $
       NewRankingBlockData
-        { freshestCertifiedEB
+        { certifiedEBforRBAt
         , txsPayload = cfg.leios.sizes.rankingBlockLegacyPraosPayloadAvgSize
         }
   newIBData = do
