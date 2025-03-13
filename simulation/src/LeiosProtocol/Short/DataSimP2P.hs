@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -38,6 +39,7 @@ import Data.List (group, groupBy, sort, sortOn, uncons)
 import Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
+import Data.Monoid
 import Data.Ord
 import qualified Data.Set as Set
 import Diffusion
@@ -550,6 +552,7 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} _printTargets = do
   let
     !stakesSet = Set.fromList $ map (StakeFraction . realToFrac) stakes
   putStrLn $ "Raw data extracted from JSON."
+  reportOnTopology prefixDir raw.p2p_network
   let
     leios = convertConfig raw.config
     fullIB = mockFullInputBlock leios
@@ -619,6 +622,26 @@ reportLeiosData prefixDir simDataFile ReportConfig{..} _printTargets = do
       , ("RB", rbCfg, SomeDE $ filterEntries raw.rb_diffusion_entries)
       ]
   forM_ rawEntries $ reportDE prefixDir raw.p2p_network stakesSet ideals
+
+data Links a = Links {upstream :: !a, downstream :: !a}
+  deriving (Functor)
+instance Semigroup a => Semigroup (Links a) where
+  Links x y <> Links x' y' = Links (x <> x') (y <> y')
+
+reportOnTopology :: FilePath -> P2PNetwork -> IO ()
+reportOnTopology prefixDir P2PNetwork{..} = do
+  let mkLinks d u =
+        (fmap . fmap . fmap)
+          (Sum . length)
+          [ (d, Links{upstream = [u], downstream = []})
+          , (u, Links{upstream = [], downstream = [d]})
+          ]
+  let links = Map.fromListWith (<>) $ concat [mkLinks d u | (d, u) <- Map.keys p2pLinks]
+  let mkCsv f = unlines . map (show . getSum . f) $ Map.elems links
+  writeFile (prefixDir </> "downcounts.csv") $ mkCsv (.downstream)
+  writeFile (prefixDir </> "upcounts.csv") $ mkCsv (.upstream)
+  writeFile (prefixDir </> "totalcounts.csv") $ mkCsv (\x -> x.upstream <> x.downstream)
+  return ()
 
 normalizeEntry :: DiffusionEntry id -> DiffusionEntry id
 normalizeEntry DiffusionEntry{..} =
