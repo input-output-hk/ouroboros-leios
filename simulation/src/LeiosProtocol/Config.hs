@@ -209,8 +209,8 @@ instance Default Config where
       , certGenerationCpuTimeMsPerNode = 0.0
       , certValidationCpuTimeMsConstant = 130.0
       , certValidationCpuTimeMsPerNode = 0.0
-      , certSizeBytesConstant = 136
-      , certSizeBytesPerNode = 15
+      , certSizeBytesConstant = 7168
+      , certSizeBytesPerNode = 0
       }
 
 configToJSONWith :: Getter Config -> Config -> Value

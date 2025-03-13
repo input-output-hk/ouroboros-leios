@@ -180,10 +180,10 @@ vote-diffusion-max-window-size: 100
 # Certificate Configuration
 ################################################################################
 
-# vote-spec#"certificate bytes"
-cert-size-bytes-constant: 136
-# vote-spec#"certificate bytes" ((80/8) + 76 * (100 - 80))/100
-cert-size-bytes-per-node: 15
+# vote-spec - certificate size plot.
+# Realistic stake distributions need about 7 kilobytes for the certificate.
+cert-size-bytes-constant: 7168
+cert-size-bytes-per-node: 0
 
 # For certificate timings we have bulk figures for realistic scenarios,
 # so we do not attempt to give -per-node (i.e. per-voter) timings.
