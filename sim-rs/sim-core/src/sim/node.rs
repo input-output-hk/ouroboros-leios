@@ -48,6 +48,8 @@ enum CpuTask {
     RBBlockValidated(NodeId, Arc<Block>),
     /// An input block has been generated and is ready to propagate
     IBBlockGenerated(InputBlock),
+    /// An IB header has been received and validated, and is ready to propagate
+    IBHeaderValidated(NodeId, InputBlockHeader, bool),
     /// An input block has been received and validated, and is ready to propagate
     IBBlockValidated(NodeId, Arc<InputBlock>),
     /// An endorser block has been generated and is ready to propagate
@@ -64,14 +66,15 @@ impl CpuTask {
     fn task_type(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "TransactionValidated",
-            Self::RBBlockGenerated(_) => "PraosBlockGenerated",
-            Self::RBBlockValidated(_, _) => "PraosBlockValidated",
-            Self::IBBlockGenerated(_) => "InputBlockGenerated",
-            Self::IBBlockValidated(_, _) => "InputBlockValidated",
-            Self::EBBlockGenerated(_) => "EndorserBlockGenerated",
-            Self::EBBlockValidated(_, _) => "EndorserBlockValidated",
-            Self::VTBundleGenerated(_) => "VoteBundleGenerated",
-            Self::VTBundleValidated(_, _) => "VoteBundleValidated",
+            Self::RBBlockGenerated(_) => "RBBlockGenerated",
+            Self::RBBlockValidated(_, _) => "RBBlockValidated",
+            Self::IBBlockGenerated(_) => "IBBlockGenerated",
+            Self::IBHeaderValidated(_, _, _) => "IBHeaderValidated",
+            Self::IBBlockValidated(_, _) => "IBBlockValidated",
+            Self::EBBlockGenerated(_) => "EBBlockGenerated",
+            Self::EBBlockValidated(_, _) => "EBBlockValidated",
+            Self::VTBundleGenerated(_) => "VTBundleGenerated",
+            Self::VTBundleValidated(_, _) => "VTBundleValidated",
         }
         .to_string()
     }
@@ -82,6 +85,7 @@ impl CpuTask {
             Self::RBBlockGenerated(_) => "".to_string(),
             Self::RBBlockValidated(_, _) => "".to_string(),
             Self::IBBlockGenerated(id) => id.header.id.to_string(),
+            Self::IBHeaderValidated(_, id, _) => id.id.to_string(),
             Self::IBBlockValidated(_, id) => id.header.id.to_string(),
             Self::EBBlockGenerated(_) => "".to_string(),
             Self::EBBlockValidated(_, _) => "".to_string(),
@@ -329,9 +333,9 @@ impl Node {
                 vec![time]
             }
             CpuTask::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTask::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
             CpuTask::IBBlockValidated(_, ib) => vec![
-                cpu_times.ib_head_validation
-                    + cpu_times.ib_body_validation_constant
+                cpu_times.ib_body_validation_constant
                     + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
             ],
             CpuTask::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
@@ -394,6 +398,7 @@ impl Node {
                                 CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block)?,
                                 CpuTask::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
                                 CpuTask::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTask::IBHeaderValidated(from, ib, has_body) => self.finish_validating_ib_header(from, ib, has_body)?,
                                 CpuTask::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
                                 CpuTask::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
                                 CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
@@ -440,7 +445,7 @@ impl Node {
                 self.receive_request_ib_header(from, id)?;
             }
             SimulationMessage::IBHeader(header, has_body) => {
-                self.receive_ib_header(from, header, has_body)?;
+                self.receive_ib_header(from, header, has_body);
             }
 
             // IB transmission
@@ -907,12 +912,7 @@ impl Node {
         Ok(())
     }
 
-    fn receive_ib_header(
-        &mut self,
-        from: NodeId,
-        header: InputBlockHeader,
-        has_body: bool,
-    ) -> Result<()> {
+    fn receive_ib_header(&mut self, from: NodeId, header: InputBlockHeader, has_body: bool) {
         let id = header.id;
         if self
             .leios
@@ -920,9 +920,21 @@ impl Node {
             .get(&id)
             .is_some_and(|ib| ib.header().is_some())
         {
-            return Ok(());
+            return;
         }
-        self.leios.ibs.insert(id, InputBlockState::Pending(header));
+        self.leios
+            .ibs
+            .insert(id, InputBlockState::Pending(header.clone()));
+        self.schedule_cpu_task(CpuTask::IBHeaderValidated(from, header, has_body));
+    }
+
+    fn finish_validating_ib_header(
+        &mut self,
+        from: NodeId,
+        header: InputBlockHeader,
+        has_body: bool,
+    ) -> Result<()> {
+        let id = header.id;
         // We haven't seen this header before, so propagate it to our neighbors
         for peer in &self.consumers {
             if *peer == from {

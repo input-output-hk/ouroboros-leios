@@ -151,6 +151,8 @@
         "EBBlockValidated",
         "IBBlockGenerated",
         "IBBlockValidated",
+        "IBHeaderGenerated",
+        "IBHeaderValidated",
         "RBBlockGenerated",
         "RBBlockValidated",
         "TransactionGenerated",

@@ -20,6 +20,7 @@ type BlockOrTaskType =
     | "EBBlock"
     | "VTBundle"
     | "IBBlock"
+    | "IBHeader"
     | "Transaction";
 type Action = "Validated" | "Generated";
 type RustCpuTaskType = `${BlockOrTaskType}${Action}`;
