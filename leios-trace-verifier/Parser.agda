@@ -114,7 +114,7 @@ data ValidAction : Action → LeiosState → Type where
   IB-Role : let open LeiosState s renaming (FFDState to ffds)
                 b = record { txs = ToPropose }
                 h = mkIBHeader slot id tt sk-IB ToPropose
-                ffds' = record ffds { outIBs = record { header = h; body = b } ∷ FFDState.outIBs ffds }
+                ffds' = proj₁ (send-total {ffds} {ibHeader h} {just (ibBody b)})
             in .(needsUpkeep IB-Role) →
                .(canProduceIB slot sk-IB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ibHeader h) (just (ibBody b)) / FFD.SendRes ⟧⇀ ffds') →
@@ -123,7 +123,7 @@ data ValidAction : Action → LeiosState → Type where
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                 h = mkEB slot id tt sk-EB LI []
-                ffds' = record ffds { outEBs = h ∷ FFDState.outEBs ffds }
+                ffds' = proj₁ (send-total {ffds} {ebHeader h} {nothing})
             in .(needsUpkeep EB-Role) →
                .(canProduceEB slot sk-EB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
@@ -132,7 +132,7 @@ data ValidAction : Action → LeiosState → Type where
   V-Role  : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
-                ffds' = record ffds { outVTs = votes ∷ FFDState.outVTs ffds }
+                ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
             in .(needsUpkeep V-Role) →
                .(canProduceV slot sk-V (stake s)) →
                .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
@@ -158,19 +158,19 @@ data ValidAction : Action → LeiosState → Type where
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
       h = mkIBHeader slot id tt sk-IB ToPropose
-      ffds' = record ffds { outIBs = record { header = h; body = b } ∷ FFDState.outIBs ffds }
+      ffds' = proj₁ (send-total {ffds} {ibHeader h} {just (ibBody b)})
   in addUpkeep record s { FFDState = ffds' } IB-Role
 ⟦ EB-Role {s} x x₁ x₂ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
       h = mkEB slot id tt sk-EB LI []
-      ffds' = record ffds { outEBs = h ∷ FFDState.outEBs ffds }
+      ffds' = proj₁ (send-total {ffds} {ebHeader h} {nothing})
   in addUpkeep record s { FFDState = ffds' } EB-Role
 ⟦ V-Role {s} x x₁ x₂ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
-      ffds' = record ffds { outVTs = votes ∷ FFDState.outVTs ffds }
+      ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } V-Role
 ⟦ No-IB-Role {s} x x₁ ⟧ = addUpkeep s IB-Role
 ⟦ No-EB-Role {s} x x₁ ⟧ = addUpkeep s EB-Role
