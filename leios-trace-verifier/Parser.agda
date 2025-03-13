@@ -113,31 +113,29 @@ data ValidAction : Action → LeiosState → Type where
 
   IB-Role : let open LeiosState s renaming (FFDState to ffds)
                 b = record { txs = ToPropose }
-                π = tt
-                h = mkIBHeader slot id π sk-IB ToPropose
+                h = mkIBHeader slot id tt sk-IB ToPropose
                 ffds' = record ffds { outIBs = record { header = h; body = b } ∷ FFDState.outIBs ffds }
-            in needsUpkeep IB-Role →
-               canProduceIB slot sk-IB (stake s) π →
-               ffds FFD.-⟦ FFD.Send (ibHeader h) (just (ibBody b)) / FFD.SendRes ⟧⇀ ffds' →
+            in .(needsUpkeep IB-Role) →
+               .(canProduceIB slot sk-IB (stake s) tt) →
+               .(ffds FFD.-⟦ FFD.Send (ibHeader h) (just (ibBody b)) / FFD.SendRes ⟧⇀ ffds') →
                ValidAction IB-Role-Action s
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                π = tt
-                h = mkEB slot id π sk-EB LI []
+                h = mkEB slot id tt sk-EB LI []
                 ffds' = record ffds { outEBs = h ∷ FFDState.outEBs ffds }
-            in needsUpkeep EB-Role →
-               canProduceEB slot sk-EB (stake s) π →
-               ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds' →
+            in .(needsUpkeep EB-Role) →
+               .(canProduceEB slot sk-EB (stake s) tt) →
+               .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction EB-Role-Action s
 
   V-Role  : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
                 ffds' = record ffds { outVTs = votes ∷ FFDState.outVTs ffds }
-            in needsUpkeep V-Role →
-               canProduceV slot sk-V (stake s) →
-               ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds' →
+            in .(needsUpkeep V-Role) →
+               .(canProduceV slot sk-V (stake s)) →
+               .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction V-Role-Action s
 
   No-IB-Role : let open LeiosState s
@@ -159,15 +157,13 @@ data ValidAction : Action → LeiosState → Type where
 ⟦ IB-Role {s} x x₁ x₂ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
-      π = tt
-      h = mkIBHeader slot id π sk-IB ToPropose
+      h = mkIBHeader slot id tt sk-IB ToPropose
       ffds' = record ffds { outIBs = record { header = h; body = b } ∷ FFDState.outIBs ffds }
   in addUpkeep record s { FFDState = ffds' } IB-Role
 ⟦ EB-Role {s} x x₁ x₂ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-      π = tt
-      h = mkEB slot id π sk-EB LI []
+      h = mkEB slot id tt sk-EB LI []
       ffds' = record ffds { outEBs = h ∷ FFDState.outEBs ffds }
   in addUpkeep record s { FFDState = ffds' } EB-Role
 ⟦ V-Role {s} x x₁ x₂ ⟧ =
@@ -185,21 +181,21 @@ instance
   Dec-ValidAction {IB-Role-Action} {s} .dec
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (IB-Role x y z)
-  ... | no ¬p | _ | _ = no λ where (IB-Role p _ _) → ⊥-elim (¬p p)
-  ... | _ | no ¬p | _ = no λ where (IB-Role _ p _) → ⊥-elim (¬p p)
-  ... | _ | _ | no ¬p = no λ where (IB-Role _ _ p) → ⊥-elim (¬p p)
+  ... | no ¬p | _ | _ = no λ where (IB-Role p _ _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | no ¬p | _ = no λ where (IB-Role _ p _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | _ | no ¬p = no λ where (IB-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
   Dec-ValidAction {EB-Role-Action} {s} .dec
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (EB-Role x y z)
-  ... | no ¬p | _ | _ = no λ where (EB-Role p _ _) → ⊥-elim (¬p p)
-  ... | _ | no ¬p | _ = no λ where (EB-Role _ p _) → ⊥-elim (¬p p)
-  ... | _ | _ | no ¬p = no λ where (EB-Role _ _ p) → ⊥-elim (¬p p)
+  ... | no ¬p | _ | _ = no λ where (EB-Role p _ _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | no ¬p | _ = no λ where (EB-Role _ p _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | _ | no ¬p = no λ where (EB-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
   Dec-ValidAction {V-Role-Action} {s} .dec
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (V-Role x y z)
-  ... | no ¬p | _ | _ = no λ where (V-Role p _ _) → ⊥-elim (¬p p)
-  ... | _ | no ¬p | _ = no λ where (V-Role _ p _) → ⊥-elim (¬p p)
-  ... | _ | _ | no ¬p = no λ where (V-Role _ _ p) → ⊥-elim (¬p p)
+  ... | no ¬p | _ | _ = no λ where (V-Role p _ _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | no ¬p | _ = no λ where (V-Role _ p _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | _ | no ¬p = no λ where (V-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
   Dec-ValidAction {No-IB-Role-Action} {s} .dec
     with dec | dec
   ... | yes p | yes q = yes (No-IB-Role p q)
@@ -234,7 +230,7 @@ mutual
   ⟦_⟧∗ (_ ∷ _ ⊣ vα) = ⟦ vα ⟧
 
 Irr-ValidAction : Irrelevant (ValidAction α s)
-Irr-ValidAction (IB-Role x x₁ x₂) (IB-Role x₃ x₄ x₅) = {!refl!}
+Irr-ValidAction {α} {s} (IB-Role x x₁ x₂) (IB-Role x₃ x₄ x₅) = refl
 Irr-ValidAction (EB-Role x x₁ x₂) (EB-Role x₃ x₄ x₅) = {!refl!}
 Irr-ValidAction (V-Role x x₁ x₂) (V-Role x₃ x₄ x₅)   = {!refl!}
 Irr-ValidAction (No-IB-Role x x₁) (No-IB-Role x₂ x₃) = refl
@@ -270,26 +266,9 @@ getLabel (No-EB-Role _ _) = No-EB-Role-Action
 getLabel (No-V-Role _ _)  = No-V-Role-Action
 
 ValidAction-sound : (va : ValidAction α s) → s ↝ ⟦ va ⟧
-ValidAction-sound (IB-Role {s} x x₁ x₂) =
-  let open LeiosState s renaming (FFDState to ffds)
-      b = record { txs = ToPropose }
-      π = tt
-      h = mkIBHeader slot id π sk-IB ToPropose
-      ffds' = record ffds { outIBs = record { header = h; body = b } ∷ FFDState.outIBs ffds }
-  in IB-Role {s} {ffds' = ffds'} x x₁ x₂
-ValidAction-sound (EB-Role {s} x x₁ x₂) =
-  let open LeiosState s renaming (FFDState to ffds)
-      LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-      π = tt
-      h = mkEB slot id π sk-EB LI []
-      ffds' = record ffds { outEBs = h ∷ FFDState.outEBs ffds }
-  in EB-Role {s} {ffds' = ffds'} x x₁ x₂
-ValidAction-sound (V-Role {s} x x₁ x₂) =
-  let open LeiosState s renaming (FFDState to ffds)
-      EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-      votes = map (vote sk-V ∘ hash) EBs'
-      ffds' = record ffds { outVTs = votes ∷ FFDState.outVTs ffds }
-  in V-Role {s} x x₁ x₂
+ValidAction-sound (IB-Role {s} x x₁ x₂) = IB-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
+ValidAction-sound (EB-Role {s} x x₁ x₂) = EB-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
+ValidAction-sound (V-Role {s} x x₁ x₂) = V-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
 ValidAction-sound (No-IB-Role {s} x x₁) = No-IB-Role {s} x x₁
 ValidAction-sound (No-EB-Role {s} x x₁) = No-EB-Role {s} x x₁
 ValidAction-sound (No-V-Role {s} x x₁)  = No-V-Role {s} x x₁
