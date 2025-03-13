@@ -70,7 +70,7 @@ record TraceEvent : Type where
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
 open import Leios.SpecStructure using (SpecStructure)
-open import Leios.Defaults 2 fzero using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD) -- TODO: variables
+open import Leios.Defaults 2 fzero using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total)
 open import Leios.Trace.Verifier st
 open SpecStructure st hiding (Hashable-IBHeader; Hashable-EndorserBlock)
 
@@ -230,9 +230,9 @@ mutual
   ⟦_⟧∗ (_ ∷ _ ⊣ vα) = ⟦ vα ⟧
 
 Irr-ValidAction : Irrelevant (ValidAction α s)
-Irr-ValidAction {α} {s} (IB-Role x x₁ x₂) (IB-Role x₃ x₄ x₅) = refl
-Irr-ValidAction (EB-Role x x₁ x₂) (EB-Role x₃ x₄ x₅) = {!refl!}
-Irr-ValidAction (V-Role x x₁ x₂) (V-Role x₃ x₄ x₅)   = {!refl!}
+Irr-ValidAction (IB-Role x x₁ x₂) (IB-Role x₃ x₄ x₅) = refl
+Irr-ValidAction (EB-Role x x₁ x₂) (EB-Role x₃ x₄ x₅) = refl
+Irr-ValidAction (V-Role x x₁ x₂) (V-Role x₃ x₄ x₅)   = refl
 Irr-ValidAction (No-IB-Role x x₁) (No-IB-Role x₂ x₃) = refl
 Irr-ValidAction (No-EB-Role x x₁) (No-EB-Role x₂ x₃) = refl
 Irr-ValidAction (No-V-Role _ _) (No-V-Role _ _)     = refl
@@ -274,9 +274,24 @@ ValidAction-sound (No-EB-Role {s} x x₁) = No-EB-Role {s} x x₁
 ValidAction-sound (No-V-Role {s} x x₁)  = No-V-Role {s} x x₁
 
 ValidAction-complete : (st : s ↝ s′) → ValidAction (getLabel st) s
-ValidAction-complete {s} (IB-Role x x₁ x₂) = IB-Role {s} x x₁ {!x₂!}
-ValidAction-complete {s} (EB-Role x x₁ x₂) = EB-Role {s} x x₁ {!x₂!}
-ValidAction-complete {s} (V-Role x x₁ x₂)  = V-Role {s} x x₁ {!x₂!}
+ValidAction-complete {s} {s′} (IB-Role {s} {π} {ffds'} x x₁ x₂) =
+  let open LeiosState s renaming (FFDState to ffds)
+      b = record { txs = ToPropose }
+      h = mkIBHeader slot id tt sk-IB ToPropose
+      pr = proj₂ (send-total {ffds} {ibHeader h} {just (ibBody b)})
+  in IB-Role {s} x x₁ pr
+ValidAction-complete {s} (EB-Role x x₁ x₂) =
+  let open LeiosState s renaming (FFDState to ffds)
+      LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
+      h = mkEB slot id tt sk-EB LI []
+      pr = proj₂ (send-total {ffds} {ebHeader h} {nothing})
+  in EB-Role {s} x x₁ pr
+ValidAction-complete {s} (V-Role x x₁ x₂)  =
+  let open LeiosState s renaming (FFDState to ffds)
+      EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
+      votes = map (vote sk-V ∘ hash) EBs'
+      pr = proj₂ (send-total {ffds} {vHeader votes} {nothing})
+  in V-Role {s} x x₁ pr
 ValidAction-complete {s} (No-IB-Role x x₁) = No-IB-Role {s} x x₁
 ValidAction-complete {s} (No-EB-Role x x₁) = No-EB-Role {s} x x₁
 ValidAction-complete {s} (No-V-Role x x₁)  = No-V-Role {s} x x₁
