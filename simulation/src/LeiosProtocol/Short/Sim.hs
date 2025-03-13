@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
@@ -77,14 +79,18 @@ logLeiosEvent nodeNames emitControl e = case e of
   LeiosEventSetup{} -> Nothing
   LeiosEventNode (LabelNode nid x) -> do
     pairs <$> logNode nid x
-  LeiosEventTcp (LabelLink from to (TcpSendMsg msg forecast _)) -> do
+  LeiosEventTcp (LabelLink from to (TcpSendMsg msg forecast fcs)) -> do
     ps <- logMsg msg
     pure $
       pairs $
         "tag" .= asString "Sent"
           <> "sender" .= from
           <> "receipient" .= to
+          <> "fragments" .= length fcs
+          <> "forecast" .= forecast
+          -- <> "forecasts" .= fcs
           <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
+          <> "time_to_received_s" .= (coerce forecast.msgRecvTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> "sending_s" .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> ps
  where
