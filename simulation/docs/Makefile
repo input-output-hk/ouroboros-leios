@@ -40,7 +40,7 @@ sim-realism.pdf: $(1)/IB-0.5-vs-ideal-vs-fitted-fig.eps \
 endef
 $(foreach s,$(MAIN_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
-OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenario4-best-IB-rate scenario4-20IB-small
+OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenario4-best-IB-rate scenario4-20IB-small scenario4-higher-IB-rate-send-recv scenario4-higher-IB-rate-send-recv-short-stage
 $(foreach s,$(OTHER_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
 #### Running simulations.

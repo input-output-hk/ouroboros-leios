@@ -259,7 +259,12 @@ scenario4-best-IB-rate Fig.~\ref{fig:scenario4-best-IB-rate}
 
 scenario4-higher-IB-rate Fig.~\ref{fig:scenario4-higher-IB-rate}
 \scenarioVsIdealFigure{scenario4-higher-IB-rate}{sc:tcp-higher-IB-rate}
-\todo{Use send-recv to see if voting diffusion improves with this much traffic}
+
+scenario4-higher-IB-rate-send-recv Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv}
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv}{sc:tcp-higher-IB-rate-send-recv}
+
+scenario4-higher-IB-rate-send-recv-short-stage Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage}
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv-short-stage}{sc:tcp-higher-IB-rate-send-recv-short-stage}
 
 scenario4-lower-stage-length Fig.~\ref{fig:scenario4-lower-stage-length}
 \scenarioVsIdealFigure{scenario4-lower-stage-length}{sc:tcp-lower-stage-length}
@@ -332,6 +337,10 @@ Fix.~\ref{fig:oldest-vs-freshest}
     \caption{Scenario \ref{sc:order}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:oldest-vs-freshest}
 \end{figure}
+
+\section{Issue 245}
+issue245 Fig.~\ref{fig:issue245}
+\scenarioVsIdealFigure{issue245}{sc:issue245}
 
 
 \addcontentsline{toc}{section}{References}
