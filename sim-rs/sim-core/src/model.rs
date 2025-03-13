@@ -70,6 +70,7 @@ impl<Node: Display + Serialize> Serialize for BlockId<Node> {
 pub struct Block {
     pub id: BlockId,
     pub vrf: u64,
+    pub parent: Option<BlockId>,
     pub header_bytes: u64,
     pub endorsement: Option<Endorsement>,
     pub transactions: Vec<Arc<Transaction>>,

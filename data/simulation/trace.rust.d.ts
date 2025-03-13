@@ -63,6 +63,11 @@ interface RustBlockEvent extends Omit<RustBaseEvent, "message"> {
         transactions?: string[];
         vrf?: number;
         endorsement?: any;
+        parent?: {
+            id: string;
+            slot: number;
+            producer: string;
+        };
     };
 }
 

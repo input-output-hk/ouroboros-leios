@@ -100,6 +100,7 @@ pub enum Event {
         #[serde(flatten)]
         id: BlockId<Node>,
         vrf: u64,
+        parent: Option<BlockId<Node>>,
         header_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
@@ -276,6 +277,7 @@ impl EventTracker {
         self.send(Event::RBGenerated {
             id: self.to_block(block.id),
             vrf: block.vrf,
+            parent: block.parent.map(|id| self.to_block(id)),
             header_bytes: block.header_bytes,
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
                 eb: self.to_endorser_block(e.eb),

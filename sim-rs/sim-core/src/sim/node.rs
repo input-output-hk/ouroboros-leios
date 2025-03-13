@@ -696,12 +696,19 @@ impl Node {
             }
         }
 
+        let parent = self
+            .praos
+            .blocks
+            .last_key_value()
+            .map(|(_, block)| block.id);
+
         let block = Block {
             id: BlockId {
                 slot,
                 producer: self.id,
             },
             vrf,
+            parent,
             header_bytes: self.sim_config.sizes.block_header,
             endorsement,
             transactions,
