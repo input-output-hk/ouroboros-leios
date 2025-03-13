@@ -172,7 +172,7 @@ convertConfig disk =
   praos =
     PraosConfig
       { blockFrequencyPerSlot = disk.rbGenerationProbability
-      , headerSize = fromIntegral disk.ibHeadSizeBytes
+      , headerSize = fromIntegral disk.rbHeadSizeBytes
       , bodySize = \body ->
           1
             + sum (map (certificateSize . snd) body.endorseBlocks)
@@ -187,7 +187,7 @@ convertConfig disk =
                 | otherwise = 0
            in legacy
                 + sum (map (certificateValidation . snd) body.endorseBlocks)
-      , headerValidationDelay = const $ durationMsToDiffTime disk.ibHeadValidationCpuTimeMs
+      , headerValidationDelay = const $ durationMsToDiffTime disk.rbHeadValidationCpuTimeMs
       , blockGenerationDelay = \(Block _ body) ->
           durationMsToDiffTime disk.rbGenerationCpuTimeMs
             + sum (map (certificateGeneration . snd) body.endorseBlocks)
@@ -509,14 +509,17 @@ mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer 
     fixSize cfg $
       EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
 
-mockFullEndorseBlock :: LeiosConfig -> EndorseBlock
-mockFullEndorseBlock cfg =
+mockEndorseBlock :: LeiosConfig -> Int -> EndorseBlock
+mockEndorseBlock cfg n =
   mkEndorseBlock
     cfg
     (EndorseBlockId (NodeId 0) 0)
     0
     (NodeId 0)
-    [InputBlockId (NodeId 0) i | i <- [0 .. cfg.sliceLength * (ceiling cfg.inputBlockFrequencyPerSlot) - 1]]
+    [InputBlockId (NodeId 0) i | i <- [0 .. n - 1]]
+
+mockFullEndorseBlock :: LeiosConfig -> EndorseBlock
+mockFullEndorseBlock cfg = mockEndorseBlock cfg $ cfg.sliceLength * (ceiling cfg.inputBlockFrequencyPerSlot)
 
 mkVoteMsg :: LeiosConfig -> VoteId -> SlotNo -> NodeId -> Word64 -> [EndorseBlockId] -> VoteMsg
 mkVoteMsg cfg id slot producer votes endorseBlocks = fixSize cfg $ VoteMsg{size = 0, ..}
@@ -525,6 +528,17 @@ mkCertificate :: LeiosConfig -> Map VoteId Word64 -> Certificate
 mkCertificate cfg vs =
   assert (fromIntegral cfg.votesForCertificate <= sum (Map.elems vs)) $
     Certificate vs
+
+mockRankingBlock :: LeiosConfig -> Int -> RankingBlock
+mockRankingBlock cfg n =
+  fixSize cfg $
+    fixupBlock (Chain.headAnchor @RankingBlock Genesis) $
+      mkPartialBlock 0 $
+        mkRankingBlockBody
+          cfg
+          (NodeId 0)
+          (Just (EndorseBlockId (NodeId 0) 0, mockCertificate cfg n))
+          cfg.sizes.rankingBlockLegacyPraosPayloadAvgSize
 
 mockFullRankingBlock :: LeiosConfig -> RankingBlock
 mockFullRankingBlock cfg =
@@ -554,18 +568,21 @@ mockFullVoteMsg cfg =
     1
     [EndorseBlockId (NodeId 0) i | i <- [0 .. ceiling cfg.endorseBlockFrequencyPerStage - 1]]
 
-mockFullCertificate :: LeiosConfig -> Certificate
-mockFullCertificate cfg =
+mockCertificate :: LeiosConfig -> Int -> Certificate
+mockCertificate cfg n =
   mkCertificate
     cfg
     ( Map.fromList $
         [ (VoteId (NodeId 0) i, 1)
         | i <-
             [ 0
-            .. cfg.votesForCertificate - 1
+            .. n - 1
             ]
         ]
     )
+
+mockFullCertificate :: LeiosConfig -> Certificate
+mockFullCertificate cfg = mockCertificate cfg cfg.votesForCertificate
 
 ---------------------------------------------------------------------------------------
 ---- Selecting data to build blocks
