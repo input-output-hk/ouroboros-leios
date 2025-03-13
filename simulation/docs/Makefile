@@ -40,7 +40,8 @@ sim-realism.pdf: $(1)/IB-0.5-vs-ideal-vs-fitted-fig.eps \
 endef
 $(foreach s,$(MAIN_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
-OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenario4-best-IB-rate scenario4-20IB-small scenario4-higher-IB-rate-send-recv scenario4-higher-IB-rate-send-recv-short-stage
+OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenario4-best-IB-rate scenario4-20IB-small scenario4-higher-IB-rate-send-recv scenario4-higher-IB-rate-send-recv-short-stage scenario4-higher-IB-rate-send-recv-short-stage-no-cert
+
 $(foreach s,$(OTHER_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
 #### Running simulations.
@@ -95,4 +96,4 @@ CDFSPLOT = gnuplot -e "set terminal postscript eps enhanced color; set output '$
 	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$*.csv" simulation "$*-ideal-4-hops.csv" ideal-4-hops
 
 scenario6/%-oldest-vs-freshest.eps: $(CDFSSCRIPT) scenario6-freshest-first/%.csv scenario6/%.csv
-	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$(word 1, $^)" freshest-first "$(word 2, $^)" oldest-first
+	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$(word 2, $^)" freshest-first "$(word 3, $^)" oldest-first
