@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-03-14
+
+### Performance analysis of sharding
+
+The Jupyter notebook [analysis/shard-performance.ipynb](analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
+
+![Performance analysis of simple sharding](analysis/shard-performance.svg)
+
 ## 2025-03-11
 
 ### Simulation comparison
