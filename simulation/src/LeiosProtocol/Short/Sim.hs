@@ -30,6 +30,7 @@ import Data.Aeson
 import Data.Aeson.Encoding (pair)
 import Data.Coerce
 import Data.Default (Default (..))
+import Data.Foldable
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -40,7 +41,7 @@ import GHC.Records
 import qualified LeiosEvents as Shared
 import LeiosProtocol.Common hiding (Point)
 import LeiosProtocol.Config
-import LeiosProtocol.Relay (Message (..), RelayMessage, relayMessageLabel)
+import LeiosProtocol.Relay
 import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import ModelTCP
@@ -164,18 +165,31 @@ logLeiosEvent nodeNames emitControl e = case e of
           [cpuTag, node nid, "task" .= task]
   logPraos _ (PraosNodeEventNewTip _chain) = Nothing
   logMsg :: LeiosMessage -> Maybe Series
-  logMsg (RelayIB msg) = (ibKind <>) <$> logRelay msg
-  logMsg (RelayEB msg) = (ebKind <>) <$> logRelay msg
-  logMsg (RelayVote msg) = (vtKind <>) <$> logRelay msg
+  logMsg (RelayIB msg) = (ibKind <>) <$> logRelay (.id) msg
+  logMsg (RelayEB msg) = (ebKind <>) <$> logRelay (.id) msg
+  logMsg (RelayVote msg) = (vtKind <>) <$> logRelay (.id) msg
   logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
     Just $ rbKind <> "id" .= show (coerce @_ @Int hash)
   logMsg (PraosMsg msg)
     | emitControl = Just $ mconcat ["id" .= asString "control", "label" .= praosMessageLabel msg]
     | otherwise = Nothing
-  logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => RelayMessage id h b -> Maybe Series
-  logRelay (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
-    Just $ "ids" .= map (mkStringId . fst) xs
-  logRelay (ProtocolMessage (SomeMessage msg))
+  logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => (h -> id) -> RelayMessage id h b -> Maybe Series
+  logRelay _getId (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
+    Just $ "ids" .= map (mkStringId . fst) xs <> "msg_label" .= asString "respond-bodies"
+  logRelay _getId (ProtocolMessage (SomeMessage (MsgRequestBodies xs))) =
+    Just $
+      "ids" .= map mkStringId xs
+        <> "msg_label" .= asString "request-bodies"
+  logRelay getId (ProtocolMessage (SomeMessage (MsgRespondHeaders xs))) =
+    Just $
+      "ids" .= map (mkStringId . getId) (toList xs)
+        <> "msg_label" .= asString "respond-headers"
+  logRelay _getId (ProtocolMessage (SomeMessage (MsgRequestHeaders _ ws we))) =
+    Just $
+      "shrink" .= ws.value
+        <> "expand" .= we.value
+        <> "msg_label" .= asString "request-headers"
+  logRelay _ (ProtocolMessage (SomeMessage msg))
     | emitControl = Just $ "id" .= asString "control" <> "label" .= relayMessageLabel msg
     | otherwise = Nothing
   asString x = x :: String

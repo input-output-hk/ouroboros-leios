@@ -711,23 +711,11 @@ relayConsumerPipelined config sst =
             -- It's important not to pipeline more requests for headers when we
             -- have no bodies to ask for, since (with no other guard) this will
             -- put us into a busy-polling loop.
-            --
-            -- Question (Andrea) : Here we have a branching in the local state:
-            --  - `rb` continues using the state that tracks we have requested more bodies
-            --
-            --  - `handleResponse lst'` instead doesn't know about
-            --    more bodies requested but shrinks the pending
-            --    requests (which makes sense, because it's the one
-            --    used when a response is received.)
-            --
-            --  Both of those eventually go back to idle, but there
-            --  doesn't seem to be a mechanism to reconcile the
-            --  states, nor to stop one of the branches?
-            --
-            --  Aside from the state branching, don't you get more and
-            --  more `RelayConsumer id header body n 'StIdle m ()` continuations to
-            --  process (probably retaining data we no longer need?) this way?
             let lst' = lst0{pendingRequests = pendingRequests'}
+
+            -- Note: the peer will proceed with only one of the two
+            -- arguments of Collect, depending on whether responses are
+            -- available or not.
             return $ TS.Collect (Just rb) (handleResponse lst')
           Left lst -> do
             -- In this case there is nothing else to do so we block until we
@@ -751,56 +739,59 @@ relayConsumerPipelined config sst =
       buffer' = lst.buffer <> Map.map (const Nothing) ignored
       (idsToAcknowledge, window') =
         Seq.spanl (`Map.member` buffer') lst.window
+      new_buffer =
+        forceElemsToWHNF $ -- TODO: Do we need this?
+          Map.restrictKeys buffer' (Set.fromList $ Foldable.toList window')
      in
-      assertRelayConsumerLocalStateInvariant $
-        lst
-          { buffer =
-              forceElemsToWHNF $ -- TODO: Do we need this?
-                Map.restrictKeys buffer' (Set.fromList $ Foldable.toList window')
-          , available = available'
-          , window = window'
-          , pendingShrink = lst.pendingShrink + fromIntegral (Seq.length idsToAcknowledge)
-          }
+      assert (all isNothing $ Map.elems $ Map.difference buffer' new_buffer) $
+        assertRelayConsumerLocalStateInvariant $
+          lst
+            { buffer = new_buffer
+            , available = available'
+            , window = window'
+            , pendingShrink = lst.pendingShrink + fromIntegral (Seq.length idsToAcknowledge)
+            }
 
   tryRequestBodies ::
     forall (n :: N).
     RelayConsumerLocalState id header body n ->
     m (Either (RelayConsumerLocalState id header body n) (RelayConsumer id header body n 'StIdle m ()))
   tryRequestBodies lst0 = do
-    isIgnored <- config.shouldIgnore
-    atomically $ do
-      -- New headers are filtered before becoming available, but we have
-      -- to filter `lst.available` again in the same STM tx that sets them as
-      -- `inFlight`.
-      inFlight <- readTVar sst.inFlightVar
-      let !lst =
-            dropFromLST
-              ( \k hd ->
-                  k `Set.member` inFlight
-                    || isIgnored hd
-              )
-              lst0
-
-      let hdrsToRequest =
-            take (fromIntegral config.maxBodiesToRequest) $
-              config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
-      let idsToRequest = map config.headerId hdrsToRequest
-      let idsToRequestSet = Set.fromList idsToRequest
-      if Set.null idsToRequestSet
-        then return (Left lst)
-        else do
-          let available2 = Map.withoutKeys lst.available idsToRequestSet
-          modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
-          let !lst2 = lst{pendingRequests = Succ lst.pendingRequests, available = available2}
-          return $
-            Right $
-              TS.YieldPipelined
-                (MsgRequestBodies idsToRequest)
-                ( TS.ReceiverAwait $ \case
-                    MsgRespondBodies bodies ->
-                      TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
-                )
-                (requestHeadersNonBlocking lst2)
+    if (min (Map.size lst0.available) (fromIntegral config.maxBodiesToRequest)) == 0
+      then return (Left lst0)
+      else return . Right . TS.Effect $ do
+        isIgnored <- config.shouldIgnore
+        atomically $ do
+          -- New headers are filtered before becoming available, but we have
+          -- to filter `lst.available` again in the same STM tx that sets them as
+          -- `inFlight`.
+          inFlight <- readTVar sst.inFlightVar
+          let !lst =
+                dropFromLST
+                  ( \k hd ->
+                      k `Set.member` inFlight
+                        || isIgnored hd
+                  )
+                  lst0
+          let hdrsToRequest =
+                take (fromIntegral config.maxBodiesToRequest) $
+                  config.prioritize lst.available (mapMaybe (`Map.lookup` lst.available) $ Foldable.toList $ lst.window)
+          let idsToRequest = map config.headerId hdrsToRequest
+          let idsToRequestSet = Set.fromList idsToRequest
+          if Set.null idsToRequestSet
+            then return (idle lst)
+            else do
+              let available2 = Map.withoutKeys lst.available idsToRequestSet
+              modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
+              let !lst2 = lst{pendingRequests = Succ lst.pendingRequests, available = available2}
+              return $
+                TS.YieldPipelined
+                  (MsgRequestBodies idsToRequest)
+                  ( TS.ReceiverAwait $ \case
+                      MsgRespondBodies bodies ->
+                        TS.ReceiverDone (CollectBodies hdrsToRequest bodies)
+                  )
+                  (requestHeadersNonBlocking lst2)
 
   windowAdjust ::
     forall (n :: N).
