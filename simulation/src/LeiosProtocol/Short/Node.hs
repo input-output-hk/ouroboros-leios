@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -278,10 +279,7 @@ relayEBConfig _tracer cfg submitBlocks st =
     , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
-    , shouldIgnore = do
-        -- FIXME: we want to ignore EBs that we pruned.
-        buff <- readTVarIO st.relayBufferVar
-        return $ flip RB.member buff . (.id)
+    , shouldIgnore = atomically $ shouldIgnoreEb cfg st
     }
 
 relayVoteConfig ::
@@ -465,6 +463,60 @@ leiosNode tracer cfg followers peers = do
       , pruningThreads
       ]
 
+shouldIgnoreEb ::
+  forall m.
+  (Monad m, MonadSTM m) =>
+  LeiosNodeConfig ->
+  LeiosNodeState m ->
+  STM m (RelayHeader EndorseBlockId -> Bool)
+shouldIgnoreEb LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = (_ :: SingPipeline p)}} st
+  | cleanupUncertified && cleanupUnadopted = shouldIgnore ||| shouldIgnoreUncertified ||| shouldIgnoreUnadopted
+  | cleanupUncertified = shouldIgnore ||| shouldIgnoreUnadopted
+  | cleanupUnadopted = shouldIgnore ||| shouldIgnoreUncertified
+  | otherwise = shouldIgnore
+ where
+  cleanupUncertified = CleanupExpiredUncertifiedEb `isEnabledIn` leios.cleanupPolicies
+  cleanupUnadopted = CleanupExpiredUnadoptedEb `isEnabledIn` leios.cleanupPolicies
+
+  shouldIgnore :: STM m (RelayHeader EndorseBlockId -> Bool)
+  shouldIgnore = do
+    ebBuffer <- readTVar st.relayEBState.relayBufferVar
+    pure $ \ebHeader -> RB.member ebHeader.id ebBuffer
+
+  shouldIgnoreUncertified :: STM m (RelayHeader EndorseBlockId -> Bool)
+  shouldIgnoreUncertified = do
+    prunedUncertifiedEBStateTo <- readTVar st.prunedUncertifiedEBStateToVar
+    pure $ \ebHeader -> ebHeader.slot <= prunedUncertifiedEBStateTo
+
+  shouldIgnoreUnadopted :: STM m (RelayHeader EndorseBlockId -> Bool)
+  shouldIgnoreUnadopted = do
+    prunedUncertifiedEBStateTo <- readTVar st.prunedUncertifiedEBStateToVar
+    prunedUnadoptedEBStateTo <- readTVar st.prunedUnadoptedEBStateToVar
+    adoptedEbIdSet <- adoptedEbIdSetAfter st prunedUncertifiedEBStateTo
+    pure $ \ebHeader -> ebHeader.slot <= prunedUnadoptedEBStateTo && ebHeader.id `Set.notMember` adoptedEbIdSet
+
+(|||) :: forall f a. Applicative f => f (a -> Bool) -> f (a -> Bool) -> f (a -> Bool)
+(|||) mf mg = liftA2 (\f g x -> f x || g x) mf mg
+
+isEbAdopted ::
+  forall m.
+  (Monad m, MonadSTM m) =>
+  LeiosNodeState m ->
+  RelayHeader EndorseBlockId ->
+  STM m Bool
+isEbAdopted st ebHeader = Set.member ebHeader.id <$> adoptedEbIdSetAfter st ebHeader.slot
+
+adoptedEbIdSetAfter ::
+  forall m.
+  (Monad m, MonadSTM m) =>
+  LeiosNodeState m ->
+  SlotNo ->
+  STM m (Set EndorseBlockId)
+adoptedEbIdSetAfter st ebSlot = do
+  chain <- PraosNode.preferredChain st.praosState
+  let rbsOnChain = takeWhile (\rb -> rb.blockHeader.headerSlot > ebSlot) . Chain.toNewestFirst $ chain
+  pure $ Set.fromList [ebId | rb <- rbsOnChain, (ebId, _ebCert) <- rb.blockBody.endorseBlocks]
+
 -- rEB slots after the end of vote-receiving,
 -- prune EBs that became certified but were not adopted by an RB.
 pruneExpiredUnadoptedEBs ::
@@ -481,14 +533,7 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = 
     let (endorseStart, endorseEnd) = endorseRange leios p
     let pruneTo = succ (lastUnadoptedEB leios p)
     _ <- waitNextSlot slotConfig pruneTo
-    chain <- atomically $ PraosNode.preferredChain st.praosState
-    let rbsOnChain = takeWhile (\rb -> rb.blockHeader.headerSlot > endorseStart) . Chain.toNewestFirst $ chain
-    let ebIdsOnChain =
-          Set.fromList
-            [ ebId
-            | rb <- rbsOnChain
-            , (ebId, _certificate) <- rb.blockBody.endorseBlocks
-            ]
+    ebIdsOnChain <- atomically $ adoptedEbIdSetAfter st endorseStart
     ebsPruned <-
       atomically $ do
         -- Prune st.relayEBState.relayBufferVar for *certified* EBs in the current pipeline
