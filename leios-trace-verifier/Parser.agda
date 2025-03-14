@@ -6,9 +6,6 @@ module Parser where
   {-# LANGUAGE OverloadedStrings #-}
 #-}
 
-open import Leios.Foreign.Defaults 2 fzero
-open import Leios.Foreign.Types hiding (EndorserBlock)
-
 {-# FOREIGN GHC
   import Data.Word
   import Data.Fixed
@@ -56,23 +53,15 @@ record Endorsement : Type where
 
 data Event : Type where
   Cpu : String → Time → String → Event
-
-  IBSent EBSent VTBundleSent RBSent IBReceived EBReceived VTBundleReceived RBReceived :
-    Maybe Node → Node → Maybe Bytes → Maybe Time → Maybe String → Maybe (List String) → Event
-
+  IBSent EBSent VTBundleSent RBSent IBReceived EBReceived VTBundleReceived RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → Maybe String → Maybe (List String) → Event
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
-
   IBGenerated : String → String → SlotNo → Maybe Bytes → Maybe Bytes → Maybe String → Event
-
   EBGenerated : String → String → Word64 → Word64 → List BlockRef → Event
-
   RBGenerated : String → Maybe String → Maybe Int → Word64 → Maybe Word64 → Maybe Endorsement → Maybe (List Endorsement) → Maybe Word64 → Event
-
   VTBundleGenerated : String → String → Word64 → Word64 → Map String Word64 → Event
 
 {-# COMPILE GHC Event = data Event (Cpu | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived
-                                        | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState
-                                        | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
+  | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
 
 record TraceEvent : Type where
   field time_s : Time
@@ -80,9 +69,36 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
--- FIXME: Implementation
-verifyTrace : List TraceEvent → Bool
-verifyTrace [] = false
-verifyTrace (_ ∷ _) = true
+open import Leios.SpecStructure using (SpecStructure)
+open import Leios.Trace.Verifier
+
+open import Leios.Defaults 2 fzero using (st)
+open import Leios.Short st
+
+EventLog = List TraceEvent
+
+traceEvent→action : TraceEvent → Maybe (Action × LeiosInput)
+traceEvent→action record { message = Cpu x x₁ x₂ } = nothing
+traceEvent→action record { message = IBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = EBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = VTBundleSent x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = RBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = IBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = EBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = VTBundleReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = RBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
+traceEvent→action record { message = IBEnteredState x x₁ x₂ } = nothing
+traceEvent→action record { message = EBEnteredState x x₁ x₂ } = nothing
+traceEvent→action record { message = VTBundleEnteredState x x₁ x₂ } = nothing
+traceEvent→action record { message = RBEnteredState x x₁ x₂ } = nothing
+traceEvent→action record { message = IBGenerated p _ s _ _ _ } = just (IB-Role-Action , SLOT)
+traceEvent→action record { message = EBGenerated p _ s _ ibs } = just (EB-Role-Action , SLOT)
+traceEvent→action record { message = RBGenerated x x₁ x₂ x₃ x₄ x₅ x₆ x₇ } = nothing
+traceEvent→action record { message = VTBundleGenerated x x₁ x₂ x₃ x₄ } = just (V-Role-Action , SLOT)
+
+verifyTrace : EventLog → Bool
+verifyTrace l =
+  let αs = L.catMaybes $ L.map traceEvent→action l
+  in ¿ ValidTrace αs ¿ᵇ
 
 {-# COMPILE GHC verifyTrace as verifyTrace #-}
