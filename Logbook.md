@@ -2,6 +2,21 @@
 
 ## 2025-03-14
 
+### Haskell simulation
+
+- Addressed various issues raised by the simulation comparison
+  - Fixed bug in Relay protocol preventing full diffusion of votes.
+  - Changed priority of certified EB to be included in RB.
+  - Avoid failing on unknown distributions in config file.
+- Opened discussion on reducing EB producer discretion in serialization order of IBs.
+- Added support for output log format that shares a common subset with the Rust sim.
+  - `sim short-leios --shared-log-format` outputs log in this format
+  - package `leios-trace-hs` provides haskell types and (de)coders for the format.
+  - Rust cpu, lottery, and transaction events are not covered.
+- Deeper analysis of TCP realism in the comparison to idealized diffusion
+  - Included scenarios with higher IB rate and size, showing somewhat higher traffic leads to better diffusion times, likely due to TCP congestion window staying open.
+  - Found another significant source of latency is access to the ledger state necessary to validate IBs.
+
 ### Formal methods
 
 - Initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`
