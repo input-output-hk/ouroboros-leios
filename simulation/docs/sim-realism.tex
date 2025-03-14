@@ -249,19 +249,113 @@ Fig.~\ref{fig:scenario3}
 
 \section{Scenario \ref{sc:tcp}}
 \label{scenario4}
-Fig.~\ref{fig:scenario4}
+Fig.~\ref{fig:scenario4} shows the introduction of the tcp congestion window having a quite dramatic effect on diffusion times.
 \scenarioVsIdealFigure{scenario4}{sc:tcp}
+\todo{do IBs which do not reference RBs do better?}
+
+As the bounded CPU scenario does better (see next section), we want to rule out the unbounded cpu task handler as problematic, but Fig.~\ref{fig:scenario4-100-cpu} is no better. So it seems actually limiting parallelism is what improves diffusion.
+\scenarioVsIdealFigure{scenario4-100-cpu}{sc:tcp-100-cpu}
+
+From other simulations we noticed there is a sweet spot of traffic for diffusion to do best, which makes sense with regard to keeping the congestion window open without overwhelming other resources. In particular from Fig.~\ref{fig:scenario4-best-IB-rate} we see IBs do slightly better with these parameters:
+\begin{lstlisting}
+ib-body-avg-size-bytes: 163840
+leios-stage-length-slots: 60
+ib-generation-probability: 10
+\end{lstlisting}
+and a topology where link bandwidth is set to $1024000$ bps, half of previous scenarios.
+\scenarioVsIdealFigure{scenario4-best-IB-rate}{sc:tcp-opt}
+
+Fig.~\ref{fig:scenario4-higher-IB-rate} shows $15$ IBs per slot, rather than the $10$ of Fig.~\ref{fig:scenario4-best-IB-rate}, which flattens the curve even more, though we keep a substantial tail. On the other hand Vote diffusion is negatively affected, possibly crowded out by the IB volume. \todo{look into how multiplexing prioritizes the various channels}
+\scenarioVsIdealFigure{scenario4-higher-IB-rate}{sc:tcp-higher-IB-rate}
+
+
+In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv} we turn on uniform voting for the whole $60$s slot of the voting stage, which does appear to improve diffusion.
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv}{sc:tcp-higher-IB-rate-send-recv}
+
+In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage} we bring stage length back to the default $20$, and we see diffusion degrade again, though not to the original levels. About a tenth of IBs do not reach 0.98 stake distribution, and the curve flexes earlier than in Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv}. Vote diffusion is also affected but not as much.
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv-short-stage}{sc:tcp-higher-IB-rate-send-recv-short-stage}
+
+
+A possibility is that IBs are not fully diffusing because nodes are unable to reconstruct the ledger state to validate them in.
+In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage-no-cert} we try to see what happens when we require too many votes for EBs to certify, so the actual ledger state stays at Genesis. However IBs will still reference the most recent RB with a ledger state on the generating node, so other nodes will have to wait an see it (and not be on a differnet fork).\todo{try setting the reference RB as always Genesis} Even with that caveat we see IB diffusion improve, getting quite close to the one with 60 slot stage length. Ledger state reconstruction does seem a significant factor, since when EBs are 3 times rarer (Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv}) diffusion does better.
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv-short-stage-no-cert}{sc:tcp-higher-IB-rate-send-recv-short-stage-no-cert}
+
+Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu} confirms the above with the bounded cpu worker pool, with a much larger than needed bound.
+\scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu}{sc:tcp-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu}
+
+
+In Fig.~\ref{fig:scenario4-lower-stage-length} we show that shorter stage length (20 slots) negatively affects even the case with 10 IBs per slot, even when we try to compensate with a shorter validation time.
+\scenarioVsIdealFigure{scenario4-lower-stage-length}{sc:tcp-lower-stage-length}
+
+
+In Fig.~\ref{fig:scenario4-20IB-small} we see that $15$ IB per second do not diffuse quite as well when they are only $96$kB, even with stage length of 60.
+\scenarioVsIdealFigure{scenario4-20IB-small}{sc:tcp-15IB-small}
+
 
 \section{Scenario \ref{sc:boundedcpu}}
 \label{scenario5}
-Fig.~\ref{fig:scenario5}
+As mentioned before, we see in Fig.~\ref{fig:scenario5} that just using 5 cores per node, instead of unbounded, improves diffusion by a good amount, without need for higher traffic. Presumably the limits on CPU make it so traffic is more spread out and keeps the tcp window open.
 \scenarioVsIdealFigure{scenario5}{sc:boundedcpu}
+\todo{try the higher traffic variations above, the sweet spot presumably shifted}
 
 \section{Scenario \ref{sc:order}}
 \label{scenario6}
-Fig.~\ref{fig:scenario6}
+Fig.~\ref{fig:scenario6} shows the effect of oldest-first diffusion for IBs, which is null with these parameters. Trace debugging shows most of the time there is only one available body to request. \todo{try with higher traffic}
 \scenarioVsIdealFigure{scenario6}{sc:order}
 
+As we will be mostly looking at IB diffusion, Fix.~\ref{fig:oldest-vs-freshest} shows adoption for only IBs but for more stake fractions.
+\begin{figure}[htbp]
+    \centering
+    \debug{\textbf{Label: oldest-vs-freshest} \\}
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.5-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.50$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.6-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.60$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.6}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.7-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.70$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.7}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.8-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.80$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.8}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.9-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.90$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.9}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6/IB-0.98-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.98$ stake.}
+        \label{fig:oldest-vs-freshest:ib0.98}
+    \end{subfigure}
+
+    \caption{Scenario \ref{sc:order}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:oldest-vs-freshest}
+\end{figure}
 
 \addcontentsline{toc}{section}{References}
 \bibliographystyle{plainnat}

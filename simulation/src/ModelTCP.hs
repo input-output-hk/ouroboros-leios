@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,12 +24,14 @@ module ModelTCP (
 ) where
 
 import Control.Exception (assert)
+import Data.Aeson
 import Data.Foldable as Foldable (Foldable (sum))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
 import qualified Data.PQueue.Prio.Min as PQ
 import Data.Semigroup (Semigroup (sconcat))
+import GHC.Generics
 import SimTypes
 import TimeCompat
 
@@ -143,7 +147,7 @@ data TcpMsgForecast = TcpMsgForecast
   -- ^ The time the last acknowledgement returns to the sender;
   , msgSize :: !Bytes
   }
-  deriving (Show)
+  deriving (Show, Generic, ToJSON, FromJSON)
 
 -- | Merging forecasts takes the bounding intervals: earliest leading edge
 -- and latest trailing edges.
