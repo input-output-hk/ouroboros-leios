@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: 20
           cache: "yarn"
-          cache-dependency-path: site/yarn.lock
+          cache-dependency-path: ./site/yarn.lock  # Changed from site/yarn.lock to ./site/yarn.lock
 
       - name: 📦 Install dependencies
         if: steps.check_changes.outputs.has_changes == 'true'
