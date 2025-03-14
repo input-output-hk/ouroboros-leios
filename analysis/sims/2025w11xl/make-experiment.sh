@@ -41,7 +41,7 @@ EOI
 cat << EOI > "$RUN_DIR/run.sh"
 #!/usr/bin/env bash
 
-set -ev
+set -e
 
 cd "\$(dirname "\${BASH_SOURCE[0]}")"
 
@@ -61,7 +61,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-mongoimport --host "\$HOST" --db "\$DB" --collection "$COLLECTION" --drop sim.log &
+mongoimport --quiet --host "\$HOST" --db "\$DB" --collection "$COLLECTION" --drop sim.log &
 
 EOI
 
@@ -78,7 +78,7 @@ cat << EOI >> "$RUN_DIR/run.sh"
 
 echo "SCENARIO: $SIMULATOR | $MAX_SLOT | $LABEL | $NETWORK | $IB_RATE | $IB_SIZE | $EB_RATE | $STAGE_LENGTH"
 
-mongo --host "\$HOST" "\$DB" scenario.js "../../queries/import.js"
+mongo --quiet --host "\$HOST" "\$DB" scenario.js "../../queries/import.js"
 EOI
 
 chmod +x "$RUN_DIR/run.sh"
