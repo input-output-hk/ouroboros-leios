@@ -27,7 +27,7 @@ function mkScenario() {
 source env.sh
 
 NETWORK=100
-MAX_SLOT=150
+MAX_SLOT=600
 
 
 #### CPU vs no CPU
