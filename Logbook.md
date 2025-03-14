@@ -21,6 +21,12 @@
 
 - Initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`
 
+### Analysis of mainnet-scale simulation
+
+The first analysis results for Leios on a mainnet-scale network simulation, using the Rust simulator, are available in [analysis/sims/2025w11xl/analysis.ipynb](analysis/sims/2025w11xl/analysis.ipynb). It is interesting to see that the 3000-node mainnet-scale network transports IBs faster than the artificial 100-node network that was previously analyzed: likely this is because the larger network has long-range "shortcut" edges that speed transport.
+
+![In-flight time for IBs](analysis/sims/2025w11xl/plots/elapsed-IB-rust.png)
+
 ### Performance analysis of sharding
 
 The Jupyter notebook [analysis/shard-performance.ipynb](analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
