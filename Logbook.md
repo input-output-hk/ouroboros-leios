@@ -2,6 +2,10 @@
 
 ## 2025-03-14
 
+### Formal methods
+
+- Initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`
+
 ### Performance analysis of sharding
 
 The Jupyter notebook [analysis/shard-performance.ipynb](analysis/shard-performance.ipynb) presents computations that elucidate the relation between the fraction of shards without an IB vs the expected number of extra IBs for the shard, for the simplest sharding scheme.
