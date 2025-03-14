@@ -9,6 +9,7 @@ clean:
 
 clean_all: clean
 	rm -f */*.eps
+	rm -f */*.pdf
 	rm -f */targets.d
 	rm -f */.ran-report-data
 
