@@ -252,6 +252,7 @@ impl EventMonitor {
                 Event::IBGenerated {
                     id,
                     header_bytes,
+                    total_bytes,
                     transactions,
                 } => {
                     generated_ibs += 1;
@@ -260,13 +261,13 @@ impl EventMonitor {
                     }
                     pending_ibs.insert(id.clone());
                     ib_txs.insert(id.clone(), transactions.clone());
-                    let mut ib_bytes = header_bytes;
+                    bytes_in_ib.insert(id.clone(), total_bytes as f64);
+                    let mut tx_bytes = header_bytes;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(id.clone()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
-                        ib_bytes += tx.bytes;
-                        *bytes_in_ib.entry(id.clone()).or_default() += tx.bytes as f64;
+                        tx_bytes += tx.bytes;
                         if tx.included_in_ib.is_none() {
                             tx.included_in_ib = Some(time);
                         }
@@ -277,7 +278,7 @@ impl EventMonitor {
                         id.producer,
                         transactions.len(),
                         id.slot,
-                        pretty_bytes(ib_bytes, pbo.clone()),
+                        pretty_bytes(tx_bytes, pbo.clone()),
                     )
                 }
                 Event::IBSent { .. } => {

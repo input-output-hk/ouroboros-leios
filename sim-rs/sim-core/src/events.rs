@@ -125,6 +125,7 @@ pub enum Event {
         #[serde(flatten)]
         id: InputBlockId<Node>,
         header_bytes: u64,
+        total_bytes: u64,
         transactions: Vec<TransactionId>,
     },
     IBSent {
@@ -342,6 +343,8 @@ impl EventTracker {
         self.send(Event::IBGenerated {
             id: self.to_input_block(block.header.id),
             header_bytes: block.header.bytes,
+            total_bytes: block.header.bytes
+                + block.transactions.iter().map(|tx| tx.bytes).sum::<u64>(),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }

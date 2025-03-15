@@ -60,6 +60,7 @@ interface RustBlockEvent extends Omit<RustBaseEvent, "message"> {
         type: RustBlockMessageType;
         index?: number;
         header_bytes?: number;
+        total_bytes?: number;
         transactions?: string[];
         vrf?: number;
         endorsement?: any;

@@ -71,6 +71,9 @@
                   },
                   "type": "object"
                 },
+                "total_bytes": {
+                  "type": "number"
+                },
                 "transactions": {
                   "items": {
                     "type": "string"
