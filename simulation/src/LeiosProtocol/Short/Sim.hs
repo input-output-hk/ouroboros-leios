@@ -70,13 +70,13 @@ data LeiosEvent
     LeiosEventTcp (LabelLink (TcpEvent LeiosMessage))
   deriving (Show)
 
-logLeiosTraceEvent :: Map NodeId T.Text -> Bool -> DiffTime -> LeiosEvent -> Maybe Encoding
-logLeiosTraceEvent m emitControl t e = do
-  x <- logLeiosEvent m emitControl e
+logLeiosTraceEvent :: Map NodeId T.Text -> Int -> DiffTime -> LeiosEvent -> Maybe Encoding
+logLeiosTraceEvent m loudness t e = do
+  x <- logLeiosEvent m loudness e
   pure $ (pairs $ "time_s" .= t <> pair "event" x)
 
-logLeiosEvent :: Map NodeId T.Text -> Bool -> LeiosEvent -> Maybe Encoding
-logLeiosEvent nodeNames emitControl e = case e of
+logLeiosEvent :: Map NodeId T.Text -> Int -> LeiosEvent -> Maybe Encoding
+logLeiosEvent nodeNames loudness e = case e of
   LeiosEventSetup{} -> Nothing
   LeiosEventNode (LabelNode nid x) -> do
     pairs <$> logNode nid x
@@ -87,14 +87,19 @@ logLeiosEvent nodeNames emitControl e = case e of
         "tag" .= asString "Sent"
           <> "sender" .= from
           <> "receipient" .= to
-          <> "fragments" .= length fcs
-          <> "forecast" .= forecast
-          -- <> "forecasts" .= fcs
+          <> mconcat
+            [ "fragments" .= length fcs
+              <> "forecast" .= forecast
+            | emitDebug
+            ]
+          <> mconcat ["forecasts" .= fcs | emitControl]
           <> "msg_size_bytes" .= fromBytes (messageSizeBytes msg)
           <> "time_to_received_s" .= (coerce forecast.msgRecvTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> "sending_s" .= (coerce forecast.msgSendTrailingEdge - coerce forecast.msgSendLeadingEdge :: DiffTime)
           <> ps
  where
+  emitControl = loudness >= 3
+  emitDebug = loudness >= 2
   node nid = "node" .= nid <> "node_name" .= nodeNames Map.! nid
   ibKind = "kind" .= asString "IB"
   ebKind = "kind" .= asString "EB"
@@ -177,26 +182,34 @@ logLeiosEvent nodeNames emitControl e = case e of
   logMsg (PraosMsg (PraosMessage (Right (ProtocolMessage (SomeMessage (MsgBlock hash _body)))))) =
     Just $ rbKind <> "id" .= show (coerce @_ @Int hash)
   logMsg (PraosMsg msg)
-    | emitControl = Just $ mconcat ["id" .= asString "control", "label" .= praosMessageLabel msg]
+    | emitControl = Just $ mconcat [rbKind <> "id" .= asString "control", "msg_label" .= praosMessageLabel msg]
     | otherwise = Nothing
   logRelay :: (HasField "node" id NodeId, HasField "num" id Int) => (h -> id) -> RelayMessage id h b -> Maybe Series
-  logRelay _getId (ProtocolMessage (SomeMessage (MsgRespondBodies xs))) =
-    Just $ "ids" .= map (mkStringId . fst) xs <> "msg_label" .= asString "respond-bodies"
-  logRelay _getId (ProtocolMessage (SomeMessage (MsgRequestBodies xs))) =
+  logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRespondBodies xs))) =
     Just $
-      "ids" .= map mkStringId xs
-        <> "msg_label" .= asString "request-bodies"
-  logRelay getId (ProtocolMessage (SomeMessage (MsgRespondHeaders xs))) =
-    Just $
-      "ids" .= map (mkStringId . getId) (toList xs)
-        <> "msg_label" .= asString "respond-headers"
-  logRelay _getId (ProtocolMessage (SomeMessage (MsgRequestHeaders _ ws we))) =
-    Just $
-      "shrink" .= ws.value
-        <> "expand" .= we.value
-        <> "msg_label" .= asString "request-headers"
+      "ids" .= map (mkStringId . fst) xs
+        <> "msg_label" .= relayMessageLabel msg
+  logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRequestBodies xs)))
+    | emitDebug =
+        Just $
+          "ids" .= map mkStringId xs
+            <> "msg_label" .= relayMessageLabel msg
+  logRelay getId (ProtocolMessage (SomeMessage msg@(MsgRespondHeaders xs)))
+    | emitDebug =
+        Just $
+          "ids" .= map (mkStringId . getId) (toList xs)
+            <> "msg_label" .= relayMessageLabel msg
+  logRelay _getId (ProtocolMessage (SomeMessage msg@(MsgRequestHeaders _ ws we)))
+    | emitDebug =
+        Just $
+          "shrink" .= ws.value
+            <> "expand" .= we.value
+            <> "msg_label" .= relayMessageLabel msg
   logRelay _ (ProtocolMessage (SomeMessage msg))
-    | emitControl = Just $ "id" .= asString "control" <> "label" .= relayMessageLabel msg
+    | emitControl =
+        Just $
+          "id" .= asString "control"
+            <> "msg_label" .= relayMessageLabel msg
     | otherwise = Nothing
   asString x = x :: String
 

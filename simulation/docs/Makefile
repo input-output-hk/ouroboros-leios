@@ -46,7 +46,7 @@ OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenari
 $(foreach s,$(OTHER_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
 #### Running simulations.
-SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$@" short-leios --no-log
+SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$@" short-leios --log-verbosity=0
 
 %/sim-data.json: %/config.yaml %/topology.yaml
 	$(SHORT_LEIOS) -l "$(word 1, $^)" -t "$(word 2, $^)" +RTS -s

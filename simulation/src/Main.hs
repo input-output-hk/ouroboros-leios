@@ -374,8 +374,8 @@ runSimOptions SimOptions{..} = case simCommand of
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
     let outputCfg =
           DataShortLeiosP2P.SimOutputConfig
-            { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | not skipLog]
-            , emitControl
+            { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | logVerbosity > 0 || sharedFormat]
+            , logVerbosity
             , dataFile = guard (takeExtension simOutputFile == ".json") >> pure simOutputFile
             , analize
             , stop = simOutputSeconds
@@ -413,8 +413,7 @@ data SimCommand
       { seed :: Int
       , configOptions :: ConfigOptions
       , topologyOptions :: TopologyOptions
-      , emitControl :: Bool
-      , skipLog :: Bool
+      , logVerbosity :: Int
       , analize :: Bool
       , sharedFormat :: Bool
       }
@@ -442,10 +441,18 @@ parserShortLeios =
     <$> parserSeed
     <*> parserConfigOptions
     <*> parserTopologyOptions
-    <*> switch (long "log-control" <> help "Include control messages in log.")
-    <*> switch (long "no-log" <> help "Do not output event log.")
+    <*> logVerbosity
     <*> switch (long "analize" <> help "Calculate metrics and statistics.")
-    <*> switch (long "shared-log-format" <> help "Use log format documented in trace.haskell.d.ts")
+    <*> switch (long "shared-log-format" <> help "Use log format documented in trace.haskell.d.ts. Ignores --log-verbosity.")
+ where
+  logVerbosity =
+    option
+      auto
+      ( long "log-verbosity"
+          <> metavar "NUMBER"
+          <> help "0: no log; 1: major events; 2: debug; 3: all."
+          <> shownDefValue 1
+      )
 
 data ConfigOptions
   = LeiosConfigFile FilePath

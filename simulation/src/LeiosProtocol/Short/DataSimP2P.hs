@@ -232,7 +232,7 @@ accumDataTransmitted _msg TcpMsgForecast{..} = [(start, end, msgSize)]
 
 data SimOutputConfig = SimOutputConfig
   { logFile :: Maybe FilePath
-  , emitControl :: Bool
+  , logVerbosity :: Int
   , dataFile :: Maybe FilePath
   , analize :: Bool
   , stop :: Time
@@ -337,7 +337,7 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
     runSampleModel' logFile logEvent model stop $
       exampleTrace2 seed cfg p2pNetwork
   logEvent = case sharedFormat of
-    False -> logLeiosTraceEvent p2pNodeNames emitControl
+    False -> logLeiosTraceEvent p2pNodeNames logVerbosity
     True -> (fmap toEncoding .) . sharedTraceEvent p2pNodeNames
   renderState fp st = do
     let diffusionData = maybeAnalizeRawData analize (rawDataFromState cfg p2pNetwork st stop)
