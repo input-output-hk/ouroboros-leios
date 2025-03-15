@@ -17,6 +17,15 @@
   - Included scenarios with higher IB rate and size, showing somewhat higher traffic leads to better diffusion times, likely due to TCP congestion window staying open.
   - Found another significant source of latency is access to the ledger state necessary to validate IBs.
 
+
+### Rust simulation
+
+- Addressed minor issues raised by simulation comparison
+  - Added more information to logs (total size of IB, parent id of RB)
+  - Use the same EB selection strategy as Haskell (choose the oldest EB available, then the one with the most TXs)
+  - Validate IB headers before propagating them to neighbors
+- Still need to investigate why the Rust simulation doesn't run into as much congestion as Haskell
+
 ### Formal methods
 
 - Initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`
