@@ -738,21 +738,30 @@ impl Node {
         //  - the age of the EB (older EBs take priority)
         //  - the TXs in the EB (more TXs take priority)
         //  - the number of votes (more votes is better)
-        let (&block, _) = self
-            .leios
-            .votes_by_eb
-            .iter()
-            .filter_map(|(eb, votes)| {
-                if slot - eb.slot > max_eb_age || forbidden_slots.contains(&eb.slot) {
-                    return None;
-                }
-                let vote_count: usize = votes.values().sum();
-                if (vote_count as u64) < vote_threshold {
-                    return None;
-                }
-                Some((eb, vote_count))
-            })
-            .max_by_key(|(eb, votes)| (slot - eb.slot, self.count_txs_in_eb(eb), *votes))?;
+        let (&block, _) =
+            self.leios
+                .votes_by_eb
+                .iter()
+                .filter_map(|(eb, votes)| {
+                    if slot - eb.slot > max_eb_age || forbidden_slots.contains(&eb.slot) {
+                        return None;
+                    }
+                    let vote_count: usize = votes.values().sum();
+                    if (vote_count as u64) < vote_threshold {
+                        return None;
+                    }
+                    // Only select the EB if we have seen all IBs which it references
+                    let Some(EndorserBlockState::Received(eb_body)) = self.leios.ebs.get(eb) else {
+                        return None;
+                    };
+                    if eb_body.ibs.iter().any(|ib| {
+                        !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_)))
+                    }) {
+                        return None;
+                    }
+                    Some((eb, vote_count))
+                })
+                .max_by_key(|(eb, votes)| (slot - eb.slot, self.count_txs_in_eb(eb), *votes))?;
 
         let (block, votes) = self.leios.votes_by_eb.remove_entry(&block)?;
         let bytes = self.sim_config.sizes.cert(votes.len());
