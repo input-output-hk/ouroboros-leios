@@ -307,9 +307,8 @@ In Fig.~\ref{fig:scenario5-10-cpus} we show results for $10$ cpu cores per node.
 \label{scenario6}
 Fig.~\ref{fig:scenario6} shows the effect of oldest-first diffusion for IBs, which is null with these parameters. Trace debugging shows most of the time there is only one available body to request. \todo{try with higher traffic}
 \scenarioVsIdealFigure{scenario6}{sc:order}
-\todo{try with 10 cpus}
 
-As we will be mostly looking at IB diffusion, Fix.~\ref{fig:oldest-vs-freshest} shows adoption for only IBs but for more stake fractions.
+As we will be mostly looking at IB diffusion, Fig.~\ref{fig:oldest-vs-freshest} shows adoption for only IBs but for more stake fractions.
 \begin{figure}[htbp]
     \centering
     \debug{\textbf{Label: oldest-vs-freshest} \\}
@@ -361,6 +360,60 @@ As we will be mostly looking at IB diffusion, Fix.~\ref{fig:oldest-vs-freshest} 
 
     \caption{Scenario \ref{sc:order}, diffusion latencies from slot start (300s run with default seed).}
     \label{fig:oldest-vs-freshest}
+\end{figure}
+
+Fig.~\ref{fig:oldest-vs-freshest-10-cpus} shows same comparison but with 10 cpus per node. Diffusion for the 0.98 stake fraction improves, but we still see no differences between the diffusion strategies.
+\begin{figure}[htbp]
+    \centering
+    \debug{\textbf{Label: oldest-vs-freshest-10-cpus} \\}
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.5-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.50$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.6-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.60$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.6}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.7-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.70$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.7}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.8-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.80$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.8}
+    \end{subfigure}
+    
+    \vspace{1em}
+    
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.9-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.90$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.9}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.45\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.98-oldest-vs-freshest.eps}
+        \caption{IB diffusion to $0.98$ stake.}
+        \label{fig:oldest-vs-freshest-10-cpus:ib0.98}
+    \end{subfigure}
+
+    \caption{Scenario \ref{sc:order}, diffusion latencies from slot start (300s run with default seed).}
+    \label{fig:oldest-vs-freshest-10-cpus}
 \end{figure}
 
 \addcontentsline{toc}{section}{References}

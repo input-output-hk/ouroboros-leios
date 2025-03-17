@@ -26,6 +26,12 @@ sim-realism.pdf: scenario1-send-recv/VT-0.5-vs-ideal-vs-fitted-fig.eps \
 		 scenario6/IB-0.8-oldest-vs-freshest.eps \
 		 scenario6/IB-0.9-oldest-vs-freshest.eps \
 		 scenario6/IB-0.98-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.5-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.6-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.7-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.8-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.9-oldest-vs-freshest.eps \
+		 scenario6-10-cpus/IB-0.98-oldest-vs-freshest.eps \
 
 ## These plots we need for each main scenario.
 MAIN_SCENARIOS := scenario1 scenario2 scenario3 scenario4 scenario5 scenario6
@@ -97,4 +103,7 @@ CDFSPLOT = gnuplot -e "set terminal postscript eps enhanced color; set output '$
 	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$*.csv" simulation "$*-ideal-4-hops.csv" ideal-4-hops
 
 scenario6/%-oldest-vs-freshest.eps: $(CDFSSCRIPT) scenario6-freshest-first/%.csv scenario6/%.csv
+	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$(word 2, $^)" freshest-first "$(word 3, $^)" oldest-first
+
+scenario6-10-cpus/%-oldest-vs-freshest.eps: $(CDFSSCRIPT) scenario6-freshest-first-10-cpus/%.csv scenario6-10-cpus/%.csv
 	$(CDFSPLOT) "$(notdir $*)" "Diffusion latency, s" "$(word 2, $^)" freshest-first "$(word 3, $^)" oldest-first
