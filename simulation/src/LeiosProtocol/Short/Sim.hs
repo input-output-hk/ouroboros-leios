@@ -378,6 +378,7 @@ traceRelayLink1 connectionOptions =
               , votingFrequencyPerStage = 4
               , votesForCertificate = 1 -- just two nodes available to vote!
               , maxEndorseBlockAgeSlots = 50
+              , maxEndorseBlockAgeForRelaySlots = 50
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig
