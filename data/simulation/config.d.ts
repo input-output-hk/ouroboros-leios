@@ -88,11 +88,28 @@ export interface Config {
   "eb-diffusion-max-headers-to-request": bigint;
   /** Only supported by Haskell simulation. */
   "eb-diffusion-max-bodies-to-request": bigint;
+
   /**
-   * The maximum age of EBs included in RBs:
-   * an EB from slot `s` can only be included in RBs
-   * up to slot `s+eb-max-age-slots`. */
+   * The maximum age of EBs included in RBs.
+   *
+   * An EB from slot `s` can only be included in RBs
+   * up to slot `s+eb-max-age-slots`.
+   *
+   * In short leios we expect votes to diffuse within 3 stages lengths of
+   * EB generation, we allow for 2 more stage lengths to account for
+   * variance in the interval within RBs.
+   */
   "eb-max-age-slots": bigint;
+
+  /**
+   * The maximum age of EBs to be relayed.
+   *
+   * An EB from slot `s` will only be relayed
+   * up to slot `s+eb-max-age-for-relay-slots`.
+   *
+   * Only supported by Haskell simulation.
+   */
+  "eb-max-age-for-relay-slots": bigint;
 
   // Vote Configuration
   "vote-generation-probability": number;
