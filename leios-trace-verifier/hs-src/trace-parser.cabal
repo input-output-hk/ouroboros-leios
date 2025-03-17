@@ -36,6 +36,7 @@ executable parser
       , bytestring
       , leios-trace-hs
       , trace-parser
+      , optparse-applicative
 
   default-language: Haskell2010
   ghc-options:      -Wall
