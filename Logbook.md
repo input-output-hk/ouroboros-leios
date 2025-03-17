@@ -16,6 +16,8 @@
 - Deeper analysis of TCP realism in the comparison to idealized diffusion
   - Included scenarios with higher IB rate and size, showing somewhat higher traffic leads to better diffusion times, likely due to TCP congestion window staying open.
   - Found another significant source of latency is access to the ledger state necessary to validate IBs.
+- Stop forwarding EBs after `eb-max-age-for-relay-slots` slots.
+- Add various cleanup policies (see `cleanup-policies`). These are disabled by default.
 
 
 ### Rust simulation
