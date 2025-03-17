@@ -12,8 +12,8 @@
         <id>https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary"/>
         <updated>2025-03-10T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week saw significant progress in simulation capabilities with the successful comparison of Rust and Haskell simulations across 90 scenarios. Our mainnet-scale analysis of Leios on a realistic network of 3000 nodes revealed unexpected performance benefits from network topology. Sharding performance analysis provided important insights into optimization strategies. Both simulation implementations received improvements to enhance realism and comparability, while our formal methods team developed initial trace verification tools for Short Leios.]]></summary>
-        <content type="html"><![CDATA[<p>This week saw significant progress in simulation capabilities with the successful comparison of Rust and Haskell simulations across <strong><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb" target="_blank" rel="noopener noreferrer">90 scenarios</a></strong>. Our <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb" target="_blank" rel="noopener noreferrer">mainnet-scale analysis</a> of Leios on a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w11/sim-rs/test_data/realistic.yaml" target="_blank" rel="noopener noreferrer">realistic network</a> of 3000 nodes revealed unexpected performance benefits from network topology. <strong><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb" target="_blank" rel="noopener noreferrer">Sharding performance analysis</a></strong> provided important insights into optimization strategies. Both simulation implementations received improvements to enhance realism and comparability, while our formal methods team developed initial trace verification tools for Short Leios.</p>
+        <summary type="html"><![CDATA[This week, the Leios team made significant progress in simulation capabilities, with a successful comparison of Rust and Haskell simulations across 90 scenarios. A mainnet-scale analysis of Leios on a realistic 3,000-node network revealed unexpected performance benefits from network topology. Insights from sharding performance analysis provided important optimization strategies. Finally, the team refined both simulation implementations for greater realism and comparability, while the formal methods team developed initial trace verification tools for Short Leios.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress in simulation capabilities, with a successful comparison of Rust and Haskell simulations across <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb" target="_blank" rel="noopener noreferrer"><strong>90 scenarios</strong></a>. A <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb" target="_blank" rel="noopener noreferrer"><strong>mainnet-scale analysis</strong></a> of Leios on a <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w11/sim-rs/test_data/realistic.yaml" target="_blank" rel="noopener noreferrer"><strong>realistic 3,000-node network</strong></a> revealed unexpected performance benefits from network topology. Insights from <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb" target="_blank" rel="noopener noreferrer"><strong>sharding performance analysis</strong></a> provided important optimization strategies. Finally, the team refined both simulation implementations for greater realism and comparability, while the formal methods team developed initial trace verification tools for Short Leios.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-comparison">Simulation comparison<a class="hash-link" aria-label="Direct link to Simulation comparison" title="Direct link to Simulation comparison" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#simulation-comparison">​</a></h2>
 <ul>
 <li>Compared <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb" target="_blank" rel="noopener noreferrer">90 scenarios</a> between Rust and Haskell simulations at tag <a href="https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w11" target="_blank" rel="noopener noreferrer"><code>leios-2025w11</code></a></li>
@@ -22,45 +22,45 @@
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-mainnet-scale-simulation">Analysis of mainnet-scale simulation<a class="hash-link" aria-label="Direct link to Analysis of mainnet-scale simulation" title="Direct link to Analysis of mainnet-scale simulation" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#analysis-of-mainnet-scale-simulation">​</a></h3>
 <ul>
-<li>Completed first <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis</a> of Leios on a mainnet-scale network simulation using Rust simulator</li>
-<li>Discovered 3000-node mainnet-scale network transports IBs faster than artificial 100-node network</li>
-<li>Identified "shortcut" edges in larger networks as likely reason for improved transport speed.</li>
+<li>Completed the first <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis</a> of Leios on a mainnet-scale network simulation using the Rust simulator</li>
+<li>Discovered that a 3,000-node mainnet-scale network transports IBs faster than an artificial 100-node network</li>
+<li>Identified 'shortcut' edges in larger networks as a likely factor in the improved transport speed.</li>
 </ul>
-<p><img decoding="async" loading="lazy" src="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/plots/elapsed-IB-rust.png?raw=true" alt="In-flight time for Input Blocks (IBs)" class="img_ev3q"></p>
+<p><img decoding="async" loading="lazy" src="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/plots/elapsed-IB-rust.png?raw=true" alt="In-flight time for input blocks (IBs)" class="img_ev3q"></p>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="performance-analysis-of-sharding">Performance analysis of sharding<a class="hash-link" aria-label="Direct link to Performance analysis of sharding" title="Direct link to Performance analysis of sharding" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#performance-analysis-of-sharding">​</a></h3>
 <ul>
-<li>Created <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb" target="_blank" rel="noopener noreferrer">computational models</a> showing relationship between fraction of shards without an IB and expected number of extra IBs</li>
+<li>Created <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb" target="_blank" rel="noopener noreferrer">computational models</a> to analyze the relationship between the fraction of shards without an IB and the expected number of extra IBs</li>
 <li>Evaluated performance characteristics of the simplest sharding scheme.</li>
 </ul>
 <p><img decoding="async" loading="lazy" src="https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/shard-performance.svg" alt="Performance analysis of simple sharding" class="img_ev3q"></p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#haskell-simulation">​</a></h2>
 <ul>
-<li>Fixed bug in Relay protocol preventing full diffusion of votes</li>
-<li>Changed priority of certified EB to be included in RB</li>
-<li>Added support for output log format sharing a common subset with the Rust sim</li>
-<li>Analyzed TCP realism in comparison to idealized diffusion<!-- -->
+<li>Fixed a bug in the relay protocol that prevented full diffusion of votes</li>
+<li>Adjusted the priority of certified EBs for inclusion in RBs</li>
+<li>Added support for an output log format that shares a common subset with the Rust simulator</li>
+<li>Analyzed TCP realism in comparison to idealized diffusion:<!-- -->
 <ul>
-<li>Found higher IB rate and size leads to better diffusion times</li>
-<li>Identified ledger state access as significant source of latency.</li>
+<li>Discovered that higher IB rates and sizes improve diffusion times</li>
+<li>Identified ledger state access as a significant source of latency.</li>
 </ul>
 </li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#rust-simulation">​</a></h2>
 <ul>
-<li>Added more information to logs (total size of IB, parent id of RB)</li>
-<li>Implemented same EB selection strategy as Haskell</li>
+<li>Expanded logs to include total IB size and parent ID of RBs</li>
+<li>Implemented the same EB selection strategy as in the Haskell simulation</li>
 <li>Added validation of IB headers before propagation to neighbors</li>
-<li>Investigating why the simulation doesn't encounter as much congestion as Haskell.</li>
+<li>Investigating lower congestion in the Rust simulation compared to Haskell.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#formal-methods">​</a></h2>
 <ul>
-<li>Developed initial trace verifier for Short Leios simulation traces in <code>leios-trace-verifier</code>.</li>
+<li>Developed the initial trace verifier for Short Leios simulation traces in <code>leios-trace-verifier</code>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="research">Research<a class="hash-link" aria-label="Direct link to Research" title="Direct link to Research" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#research">​</a></h2>
 <ul>
-<li>Progressing on ledger design by exploring different implementation options and their trade-offs</li>
+<li>Progressing on ledger design by exploring options and trade-offs</li>
 <li>Analyzing how concurrent input blocks in Leios create unique ledger-level challenges not present in Praos</li>
-<li>Evaluating approaches that balance multiple properties including:<!-- -->
+<li>Evaluating approaches that balance multiple properties, including:<!-- -->
 <ul>
 <li>Conflict avoidance in the blockchain</li>
 <li>Guaranteed fee payment for block producers</li>
@@ -69,14 +69,14 @@
 </ul>
 </li>
 <li>Investigating sharding-based solutions with various optimization strategies</li>
-<li>Planning to share more detailed findings at our public meeting by the end of March</li>
-<li>Aim to provide a comprehensive recommendation for implementors by the end of April.</li>
+<li>Planning to share more detailed findings at Leios public meeting by the end of March</li>
+<li>Targeting a comprehensive recommendation for implementors by the end of April.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="from-short-leios-to-full-leios">From Short Leios to Full Leios<a class="hash-link" aria-label="Direct link to From Short Leios to Full Leios" title="Direct link to From Short Leios to Full Leios" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#from-short-leios-to-full-leios">​</a></h3>
 <ul>
 <li>Planning the simulation roadmap for transitioning from Short Leios (currently implemented) to Full Leios</li>
 <li>Developing implementation guidelines for simulators to incorporate the pipeline referencing scheme specified in the papers</li>
-<li>Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios</li>
+<li>Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
@@ -87,7 +87,7 @@
         <category label="weekly" term="weekly"/>
     </entry>
     <entry>
-        <title type="html"><![CDATA[Weekly Summary - March 3, 2025]]></title>
+        <title type="html"><![CDATA[Weekly Summary – March 3, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/03/03/weekly-progress-summary"/>
         <updated>2025-03-03T00:00:00.000Z</updated>
