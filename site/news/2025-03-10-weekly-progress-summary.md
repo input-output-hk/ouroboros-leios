@@ -66,6 +66,3 @@ This week saw significant progress in simulation capabilities with the successfu
 - Planning the simulation roadmap for transitioning from Short Leios (currently implemented) to Full Leios
 - Developing implementation guidelines for simulators to incorporate the pipeline referencing scheme specified in the papers
 - Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios
-- Evaluating additional simulator instrumentation required to measure censorship resistance properties
-- Preparing documentation on EB voting and RB selection rules for both simulation implementations
-- Creating test scenarios to validate the Full Leios extension in controlled environments
