@@ -244,7 +244,9 @@ Fig.~\ref{fig:scenario2}
 
 \section{Scenario \ref{sc:multiplexing}}
 \label{scenario3}
-Fig.~\ref{fig:scenario3}
+Fig.~\ref{fig:scenario3} shows the result of multiplexing all the mini-protocols onto the same connection. We do not see a significant difference with Scenario~\ref{sc:request-from-first}.
+
+Note that multiplexing in the simulation happens at the level of whole mini-protocol messages, without specific attempts to share the bandwidth fairly between them. This is not as realistic as breaking messages into same-size chunks and interleave those in a round-robin fashion.
 \scenarioVsIdealFigure{scenario3}{sc:multiplexing}
 
 \section{Scenario \ref{sc:tcp}}
@@ -265,7 +267,7 @@ ib-generation-probability: 10
 and a topology where link bandwidth is set to $1024000$ bps, half of previous scenarios.
 \scenarioVsIdealFigure{scenario4-best-IB-rate}{sc:tcp-opt}
 
-Fig.~\ref{fig:scenario4-higher-IB-rate} shows $15$ IBs per slot, rather than the $10$ of Fig.~\ref{fig:scenario4-best-IB-rate}, which flattens the curve even more, though we keep a substantial tail. On the other hand Vote diffusion is negatively affected, possibly crowded out by the IB volume. \todo{look into how multiplexing prioritizes the various channels}
+Fig.~\ref{fig:scenario4-higher-IB-rate} shows $15$ IBs per slot, rather than the $10$ of Fig.~\ref{fig:scenario4-best-IB-rate}, which flattens the curve even more, though we keep a substantial tail. On the other hand Vote diffusion is negatively affected, possibly crowded out by the IB volume.
 \scenarioVsIdealFigure{scenario4-higher-IB-rate}{sc:tcp-higher-IB-rate}
 
 
@@ -277,7 +279,7 @@ In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage} we bring stage 
 
 
 A possibility is that IBs are not fully diffusing because nodes are unable to reconstruct the ledger state to validate them in.
-In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage-no-cert} we try to see what happens when we require too many votes for EBs to certify, so the actual ledger state stays at Genesis. However IBs will still reference the most recent RB with a ledger state on the generating node, so other nodes will have to wait an see it (and not be on a differnet fork).\todo{try setting the reference RB as always Genesis} Even with that caveat we see IB diffusion improve, getting quite close to the one with 60 slot stage length. Ledger state reconstruction does seem a significant factor, since when EBs are 3 times rarer (Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv}) diffusion does better.
+In Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage-no-cert} we try to see what happens when we require too many votes for EBs to certify, so the actual ledger state stays at Genesis. However IBs will still reference the most recent RB with a ledger state on the generating node, so other nodes will have to wait an see it (and not be on a differnet fork).\todo{try setting the reference RB as always Genesis} Even with that caveat we see IB diffusion improve, getting quite close to the one with 60 slot stage length. Ledger state reconstruction does seem a significant factor, since when EBs are 3 times rarer (Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv}), or here where they do not get certified, diffusion does better.
 \scenarioVsIdealFigure{scenario4-higher-IB-rate-send-recv-short-stage-no-cert}{sc:tcp-higher-IB-rate-send-recv-short-stage-no-cert}
 
 Fig.~\ref{fig:scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu} confirms the above with the bounded cpu worker pool, with a much larger than needed bound.
@@ -298,10 +300,14 @@ As mentioned before, we see in Fig.~\ref{fig:scenario5} that just using 5 cores 
 \scenarioVsIdealFigure{scenario5}{sc:boundedcpu}
 \todo{try the higher traffic variations above, the sweet spot presumably shifted}
 
+In Fig.~\ref{fig:scenario5-10-cpus} we show results for $10$ cpu cores per node. Here we see all IBs making it to $0.98$ stake diffusion.
+\scenarioVsIdealFigure{scenario5-10-cpus}{sc:boundedcpu-10-cpus}
+
 \section{Scenario \ref{sc:order}}
 \label{scenario6}
 Fig.~\ref{fig:scenario6} shows the effect of oldest-first diffusion for IBs, which is null with these parameters. Trace debugging shows most of the time there is only one available body to request. \todo{try with higher traffic}
 \scenarioVsIdealFigure{scenario6}{sc:order}
+\todo{try with 10 cpus}
 
 As we will be mostly looking at IB diffusion, Fix.~\ref{fig:oldest-vs-freshest} shows adoption for only IBs but for more stake fractions.
 \begin{figure}[htbp]
