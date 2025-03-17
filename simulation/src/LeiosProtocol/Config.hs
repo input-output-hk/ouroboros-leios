@@ -91,6 +91,7 @@ data Config = Config
   , multiplexMiniProtocols :: Bool
   , treatBlocksAsFull :: Bool
   , cleanupPolicies :: CleanupPolicies
+  , simulateTransactions :: Bool
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
@@ -118,6 +119,7 @@ data Config = Config
   , ibDiffusionMaxWindowSize :: Word16
   , ibDiffusionMaxHeadersToRequest :: Word16
   , ibDiffusionMaxBodiesToRequest :: Word16
+  , ibShards :: Word16
   , ebGenerationProbability :: Double
   , ebGenerationCpuTimeMs :: DurationMs
   , ebValidationCpuTimeMs :: DurationMs
@@ -157,6 +159,7 @@ instance Default Config where
       , multiplexMiniProtocols = True
       , treatBlocksAsFull = False
       , cleanupPolicies = def
+      , simulateTransactions = True
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
@@ -184,6 +187,7 @@ instance Default Config where
       , ibDiffusionMaxWindowSize = 100
       , ibDiffusionMaxHeadersToRequest = 100
       , ibDiffusionMaxBodiesToRequest = 1
+      , ibShards = 1
       , ebGenerationProbability = 1.5
       , ebGenerationCpuTimeMs = 75.0
       , ebValidationCpuTimeMs = 1.0
@@ -227,6 +231,7 @@ configToKVsWith getter cfg =
     , get @"multiplexMiniProtocols" getter cfg
     , get @"treatBlocksAsFull" getter cfg
     , get @"cleanupPolicies" getter cfg
+    , get @"simulateTransactions" getter cfg
     , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
     , get @"leiosVoteSendRecvStages" getter cfg
@@ -254,6 +259,7 @@ configToKVsWith getter cfg =
     , get @"ibDiffusionMaxWindowSize" getter cfg
     , get @"ibDiffusionMaxHeadersToRequest" getter cfg
     , get @"ibDiffusionMaxBodiesToRequest" getter cfg
+    , get @"ibShards" getter cfg
     , get @"ebGenerationProbability" getter cfg
     , get @"ebGenerationCpuTimeMs" getter cfg
     , get @"ebValidationCpuTimeMs" getter cfg
@@ -307,6 +313,7 @@ instance FromJSON Config where
     multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
     treatBlocksAsFull <- parseFieldOrDefault @Config @"treatBlocksAsFull" obj
     cleanupPolicies <- parseFieldOrDefault @Config @"cleanupPolicies" obj
+    simulateTransactions <- parseFieldOrDefault @Config @"simulateTransactions" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
     leiosVoteSendRecvStages <- parseFieldOrDefault @Config @"leiosVoteSendRecvStages" obj
@@ -334,6 +341,7 @@ instance FromJSON Config where
     ibDiffusionMaxWindowSize <- parseFieldOrDefault @Config @"ibDiffusionMaxWindowSize" obj
     ibDiffusionMaxHeadersToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxHeadersToRequest" obj
     ibDiffusionMaxBodiesToRequest <- parseFieldOrDefault @Config @"ibDiffusionMaxBodiesToRequest" obj
+    ibShards <- parseFieldOrDefault @Config @"ibShards" obj
     ebGenerationProbability <- parseFieldOrDefault @Config @"ebGenerationProbability" obj
     ebGenerationCpuTimeMs <- parseFieldOrDefault @Config @"ebGenerationCpuTimeMs" obj
     ebValidationCpuTimeMs <- parseFieldOrDefault @Config @"ebValidationCpuTimeMs" obj
