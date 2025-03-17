@@ -47,3 +47,25 @@ This week saw significant progress in simulation capabilities with the successfu
 ## Formal methods
 
 - Developed initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`.
+
+## Research
+
+- Progressing on ledger design by exploring different implementation options and their trade-offs
+- Analyzing how concurrent input blocks in Leios create unique ledger-level challenges not present in Praos
+- Evaluating approaches that balance multiple properties including:
+  - Conflict avoidance in the blockchain
+  - Guaranteed fee payment for block producers
+  - Transaction eligibility and inclusion speed
+  - User experience regarding fee payment
+- Investigating sharding-based solutions with various optimization strategies
+- Planning to share more detailed findings at our public meeting by the end of March
+- Aim to provide a comprehensive recommendation for implementors by the end of April.
+
+### From Short Leios to Full Leios
+
+- Planning the simulation roadmap for transitioning from Short Leios (currently implemented) to Full Leios
+- Developing implementation guidelines for simulators to incorporate the pipeline referencing scheme specified in the papers
+- Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios
+- Evaluating additional simulator instrumentation required to measure censorship resistance properties
+- Preparing documentation on EB voting and RB selection rules for both simulation implementations
+- Creating test scenarios to validate the Full Leios extension in controlled environments
