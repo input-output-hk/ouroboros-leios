@@ -56,6 +56,31 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#formal-methods">​</a></h2>
 <ul>
 <li>Developed initial trace verifier for Short Leios simulation traces in <code>leios-trace-verifier</code>.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="research">Research<a class="hash-link" aria-label="Direct link to Research" title="Direct link to Research" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#research">​</a></h2>
+<ul>
+<li>Progressing on ledger design by exploring different implementation options and their trade-offs</li>
+<li>Analyzing how concurrent input blocks in Leios create unique ledger-level challenges not present in Praos</li>
+<li>Evaluating approaches that balance multiple properties including:<!-- -->
+<ul>
+<li>Conflict avoidance in the blockchain</li>
+<li>Guaranteed fee payment for block producers</li>
+<li>Transaction eligibility and inclusion speed</li>
+<li>User experience regarding fee payment</li>
+</ul>
+</li>
+<li>Investigating sharding-based solutions with various optimization strategies</li>
+<li>Planning to share more detailed findings at our public meeting by the end of March</li>
+<li>Aim to provide a comprehensive recommendation for implementors by the end of April.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="from-short-leios-to-full-leios">From Short Leios to Full Leios<a class="hash-link" aria-label="Direct link to From Short Leios to Full Leios" title="Direct link to From Short Leios to Full Leios" href="https://leios.cardano-scaling.org/news/2025/03/10/weekly-progress-summary#from-short-leios-to-full-leios">​</a></h3>
+<ul>
+<li>Planning the simulation roadmap for transitioning from Short Leios (currently implemented) to Full Leios</li>
+<li>Developing implementation guidelines for simulators to incorporate the pipeline referencing scheme specified in the papers</li>
+<li>Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios</li>
+<li>Evaluating additional simulator instrumentation required to measure censorship resistance properties</li>
+<li>Preparing documentation on EB voting and RB selection rules for both simulation implementations</li>
+<li>Creating test scenarios to validate the Full Leios extension in controlled environments</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
