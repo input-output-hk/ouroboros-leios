@@ -266,8 +266,9 @@ relayEBConfig ::
   LeiosNodeConfig ->
   SubmitBlocks m EndorseBlockId EndorseBlock ->
   RelayEBState m ->
+  LeiosNodeState m ->
   RelayConsumerConfig EndorseBlockId (RelayHeader EndorseBlockId) EndorseBlock m
-relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: SingPipeline p)}} submitBlocks st =
+relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: SingPipeline p)}} submitBlocks st leiosState =
   RelayConsumerConfig
     { relay = RelayConfig{maxWindowSize = coerce cfg.leios.ebDiffusion.maxWindowSize}
     , headerId = (.id)
@@ -280,16 +281,20 @@ relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: S
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     , shouldIgnore = do
         -- FIXME: we want to ignore EBs that we pruned.
-        ebBuffer <- readTVarIO st.relayBufferVar
-        slot <- currentSlotNo cfg.slotConfig
-        pure $ \ebHeader -> do
-          -- Check whether or not the EB is already in the relay buffer
-          let ebAlreadyInBuffer = RB.member ebHeader.id ebBuffer
-          -- Check whether or not the EB is older than "eb-max-age-for-relay-slots"
-          let (endorseStart, _endorseEnd) = endorseRange cfg.leios $ pipelineOf @p cfg.leios Short.Endorse ebHeader.slot
-          let endorseMaxSlotForRelay = endorseStart + fromIntegral cfg.leios.maxEndorseBlockAgeForRelaySlots
-          let ebTooOld = slot > endorseMaxSlotForRelay
-          ebAlreadyInBuffer || ebTooOld
+        currSlot <- currentSlotNo cfg.slotConfig
+        atomically $ do
+          ebBuffer <- readTVar st.relayBufferVar
+          prunedTo <- readTVar leiosState.prunedUncertifiedEBStateToVar
+          pure $ \ebHeader -> do
+            -- Check whether or not the EB is older than prunedUncertifiedEBStateTo
+            let ebTooOld1 = ebHeader.slot < prunedTo
+            -- Check whether or not the EB is older than "eb-max-age-for-relay-slots"
+            let (endorseStart, _endorseEnd) = endorseRange cfg.leios $ pipelineOf @p cfg.leios Short.Endorse ebHeader.slot
+            let ebMaxSlotForRelay = endorseStart + fromIntegral cfg.leios.maxEndorseBlockAgeForRelaySlots
+            let ebTooOld2 = ebMaxSlotForRelay < currSlot
+            -- Check whether or not the EB is already in the relay buffer
+            let ebAlreadyInBuffer = RB.member ebHeader.id ebBuffer
+            ebTooOld1 || ebTooOld2 || ebAlreadyInBuffer
     }
 
 relayVoteConfig ::
@@ -413,7 +418,7 @@ leiosNode tracer cfg followers peers = do
   ebThreads <-
     setupRelay
       cfg.leios
-      (relayEBConfig tracer cfg submitEB relayEBState)
+      (relayEBConfig tracer cfg submitEB relayEBState leiosState)
       relayEBState
       (map (.protocolEB) followers)
       (map (.protocolEB) peers)
