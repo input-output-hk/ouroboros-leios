@@ -163,9 +163,15 @@
     "eb-generation-probability": {
       "type": "number"
     },
+    "eb-max-age-for-relay-slots": {
+      "additionalProperties": false,
+      "description": "The maximum age of EBs to be relayed.\n\nAn EB from slot `s` will only be relayed\nup to slot `s+eb-max-age-for-relay-slots`.\n\nOnly supported by Haskell simulation.",
+      "properties": {},
+      "type": "number"
+    },
     "eb-max-age-slots": {
       "additionalProperties": false,
-      "description": "The maximum age of EBs included in RBs:\nan EB from slot `s` can only be included in RBs\nup to slot `s+eb-max-age-slots`.",
+      "description": "The maximum age of EBs included in RBs.\n\nAn EB from slot `s` can only be included in RBs\nup to slot `s+eb-max-age-slots`.\n\nIn short leios we expect votes to diffuse within 3 stages lengths of\nEB generation, we allow for 2 more stage lengths to account for\nvariance in the interval within RBs.",
       "properties": {},
       "type": "number"
     },
