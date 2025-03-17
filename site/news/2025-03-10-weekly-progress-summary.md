@@ -5,7 +5,7 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-This week saw significant progress in simulation capabilities with the successful comparison of Rust and Haskell simulations across **[90 scenarios](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb)**. Our [mainnet-scale analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb) of Leios on a [realistic network](https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w11/sim-rs/test_data/realistic.yaml) of 3000 nodes revealed unexpected performance benefits from network topology. **[Sharding performance analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb)** provided important insights into optimization strategies. Both simulation implementations received improvements to enhance realism and comparability, while our formal methods team developed initial trace verification tools for Short Leios.
+This week, the Leios team made significant progress in simulation capabilities, with a successful comparison of Rust and Haskell simulations across [**90 scenarios**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb). A [**mainnet-scale analysis**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb) of Leios on a [**realistic 3,000-node network**](https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w11/sim-rs/test_data/realistic.yaml) revealed unexpected performance benefits from network topology. Insights from [**sharding performance analysis**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb) provided important optimization strategies. Finally, the team refined both simulation implementations for greater realism and comparability, while the formal methods team developed initial trace verification tools for Short Leios.
 
 ## Simulation comparison
 
@@ -15,54 +15,54 @@ This week saw significant progress in simulation capabilities with the successfu
 
 ### Analysis of mainnet-scale simulation
 
-- Completed first [analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb) of Leios on a mainnet-scale network simulation using Rust simulator
-- Discovered 3000-node mainnet-scale network transports IBs faster than artificial 100-node network
-- Identified "shortcut" edges in larger networks as likely reason for improved transport speed.
+- Completed the first [analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb) of Leios on a mainnet-scale network simulation using the Rust simulator
+- Discovered that a 3,000-node mainnet-scale network transports IBs faster than an artificial 100-node network
+- Identified 'shortcut' edges in larger networks as a likely factor in the improved transport speed.
 
-![In-flight time for Input Blocks (IBs)](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/plots/elapsed-IB-rust.png?raw=true)
+![In-flight time for input blocks (IBs)](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/plots/elapsed-IB-rust.png?raw=true)
 
 ### Performance analysis of sharding
 
-- Created [computational models](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb) showing relationship between fraction of shards without an IB and expected number of extra IBs
+- Created [computational models](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb) to analyze the relationship between the fraction of shards without an IB and the expected number of extra IBs
 - Evaluated performance characteristics of the simplest sharding scheme.
 
 ![Performance analysis of simple sharding](https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/shard-performance.svg)
 
 ## Haskell simulation
 
-- Fixed bug in Relay protocol preventing full diffusion of votes
-- Changed priority of certified EB to be included in RB
-- Added support for output log format sharing a common subset with the Rust sim
-- Analyzed TCP realism in comparison to idealized diffusion
-  - Found higher IB rate and size leads to better diffusion times
-  - Identified ledger state access as significant source of latency.
+- Fixed a bug in the relay protocol that prevented full diffusion of votes
+- Adjusted the priority of certified EBs for inclusion in RBs
+- Added support for an output log format that shares a common subset with the Rust simulator
+- Analyzed TCP realism in comparison to idealized diffusion:
+  - Discovered that higher IB rates and sizes improve diffusion times
+  - Identified ledger state access as a significant source of latency.
 
 ## Rust simulation
 
-- Added more information to logs (total size of IB, parent id of RB)
-- Implemented same EB selection strategy as Haskell
+- Expanded logs to include total IB size and parent ID of RBs
+- Implemented the same EB selection strategy as in the Haskell simulation
 - Added validation of IB headers before propagation to neighbors
-- Investigating why the simulation doesn't encounter as much congestion as Haskell.
+- Investigating lower congestion in the Rust simulation compared to Haskell.
 
 ## Formal methods
 
-- Developed initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`.
+- Developed the initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`.
 
 ## Research
 
-- Progressing on ledger design by exploring different implementation options and their trade-offs
+- Progressing on ledger design by exploring options and trade-offs
 - Analyzing how concurrent input blocks in Leios create unique ledger-level challenges not present in Praos
-- Evaluating approaches that balance multiple properties including:
+- Evaluating approaches that balance multiple properties, including:
   - Conflict avoidance in the blockchain
   - Guaranteed fee payment for block producers
   - Transaction eligibility and inclusion speed
   - User experience regarding fee payment
 - Investigating sharding-based solutions with various optimization strategies
-- Planning to share more detailed findings at our public meeting by the end of March
-- Aim to provide a comprehensive recommendation for implementors by the end of April.
+- Planning to share more detailed findings at Leios public meeting by the end of March
+- Targeting a comprehensive recommendation for implementors by the end of April.
 
 ### From Short Leios to Full Leios
 
 - Planning the simulation roadmap for transitioning from Short Leios (currently implemented) to Full Leios
 - Developing implementation guidelines for simulators to incorporate the pipeline referencing scheme specified in the papers
-- Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios
+- Identifying key components needed to simulate the complete ledger inclusion guarantees of Full Leios.
