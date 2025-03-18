@@ -1,4 +1,7 @@
 open import Leios.Prelude hiding (id)
+open import Data.Bool using (if_then_else_)
+
+open import Agda.Builtin.Word using (Word64; primWord64ToNat)
 
 module Parser where
 
@@ -16,11 +19,9 @@ module Parser where
 
 postulate
   Int : Set
-  Word64 : Set
   Micro : Set
   Map : Set → Set → Set
 
-{-# COMPILE GHC Word64 = type Data.Word.Word64 #-}
 {-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
 {-# COMPILE GHC Map = type Data.Map.Map #-}
 {-# COMPILE GHC Int = type Int #-}
@@ -75,6 +76,9 @@ open import Leios.Trace.Verifier
 open import Leios.Defaults 2 fzero using (st)
 open import Leios.Short st
 
+blockRefToString : BlockRef → String
+blockRefToString record { id = ref } = ref
+
 EventLog = List TraceEvent
 
 traceEvent→action : TraceEvent → Maybe (Action × LeiosInput)
@@ -91,14 +95,24 @@ traceEvent→action record { message = IBEnteredState x x₁ x₂ } = nothing
 traceEvent→action record { message = EBEnteredState x x₁ x₂ } = nothing
 traceEvent→action record { message = VTBundleEnteredState x x₁ x₂ } = nothing
 traceEvent→action record { message = RBEnteredState x x₁ x₂ } = nothing
-traceEvent→action record { message = IBGenerated p _ s _ _ _ } = just (IB-Role-Action , SLOT)
-traceEvent→action record { message = EBGenerated p _ s _ ibs } = just (EB-Role-Action , SLOT)
+traceEvent→action record { message = IBGenerated p _ s _ _ _ } = just (IB-Role-Action (primWord64ToNat s) , SLOT)
+traceEvent→action record { message = EBGenerated p _ s _ ibs } = just (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)
 traceEvent→action record { message = RBGenerated x x₁ x₂ x₃ x₄ x₅ x₆ x₇ } = nothing
-traceEvent→action record { message = VTBundleGenerated x x₁ x₂ x₃ x₄ } = just (V-Role-Action , SLOT)
+traceEvent→action record { message = VTBundleGenerated p _ s _ _ } = just (VT-Role-Action (primWord64ToNat s) , SLOT)
 
-verifyTrace : EventLog → Bool
-verifyTrace l =
-  let αs = L.catMaybes $ L.map traceEvent→action l
-  in ¿ ValidTrace αs ¿ᵇ
 
-{-# COMPILE GHC verifyTrace as verifyTrace #-}
+opaque
+  unfolding List-Model
+
+  verifyTrace : EventLog → ℕ
+  verifyTrace l =
+    let αs = L.catMaybes $ L.map traceEvent→action l
+    in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+
+  {-# COMPILE GHC verifyTrace as verifyTrace #-}
+
+  test : Bool
+  test = ¿ ValidTrace ((IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
+
+  _ : test ≡ true
+  _ = refl
