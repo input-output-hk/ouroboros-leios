@@ -181,6 +181,9 @@ are only supported by either the Rust or Haskell implementation:
 | `relay-strategy`           | Strategy for relaying blocks          |   ✅    |  ✅  |
 | `tcp-congestion-control`   | Enable TCP congestion control         |   ✅    |  ❌  |
 | `multiplex-mini-protocols` | Enable multiplexing of mini-protocols |   ✅    |  ❌  |
+| `simulate-transactions`    | Enable transaction simulation         |   ❌    |  ✅  |
+| `treat-blocks-as-full`     | Calculate delays and message sizes as if blocks were full | ✅ | ❌ |
+| `cleanup-policies`         | Policies for cleaning up expired data |   ✅    |  ❌  |
 
 #### Leios Protocol Configuration
 
