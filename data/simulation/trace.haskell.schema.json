@@ -133,6 +133,14 @@
         "id": {
           "type": "string"
         },
+        "parent": {
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
         "payload_bytes": {
           "type": "number"
         },

@@ -56,6 +56,9 @@ interface GeneratedRankingBlock extends GeneratedBlockEvent {
     vrf? : number;
     id? : string;
     payload_bytes? : number;
+    parent?: {
+        id: string;
+    };
 }
 
 interface GeneratedVote extends GeneratedBlockEvent {
