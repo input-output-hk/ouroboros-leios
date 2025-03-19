@@ -110,7 +110,9 @@ data LeiosNodeState m = LeiosNodeState
   , relayVoteState :: !(RelayVoteState m)
   , prunedVoteStateToVar :: !(TVar m SlotNo)
   -- ^ TODO: refactor into RelayState.
-  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId UTCTime))
+  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId (SlotNo, UTCTime)))
+  -- ^ records time we received the input block.
+  --   Also stores the SlotNo of the IB to ease pruning.
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
   , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
   -- ^ waiting for RB block itself to be validated.
@@ -573,9 +575,10 @@ pruneExpiredVotes ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredVotes _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
  where
   go p = do
+    let pruneIBDeliveryTo = succ $ snd (stageRangeOf @p leios p Short.Propose)
     let pruneTo = succ (lastVoteSend leios p)
     _ <- waitNextSlot slotConfig (succ (lastVoteRecv leios p))
     atomically $ do
@@ -584,6 +587,8 @@ pruneExpiredVotes _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
           let voteSlot = (snd voteEntry.value).slot
            in voteSlot >= pruneTo
       writeTVar st.prunedVoteStateToVar $! pruneTo
+      -- delivery times for IBs are only needed to vote, so they can be pruned too.
+      modifyTVar' st.ibDeliveryTimesVar $ Map.filter $ \(slot, _) -> slot >= pruneIBDeliveryTo
     go (succ p)
 
 computeLedgerStateThread ::
@@ -623,10 +628,11 @@ computeLedgerStateThread _tracer _cfg st = forever $ do
 
 adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
 adoptIB leiosState ib deliveryTime = do
+  let !ibSlot = ib.header.slot
   -- NOTE: voting relies on delivery times for IBs
   modifyTVar'
     leiosState.ibDeliveryTimesVar
-    (Map.insertWith min ib.id deliveryTime)
+    (Map.insertWith (\(_, x) (s, y) -> (,) s $! min x y) ib.id (ibSlot, deliveryTime))
 
   -- TODO: likely needs optimization, although EBs also grow slowly.
   modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete ib.id))
@@ -826,7 +832,7 @@ mkBuffersView cfg st = BuffersView{..}
             $ buffer
         receivedByCheck slot =
           filter
-            ( maybe False (<= slotTime cfg.slotConfig slot)
+            ( maybe False ((<= slotTime cfg.slotConfig slot) . snd)
                 . flip Map.lookup times
             )
         validInputBlocks q = receivedByCheck q.receivedBy $ generatedCheck q.generatedBetween
