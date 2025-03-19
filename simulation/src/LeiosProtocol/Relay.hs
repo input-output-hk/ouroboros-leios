@@ -14,6 +14,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
@@ -440,16 +441,16 @@ relayProducer config sst = TC.Yield MsgInit $ idle initRelayProducerLocalState
       when (expand.value == 0 && (isBlocking blocking || shrink.value == 0)) $ do
         throw $ RequestedNoChange (isBlocking blocking) shrink expand
       -- Shrink the window:
-      let keptValues = Seq.drop (fromIntegral shrink) lst.window
+      let !keptValues = Seq.drop (fromIntegral shrink) lst.window
       -- Find the new entries:
       newEntries <- readNewEntries sst blocking expand lst.lastTicket
       -- Expand the window:
-      let newValues = Seq.fromList [(e.key, e.ticket) | e <- Foldable.toList newEntries]
+      let newValues = Seq.fromList [(key, ticket) | RB.EntryWithTicket{..} <- Foldable.toList newEntries]
       let window' = keptValues <> newValues
       let lastTicket' = case newValues of
             Seq.Empty -> lst.lastTicket
             _ Seq.:|> (_, ticket) -> ticket
-      let lst' = lst{window = window', lastTicket = lastTicket'}
+      let !lst' = lst{window = window', lastTicket = lastTicket'}
       let responseList = fmap (fst . (.value)) newEntries
       -- Yield the new entries:
       withSingIBlockingStyle blocking $ do
@@ -547,7 +548,7 @@ runRelayConsumer config sst chan =
 -- implementation.
 type RelayConsumerLocalState :: Type -> Type -> Type -> N -> Type
 data RelayConsumerLocalState id header body n = RelayConsumerLocalState
-  { pendingRequests :: Nat n
+  { pendingRequests :: !(Nat n)
   , pendingExpand :: !WindowExpand
   -- ^ The number of headers that we have requested but
   -- which have not yet been replied to. We need to track this it keep
@@ -711,7 +712,7 @@ relayConsumerPipelined config sst =
             -- It's important not to pipeline more requests for headers when we
             -- have no bodies to ask for, since (with no other guard) this will
             -- put us into a busy-polling loop.
-            let lst' = lst0{pendingRequests = pendingRequests'}
+            let !lst' = lst0{pendingRequests = pendingRequests'}
 
             -- Note: the peer will proceed with only one of the two
             -- arguments of Collect, depending on whether responses are
@@ -720,7 +721,7 @@ relayConsumerPipelined config sst =
           Left lst -> do
             -- In this case there is nothing else to do so we block until we
             -- collect a reply.
-            let lst' = lst{pendingRequests = pendingRequests'}
+            let !lst' = lst{pendingRequests = pendingRequests'}
             return $ TS.Collect Nothing (handleResponse lst')
 
   done ::
@@ -783,7 +784,7 @@ relayConsumerPipelined config sst =
             else do
               let available2 = Map.withoutKeys lst.available idsToRequestSet
               modifyTVar' sst.inFlightVar $ Set.union idsToRequestSet
-              let !lst2 = lst{pendingRequests = Succ lst.pendingRequests, available = available2}
+              let !lst2 = lst{pendingRequests = Succ $! lst.pendingRequests, available = available2}
               return $
                 TS.YieldPipelined
                   (MsgRequestBodies idsToRequest)
