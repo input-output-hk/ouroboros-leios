@@ -37,7 +37,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Traversable
 import Data.Tuple (swap)
-import Debug.Trace (trace)
 import LeiosProtocol.Common
 import LeiosProtocol.Config
 import LeiosProtocol.Relay
@@ -56,7 +55,6 @@ import qualified PraosProtocol.PraosNode as PraosNode
 import STMCompat
 import SimTypes (cpuTask)
 import System.Random
-import Text.Printf (printf)
 
 --------------------------------------------------------------
 ---- Events
@@ -282,21 +280,25 @@ relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: S
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
     , shouldIgnore = do
-        -- FIXME: we want to ignore EBs that we pruned.
-        currSlot <- currentSlotNo cfg.slotConfig
-        atomically $ do
-          ebBuffer <- readTVar st.relayBufferVar
-          prunedTo <- readTVar leiosState.prunedUncertifiedEBStateToVar
-          pure $ \ebHeader -> do
-            -- Check whether or not the EB is older than prunedUncertifiedEBStateTo
-            let ebTooOld1 = ebHeader.slot < prunedTo
-            -- Check whether or not the EB is older than "eb-max-age-for-relay-slots"
-            let (endorseStart, _endorseEnd) = endorseRange cfg.leios $ pipelineOf @p cfg.leios Short.Endorse ebHeader.slot
-            let ebMaxSlotForRelay = endorseStart + fromIntegral cfg.leios.maxEndorseBlockAgeForRelaySlots
-            let ebTooOld2 = ebMaxSlotForRelay < currSlot
-            -- Check whether or not the EB is already in the relay buffer
-            let ebAlreadyInBuffer = RB.member ebHeader.id ebBuffer
-            ebTooOld1 || ebTooOld2 || ebAlreadyInBuffer
+        -- We possibly prune certified EBs (not referenced in the
+        -- chain) after maxEndorseBlockAgeSlots, so we should not end
+        -- up asking for their bodies again, in the remote possibility
+        -- they get offered.
+        assert (cfg.leios.maxEndorseBlockAgeForRelaySlots <= cfg.leios.maxEndorseBlockAgeSlots) $ do
+          currSlot <- currentSlotNo cfg.slotConfig
+          let oldestEBToRelay = currSlot - fromIntegral cfg.leios.maxEndorseBlockAgeForRelaySlots
+          atomically $ do
+            ebBuffer <- readTVar st.relayBufferVar
+            prunedTo <- readTVar leiosState.prunedUncertifiedEBStateToVar
+            pure $ \ebHeader -> do
+              -- Check whether or not the EB is older than prunedUncertifiedEBStateTo
+              -- Should be redundant with check against oldestEBToRelay: only EBs from previous pipeline are pruned this way.
+              let ebTooOld1 = ebHeader.slot < prunedTo
+              -- Check whether or not the EB is older than "eb-max-age-for-relay-slots"
+              let ebTooOld2 = ebHeader.slot < oldestEBToRelay
+              -- Check whether or not the EB is already in the relay buffer
+              let ebAlreadyInBuffer = RB.member ebHeader.id ebBuffer
+              ebTooOld1 || ebTooOld2 || ebAlreadyInBuffer
     }
 
 relayVoteConfig ::
@@ -489,13 +491,14 @@ pruneExpiredUnadoptedEBs ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = go (toEnum 0)
+pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
  where
   go :: PipelineNo -> m ()
   go p = do
-    let (endorseStart, endorseEnd) = endorseRange leios p
-    let pruneTo = succ (lastUnadoptedEB leios p)
-    _ <- waitNextSlot slotConfig pruneTo
+    let ebRange@(endorseStart, endorseEnd) = endorseRange leios p
+    let slotWhenEBsTooOldForRBs = succ $ endorseEnd + fromIntegral leios.maxEndorseBlockAgeSlots
+    let pruneTo = succ endorseEnd
+    _ <- waitNextSlot slotConfig slotWhenEBsTooOldForRBs
     chain <- atomically $ PraosNode.preferredChain st.praosState
     let rbsOnChain = takeWhile (\rb -> rb.blockHeader.headerSlot > endorseStart) . Chain.toNewestFirst $ chain
     let ebIdsOnChain =
@@ -513,7 +516,7 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = 
             RB.partition $ \ebEntry -> do
               let ebId = (snd ebEntry.value).id
               let ebSlot = (fst ebEntry.value).slot
-              let ebInPipeline = endorseStart <= ebSlot && ebSlot <= endorseEnd
+              let ebInPipeline = ebSlot `inRange` ebRange
               let ebAdopted = ebId `Set.member` ebIdsOnChain
               -- NOTE: pruneExpiredUnadoptedEBs runs long after pruneExpiredUncertifiedEBs,
               --       hence any EB from pipeline p MUST be certified at this point
@@ -525,12 +528,12 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = 
         -- Prune st.ibsNeededForEBVar for *certified* EBs in ebIdsToPrune:
         modifyTVar' st.ibsNeededForEBVar (`Map.withoutKeys` ebIdsToPrune)
         -- Update st.prunedUnadoptedEBStateToVar with the slot number pruned to.
+        -- TODO: Unused
         writeTVar st.prunedUnadoptedEBStateToVar $! pruneTo
         -- Return the pruned EBs.
         pure ebsPruned
     -- Emit trace events for pruning each EB
     for_ ebsPruned $ \eb -> do
-      trace (printf "Node %d pruned certified EB #%d" (coerce @_ @Int nodeId) eb.id.num) $ pure ()
       traceWith tracer $ LeiosNodeEvent Pruned (EventEB eb)
     -- Continue with the next pipeline.
     go (succ p)
@@ -544,13 +547,14 @@ pruneExpiredUncertifiedEBs ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st = go (toEnum 0)
+pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
  where
   go :: PipelineNo -> m ()
   go p = do
-    let (endorseStart, endorseEnd) = endorseRange leios p
-    let pruneTo = succ (lastVoteRecv leios p)
-    _ <- waitNextSlot slotConfig pruneTo
+    let (_, endorseEnd) = endorseRange leios p
+    let endOfVoting = succ (lastVoteRecv leios p)
+    let pruneTo = succ endorseEnd
+    _ <- waitNextSlot slotConfig endOfVoting
     ebsPruned <-
       atomically $ do
         votesForEB <- readTVar st.votesForEBVar
@@ -559,10 +563,10 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st 
           fmap (fmap snd . RB.values) . stateTVar st.relayEBState.relayBufferVar . RB.partition $ \ebEntry -> do
             let ebId = (fst ebEntry.value).id
             let ebSlot = (fst ebEntry.value).slot
-            let ebInPipeline = endorseStart <= ebSlot && ebSlot <= endorseEnd
+            let ebAlreadyVotedOn = ebSlot < pruneTo
             let ebNumVotes = maybe 0 (fromIntegral . sum . Map.elems) (Map.lookup ebId votesForEB)
             let ebCertified = ebNumVotes >= leios.votesForCertificate
-            ebInPipeline && not ebCertified
+            ebAlreadyVotedOn && not ebCertified
         -- Create set of EB ids to prune:
         let ebIdsToPrune = Set.fromList [eb.id | eb <- ebsPruned]
         -- Prune st.votesForEBVar for uncertified EBs in ebIdsToPrune:
@@ -575,7 +579,6 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{nodeId, leios, slotConfig} st 
         pure ebsPruned
     -- Emit trace events for pruning each EB
     for_ ebsPruned $ \eb -> do
-      trace (printf "Node %d pruned uncertified EB #%d" (coerce @_ @Int nodeId) eb.id.num) $ pure ()
       traceWith tracer $ LeiosNodeEvent Pruned (EventEB eb)
     -- Continue with the next pipeline.
     go (succ p)
