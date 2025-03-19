@@ -801,6 +801,7 @@ mkBuffersView cfg st = BuffersView{..}
     chain <- PraosNode.preferredChain st.praosState
     bufferEB <- readTVar st.relayEBState.relayBufferVar
     votesForEB <- readTVar st.votesForEBVar
+    ibsNeededForEB <- readTVar st.ibsNeededForEBVar
     -- RBs in the same chain should not contain certificates for the same pipeline.
     let pipelinesInChain =
           Set.fromList $
@@ -813,6 +814,9 @@ mkBuffersView cfg st = BuffersView{..}
     let tryCertify eb = do
           votes <- Map.lookup eb.id votesForEB
           guard (not $ Set.member (endorseBlockPipeline cfg.leios eb) pipelinesInChain)
+          -- Note: we expect to have received the IBs for any
+          -- certified EB, but degraded network could mean we do not.
+          guard (Map.lookup eb.id ibsNeededForEB == Just Set.empty)
           guard (cfg.leios.votesForCertificate <= totalVotes votes)
           return $! (eb.id,) $! mkCertificate cfg.leios votes
 
