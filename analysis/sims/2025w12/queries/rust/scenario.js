@@ -2,7 +2,10 @@ db.rust.aggregate(
 [
   {
     $group: {
-      _id: "$scenario"
+      _id: "$scenario",
+      time: {
+        $max: "$time_s"
+      }
     }
   },
   {
