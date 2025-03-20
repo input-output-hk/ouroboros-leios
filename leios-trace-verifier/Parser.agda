@@ -1,6 +1,8 @@
+open import Prelude.AssocList
 open import Leios.Prelude hiding (id)
-open import Data.Bool using (if_then_else_)
+open import Leios.Foreign.Util
 
+open import Data.Bool using (if_then_else_)
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
 
 module Parser where
@@ -58,7 +60,7 @@ data Event : Type where
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
   IBGenerated : String → String → SlotNo → Maybe Bytes → Maybe Bytes → Maybe String → Event
   EBGenerated : String → String → Word64 → Word64 → List BlockRef → Event
-  RBGenerated : String → Maybe String → Maybe Int → Word64 → Maybe Word64 → Maybe Endorsement → Maybe (List Endorsement) → Maybe Word64 → Event
+  RBGenerated : String → Maybe String → Maybe Int → Word64 → Maybe Word64 → Maybe Endorsement → Maybe (List Endorsement) → Maybe Word64 → Maybe BlockRef → Event
   VTBundleGenerated : String → String → Word64 → Word64 → Map String Word64 → Event
 
 {-# COMPILE GHC Event = data Event (Cpu | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived
@@ -71,48 +73,100 @@ record TraceEvent : Type where
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
 open import Leios.SpecStructure using (SpecStructure)
-open import Leios.Trace.Verifier
 
-open import Leios.Defaults 2 fzero using (st)
+open import Leios.Defaults 10 fzero hiding (LeiosInput; LeiosOutput; SLOT)
+open import Leios.Trace.Verifier 10 fzero
 open import Leios.Short st
+import Data.String as S
+
+nodeId : String → Fin 10
+nodeId "node-0" = fzero
+nodeId "node-1" = fsuc fzero
+nodeId "node-2" = fsuc $ fsuc fzero
+nodeId "node-3" = fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-4" = fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-5" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-6" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-7" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-8" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-9" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId s        = error ("Unknown node: " S.++ s)
+
+SUT : String
+SUT = "node-0"
 
 blockRefToString : BlockRef → String
 blockRefToString record { id = ref } = ref
 
 EventLog = List TraceEvent
 
-traceEvent→action : TraceEvent → Maybe (Action × LeiosInput)
-traceEvent→action record { message = Cpu x x₁ x₂ } = nothing
-traceEvent→action record { message = IBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = EBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = VTBundleSent x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = RBSent x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = IBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = EBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = VTBundleReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = RBReceived x x₁ x₂ x₃ x₄ x₅ } = nothing
-traceEvent→action record { message = IBEnteredState x x₁ x₂ } = nothing
-traceEvent→action record { message = EBEnteredState x x₁ x₂ } = nothing
-traceEvent→action record { message = VTBundleEnteredState x x₁ x₂ } = nothing
-traceEvent→action record { message = RBEnteredState x x₁ x₂ } = nothing
-traceEvent→action record { message = IBGenerated p _ s _ _ _ } = just (IB-Role-Action (primWord64ToNat s) , SLOT)
-traceEvent→action record { message = EBGenerated p _ s _ ibs } = just (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)
-traceEvent→action record { message = RBGenerated x x₁ x₂ x₃ x₄ x₅ x₆ x₇ } = nothing
-traceEvent→action record { message = VTBundleGenerated p _ s _ _ } = just (VT-Role-Action (primWord64ToNat s) , SLOT)
+data Blk : Type where
+  IB-Blk : InputBlock → Blk
+  EB-Blk : EndorserBlock → Blk
+  VT-Blk : List Vote → Blk
 
+traceEvent→action : AssocList String Blk → TraceEvent → AssocList String Blk × Maybe ((Action × LeiosInput) ⊎ FFDUpdate)
+traceEvent→action l record { message = Cpu _ _ _ } = l , nothing
+traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = IBReceived _ _ _ _ (just i) _ }
+  with l ⁉ i
+... | just (IB-Blk ib) = l ,  just (inj₂ (IB-Recv-Update ib))
+... | _ = l , nothing
+traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , nothing
+traceEvent→action l record { message = EBReceived _ _ _ _ (just i) _ }
+  with l ⁉ i
+... | just (EB-Blk eb) = l ,  just (inj₂ (EB-Recv-Update eb))
+... | _ = l , nothing
+traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , nothing
+traceEvent→action l record { message = VTBundleReceived _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = IBEnteredState _ _ _ } = l , nothing
+traceEvent→action l record { message = EBEnteredState _ _ _ } = l , nothing
+traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , nothing
+traceEvent→action l record { message = RBEnteredState _ _ _ } = l , nothing
+traceEvent→action l record { message = IBGenerated p i s _ _ _ }
+  with p ≟ SUT
+... | yes _ = l , just (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT))
+... | no _  = let ib = record { header =
+                         record { slotNumber = primWord64ToNat s
+                                ; producerID = nodeId p
+                                ; lotteryPf = tt
+                                ; bodyHash = ""
+                                ; signature = tt
+                                }
+                              ; body = record { txs = [] } } -- TODO: add transactions
+              in (i , IB-Blk ib) ∷ l , nothing
+traceEvent→action l record { message = EBGenerated p i s _ ibs }
+  with p ≟ SUT
+... | yes _ = l , just (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT))
+... | no _ = let eb = record
+                        { slotNumber = primWord64ToNat s
+                        ; producerID = nodeId p
+                        ; lotteryPf = tt
+                        ; ibRefs = map blockRefToString ibs
+                        ; ebRefs = []
+                        ; signature = tt
+                        }
+             in (i , EB-Blk eb) ∷ l , nothing
+traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = VTBundleGenerated p _ s _ _ } = l , just (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT))
+
+mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
+mapAccuml f s []       = s , []
+mapAccuml f s (x ∷ xs) =
+  let (s' , y)  = f s x
+      (s'' , ys) = mapAccuml f s' xs
+  in  s'' , y ∷ ys
 
 opaque
   unfolding List-Model
 
   verifyTrace : EventLog → ℕ
   verifyTrace l =
-    let αs = L.catMaybes $ L.map traceEvent→action l
+    let αs = L.catMaybes $ proj₂ (mapAccuml traceEvent→action [] l)
     in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
 
   {-# COMPILE GHC verifyTrace as verifyTrace #-}
-
-  test : Bool
-  test = ¿ ValidTrace ((IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
-
-  _ : test ≡ true
-  _ = refl
