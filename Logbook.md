@@ -1,5 +1,22 @@
 # Leios logbook
 
+## 2025-03-20
+
+### Analysis of simulations
+
+The Haskell and Rust simulators, at tag [leios-2025w12](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w12), were used to simulation 18 scenarios of Short Leios for varied IB production rate, IB size, and network topology. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w12/analysis.ipynb](analysis/sims/2025w12/analysis.ipynb).
+
+- In the simulations the Leios protocol scales well to mainnet-size networks.
+- The protocol tends to experience congestion once the input-block rate reaches 30 IB/s.
+- Even at the highest data rates studied, it appears that six vCPUs are sufficient to handle cryptographic operations.
+- Allowing IBs that are larger than current Praos RBs may have advantages in TCP efficiency, in network usage, and in adapting to fluctuating transaction loads.
+- A few minor unexplained differences remain when comparing the Haskell and Rust results, and these are under active investigation.
+- Overall, the two simulators are in essential agreement for the protocol parameters and network configurations studied.
+
+| Peak CPU                                                                                                               | Mean CPU                                                                                                               |
+|------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| ![analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png) | ![analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png) |
+
 ## 2025-03-14
 
 ### Haskell simulation
