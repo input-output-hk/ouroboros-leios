@@ -15,7 +15,7 @@ The Haskell and Rust simulators, at tag [leios-2025w12](https://github.com/input
 
 | Peak CPU                                                                                                               | Mean CPU                                                                                                               |
 |------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| [analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png) | [analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png) |
+| ![analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png) | ![analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png](analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png) |
 
 ## 2025-03-14
 
