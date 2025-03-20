@@ -20,7 +20,7 @@ module LeiosProtocol.Short.Sim where
 
 import Chan
 import Control.Exception (assert)
-import Control.Monad (forever)
+import Control.Monad (forever, guard)
 import Control.Monad.Class.MonadFork (MonadFork (forkIO))
 import Control.Monad.IOSim as IOSim (IOSim, runSimTrace)
 import Control.Tracer as Tracer (
@@ -49,6 +49,7 @@ import LeiosProtocol.Short.Node
 import ModelTCP
 import Network.TypedProtocol
 import PraosProtocol.BlockFetch (Message (..))
+import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode (PraosMessage (..), praosMessageLabel)
 import SimTCPLinks
 import SimTypes
@@ -110,6 +111,14 @@ logLeiosEvent nodeNames loudness e = case e of
     GenesisHash -> "genesis"
     BlockHash x -> show (coerce x :: Int)
   logNode nid (PraosNodeEvent x) = logPraos nid x
+  logNode nid (LeiosNodeEventLedgerState rbId) = do
+    guard emitDebug
+    Just $
+      mconcat
+        [ "tag" .= asString "ledgerstate"
+        , node nid
+        , "id" .= show (coerce rbId :: Int)
+        ]
   logNode nid (LeiosNodeEventCPU CPUTask{..}) =
     Just $
       mconcat
@@ -176,7 +185,14 @@ logLeiosEvent nodeNames loudness e = case e of
       Just $
         mconcat
           [cpuTag, node nid, "task" .= task]
-  logPraos _ (PraosNodeEventNewTip _chain) = Nothing
+  logPraos nid (PraosNodeEventNewTip chain) = do
+    guard emitDebug
+    Just $
+      mconcat
+        [ "tag" .= asString "chaintip"
+        , "id" .= rbRef (Chain.headHash chain)
+        , node nid
+        ]
   logMsg :: LeiosMessage -> Maybe Series
   logMsg (RelayIB msg) = (ibKind <>) <$> logRelay (.id) msg
   logMsg (RelayEB msg) = (ebKind <>) <$> logRelay (.id) msg

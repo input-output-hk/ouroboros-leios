@@ -77,6 +77,7 @@ data LeiosNodeEvent
   = PraosNodeEvent !(PraosNode.PraosNodeEvent RankingBlockBody)
   | LeiosNodeEventCPU !CPUTask
   | LeiosNodeEvent !BlockEvent !LeiosEventBlock
+  | LeiosNodeEventLedgerState !RankingBlockId
   deriving (Show)
 
 --------------------------------------------------------------
@@ -512,8 +513,8 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEn
         -- Prune st.relayEBState.relayBufferVar for *certified* EBs in the current pipeline
         -- which were not adopted as part of the chain, and return the set of pruned EBs:
         ebsPruned <-
-          fmap (fmap snd . RB.values) . stateTVar st.relayEBState.relayBufferVar $
-            RB.partition $ \ebEntry -> do
+          (fmap . fmap) snd . partitionRBVar st.relayEBState.relayBufferVar $
+            \ebEntry -> do
               let ebId = (snd ebEntry.value).id
               let ebSlot = (fst ebEntry.value).slot
               let ebInPipeline = ebSlot `inRange` ebRange
@@ -559,8 +560,8 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (to
       atomically $ do
         votesForEB <- readTVar st.votesForEBVar
         -- Prune st.relayEBState.relayBufferVar for EBs in pipeline p that did not become certified.
-        ebsPruned <-
-          fmap (fmap snd . RB.values) . stateTVar st.relayEBState.relayBufferVar . RB.partition $ \ebEntry -> do
+        ebsPruned <- (fmap . fmap) snd . partitionRBVar st.relayEBState.relayBufferVar $
+          \ebEntry -> do
             let ebId = (fst ebEntry.value).id
             let ebSlot = (fst ebEntry.value).slot
             let ebAlreadyVotedOn = ebSlot < pruneTo
@@ -591,20 +592,22 @@ pruneExpiredVotes ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
+pruneExpiredVotes tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
  where
   go p = do
     let pruneIBDeliveryTo = succ $ snd (stageRangeOf @p leios p Short.Propose)
     let pruneTo = succ (lastVoteSend leios p)
     _ <- waitNextSlot slotConfig (succ (lastVoteRecv leios p))
-    atomically $ do
-      modifyTVar' st.relayVoteState.relayBufferVar $
-        RB.filter $ \voteEntry ->
-          let voteSlot = (snd voteEntry.value).slot
-           in voteSlot >= pruneTo
+    votesPruned <- atomically $ do
       writeTVar st.prunedVoteStateToVar $! pruneTo
       -- delivery times for IBs are only needed to vote, so they can be pruned too.
       modifyTVar' st.ibDeliveryTimesVar $ Map.filter $ \(slot, _) -> slot >= pruneIBDeliveryTo
+      partitionRBVar st.relayVoteState.relayBufferVar $
+        \voteEntry ->
+          let voteSlot = (snd voteEntry.value).slot
+           in voteSlot < pruneTo
+    for_ votesPruned $ \vt -> do
+      traceWith tracer $ LeiosNodeEvent Pruned (EventVote $ snd vt)
     go (succ p)
 
 computeLedgerStateThread ::
@@ -614,8 +617,8 @@ computeLedgerStateThread ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-computeLedgerStateThread _tracer _cfg st = forever $ do
-  _readyLedgerState <- atomically $ do
+computeLedgerStateThread tracer _cfg st = forever $ do
+  readyLedgerState <- atomically $ do
     -- TODO: this will get more costly as the base chain grows,
     -- however it grows much more slowly than anything else.
     blocks <- readTVar st.praosState.blockFetchControllerState.blocksVar
@@ -639,7 +642,8 @@ computeLedgerStateThread _tracer _cfg st = forever $ do
     when (null readyLedgerState) retry
     modifyTVar' st.ledgerStateVar (`Map.union` Map.fromList readyLedgerState)
     return readyLedgerState
-  -- TODO? trace readyLedgerState
+  for_ readyLedgerState $ \(rb, _) -> do
+    traceWith tracer (LeiosNodeEventLedgerState rb)
   return ()
 
 adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
@@ -720,19 +724,19 @@ dispatchValidation tracer cfg leiosState req =
                     then leiosState.waitingForRBVar
                     -- TODO: assumes payload can be validated without content of EB, check with spec.
                     else leiosState.waitingForLedgerStateVar
-          modifyTVar' var $ Map.insertWith (++) prev [queue [task]]
+          waitFor var [(prev, [queue [task]])]
           return []
     ValidateIBS ibs deliveryTime completion -> do
       -- NOTE: IBs with an RB reference have to wait for ledger state of that RB.
       let waitingLedgerState =
-            Map.fromListWith
-              (++)
-              [ (rbHash, [queue [valIB ib deliveryTime completion]])
-              | ib <- ibs
-              , BlockHash rbHash <- [(fst ib).rankingBlock]
-              ]
+            [ (rbHash, [queue [valIB ib deliveryTime completion]])
+            | ib <- ibs
+            , BlockHash rbHash <- [(fst ib).rankingBlock]
+            ]
 
-      modifyTVar' leiosState.waitingForLedgerStateVar (`Map.union` waitingLedgerState)
+      waitFor
+        leiosState.waitingForLedgerStateVar
+        waitingLedgerState
 
       return [valIB ib deliveryTime completion | ib@(h, _) <- ibs, GenesisHash <- [h.rankingBlock]]
     ValidateEBS ebs completion -> do
@@ -894,3 +898,22 @@ mkSchedule cfg = do
   pickFromRanges rng0 rs = snd $ mapAccumL f rng0 rs
    where
     f rng r = coerce $ swap $ uniformR (coerce r :: (Word64, Word64)) rng
+
+-- * Utils
+
+partitionRBVar ::
+  (Ord key, MonadSTM m) =>
+  TVar m (RB.RelayBuffer key value) ->
+  (RB.EntryWithTicket key value -> Bool) ->
+  STM m [value]
+partitionRBVar var f = fmap RB.values . stateTVar' var $ RB.partition f
+
+waitFor ::
+  MonadSTM m =>
+  TVar m (Map RankingBlockId [STM m ()]) ->
+  [(RankingBlockId, [STM m ()])] ->
+  STM m ()
+waitFor var xs = do
+  modifyTVar'
+    var
+    (flip (Map.unionWith (++)) $ Map.fromListWith (++) xs)
