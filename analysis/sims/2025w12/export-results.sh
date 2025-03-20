@@ -6,33 +6,33 @@ mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=receipts \
             --type=csv \
-            --fields='elapsed,ib-body-avg-size-bytes,ib-generation-probability,item,kind,label,leios-stage-length-slots,network,producer,received,recipient,sent,simulator' \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,kind,item,producer,recipient,sent,received,elapsed' \
 | gzip -9vc > results/receipts.csv.gz
 
 mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=cpus \
             --type=csv \
-            --fields 'duration,ib-body-avg-size-bytes,ib-generation-probability,label,leios-stage-length-slots,network,node,simulator,slot,task' \
+            --fields 'simulator,network,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,label,slot,node,task,duration' \
 | gzip -9vc > results/cpus.csv.gz
 
 mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=ibgen \
             --type=csv \
-            --fields='eb-count,eb-first,eb-last,ib,ib-body-avg-size-bytes,ib-generation-probability,label,leios-stage-length-slots,network,node,simulator,time,size' \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,time,ib,node,eb-count,eb-first,eb-last,size' \
 | gzip -9vc > results/ibgen.csv.gz
 
 mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=ebgen \
             --type=csv \
-            --fields='eb,ib-body-avg-size-bytes,ib-count,ib-generation-probability,label,leios-stage-length-slots,network,node,rb-count,rb-first,rb-last,simulator,size,time' \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,time,eb,node,ib-count,rb-count,rb-first,rb-last,size' \
 | gzip -9vc > results/ebgen.csv.gz
 
 mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=rbgen \
             --type=csv \
-            --fields='eb-count,ib-body-avg-size-bytes,ib-generation-probability,label,leios-stage-length-slots,network,rb,simulator,time,size' \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,time,rb,eb-count,size' \
 | gzip -9vc > results/rbgen.csv.gz
