@@ -3,6 +3,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -24,6 +25,7 @@ module PraosProtocol.Common (
   module ConcreteBlock,
   module ProducerState,
   SlotConfig (..),
+  currentSlotNo,
   slotTime,
   slotConfigFromNow,
   PraosNodeEvent (..),
@@ -125,6 +127,14 @@ slotConfigFromNow :: MonadTime m => m SlotConfig
 slotConfigFromNow = do
   start <- getCurrentTime
   return $ SlotConfig{start, duration = 1}
+
+currentSlotNo :: MonadTime m => SlotConfig -> m SlotNo
+currentSlotNo slotConfig = do
+  currentTime <- getCurrentTime
+  let secondsSinceStart = realToFrac @_ @Double (currentTime `diffUTCTime` slotConfig.start)
+  let secondsPerSlot = realToFrac @_ @Double slotConfig.duration
+  let slotNo = fromIntegral @Word64 @SlotNo (floor (secondsSinceStart / secondsPerSlot))
+  pure slotNo
 
 blockBodyColor :: IsBody body => body -> (Double, Double, Double)
 blockBodyColor = hashToColor . coerce . hashBody

@@ -106,6 +106,9 @@ logLeiosEvent nodeNames loudness e = case e of
   vtKind = "kind" .= asString "VT"
   rbKind = "kind" .= asString "RB"
   cpuTag = "tag" .= asString "Cpu"
+  rbRef h = case h of
+    GenesisHash -> "genesis"
+    BlockHash x -> show (coerce x :: Int)
   logNode nid (PraosNodeEvent x) = logPraos nid x
   logNode nid (LeiosNodeEventCPU CPUTask{..}) =
     Just $
@@ -124,9 +127,7 @@ logLeiosEvent nodeNames loudness e = case e of
               [ "slot" .= ib.header.slot
               , "payload_bytes" .= fromBytes ib.body.size
               , "size_bytes" .= fromBytes (messageSizeBytes ib)
-              , "rb_ref" .= case (ib.header.rankingBlock) of
-                  GenesisHash -> "genesis"
-                  BlockHash x -> show (coerce x :: Int)
+              , "rb_ref" .= rbRef (ib.header.rankingBlock)
               ]
           EventEB eb ->
             mconcat
@@ -160,6 +161,7 @@ logLeiosEvent nodeNames loudness e = case e of
         , "size_bytes" .= fromBytes (messageSizeBytes h + messageSizeBytes b)
         , node nid
         , "endorsed" .= map fst b.endorseBlocks
+        , "parent" .= rbRef (blockPrevHash blk)
         ]
   logPraos nid (PraosNodeEventReceived blk) =
     Just $
@@ -254,6 +256,9 @@ sharedEvent nodeNames e = case e of
             , endorsement = Nothing
             , endorsements = Just . map (Shared.Endorsement . Shared.BlockRef . T.pack . mkStringId . fst) $ blk.blockBody.endorseBlocks
             , payload_bytes = Just . fromIntegral $ blk.blockBody.payload
+            , parent = do
+                h@BlockHash{} <- pure $ blockPrevHash blk
+                Just $! Shared.BlockRef{id = rbRef h}
             , ..
             }
       PraosNodeEventReceived blk ->
@@ -295,6 +300,9 @@ sharedEvent nodeNames e = case e of
         Shared.RBSent{block_id = Just $ T.pack $ show hash, block_ids = Just [], ..}
     _ -> Nothing
 
+  rbRef h = T.pack $ case h of
+    GenesisHash -> "genesis"
+    BlockHash x -> show (coerce x :: Int)
   sharedGenerated :: T.Text -> String -> Word64 -> LeiosEventBlock -> Shared.Event
   sharedGenerated producer (T.pack -> id) slot blk =
     case blk of
@@ -303,12 +311,7 @@ sharedEvent nodeNames e = case e of
           { size_bytes = Just (fromIntegral $ messageSizeBytes ib)
           , payload_bytes = Just (fromIntegral $ ib.body.size)
           , rb_ref =
-              Just $
-                T.pack
-                  ( case (ib.header.rankingBlock) of
-                      GenesisHash -> "genesis"
-                      BlockHash x -> show (coerce x :: Int)
-                  )
+              Just $ rbRef (ib.header.rankingBlock)
           , ..
           }
       EventEB eb -> Shared.EBGenerated{bytes = fromIntegral (messageSizeBytes eb), input_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.inputBlocks, ..}
@@ -378,6 +381,7 @@ traceRelayLink1 connectionOptions =
               , votingFrequencyPerStage = 4
               , votesForCertificate = 1 -- just two nodes available to vote!
               , maxEndorseBlockAgeSlots = 50
+              , maxEndorseBlockAgeForRelaySlots = 50
               , sizes -- TODO: realistic sizes
                 =
                   SizesConfig

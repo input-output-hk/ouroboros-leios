@@ -104,6 +104,7 @@ data Event where
     , endorsement :: !(Maybe Endorsement)
     , endorsements :: !(Maybe [Endorsement])
     , payload_bytes :: !(Maybe Word64)
+    , parent :: !(Maybe BlockRef)
     } ->
     Event
   VTBundleGenerated ::
