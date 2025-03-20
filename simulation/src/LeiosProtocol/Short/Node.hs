@@ -103,6 +103,7 @@ data LeiosNodeConfig = LeiosNodeConfig
 data LeiosNodeState m = LeiosNodeState
   { praosState :: !(PraosNode.PraosNodeState RankingBlockBody m)
   , relayIBState :: !(RelayIBState m)
+  , prunedIBStateToVar :: !(TVar m SlotNo)
   , relayEBState :: !(RelayEBState m)
   , prunedUnadoptedEBStateToVar :: !(TVar m SlotNo)
   , prunedUncertifiedEBStateToVar :: !(TVar m SlotNo)
@@ -244,7 +245,7 @@ relayIBConfig ::
   LeiosNodeConfig ->
   ([InputBlockHeader] -> m ()) ->
   SubmitBlocks m InputBlockHeader InputBlockBody ->
-  RelayIBState m ->
+  LeiosNodeState m ->
   RelayConsumerConfig InputBlockId InputBlockHeader InputBlockBody m
 relayIBConfig _tracer cfg validateHeaders submitBlocks st =
   RelayConsumerConfig
@@ -256,9 +257,10 @@ relayIBConfig _tracer cfg validateHeaders submitBlocks st =
     , maxHeadersToRequest = cfg.leios.ibDiffusion.maxHeadersToRequest
     , maxBodiesToRequest = cfg.leios.ibDiffusion.maxBodiesToRequest
     , submitBlocks
-    , shouldIgnore = do
-        buff <- readTVarIO st.relayBufferVar
-        return $ flip RB.member buff . (.id)
+    , shouldIgnore = atomically $ do
+        prunedTo <- readTVar st.prunedIBStateToVar
+        buff <- readTVar st.relayIBState.relayBufferVar
+        return $ \h -> h.slot < prunedTo || h.id `RB.member` buff
     }
 
 relayEBConfig ::
@@ -348,6 +350,7 @@ newLeiosNodeState ::
 newLeiosNodeState cfg = do
   praosState <- PraosNode.newPraosNodeState cfg.baseChain
   relayIBState <- newRelayState
+  prunedIBStateToVar <- newTVarIO (toEnum 0)
   relayEBState <- newRelayState
   prunedUnadoptedEBStateToVar <- newTVarIO (toEnum 0)
   prunedUncertifiedEBStateToVar <- newTVarIO (toEnum 0)
@@ -415,7 +418,7 @@ leiosNode tracer cfg followers peers = do
   ibThreads <-
     setupRelay
       cfg.leios
-      (relayIBConfig tracer cfg valHeaderIB submitIB relayIBState)
+      (relayIBConfig tracer cfg valHeaderIB submitIB leiosState)
       relayIBState
       (map (.protocolIB) followers)
       (map (.protocolIB) peers)
@@ -469,6 +472,9 @@ leiosNode tracer cfg followers peers = do
           , [ pruneExpiredUnadoptedEBs tracer cfg leiosState
             | CleanupExpiredUnadoptedEb `isEnabledIn` cfg.leios.cleanupPolicies
             ]
+          , [ pruneExpiredIBs tracer cfg leiosState
+            | CleanupExpiredIb `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
           ]
 
   return $
@@ -482,6 +488,23 @@ leiosNode tracer cfg followers peers = do
       , computeLedgerStateThreads
       , pruningThreads
       ]
+
+-- Actually prunes IBs we should stop delivering.
+pruneExpiredIBs :: (Monad m, MonadDelay m, MonadSTM m, MonadTime m) => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
+pruneExpiredIBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+ where
+  go p = do
+    -- TODO: could end when Endorse ends, but we want them around for voting.
+    let endOfIBDiffusion = succ $ lastVoteSend leios p
+    let pruneTo = succ $ snd $ proposeRange leios p
+    _ <- waitNextSlot slotConfig endOfIBDiffusion
+    ibsPruned <- atomically $ do
+      writeTVar st.prunedIBStateToVar $! pruneTo
+      partitionRBVar st.relayIBState.relayBufferVar $
+        \ibEntry -> (fst ibEntry.value).slot < pruneTo
+    for_ ibsPruned $ \(uncurry InputBlock -> ib) ->
+      traceWith tracer $! LeiosNodeEvent Pruned (EventIB ib)
+    go (succ p)
 
 -- rEB slots after the end of vote-receiving,
 -- prune EBs that became certified but were not adopted by an RB.

@@ -469,6 +469,10 @@ endorseRange :: LeiosConfig -> PipelineNo -> (SlotNo, SlotNo)
 endorseRange cfg@LeiosConfig{pipeline = (_ :: SingPipeline p)} p =
   stageRangeOf @p cfg p Endorse
 
+proposeRange :: LeiosConfig -> PipelineNo -> (SlotNo, SlotNo)
+proposeRange cfg@LeiosConfig{pipeline = (_ :: SingPipeline p)} p =
+  stageRangeOf @p cfg p Propose
+
 lastUnadoptedEB :: LeiosConfig -> PipelineNo -> SlotNo
 lastUnadoptedEB leios@LeiosConfig{pipeline = (_ :: SingPipeline p), maxEndorseBlockAgeSlots} pipelineNo =
   lastVoteRecv leios pipelineNo + toEnum maxEndorseBlockAgeSlots
