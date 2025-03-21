@@ -1287,26 +1287,14 @@ impl Node {
         ibs
     }
 
-    fn select_ebs_for_eb(&mut self, slot: u64) -> Vec<EndorserBlockId> {
+    fn select_ebs_for_eb(&self, slot: u64) -> Vec<EndorserBlockId> {
         let Some(referenced_slots) = self.slots_referenced_by_ebs(slot) else {
             return vec![];
         };
 
-        let slots_with_ebs_already_referenced = self
-            .praos
-            .blocks
-            .values()
-            .filter_map(|b| b.endorsement.as_ref())
-            .map(|e| e.eb.slot)
-            .collect::<HashSet<_>>();
-
         // include one certified EB from each of these pipelines
         let mut ebs = vec![];
         for pipeline_slot in referenced_slots {
-            // An EB from this pipeline has already been referenced. Don't include another.
-            if slots_with_ebs_already_referenced.contains(&pipeline_slot) {
-                continue;
-            }
             if let Some(eb) = self.choose_endorsed_block_from_slot(pipeline_slot) {
                 ebs.push(eb);
             }
