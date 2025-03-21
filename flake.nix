@@ -7,7 +7,7 @@
       url = "github:input-output-hk/iogx";
     };
 
-    leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?ref=1bea2eaedf3cc38448a11819f3e2a7ab75b24735";
+      leios-spec.url = "github:input-output-hk/ouroboros-leios-formal-spec?ref=5886fcd1cb6eeebac146dc67d052a58e1304327d";
   };
 
 

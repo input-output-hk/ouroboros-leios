@@ -38,8 +38,8 @@ executable parser
       , trace-parser
       , optparse-applicative
 
-  default-language: Haskell2010
-  ghc-options:      -Wall
+    default-language: Haskell2010
+    ghc-options:      -Wall
 
 library
     import: globalOptions
