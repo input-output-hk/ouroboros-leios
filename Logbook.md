@@ -2,6 +2,22 @@
 
 ## 2025-03-21
 
+### Haskell simulation
+
+- Implemented expiration of blocks
+  - Has to be enabled via the `cleanup-policies` configuration parameter.
+  - Greatly improves memory use of the simulation.
+  - Blocks are cleared from relay buffer as soon as they should stop
+    diffusing, then cleared from other state as specified.
+  - Resumption of IB diffusion or other catch-up diffusion mechanisms
+    are not implemented atm, so scenarios where the network gets very
+    congested might not give representative results.
+- First stab at Full Leios implementation
+  - Only lightly tested so far.
+  - Added `praos-chain-quality` configuration parameter for the `\eta`
+    parameter from the spec.
+    - default should be revised with input from research.
+
 ### Formal methods
 
 - Short Leios trace verification: For Short Leios we are modelling the local state evolution of a node. In addition to the transitions in the Short Leios relation there are updates to the state (for example the network or the underlying ledger) which we now cover in a larger relation. The mapping from simulation log to state updates has been refined
