@@ -111,15 +111,15 @@ traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , nothing
 traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , nothing
 traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , nothing
 traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = IBReceived _ _ _ _ (just i) _ }
-  with l ⁉ i
-... | just (IB-Blk ib) = l ,  just (inj₂ (IB-Recv-Update ib))
-... | _ = l , nothing
+traceEvent→action l record { message = IBReceived _ p _ _ (just i) _ }
+  with p ≟ SUT | l ⁉ i
+... | yes _ | just (IB-Blk ib) = l ,  just (inj₂ (IB-Recv-Update ib))
+... | _ | _ = l , nothing
 traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , nothing
-traceEvent→action l record { message = EBReceived _ _ _ _ (just i) _ }
-  with l ⁉ i
-... | just (EB-Blk eb) = l ,  just (inj₂ (EB-Recv-Update eb))
-... | _ = l , nothing
+traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
+  with p ≟ SUT | l ⁉ i
+... | yes _ | just (EB-Blk eb) = l ,  just (inj₂ (EB-Recv-Update eb))
+... | _ | _ = l , nothing
 traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , nothing
 traceEvent→action l record { message = VTBundleReceived _ _ _ _ _ _ } = l , nothing
 traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , nothing
@@ -133,9 +133,9 @@ traceEvent→action l record { message = IBGenerated p i s _ _ _ }
 ... | no _  = let ib = record { header =
                          record { slotNumber = primWord64ToNat s
                                 ; producerID = nodeId p
-                                ; lotteryPf = tt
-                                ; bodyHash = ""
-                                ; signature = tt
+                                ; lotteryPf  = tt
+                                ; bodyHash   = ""
+                                ; signature  = tt
                                 }
                               ; body = record { txs = [] } } -- TODO: add transactions
               in (i , IB-Blk ib) ∷ l , nothing
@@ -145,10 +145,10 @@ traceEvent→action l record { message = EBGenerated p i s _ ibs }
 ... | no _ = let eb = record
                         { slotNumber = primWord64ToNat s
                         ; producerID = nodeId p
-                        ; lotteryPf = tt
-                        ; ibRefs = map blockRefToString ibs
-                        ; ebRefs = []
-                        ; signature = tt
+                        ; lotteryPf  = tt
+                        ; ibRefs     = map blockRefToString ibs
+                        ; ebRefs     = []
+                        ; signature  = tt
                         }
              in (i , EB-Blk eb) ∷ l , nothing
 traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , nothing
