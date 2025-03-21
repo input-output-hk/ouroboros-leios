@@ -72,6 +72,10 @@
       },
       "type": "object"
     },
+    "LeiosVariant": {
+      "enum": ["short", "full"],
+      "type": "string"
+    },
     "LogNormalDistribution": {
       "properties": {
         "distribution": {
@@ -244,6 +248,10 @@
       "description": "Only supported by Rust simulation.",
       "type": "number"
     },
+    "leios-header-diffusion-time-ms": {
+      "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.\n\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
@@ -253,6 +261,10 @@
       "additionalProperties": false,
       "properties": {},
       "type": "number"
+    },
+    "leios-variant": {
+      "$ref": "#/definitions/LeiosVariant",
+      "description": "Only supported by Rust simulation."
     },
     "leios-vote-send-recv-stages": {
       "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",

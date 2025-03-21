@@ -53,12 +53,14 @@ impl From<DistributionConfig> for FloatDistribution {
 #[serde(rename_all = "kebab-case")]
 pub struct RawParameters {
     // Simulation Configuration
+    pub leios_variant: LeiosVariant,
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
     pub leios_stage_active_voting_slots: u64,
+    pub leios_header_diffusion_time_ms: f64,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -121,6 +123,13 @@ pub enum DiffusionStrategy {
     PeerOrder,
     FreshestFirst,
     OldestFirst,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum LeiosVariant {
+    Short,
+    Full,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -404,6 +413,8 @@ pub struct SimConfiguration {
     pub links: Vec<LinkConfiguration>,
     pub stage_length: u64,
     pub max_eb_age: u64,
+    pub(crate) variant: LeiosVariant,
+    pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -429,6 +440,8 @@ impl SimConfiguration {
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
             links: topology.links,
+            variant: params.leios_variant,
+            header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,

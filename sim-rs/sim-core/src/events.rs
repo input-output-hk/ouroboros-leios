@@ -149,6 +149,7 @@ pub enum Event {
         id: EndorserBlockId<Node>,
         bytes: u64,
         input_blocks: Vec<InputBlockId<Node>>,
+        endorser_blocks: Vec<EndorserBlockId<Node>>,
     },
     EBSent {
         #[serde(flatten)]
@@ -379,6 +380,11 @@ impl EventTracker {
                 .ibs
                 .iter()
                 .map(|id| self.to_input_block(*id))
+                .collect(),
+            endorser_blocks: block
+                .ebs
+                .iter()
+                .map(|id| self.to_endorser_block(*id))
                 .collect(),
         });
     }

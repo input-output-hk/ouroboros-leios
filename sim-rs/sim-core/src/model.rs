@@ -178,6 +178,7 @@ pub struct EndorserBlock {
     pub bytes: u64,
     // The real impl will store hashes
     pub ibs: Vec<InputBlockId>,
+    pub ebs: Vec<EndorserBlockId>,
 }
 impl EndorserBlock {
     pub fn id(&self) -> EndorserBlockId {
@@ -223,6 +224,7 @@ pub enum NoVoteReason {
     InvalidSlot,
     ExtraIB,
     MissingIB,
+    MissingEB,
 }
 
 #[derive(Clone, Debug, Serialize)]

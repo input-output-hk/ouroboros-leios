@@ -22,9 +22,11 @@ cleanup-policies: ["cleanup-expired-vote"]
 # Leios Protocol Configuration
 ################################################################################
 
+leios-variant: short
 leios-stage-length-slots: 20
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
+leios-header-diffusion-time-ms: 1000.0
 
 ################################################################################
 # Transaction Configuration

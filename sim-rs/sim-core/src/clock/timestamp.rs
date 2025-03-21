@@ -7,12 +7,20 @@ use std::{
 use serde::Serialize;
 
 /// A timestamp tracks the time from the start of the simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct Timestamp(Duration);
 
 impl Timestamp {
     pub fn zero() -> Self {
         Self(Duration::from_secs(0))
+    }
+
+    pub fn from_secs(secs: u64) -> Self {
+        Self(Duration::from_secs(secs))
+    }
+
+    pub fn checked_sub_duration(self, rhs: Duration) -> Option<Self> {
+        Some(Self(self.0.checked_sub(rhs)?))
     }
 }
 
