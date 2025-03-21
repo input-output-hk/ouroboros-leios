@@ -85,6 +85,9 @@ instance Default CleanupPolicies where
 allCleanupPolicies :: CleanupPolicies
 allCleanupPolicies = CleanupPolicies $ Set.fromList [minBound .. maxBound]
 
+data LeiosVariant = Short | Full
+  deriving (Show, Eq, Generic)
+
 data Config = Config
   { relayStrategy :: RelayStrategy
   , tcpCongestionControl :: Bool
@@ -95,6 +98,9 @@ data Config = Config
   , leiosStageLengthSlots :: Word
   , leiosStageActiveVotingSlots :: Word
   , leiosVoteSendRecvStages :: Bool
+  , leiosVariant :: LeiosVariant
+  , leiosHeaderDiffusionTimeMs :: DurationMs
+  , praosChainQuality :: Double
   , txGenerationDistribution :: Distribution
   , txSizeBytesDistribution :: Distribution
   , txValidationCpuTimeMs :: DurationMs
@@ -164,6 +170,9 @@ instance Default Config where
       , leiosStageLengthSlots = 20
       , leiosStageActiveVotingSlots = 1
       , leiosVoteSendRecvStages = False
+      , leiosVariant = Short
+      , leiosHeaderDiffusionTimeMs = 1000
+      , praosChainQuality = 20
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
       , txSizeBytesDistribution = LogNormal{mu = 6.833, sigma = 1.127}
       , txValidationCpuTimeMs = 1.5
@@ -233,6 +242,9 @@ configToKVsWith getter cfg =
     , get @"multiplexMiniProtocols" getter cfg
     , get @"treatBlocksAsFull" getter cfg
     , get @"cleanupPolicies" getter cfg
+    , get @"leiosVariant" getter cfg
+    , get @"leiosHeaderDiffusionTimeMs" getter cfg
+    , get @"praosChainQuality" getter cfg
     , get @"simulateTransactions" getter cfg
     , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
@@ -316,6 +328,9 @@ instance FromJSON Config where
     multiplexMiniProtocols <- parseFieldOrDefault @Config @"multiplexMiniProtocols" obj
     treatBlocksAsFull <- parseFieldOrDefault @Config @"treatBlocksAsFull" obj
     cleanupPolicies <- parseFieldOrDefault @Config @"cleanupPolicies" obj
+    leiosVariant <- parseFieldOrDefault @Config @"leiosVariant" obj
+    leiosHeaderDiffusionTimeMs <- parseFieldOrDefault @Config @"leiosHeaderDiffusionTimeMs" obj
+    praosChainQuality <- parseFieldOrDefault @Config @"praosChainQuality" obj
     simulateTransactions <- parseFieldOrDefault @Config @"simulateTransactions" obj
     leiosStageLengthSlots <- parseFieldOrDefault @Config @"leiosStageLengthSlots" obj
     leiosStageActiveVotingSlots <- parseFieldOrDefault @Config @"leiosStageActiveVotingSlots" obj
@@ -462,6 +477,13 @@ instance FromJSON RelayStrategy where
   parseJSON = genericParseJSON defaultEnumOptions
 
 instance ToJSON RelayStrategy where
+  toJSON = genericToJSON defaultEnumOptions
+  toEncoding = genericToEncoding defaultEnumOptions
+
+instance FromJSON LeiosVariant where
+  parseJSON = genericParseJSON defaultEnumOptions
+
+instance ToJSON LeiosVariant where
   toJSON = genericToJSON defaultEnumOptions
   toEncoding = genericToEncoding defaultEnumOptions
 

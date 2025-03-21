@@ -249,7 +249,7 @@
       "type": "number"
     },
     "leios-header-diffusion-time-ms": {
-      "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.\n\nOnly supported by Rust simulation.",
+      "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.",
       "type": "number"
     },
     "leios-stage-active-voting-slots": {
@@ -273,6 +273,10 @@
     "multiplex-mini-protocols": {
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
+    },
+    "praos-chain-quality": {
+      "description": "Praos blockchain quality parameter.\nThis is η from the Leios paper.\nControls the pipelines EBs should reference in Full leios:\n  i - ⌈3η/L⌉, …, i-3\nwhere i is the index of the current pipeline.\n\nOnly supported by Haskell simulation",
+      "type": "number"
     },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,

@@ -38,10 +38,17 @@ export interface Config {
   /**
    * The expected time it takes a header to fully diffuse across the network.
    * This is Δhdr from the Leios paper.
-   * 
-   * Only supported by Rust simulation. */
+   * */
   "leios-header-diffusion-time-ms": number;
-
+  /**
+   * Praos blockchain quality parameter.
+   * This is η from the Leios paper.
+   * Controls the pipelines EBs should reference in Full leios:
+   *   i - ⌈3η/L⌉, …, i-3
+   * where i is the index of the current pipeline.
+   *
+   * Only supported by Haskell simulation */
+  "praos-chain-quality": number;
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
