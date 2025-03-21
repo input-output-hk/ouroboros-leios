@@ -9,6 +9,12 @@ module Parser where
 
 {-# FOREIGN GHC
   {-# LANGUAGE OverloadedStrings #-}
+
+  import Data.Word
+  import Data.Fixed
+  import qualified Data.Map as M
+  import qualified Data.ByteString.Lazy.Char8 as BSL8
+  import LeiosEvents
 #-}
 
 postulate
@@ -18,17 +24,11 @@ postulate
   elems : ∀ {k v} → Map k v → List v
 
 {-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
-{-# COMPILE GHC Map = type Data.Map.Map #-}
+{-# COMPILE GHC Map = type M.Map #-}
 {-# COMPILE GHC Int = type Int #-}
 
 {-# FOREIGN GHC
-  import Data.Word
-  import Data.Fixed
-  import Data.Map as M
-  import qualified Data.ByteString.Lazy.Char8 as BSL8
-  import LeiosEvents
-
-elems :: Map k v -> [v]
+elems :: M.Map k v -> [v]
 elems = M.elems
 #-}
 
