@@ -140,10 +140,14 @@ logLeiosEvent nodeNames loudness e = case e of
               , "size_bytes" .= fromBytes (messageSizeBytes ib)
               , "rb_ref" .= rbRef (ib.header.rankingBlock)
               ]
-          EventEB eb ->
+          EventEB eb -> do
+            let ebRefs = case eb.endorseBlocksEarlierPipeline of
+                  [] -> mempty
+                  ebrefs -> "endorse_blocks" .= map mkStringId ebrefs
             mconcat
               [ "slot" .= eb.slot
               , "input_blocks" .= map mkStringId eb.inputBlocks
+              , ebRefs
               , "size_bytes" .= fromBytes (messageSizeBytes eb)
               ]
           EventVote vt ->
@@ -393,6 +397,9 @@ traceRelayLink1 connectionOptions =
               , -- expected EndorseBlock generation rate per stage, at most one per _node_ in each (pipeline, stage).
                 endorseBlockFrequencyPerStage = 4
               , cleanupPolicies = def
+              , variant = Short
+              , headerDiffusionTime = 1
+              , pipelinesToReferenceFromEB = 0
               , activeVotingStageLength = 1
               , pipeline = SingSingleVote
               , voteSendStage = Vote

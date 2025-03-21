@@ -17,6 +17,7 @@
 module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..)) where
 
 import Chan (mkConnectionConfig)
+import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Kind
@@ -106,7 +107,7 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , cleanupPolicies :: CleanupPolicies
   -- ^ active cleanup policies
   , variant :: LeiosVariant
-  , headerDiffusionTime :: DiffTime
+  , headerDiffusionTime :: NominalDiffTime
   -- ^ Δ_{hdr}.
   , pipelinesToReferenceFromEB :: Int
   -- ^ how many older pipelines to reference from an EB when `variant = Full`.
@@ -143,7 +144,7 @@ convertConfig disk =
           , maxEndorseBlockAgeForRelaySlots = fromIntegral disk.ebMaxAgeForRelaySlots
           , cleanupPolicies = disk.cleanupPolicies
           , variant = disk.leiosVariant
-          , headerDiffusionTime = durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
+          , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
           , pipelinesToReferenceFromEB =
               if disk.leiosVariant == Full
                 then
@@ -223,6 +224,8 @@ convertConfig disk =
           fromIntegral $
             disk.ebSizeBytesConstant
               + disk.ebSizeBytesPerIb `forEach` eb.inputBlocks
+              -- TODO: make it a per-ref field.
+              + disk.ebSizeBytesPerIb `forEach` eb.endorseBlocksEarlierPipeline
       , voteMsg = \vt ->
           fromIntegral $
             disk.voteBundleSizeBytesConstant
@@ -411,7 +414,7 @@ instance IsPipeline a => Bounded (Stage a) where
     [] -> undefined
   maxBound = last allStages
 
-inRange :: SlotNo -> (SlotNo, SlotNo) -> Bool
+inRange :: Ord a => a -> (a, a) -> Bool
 inRange s (a, b) = a <= s && s <= b
 
 rangePrefix :: Int -> (SlotNo, SlotNo) -> (SlotNo, SlotNo)
@@ -489,9 +492,15 @@ proposeRange :: LeiosConfig -> PipelineNo -> (SlotNo, SlotNo)
 proposeRange cfg@LeiosConfig{pipeline = (_ :: SingPipeline p)} p =
   stageRangeOf @p cfg p Propose
 
+pipelineRange :: LeiosConfig -> PipelineNo -> (SlotNo, SlotNo)
+pipelineRange cfg p = (fst $ proposeRange cfg p, lastVoteRecv cfg p)
+
 lastUnadoptedEB :: LeiosConfig -> PipelineNo -> SlotNo
 lastUnadoptedEB leios@LeiosConfig{pipeline = (_ :: SingPipeline p), maxEndorseBlockAgeSlots} pipelineNo =
   lastVoteRecv leios pipelineNo + toEnum maxEndorseBlockAgeSlots
+
+endorseBlockPipeline :: LeiosConfig -> EndorseBlock -> PipelineNo
+endorseBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} eb = pipelineOf @p cfg Endorse eb.slot
 
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
@@ -526,21 +535,27 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
   ib = InputBlock{header, body = InputBlockBody{id = header.id, size = bodySize, slot = header.slot}}
 
 mkEndorseBlock ::
-  LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [InputBlockId] -> EndorseBlock
-mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer inputBlocks =
-  -- Endorse blocks are produced at the beginning of the stage.
-  assert (stageStart @p cfg Endorse slot Endorse == Just slot) $
-    fixSize cfg $
-      EndorseBlock{endorseBlocksEarlierStage = [], endorseBlocksEarlierPipeline = [], size = 0, ..}
+  LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [EndorseBlockId] -> [InputBlockId] -> EndorseBlock
+mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer endorseBlocksEarlierPipeline inputBlocks =
+  assert (cfg.variant == Full || null endorseBlocksEarlierPipeline) $
+    -- Endorse blocks are produced at the beginning of the stage.
+    assert (stageStart @p cfg Endorse slot Endorse == Just slot) $
+      rnf endorseBlocksEarlierPipeline `seq`
+        rnf inputBlocks `seq`
+          fixSize
+            cfg
+            EndorseBlock{endorseBlocksEarlierStage = [], size = 0, ..}
 
 mockEndorseBlock :: LeiosConfig -> Int -> EndorseBlock
 mockEndorseBlock cfg n =
-  mkEndorseBlock
-    cfg
-    (EndorseBlockId (NodeId 0) 0)
-    0
-    (NodeId 0)
-    [InputBlockId (NodeId 0) i | i <- [0 .. n - 1]]
+  assert (cfg.variant /= Full) $
+    mkEndorseBlock
+      cfg
+      (EndorseBlockId (NodeId 0) 0)
+      0
+      (NodeId 0)
+      []
+      [InputBlockId (NodeId 0) i | i <- [0 .. n - 1]]
 
 mockFullEndorseBlock :: LeiosConfig -> EndorseBlock
 mockFullEndorseBlock cfg = mockEndorseBlock cfg $ cfg.sliceLength * (ceiling cfg.inputBlockFrequencyPerSlot)
@@ -629,8 +644,10 @@ newtype InputBlocksSnapshot = InputBlocksSnapshot
   { validInputBlocks :: InputBlocksQuery -> [InputBlockId]
   }
 
-newtype EndorseBlocksSnapshot = EndorseBlocksSnapshot
+data EndorseBlocksSnapshot = EndorseBlocksSnapshot
   { validEndorseBlocks :: (SlotNo, SlotNo) -> [EndorseBlock]
+  , --  , endorseBlocksInChain :: (SlotNo, SlotNo) -> [EndorseBlock]
+    certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
   }
 
 -- | Both constraints are inclusive.
@@ -656,16 +673,37 @@ inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buf
         , receivedBy
         }
 
+-- | Returns possible EBs to reference from current pipeline EB.
+endorseBlocksToReference ::
+  LeiosConfig ->
+  PipelineNo ->
+  EndorseBlocksSnapshot ->
+  (PipelineNo -> UTCTime -> Bool) ->
+  [(PipelineNo, [EndorseBlock])]
+endorseBlocksToReference LeiosConfig{variant = Short} _ _ _ = []
+endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapshot{..} checkDeliveryTime =
+  [ (p, [eb | (eb, _, _) <- es])
+  | (p, es) <- ebs
+  , or [checkDeliveryTime p t | (_, _, t) <- es]
+  ]
+ where
+  newestPL = toEnum $ max 0 $ fromEnum pl - 2
+  oldestPL = toEnum $ max 0 $ fromEnum newestPL - cfg.pipelinesToReferenceFromEB
+  ebs = certifiedEndorseBlocks (oldestPL, newestPL)
+
 shouldVoteOnEB ::
   LeiosConfig ->
+  SlotConfig ->
   -- | current slot
   SlotNo ->
   InputBlocksSnapshot ->
+  EndorseBlocksSnapshot ->
   EndorseBlock ->
   Bool
-shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot _buffers
+shouldVoteOnEB cfg@LeiosConfig{voteSendStage} _ slot _buffers _
+  -- checks whether a pipeline has been started before.
   | Nothing <- stageRange cfg voteSendStage slot Propose = const False
-shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot buffers = cond
+shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slotConfig slot buffers ebuffers = cond
  where
   generatedBetween = fromMaybe (error "impossible") $ stageRange cfg voteSendStage slot Propose
   receivedByEndorse =
@@ -685,12 +723,14 @@ shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot buffers = cond
   -- Note: maybe order on (slot, subSlot, vrf proof) should be used instead?
   subset xs ys = all (`elem` ys) xs
 
+  endOfPipelineTime p = slotTime slotConfig (snd (pipelineRange cfg p))
+
   cond :: EndorseBlock -> Bool
-  cond eb = assert assumptions $ acd && b
+  cond eb = assert assumptions $ acd && b && full
    where
     assumptions =
       null eb.endorseBlocksEarlierStage
-        && null eb.endorseBlocksEarlierPipeline
+        && (null eb.endorseBlocksEarlierPipeline || cfg.variant == Full)
         && eb.slot `inRange` fromMaybe (error "impossible") (stageRange cfg voteSendStage slot Endorse)
     -- A. all referenced IBs have been received by the end of the Endorse stage,
     -- C. all referenced IBs validate (wrt. script execution), and,
@@ -698,21 +738,34 @@ shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slot buffers = cond
     acd = eb.inputBlocks `subset` receivedByEndorse
     -- B. all IBs seen by the end of the Deliver 1 stage are referenced,
     b = receivedByDeliver1 `subset` eb.inputBlocks
+    -- assumes eb.endorseBlocksEarlierPipeline are in pipeline order.
+    full =
+      and $
+        zipWith elem eb.endorseBlocksEarlierPipeline $
+          [ map (.id) es
+          | (_, es) <-
+              endorseBlocksToReference
+                cfg
+                (endorseBlockPipeline cfg eb)
+                ebuffers
+                ( \p t ->
+                    addUTCTime cfg.headerDiffusionTime t < endOfPipelineTime p
+                )
+          , not (null es)
+          ]
 
 endorseBlocksToVoteFor ::
   LeiosConfig ->
+  SlotConfig ->
   -- | current slot
   SlotNo ->
   InputBlocksSnapshot ->
   EndorseBlocksSnapshot ->
   [EndorseBlock]
-endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slot ibs ebs =
-  let cond = shouldVoteOnEB cfg slot ibs
+endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slotConfig slot ibs ebs =
+  let cond = shouldVoteOnEB cfg slotConfig slot ibs ebs
    in filter cond $
         maybe [] ebs.validEndorseBlocks (stageRange cfg voteSendStage slot Endorse)
-
-endorseBlockPipeline :: LeiosConfig -> EndorseBlock -> PipelineNo
-endorseBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} eb = pipelineOf @p cfg Endorse eb.slot
 
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.

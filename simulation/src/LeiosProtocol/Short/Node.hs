@@ -864,13 +864,17 @@ mkBuffersView cfg st = BuffersView{..}
           return $! (eb.id,) $! cert
 
     -- TODO: cache index of EBs ordered by .slot?
+    let orderEBs = case cfg.leios.variant of
+          Short -> sortOn (\eb -> (eb.slot, Down $ length eb.inputBlocks))
+          Full -> sortOn (\eb -> (Down eb.slot, Down $ length eb.inputBlocks))
     let certifiedEBforRBAt rbSlot =
           listToMaybe
             . mapMaybe tryCertify
-            . dropWhile (\eb -> fromEnum eb.slot < fromEnum rbSlot - cfg.leios.maxEndorseBlockAgeSlots)
-            . sortOn (\eb -> (eb.slot, Down $ length eb.inputBlocks))
+            . orderEBs
+            . filter (\eb -> not $ fromEnum eb.slot < fromEnum rbSlot - cfg.leios.maxEndorseBlockAgeSlots)
             . map snd
             . RB.values
+            -- TODO: start from votesForEB, would allow to drop EBs from relayBuffer as soon as Endorse ends.
             $ bufferEB
     return $
       NewRankingBlockData
@@ -902,8 +906,18 @@ mkBuffersView cfg st = BuffersView{..}
     return InputBlocksSnapshot{..}
   ebs = do
     buffer <- readTVar st.relayEBState.relayBufferVar
+    ebCerts <- readTVar st.votesForEBVar
     let validEndorseBlocks r =
           filter (\eb -> eb.slot `inRange` r) . map snd . RB.values $ buffer
+        certifiedEndorseBlocks pr =
+          Map.toAscList $
+            Map.fromListWith (++) $
+              [ (p, [(eb, c, t)])
+              | eb <- map snd . RB.values $ buffer
+              , let p = endorseBlockPipeline cfg.leios eb
+              , p `inRange` pr
+              , Just (Certified c t) <- [Map.lookup eb.id ebCerts]
+              ]
     return EndorseBlocksSnapshot{..}
 
 mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])

@@ -242,6 +242,9 @@ configToKVsWith getter cfg =
     , get @"multiplexMiniProtocols" getter cfg
     , get @"treatBlocksAsFull" getter cfg
     , get @"cleanupPolicies" getter cfg
+    , get @"leiosVariant" getter cfg
+    , get @"leiosHeaderDiffusionTimeMs" getter cfg
+    , get @"praosChainQuality" getter cfg
     , get @"simulateTransactions" getter cfg
     , get @"leiosStageLengthSlots" getter cfg
     , get @"leiosStageActiveVotingSlots" getter cfg
