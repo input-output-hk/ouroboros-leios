@@ -11,22 +11,26 @@ module Parser where
   {-# LANGUAGE OverloadedStrings #-}
 #-}
 
-{-# FOREIGN GHC
-  import Data.Word
-  import Data.Fixed
-  import Data.Map
-  import qualified Data.ByteString.Lazy.Char8 as BSL8
-  import LeiosEvents
-#-}
-
 postulate
   Int : Set
   Micro : Set
   Map : Set → Set → Set
+  elems : ∀ {k v} → Map k v → List v
 
 {-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
 {-# COMPILE GHC Map = type Data.Map.Map #-}
 {-# COMPILE GHC Int = type Int #-}
+
+{-# FOREIGN GHC
+  import Data.Word
+  import Data.Fixed
+  import Data.Map as M
+  import qualified Data.ByteString.Lazy.Char8 as BSL8
+  import LeiosEvents
+
+elems :: Map k v -> [v]
+elems = M.elems
+#-}
 
 Bytes = Word64
 SlotNo = Word64
@@ -121,7 +125,11 @@ traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
 ... | yes _ | just (EB-Blk eb) = l ,  just (inj₂ (EB-Recv-Update eb))
 ... | _ | _ = l , nothing
 traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , nothing
-traceEvent→action l record { message = VTBundleReceived _ _ _ _ _ _ } = l , nothing
+traceEvent→action l record { message = VTBundleReceived _ p _ _ (just i) _ }
+  with p ≟ SUT | l ⁉ i
+... | yes _ | just (VT-Blk vt) = l ,  just (inj₂ (VT-Recv-Update vt))
+... | _ | _ = l , nothing
+traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , nothing
 traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , nothing
 traceEvent→action l record { message = IBEnteredState _ _ _ } = l , nothing
 traceEvent→action l record { message = EBEnteredState _ _ _ } = l , nothing
@@ -151,15 +159,19 @@ traceEvent→action l record { message = EBGenerated p i s _ ibs }
                         ; signature  = tt
                         }
              in (i , EB-Blk eb) ∷ l , nothing
+traceEvent→action l record { message = VTBundleGenerated p i s _ vts }
+  with p ≟ SUT
+... | yes _ = l , just (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT))
+... | no _ = let vt = map (const tt) (elems vts)
+             in (i , VT-Blk vt) ∷ l , nothing
 traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = VTBundleGenerated p _ s _ _ } = l , just (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT))
 
 mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
 mapAccuml f s []       = s , []
 mapAccuml f s (x ∷ xs) =
-  let (s' , y)  = f s x
+  let (s' , y)   = f s x
       (s'' , ys) = mapAccuml f s' xs
-  in  s'' , y ∷ ys
+  in s'' , y ∷ ys
 
 opaque
   unfolding List-Model
