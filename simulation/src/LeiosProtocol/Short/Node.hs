@@ -491,14 +491,14 @@ leiosNode tracer cfg followers peers = do
 
 -- Actually prunes IBs we should stop delivering.
 pruneExpiredIBs :: (Monad m, MonadDelay m, MonadSTM m, MonadTime m) => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
-pruneExpiredIBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+pruneExpiredIBs _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
  where
   go p = do
     -- TODO: could end when Endorse ends, but we want them around for voting.
     let endOfIBDiffusion = succ $ lastVoteSend leios p
     let pruneTo = succ $ snd $ proposeRange leios p
     _ <- waitNextSlot slotConfig endOfIBDiffusion
-    ibsPruned <- atomically $ do
+    _ibsPruned <- atomically $ do
       writeTVar st.prunedIBStateToVar $! pruneTo
       partitionRBVar st.relayIBState.relayBufferVar $
         \ibEntry -> (fst ibEntry.value).slot < pruneTo
@@ -616,13 +616,13 @@ pruneExpiredVotes ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-pruneExpiredVotes tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
+pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
  where
   go p = do
     let pruneIBDeliveryTo = succ $ snd (stageRangeOf @p leios p Short.Propose)
     let pruneTo = succ (lastVoteSend leios p)
     _ <- waitNextSlot slotConfig (succ (lastVoteRecv leios p))
-    votesPruned <- atomically $ do
+    _votesPruned <- atomically $ do
       writeTVar st.prunedVoteStateToVar $! pruneTo
       -- delivery times for IBs are only needed to vote, so they can be pruned too.
       modifyTVar' st.ibDeliveryTimesVar $ Map.filter $ \(slot, _) -> slot >= pruneIBDeliveryTo
