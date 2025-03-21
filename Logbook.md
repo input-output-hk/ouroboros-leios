@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-03-21
+
+### Formal methods
+
+- Short Leios trace verification: For Short Leios we are modelling the local state evolution of a node. In addition to the transitions in the Short Leios relation there are updates to the state (for example the network or the underlying ledger) which we now cover in a larger relation. The mapping from simulation log to state updates has been refined
+
 ## 2025-03-20
 
 ### Analysis of simulations
