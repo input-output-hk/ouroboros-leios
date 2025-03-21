@@ -105,6 +105,11 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   -- ^ maximum age of an uncertified endorsement block before it expires
   , cleanupPolicies :: CleanupPolicies
   -- ^ active cleanup policies
+  , variant :: LeiosVariant
+  , headerDiffusionTime :: DiffTime
+  -- ^ Δ_{hdr}.
+  , pipelinesToReferenceFromEB :: Int
+  -- ^ how many older pipelines to reference from an EB when `variant = Full`.
   , votingFrequencyPerStage :: Double
   , voteSendStage :: Stage p
   , votesForCertificate :: Int
@@ -125,17 +130,25 @@ convertConfig disk =
       else (\x -> x)
   )
     $ case voting of
-      SomeStage pipeline voteSendStage ->
+      SomeStage pipeline voteSendStage -> do
+        let sliceLength = fromIntegral disk.leiosStageLengthSlots
         LeiosConfig
           { praos
           , pipeline
           , voteSendStage
-          , sliceLength = fromIntegral disk.leiosStageLengthSlots
+          , sliceLength
           , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
           , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
           , maxEndorseBlockAgeSlots = fromIntegral disk.ebMaxAgeSlots
           , maxEndorseBlockAgeForRelaySlots = fromIntegral disk.ebMaxAgeForRelaySlots
           , cleanupPolicies = disk.cleanupPolicies
+          , variant = disk.leiosVariant
+          , headerDiffusionTime = durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
+          , pipelinesToReferenceFromEB =
+              if disk.leiosVariant == Full
+                then
+                  ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
+                else 0
           , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
           , votingFrequencyPerStage = disk.voteGenerationProbability
           , votesForCertificate = fromIntegral disk.voteThreshold
@@ -265,6 +278,9 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , maxEndorseBlockAgeSlots = cfg.maxEndorseBlockAgeSlots
     , maxEndorseBlockAgeForRelaySlots = fromIntegral cfg.maxEndorseBlockAgeForRelaySlots
     , cleanupPolicies = cfg.cleanupPolicies
+    , variant = cfg.variant
+    , headerDiffusionTime = cfg.headerDiffusionTime
+    , pipelinesToReferenceFromEB = cfg.pipelinesToReferenceFromEB
     , activeVotingStageLength = cfg.activeVotingStageLength
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
     , voteSendStage = voteSendStage
