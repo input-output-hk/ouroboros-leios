@@ -127,7 +127,9 @@ logLeiosEvent nodeNames loudness e = case e of
         , "duration_s" .= cpuTaskDuration
         , "task_label" .= cpuTaskLabel
         ]
-  logNode nid (LeiosNodeEvent blkE blk) = Just $ "tag" .= tag <> kindAndId <> extra <> node nid
+  logNode nid (LeiosNodeEvent blkE blk)
+    | Pruned <- blkE, not emitDebug = Nothing
+    | otherwise = Just $ "tag" .= tag <> kindAndId <> extra <> node nid
    where
     extra
       | Generate <- blkE = case blk of

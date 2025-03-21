@@ -502,8 +502,9 @@ pruneExpiredIBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
       writeTVar st.prunedIBStateToVar $! pruneTo
       partitionRBVar st.relayIBState.relayBufferVar $
         \ibEntry -> (fst ibEntry.value).slot < pruneTo
-    for_ ibsPruned $ \(uncurry InputBlock -> ib) ->
-      traceWith tracer $! LeiosNodeEvent Pruned (EventIB ib)
+    -- TODO: batch these, too many events
+    -- for_ ibsPruned $ \(uncurry InputBlock -> ib) ->
+    --   traceWith tracer $! LeiosNodeEvent Pruned (EventIB ib)
     go (succ p)
 
 -- rEB slots after the end of vote-receiving,
@@ -558,7 +559,7 @@ pruneExpiredUnadoptedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (toEn
         pure ebsPruned
     -- Emit trace events for pruning each EB
     for_ ebsPruned $ \eb -> do
-      traceWith tracer $ LeiosNodeEvent Pruned (EventEB eb)
+      traceWith tracer $! LeiosNodeEvent Pruned (EventEB eb)
     -- Continue with the next pipeline.
     go (succ p)
 
@@ -603,7 +604,7 @@ pruneExpiredUncertifiedEBs tracer LeiosNodeConfig{leios, slotConfig} st = go (to
         pure ebsPruned
     -- Emit trace events for pruning each EB
     for_ ebsPruned $ \eb -> do
-      traceWith tracer $ LeiosNodeEvent Pruned (EventEB eb)
+      traceWith tracer $! LeiosNodeEvent Pruned (EventEB eb)
     -- Continue with the next pipeline.
     go (succ p)
 
@@ -629,8 +630,9 @@ pruneExpiredVotes tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ 
         \voteEntry ->
           let voteSlot = (snd voteEntry.value).slot
            in voteSlot < pruneTo
-    for_ votesPruned $ \vt -> do
-      traceWith tracer $ LeiosNodeEvent Pruned (EventVote $ snd vt)
+    -- TODO: batch these, too many events.
+    -- for_ votesPruned $ \vt -> do
+    --   traceWith tracer $! LeiosNodeEvent Pruned (EventVote $ snd vt)
     go (succ p)
 
 computeLedgerStateThread ::
@@ -666,7 +668,7 @@ computeLedgerStateThread tracer _cfg st = forever $ do
     modifyTVar' st.ledgerStateVar (`Map.union` Map.fromList readyLedgerState)
     return readyLedgerState
   for_ readyLedgerState $ \(rb, _) -> do
-    traceWith tracer (LeiosNodeEventLedgerState rb)
+    traceWith tracer $! LeiosNodeEventLedgerState rb
   return ()
 
 adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
