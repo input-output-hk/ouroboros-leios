@@ -9,12 +9,6 @@ module Parser where
 
 {-# FOREIGN GHC
   {-# LANGUAGE OverloadedStrings #-}
-
-  import Data.Word
-  import Data.Fixed
-  import qualified Data.Map as M
-  import qualified Data.ByteString.Lazy.Char8 as BSL8
-  import LeiosEvents
 #-}
 
 postulate
@@ -22,15 +16,27 @@ postulate
   Micro : Set
   Map : Set → Set → Set
   elems : ∀ {k v} → Map k v → List v
+  trunc : Micro → ℕ
+
+{-# FOREIGN GHC
+  import Data.Word
+  import Data.Fixed
+  import qualified Data.Map as M
+  import qualified Data.ByteString.Lazy.Char8 as BSL8
+  import LeiosEvents
+
+  elems' :: () -> () -> M.Map k v -> [v]
+  elems' _ _ = M.elems
+
+  trunc' :: Micro -> Integer
+  trunc' = floor
+#-}
 
 {-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
 {-# COMPILE GHC Map = type M.Map #-}
 {-# COMPILE GHC Int = type Int #-}
-
-{-# FOREIGN GHC
-elems :: M.Map k v -> [v]
-elems = M.elems
-#-}
+{-# COMPILE GHC elems = elems' #-}
+{-# COMPILE GHC trunc = trunc' #-}
 
 Bytes = Word64
 SlotNo = Word64
@@ -109,35 +115,44 @@ data Blk : Type where
   EB-Blk : EndorserBlock → Blk
   VT-Blk : List Vote → Blk
 
-traceEvent→action : AssocList String Blk → TraceEvent → AssocList String Blk × Maybe ((Action × LeiosInput) ⊎ FFDUpdate)
-traceEvent→action l record { message = Cpu _ _ _ } = l , nothing
-traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , nothing
+record State : Type where
+  field refs : AssocList String Blk
+        currentSlot : ℕ
+
+open State
+
+traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
+traceEvent→action l record { message = Cpu _ _ _ ; time_s = t }
+  with trunc t ≟ suc (currentSlot l)
+... | yes p = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
+... | no _ = l , []
+traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
+traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
+traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
+traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
 traceEvent→action l record { message = IBReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | l ⁉ i
-... | yes _ | just (IB-Blk ib) = l ,  just (inj₂ (IB-Recv-Update ib))
-... | _ | _ = l , nothing
-traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , nothing
+  with p ≟ SUT | refs l ⁉ i
+... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
+... | _ | _ = l , []
+traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , []
 traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | l ⁉ i
-... | yes _ | just (EB-Blk eb) = l ,  just (inj₂ (EB-Recv-Update eb))
-... | _ | _ = l , nothing
-traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , nothing
+  with p ≟ SUT | refs l ⁉ i
+... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
+... | _ | _ = l , []
+traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , []
 traceEvent→action l record { message = VTBundleReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | l ⁉ i
-... | yes _ | just (VT-Blk vt) = l ,  just (inj₂ (VT-Recv-Update vt))
-... | _ | _ = l , nothing
-traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , nothing
-traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , nothing
-traceEvent→action l record { message = IBEnteredState _ _ _ } = l , nothing
-traceEvent→action l record { message = EBEnteredState _ _ _ } = l , nothing
-traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , nothing
-traceEvent→action l record { message = RBEnteredState _ _ _ } = l , nothing
+  with p ≟ SUT | refs l ⁉ i
+... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
+... | _ | _ = l , []
+traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , []
+traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
+traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
+traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
+traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
+traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
 traceEvent→action l record { message = IBGenerated p i s _ _ _ }
   with p ≟ SUT
-... | yes _ = l , just (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT))
+... | yes _ = l , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
 ... | no _  = let ib = record { header =
                          record { slotNumber = primWord64ToNat s
                                 ; producerID = nodeId p
@@ -146,10 +161,10 @@ traceEvent→action l record { message = IBGenerated p i s _ _ _ }
                                 ; signature  = tt
                                 }
                               ; body = record { txs = [] } } -- TODO: add transactions
-              in (i , IB-Blk ib) ∷ l , nothing
+              in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
 traceEvent→action l record { message = EBGenerated p i s _ ibs }
   with p ≟ SUT
-... | yes _ = l , just (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT))
+... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)) ∷ []
 ... | no _ = let eb = record
                         { slotNumber = primWord64ToNat s
                         ; producerID = nodeId p
@@ -158,13 +173,13 @@ traceEvent→action l record { message = EBGenerated p i s _ ibs }
                         ; ebRefs     = []
                         ; signature  = tt
                         }
-             in (i , EB-Blk eb) ∷ l , nothing
+             in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
 traceEvent→action l record { message = VTBundleGenerated p i s _ vts }
   with p ≟ SUT
-... | yes _ = l , just (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT))
+... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
 ... | no _ = let vt = map (const tt) (elems vts)
-             in (i , VT-Blk vt) ∷ l , nothing
-traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , nothing
+             in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
+traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , []
 
 mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
 mapAccuml f s []       = s , []
@@ -178,7 +193,8 @@ opaque
 
   verifyTrace : EventLog → ℕ
   verifyTrace l =
-    let αs = L.catMaybes $ proj₂ (mapAccuml traceEvent→action [] l)
+    let s₀ = record { refs = [] ; currentSlot = 0 }
+        αs = L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
     in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
 
   {-# COMPILE GHC verifyTrace as verifyTrace #-}
