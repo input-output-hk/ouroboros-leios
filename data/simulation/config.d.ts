@@ -46,8 +46,7 @@ export interface Config {
    * Controls the pipelines EBs should reference in Full leios:
    *   i - ⌈3η/L⌉, …, i-3
    * where i is the index of the current pipeline.
-   *
-   * Only supported by Haskell simulation */
+   * */
   "praos-chain-quality": number;
   // Transaction Configuration
   /** Only supported by Rust simulation. */

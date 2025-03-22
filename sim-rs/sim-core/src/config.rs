@@ -61,6 +61,7 @@ pub struct RawParameters {
     pub leios_stage_length_slots: u64,
     pub leios_stage_active_voting_slots: u64,
     pub leios_header_diffusion_time_ms: f64,
+    pub praos_chain_quality: u64,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -416,6 +417,7 @@ pub struct SimConfiguration {
     pub(crate) variant: LeiosVariant,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
+    pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
@@ -443,6 +445,7 @@ impl SimConfiguration {
             variant: params.leios_variant,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
+            praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
             eb_generation_probability: params.eb_generation_probability,

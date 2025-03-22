@@ -275,7 +275,7 @@
       "type": "boolean"
     },
     "praos-chain-quality": {
-      "description": "Praos blockchain quality parameter.\nThis is η from the Leios paper.\nControls the pipelines EBs should reference in Full leios:\n  i - ⌈3η/L⌉, …, i-3\nwhere i is the index of the current pipeline.\n\nOnly supported by Haskell simulation",
+      "description": "Praos blockchain quality parameter.\nThis is η from the Leios paper.\nControls the pipelines EBs should reference in Full leios:\n  i - ⌈3η/L⌉, …, i-3\nwhere i is the index of the current pipeline.",
       "type": "number"
     },
     "rb-body-legacy-praos-payload-avg-size-bytes": {

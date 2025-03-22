@@ -8,7 +8,6 @@ use std::{
 
 use anyhow::{bail, Result};
 use netsim_async::HasBytesSize as _;
-use num_traits::Inv;
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
 use rand_chacha::ChaChaRng;
@@ -1317,9 +1316,8 @@ impl Node {
 
         // the oldest pipeline is i-⌈3η/L⌉, where i is the current pipeline,
         // η is the "quality parameter" (expected block rate), and L is stage length.
-        let old_pipelines = (3.0 * self.sim_config.block_generation_probability.inv()
-            / self.sim_config.stage_length as f64)
-            .ceil() as u64;
+        let old_pipelines =
+            (3 * self.sim_config.praos_chain_quality).div_ceil(self.sim_config.stage_length);
         let oldest_included_pipeline = current_pipeline
             .checked_sub(old_pipelines)
             .unwrap_or(newest_included_pipeline);
