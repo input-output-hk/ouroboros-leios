@@ -12,6 +12,12 @@ db.rust.aggregate(
       simulator: "rust",
       scenario: 1,
       time: "$time_s",
+      size: {
+        $add: [
+          "$message.header_bytes",
+           {$sum: "$message.endorsement.bytes"}
+        ],
+      },
       "eb-count": {
         $cond: {
           if: {

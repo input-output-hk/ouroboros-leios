@@ -1,6 +1,7 @@
 db.receipts.deleteMany({simulator: "haskell"})
 
-db["haskell-scenario"].find().forEach(s =>
+db["haskell-scenario"].find().forEach(function(s) {
+printjson(s["_id"])
 db.haskell.aggregate(
 [
   {
@@ -31,6 +32,9 @@ db.haskell.aggregate(
       sent: {
         $eq: ["$event.tag", "Sent"]
       },
+      size: {
+        $ifNull :["$event.size_bytes", "$event.msg_size_bytes"]
+      },
       node_name: "$event.node_name"
     }
   },
@@ -54,6 +58,9 @@ db.haskell.aggregate(
       },
       sent: {
         $min: "$time"
+      },
+      size: {
+        $max: "$size"
       },
       receipts: {
         $push: {
@@ -79,6 +86,7 @@ db.haskell.aggregate(
     $project: {
       simulator: "haskell",
       sent: "$sent",
+      size: "$size",
       received: "$receipts.time",
       elapsed: {
         $subtract: ["$receipts.time", "$sent"]
@@ -104,4 +112,4 @@ db.haskell.aggregate(
   }
 ]
 )
-)
+})

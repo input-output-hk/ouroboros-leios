@@ -6,7 +6,7 @@ mongoexport --host="$HOST" \
             --db="$DB" \
             --collection=receipts \
             --type=csv \
-            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,kind,item,producer,recipient,sent,received,elapsed' \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,kind,item,producer,recipient,sent,received,elapsed,size' \
 | gzip -9vc > results/receipts.csv.gz
 
 mongoexport --host="$HOST" \
