@@ -98,14 +98,14 @@
 \begin{document}
 
 \title{Ouroboros Leios simulation: \\
-       building confidence in the performance results \\
-       {\large \sc An IOHK technical report}
-  }
+building confidence in the performance results \\
+{\large \sc An IOHK technical report}
+}
 \date{Version 1.0, April 2021}
 \author{Andrea Vezzosi     \\ {\small \texttt{andrea@well-typed.com}} \\
-   \and Wen Kokke          \\ {\small \texttt{wen@well-typed.com}} \\
-   \and Duncan Coutts      \\ {\small \texttt{duncan@well-typed.com}}
-   }
+\and Wen Kokke          \\ {\small \texttt{wen@well-typed.com}} \\
+\and Duncan Coutts      \\ {\small \texttt{duncan@well-typed.com}}
+}
 
 \maketitle
 
@@ -122,23 +122,23 @@
 
 Most idealized setting for the simulation:
 \begin{itemize}
-\item Nodes request block bodies from every peer.
-\item Mini-protocols are each run on a dedicated connection.
-\item The network model is a simplified one where packets are sent in-order and
-  limited only by latency and bandwidth.
-\item An unbounded number of CPU intensive tasks, like validation, are simulated to run in parallel.
-\item Delays and sizes for blocks are kept uniform.
+    \item Nodes request block bodies from every peer.
+    \item Mini-protocols are each run on a dedicated connection.
+    \item The network model is a simplified one where packets are sent in-order and
+          limited only by latency and bandwidth.
+    \item An unbounded number of CPU intensive tasks, like validation, are simulated to run in parallel.
+    \item Delays and sizes for blocks are kept uniform.
 \end{itemize}
 
 Scenarios proceed from most idealized and gradually turn one more realism feature:
 \begin{enumerate}
-\item \label{sc:most-idealized} most idealized.
-\item \label{sc:request-from-first} nodes request block bodies from first peer available.
-\item \label{sc:multiplexing} mini-protocols are multiplexed over one connection.
-\item \label{sc:tcp} network layer more closely models TCP, in particular acks
-  and congestion window collapse/restart.
-\item \label{sc:boundedcpu} nodes simulate CPU tasks with a finite number of worker threads.
-\item \label{sc:order} request IB bodies in oldest-first order.
+    \item \label{sc:most-idealized} most idealized.
+    \item \label{sc:request-from-first} nodes request block bodies from first peer available.
+    \item \label{sc:multiplexing} mini-protocols are multiplexed over one connection.
+    \item \label{sc:tcp} network layer more closely models TCP, in particular acks
+          and congestion window collapse/restart.
+    \item \label{sc:boundedcpu} nodes simulate CPU tasks with a finite number of worker threads.
+    \item \label{sc:order} request IB bodies in oldest-first order.
 \end{enumerate}
 The last scenario is not strictly about realism, but we rather want to
 investigate the impact of deviating from the freshest-first default.
@@ -151,8 +151,8 @@ The least realistic scenario. Config:
 
 In Figure~\ref{fig:scenario1} we compute ideal times two ways:
 \begin{itemize}
-\item \textbf{ideal} -- Uses $3$ latencies for every communication.
-\item \textbf{ideal-fitted} -- Uses $3$ latencies for RB and EB, but $4$ for IB and $3.5$ for Votes.
+    \item \textbf{ideal} -- Uses $3$ latencies for every communication.
+    \item \textbf{ideal-fitted} -- Uses $3$ latencies for RB and EB, but $4$ for IB and $3.5$ for Votes.
 \end{itemize}
 we see that ideal-fitted better matches the simulation.
 
@@ -325,9 +325,9 @@ As we will be mostly looking at IB diffusion, Fig.~\ref{fig:oldest-vs-freshest} 
         \caption{IB diffusion to $0.60$ stake.}
         \label{fig:oldest-vs-freshest:ib0.6}
     \end{subfigure}
-    
+
     \vspace{1em}
-    
+
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{scenario6/IB-0.7-oldest-vs-freshest.eps}
@@ -341,9 +341,9 @@ As we will be mostly looking at IB diffusion, Fig.~\ref{fig:oldest-vs-freshest} 
         \caption{IB diffusion to $0.80$ stake.}
         \label{fig:oldest-vs-freshest:ib0.8}
     \end{subfigure}
-    
+
     \vspace{1em}
-    
+
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{scenario6/IB-0.9-oldest-vs-freshest.eps}
@@ -379,9 +379,9 @@ Fig.~\ref{fig:oldest-vs-freshest-10-cpus} shows same comparison but with 10 cpus
         \caption{IB diffusion to $0.60$ stake.}
         \label{fig:oldest-vs-freshest-10-cpus:ib0.6}
     \end{subfigure}
-    
+
     \vspace{1em}
-    
+
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.7-oldest-vs-freshest.eps}
@@ -395,9 +395,9 @@ Fig.~\ref{fig:oldest-vs-freshest-10-cpus} shows same comparison but with 10 cpus
         \caption{IB diffusion to $0.80$ stake.}
         \label{fig:oldest-vs-freshest-10-cpus:ib0.8}
     \end{subfigure}
-    
+
     \vspace{1em}
-    
+
     \begin{subfigure}[b]{0.45\textwidth}
         \centering
         \includegraphics[width=\textwidth]{scenario6-10-cpus/IB-0.9-oldest-vs-freshest.eps}
