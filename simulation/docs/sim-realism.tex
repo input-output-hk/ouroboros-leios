@@ -4,6 +4,7 @@
 
 \usepackage[margin=2.5cm]{geometry}
 \usepackage[dvipsnames]{xcolor}
+\usepackage{nicematrix,tikz}
 \usepackage{parskip}
 \usepackage{todonotes}
 \usepackage{regexpatch}
@@ -11,6 +12,7 @@
 \xpatchcmd{\@todo}{\setkeys{todonotes}{#1}}{\setkeys{todonotes}{inline,#1}}{}{}
 \makeatother
 \usepackage{microtype}
+\usepackage{extarrows}
 \usepackage{amssymb,amsmath}
 \usepackage{mathpazo}
 \usepackage{longtable,booktabs}
@@ -124,6 +126,34 @@ building confidence in the performance results \\
 
 \section{Summary}
 \label{summary}
+
+\definecolor{Bu}{HTML}{069AF3}
+\definecolor{Gn}{HTML}{15B01A}
+\begin{center}
+    \begin{NiceTabular}{c c c c c}[cell-space-limits=2pt,color-inside,rounded-corners]
+        \CodeBefore
+        \definecolorseries{BuGn}{rgb}{last}{Bu}{Gn}
+        \resetcolorseries[\value{iRow}]{BuGn}
+        \rowlistcolors{1}{BuGn!!+}
+        \Body
+        \Block[tikz = {left color=Bu, right color=Gn}]{*-*}{}
+        \text{Most Idealised}
+         &
+        \multicolumn{3}{c}{\(\xleftrightarrow{\hspace{6cm}}\)}
+         &
+        \text{Most Realistic}
+        \\
+        \text{Scenario 1}
+         &
+        \text{Scenario 2}
+         &
+        \text{Scenario 3}
+         &
+        \text{Scenario 4}
+         &
+        \text{Scenario 5}
+    \end{NiceTabular}
+\end{center}
 
 Most idealized setting for the simulation:
 \begin{itemize}
