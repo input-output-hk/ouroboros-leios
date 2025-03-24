@@ -5,7 +5,7 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-This week, the team made great progress in the Leios protocol development, focusing on improving simulation capabilities and understanding the behavior of the protocol in different network conditions. A comparison of Haskell and Rust simulations across [**18 scenarios**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb) revealed that Leios protocol scales well to mainnet-size networks. However, the protocol tends to experience congestion once the input-block rate reaches 30 IB/s.
+This week, the Leios team made significant progress in protocol development, focusing on improving simulation capabilities and analyzing protocol behavior under various network conditions. A comparison of Haskell and Rust simulations across [**18 scenarios**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb) demonstrated that the Leios protocol scales effectively to mainnet-sized networks. However, congestion occurs when the input block rate reaches 30 IB/s.
 
 ## Simulation comparison
 
@@ -15,28 +15,28 @@ This week, the team made great progress in the Leios protocol development, focus
 
 ### Analysis of simulations
 
-- Completed the first simulation of Short Leios for varied IB production rate, IB size, and network topology
-- In the simulations, the Leios protocol scales well to mainnet-size networks
-- Identified congestion in the protocol once the input-block rate reaches 30 IB/s
+- Completed the first simulation of Short Leios, evaluating IB production rate, IB size, and network topology
+- Demonstrated that the Leios protocol scales effectively to mainnet-sized networks
+- Identified congestion occurring when the input block rate exceeds 30 IB/s
 - Suggested that allowing IBs larger than current Praos RBs may have advantages in TCP efficiency, network usage, and adapting to fluctuating transaction loads.
 
 | Peak CPU                                                                                                               | Mean CPU                                                                                                               |
 |------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | ![analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png](https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png) | ![analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png](https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png) |
 
-### HasKell simulation
+### Haskell simulation
 
-- Implemented expiration of blocks
-  - Blocks are cleared from relay buffer as soon as they should stop diffusing, then cleared from other state as specified
-- Implemented first stab at Full Leios implementation
-  - Only lightly tested so far
-  - Added `praos-chain-quality` configuration parameter for the `\eta` parameter from the spec.
+- Implemented expiration of blocks:
+  - Blocks are removed from the relay buffer once diffusion stops and cleared from other states as specified
+- Developed an initial Full Leios implementation:
+  - Currently in early testing
+  - Added the `praos-chain-quality` configuration parameter for the `\eta` parameter from the specification.
 
 ### Rust simulation
 
-- Implemented first pass at Full Leios, with guesses for some parameters.
+- Developed an initial Full Leios implementation using estimated values for some parameters.
 
 ### Formal methods
 
-- Short Leios trace verification: For Short Leios, we are modelling the local state evolution of a node
-- Developed the initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`.
+- Short Leios trace verification: modeling local state evolution of a node 
+- Developed an initial trace verifier for Short Leios simulation traces in `leios-trace-verifier`.
