@@ -2,6 +2,7 @@
 
 \documentclass[11pt,a4paper]{article}
 
+\usepackage[margin=2.5cm]{geometry}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{todonotes}
 \usepackage{regexpatch}
@@ -24,6 +25,7 @@
 }
 \usepackage{subcaption}
 \usepackage{listings}
+\usepackage{minted}
 %%\newcommand{\debug}[1]{}
 \newcommand{\debug}[1]{#1}
 \newcommand{\scenarioVsIdealFigure}[2]{
@@ -149,9 +151,12 @@ investigate the impact of deviating from the freshest-first default.
 \section{Scenario \ref{sc:most-idealized}}
 \label{scenario1}
 The least realistic scenario. Config:
-\lstinputlisting[firstline=7]{scenario1/config.yaml}
-\todo{remove config once scenario explained}
-
+\begin{minted}{yaml}
+relay-strategy: "request-from-all"
+tcp-congestion-control: false
+multiplex-mini-protocols: false
+treat-blocks-as-full: true
+\end{minted}
 In Figure~\ref{fig:scenario1} we compute ideal times two ways:
 \begin{itemize}
     \item \textbf{ideal} -- Uses $3$ latencies for every communication.
@@ -262,11 +267,11 @@ As the bounded CPU scenario does better (see next section), we want to rule out 
 \scenarioVsIdealFigure{scenario4-100-cpu}{sc:tcp-100-cpu}
 
 From other simulations we noticed there is a sweet spot of traffic for diffusion to do best, which makes sense with regard to keeping the congestion window open without overwhelming other resources. In particular from Fig.~\ref{fig:scenario4-best-IB-rate} we see IBs do slightly better with these parameters:
-\begin{lstlisting}
+\begin{minted}{yaml}
 ib-body-avg-size-bytes: 163840
 leios-stage-length-slots: 60
 ib-generation-probability: 10
-\end{lstlisting}
+\end{minted}
 and a topology where link bandwidth is set to $1024000$ bps, half of previous scenarios.
 \scenarioVsIdealFigure{scenario4-best-IB-rate}{sc:tcp-opt}
 

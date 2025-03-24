@@ -26,3 +26,4 @@ _build
 /simulation/docs/*/*.eps
 /simulation/docs/scenario*/sim-data.json
 /simulation/docs/*/sim-data.json
+/simulation/docs/_minted-sim-realism/
