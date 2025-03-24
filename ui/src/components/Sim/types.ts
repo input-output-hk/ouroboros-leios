@@ -92,6 +92,7 @@ export interface IInputBlockGenerated {
   type: EMessageType.IBGenerated;
   id: string;
   slot: number;
+  pipeline: number;
   producer: string;
   index: number;
   vrf: number;
@@ -161,6 +162,7 @@ export interface IEndorserBlockGenerated {
   type: EMessageType.EBGenerated;
   id: string;
   slot: number;
+  pipeline: number;
   producer: string;
   bytes: number;
   input_blocks: IInputBlock[]

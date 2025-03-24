@@ -26,6 +26,9 @@
         "id": {
           "type": "string"
         },
+        "pipeline": {
+          "type": "number"
+        },
         "producer": {
           "type": "string"
         },

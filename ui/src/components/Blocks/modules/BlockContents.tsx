@@ -117,8 +117,8 @@ const InputBlocksList: FC<IInputBlocksProps> = ({ ibs, hovered, block, onHover }
         const proportion = Math.min(100, ib.txs.length * 1000 / block.txs.length);
         return (
           <Box key={ib.id} style={{ backgroundColor: `color-mix(in hsl, white, #82ca9d ${proportion}%)` }} hovered={isHovered} onHover={onHover(ib.id)} className={classes.input}>
-            {isHovered ? 'Input Block' : 'IB'}
-            <span className="text-sm">Slot&nbsp;{ib.slot}, {ib.txs.length}&nbsp;TX</span>
+            {isHovered ? <>Input&nbsp;Block</> : 'IB'}
+            <span className="text-sm">Pipeline&nbsp;{ib.pipeline}, Slot&nbsp;{ib.slot}, {ib.txs.length}&nbsp;TX</span>
           </Box>
         );
       })}
@@ -137,7 +137,7 @@ const EndorserBlock: FC<IEndorserBlockProps> = ({ eb, hovered, onHover, onClick 
   return <div className={classes.endorser}>
     <Box hovered={hovered} onHover={onHover} onClick={onClick}>
       Endorser Block
-      <span className='text-sm'>Slot {eb.slot}</span>
+      <span className='text-sm'>Pipeline {eb.pipeline}, Slot {eb.slot}</span>
       {eb.ibs.length ? <span className='text-sm'>References {eb.ibs.length} IB(s)</span> : null}
       {eb.ebs.length ? <span className='text-sm'>References {eb.ebs.length} EB(s)</span> : null}
     </Box>

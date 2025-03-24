@@ -100,6 +100,7 @@ pub struct Transaction {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct InputBlockId<Node = NodeId> {
     pub slot: u64,
+    pub pipeline: u64,
     pub producer: Node,
     /// Need this field to distinguish IBs from the same slot+producer.
     /// The real implementation can use the VRF proof for that.
@@ -120,9 +121,10 @@ impl<Node: Display + Serialize> Serialize for InputBlockId<Node> {
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("InputBlockId", 4)?;
+        let mut obj = serializer.serialize_struct("InputBlockId", 5)?;
         obj.serialize_field("id", &self.to_string())?;
         obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("pipeline", &self.pipeline)?;
         obj.serialize_field("producer", &self.producer)?;
         obj.serialize_field("index", &self.index)?;
         obj.end()
@@ -151,6 +153,7 @@ impl InputBlock {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EndorserBlockId<Node = NodeId> {
     pub slot: u64,
+    pub pipeline: u64,
     pub producer: Node,
 }
 impl<Node: Display> Display for EndorserBlockId<Node> {
@@ -163,9 +166,10 @@ impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("EndorserBlockId", 3)?;
+        let mut obj = serializer.serialize_struct("EndorserBlockId", 4)?;
         obj.serialize_field("id", &self.to_string())?;
         obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("pipeline", &self.pipeline)?;
         obj.serialize_field("producer", &self.producer)?;
         obj.end()
     }
@@ -174,6 +178,7 @@ impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
 #[derive(Debug)]
 pub struct EndorserBlock {
     pub slot: u64,
+    pub pipeline: u64,
     pub producer: NodeId,
     pub bytes: u64,
     // The real impl will store hashes
@@ -184,6 +189,7 @@ impl EndorserBlock {
     pub fn id(&self) -> EndorserBlockId {
         EndorserBlockId {
             slot: self.slot,
+            pipeline: self.pipeline,
             producer: self.producer,
         }
     }
@@ -192,6 +198,7 @@ impl EndorserBlock {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VoteBundleId<Node = NodeId> {
     pub slot: u64,
+    pub pipeline: u64,
     pub producer: Node,
 }
 impl<Node: Display> Display for VoteBundleId<Node> {
@@ -204,9 +211,10 @@ impl<Node: Display + Serialize> Serialize for VoteBundleId<Node> {
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("VoteBundleId", 3)?;
+        let mut obj = serializer.serialize_struct("VoteBundleId", 4)?;
         obj.serialize_field("id", &self.to_string())?;
         obj.serialize_field("slot", &self.slot)?;
+        obj.serialize_field("pipeline", &self.pipeline)?;
         obj.serialize_field("producer", &self.producer)?;
         obj.end()
     }

@@ -536,6 +536,7 @@ impl Node {
                 .map(|(index, vrf)| InputBlockHeader {
                     id: InputBlockId {
                         slot,
+                        pipeline: self.slot_to_pipeline(slot),
                         producer: self.id,
                         index: index as u64,
                     },
@@ -553,6 +554,7 @@ impl Node {
             if self.run_vrf(next_p).is_some() {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
+                    pipeline: self.slot_to_pipeline(slot),
                     producer: self.id,
                 });
                 let ibs = self.select_ibs_for_eb(slot);
@@ -560,6 +562,7 @@ impl Node {
                 let bytes = self.sim_config.sizes.eb(ibs.len());
                 let eb = EndorserBlock {
                     slot,
+                    pipeline: self.slot_to_pipeline(slot),
                     producer: self.id,
                     bytes,
                     ibs,
@@ -585,6 +588,7 @@ impl Node {
         let new_slot = slot + self.rng.random_range(0..self.sim_config.vote_slot_length);
         self.tracker.track_vote_lottery_won(VoteBundleId {
             slot: new_slot,
+            pipeline: self.slot_to_pipeline(new_slot),
             producer: self.id,
         });
         self.leios.votes_to_generate.insert(new_slot, vrf_wins);
@@ -612,7 +616,13 @@ impl Node {
             match self.should_vote_for(slot, eb) {
                 Ok(()) => true,
                 Err(reason) => {
-                    self.tracker.track_no_vote(slot, self.id, *eb_id, reason);
+                    self.tracker.track_no_vote(
+                        slot,
+                        self.slot_to_pipeline(slot),
+                        self.id,
+                        *eb_id,
+                        reason,
+                    );
                     false
                 }
             }
@@ -625,6 +635,7 @@ impl Node {
         let votes = VoteBundle {
             id: VoteBundleId {
                 slot,
+                pipeline: self.slot_to_pipeline(slot),
                 producer: self.id,
             },
             bytes: self.sim_config.sizes.vote_bundle(ebs.len()),
@@ -1462,6 +1473,10 @@ impl Node {
         self.clock.start_task();
         self.msg_sink
             .send_to(to, msg.bytes_size(), msg.protocol(), msg, self.clock.now())
+    }
+
+    fn slot_to_pipeline(&self, slot: u64) -> u64 {
+        slot / self.sim_config.stage_length
     }
 }
 

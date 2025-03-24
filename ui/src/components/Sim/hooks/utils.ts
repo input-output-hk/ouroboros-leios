@@ -65,6 +65,7 @@ const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string)
     return {
       id,
       slot: ib.slot,
+      pipeline: ib.pipeline,
       headerBytes: ib.headerBytes,
       txs,
     };
@@ -73,6 +74,7 @@ const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string)
   return {
     id: ebId,
     slot: eb.slot,
+    pipeline: eb.pipeline,
     bytes: eb.bytes,
     ibs,
     ebs,
@@ -98,6 +100,7 @@ export const processMessage = (
     trackDataGenerated(aggregatedData, intermediate, message.producer, "ib", message.id, bytes);
     intermediate.ibs.set(message.id, {
       slot: message.slot,
+      pipeline: message.pipeline,
       headerBytes: message.header_bytes,
       txs: message.transactions,
     });
@@ -136,6 +139,7 @@ export const processMessage = (
     trackDataGenerated(aggregatedData, intermediate, message.producer, "eb", message.id, message.bytes);
     intermediate.ebs.set(message.id, {
       slot: message.slot,
+      pipeline: message.pipeline,
       bytes: message.bytes,
       ibs: message.input_blocks.map(ib => ib.id),
       ebs: message.endorser_blocks.map(eb => eb.id),
