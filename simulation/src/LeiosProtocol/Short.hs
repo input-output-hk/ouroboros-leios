@@ -683,13 +683,23 @@ endorseBlocksToReference ::
 endorseBlocksToReference LeiosConfig{variant = Short} _ _ _ = []
 endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapshot{..} checkDeliveryTime =
   [ (p, [eb | (eb, _, _) <- es])
-  | (p, es) <- ebs
+  | plRange <- maybeToList $ pipelinesToReferenceFromEB cfg.pipelinesToReferenceFromEB pl
+  , (p, es) <- certifiedEndorseBlocks plRange
   , or [checkDeliveryTime p t | (_, _, t) <- es]
   ]
+
+pipelinesToReferenceFromEB :: Int -> PipelineNo -> Maybe (PipelineNo, PipelineNo)
+pipelinesToReferenceFromEB n pl =
+  case fromEnum (pred pl) - maxStagesAfterEndorse of
+    newestIx
+      | newestIx < 0 -> Nothing
+      | otherwise ->
+          Just
+            ( toEnum $ max 0 $ newestIx - (n - 1)
+            , toEnum newestIx
+            )
  where
-  newestPL = toEnum $ max 0 $ fromEnum pl - 2
-  oldestPL = toEnum $ max 0 $ fromEnum newestPL - cfg.pipelinesToReferenceFromEB
-  ebs = certifiedEndorseBlocks (oldestPL, newestPL)
+  maxStagesAfterEndorse = 2
 
 shouldVoteOnEB ::
   LeiosConfig ->
