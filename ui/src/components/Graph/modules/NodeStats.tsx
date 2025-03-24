@@ -83,7 +83,7 @@ export const NodeStats: FC = () => {
   return (
     <div
       ref={ref}
-      className={`border-2 border-gray-200 rounded p-4 absolute z-30 bg-white/80 backdrop-blur-sm min-w-[220px] ${Boolean(currentNodeData && currentNodeStats) ? "block" : "hidden"}`}
+      className={`border-2 border-gray-200 rounded-sm p-4 absolute z-30 bg-white/80 backdrop-blur-xs min-w-[220px] ${Boolean(currentNodeData && currentNodeStats) ? "block" : "hidden"}`}
       style={{
         left,
         top

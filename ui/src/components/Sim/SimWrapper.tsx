@@ -90,14 +90,14 @@ export const SimWrapper: FC = ({
           </div>
         </div>
         <div className="absolute bottom-12 flex w-1/2 gap-4 justify-center">
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-sm">
+          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
             <Scenario />
           </div>
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-sm">
+          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto w-full bg-white/80 backdrop-blur-xs">
             <Controls />
             <Progress />
           </div>
-          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-sm">
+          <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
             <BatchSize />
           </div>
         </div>

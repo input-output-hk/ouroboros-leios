@@ -48,8 +48,8 @@ const Stats: FC<IStatsProps> = ({ name, slot, txs, breakdown, position: [left, t
   const totalBytes = breakdown.reduce((sum, el) => sum + el[1], txBytes);
   return (
     <div onMouseMove={onMouseMove} className="flex flex-col items-center justify-between gap-4 z-10 absolute" style={{ left, top }}>
-      <div className="flex flex-col gap-4 backdrop-blur-sm bg-white/80 text-xl min-w-[300px]">
-        <div className="border-2 border-black rounded p-4">
+      <div className="flex flex-col gap-4 backdrop-blur-xs bg-white/80 text-xl min-w-[300px]">
+        <div className="border-2 border-black rounded-sm p-4">
           <h2 className='font-bold uppercase mb-2'>{name}</h2>
           <h4 className="flex items-center justify-between gap-4">Created in slot: <span>{slot}</span></h4>
           {txs && <h4 className="flex items-center justify-between gap-4">Transaction count: <span>{txs.length}</span></h4>}
