@@ -2,9 +2,12 @@
 
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[margin=2.5cm]{geometry}
 \usepackage[dvipsnames]{xcolor}
 \usepackage{todonotes}
+\usepackage{regexpatch}
+\makeatletter
+\xpatchcmd{\@todo}{\setkeys{todonotes}{#1}}{\setkeys{todonotes}{inline,#1}}{}{}
+\makeatother
 \usepackage{microtype}
 \usepackage{amssymb,amsmath}
 \usepackage{mathpazo}
