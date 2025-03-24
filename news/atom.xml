@@ -12,8 +12,8 @@
         <id>https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary"/>
         <updated>2025-03-17T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the team made great progress in the Leios protocol development, focusing on improving simulation capabilities and understanding the behavior of the protocol in different network conditions. A comparison of Haskell and Rust simulations across 18 scenarios revealed that Leios protocol scales well to mainnet-size networks. However, the protocol tends to experience congestion once the input-block rate reaches 30 IB/s.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the team made great progress in the Leios protocol development, focusing on improving simulation capabilities and understanding the behavior of the protocol in different network conditions. A comparison of Haskell and Rust simulations across <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb" target="_blank" rel="noopener noreferrer"><strong>18 scenarios</strong></a> revealed that Leios protocol scales well to mainnet-size networks. However, the protocol tends to experience congestion once the input-block rate reaches 30 IB/s.</p>
+        <summary type="html"><![CDATA[This week, the Leios team made significant progress in protocol development, focusing on improving simulation capabilities and analyzing protocol behavior under various network conditions. A comparison of Haskell and Rust simulations across 18 scenarios demonstrated that the Leios protocol scales effectively to mainnet-sized networks. However, congestion occurs when the input block rate reaches 30 IB/s.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team made significant progress in protocol development, focusing on improving simulation capabilities and analyzing protocol behavior under various network conditions. A comparison of Haskell and Rust simulations across <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb" target="_blank" rel="noopener noreferrer"><strong>18 scenarios</strong></a> demonstrated that the Leios protocol scales effectively to mainnet-sized networks. However, congestion occurs when the input block rate reaches 30 IB/s.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-comparison">Simulation comparison<a class="hash-link" aria-label="Direct link to Simulation comparison" title="Direct link to Simulation comparison" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#simulation-comparison">​</a></h2>
 <ul>
 <li>Compared <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb" target="_blank" rel="noopener noreferrer"><strong>18 scenarios</strong></a> between Haskell and Rust simulations at tag <a href="https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w12" target="_blank" rel="noopener noreferrer"><code>leios-2025w12</code></a></li>
@@ -22,34 +22,34 @@
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-simulations">Analysis of simulations<a class="hash-link" aria-label="Direct link to Analysis of simulations" title="Direct link to Analysis of simulations" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#analysis-of-simulations">​</a></h3>
 <ul>
-<li>Completed the first simulation of Short Leios for varied IB production rate, IB size, and network topology</li>
-<li>In the simulations, the Leios protocol scales well to mainnet-size networks</li>
-<li>Identified congestion in the protocol once the input-block rate reaches 30 IB/s</li>
+<li>Completed the first simulation of Short Leios, evaluating IB production rate, IB size, and network topology</li>
+<li>Demonstrated that the Leios protocol scales effectively to mainnet-sized networks</li>
+<li>Identified congestion occurring when the input block rate exceeds 30 IB/s</li>
 <li>Suggested that allowing IBs larger than current Praos RBs may have advantages in TCP efficiency, network usage, and adapting to fluctuating transaction loads.</li>
 </ul>
 <table><thead><tr><th>Peak CPU</th><th>Mean CPU</th></tr></thead><tbody><tr><td><img decoding="async" loading="lazy" src="https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png" alt="analysis/sims/2025w12xl/plots/cpu-peak-histogram-rust.png" class="img_ev3q"></td><td><img decoding="async" loading="lazy" src="https://github.com/input-output-hk/ouroboros-leios/raw/main/analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png" alt="analysis/sims/2025w12xl/plots/cpu-mean-histogram-rust.png" class="img_ev3q"></td></tr></tbody></table>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">HasKell simulation<a class="hash-link" aria-label="Direct link to HasKell simulation" title="Direct link to HasKell simulation" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#haskell-simulation">​</a></h3>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#haskell-simulation">​</a></h3>
 <ul>
-<li>Implemented expiration of blocks<!-- -->
+<li>Implemented expiration of blocks:<!-- -->
 <ul>
-<li>Blocks are cleared from relay buffer as soon as they should stop diffusing, then cleared from other state as specified</li>
+<li>Blocks are removed from the relay buffer once diffusion stops and cleared from other states as specified</li>
 </ul>
 </li>
-<li>Implemented first stab at Full Leios implementation<!-- -->
+<li>Developed an initial Full Leios implementation:<!-- -->
 <ul>
-<li>Only lightly tested so far</li>
-<li>Added <code>praos-chain-quality</code> configuration parameter for the <code>\eta</code> parameter from the spec.</li>
+<li>Currently in early testing</li>
+<li>Added the <code>praos-chain-quality</code> configuration parameter for the <code>\eta</code> parameter from the specification.</li>
 </ul>
 </li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#rust-simulation">​</a></h3>
 <ul>
-<li>Implemented first pass at Full Leios, with guesses for some parameters.</li>
+<li>Developed an initial Full Leios implementation using estimated values for some parameters.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="https://leios.cardano-scaling.org/news/2025/03/17/weekly-progress-summary#formal-methods">​</a></h3>
 <ul>
-<li>Short Leios trace verification: For Short Leios, we are modelling the local state evolution of a node</li>
-<li>Developed the initial trace verifier for Short Leios simulation traces in <code>leios-trace-verifier</code>.</li>
+<li>Short Leios trace verification: modeling local state evolution of a node</li>
+<li>Developed an initial trace verifier for Short Leios simulation traces in <code>leios-trace-verifier</code>.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
