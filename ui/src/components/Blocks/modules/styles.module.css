@@ -15,6 +15,6 @@
   flex-shrink: 1;
 }
 
-.input.selected {
+.input.hovered {
   flex-shrink: 0;
 }

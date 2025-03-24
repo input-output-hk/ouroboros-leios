@@ -75,7 +75,7 @@ export const NodeStats: FC = () => {
   const data = [
     { name: "Transactions", ...getCounts("tx"), color: '#26de81' },
     { name: "Input Blocks", ...getCounts("ib"), color: '#2bcbba' },
-    { name: "Endorsement Blocks", ...getCounts("eb"), color: '#4b7bec' },
+    { name: "Endorser Blocks", ...getCounts("eb"), color: '#4b7bec' },
     { name: "Votes", ...getCounts("votes"), color: '#2d98da' },
     { name: "Blocks", ...getCounts("pb"), color: '#fc5c65' },
   ]

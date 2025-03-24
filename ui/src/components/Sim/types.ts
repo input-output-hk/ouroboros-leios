@@ -164,9 +164,14 @@ export interface IEndorserBlockGenerated {
   producer: string;
   bytes: number;
   input_blocks: IInputBlock[]
+  endorser_blocks: IEndorserBlock[]
 }
 
 export interface IInputBlock {
+  id: string;
+}
+
+export interface IEndorserBlock {
   id: string;
 }
 

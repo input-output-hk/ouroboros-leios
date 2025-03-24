@@ -4,6 +4,7 @@ import {
   ISimulationAggregatedData,
   ISimulationAggregatedDataState,
   ISimulationBlock,
+  ISimulationEndorsementBlock,
   ISimulationIntermediateDataState,
 } from "@/contexts/SimContext/types";
 
@@ -51,6 +52,33 @@ const getNodeData = (aggregationNodeDataRef: ISimulationAggregatedDataState, nod
   return data;
 };
 
+const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string): ISimulationEndorsementBlock => {
+  const eb = intermediate.ebs.get(ebId)!;
+  const ibs = eb.ibs.map(id => {
+    const ib = intermediate.ibs.get(id)!;
+    for (const tx of ib.txs) {
+      if (!intermediate.praosTxs.has(tx)) {
+        intermediate.leiosTxs.add(tx);
+      }
+    }
+    const txs = ib.txs.map(tx => intermediate.txs[tx]);
+    return {
+      id,
+      slot: ib.slot,
+      headerBytes: ib.headerBytes,
+      txs,
+    };
+  });
+  const ebs = eb.ebs.map(id => extractEb(intermediate, id));
+  return {
+    id: ebId,
+    slot: eb.slot,
+    bytes: eb.bytes,
+    ibs,
+    ebs,
+  }
+};
+
 export const processMessage = (
   json: IServerMessage,
   aggregatedData: ISimulationAggregatedDataState,
@@ -91,30 +119,9 @@ export const processMessage = (
     if (message.endorsement != null) {
       bytes += message.endorsement.bytes;
       const ebId = message.endorsement.eb.id;
-      const eb = intermediate.ebs.get(ebId)!;
-      const ibs = eb.ibs.map(id => {
-        const ib = intermediate.ibs.get(id)!;
-        for (const tx of ib.txs) {
-          if (!intermediate.praosTxs.has(tx)) {
-            intermediate.leiosTxs.add(tx);
-          }
-        }
-        const txs = ib.txs.map(tx => intermediate.txs[tx]);
-        return {
-          id,
-          slot: ib.slot,
-          headerBytes: ib.headerBytes,
-          txs,
-        };
-      })
       block.cert = {
         bytes: message.endorsement.bytes,
-        eb: {
-          id: ebId,
-          slot: eb.slot,
-          bytes: eb.bytes,
-          ibs,
-        }
+        eb: extractEb(intermediate, ebId),
       }
     }
     trackDataGenerated(aggregatedData, intermediate, message.producer, "pb", message.id, bytes);
@@ -131,6 +138,7 @@ export const processMessage = (
       slot: message.slot,
       bytes: message.bytes,
       ibs: message.input_blocks.map(ib => ib.id),
+      ebs: message.endorser_blocks.map(eb => eb.id),
     });
   } else if (message.type === EMessageType.EBSent) {
     trackDataSent(aggregatedData, intermediate, message.sender, "eb", message.id);

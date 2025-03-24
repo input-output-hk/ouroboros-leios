@@ -54,6 +54,7 @@ export interface ISimulationEndorsementBlock {
   slot: number;
   bytes: number;
   ibs: ISimulationInputBlock[];
+  ebs: ISimulationEndorsementBlock[];
 }
 
 export interface ISimulationCertificate {
@@ -86,6 +87,7 @@ export interface ISimulationIntermediateEndorsementBlock {
   slot: number;
   bytes: number;
   ibs: string[];
+  ebs: string[];
 }
 
 export interface ISimulationIntermediateDataState {
