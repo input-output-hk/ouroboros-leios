@@ -23,25 +23,30 @@
     (A) 20 peers from TargetNumberOfActivePeers default configuration
     (B) ~35 downstream peers per node
 ```
-
-- assuming efficient gossip?, it sends to (P-1)/2 peers:
-```
-    (A) 9.5
-    (B) 17 
-```
+- Block header size: 1,024 bytes
+- Block body size: 90,112 bytes
+- Propagation model: 100% header propagation, 25% body requests
 
 #### Node traffic
-```    
-    (A) 131,400 blocks x 90,112 bytes x 9.5 = 11,840,724,480 bytes = ~112.48GB
-    (B) 131,400 blocks x 90,112 bytes x 17 = 11,840,724,480 bytes = ~201.30GB
 ```
- 
+(A) Headers: 131,400 blocks x 1,024 bytes x 20 peers = 2.69 GB
+    Bodies: 131,400 blocks x 90,112 bytes x 5 peers = 59.19 GB
+    Total: 61.88 GB
+
+(B) Headers: 131,400 blocks x 1,024 bytes x 35 peers = 4.71 GB
+    Bodies: 131,400 blocks x 90,112 bytes x 9 peers = 106.55 GB
+    Total: 111.26 GB
+```
+
 - additional traffic from transactions (5-10GB?) and consensus (~1-2GB?)
 
 #### Final total egress per month/ node
 ```
-    (A) Low end:  112.48 + 5 + 1   = 118.48 GB
-    (B) High end: 201.30 + 10 + 2 = 213.30 GB
+(A) Low end: 61.88 GB + 5 GB + 1 GB = 67.88 GB
+    High end: 61.88 GB + 10 GB + 2 GB = 73.88 GB
+
+(B) Low end: 111.26 GB + 5 GB + 1 GB = 117.26 GB
+    High end: 111.26 GB + 10 GB + 2 GB = 123.26 GB
 ```
 
 ## Ouroboros Leios
@@ -87,6 +92,11 @@ EB Bodies: 194,400 seconds × 32 bytes × 20 IBs per stage × 5 peers = 622.08 M
 RB Headers: 129,600 seconds × 1,024 bytes × 20 peers = 2.65 GB
 RB Bodies: 129,600 seconds × 90,112 bytes × 5 peers = 58.39 GB
 Total: 1.35 TB
+
+Note: 
+- IB traffic dominates due to larger body size (98,304 bytes)
+- EB traffic is minimal due to small body size (32 bytes per reference)
+- RB traffic is moderate, similar to Praos block size
 ```
 
 ### Monthly Traffic per Node
