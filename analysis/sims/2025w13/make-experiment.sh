@@ -26,6 +26,7 @@ ib-body-avg-size-bytes: $IB_SIZE
 ib-body-max-size-bytes: $IB_SIZE
 eb-generation-probability: $EB_RATE
 leios-stage-length-slots: $STAGE_LENGTH
+leios-stage-active-voting-slots: $STAGE_LENGTH
 EOI
 
 ln -f -s "../../$NETWORK.yaml" "$RUN_DIR/network.yaml"
