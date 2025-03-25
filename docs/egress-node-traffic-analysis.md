@@ -1,5 +1,7 @@
 # Egress cost estimation per node
 
+> **Note:** This analysis assumes fully utilized block space (filled blocks) for both Ouroboros Praos and Leios protocols. In practice, block utilization may vary, but this provides a conservative upper bound for egress traffic estimation.
+
 ## Ouroboros Praos
 
 ### Back of envelope calculation
@@ -13,8 +15,7 @@
 
 #### Total block data
 - block size 90,112 bytes (88KB)
-- assume 50% filled → 45,056 bytes (44kB)
-- **131,400 blocks x 45,056 bytes = 5,920,362,240 bytes ~5.92GB**
+- **131,400 blocks x 90,112 bytes = 11,840,724,480 bytes ~11.84GB**
 
 #### Egress traffic for p2p block propagation
 - Peers (P): assume:
@@ -31,98 +32,84 @@
 
 #### Node traffic
 ```    
-    (A) 131,400 blocks x 45,056 bytes x 9.5 = 5,920,362,240 bytes = ~56.24GB
-    (B) 131,400 blocks x 45,056 bytes x 17 = 5,920,362,240 bytes  = ~100.65GB
+    (A) 131,400 blocks x 90,112 bytes x 9.5 = 11,840,724,480 bytes = ~112.48GB
+    (B) 131,400 blocks x 90,112 bytes x 17 = 11,840,724,480 bytes = ~201.30GB
 ```
  
 - additional traffic from transactions (5-10GB?) and consensus (~1-2GB?)
 
 #### Final total egress per month/ node
 ```
-    (A) Low end:  56.24 + 5 + 1   = 62.24 GB
-    (B) High end: 100.65 + 10 + 2 = 112.65 GB
+    (A) Low end:  112.48 + 5 + 1   = 118.48 GB
+    (B) High end: 201.30 + 10 + 2 = 213.30 GB
 ```
 
 ## Ouroboros Leios
 
-### Back of envelope calculation
+### Block Size Breakdown
 
-#### Blocks/ month
-- 30 days = 2,592,000 seconds
-- Input Blocks (IBs): 5.0 * 2,592,000 = 12,960,000 IBs/month
-- Endorsement Blocks (EBs): 1.5 * 2,592,000 = 3,888,000 EBs/month
-- Ranking Blocks (RBs): 0.05 * 2,592,000 = 129,600 RBs/month
+#### Input Blocks (IB)
+- Header: 304 bytes
+  - ProducerId: 32 bytes
+  - SlotNo: 64 bytes
+  - VRF proof: 80 bytes
+  - Body hash: 32 bytes
+  - RB Ref: 32 bytes
+  - Signature: 64 bytes
+- Body: 98,304 bytes
 
-#### Total block data
-- IBs: 12,960,000 * (304 + 98,304) = ~1.28 TB
-  - Head (304 bytes) from `ib-head-size-bytes: 304`:
-    - ProducerId: 32 bytes
-    - SlotNo: 64 bytes
-    - VRF proof: 80 bytes
-    - Body hash: 32 bytes
-    - RB Ref: 32 bytes
-    - Signature: 64 bytes
-  - Body (98,304 bytes) from `ib-body-avg-size-bytes: 98304`
-- EBs: 3,888,000 * (240 + 32) = ~1.06 GB
-  - Constant (240 bytes) from `eb-size-bytes-constant: 240`:
-    - ProducerId: 32 bytes
-    - SlotNo: 64 bytes
-    - VRF proof: 80 bytes
-    - Signature: 64 bytes
-  - Per IB (32 bytes) from `eb-size-bytes-per-ib: 32` (IB hash)
-- RBs: 129,600 * (1,024 + 90,112) = ~11.82 GB
-  - Head (1,024 bytes) from `rb-head-size-bytes: 1024`
-  - Body (90,112 bytes) from `rb-body-max-size-bytes: 90112`
+#### Endorsement Blocks (EB)
+- Header: 240 bytes
+  - ProducerId: 32 bytes
+  - SlotNo: 64 bytes
+  - VRF proof: 80 bytes
+  - Signature: 64 bytes
+- Body: 32 bytes per IB reference
 
-#### Egress traffic for p2p propagation
-Using same peer assumptions as Praos:
+#### Ranking Blocks (RB)
+- Header: 1,024 bytes
+- Body: 90,112 bytes
+
+### Monthly Traffic Calculation
+
+#### Base Parameters
+- Seconds per month: 2,592,000 (30 days)
+- Stage length: 20 slots
+- EBs per stage: 1.5
+- RBs per second: 0.05
+
+#### Example Calculation (1 IB/s, 20 peers, 100% header propagation, 25% body requests)
 ```
-(A) 20 peers → 9.5 peers for gossip
-(B) 35 peers → 17 peers for gossip
-```
-
-#### Node traffic
-```
-(A) Low end:
-    - IBs: 1.28 TB * 9.5 = 12.16 TB
-    - EBs: 1.06 GB * 9.5 = 10.07 GB
-    - RBs: 11.82 GB * 9.5 = 112.29 GB
-    Total: ~12.28 TB
-
-(B) High end:
-    - IBs: 1.28 TB * 17 = 21.76 TB
-    - EBs: 1.06 GB * 17 = 18.02 GB
-    - RBs: 11.82 GB * 17 = 200.94 GB
-    Total: ~21.98 TB
+IB Headers: 2,592,000 seconds × 304 bytes × 20 peers = 15.76 GB
+IB Bodies: 2,592,000 seconds × 98,304 bytes × 5 peers = 1.27 TB
+EB Headers: 194,400 seconds × 240 bytes × 20 peers = 933.12 MB
+EB Bodies: 194,400 seconds × 32 bytes × 20 IBs per stage × 5 peers = 622.08 MB
+RB Headers: 129,600 seconds × 1,024 bytes × 20 peers = 2.65 GB
+RB Bodies: 129,600 seconds × 90,112 bytes × 5 peers = 58.39 GB
+Total: 1.35 TB
 ```
 
-## Estimated Egress Costs by Cloud Provider (March 2025)
+### Monthly Traffic per Node
 
-| Cloud Provider         | Egress Cost ($/GB) | Free Allowance (GB/mo) | Praos A (62.24 GB) Cost ($) | Praos B (112.65 GB) Cost ($) | Leios A (12.28 TB) Cost ($) | Leios B (21.98 TB) Cost ($) |
-|-----------------------|--------------------|------------------------|----------------------------|-----------------------------|----------------------------|-----------------------------|
-| AWS                   | 0.09              | 100                    | 0                          | 1.14                        | 1,123.20                    | 1,978.20                    |
-| Microsoft Azure       | 0.087             | 100                    | 0                          | 1.10                        | 1,085.76                    | 1,911.24                    |
-| Google Cloud          | 0.114             | 0                      | 7.10                       | 12.84                       | 1,399.92                    | 2,505.72                    |
-| Alibaba Cloud         | 0.074             | 10                     | 3.87                       | 7.60                        | 908.72                      | 1,626.52                    |
-| Railway               | 0.1               | 0                      | 6.22                       | 11.27                       | 1,228.00                    | 2,198.00                    |
-| DigitalOcean          | 0.01              | 100–10,000             | 0                          | 0.13                        | 122.80                      | 219.80                      |
-| Oracle Cloud          | 0.0085            | 10,240                 | 0                          | 0                           | 104.38                      | 186.83                      |
-| Linode                | 0.005             | 1,024–20,480           | 0                          | 0                           | 61.40                       | 109.90                      |
-| Hetzner               | 0.00108           | 1,024                  | 0                          | 0                           | 13.26                       | 23.74                       |
-| UpCloud               | 0                 | 1,024–24,576           | 0                          | 0                           | 0                           | 0                           |
+| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | RB Headers | RB Bodies | Total |
+|------|------------|-----------|------------|-----------|------------|-----------|-------|
+| 1    | 15.76 GB   | 1.27 TB   | 933.12 MB  | 622.08 MB | 2.65 GB    | 58.39 GB  | 1.35 TB |
+| 5    | 78.80 GB   | 6.37 TB   | 933.12 MB  | 3.11 GB   | 2.65 GB    | 58.39 GB  | 6.51 TB |
+| 10   | 157.59 GB  | 12.74 TB  | 933.12 MB  | 6.22 GB   | 2.65 GB    | 58.39 GB  | 12.97 TB |
+| 20   | 315.19 GB  | 25.48 TB  | 933.12 MB  | 12.44 GB  | 2.65 GB    | 58.39 GB  | 25.87 TB |
+| 30   | 472.78 GB  | 38.22 TB  | 933.12 MB  | 18.66 GB  | 2.65 GB    | 58.39 GB  | 38.77 TB |
 
-## Additional IB Production Rate Scenarios
+### Monthly Cost by Cloud Provider ($)
 
-### 10 IBs/second
-| Cloud Provider         | Egress Cost ($/GB) | Free Allowance (GB/mo) | Low (20 peers) Cost ($) | High (35 peers) Cost ($) |
-|-----------------------|--------------------|------------------------|------------------------|-------------------------|
-| AWS                   | 0.09              | 100                    | 2,246.40               | 3,956.40                |
-| Microsoft Azure       | 0.087             | 100                    | 2,171.52               | 3,822.48                |
-| Google Cloud          | 0.114             | 0                      | 2,799.84               | 5,011.44                |
-| Alibaba Cloud         | 0.074             | 10                     | 1,817.44               | 3,253.04                |
-| Railway               | 0.1               | 0                      | 2,456.00               | 4,396.00                |
-| DigitalOcean          | 0.01              | 100–10,000             | 245.60                 | 439.60                  |
-| Oracle Cloud          | 0.0085            | 10,240                 | 208.76                 | 373.66                  |
-| Linode                | 0.005             | 1,024–20,480           | 122.80                 | 219.80                  |
-| Hetzner               | 0.00108           | 1,024                  | 26.52                  | 47.48                   |
-| UpCloud               | 0                 | 1,024–24,576           | 0                      | 0                       |
+| Provider         | Price/GB | Free Allowance (GB) | 1 IB/s | 5 IB/s | 10 IB/s | 20 IB/s | 30 IB/s |
+|------------------|----------|---------------------|---------|---------|----------|----------|----------|
+| Google Cloud     | $0.114   | 0                   | $154.17 | $742.59 | $1,478.12| $2,949.18| $4,420.24|
+| Railway          | $0.100   | 0                   | $135.24 | $651.40 | $1,296.60| $2,587.00| $3,877.40|
+| AWS              | $0.090   | 100                 | $112.71 | $577.26 | $1,157.94| $2,319.30| $3,480.66|
+| Microsoft Azure  | $0.087   | 100                 | $108.96 | $558.02 | $1,119.34| $2,241.99| $3,364.64|
+| Alibaba Cloud    | $0.074   | 10                  | $99.34  | $481.29 | $958.74  | $1,913.64| $2,868.54|
+| DigitalOcean     | $0.010   | 100–10,000          | $12.52  | $64.14  | $128.66  | $257.70  | $386.74  |
+| Oracle Cloud     | $0.009   | 10,240              | $11.41  | $55.28  | $110.13  | $219.81  | $329.49  |
+| Linode           | $0.005   | 1,024–20,480        | $6.76   | $32.56  | $64.82   | $129.35  | $193.87  |
+| Hetzner          | $0.001   | 1,024               | $1.46   | $7.03   | $14.00   | $27.94   | $41.87   |
+| UpCloud          | $0.000   | 1,024–24,576        | $0.00   | $0.00   | $0.00    | $0.00    | $0.00    |
