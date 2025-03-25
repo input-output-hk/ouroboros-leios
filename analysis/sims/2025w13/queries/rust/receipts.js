@@ -1,6 +1,7 @@
 db.receipts.deleteMany({simulator: "rust"})
 
-db["rust-scenario"].find().forEach(s =>
+db["rust-scenario"].find().forEach(function(s) {
+printjson(s["_id"])
 db.rust.aggregate(
 [
   {
@@ -40,6 +41,45 @@ db.rust.aggregate(
           regex: "Sent$"
         }
       },
+      size: {
+        $switch: {
+          branches: [
+            {
+              case: {
+                $eq: ["$message.type", "IBGenerated"]
+              },
+              then: "$message.total_bytes"
+            },
+            {
+              case: {
+                $eq: ["$message.type", "EBGenerated"]
+              },
+              then: "$message.bytes"
+            },
+            {
+              case: {
+                $eq: [
+                  "$message.type",
+                  "VTBundleGenerated"
+                ]
+              },
+              then: "$message.bytes"
+            },
+            {
+              case: {
+                $eq: ["$message.type", "RBGenerated"]
+              },
+              then: {
+                $add: [
+                  "$message.header_bytes",
+                  {$sum: "$message.endorsement.bytes"}
+                ]
+              }
+            }
+          ],
+          default: null
+        }
+      },
       node_name: {
         $switch: {
           branches: [
@@ -68,7 +108,7 @@ db.rust.aggregate(
                   regex: "Received$"
                 }
               },
-              then: "$message.receiver"
+              then: "$message.recipient"
             }
           ]
         }
@@ -96,6 +136,9 @@ db.rust.aggregate(
       sent: {
         $min: "$time"
       },
+      size: {
+        $max: "$size"
+      },
       receipts: {
         $push: {
           $cond: [
@@ -120,6 +163,7 @@ db.rust.aggregate(
     $project: {
       simulator: "rust",
       sent: "$sent",
+      size: "$size",
       received: "$receipts.time",
       elapsed: {
         $subtract: ["$receipts.time", "$sent"]
@@ -145,4 +189,4 @@ db.rust.aggregate(
   }
 ]
 )
-)
+})
