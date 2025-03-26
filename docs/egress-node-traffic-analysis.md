@@ -81,7 +81,7 @@
 - Seconds per month: 2,592,000 (30 days)
 - Stage length: 20 slots
 - EBs per stage: 1.5
-- RBs per second: 0.05
+- RBs per stage: 1 (every 20 slots)
 
 #### Example Calculation (1 IB/s, 20 peers, 100% header propagation, 25% body requests)
 ```
