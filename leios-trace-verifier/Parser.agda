@@ -90,16 +90,16 @@ open import Leios.Short st
 import Data.String as S
 
 nodeId : String → Fin 10
-nodeId "node-0" = fzero
-nodeId "node-1" = fsuc fzero
-nodeId "node-2" = fsuc $ fsuc fzero
-nodeId "node-3" = fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-4" = fsuc $ fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-5" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-6" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-7" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-8" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
-nodeId "node-9" = fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fsuc $ fzero
+nodeId "node-0" = # 0
+nodeId "node-1" = # 1
+nodeId "node-2" = # 2
+nodeId "node-3" = # 3
+nodeId "node-4" = # 4
+nodeId "node-5" = # 5
+nodeId "node-6" = # 6
+nodeId "node-7" = # 7
+nodeId "node-8" = # 8
+nodeId "node-9" = # 9
 nodeId s        = error ("Unknown node: " S.++ s)
 
 SUT : String
