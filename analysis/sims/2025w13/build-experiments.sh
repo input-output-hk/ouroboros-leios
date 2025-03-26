@@ -2,6 +2,7 @@
 
 set -ev
 
+
 LABEL=default
 NETWORK=100-nodes
 MAX_SLOT=600
@@ -20,5 +21,37 @@ do
         done
       done
     done
+  done
+done
+
+
+LABEL=default
+IB_RATE=1.0
+IB_SIZE=98304
+EB_RATE=2.0
+STAGE_LENGTH=40
+MAX_SLOT=600
+
+for SIMULATOR in haskell rust
+do
+  for NETWORK in 100-nodes-4cpus 100-nodes-6cpus 100-nodes-8cpus
+  do
+    ./make-experiment.sh $SIMULATOR $MAX_SLOT $LABEL $NETWORK $IB_RATE $IB_SIZE $EB_RATE $STAGE_LENGTH
+  done
+done
+
+
+NETWORK=100-nodes
+IB_RATE=1.0
+IB_SIZE=98304
+EB_RATE=2.0
+STAGE_LENGTH=40
+MAX_SLOT=600
+
+for SIMULATOR in haskell rust
+do
+  for LABEL in extended-voting oldest-first peer-order
+  do
+    ./make-experiment.sh $SIMULATOR $MAX_SLOT $LABEL $NETWORK $IB_RATE $IB_SIZE $EB_RATE $STAGE_LENGTH
   done
 done
