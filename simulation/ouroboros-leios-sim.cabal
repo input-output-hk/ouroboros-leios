@@ -152,6 +152,7 @@ library
     , si-timers
     , singletons
     , sqlite-simple              >=0.4
+    , statistics
     , temporary
     , text
     , time
