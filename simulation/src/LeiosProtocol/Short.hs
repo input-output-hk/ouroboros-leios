@@ -689,8 +689,9 @@ endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapsho
   ]
 
 pipelinesToReferenceFromEB :: Int -> PipelineNo -> Maybe (PipelineNo, PipelineNo)
-pipelinesToReferenceFromEB n pl =
-  case fromEnum (pred pl) - maxStagesAfterEndorse of
+pipelinesToReferenceFromEB n pl = do
+  predPl <- safePred pl
+  case fromEnum predPl - maxStagesAfterEndorse of
     newestIx
       | newestIx < 0 -> Nothing
       | otherwise ->
@@ -700,6 +701,9 @@ pipelinesToReferenceFromEB n pl =
             )
  where
   maxStagesAfterEndorse = 2
+  safePred x = do
+    guard $ x > minBound
+    pure $ pred x
 
 shouldVoteOnEB ::
   LeiosConfig ->
