@@ -67,7 +67,6 @@ library
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP
-    JSONCompat
     P2P
     PlotTCP
     PraosProtocol.BlockFetch
