@@ -3,6 +3,8 @@ open import Leios.Prelude hiding (id)
 open import Leios.Foreign.Util
 
 open import Data.Bool using (if_then_else_)
+import Data.Nat.Show as S
+import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
 
 module Parser where
@@ -84,117 +86,125 @@ record TraceEvent : Type where
 
 open import Leios.SpecStructure using (SpecStructure)
 
-open import Leios.Defaults 10 fzero hiding (LeiosInput; LeiosOutput; SLOT)
-open import Leios.Trace.Verifier 10 fzero
-open import Leios.Short st
-import Data.String as S
+module _ (numberOfParties : ℕ) (sutId : ℕ) where
 
-nodeId : String → Fin 10
-nodeId "node-0" = # 0
-nodeId "node-1" = # 1
-nodeId "node-2" = # 2
-nodeId "node-3" = # 3
-nodeId "node-4" = # 4
-nodeId "node-5" = # 5
-nodeId "node-6" = # 6
-nodeId "node-7" = # 7
-nodeId "node-8" = # 8
-nodeId "node-9" = # 9
-nodeId s        = error ("Unknown node: " S.++ s)
+  from-id : ℕ → Fin numberOfParties
+  from-id n =
+    case n <? numberOfParties of λ where
+      (yes p) → #_ n {numberOfParties} {fromWitness p}
+      (no _) → error "Conversion to Fin not possible!"
 
-SUT : String
-SUT = "node-0"
+  nodePrefix : String
+  nodePrefix = "node-"
 
-blockRefToString : BlockRef → String
-blockRefToString record { id = ref } = ref
+  SUT-id : Fin numberOfParties
+  SUT-id = from-id sutId
 
-EventLog = List TraceEvent
+  open import Leios.Defaults numberOfParties SUT-id hiding (LeiosInput; LeiosOutput; SLOT)
+  open import Leios.Trace.Verifier numberOfParties SUT-id
+  open import Leios.Short st
 
-data Blk : Type where
-  IB-Blk : InputBlock → Blk
-  EB-Blk : EndorserBlock → Blk
-  VT-Blk : List Vote → Blk
+  to-nodeId : ℕ → String
+  to-nodeId n = nodePrefix S.++ show n
 
-record State : Type where
-  field refs : AssocList String Blk
-        currentSlot : ℕ
+  SUT : String
+  SUT = to-nodeId sutId
 
-open State
+  nodeId : String → Fin numberOfParties
+  nodeId s with S.readMaybe 10 (S.fromList (take (S.length nodePrefix) $ S.toList s))
+  ... | nothing = error ("Unknown node: " S.++ s)
+  ... | just n = from-id n
 
-traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
-traceEvent→action l record { message = Cpu _ _ _ ; time_s = t }
-  with trunc t ≟ suc (currentSlot l)
-... | yes p = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
-... | no _ = l , []
-traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
-traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
-traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
-traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
-traceEvent→action l record { message = IBReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | refs l ⁉ i
-... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
-... | _ | _ = l , []
-traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , []
-traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | refs l ⁉ i
-... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
-... | _ | _ = l , []
-traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , []
-traceEvent→action l record { message = VTBundleReceived _ p _ _ (just i) _ }
-  with p ≟ SUT | refs l ⁉ i
-... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
-... | _ | _ = l , []
-traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , []
-traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
-traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
-traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
-traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
-traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
-traceEvent→action l record { message = IBGenerated p i s _ _ _ }
-  with p ≟ SUT
-... | yes _ = l , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-... | no _  = let ib = record { header =
-                         record { slotNumber = primWord64ToNat s
-                                ; producerID = nodeId p
-                                ; lotteryPf  = tt
-                                ; bodyHash   = ""
-                                ; signature  = tt
-                                }
-                              ; body = record { txs = [] } } -- TODO: add transactions
-              in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
-traceEvent→action l record { message = EBGenerated p i s _ ibs }
-  with p ≟ SUT
-... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)) ∷ []
-... | no _ = let eb = record
-                        { slotNumber = primWord64ToNat s
-                        ; producerID = nodeId p
-                        ; lotteryPf  = tt
-                        ; ibRefs     = map blockRefToString ibs
-                        ; ebRefs     = []
-                        ; signature  = tt
-                        }
-             in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
-traceEvent→action l record { message = VTBundleGenerated p i s _ vts }
-  with p ≟ SUT
-... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-... | no _ = let vt = map (const tt) (elems vts)
-             in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
-traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , []
+  blockRefToString : BlockRef → String
+  blockRefToString record { id = ref } = ref
 
-mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
-mapAccuml f s []       = s , []
-mapAccuml f s (x ∷ xs) =
-  let (s' , y)   = f s x
-      (s'' , ys) = mapAccuml f s' xs
-  in s'' , y ∷ ys
+  EventLog = List TraceEvent
 
-opaque
-  unfolding List-Model
+  data Blk : Type where
+    IB-Blk : InputBlock → Blk
+    EB-Blk : EndorserBlock → Blk
+    VT-Blk : List Vote → Blk
 
-  verifyTrace : EventLog → ℕ
-  verifyTrace l =
-    let s₀ = record { refs = [] ; currentSlot = 0 }
-        αs = L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
-    in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+  record State : Type where
+    field refs : AssocList String Blk
+          currentSlot : ℕ
 
-  {-# COMPILE GHC verifyTrace as verifyTrace #-}
+  open State
+
+  traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
+  traceEvent→action l record { message = Cpu _ _ _ ; time_s = t }
+    with trunc t ≟ suc (currentSlot l)
+  ... | yes p = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
+  ... | no _ = l , []
+  traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = IBReceived _ p _ _ (just i) _ }
+    with p ≟ SUT | refs l ⁉ i
+  ... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
+  ... | _ | _ = l , []
+  traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , []
+  traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
+    with p ≟ SUT | refs l ⁉ i
+  ... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
+  ... | _ | _ = l , []
+  traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , []
+  traceEvent→action l record { message = VTBundleReceived _ p _ _ (just i) _ }
+    with p ≟ SUT | refs l ⁉ i
+  ... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
+  ... | _ | _ = l , []
+  traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , []
+  traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
+  traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
+  traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
+  traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
+  traceEvent→action l record { message = IBGenerated p i s _ _ _ }
+    with p ≟ SUT
+  ... | yes _ = l , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+  ... | no _  = let ib = record { header =
+                           record { slotNumber = primWord64ToNat s
+                                  ; producerID = nodeId p
+                                  ; lotteryPf  = tt
+                                  ; bodyHash   = ""
+                                  ; signature  = tt
+                                  }
+                                ; body = record { txs = [] } } -- TODO: add transactions
+                in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
+  traceEvent→action l record { message = EBGenerated p i s _ ibs }
+    with p ≟ SUT
+  ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)) ∷ []
+  ... | no _ = let eb = record
+                          { slotNumber = primWord64ToNat s
+                          ; producerID = nodeId p
+                          ; lotteryPf  = tt
+                          ; ibRefs     = map blockRefToString ibs
+                          ; ebRefs     = []
+                          ; signature  = tt
+                          }
+               in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
+  traceEvent→action l record { message = VTBundleGenerated p i s _ vts }
+    with p ≟ SUT
+  ... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+  ... | no _ = let vt = map (const tt) (elems vts)
+               in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
+  traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , []
+
+  mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
+  mapAccuml f s []       = s , []
+  mapAccuml f s (x ∷ xs) =
+    let (s' , y)   = f s x
+        (s'' , ys) = mapAccuml f s' xs
+    in s'' , y ∷ ys
+
+  opaque
+    unfolding List-Model
+
+    verifyTrace : EventLog → ℕ
+    verifyTrace l =
+      let s₀ = record { refs = [] ; currentSlot = 0 }
+          αs = L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
+      in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+
+    {-# COMPILE GHC verifyTrace as verifyTrace #-}

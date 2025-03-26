@@ -12,10 +12,13 @@ main :: IO ()
 main =
   do
     Command{..} <- execParser commandParser
-    BSL.readFile logFile >>= print . verifyTrace . decodeJSONL
+    BSL.readFile logFile >>= print . verifyTrace nrNodes idSut . decodeJSONL
 
-newtype Command = Command
+data Command = Command
   { logFile :: FilePath
+  , topologyFile :: FilePath
+  , nrNodes :: Integer -- FIXME: Number of nodes from topology file
+  , idSut :: Integer
   }
   deriving (Eq, Ord, Read, Show)
 
@@ -28,7 +31,7 @@ commandParser =
  where
   com =
     Command
-      <$> strOption
-        ( long "trace-file"
-            <> help "Short Leios simulation trace log file"
-        )
+      <$> strOption (long "trace-file" <> help "Short Leios simulation trace log file")
+      <*> strOption (long "topology-file" <> help "Short Leios topology file")
+      <*> option auto (long "nrNodes" <> help "Number of nodes")
+      <*> option auto (long "idSut" <> help "Id of system under test (SUT)")
