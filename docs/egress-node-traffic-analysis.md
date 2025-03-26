@@ -113,15 +113,32 @@ Note:
 
 | Provider         | Price/GB | Free Allowance (GB) | 1 IB/s | 5 IB/s | 10 IB/s | 20 IB/s | 30 IB/s | vs Praos (A) |
 |------------------|----------|---------------------|---------|---------|----------|----------|----------|--------------|
-| Google Cloud     | $0.114   | 0                   | $154.17 | $742.59 | $1,478.12| $2,949.18| $4,420.24| +5,987% |
-| Railway          | $0.100   | 0                   | $135.24 | $651.40 | $1,296.60| $2,587.00| $3,877.40| +5,251% |
-| AWS              | $0.090   | 100                 | $112.71 | $577.26 | $1,157.94| $2,319.30| $3,480.66| +5,036% |
-| Microsoft Azure  | $0.087   | 100                 | $108.96 | $558.02 | $1,119.34| $2,241.99| $3,364.64| +4,864% |
-| Alibaba Cloud    | $0.074   | 10                  | $99.34  | $481.29 | $958.74  | $1,913.64| $2,868.54| +4,145% |
-| DigitalOcean     | $0.010   | 100–10,000          | $12.52  | $64.14  | $128.66  | $257.70  | $386.74  | +523% |
-| Oracle Cloud     | $0.009   | 10,240              | $11.41  | $55.28  | $110.13  | $219.81  | $329.49  | +477% |
-| Linode           | $0.005   | 1,024–20,480        | $6.76   | $32.56  | $64.82   | $129.35  | $193.87  | +264% |
-| Hetzner          | $0.001   | 1,024               | $1.46   | $7.03   | $14.00   | $27.94   | $41.87   | +47% |
+| Google Cloud     | $0.120   | 0                   | $165.60 | $781.20 | $1,556.40| $3,104.40| $4,652.40| +5,987% |
+| Railway          | $0.100   | 0                   | $138.00 | $651.00 | $1,297.00| $2,587.00| $3,877.00| +5,251% |
+| AWS              | $0.090   | 100                 | $124.20 | $585.90 | $1,167.30| $2,328.30| $3,489.30| +5,036% |
+| Microsoft Azure  | $0.087   | 100                 | $120.06 | $566.37 | $1,128.39| $2,250.69| $3,372.99| +4,864% |
+| Alibaba Cloud    | $0.074   | 10                  | $102.12 | $481.74 | $960.18  | $1,914.38| $2,868.58| +4,145% |
+| DigitalOcean     | $0.010   | 100–10,000          | $13.80  | $65.10  | $129.70  | $258.70  | $387.70  | +523% |
+| Oracle Cloud     | $0.0085  | 10,240              | $11.73  | $55.34  | $110.25  | $219.90  | $329.55  | +477% |
+| Linode           | $0.005   | 1,024–20,480        | $6.90   | $32.55  | $64.85   | $129.35  | $193.85  | +264% |
+| Hetzner          | $0.00108 | 1,024               | $1.49   | $7.03   | $14.01   | $27.94   | $41.87   | +47% |
 | UpCloud          | $0.000   | 1,024–24,576        | $0.00   | $0.00   | $0.00    | $0.00    | $0.00    | 0% |
 
 Note: Percentage increases are calculated against Praos scenario A (20 peers) baseline of 67.88 GB/month and $7.73/month (using average cost across providers)
+
+### Data Egress Cost Sources
+
+| Provider | Price/GB | Source | Last Updated |
+|----------|----------|---------|--------------|
+| Google Cloud | $0.120 | https://cloud.google.com/vpc/pricing | Feb 2025 |
+| Railway | $0.100 | https://railway.app/pricing | - |
+| AWS | $0.090 | https://aws.amazon.com/ec2/pricing/ | 2023 |
+| Microsoft Azure | $0.087 | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024 |
+| Alibaba Cloud | $0.074 | https://www.alibabacloud.com/pricing | 2024 |
+| DigitalOcean | $0.010 | https://www.digitalocean.com/pricing/ | - |
+| Oracle Cloud | $0.0085 | https://www.oracle.com/cloud/pricing/ | Dec 2024 |
+| Linode | $0.005 | https://www.linode.com/pricing/ | Apr 2023 |
+| Hetzner | $0.00108 | https://www.hetzner.com/cloud/pricing | 2024 |
+| UpCloud | $0.000 | https://upcloud.com/pricing/ | - |
+
+Note: Prices may vary by region and volume. Some providers offer free tiers or volume discounts not reflected in these base rates. The table shows the standard outbound data transfer rates for the most commonly used regions.
