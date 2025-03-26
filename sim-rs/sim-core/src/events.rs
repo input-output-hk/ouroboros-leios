@@ -175,6 +175,7 @@ pub enum Event {
     },
     VTBundleNotGenerated {
         slot: u64,
+        pipeline: u64,
         producer: Node,
         eb: EndorserBlockId<Node>,
         reason: NoVoteReason,
@@ -428,12 +429,14 @@ impl EventTracker {
     pub fn track_no_vote(
         &self,
         slot: u64,
+        pipeline: u64,
         producer: NodeId,
         eb: EndorserBlockId,
         reason: NoVoteReason,
     ) {
         self.send(Event::VTBundleNotGenerated {
             slot,
+            pipeline,
             producer: self.to_node(producer),
             eb: self.to_endorser_block(eb),
             reason,
@@ -479,6 +482,7 @@ impl EventTracker {
     fn to_input_block(&self, id: InputBlockId) -> InputBlockId<Node> {
         InputBlockId {
             slot: id.slot,
+            pipeline: id.pipeline,
             producer: self.to_node(id.producer),
             index: id.index,
         }
@@ -487,6 +491,7 @@ impl EventTracker {
     fn to_endorser_block(&self, id: EndorserBlockId) -> EndorserBlockId<Node> {
         EndorserBlockId {
             slot: id.slot,
+            pipeline: id.pipeline,
             producer: self.to_node(id.producer),
         }
     }
@@ -494,6 +499,7 @@ impl EventTracker {
     fn to_vote_bundle(&self, id: VoteBundleId) -> VoteBundleId<Node> {
         VoteBundleId {
             slot: id.slot,
+            pipeline: id.pipeline,
             producer: self.to_node(id.producer),
         }
     }

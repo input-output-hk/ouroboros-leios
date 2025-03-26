@@ -75,7 +75,7 @@ export const NodeStats: FC = () => {
   const data = [
     { name: "Transactions", ...getCounts("tx"), color: '#26de81' },
     { name: "Input Blocks", ...getCounts("ib"), color: '#2bcbba' },
-    { name: "Endorsement Blocks", ...getCounts("eb"), color: '#4b7bec' },
+    { name: "Endorser Blocks", ...getCounts("eb"), color: '#4b7bec' },
     { name: "Votes", ...getCounts("votes"), color: '#2d98da' },
     { name: "Blocks", ...getCounts("pb"), color: '#fc5c65' },
   ]
@@ -83,7 +83,7 @@ export const NodeStats: FC = () => {
   return (
     <div
       ref={ref}
-      className={`border-2 border-gray-200 rounded p-4 absolute z-30 bg-white/80 backdrop-blur-sm min-w-[220px] ${Boolean(currentNodeData && currentNodeStats) ? "block" : "hidden"}`}
+      className={`border-2 border-gray-200 rounded-sm p-4 absolute z-30 bg-white/80 backdrop-blur-xs min-w-[220px] ${Boolean(currentNodeData && currentNodeStats) ? "block" : "hidden"}`}
       style={{
         left,
         top

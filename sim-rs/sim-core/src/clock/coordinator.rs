@@ -69,11 +69,13 @@ impl ClockCoordinator {
                         self.time.store(timestamp, Ordering::Release);
 
                         for id in waiter_ids {
-                            let Some(waiter) = waiters[id].take() else {
-                                continue;
-                            };
-                            if waiter.until.is_some_and(|ts| ts == timestamp) {
+                            if waiters[id]
+                                .as_ref()
+                                .and_then(|w| w.until)
+                                .is_some_and(|ts| ts == timestamp)
+                            {
                                 running += 1;
+                                let waiter = waiters[id].take().unwrap();
                                 let _ = waiter.done.send(());
                             }
                         }
