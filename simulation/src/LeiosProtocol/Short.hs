@@ -539,14 +539,18 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [EndorseBlockId] -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer endorseBlocksEarlierPipeline inputBlocks =
-  assert (cfg.variant == Full || null endorseBlocksEarlierPipeline) $
+  assert
+    ( (cfg.variant == Full && length endorseBlocksEarlierPipeline <= cfg.pipelinesToReferenceFromEB)
+        || null endorseBlocksEarlierPipeline
+    )
+    $
     -- Endorse blocks are produced at the beginning of the stage.
-    assert (stageStart @p cfg Endorse slot Endorse == Just slot) $
-      rnf endorseBlocksEarlierPipeline `seq`
-        rnf inputBlocks `seq`
-          fixSize
-            cfg
-            EndorseBlock{endorseBlocksEarlierStage = [], size = 0, ..}
+    assert (stageStart @p cfg Endorse slot Endorse == Just slot)
+    $ rnf endorseBlocksEarlierPipeline
+    `seq` rnf inputBlocks
+    `seq` fixSize
+      cfg
+      EndorseBlock{endorseBlocksEarlierStage = [], size = 0, ..}
 
 mockEndorseBlock :: LeiosConfig -> Int -> EndorseBlock
 mockEndorseBlock cfg n =
@@ -648,8 +652,7 @@ newtype InputBlocksSnapshot = InputBlocksSnapshot
 
 data EndorseBlocksSnapshot = EndorseBlocksSnapshot
   { validEndorseBlocks :: (SlotNo, SlotNo) -> [EndorseBlock]
-  , --  , endorseBlocksInChain :: (SlotNo, SlotNo) -> [EndorseBlock]
-    certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
+  , certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
   }
 
 -- | Both constraints are inclusive.
@@ -684,11 +687,18 @@ endorseBlocksToReference ::
   [(PipelineNo, [EndorseBlock])]
 endorseBlocksToReference LeiosConfig{variant = Short} _ _ _ = []
 endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapshot{..} checkDeliveryTime =
-  [ (p, [eb | (eb, _, _) <- es])
-  | plRange <- maybeToList $ pipelinesToReferenceFromEB cfg.pipelinesToReferenceFromEB pl
-  , (p, es) <- certifiedEndorseBlocks plRange
-  , or [checkDeliveryTime p t | (_, _, t) <- es]
-  ]
+  assert
+    ( all (\(p, ebs) -> all (\eb -> p == endorseBlockPipeline cfg eb) ebs && succ (succ p) <= pl) result
+        && (\ps -> sort ps == ps) (map fst result)
+    )
+    result
+ where
+  result =
+    [ (p, [eb | (eb, _, _) <- es])
+    | plRange <- maybeToList $ pipelinesToReferenceFromEB cfg.pipelinesToReferenceFromEB pl
+    , (p, es) <- certifiedEndorseBlocks plRange
+    , or [checkDeliveryTime p t | (_, _, t) <- es]
+    ]
 
 pipelinesToReferenceFromEB :: Int -> PipelineNo -> Maybe (PipelineNo, PipelineNo)
 pipelinesToReferenceFromEB n pl = do
