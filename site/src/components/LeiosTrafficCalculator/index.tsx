@@ -116,15 +116,16 @@ const LeiosTrafficCalculator: React.FC = () => {
                 TX_FEE_PARAMS.avgTxSize,
         );
         const totalTxs = ibCount * txPerIB;
-        const txFeeADA = totalTxs *
-            (TX_FEE_PARAMS.a + TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize);
-        const txFeeUSD = txFeeADA * adaToUsd;
+        // Calculate fee per transaction exactly: a + (b * avgTxSize)
+        const feePerTx = TX_FEE_PARAMS.a +
+            (TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize);
+        // Calculate total fees without any intermediate rounding
+        const txFeeADA = totalTxs * feePerTx;
 
         return {
             traffic,
             totalTraffic,
             txFeeADA,
-            txFeeUSD,
             totalTxs,
         };
     };
@@ -619,8 +620,6 @@ const LeiosTrafficCalculator: React.FC = () => {
                             <th>RB Bodies</th>
                             <th>Total Traffic</th>
                             <th>Total Txs</th>
-                            <th>Tx Fees (₳)</th>
-                            <th>Tx Fees (USD)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -628,8 +627,6 @@ const LeiosTrafficCalculator: React.FC = () => {
                             const {
                                 traffic,
                                 totalTraffic,
-                                txFeeADA,
-                                txFeeUSD,
                                 totalTxs,
                             } = calculateTraffic(rate);
                             return (
@@ -643,17 +640,6 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     <td>{formatTraffic(traffic.rb.bodies)}</td>
                                     <td>{formatTraffic(totalTraffic)}</td>
                                     <td>{totalTxs.toLocaleString()}</td>
-                                    <td>
-                                        {txFeeADA.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 6,
-                                        }).replace(/\.?0+$/, "")} ₳
-                                    </td>
-                                    <td>
-                                        ${txFeeUSD.toLocaleString(undefined, {
-                                            minimumFractionDigits: 2,
-                                        })}
-                                    </td>
                                 </tr>
                             );
                         })}
@@ -766,6 +752,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                     <thead>
                         <tr>
                             <th>IB/s</th>
+                            <th>Total Txs</th>
                             <th>Gross Network Revenue (₳)</th>
                             <th>After Treasury Tax (₳)</th>
                             <th>Per Node (₳)</th>
@@ -774,13 +761,16 @@ const LeiosTrafficCalculator: React.FC = () => {
                     </thead>
                     <tbody>
                         {IB_RATES.map((rate) => {
-                            const { txFeeADA } = calculateTraffic(rate);
+                            const { txFeeADA, totalTxs } = calculateTraffic(
+                                rate,
+                            );
                             const afterTax = txFeeADA *
                                 (1 - treasuryTaxRate / 100);
                             const perNode = afterTax / totalNodes;
                             return (
                                 <tr key={rate}>
                                     <td>{rate}</td>
+                                    <td>{totalTxs.toLocaleString()}</td>
                                     <td>
                                         {txFeeADA.toLocaleString(undefined, {
                                             minimumFractionDigits: 0,
@@ -843,6 +833,11 @@ const LeiosTrafficCalculator: React.FC = () => {
                                 SPOs can multiply the per-node income by their
                                 total number of nodes (BP + relays) to estimate
                                 their total income.
+                            </li>
+                            <li>
+                                Transaction fee calculation parameters (base fee
+                                and per-byte fee) remain constant, though these
+                                may be adjusted through governance
                             </li>
                         </ul>
                     </div>
