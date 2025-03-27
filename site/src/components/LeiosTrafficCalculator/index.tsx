@@ -54,6 +54,8 @@ const LeiosTrafficCalculator: React.FC = () => {
     const [bodyRequestPercent, setBodyRequestPercent] = useState(25);
     const [blockUtilizationPercent, setBlockUtilizationPercent] = useState(100);
     const [adaToUsd, setAdaToUsd] = useState(0.5);
+    const [totalNodes, setTotalNodes] = useState(30000);
+    const [treasuryTaxRate, setTreasuryTaxRate] = useState(20);
     const [sortConfig, setSortConfig] = useState<SortConfig>({
         key: "egressCost",
         direction: "desc",
@@ -259,6 +261,33 @@ const LeiosTrafficCalculator: React.FC = () => {
                             setAdaToUsd(parseFloat(e.target.value))}
                         min="0"
                         step="0.01"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor="totalNodes">
+                        Total Network Nodes:
+                    </label>
+                    <input
+                        type="number"
+                        id="totalNodes"
+                        value={totalNodes}
+                        onChange={(e) =>
+                            setTotalNodes(parseInt(e.target.value))}
+                        min="1"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor="treasuryTaxRate">
+                        Treasury Tax Rate (%):
+                    </label>
+                    <input
+                        type="number"
+                        id="treasuryTaxRate"
+                        value={treasuryTaxRate}
+                        onChange={(e) =>
+                            setTreasuryTaxRate(parseInt(e.target.value))}
+                        min="0"
+                        max="100"
                     />
                 </div>
             </div>
@@ -660,6 +689,76 @@ const LeiosTrafficCalculator: React.FC = () => {
                         </ul>
                         Hyperscale providers may offer advantages that justify
                         higher costs for production operations.
+                    </div>
+                </div>
+            </div>
+
+            <h3>Estimated Node Income*</h3>
+            <div className={styles.tableContainer}>
+                <table className={styles.table}>
+                    <thead>
+                        <tr>
+                            <th>IB/s</th>
+                            <th>Gross Network Revenue (₳)</th>
+                            <th>After Treasury Tax (₳)</th>
+                            <th>Per Node (₳)</th>
+                            <th>Per Node (USD)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {IB_RATES.map((rate) => {
+                            const { txFeeADA } = calculateTraffic(rate);
+                            const afterTax = txFeeADA *
+                                (1 - treasuryTaxRate / 100);
+                            const perNode = afterTax / totalNodes;
+                            return (
+                                <tr key={rate}>
+                                    <td>{rate}</td>
+                                    <td>
+                                        {txFeeADA.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 6,
+                                        }).replace(/\.?0+$/, "")} ₳
+                                    </td>
+                                    <td>
+                                        {afterTax.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 6,
+                                        }).replace(/\.?0+$/, "")} ₳
+                                    </td>
+                                    <td>
+                                        {perNode.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 6,
+                                        }).replace(/\.?0+$/, "")} ₳
+                                    </td>
+                                    <td>
+                                        ${(perNode * adaToUsd).toLocaleString(
+                                            undefined,
+                                            {
+                                                minimumFractionDigits: 2,
+                                            },
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                <div className={styles.note}>
+                    <div className={styles.noteTitle}>
+                        Estimated Node Income Disclaimer
+                    </div>
+                    <div className={styles.noteContent}>
+                        These estimates are based on <b>several assumptions</b>:
+                        <ul>
+                            <li>
+                                Equal distribution of rewards across all nodes
+                            </li>
+                            <li>No additional operational costs</li>
+                            <li>No pool fees or other deductions</li>
+                            <li>Constant ADA/USD price</li>
+                        </ul>
                     </div>
                 </div>
             </div>
