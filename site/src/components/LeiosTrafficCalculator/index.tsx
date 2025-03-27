@@ -193,102 +193,110 @@ const LeiosTrafficCalculator: React.FC = () => {
     return (
         <div className={styles.container}>
             <div className={styles.controls}>
-                <div className={styles.control}>
-                    <label htmlFor="numPeers">Number of Peers:</label>
-                    <input
-                        type="number"
-                        id="numPeers"
-                        value={numPeers}
-                        onChange={(e) => setNumPeers(parseInt(e.target.value))}
-                        min="1"
-                    />
+                <div className={styles.controlGroup}>
+                    <h4>Network Parameters</h4>
+                    <div className={styles.control}>
+                        <label htmlFor="numPeers">Number of Peers:</label>
+                        <input
+                            type="number"
+                            id="numPeers"
+                            value={numPeers}
+                            onChange={(e) =>
+                                setNumPeers(parseInt(e.target.value))}
+                            min="1"
+                        />
+                    </div>
+                    <div className={styles.control}>
+                        <label htmlFor="totalNodes">Total Network Nodes:</label>
+                        <input
+                            type="number"
+                            id="totalNodes"
+                            value={totalNodes}
+                            onChange={(e) =>
+                                setTotalNodes(parseInt(e.target.value))}
+                            min="1"
+                        />
+                    </div>
                 </div>
-                <div className={styles.control}>
-                    <label htmlFor="headerPropagation">
-                        Header Propagation (% of peers):
-                    </label>
-                    <input
-                        type="number"
-                        id="headerPropagation"
-                        value={headerPropagationPercent}
-                        onChange={(e) =>
-                            setHeaderPropagationPercent(
-                                parseInt(e.target.value),
-                            )}
-                        min="0"
-                        max="100"
-                    />
+
+                <div className={styles.controlGroup}>
+                    <h4>Block Parameters</h4>
+                    <div className={styles.control}>
+                        <label htmlFor="headerPropagation">
+                            Header Propagation (% of peers):
+                        </label>
+                        <input
+                            type="number"
+                            id="headerPropagation"
+                            value={headerPropagationPercent}
+                            onChange={(e) =>
+                                setHeaderPropagationPercent(
+                                    parseInt(e.target.value),
+                                )}
+                            min="0"
+                            max="100"
+                        />
+                    </div>
+                    <div className={styles.control}>
+                        <label htmlFor="bodyRequest">
+                            Body Request (% of peers):
+                        </label>
+                        <input
+                            type="number"
+                            id="bodyRequest"
+                            value={bodyRequestPercent}
+                            onChange={(e) =>
+                                setBodyRequestPercent(parseInt(e.target.value))}
+                            min="0"
+                            max="100"
+                        />
+                    </div>
+                    <div className={styles.control}>
+                        <label htmlFor="blockUtilization">
+                            Input Block Utilization (%):
+                        </label>
+                        <input
+                            type="number"
+                            id="blockUtilization"
+                            value={blockUtilizationPercent}
+                            onChange={(e) =>
+                                setBlockUtilizationPercent(
+                                    parseInt(e.target.value),
+                                )}
+                            min="0"
+                            max="100"
+                        />
+                    </div>
                 </div>
-                <div className={styles.control}>
-                    <label htmlFor="bodyRequest">
-                        Body Request (% of peers):
-                    </label>
-                    <input
-                        type="number"
-                        id="bodyRequest"
-                        value={bodyRequestPercent}
-                        onChange={(e) =>
-                            setBodyRequestPercent(parseInt(e.target.value))}
-                        min="0"
-                        max="100"
-                    />
-                </div>
-                <div className={styles.control}>
-                    <label htmlFor="blockUtilization">
-                        Input Block Utilization (%):
-                    </label>
-                    <input
-                        type="number"
-                        id="blockUtilization"
-                        value={blockUtilizationPercent}
-                        onChange={(e) =>
-                            setBlockUtilizationPercent(
-                                parseInt(e.target.value),
-                            )}
-                        min="0"
-                        max="100"
-                    />
-                </div>
-                <div className={styles.control}>
-                    <label htmlFor="adaToUsd">
-                        ADA/USD Price:
-                    </label>
-                    <input
-                        type="number"
-                        id="adaToUsd"
-                        value={adaToUsd}
-                        onChange={(e) =>
-                            setAdaToUsd(parseFloat(e.target.value))}
-                        min="0"
-                        step="0.01"
-                    />
-                </div>
-                <div className={styles.control}>
-                    <label htmlFor="totalNodes">
-                        Total Network Nodes:
-                    </label>
-                    <input
-                        type="number"
-                        id="totalNodes"
-                        value={totalNodes}
-                        onChange={(e) =>
-                            setTotalNodes(parseInt(e.target.value))}
-                        min="1"
-                    />
-                </div>
-                <div className={styles.control}>
-                    <label htmlFor="treasuryTaxRate">
-                        Treasury Tax Rate (%):
-                    </label>
-                    <input
-                        type="number"
-                        id="treasuryTaxRate"
-                        value={treasuryTaxRate}
-                        onChange={(e) =>
-                            setTreasuryTaxRate(parseInt(e.target.value))}
-                        min="0"
-                        max="100"
-                    />
+
+                <div className={styles.controlGroup}>
+                    <h4>Economic Parameters</h4>
+                    <div className={styles.control}>
+                        <label htmlFor="adaToUsd">ADA/USD Price:</label>
+                        <input
+                            type="number"
+                            id="adaToUsd"
+                            value={adaToUsd}
+                            onChange={(e) =>
+                                setAdaToUsd(parseFloat(e.target.value))}
+                            min="0"
+                            step="0.01"
+                        />
+                    </div>
+                    <div className={styles.control}>
+                        <label htmlFor="treasuryTaxRate">
+                            Treasury Tax Rate (%):
+                        </label>
+                        <input
+                            type="number"
+                            id="treasuryTaxRate"
+                            value={treasuryTaxRate}
+                            onChange={(e) =>
+                                setTreasuryTaxRate(parseInt(e.target.value))}
+                            min="0"
+                            max="100"
+                        />
+                    </div>
                 </div>
             </div>
 

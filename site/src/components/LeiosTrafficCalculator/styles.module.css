@@ -34,28 +34,60 @@
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 2rem;
   margin-bottom: 2rem;
-  flex-wrap: wrap;
-  width: 100%;
-  justify-content: center;
+}
+
+.controlGroup {
+  flex: 1;
+  min-width: 300px;
+  background-color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e1e4e8;
+}
+
+.controlGroup h4 {
+  margin: 0 0 1rem 0;
+  color: #24292f;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e1e4e8;
 }
 
 .control {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.control:last-child {
+  margin-bottom: 0;
 }
 
 .control label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #24292f;
+  font-size: 0.9rem;
   font-weight: 500;
 }
 
 .control input {
+  width: 100%;
   padding: 0.5rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
+  border: 1px solid #e1e4e8;
   border-radius: 4px;
-  width: 150px;
+  background: #ffffff;
+  color: #24292f;
+  font-size: 0.9rem;
+}
+
+.control input:focus {
+  outline: none;
+  border-color: #0969da;
+  box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.2);
 }
 
 .calculationBreakdown {
