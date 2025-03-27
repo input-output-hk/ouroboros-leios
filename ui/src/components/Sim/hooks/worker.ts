@@ -1,6 +1,6 @@
 import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
 import * as cbor from 'cbor';
-import { ReadableStream } from 'stream/web';
+import type { ReadableStream } from 'stream/web';
 import { IServerMessage } from '../types';
 import { processMessage } from './utils';
 

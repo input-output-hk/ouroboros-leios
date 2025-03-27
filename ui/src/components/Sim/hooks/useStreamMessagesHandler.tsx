@@ -1,6 +1,7 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TWorkerResponse } from "./worker";
+import StreamWorker from './worker?worker';
 
 export const useStreamMessagesHandler = () => {
   const {
@@ -13,13 +14,7 @@ export const useStreamMessagesHandler = () => {
   const [streaming, setStreaming] = useState(false);
 
   const worker = useMemo(() => {
-    if (typeof Worker === "undefined") {
-      // return fake worker to make next.js happy
-      return {
-        postMessage() { }
-      } as unknown as Worker;
-    }
-    return new Worker(new URL('worker.ts', import.meta.url));
+    return new StreamWorker();
   }, []);
 
   const startStream = useCallback(() => {

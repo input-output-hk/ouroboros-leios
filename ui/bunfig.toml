@@ -1,5 +1,0 @@
-[install.scopes]
-"@sundaeswap" = { token = "$NPM_AUTH_TOKEN" }
-
-[test]
-root = "./src"

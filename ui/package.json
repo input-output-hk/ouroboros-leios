@@ -1,48 +1,38 @@
 {
   "name": "leios-visual",
-  "module": "src/index.tsx",
+  "private": true,
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "seed": "bun src/components/files/convertTestData.ts"
-  },
-  "devDependencies": {
-    "@sundaeswap/prettier-config": "^2.0.13",
-    "@tailwindcss/postcss": "^4.0.15",
-    "@types/bun": "latest",
-    "@types/d3": "^7.4.3",
-    "@types/oboe": "^2.1.4",
-    "@types/pako": "^2.0.3",
-    "@types/react": "^19.0.12",
-    "@types/react-dom": "^19.0.4",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.3",
-    "tailwindcss": "^4.0.15",
-    "vite": "^6.2.3"
-  },
-  "peerDependencies": {
-    "typescript": "^5.7.3"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@visx/responsive": "^3.12.0",
     "cbor": "^10.0.3",
     "classnames": "^2.5.1",
-    "concat-stream": "^2.0.0",
-    "d3": "^7.9.0",
     "debounce": "^2.2.0",
-    "linebyline": "^1.3.0",
-    "msgpack-lite": "^0.1.26",
-    "next": "^15.2.3",
-    "oboe": "^2.1.7",
-    "pako": "^2.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.1",
-    "swr": "^2.3.3",
     "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "@tailwindcss/vite": "^4.0.17",
+    "@types/node": "^22.13.14",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.21.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^15.15.0",
+    "tailwindcss": "^4.0.17",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.24.1",
+    "vite": "^6.2.0",
+    "vite-plugin-node-polyfills": "^0.23.0"
   }
 }
