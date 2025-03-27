@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./styles.module.css";
 
 interface CloudProvider {
@@ -54,12 +54,28 @@ const LeiosTrafficCalculator: React.FC = () => {
     const [bodyRequestPercent, setBodyRequestPercent] = useState(25);
     const [blockUtilizationPercent, setBlockUtilizationPercent] = useState(100);
     const [adaToUsd, setAdaToUsd] = useState(0.5);
-    const [totalNodes, setTotalNodes] = useState(30000);
+    const [totalNodes, setTotalNodes] = useState(10000);
     const [treasuryTaxRate, setTreasuryTaxRate] = useState(20);
     const [sortConfig, setSortConfig] = useState<SortConfig>({
         key: "egressCost",
         direction: "desc",
     });
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isToggleVisible, setIsToggleVisible] = useState(false);
+    const controlsRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (controlsRef.current) {
+                const controlsBottom =
+                    controlsRef.current.getBoundingClientRect().bottom;
+                setIsToggleVisible(controlsBottom < 0);
+            }
+        };
+
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     const calculateTraffic = (ibRate: number) => {
         const ibCount = ibRate * SECONDS_PER_MONTH;
@@ -190,113 +206,156 @@ const LeiosTrafficCalculator: React.FC = () => {
         }
     };
 
+    const Controls: React.FC<{ idPrefix?: string }> = ({ idPrefix = "" }) => (
+        <div className={styles.controls}>
+            <div className={styles.controlGroup}>
+                <h4>Network Parameters</h4>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}numPeers`}>
+                        Number of Peers:
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}numPeers`}
+                        value={numPeers}
+                        onChange={(e) => setNumPeers(parseInt(e.target.value))}
+                        min="1"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}totalNodes`}>
+                        Total Network Nodes:
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}totalNodes`}
+                        value={totalNodes}
+                        onChange={(e) =>
+                            setTotalNodes(parseInt(e.target.value))}
+                        min="1"
+                    />
+                </div>
+            </div>
+
+            <div className={styles.controlGroup}>
+                <h4>Block Parameters</h4>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}headerPropagation`}>
+                        Header Propagation (% of peers):
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}headerPropagation`}
+                        value={headerPropagationPercent}
+                        onChange={(e) =>
+                            setHeaderPropagationPercent(
+                                parseInt(e.target.value),
+                            )}
+                        min="0"
+                        max="100"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}bodyRequest`}>
+                        Body Request (% of peers):
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}bodyRequest`}
+                        value={bodyRequestPercent}
+                        onChange={(e) =>
+                            setBodyRequestPercent(parseInt(e.target.value))}
+                        min="0"
+                        max="100"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}blockUtilization`}>
+                        Input Block Utilization (%):
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}blockUtilization`}
+                        value={blockUtilizationPercent}
+                        onChange={(e) =>
+                            setBlockUtilizationPercent(
+                                parseInt(e.target.value),
+                            )}
+                        min="0"
+                        max="100"
+                    />
+                </div>
+            </div>
+
+            <div className={styles.controlGroup}>
+                <h4>Economic Parameters</h4>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}adaToUsd`}>
+                        ADA/USD Price:
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}adaToUsd`}
+                        value={adaToUsd}
+                        onChange={(e) =>
+                            setAdaToUsd(parseFloat(e.target.value))}
+                        min="0"
+                        step="0.01"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor={`${idPrefix}treasuryTaxRate`}>
+                        Treasury Tax Rate (%):
+                    </label>
+                    <input
+                        type="number"
+                        id={`${idPrefix}treasuryTaxRate`}
+                        value={treasuryTaxRate}
+                        onChange={(e) =>
+                            setTreasuryTaxRate(parseInt(e.target.value))}
+                        min="0"
+                        max="100"
+                    />
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <div className={styles.container}>
-            <div className={styles.controls}>
-                <div className={styles.controlGroup}>
-                    <h4>Network Parameters</h4>
-                    <div className={styles.control}>
-                        <label htmlFor="numPeers">Number of Peers:</label>
-                        <input
-                            type="number"
-                            id="numPeers"
-                            value={numPeers}
-                            onChange={(e) =>
-                                setNumPeers(parseInt(e.target.value))}
-                            min="1"
-                        />
-                    </div>
-                    <div className={styles.control}>
-                        <label htmlFor="totalNodes">Total Network Nodes:</label>
-                        <input
-                            type="number"
-                            id="totalNodes"
-                            value={totalNodes}
-                            onChange={(e) =>
-                                setTotalNodes(parseInt(e.target.value))}
-                            min="1"
-                        />
-                    </div>
-                </div>
+        <div
+            className={`${styles.container} ${
+                isSidebarOpen ? styles.sidebarOpen : ""
+            }`}
+        >
+            <div ref={controlsRef}>
+                <Controls idPrefix="top-" />
+            </div>
 
-                <div className={styles.controlGroup}>
-                    <h4>Block Parameters</h4>
-                    <div className={styles.control}>
-                        <label htmlFor="headerPropagation">
-                            Header Propagation (% of peers):
-                        </label>
-                        <input
-                            type="number"
-                            id="headerPropagation"
-                            value={headerPropagationPercent}
-                            onChange={(e) =>
-                                setHeaderPropagationPercent(
-                                    parseInt(e.target.value),
-                                )}
-                            min="0"
-                            max="100"
-                        />
-                    </div>
-                    <div className={styles.control}>
-                        <label htmlFor="bodyRequest">
-                            Body Request (% of peers):
-                        </label>
-                        <input
-                            type="number"
-                            id="bodyRequest"
-                            value={bodyRequestPercent}
-                            onChange={(e) =>
-                                setBodyRequestPercent(parseInt(e.target.value))}
-                            min="0"
-                            max="100"
-                        />
-                    </div>
-                    <div className={styles.control}>
-                        <label htmlFor="blockUtilization">
-                            Input Block Utilization (%):
-                        </label>
-                        <input
-                            type="number"
-                            id="blockUtilization"
-                            value={blockUtilizationPercent}
-                            onChange={(e) =>
-                                setBlockUtilizationPercent(
-                                    parseInt(e.target.value),
-                                )}
-                            min="0"
-                            max="100"
-                        />
-                    </div>
-                </div>
+            <button
+                className={`${styles.sidebarToggle} ${
+                    isToggleVisible ? styles.visible : ""
+                }`}
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+                {isSidebarOpen ? "Hide Parameters" : "Show Parameters"}
+            </button>
 
-                <div className={styles.controlGroup}>
-                    <h4>Economic Parameters</h4>
-                    <div className={styles.control}>
-                        <label htmlFor="adaToUsd">ADA/USD Price:</label>
-                        <input
-                            type="number"
-                            id="adaToUsd"
-                            value={adaToUsd}
-                            onChange={(e) =>
-                                setAdaToUsd(parseFloat(e.target.value))}
-                            min="0"
-                            step="0.01"
-                        />
-                    </div>
-                    <div className={styles.control}>
-                        <label htmlFor="treasuryTaxRate">
-                            Treasury Tax Rate (%):
-                        </label>
-                        <input
-                            type="number"
-                            id="treasuryTaxRate"
-                            value={treasuryTaxRate}
-                            onChange={(e) =>
-                                setTreasuryTaxRate(parseInt(e.target.value))}
-                            min="0"
-                            max="100"
-                        />
-                    </div>
+            <div
+                className={`${styles.sidebar} ${
+                    isSidebarOpen ? styles.open : ""
+                }`}
+            >
+                <div className={styles.sidebarHeader}>
+                    <h3>Parameters</h3>
+                    <button
+                        className={styles.closeButton}
+                        onClick={() => setIsSidebarOpen(false)}
+                    >
+                        ×
+                    </button>
+                </div>
+                <div className={styles.sidebarControls}>
+                    <Controls idPrefix="sidebar-" />
                 </div>
             </div>
 
@@ -701,7 +760,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                 </div>
             </div>
 
-            <h3>Estimated Node Income*</h3>
+            <h3>Estimated Monthly Node Income*</h3>
             <div className={styles.tableContainer}>
                 <table className={styles.table}>
                     <thead>
@@ -766,6 +825,25 @@ const LeiosTrafficCalculator: React.FC = () => {
                             <li>No additional operational costs</li>
                             <li>No pool fees or other deductions</li>
                             <li>Constant ADA/USD price</li>
+                            <li>
+                                Network topology: Based on current mainnet
+                                (~3,000 BP nodes), we estimate ~10,000 total
+                                nodes to account for:
+                                <ul>
+                                    <li>BP nodes (behind relays)</li>
+                                    <li>
+                                        Relay nodes (typically 2+ per BP node)
+                                    </li>
+                                    <li>
+                                        Additional relays for dApps and
+                                        infrastructure
+                                    </li>
+                                    <li>Full node wallets</li>
+                                </ul>
+                                SPOs can multiply the per-node income by their
+                                total number of nodes (BP + relays) to estimate
+                                their total income.
+                            </li>
                         </ul>
                     </div>
                 </div>

@@ -6,6 +6,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  transition: margin-right 0.3s ease;
+}
+
+.container.sidebarOpen {
+  margin-left: -100px;
+  width: calc(100% - 200px);
+}
+
+@media (max-width: 768px) {
+  .container.sidebarOpen {
+    margin-right: 0;
+  }
 }
 
 .description {
@@ -242,8 +255,9 @@
 }
 
 .table th {
-  background-color: var(--ifm-color-emphasis-100);
+  background-color: #f6f8fa;
   font-weight: 500;
+  color: #24292f;
 }
 
 .sortable {
@@ -253,15 +267,19 @@
 }
 
 .sortable:hover {
-  background-color: var(--ifm-color-emphasis-200);
+  background-color: #e1e4e8;
 }
 
-.table tr:nth-child(even) {
-  background-color: var(--ifm-color-emphasis-50);
+.table tbody tr {
+  background-color: #ffffff;
 }
 
-.table tr:hover {
-  background-color: var(--ifm-color-emphasis-100);
+.table tbody tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+.table tbody tr:hover {
+  background-color: #f1f3f5;
 }
 
 .note {
@@ -290,4 +308,94 @@
 
 .noteContent li {
     margin: 0.25rem 0;
+}
+
+.sidebarToggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebarToggle.visible {
+  opacity: 1;
+}
+
+.sidebarToggle:hover {
+  background: #f6f8fa;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 400px;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: right 0.3s ease;
+  z-index: 999;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+.sidebar.open {
+  right: 0;
+}
+
+.sidebarControls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sidebarHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+.sidebarHeader h3 {
+  margin: 0;
+  color: #24292f;
+  font-size: 1.25rem;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #24292f;
+  padding: 4px;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  color: #0969da;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    right: -100%;
+  }
+  
+  .sidebar.open {
+    right: 0;
+  }
 } 
