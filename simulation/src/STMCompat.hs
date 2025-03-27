@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -11,6 +12,7 @@ module STMCompat (
   asTakeOnly,
   takeTakeOnlyTMVar,
   tryTakeTakeOnlyTMVar,
+  stateTVar',
 ) where
 
 import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
@@ -41,3 +43,6 @@ takeTakeOnlyTMVar TakeOnly{unTakeOnly} = takeTMVar unTakeOnly
 
 tryTakeTakeOnlyTMVar :: MonadSTM m => TakeOnly (TMVar m a) -> STM m (Maybe a)
 tryTakeTakeOnlyTMVar TakeOnly{unTakeOnly} = tryTakeTMVar unTakeOnly
+
+stateTVar' :: MonadSTM m => TVar m t -> (t -> (a, t)) -> STM m a
+stateTVar' var f = stateTVar var (\x -> let (!a, !b) = f x in (a, b))

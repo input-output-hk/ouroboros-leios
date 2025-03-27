@@ -46,6 +46,7 @@ interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
 interface RustBaseBlockEvent {
     id: string;
     slot: number;
+    pipeline?: number;
     producer: string;
     sender?: string;
     recipient?: string;

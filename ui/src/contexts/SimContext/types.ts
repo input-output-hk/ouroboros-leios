@@ -45,6 +45,7 @@ export interface ISimulationTransaction {
 export interface ISimulationInputBlock {
   id: string;
   slot: number;
+  pipeline: number;
   headerBytes: number;
   txs: ISimulationTransaction[];
 }
@@ -52,8 +53,10 @@ export interface ISimulationInputBlock {
 export interface ISimulationEndorsementBlock {
   id: string;
   slot: number;
+  pipeline: number;
   bytes: number;
   ibs: ISimulationInputBlock[];
+  ebs: ISimulationEndorsementBlock[];
 }
 
 export interface ISimulationCertificate {
@@ -78,14 +81,17 @@ export interface ISimulationAggregatedDataState {
 
 export interface ISimulationIntermediateInputBlock {
   slot: number;
+  pipeline: number;
   headerBytes: number;
   txs: number[];
 }
 
 export interface ISimulationIntermediateEndorsementBlock {
   slot: number;
+  pipeline: number;
   bytes: number;
   ibs: string[];
+  ebs: string[];
 }
 
 export interface ISimulationIntermediateDataState {

@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short.Generate where
@@ -19,15 +20,14 @@ import Control.Monad.State (
  )
 import Data.Bifunctor (Bifunctor (..))
 import Data.Kind (Type)
+import Data.List
+import Data.Maybe
+import Data.Ord
 import LeiosProtocol.Common
+import LeiosProtocol.Config
 import LeiosProtocol.Short hiding (Stage (..))
+import qualified LeiosProtocol.Short as Short
 import STMCompat
-
---------------------------------------------------------------------------------
-
-{-# ANN module ("HLint: ignore Use <$>" :: String) #-}
-
---------------------------------------------------------------------------------
 
 data BuffersView m = BuffersView
   { newRBData :: STM m NewRankingBlockData
@@ -92,14 +92,29 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
   execute' slot Endorse _wins = do
     i <- nextBlkId EndorseBlockId
     ibs <- lift $ atomically buffers.ibs
-    let !eb = mkEndorseBlock leios i slot nodeId $ inputBlocksToEndorse leios slot ibs
+    referencedEBs <- case leios.variant of
+      Short -> pure []
+      Full -> do
+        ebs <- lift $ atomically buffers.ebs
+        let p = case leios of
+              LeiosConfig{pipeline = _ :: SingPipeline p} ->
+                pipelineOf @p leios Short.Endorse slot
+        let chooseEB =
+              fmap (.id)
+                . listToMaybe
+                . sortOn (Down . length . (.inputBlocks))
+        pure $
+          mapMaybe (chooseEB . snd) $
+            endorseBlocksToReference leios p ebs (\_ _ -> True)
+    let endorsedIBs = inputBlocksToEndorse leios slot ibs
+    let !eb = mkEndorseBlock leios i slot nodeId referencedEBs endorsedIBs
     let !task = leios.delays.endorseBlockGeneration eb
     return [(task, eb)]
   execute' slot Vote votes = do
     votingFor <- lift $ atomically $ do
       ibs <- buffers.ibs
       ebs <- buffers.ebs
-      pure $ endorseBlocksToVoteFor leios slot ibs ebs
+      pure $ endorseBlocksToVoteFor leios slotConfig slot ibs ebs
     i <- nextBlkId VoteId
     let voteMsg = mkVoteMsg leios i slot nodeId votes (map (.id) votingFor)
     let !task = leios.delays.voteMsgGeneration voteMsg votingFor

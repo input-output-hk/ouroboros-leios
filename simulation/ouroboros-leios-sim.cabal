@@ -67,7 +67,6 @@ library
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP
-    JSONCompat
     P2P
     PlotTCP
     PraosProtocol.BlockFetch
@@ -152,6 +151,7 @@ library
     , si-timers
     , singletons
     , sqlite-simple              >=0.4
+    , statistics
     , temporary
     , text
     , time

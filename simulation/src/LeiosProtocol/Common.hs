@@ -40,6 +40,7 @@ module LeiosProtocol.Common (
 where
 
 import Chan.TCP
+import Control.DeepSeq
 import Control.Exception (assert)
 import Control.Monad (guard)
 import Data.Aeson
@@ -103,6 +104,9 @@ data InputBlockId = InputBlockId
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (Hashable)
 
+instance NFData InputBlockId where
+  rnf InputBlockId{} = ()
+
 newtype SubSlotNo = SubSlotNo Word8
   deriving stock (Show)
   deriving newtype (Eq, Ord, Num, Enum, Bounded)
@@ -149,6 +153,9 @@ data EndorseBlockId = EndorseBlockId
   }
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass (Hashable)
+
+instance NFData EndorseBlockId where
+  rnf EndorseBlockId{} = ()
 
 data EndorseBlock = EndorseBlock
   { id :: !EndorseBlockId

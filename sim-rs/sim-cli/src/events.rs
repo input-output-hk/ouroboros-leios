@@ -92,6 +92,7 @@ impl EventMonitor {
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
         let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
         let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
+        let mut eb_ebs: BTreeMap<EndorserBlockId, Vec<EndorserBlockId>> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp::zero();
         let mut total_slots = 0u64;
@@ -205,10 +206,13 @@ impl EventMonitor {
                         leios_blocks_with_endorsements += 1;
                         pending_ebs.retain(|eb| eb.slot != endorsement.eb.slot);
 
-                        let block_leios_txs: Vec<_> = eb_ibs
+                        let all_eb_ids = eb_ebs
                             .get(&endorsement.eb)
                             .unwrap()
                             .iter()
+                            .chain(std::iter::once(&endorsement.eb));
+                        let block_leios_txs: Vec<_> = all_eb_ids
+                            .flat_map(|eb| eb_ibs.get(eb).unwrap())
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
                             .copied()
                             .collect();
@@ -290,11 +294,15 @@ impl EventMonitor {
                 }
                 Event::EBLotteryWon { .. } => {}
                 Event::EBGenerated {
-                    id, input_blocks, ..
+                    id,
+                    input_blocks,
+                    endorser_blocks,
+                    ..
                 } => {
                     generated_ebs += 1;
                     pending_ebs.insert(id.clone());
                     eb_ibs.insert(id.clone(), input_blocks.clone());
+                    eb_ebs.insert(id.clone(), endorser_blocks);
                     for ib_id in &input_blocks {
                         *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
                         *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;

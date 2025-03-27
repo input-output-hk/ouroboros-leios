@@ -25,7 +25,7 @@ module ModelTCP (
 
 import Control.Exception (assert)
 import Data.Aeson
-import Data.Foldable as Foldable (Foldable (sum))
+import Data.Foldable as Foldable (Foldable (sum, toList))
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import qualified Data.List.NonEmpty as NE
 import Data.PQueue.Prio.Min (MinPQueue)
@@ -181,9 +181,10 @@ forecastTcpMsgSend
   tcpstate0
   now0
   msgsize0 =
-    let (forecasts, tcpstate) = trySend [] tcpstate0 now0 msgsize0
-        overallforecast = sconcat forecasts
-     in (overallforecast, mergeAdjacentForecasts forecasts, tcpstate)
+    let (forecasts, !tcpstate) = trySend [] tcpstate0 now0 msgsize0
+        !mergedForecasts = mergeAdjacentForecasts forecasts
+        !overallforecast = sconcat mergedForecasts
+     in (overallforecast, toList mergedForecasts, tcpstate)
    where
     trySend ::
       [TcpMsgForecast] ->
@@ -340,9 +341,11 @@ forecastTcpMsgSend
 
 -- | To make the result easier to interpret, merge together any fragments
 -- that are in fact contiguous.
-mergeAdjacentForecasts :: NonEmpty TcpMsgForecast -> [TcpMsgForecast]
+mergeAdjacentForecasts :: NonEmpty TcpMsgForecast -> NonEmpty TcpMsgForecast
 mergeAdjacentForecasts (forecast0 :| forecasts0) =
-  go forecast0 forecasts0
+  case go forecast0 forecasts0 of
+    [] -> error "internal: merged into empty"
+    (x : xs) -> x :| xs
  where
   go forecast (forecast' : forecasts)
     | msgSendTrailingEdge forecast == msgSendLeadingEdge forecast' =

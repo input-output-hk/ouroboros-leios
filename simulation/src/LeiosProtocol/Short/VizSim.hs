@@ -431,6 +431,8 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
         }
   accumEventVizState now (LeiosEventNode (LabelNode nid (LeiosNodeEventCPU task))) vs =
     vs{nodeCpuUsage = accumNodeCpuUsage now nid task (nodeCpuUsage vs)}
+  accumEventVizState _now (LeiosEventNode (LabelNode _nid (LeiosNodeEventLedgerState{}))) vs =
+    vs
   accumEventVizState
     _now
     ( LeiosEventNode

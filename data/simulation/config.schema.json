@@ -72,6 +72,10 @@
       },
       "type": "object"
     },
+    "LeiosVariant": {
+      "enum": ["short", "full"],
+      "type": "string"
+    },
     "LogNormalDistribution": {
       "properties": {
         "distribution": {
@@ -244,6 +248,10 @@
       "description": "Only supported by Rust simulation.",
       "type": "number"
     },
+    "leios-header-diffusion-time-ms": {
+      "description": "The expected time it takes a header to fully diffuse across the network.\nThis is Δhdr from the Leios paper.",
+      "type": "number"
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
@@ -254,6 +262,10 @@
       "properties": {},
       "type": "number"
     },
+    "leios-variant": {
+      "$ref": "#/definitions/LeiosVariant",
+      "description": "Only supported by Rust simulation."
+    },
     "leios-vote-send-recv-stages": {
       "description": "Determines whether a Leios pipeline has separate Vote (Send) and Vote (Recv) stages.\nIf this is set to `true`, it is recommended to set `leios-stage-active-voting-slots`\nto be equal to `leios-stage-length-slots`.\n\nOnly supported by Haskell simulation.",
       "type": "boolean"
@@ -261,6 +273,10 @@
     "multiplex-mini-protocols": {
       "description": "Only supported by Haskell simulation.",
       "type": "boolean"
+    },
+    "praos-chain-quality": {
+      "description": "Praos blockchain quality parameter.\nThis is η from the Leios paper.\nControls the pipelines EBs should reference in Full leios:\n  i - ⌈3η/L⌉, …, i-3\nwhere i is the index of the current pipeline.",
+      "type": "number"
     },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,
