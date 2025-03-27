@@ -3,7 +3,7 @@
 > [!Note]
 > **100% filled blocks assumption:**
 >
-> This analysis assumes **fully utilized block space (filled blocks)** for both Ouroboros Praos and Leios protocols. In practice, block utilization may vary, but this provides a conservative upper bound for egress traffic estimation.
+> This analysis assumes fully utilized block space (filled blocks) for both Ouroboros Praos and Leios protocols. In practice, block utilization may vary, but this provides a conservative upper bound for egress traffic estimation. Transaction sizes are based on mainnet data from Epoch 500 onwards, where average transaction size is ~1,400 bytes.
 
 ## Ouroboros Praos
 
@@ -18,6 +18,8 @@
 
 #### Total block data
 - block size 90,112 bytes (88 KiB)
+- average transaction size: 1,400 bytes (based on mainnet data)
+- average transactions per block: ~13.5 (based on mainnet data)
 - **131,400 blocks x 90,112 bytes = 11,840,724,480 bytes ~11.84 GiB**
 
 > [!Note]
