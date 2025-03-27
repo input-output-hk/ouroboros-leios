@@ -43,7 +43,7 @@ const blockSizes: BlockSizes = {
 const TX_FEE_PARAMS = {
     a: 0.155381, // Fixed fee in ADA
     b: 0.000043946, // Fee per byte in ADA
-    avgTxSize: 300, // Average transaction size in bytes
+    avgTxSize: 1400, // Average size based on mainnet data (Epoch 500+)
 };
 
 const LeiosTrafficCalculator: React.FC = () => {
@@ -165,38 +165,26 @@ const LeiosTrafficCalculator: React.FC = () => {
     };
 
     const formatTraffic = (bytes: number) => {
-        if (bytes >= 1e12) {
-            return (bytes / 1e12).toFixed(2) + " TB";
-        } else if (bytes >= 1e9) {
-            return (bytes / 1e9).toFixed(2) + " GB";
-        } else if (bytes >= 1e6) {
-            return (bytes / 1e6).toFixed(2) + " MB";
+        if (bytes >= 1024 * 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024 * 1024 * 1024)).toFixed(2) + " TiB";
+        } else if (bytes >= 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GiB";
+        } else if (bytes >= 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(2) + " MiB";
         } else {
-            return (bytes / 1e3).toFixed(2) + " KB";
+            return (bytes / 1024).toFixed(2) + " KiB";
         }
     };
 
     const formatTrafficForTable = (bytes: number) => {
-        if (bytes >= 1e12) {
-            return (bytes / 1e12).toFixed(2);
-        } else if (bytes >= 1e9) {
-            return (bytes / 1e9).toFixed(2);
-        } else if (bytes >= 1e6) {
-            return (bytes / 1e6).toFixed(2);
+        if (bytes >= 1024 * 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024 * 1024 * 1024)).toFixed(2);
+        } else if (bytes >= 1024 * 1024 * 1024) {
+            return (bytes / (1024 * 1024 * 1024)).toFixed(2);
+        } else if (bytes >= 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(2);
         } else {
-            return (bytes / 1e3).toFixed(2);
-        }
-    };
-
-    const getTrafficUnit = (bytes: number) => {
-        if (bytes >= 1e12) {
-            return "TB";
-        } else if (bytes >= 1e9) {
-            return "GB";
-        } else if (bytes >= 1e6) {
-            return "MB";
-        } else {
-            return "KB";
+            return (bytes / 1024).toFixed(2);
         }
     };
 
@@ -279,108 +267,99 @@ const LeiosTrafficCalculator: React.FC = () => {
                 <h3>Calculation Breakdown</h3>
                 <div className={styles.breakdownGrid}>
                     <div className={styles.breakdownItem}>
-                        <h4>Monthly Parameters</h4>
-                        <ul>
-                            <li>
-                                Seconds per month:{" "}
+                        <h4>General Parameters</h4>
+                        <div className={styles.calculationSection}>
+                            <div className={styles.calculationTitle}>
+                                Time Period
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Seconds/Month ={" "}
                                 {SECONDS_PER_MONTH.toLocaleString()}
-                            </li>
-                            <li>
-                                Header propagation:{" "}
-                                {headerPropagationPercent}% of {numPeers}{" "}
-                                peers = {Math.round(
+                            </div>
+                            <div className={styles.calculationTitle}>
+                                Peer Distribution
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Header Peers = {numPeers} ×{" "}
+                                {headerPropagationPercent}% = {Math.round(
                                     numPeers * (headerPropagationPercent / 100),
-                                )} peers
-                            </li>
-                            <li>
-                                Body requests: {bodyRequestPercent}% of{" "}
-                                {numPeers} peers = {Math.round(
+                                )}
+                                {"\n"}Body Peers = {numPeers} ×{" "}
+                                {bodyRequestPercent}% = {Math.round(
                                     numPeers * (bodyRequestPercent / 100),
-                                )} peers
-                            </li>
-                        </ul>
+                                )}
+                            </div>
+                            <div className={styles.calculationTitle}>
+                                Transaction Parameters
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Avg Tx Size = {TX_FEE_PARAMS.avgTxSize} bytes
+                                {"\n"}Base Fee = {TX_FEE_PARAMS.a} ₳
+                                {"\n"}Fee/Byte = {TX_FEE_PARAMS.b} ₳
+                                {"\n"}Txs/IB = {Math.floor(
+                                    (blockSizes.ib.body *
+                                        (blockUtilizationPercent / 100)) /
+                                        TX_FEE_PARAMS.avgTxSize,
+                                )} Txs
+                                {"\n"}Fee/Tx = {(TX_FEE_PARAMS.a +
+                                    TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize)
+                                    .toFixed(6)} ₳
+                            </div>
+                        </div>
                     </div>
                     <div className={styles.breakdownItem}>
                         <h4>Block Timing</h4>
-                        <ul>
-                            <li>
-                                Endorsement Blocks (EB):
-                                <ul>
-                                    <li>Stage length: 20 seconds</li>
-                                    <li>
-                                        Stages per month: {SECONDS_PER_MONTH}
-                                        {" "}
-                                        / 20 = {(SECONDS_PER_MONTH / 20)
-                                            .toLocaleString()} stages
-                                    </li>
-                                    <li>EBs per stage: 1.5</li>
-                                    <li>
-                                        Total EBs: {(SECONDS_PER_MONTH / 20)
-                                            .toLocaleString()} × 1.5 ={" "}
-                                        {((SECONDS_PER_MONTH / 20) * 1.5)
-                                            .toLocaleString()} EBs
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                Ranking Blocks (RB):
-                                <ul>
-                                    <li>RB generation rate: 0.05 RBs/second</li>
-                                    <li>
-                                        Total RBs:{" "}
-                                        {SECONDS_PER_MONTH.toLocaleString()}
-                                        {" "}
-                                        × 0.05 = {(0.05 * SECONDS_PER_MONTH)
-                                            .toLocaleString()} RBs
-                                    </li>
-                                </ul>
-                            </li>
-                        </ul>
+                        <div className={styles.calculationSection}>
+                            <div className={styles.calculationTitle}>
+                                Endorsement Blocks (EB)
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Stage Length = 20 secs{"\n"}Stages/Month ={" "}
+                                {(SECONDS_PER_MONTH / 20).toLocaleString()}{" "}
+                                stages{"\n"}EBs/Stage = 1.5{"\n"}EBs/Month =
+                                {" "}
+                                {((SECONDS_PER_MONTH / 20) * 1.5)
+                                    .toLocaleString()} EBs
+                            </div>
+                            <div className={styles.calculationTitle}>
+                                Ranking Blocks (RB)
+                            </div>
+                            <div className={styles.calculationCode}>
+                                RB/sec = 0.05{"\n"}RBs/month ={" "}
+                                {(0.05 * SECONDS_PER_MONTH).toLocaleString()}
+                                {" "}
+                                RBs
+                            </div>
+                        </div>
                     </div>
                     <div className={styles.breakdownItem}>
                         <h4>Block Sizes</h4>
-                        <ul>
-                            <li>
-                                Input Blocks (IB):
-                                <ul>
-                                    <li>
-                                        Header: {blockSizes.ib.header} bytes
-                                    </li>
-                                    <li>
-                                        Body:{" "}
-                                        {blockSizes.ib.body.toLocaleString()}
-                                        {" "}
-                                        bytes
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                Endorsement Blocks (EB):
-                                <ul>
-                                    <li>
-                                        Header: {blockSizes.eb.header} bytes
-                                    </li>
-                                    <li>
-                                        Body: {blockSizes.eb.body}{" "}
-                                        bytes per IB reference
-                                    </li>
-                                </ul>
-                            </li>
-                            <li>
-                                Ranking Blocks (RB):
-                                <ul>
-                                    <li>
-                                        Header: {blockSizes.rb.header} bytes
-                                    </li>
-                                    <li>
-                                        Body:{" "}
-                                        {blockSizes.rb.body.toLocaleString()}
-                                        {" "}
-                                        bytes
-                                    </li>
-                                </ul>
-                            </li>
-                        </ul>
+                        <div className={styles.calculationSection}>
+                            <div className={styles.calculationTitle}>
+                                Input Blocks (IB)
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Header Size = {blockSizes.ib.header} bytes{" "}
+                                {"\n"}Body Size ={" "}
+                                {blockSizes.ib.body.toLocaleString()} bytes
+                            </div>
+                            <div className={styles.calculationTitle}>
+                                Endorsement Blocks (EB)
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Header Size = {blockSizes.eb.header} bytes{" "}
+                                {"\n"}Body Size = {blockSizes.eb.body}{" "}
+                                bytes/IB ref
+                            </div>
+                            <div className={styles.calculationTitle}>
+                                Ranking Blocks (RB)
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Header Size = {blockSizes.rb.header} bytes{" "}
+                                {"\n"}Body Size ={" "}
+                                {blockSizes.rb.body.toLocaleString()} bytes
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className={styles.calculationNote}>
@@ -389,8 +368,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                         <li>
                             IB Headers: {SECONDS_PER_MONTH.toLocaleString()}
                             {" "}
-                            seconds × {blockSizes.ib.header} bytes ×{" "}
-                            {Math.round(
+                            secs × {blockSizes.ib.header} bytes × {Math.round(
                                 numPeers * (headerPropagationPercent / 100),
                             )} peers = {formatTraffic(
                                 SECONDS_PER_MONTH * blockSizes.ib.header *
@@ -402,9 +380,9 @@ const LeiosTrafficCalculator: React.FC = () => {
                         </li>
                         <li>
                             IB Bodies: {SECONDS_PER_MONTH.toLocaleString()}{" "}
-                            seconds × {blockSizes.ib.body.toLocaleString()}{" "}
-                            bytes × {blockUtilizationPercent}% utilization ×
+                            secs × {blockSizes.ib.body.toLocaleString()} bytes ×
                             {" "}
+                            {blockUtilizationPercent}% utilization ×{" "}
                             {Math.round(numPeers * (bodyRequestPercent / 100))}
                             {" "}
                             peers = {formatTraffic(
@@ -436,7 +414,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                             {((SECONDS_PER_MONTH / 20) * 1.5).toLocaleString()}
                             {" "}
                             seconds × {blockSizes.eb.body} bytes × {20}{" "}
-                            IBs per stage ×{" "}
+                            IBs/stage ×{" "}
                             {Math.round(numPeers * (bodyRequestPercent / 100))}
                             {" "}
                             peers = {formatTraffic(
@@ -476,11 +454,62 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     ),
                             )}
                         </li>
+                        <li>
+                            Transactions per IB:{" "}
+                            {blockSizes.ib.body.toLocaleString()} bytes ×{" "}
+                            {blockUtilizationPercent}% utilization ÷{" "}
+                            {TX_FEE_PARAMS.avgTxSize} bytes/tx = {Math.floor(
+                                (blockSizes.ib.body *
+                                    (blockUtilizationPercent / 100)) /
+                                    TX_FEE_PARAMS.avgTxSize,
+                            )} txs
+                        </li>
+                        <li>
+                            Monthly Transactions: {Math.floor(
+                                (blockSizes.ib.body *
+                                    (blockUtilizationPercent / 100)) /
+                                    TX_FEE_PARAMS.avgTxSize,
+                            )} txs/block × {SECONDS_PER_MONTH.toLocaleString()}
+                            {" "}
+                            blocks = {(SECONDS_PER_MONTH *
+                                Math.floor(
+                                    (blockSizes.ib.body *
+                                        (blockUtilizationPercent / 100)) /
+                                        TX_FEE_PARAMS.avgTxSize,
+                                )).toLocaleString()} txs
+                        </li>
+                        <li>
+                            Fee per Transaction: {TX_FEE_PARAMS.a}{" "}
+                            ₳ + ({TX_FEE_PARAMS.b} ₳/byte ×{" "}
+                            {TX_FEE_PARAMS.avgTxSize} bytes) ={" "}
+                            {(TX_FEE_PARAMS.a +
+                                TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize)
+                                .toFixed(6)} ₳
+                        </li>
+                        <li>
+                            Monthly Fee Revenue: {(SECONDS_PER_MONTH *
+                                Math.floor(
+                                    (blockSizes.ib.body *
+                                        (blockUtilizationPercent / 100)) /
+                                        TX_FEE_PARAMS.avgTxSize,
+                                )).toLocaleString()} txs × {(TX_FEE_PARAMS.a +
+                                    TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize)
+                                .toFixed(6)} ₳ = {(SECONDS_PER_MONTH *
+                                    Math.floor(
+                                        (blockSizes.ib.body *
+                                            (blockUtilizationPercent / 100)) /
+                                            TX_FEE_PARAMS.avgTxSize,
+                                    ) *
+                                    (TX_FEE_PARAMS.a +
+                                        TX_FEE_PARAMS.b *
+                                            TX_FEE_PARAMS.avgTxSize))
+                                .toLocaleString()} ₳
+                        </li>
                     </ul>
                 </div>
             </div>
 
-            <h3>Monthly Traffic and Fees per Node</h3>
+            <h3>Monthly Traffic and Network Fees</h3>
             <div className={styles.tableContainer}>
                 <table className={styles.table}>
                     <thead>
@@ -541,6 +570,9 @@ const LeiosTrafficCalculator: React.FC = () => {
                         before expenses and taxes. Actual earnings depend on:
                         <ul>
                             <li>Node operator's stake percentage</li>
+                            <li>
+                                SPO's pool configuration (fixed & margin fees)
+                            </li>
                             <li>Treasury tax (20%)</li>
                             <li>Other operational costs</li>
                         </ul>
@@ -563,13 +595,13 @@ const LeiosTrafficCalculator: React.FC = () => {
                                 onClick={() => handleSort("egressCost")}
                                 className={styles.sortable}
                             >
-                                Price/GB {getSortIcon("egressCost")}
+                                Price/GiB {getSortIcon("egressCost")}
                             </th>
                             <th
                                 onClick={() => handleSort("freeAllowance")}
                                 className={styles.sortable}
                             >
-                                Free Allowance (GB){" "}
+                                Free Allowance (GiB){" "}
                                 {getSortIcon("freeAllowance")}
                             </th>
                             {IB_RATES.map((rate) => (
