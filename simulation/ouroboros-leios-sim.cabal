@@ -38,6 +38,7 @@ library
   default-extensions:
     DisambiguateRecordFields
     OverloadedRecordDot
+    PatternSynonyms
     ScopedTypeVariables
 
   exposed-modules:

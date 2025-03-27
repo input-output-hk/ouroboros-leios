@@ -21,6 +21,7 @@ import TimeCompat
 
 import Chan
 import Chan.TCP (newConnectionTCP)
+import P2P
 import SimRelay
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
@@ -48,38 +49,18 @@ traceRelayP2P
             p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
-        tcplinks <-
-          sequence
-            [ do
-              (inChan, outChan) <-
-                newConnectionTCP
-                  (linkTracer na nb)
-                  (tcpprops (secondsToDiffTime latency) bw)
-              return ((na, nb), (inChan, outChan))
-            | ((na, nb), (latency, bw)) <- Map.toList p2pLinks
-            ]
-        let tcplinksInChan =
-              Map.fromListWith
-                (++)
-                [ (nfrom, [inChan])
-                | ((nfrom, _nto), (inChan, _outChan)) <- tcplinks
-                ]
-            tcplinksOutChan =
-              Map.fromListWith
-                (++)
-                [ (nto, [outChan])
-                | ((_nfrom, nto), (_inChan, outChan)) <- tcplinks
-                ]
-        -- Note that the incomming edges are the output ends of the
-        -- channels and vice versa. That's why it looks backwards.
+        (chansToDownstream :<- chansToUpstream) <- traverseLinks p2pLinks $ \na nb (latency, bw) ->
+          newConnectionTCP
+            (linkTracer na nb)
+            (tcpprops (secondsToDiffTime latency) bw)
         runConcurrently $
           sequenceA_
             [ Concurrently $
               relayNode
                 (nodeTracer nid)
                 (relayConfig rng)
-                (Map.findWithDefault [] nid tcplinksOutChan)
-                (Map.findWithDefault [] nid tcplinksInChan)
+                (Map.findWithDefault [] nid chansToDownstream)
+                (Map.findWithDefault [] nid chansToUpstream)
             | (nid, rng) <-
                 zip
                   (Map.keys p2pNodes)

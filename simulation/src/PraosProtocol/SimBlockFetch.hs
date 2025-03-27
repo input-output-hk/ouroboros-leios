@@ -22,6 +22,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import ModelTCP (mkTcpConnProps)
+import P2P
 import PraosProtocol.BlockFetch
 import PraosProtocol.Common hiding (Point)
 import STMCompat
@@ -35,7 +36,7 @@ data BlockFetchEvent
     BlockFetchEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
-      !(Set (NodeId, NodeId)) -- links between nodes
+      !(Set Link) -- links between nodes
   | -- | An event at a node
     BlockFetchEventNode (LabelNode BlockFetchNodeEvent)
   | -- | An event on a tcp link between two nodes
@@ -67,7 +68,7 @@ traceRelayLink1 tcpprops =
               ]
           )
           ( Set.fromList
-              [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
+              [(NodeId 0 :<- NodeId 1), (NodeId 1 :<- NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       let praosConfig = defaultPraosConfig
@@ -77,7 +78,7 @@ traceRelayLink1 tcpprops =
       return ()
  where
   -- Soon-To-Be-Shared Chain
-  bchain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
+  bchain = mkChainSimple (kilobytes 1) $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
 
   -- Block-Fetch Controller & Consumer
   nodeA :: (MonadAsync m, MonadDelay m, MonadSTM m) => PraosConfig BlockBody -> Chan m (ProtocolMessage (BlockFetchState BlockBody)) -> m ()

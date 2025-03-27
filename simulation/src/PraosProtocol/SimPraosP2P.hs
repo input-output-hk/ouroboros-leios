@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -16,6 +17,7 @@ import Control.Tracer as Tracer (
  )
 import Data.List (unfoldr)
 import qualified Data.Map.Strict as Map
+import P2P
 import PraosProtocol.Common
 import PraosProtocol.PraosNode
 import PraosProtocol.SimPraos
@@ -47,30 +49,12 @@ tracePraosP2P
             p2pWorld
             p2pNodes
             (Map.keysSet p2pLinks)
-        tcplinks <-
-          sequence
-            [ do
-              (inChan, outChan) <-
-                newConnectionBundle @(Praos BlockBody)
-                  (linkTracer na nb)
-                  (configureConnection (realToFrac latency) bw)
-              return ((na, nb), (inChan, outChan))
-            | ((na, nb), (latency, bw)) <- Map.toList p2pLinks
-            ]
-        let tcplinksInChan =
-              Map.fromListWith
-                (++)
-                [ (nfrom, [inChan])
-                | ((nfrom, _nto), (inChan, _outChan)) <- tcplinks
-                ]
-            tcplinksOutChan =
-              Map.fromListWith
-                (++)
-                [ (nto, [outChan])
-                | ((_nfrom, nto), (_inChan, outChan)) <- tcplinks
-                ]
-        -- Note that the incomming edges are the output ends of the
-        -- channels and vice versa. That's why it looks backwards.
+
+        (chansToDownstream :<- chansToUpstream) <-
+          traverseLinks p2pLinks $ \na nb (latency, bw) ->
+            newConnectionBundle @(Praos BlockBody)
+              (linkTracer na nb)
+              (configureConnection (realToFrac latency) bw)
 
         -- Nested children threads are slow with IOSim, this impl forks them all as direct children.
         mapM_
@@ -78,8 +62,8 @@ tracePraosP2P
           [ praosNode
             (nodeTracer nid)
             (praosConfig slotConfig nid rng)
-            (Map.findWithDefault [] nid tcplinksInChan)
-            (Map.findWithDefault [] nid tcplinksOutChan)
+            (Map.findWithDefault [] nid chansToDownstream)
+            (Map.findWithDefault [] nid chansToUpstream)
           | (nid, rng) <-
               zip
                 (Map.keys p2pNodes)

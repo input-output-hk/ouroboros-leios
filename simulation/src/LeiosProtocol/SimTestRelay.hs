@@ -35,6 +35,7 @@ import qualified Data.Set as Set
 import LeiosProtocol.Relay
 import LeiosProtocol.RelayBuffer (RelayBuffer)
 import qualified LeiosProtocol.RelayBuffer as RB
+import P2P
 import STMCompat
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
@@ -54,7 +55,7 @@ data RelaySimEvent
     RelaySimEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
-      !(Set (NodeId, NodeId)) -- links between nodes
+      !(Set Link) -- links between nodes
   | -- | An event at a node
     RelaySimEventNode (LabelNode (RelayNodeEvent TestBlock))
   | -- | An event on a tcp link between two nodes
@@ -248,8 +249,8 @@ relayNode
 testHeader :: TestBlock -> TestBlockHeader
 testHeader blk = TestBlockHeader (testBlockId blk) (testBlockExpiry blk)
 
-symmetric :: Ord a => Set (a, a) -> Set (a, a)
-symmetric xys = xys <> Set.map (\(x, y) -> (y, x)) xys
+symmetric :: Ord a => Set (Link' a) -> Set (Link' a)
+symmetric xys = xys <> Set.map (\(x :<- y) -> (y :<- x)) xys
 
 newtype TestRelayBundle f = TestRelayBundle
   { testMsg :: f TestBlockRelayMessage
@@ -287,7 +288,7 @@ traceRelayLink1 tcpprops generationPattern =
               ]
           )
           ( Set.fromList
-              [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
+              [(NodeId 0 :<- NodeId 1), (NodeId 1 :<- NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
@@ -335,7 +336,7 @@ traceRelayLink4 tcpprops generationPattern =
               ]
           )
           ( symmetric $
-              Set.fromList
+              Set.fromList . map (uncurry (:<-)) $
                 [ (NodeId 0, NodeId 1)
                 , (NodeId 1, NodeId 3)
                 , (NodeId 0, NodeId 2)
@@ -397,7 +398,7 @@ traceRelayLink4Asymmetric tcppropsShort tcppropsLong generationPattern =
               ]
           )
           ( symmetric $
-              Set.fromList
+              Set.fromList . map (uncurry (:<-)) $
                 [ (NodeId 0, NodeId 1)
                 , (NodeId 1, NodeId 3)
                 , (NodeId 0, NodeId 2)

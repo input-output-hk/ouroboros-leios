@@ -67,7 +67,7 @@ import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
 import LeiosTopology
 import ModelTCP (Bytes, kilobytes)
-import P2P (Latency, P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (Latency, Link, Link' (..), P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography, pattern (:<-))
 import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
@@ -151,7 +151,21 @@ someTopologyToGrCoord2D params = \case
   SomeTopology SCLUSTER topology -> layoutGr params $ topologyToGr topology
   SomeTopology SCOORD2D topology -> pure $ topologyToGr topology
 
+linkToEdge :: Link -> a -> G.LEdge a
+linkToEdge Link{..} x = (coerce upstream, coerce downstream, x)
+
+edgeToLink :: G.LEdge a -> (Link, a)
+edgeToLink (producer, consumer, x) =
+  ( Link
+      { upstream = NodeId producer
+      , downstream = NodeId consumer
+      }
+  , x
+  )
+
 -- | Convert 'Topology' to an FGL 'Gr'.
+--
+--   edges are in '(producer, consumer, info)' format, c.f. 'linkToEdge'/'edgeToLink' .
 topologyToGr :: Topology lk -> Gr (NodeName, NodeInfo lk) LinkInfo
 topologyToGr topology = G.mkGraph grNodes grLinks
  where
@@ -322,7 +336,7 @@ data P2PNetwork = P2PNetwork
   , p2pNodeNames :: !(Map NodeId Text)
   , p2pNodeCores :: !(Map NodeId NumCores)
   , p2pNodeStakes :: !(Map NodeId StakeFraction)
-  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe BandwidthBytesPerSecond))
+  , p2pLinks :: !(Map Link (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -357,8 +371,8 @@ grToP2PNetwork p2pWorld gr = P2PNetwork{..}
       ]
   edgeInfoMap =
     M.fromList
-      [ ((NodeId grNode1, NodeId grNode2), latency)
-      | (grNode1, grNode2, latency) <- G.labEdges gr
+      [ edgeToLink e
+      | e <- G.labEdges gr
       ]
   p2pNodes = Map.map ((.coord2D) . snd) nodeInfoMap
   p2pNodeNames = Map.map (coerce . fst) nodeInfoMap
@@ -382,8 +396,8 @@ p2pNetworkToGr totalStake P2PNetwork{..} = G.mkGraph grNodes grLinks
     , let location = LocCoord2D point
     ]
   grLinks =
-    [ (coerce n, coerce m, linkInfo)
-    | ((n, m), (latency, bw)) <- M.toList p2pLinks
+    [ linkToEdge link linkInfo
+    | (link, (latency, bw)) <- M.toList p2pLinks
     , let linkInfo =
             LinkInfo
               { latencyMs = LatencyMs $ latency * 1000
@@ -424,8 +438,8 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     | (NodeId grNode, point) <- M.assocs p2pNodes
     ]
   edges =
-    [ (grNode1, grNode2, latencyInSeconds)
-    | ((NodeId grNode1, NodeId grNode2), latencyInSeconds) <- M.assocs p2pLinks
+    [ linkToEdge link latencyInSeconds
+    | (link, latencyInSeconds) <- M.assocs p2pLinks
     ]
 
 readP2PTopographyFromSomeTopology ::
@@ -577,17 +591,17 @@ readLatenciesSqlite3 topology latencySqliteFile = do
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
 
-type LinkLatency = ((NodeId, NodeId), Latency)
+type LinkLatency = (Link, Latency)
 
 -- | Returns nodes failing the expected triangle inequality for latencies.
-triangleInequalityCheck :: Map (NodeId, NodeId) Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
+triangleInequalityCheck :: Map Link Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
 triangleInequalityCheck mls = do
   let ls = Map.toList mls
-  l1@((s, t), st) <- ls
-  l2@((s', middle), sm) <- ls
+  l1@((s :<- t), st) <- ls
+  l2@((s' :<- middle), sm) <- ls
   guard (s' == s)
-  Just mt <- pure $ Map.lookup (middle, t) mls
-  let l3 = ((middle, t), mt)
+  Just mt <- pure $ Map.lookup (middle :<- t) mls
+  let l3 = ((middle :<- t), mt)
   guard (st > (sm + mt))
   return (l1, l2, l3)
 

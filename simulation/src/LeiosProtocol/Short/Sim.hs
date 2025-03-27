@@ -48,6 +48,7 @@ import LeiosProtocol.Short
 import LeiosProtocol.Short.Node
 import ModelTCP
 import Network.TypedProtocol
+import P2P
 import PraosProtocol.BlockFetch (Message (..))
 import qualified PraosProtocol.Common.Chain as Chain
 import PraosProtocol.PraosNode (PraosMessage (..), praosMessageLabel)
@@ -64,7 +65,7 @@ data LeiosEvent
       !World
       !(Map NodeId Point) -- nodes and locations
       !(Map NodeId StakeFraction)
-      !(Set (NodeId, NodeId)) -- links between nodes
+      !(Set Link) -- links between nodes
   | -- | An event at a node
     LeiosEventNode (LabelNode LeiosNodeEvent)
   | -- | An event on a tcp link between two nodes
@@ -383,7 +384,7 @@ traceRelayLink1 connectionOptions =
               ]
           )
           ( Set.fromList
-              [(nodeA, nodeB), (nodeB, nodeA)]
+              [(nodeA :<- nodeB), (nodeB :<- nodeA)]
           )
       slotConfig <- slotConfigFromNow
       let praosConfig@PraosConfig{configureConnection} = defaultPraosConfig

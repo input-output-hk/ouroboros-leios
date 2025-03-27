@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
@@ -190,14 +191,16 @@ instance (Typeable body, Hashable body) => HasFullHeader (Block body) where
 type IsBody body = (Typeable body, Hashable body)
 
 -- | This takes the blocks in order from /oldest to newest/.
-mkChain :: IsBody body => [(SlotNo, body)] -> Chain (Block body)
-mkChain =
+mkChain :: IsBody body => Bytes -> [(SlotNo, body)] -> Chain (Block body)
+mkChain hSize =
   fixupChain fixupBlock
-    . map (uncurry mkPartialBlock)
+    . map (fixHeaderSize . uncurry mkPartialBlock)
     . reverse
+ where
+  fixHeaderSize Block{..} = Block{blockHeader = blockHeader{headerMessageSize = hSize}, ..}
 
-mkChainSimple :: IsBody body => [body] -> Chain (Block body)
-mkChainSimple = mkChain . zip [1 ..]
+mkChainSimple :: IsBody body => Bytes -> [body] -> Chain (Block body)
+mkChainSimple hSize = mkChain hSize . zip [1 ..]
 
 mkAnchoredFragment ::
   IsBody body =>

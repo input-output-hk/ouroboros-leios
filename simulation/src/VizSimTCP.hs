@@ -9,6 +9,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Graphics.Rendering.Cairo as Cairo
 import ModelTCP
+import P2P
 import SimTCPLinks
 import SimTypes (LabelLink (..), LabelNode (..), NodeId, Point (..))
 import TimeCompat
@@ -29,7 +30,7 @@ type TcpSimVizModel =
 -- | The vizualisation state within the data model for the tcp simulation
 data TcpSimVizState = TcpSimVizState
   { vizNodePos :: Map NodeId Point
-  , vizNodeLinks :: Set (NodeId, NodeId)
+  , vizNodeLinks :: Set Link
   , vizMsgsInTransit ::
       Map
         (NodeId, NodeId)
@@ -213,7 +214,7 @@ tcpSimVizRenderModel
      where
       linksAndMsgs =
         [ (fromPos, toPos, msgs)
-        | (fromNode, toNode) <- Set.toList vizNodeLinks
+        | (fromNode :<- toNode) <- Set.toList vizNodeLinks
         , let (fromPos, toPos) =
                 translateLineNormal
                   displace
@@ -224,7 +225,7 @@ tcpSimVizRenderModel
               -- so they don't overlap each other, but for unidirectional
               -- links we can draw it centrally.
               displace
-                | Set.notMember (toNode, fromNode) vizNodeLinks = 0
+                | Set.notMember (toNode :<- fromNode) vizNodeLinks = 0
                 | otherwise = -10
 
               msgs =
