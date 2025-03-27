@@ -204,6 +204,7 @@ test-suite ols-test
     , directory
     , fgl
     , fgl-arbitrary
+    , leios-trace-hs
     , ouroboros-leios-sim
     , QuickCheck
     , random
