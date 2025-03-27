@@ -13,12 +13,12 @@ interface SortConfig {
 }
 
 const cloudProviders: CloudProvider[] = [
-    { name: "AWS", egressCost: 0.09, freeAllowance: "100" },
+    { name: "Google Cloud", egressCost: 0.120, freeAllowance: "0" },
+    { name: "Railway", egressCost: 0.100, freeAllowance: "0" },
+    { name: "AWS", egressCost: 0.090, freeAllowance: "100" },
     { name: "Microsoft Azure", egressCost: 0.087, freeAllowance: "100" },
-    { name: "Google Cloud", egressCost: 0.114, freeAllowance: "0" },
     { name: "Alibaba Cloud", egressCost: 0.074, freeAllowance: "10" },
-    { name: "Railway", egressCost: 0.1, freeAllowance: "0" },
-    { name: "DigitalOcean", egressCost: 0.01, freeAllowance: "100–10,000" },
+    { name: "DigitalOcean", egressCost: 0.010, freeAllowance: "100–10,000" },
     { name: "Oracle Cloud", egressCost: 0.0085, freeAllowance: "10,240" },
     { name: "Linode", egressCost: 0.005, freeAllowance: "1,024–20,480" },
     { name: "Hetzner", egressCost: 0.00108, freeAllowance: "1,024" },
@@ -40,12 +40,20 @@ const blockSizes: BlockSizes = {
     rb: { header: 1024, body: 90112 },
 };
 
+const TX_FEE_PARAMS = {
+    a: 0.155381, // Fixed fee in ADA
+    b: 0.000043946, // Fee per byte in ADA
+    avgTxSize: 300, // Average transaction size in bytes
+};
+
 const LeiosTrafficCalculator: React.FC = () => {
     const [numPeers, setNumPeers] = useState(20);
     const [headerPropagationPercent, setHeaderPropagationPercent] = useState(
         100,
     );
     const [bodyRequestPercent, setBodyRequestPercent] = useState(25);
+    const [blockUtilizationPercent, setBlockUtilizationPercent] = useState(100);
+    const [adaToUsd, setAdaToUsd] = useState(0.5);
     const [sortConfig, setSortConfig] = useState<SortConfig>({
         key: "egressCost",
         direction: "desc",
@@ -65,7 +73,8 @@ const LeiosTrafficCalculator: React.FC = () => {
         const traffic = {
             ib: {
                 headers: ibCount * blockSizes.ib.header * headerPeers,
-                bodies: ibCount * blockSizes.ib.body * bodyPeers,
+                bodies: ibCount * blockSizes.ib.body *
+                    (blockUtilizationPercent / 100) * bodyPeers,
             },
             eb: {
                 headers: ebCount * blockSizes.eb.header * headerPeers,
@@ -78,14 +87,27 @@ const LeiosTrafficCalculator: React.FC = () => {
             },
         };
 
-        const total = Object.values(traffic).reduce(
+        const totalTraffic = Object.values(traffic).reduce(
             (acc, block) => acc + block.headers + block.bodies,
             0,
         );
 
+        // Calculate transaction fees
+        const txPerIB = Math.floor(
+            (blockSizes.ib.body * (blockUtilizationPercent / 100)) /
+                TX_FEE_PARAMS.avgTxSize,
+        );
+        const totalTxs = ibCount * txPerIB;
+        const txFeeADA = totalTxs *
+            (TX_FEE_PARAMS.a + TX_FEE_PARAMS.b * TX_FEE_PARAMS.avgTxSize);
+        const txFeeUSD = txFeeADA * adaToUsd;
+
         return {
             traffic,
-            total,
+            totalTraffic,
+            txFeeADA,
+            txFeeUSD,
+            totalTxs,
         };
     };
 
@@ -125,8 +147,8 @@ const LeiosTrafficCalculator: React.FC = () => {
             }
             if (sortConfig.key.startsWith("ib_")) {
                 const rate = parseInt(sortConfig.key.split("_")[1]);
-                const { total: aTotal } = calculateTraffic(rate);
-                const { total: bTotal } = calculateTraffic(rate);
+                const { totalTraffic: aTotal } = calculateTraffic(rate);
+                const { totalTraffic: bTotal } = calculateTraffic(rate);
                 const aCost = calculateCost(aTotal / 1e9, a);
                 const bCost = calculateCost(bTotal / 1e9, b);
                 return sortConfig.direction === "asc"
@@ -180,16 +202,6 @@ const LeiosTrafficCalculator: React.FC = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.description}>
-                <p>
-                    <strong>Note:</strong>{" "}
-                    This calculator assumes fully utilized block space (filled
-                    blocks) for all block types. In practice, block utilization
-                    may vary, but this provides a conservative upper bound for
-                    egress traffic estimation.
-                </p>
-            </div>
-
             <div className={styles.controls}>
                 <div className={styles.control}>
                     <label htmlFor="numPeers">Number of Peers:</label>
@@ -231,121 +243,147 @@ const LeiosTrafficCalculator: React.FC = () => {
                         max="100"
                     />
                 </div>
+                <div className={styles.control}>
+                    <label htmlFor="blockUtilization">
+                        Input Block Utilization (%):
+                    </label>
+                    <input
+                        type="number"
+                        id="blockUtilization"
+                        value={blockUtilizationPercent}
+                        onChange={(e) =>
+                            setBlockUtilizationPercent(
+                                parseInt(e.target.value),
+                            )}
+                        min="0"
+                        max="100"
+                    />
+                </div>
+                <div className={styles.control}>
+                    <label htmlFor="adaToUsd">
+                        ADA/USD Price:
+                    </label>
+                    <input
+                        type="number"
+                        id="adaToUsd"
+                        value={adaToUsd}
+                        onChange={(e) =>
+                            setAdaToUsd(parseFloat(e.target.value))}
+                        min="0"
+                        step="0.01"
+                    />
+                </div>
             </div>
 
             <div className={styles.calculationBreakdown}>
-                <h3>Block Size Breakdown</h3>
+                <h3>Calculation Breakdown</h3>
                 <div className={styles.breakdownGrid}>
                     <div className={styles.breakdownItem}>
-                        <h4>Input Blocks (IB)</h4>
+                        <h4>Monthly Parameters</h4>
                         <ul>
                             <li>
-                                Header: {blockSizes.ib.header} bytes
-                                <ul>
-                                    <li>ProducerId: 32 bytes</li>
-                                    <li>SlotNo: 64 bytes</li>
-                                    <li>VRF proof: 80 bytes</li>
-                                    <li>Body hash: 32 bytes</li>
-                                    <li>RB Ref: 32 bytes</li>
-                                    <li>Signature: 64 bytes</li>
-                                </ul>
+                                Seconds per month:{" "}
+                                {SECONDS_PER_MONTH.toLocaleString()}
                             </li>
                             <li>
-                                Body: {blockSizes.ib.body.toLocaleString()}{" "}
-                                bytes
+                                Header propagation:{" "}
+                                {headerPropagationPercent}% of {numPeers}{" "}
+                                peers = {Math.round(
+                                    numPeers * (headerPropagationPercent / 100),
+                                )} peers
+                            </li>
+                            <li>
+                                Body requests: {bodyRequestPercent}% of{" "}
+                                {numPeers} peers = {Math.round(
+                                    numPeers * (bodyRequestPercent / 100),
+                                )} peers
                             </li>
                         </ul>
                     </div>
                     <div className={styles.breakdownItem}>
-                        <h4>Endorsement Blocks (EB)</h4>
+                        <h4>Block Timing</h4>
                         <ul>
                             <li>
-                                Header: {blockSizes.eb.header} bytes
+                                Endorsement Blocks (EB):
                                 <ul>
-                                    <li>ProducerId: 32 bytes</li>
-                                    <li>SlotNo: 64 bytes</li>
-                                    <li>VRF proof: 80 bytes</li>
-                                    <li>Signature: 64 bytes</li>
+                                    <li>Stage length: 20 seconds</li>
+                                    <li>
+                                        Stages per month: {SECONDS_PER_MONTH}
+                                        {" "}
+                                        / 20 = {(SECONDS_PER_MONTH / 20)
+                                            .toLocaleString()} stages
+                                    </li>
+                                    <li>EBs per stage: 1.5</li>
+                                    <li>
+                                        Total EBs: {(SECONDS_PER_MONTH / 20)
+                                            .toLocaleString()} × 1.5 ={" "}
+                                        {((SECONDS_PER_MONTH / 20) * 1.5)
+                                            .toLocaleString()} EBs
+                                    </li>
                                 </ul>
                             </li>
                             <li>
-                                Body: {blockSizes.eb.body}{" "}
-                                bytes per IB reference
+                                Ranking Blocks (RB):
+                                <ul>
+                                    <li>RB generation rate: 0.05 RBs/second</li>
+                                    <li>
+                                        Total RBs:{" "}
+                                        {SECONDS_PER_MONTH.toLocaleString()}
+                                        {" "}
+                                        × 0.05 = {(0.05 * SECONDS_PER_MONTH)
+                                            .toLocaleString()} RBs
+                                    </li>
+                                </ul>
                             </li>
                         </ul>
                     </div>
                     <div className={styles.breakdownItem}>
-                        <h4>Ranking Blocks (RB)</h4>
+                        <h4>Block Sizes</h4>
                         <ul>
-                            <li>Header: {blockSizes.rb.header} bytes</li>
                             <li>
-                                Body: {blockSizes.rb.body.toLocaleString()}{" "}
-                                bytes
+                                Input Blocks (IB):
+                                <ul>
+                                    <li>
+                                        Header: {blockSizes.ib.header} bytes
+                                    </li>
+                                    <li>
+                                        Body:{" "}
+                                        {blockSizes.ib.body.toLocaleString()}
+                                        {" "}
+                                        bytes
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>
+                                Endorsement Blocks (EB):
+                                <ul>
+                                    <li>
+                                        Header: {blockSizes.eb.header} bytes
+                                    </li>
+                                    <li>
+                                        Body: {blockSizes.eb.body}{" "}
+                                        bytes per IB reference
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>
+                                Ranking Blocks (RB):
+                                <ul>
+                                    <li>
+                                        Header: {blockSizes.rb.header} bytes
+                                    </li>
+                                    <li>
+                                        Body:{" "}
+                                        {blockSizes.rb.body.toLocaleString()}
+                                        {" "}
+                                        bytes
+                                    </li>
+                                </ul>
                             </li>
                         </ul>
                     </div>
                 </div>
                 <div className={styles.calculationNote}>
-                    <p>Monthly traffic calculation:</p>
-                    <ul>
-                        <li>
-                            Seconds per month:{" "}
-                            {SECONDS_PER_MONTH.toLocaleString()}
-                        </li>
-                        <li>
-                            Header propagation: {headerPropagationPercent}% of
-                            {" "}
-                            {numPeers} peers = {Math.round(
-                                numPeers * (headerPropagationPercent / 100),
-                            )} peers
-                        </li>
-                        <li>
-                            Body requests: {bodyRequestPercent}% of {numPeers}
-                            {" "}
-                            peers ={" "}
-                            {Math.round(numPeers * (bodyRequestPercent / 100))}
-                            {" "}
-                            peers
-                        </li>
-                    </ul>
-
-                    <p>Block timing breakdown:</p>
-                    <ul>
-                        <li>
-                            Endorsement Blocks (EB):
-                            <ul>
-                                <li>Stage length: 20 seconds</li>
-                                <li>
-                                    Stages per month: {SECONDS_PER_MONTH} / 20 =
-                                    {" "}
-                                    {(SECONDS_PER_MONTH / 20).toLocaleString()}
-                                    {" "}
-                                    stages
-                                </li>
-                                <li>EBs per stage: 1.5</li>
-                                <li>
-                                    Total EBs:{" "}
-                                    {(SECONDS_PER_MONTH / 20).toLocaleString()}
-                                    {" "}
-                                    × 1.5 = {((SECONDS_PER_MONTH / 20) * 1.5)
-                                        .toLocaleString()} EBs
-                                </li>
-                            </ul>
-                        </li>
-                        <li>
-                            Ranking Blocks (RB):
-                            <ul>
-                                <li>RB generation rate: 0.05 RBs/second</li>
-                                <li>
-                                    Total RBs:{" "}
-                                    {SECONDS_PER_MONTH.toLocaleString()}{" "}
-                                    × 0.05 = {(0.05 * SECONDS_PER_MONTH)
-                                        .toLocaleString()} RBs
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-
                     <p>Example calculation for 1 IB/s:</p>
                     <ul>
                         <li>
@@ -365,11 +403,13 @@ const LeiosTrafficCalculator: React.FC = () => {
                         <li>
                             IB Bodies: {SECONDS_PER_MONTH.toLocaleString()}{" "}
                             seconds × {blockSizes.ib.body.toLocaleString()}{" "}
-                            bytes ×{" "}
+                            bytes × {blockUtilizationPercent}% utilization ×
+                            {" "}
                             {Math.round(numPeers * (bodyRequestPercent / 100))}
                             {" "}
                             peers = {formatTraffic(
                                 SECONDS_PER_MONTH * blockSizes.ib.body *
+                                    (blockUtilizationPercent / 100) *
                                     Math.round(
                                         numPeers * (bodyRequestPercent / 100),
                                     ),
@@ -401,8 +441,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                             {" "}
                             peers = {formatTraffic(
                                 (SECONDS_PER_MONTH / 20) * 1.5 *
-                                    blockSizes.eb.body *
-                                    20 *
+                                    blockSizes.eb.body * 20 *
                                     Math.round(
                                         numPeers * (bodyRequestPercent / 100),
                                     ),
@@ -441,7 +480,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                 </div>
             </div>
 
-            <h3>Monthly Traffic per Node (TB)</h3>
+            <h3>Monthly Traffic and Fees per Node</h3>
             <div className={styles.tableContainer}>
                 <table className={styles.table}>
                     <thead>
@@ -453,12 +492,21 @@ const LeiosTrafficCalculator: React.FC = () => {
                             <th>EB Bodies</th>
                             <th>RB Headers</th>
                             <th>RB Bodies</th>
-                            <th>Total</th>
+                            <th>Total Traffic</th>
+                            <th>Total Txs</th>
+                            <th>Tx Fees (₳)</th>
+                            <th>Tx Fees (USD)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {[1, 5, 10, 20, 30].map((rate) => {
-                            const { traffic, total } = calculateTraffic(rate);
+                        {IB_RATES.map((rate) => {
+                            const {
+                                traffic,
+                                totalTraffic,
+                                txFeeADA,
+                                txFeeUSD,
+                                totalTxs,
+                            } = calculateTraffic(rate);
                             return (
                                 <tr key={rate}>
                                     <td>{rate}</td>
@@ -468,12 +516,36 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     <td>{formatTraffic(traffic.eb.bodies)}</td>
                                     <td>{formatTraffic(traffic.rb.headers)}</td>
                                     <td>{formatTraffic(traffic.rb.bodies)}</td>
-                                    <td>{formatTraffic(total)}</td>
+                                    <td>{formatTraffic(totalTraffic)}</td>
+                                    <td>{totalTxs.toLocaleString()}</td>
+                                    <td>
+                                        {txFeeADA.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 6,
+                                        }).replace(/\.?0+$/, "")} ₳
+                                    </td>
+                                    <td>
+                                        ${txFeeUSD.toLocaleString(undefined, {
+                                            minimumFractionDigits: 2,
+                                        })}
+                                    </td>
                                 </tr>
                             );
                         })}
                     </tbody>
                 </table>
+                <div className={styles.note}>
+                    <div className={styles.noteTitle}>Network Revenue</div>
+                    <div className={styles.noteContent}>
+                        Transaction fees shown represent total network revenue
+                        before expenses and taxes. Actual earnings depend on:
+                        <ul>
+                            <li>Node operator's stake percentage</li>
+                            <li>Treasury tax (20%)</li>
+                            <li>Other operational costs</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <h3>Monthly Cost by Cloud Provider ($)</h3>
@@ -518,17 +590,22 @@ const LeiosTrafficCalculator: React.FC = () => {
                                 <td>${provider.egressCost.toFixed(3)}</td>
                                 <td>{provider.freeAllowance}</td>
                                 {IB_RATES.map((rate) => {
-                                    const { total } = calculateTraffic(rate);
-                                    const cost = calculateCost(
-                                        total / 1e9,
+                                    const { totalTraffic } = calculateTraffic(
+                                        rate,
+                                    );
+                                    const egressCost = calculateCost(
+                                        totalTraffic / 1e9,
                                         provider,
                                     );
                                     return (
                                         <td key={rate}>
-                                            ${cost.toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                            })}
+                                            ${egressCost.toLocaleString(
+                                                undefined,
+                                                {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                },
+                                            )}
                                         </td>
                                     );
                                 })}
@@ -536,6 +613,23 @@ const LeiosTrafficCalculator: React.FC = () => {
                         ))}
                     </tbody>
                 </table>
+                <div className={styles.note}>
+                    <div className={styles.noteTitle}>
+                        Cloud Provider Selection
+                    </div>
+                    <div className={styles.noteContent}>
+                        This cost comparison is for informational purposes only.
+                        Beyond cost, consider:
+                        <ul>
+                            <li>Geographic availability and latency</li>
+                            <li>Service reliability and support</li>
+                            <li>Security and compliance features</li>
+                            <li>Network performance and scalability</li>
+                        </ul>
+                        Hyperscale providers may offer advantages that justify
+                        higher costs for production operations.
+                    </div>
+                </div>
             </div>
         </div>
     );
