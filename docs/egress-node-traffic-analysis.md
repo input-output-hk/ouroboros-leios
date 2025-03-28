@@ -81,6 +81,11 @@
   - Signature: 64 bytes
 - Body: 32 bytes per IB reference
 
+#### Votes
+- Size: 150 bytes per vote
+- Votes per pipeline: 600
+- Votes per EB: 600 votes × 1.5 EBs = 900 votes per stage
+
 #### Ranking Blocks (RB)
 - Header: 1,024 bytes
 - Body: 90,112 bytes
@@ -99,39 +104,41 @@ IB Headers: 2,592,000 seconds × 304 bytes × 20 peers = 15.76 GiB
 IB Bodies: 2,592,000 seconds × 98,304 bytes × 5 peers = 1.27 TiB
 EB Headers: 194,400 seconds × 240 bytes × 20 peers = 933.12 MiB
 EB Bodies: 194,400 seconds × 32 bytes × 20 IBs per stage × 5 peers = 622.08 MiB
+Votes: 194,400 seconds × 150 bytes × 900 votes × 20 peers = 524.88 GiB
 RB Headers: 129,600 seconds × 1,024 bytes × 20 peers = 2.65 GiB
 RB Bodies: 129,600 seconds × 90,112 bytes × 5 peers = 58.39 GiB
-Total: 1.35 TiB
+Total: 1.88 TiB
 
 Note: 
 - IB traffic dominates due to larger body size (98,304 bytes = 96 KiB)
 - EB traffic is minimal due to small body size (32 bytes per reference)
+- Vote traffic is significant due to high volume (900 votes per stage)
 - RB traffic is moderate, similar to Praos block size
 ```
 
 ### Monthly Traffic per Node
 
-| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | RB Headers | RB Bodies | Total | vs Praos (A) |
-|------|------------|-----------|------------|-----------|------------|-----------|-------|--------------|
-| 1    | 15.76 GiB  | 1.27 TiB  | 933.12 MiB | 622.08 MiB| 2.65 GiB   | 58.39 GiB | 1.35 TiB | +1,890% |
-| 5    | 78.80 GiB  | 6.37 TiB  | 933.12 MiB | 3.11 GiB  | 2.65 GiB   | 58.39 GiB | 6.51 TiB | +9,495% |
-| 10   | 157.59 GiB | 12.74 TiB | 933.12 MiB | 6.22 GiB  | 2.65 GiB   | 58.39 GiB | 12.97 TiB | +19,090% |
-| 20   | 315.19 GiB | 25.48 TiB | 933.12 MiB | 12.44 GiB | 2.65 GiB   | 58.39 GiB | 25.87 TiB | +38,180% |
-| 30   | 472.78 GiB | 38.22 TiB | 933.12 MiB | 18.66 GiB | 2.65 GiB   | 58.39 GiB | 38.77 TiB | +57,270% |
+| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes | RB Headers | RB Bodies | Total | vs Praos (A) |
+|------|------------|-----------|------------|-----------|-------|------------|-----------|-------|--------------|
+| 1    | 15.76 GB   | 1.27 TB   | 933.12 MB  | 622.08 MB | 524.88 GB | 2.65 GB    | 58.39 GB  | 1.88 TB | +2,670% |
+| 5    | 78.80 GB   | 6.37 TB   | 933.12 MB  | 3.11 GB   | 2.62 TB   | 2.65 GB    | 58.39 GB  | 9.07 TB | +13,260% |
+| 10   | 157.59 GB  | 12.74 TB  | 933.12 MB  | 6.22 GB   | 5.25 TB   | 2.65 GB    | 58.39 GB  | 18.11 TB | +26,590% |
+| 20   | 315.19 GB  | 25.48 TB  | 933.12 MB  | 12.44 GB  | 10.50 TB  | 2.65 GB    | 58.39 GB  | 36.19 TB | +53,130% |
+| 30   | 472.78 GB  | 38.22 TB  | 933.12 MB  | 18.66 GB  | 15.75 TB  | 2.65 GB    | 58.39 GB  | 54.28 TB | +79,670% |
 
 ### Monthly Cost by Cloud Provider ($)
 
 | Provider         | Price/GB | Free Allowance (GB) | 1 IB/s | 5 IB/s | 10 IB/s | 20 IB/s | 30 IB/s | vs Praos (A) |
 |------------------|----------|---------------------|---------|---------|----------|----------|----------|--------------|
-| Google Cloud     | $0.120   | 0                   | $165.60 | $781.20 | $1,556.40| $3,104.40| $4,652.40| +5,987% |
-| Railway          | $0.100   | 0                   | $138.00 | $651.00 | $1,297.00| $2,587.00| $3,877.00| +5,251% |
-| AWS              | $0.090   | 100                 | $124.20 | $585.90 | $1,167.30| $2,328.30| $3,489.30| +5,036% |
-| Microsoft Azure  | $0.087   | 100                 | $120.06 | $566.37 | $1,128.39| $2,250.69| $3,372.99| +4,864% |
-| Alibaba Cloud    | $0.074   | 10                  | $102.12 | $481.74 | $960.18  | $1,914.38| $2,868.58| +4,145% |
-| DigitalOcean     | $0.010   | 100–10,000          | $13.80  | $65.10  | $129.70  | $258.70  | $387.70  | +523% |
-| Oracle Cloud     | $0.0085  | 10,240              | $11.73  | $55.34  | $110.25  | $219.90  | $329.55  | +477% |
-| Linode           | $0.005   | 1,024–20,480        | $6.90   | $32.55  | $64.85   | $129.35  | $193.85  | +264% |
-| Hetzner          | $0.00108 | 1,024               | $1.49   | $7.03   | $14.01   | $27.94   | $41.87   | +47% |
+| Google Cloud     | $0.120   | 0                   | $230.40 | $1,088.40| $2,167.20| $4,325.40| $6,483.60| +8,340% |
+| Railway          | $0.100   | 0                   | $192.00 | $907.00 | $1,806.00| $3,604.00| $5,403.00| +7,000% |
+| AWS              | $0.090   | 100                 | $172.80 | $816.30 | $1,625.40| $3,243.60| $4,862.70| +6,300% |
+| Microsoft Azure  | $0.087   | 100                 | $167.04 | $788.73 | $1,570.89| $3,135.09| $4,699.29| +6,084% |
+| Alibaba Cloud    | $0.074   | 10                  | $142.08 | $670.74 | $1,335.78| $2,665.38| $3,995.08| +5,170% |
+| DigitalOcean     | $0.010   | 100–10,000          | $19.20  | $90.70  | $180.60  | $360.40  | $540.30  | +699% |
+| Oracle Cloud     | $0.0085  | 10,240              | $16.32  | $77.09  | $153.51  | $306.34  | $459.26  | +594% |
+| Linode           | $0.005   | 1,024–20,480        | $9.60   | $45.35  | $90.30   | $180.20  | $270.15  | +350% |
+| Hetzner          | $0.00108 | 1,024               | $2.07   | $9.80   | $19.50   | $38.92   | $58.35   | +75% |
 | UpCloud          | $0.000   | 1,024–24,576        | $0.00   | $0.00   | $0.00    | $0.00    | $0.00    | 0% |
 
 Note: Percentage increases are calculated against Praos scenario A (20 peers) baseline of 67.88 GiB/month and $7.73/month (using average cost across providers)
