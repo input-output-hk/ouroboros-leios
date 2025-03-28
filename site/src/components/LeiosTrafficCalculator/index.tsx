@@ -646,7 +646,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                                 .toFixed(6)} ₳
                         </li>
                         <li>
-                            Monthly Fee Revenue: {(SECONDS_PER_MONTH *
+                            Monthly Network Fee Revenue: {(SECONDS_PER_MONTH *
                                 Math.floor(
                                     (blockSizes.ib.body *
                                         (blockUtilizationPercent / 100)) /
