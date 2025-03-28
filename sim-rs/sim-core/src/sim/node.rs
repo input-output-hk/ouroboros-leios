@@ -1420,6 +1420,17 @@ impl Node {
                 }
             }
         }
+
+        // If this EB _does_ reference other EBs, make sure we trust them
+        for referenced_eb in &eb.ebs {
+            let Some(votes) = self.leios.votes_by_eb.get(referenced_eb) else {
+                return Err(NoVoteReason::UncertifiedEBReference);
+            };
+            let vote_count = votes.values().copied().sum::<usize>() as u64;
+            if vote_count < self.sim_config.vote_threshold {
+                return Err(NoVoteReason::UncertifiedEBReference);
+            }
+        }
         Ok(())
     }
 

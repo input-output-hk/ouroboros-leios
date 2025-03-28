@@ -233,6 +233,7 @@ pub enum NoVoteReason {
     ExtraIB,
     MissingIB,
     MissingEB,
+    UncertifiedEBReference,
 }
 
 #[derive(Clone, Debug, Serialize)]
