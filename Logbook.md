@@ -2,6 +2,29 @@
 
 ## 2025-03-28
 
+### Haskell simulation
+
+- Moved configuration and topology parsers to `leios-trace-hs` package
+  for reuse by formal methods.
+- Investigated differences in IBs referenced with Rust simulation:
+  - IBs that belong to preferred chain get referenced in pipelines
+    where EBs are generated, as expected.
+  - Odd gaps in their distribution seem within variance. Their
+    consistency across different runs is due to performing the same
+    sequence of random samples no matter the frequency of
+    blocks.
+  - Nevertheless streamlined sortition code by relying on external statistics
+    package.
+- Testing of Full Leios
+  - added assertions for limits on referenced EBs
+  - resolved tension between `η`/`praos-chain-quality` and `r_EB`/`eb-max-age-slots`:
+    - an error is thrown if `r_EB` is not large enough to allow for the
+      certified EBs required by `η` to be kept by a node long enough.
+  - traces show expected behaviour.
+- Fix for `cabal run ols -- generate-topology close-and-random`
+  - The `close-and-random` peers chosen for each node are now properly listed as `producers`.
+  - Variance in upstream peers, and hence access to blocks, is now much smaller.
+
 ### Tools
 
 ### Egress Traffic Calculator
