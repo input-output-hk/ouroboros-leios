@@ -32,12 +32,14 @@ interface BlockSizes {
     ib: { header: number; body: number };
     eb: { header: number; body: number };
     rb: { header: number; body: number };
+    vote: { size: number; countPerPipeline: number };
 }
 
 const blockSizes: BlockSizes = {
     ib: { header: 304, body: 98304 },
     eb: { header: 240, body: 32 },
     rb: { header: 1024, body: 90112 },
+    vote: { size: 150, countPerPipeline: 900 }, // 600 votes per pipeline * 1.5 EBs per pipeline
 };
 
 const TX_FEE_PARAMS = {
@@ -80,7 +82,8 @@ const LeiosTrafficCalculator: React.FC = () => {
     const calculateTraffic = (ibRate: number) => {
         const ibCount = ibRate * SECONDS_PER_MONTH;
         const stagesPerMonth = SECONDS_PER_MONTH / 20;
-        const ebCount = stagesPerMonth * 1.5;
+        const ebRate = 1.5; // EBs per pipeline
+        const ebCount = stagesPerMonth * ebRate;
         const rbCount = 0.05 * SECONDS_PER_MONTH;
 
         const headerPeers = Math.round(
@@ -95,18 +98,23 @@ const LeiosTrafficCalculator: React.FC = () => {
                     (blockUtilizationPercent / 100) * bodyPeers,
             },
             eb: {
-                headers: ebCount * blockSizes.eb.header * headerPeers,
-                bodies: ebCount * blockSizes.eb.body * (ibRate * 20) *
-                    bodyPeers,
+                headers: ibRate * blockSizes.eb.header * ebRate * headerPeers *
+                    stagesPerMonth,
+                bodies: ibRate * blockSizes.eb.body * ebRate * bodyPeers *
+                    stagesPerMonth,
             },
             rb: {
                 headers: rbCount * blockSizes.rb.header * headerPeers,
                 bodies: rbCount * blockSizes.rb.body * bodyPeers,
             },
+            votes: ebCount * blockSizes.vote.size *
+                blockSizes.vote.countPerPipeline * headerPeers,
         };
 
         const totalTraffic = Object.values(traffic).reduce(
-            (acc, block) => acc + block.headers + block.bodies,
+            (acc, block) =>
+                acc + (block.headers || 0) + (block.bodies || 0) +
+                (block.votes || 0),
             0,
         );
 
@@ -449,6 +457,15 @@ const LeiosTrafficCalculator: React.FC = () => {
                                 bytes/IB ref
                             </div>
                             <div className={styles.calculationTitle}>
+                                Votes
+                            </div>
+                            <div className={styles.calculationCode}>
+                                Vote Size = {blockSizes.vote.size} bytes{" "}
+                                {"\n"}Votes per Pipeline ={" "}
+                                {blockSizes.vote.countPerPipeline}{" "}
+                                votes (600 votes × 1.5 EBs)
+                            </div>
+                            <div className={styles.calculationTitle}>
                                 Ranking Blocks (RB)
                             </div>
                             <div className={styles.calculationCode}>
@@ -519,6 +536,24 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     blockSizes.eb.body * 20 *
                                     Math.round(
                                         numPeers * (bodyRequestPercent / 100),
+                                    ),
+                            )}
+                        </li>
+                        <li>
+                            Votes:{" "}
+                            {((SECONDS_PER_MONTH / 20) * 1.5).toLocaleString()}
+                            {" "}
+                            seconds × {blockSizes.vote.size} bytes ×{" "}
+                            {blockSizes.vote.countPerPipeline} votes ×{" "}
+                            {Math.round(
+                                numPeers * (headerPropagationPercent / 100),
+                            )} peers = {formatTraffic(
+                                (SECONDS_PER_MONTH / 20) * 1.5 *
+                                    blockSizes.vote.size *
+                                    blockSizes.vote.countPerPipeline *
+                                    Math.round(
+                                        numPeers *
+                                            (headerPropagationPercent / 100),
                                     ),
                             )}
                         </li>
@@ -616,6 +651,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                             <th>IB Bodies</th>
                             <th>EB Headers</th>
                             <th>EB Bodies</th>
+                            <th>Votes</th>
                             <th>RB Headers</th>
                             <th>RB Bodies</th>
                             <th>Total Traffic</th>
@@ -636,6 +672,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     <td>{formatTraffic(traffic.ib.bodies)}</td>
                                     <td>{formatTraffic(traffic.eb.headers)}</td>
                                     <td>{formatTraffic(traffic.eb.bodies)}</td>
+                                    <td>{formatTraffic(traffic.votes)}</td>
                                     <td>{formatTraffic(traffic.rb.headers)}</td>
                                     <td>{formatTraffic(traffic.rb.bodies)}</td>
                                     <td>{formatTraffic(totalTraffic)}</td>
