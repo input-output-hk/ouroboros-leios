@@ -121,7 +121,6 @@ data LeiosNodeState m = LeiosNodeState
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
   , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
-  -- ^ TODO: prune of EBs that won't make it into chain anymore.
   }
 
 type CertificatesProgress = Map EndorseBlockId CertificateProgress
@@ -478,8 +477,6 @@ leiosNode tracer cfg followers peers = do
 
   let computeLedgerStateThreads = [computeLedgerStateThread tracer cfg leiosState]
 
-  -- TODO: expiration times to be decided. At least need EB/IBs to be
-  -- around long enough to compute ledger state if they end in RB.
   let pruningThreads =
         concat
           [ [ pruneExpiredVotes tracer cfg leiosState
