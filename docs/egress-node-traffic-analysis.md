@@ -20,7 +20,7 @@
 - block size 90,112 bytes (88 KiB)
 - average transaction size: 1,400 bytes (based on mainnet data)
 - average transactions per block: ~13.5 (based on mainnet data)
-- **131,400 blocks x 90,112 bytes = 11,840,724,480 bytes ~11.84 GiB**
+- **131,400 blocks x 90,112 bytes = 11,840,724,480 bytes ~11.03 GiB**
 
 > [!Note]
 >
@@ -39,24 +39,24 @@
 
 #### Node traffic
 ```
-(A) Headers: 131,400 blocks x 1,024 bytes x 20 peers = 2.69 GiB
-    Bodies: 131,400 blocks x 90,112 bytes x 5 peers = 59.19 GiB
-    Total: 61.88 GiB
+(A) Headers: 131,400 blocks x 1,024 bytes x 20 peers = 2.51 GiB
+    Bodies: 131,400 blocks x 90,112 bytes x 5 peers = 55.13 GiB
+    Total: 57.64 GiB
 
-(B) Headers: 131,400 blocks x 1,024 bytes x 35 peers = 4.71 GiB
-    Bodies: 131,400 blocks x 90,112 bytes x 9 peers = 106.55 GiB
-    Total: 111.26 GiB
+(B) Headers: 131,400 blocks x 1,024 bytes x 35 peers = 4.39 GiB
+    Bodies: 131,400 blocks x 90,112 bytes x 9 peers = 99.23 GiB
+    Total: 103.62 GiB
 ```
 
 - additional traffic from transactions (5-10 GiB?) and consensus (~1-2 GiB?)
 
 #### Final total egress per month/ node
 ```
-(A) Low end: 61.88 GiB + 5 GiB + 1 GiB = 67.88 GiB
-    High end: 61.88 GiB + 10 GiB + 2 GiB = 73.88 GiB
+(A) Low end: 57.64 GiB + 5 GiB + 1 GiB = 63.64 GiB
+    High end: 57.64 GiB + 10 GiB + 2 GiB = 69.64 GiB
 
-(B) Low end: 111.26 GiB + 5 GiB + 1 GiB = 117.26 GiB
-    High end: 111.26 GiB + 10 GiB + 2 GiB = 123.26 GiB
+(B) Low end: 103.62 GiB + 5 GiB + 1 GiB = 109.62 GiB
+    High end: 103.62 GiB + 10 GiB + 2 GiB = 115.62 GiB
 ```
 
 ## Ouroboros Leios
@@ -71,7 +71,7 @@
   - Body hash: 32 bytes
   - RB Ref: 32 bytes
   - Signature: 64 bytes
-- Body: 98,304 bytes
+- Body: 98,304 bytes (96 KiB)
 
 #### Endorsement Blocks (EB)
 - Header: 240 bytes
@@ -87,8 +87,8 @@
 - Votes per EB: 600 votes × 1.5 EBs = 900 votes per stage
 
 #### Ranking Blocks (RB)
-- Header: 1,024 bytes
-- Body: 90,112 bytes
+- Header: 1,024 bytes (1 KiB)
+- Body: 90,112 bytes (88 KiB)
 
 ### Monthly Traffic Calculation
 
@@ -100,14 +100,14 @@
 
 #### Example Calculation (1 IB/s, 20 peers, 100% header propagation, 25% body requests)
 ```
-IB Headers: 2,592,000 seconds × 304 bytes × 20 peers = 15.76 GiB
-IB Bodies: 2,592,000 seconds × 98,304 bytes × 5 peers = 1.27 TiB
-EB Headers: 194,400 seconds × 240 bytes × 20 peers = 933.12 MiB
-EB Bodies: 194,400 seconds × 32 bytes × 20 IBs per stage × 5 peers = 622.08 MiB
+IB Headers: 2,592,000 seconds × 304 bytes × 20 peers = 14.69 GiB
+IB Bodies: 2,592,000 seconds × 98,304 bytes × 5 peers = 1.18 TiB
+EB Headers: 1 IB/s × 240 bytes × 1.5 EBs × 20 peers × 129,600 stages = 869.38 MiB
+EB Bodies: 1 IB/s × 32 bytes × 1.5 EBs × 5 peers × 129,600 stages = 579.59 MiB
 Votes: 194,400 seconds × 150 bytes × 900 votes × 20 peers = 524.88 GiB
-RB Headers: 129,600 seconds × 1,024 bytes × 20 peers = 2.65 GiB
-RB Bodies: 129,600 seconds × 90,112 bytes × 5 peers = 58.39 GiB
-Total: 1.88 TiB
+RB Headers: 129,600 seconds × 1,024 bytes × 20 peers = 2.47 GiB
+RB Bodies: 129,600 seconds × 90,112 bytes × 5 peers = 54.43 GiB
+Total: 1.75 TiB
 
 Note: 
 - IB traffic dominates due to larger body size (98,304 bytes = 96 KiB)
@@ -120,11 +120,11 @@ Note:
 
 | IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes | RB Headers | RB Bodies | Total | vs Praos (A) |
 |------|------------|-----------|------------|-----------|-------|------------|-----------|-------|--------------|
-| 1    | 15.76 GB   | 1.27 TB   | 933.12 MB  | 622.08 MB | 524.88 GB | 2.65 GB    | 58.39 GB  | 1.88 TB | +2,670% |
-| 5    | 78.80 GB   | 6.37 TB   | 933.12 MB  | 3.11 GB   | 2.62 TB   | 2.65 GB    | 58.39 GB  | 9.07 TB | +13,260% |
-| 10   | 157.59 GB  | 12.74 TB  | 933.12 MB  | 6.22 GB   | 5.25 TB   | 2.65 GB    | 58.39 GB  | 18.11 TB | +26,590% |
-| 20   | 315.19 GB  | 25.48 TB  | 933.12 MB  | 12.44 GB  | 10.50 TB  | 2.65 GB    | 58.39 GB  | 36.19 TB | +53,130% |
-| 30   | 472.78 GB  | 38.22 TB  | 933.12 MB  | 18.66 GB  | 15.75 TB  | 2.65 GB    | 58.39 GB  | 54.28 TB | +79,670% |
+| 1    | 14.69 GiB  | 1.18 TiB  | 869.38 MiB | 579.59 MiB | 524.88 GiB | 2.47 GiB   | 54.43 GiB  | 1.75 TiB | +2,670% |
+| 5    | 73.45 GiB  | 5.90 TiB  | 869.38 MiB | 2.90 GiB   | 2.62 TiB   | 2.47 GiB   | 54.43 GiB  | 8.52 TiB | +13,260% |
+| 10   | 146.90 GiB | 11.80 TiB | 869.38 MiB | 5.80 GiB   | 5.25 TiB   | 2.47 GiB   | 54.43 GiB  | 17.03 TiB | +26,590% |
+| 20   | 293.80 GiB | 23.60 TiB | 869.38 MiB | 11.60 GiB  | 10.50 TiB  | 2.47 GiB   | 54.43 GiB  | 34.06 TiB | +53,130% |
+| 30   | 440.70 GiB | 35.40 TiB | 869.38 MiB | 17.40 GiB  | 15.75 TiB  | 2.47 GiB   | 54.43 GiB  | 51.09 TiB | +79,670% |
 
 ### Monthly Cost by Cloud Provider ($)
 
@@ -141,7 +141,7 @@ Note:
 | Hetzner          | $0.00108 | 1,024               | $2.07   | $9.80   | $19.50   | $38.92   | $58.35   | +75% |
 | UpCloud          | $0.000   | 1,024–24,576        | $0.00   | $0.00   | $0.00    | $0.00    | $0.00    | 0% |
 
-Note: Percentage increases are calculated against Praos scenario A (20 peers) baseline of 67.88 GiB/month and $7.73/month (using average cost across providers)
+Note: Percentage increases are calculated against Praos scenario A (20 peers) baseline of 63.64 GiB/month and $7.73/month (using average cost across providers)
 
 ### Data Egress Cost Sources
 
