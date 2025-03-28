@@ -1,5 +1,25 @@
 # Leios logbook
 
+## 2025-03-28
+
+### Tools
+
+### Egress Traffic Calculator
+
+Added a new interactive calculator tool to help node operators estimate egress traffic and costs under Leios. The calculator allows users to model different network scenarios and understand the potential impact on infrastructure costs.
+
+Key features:
+- Interactive parameters for IB rate, block utilization, peer count, and network propagation
+- Detailed traffic breakdown by block type (IB, EB, RB, Votes)
+- Cost estimates across multiple cloud providers with varying pricing models
+- Comparison with Ouroboros Praos traffic levels
+- Responsive design with mobile-friendly controls
+- Calculation breakdown showing the methodology behind the estimates
+- Monthly transaction volume and fee revenue projections
+
+The calculator helps visualize how Leios traffic scales with different input block rates and network configurations, providing SPOs and infrastructure providers with data to plan for the transition.
+
+
 ## 2025-03-21
 
 ### Haskell simulation
