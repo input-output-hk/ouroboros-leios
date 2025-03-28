@@ -3,7 +3,6 @@ db.haskell.aggregate(
 [
   {
     $match: {
-      "scenario.label": "default",
       "event.tag": "Cpu"
     }
   },

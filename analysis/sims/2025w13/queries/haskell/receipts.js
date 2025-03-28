@@ -1,7 +1,14 @@
 db.receipts.deleteMany({simulator: "haskell"})
 
 db["haskell-scenario"].find().forEach(function(s) {
+print("-----")
 printjson(s["_id"])
+if (db.receipts.findOne(Object.assign({simulator: "haskell"}, s["_id"]))) {
+  print("SKIP")
+  return
+} else {
+  print("COMPUTE")
+}
 db.haskell.aggregate(
 [
   {

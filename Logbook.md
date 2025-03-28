@@ -25,6 +25,16 @@
   - The `close-and-random` peers chosen for each node are now properly listed as `producers`.
   - Variance in upstream peers, and hence access to blocks, is now much smaller.
 
+### Analysis of simulations at tag `leios-2025w13`
+
+The Haskell and Rust simulators, at tag [leios-2025w13](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w13), were used to simulation 198 scenarios of Short Leios for varied IB production rate, IB size, and network topology, CPU limits, and protocol flags. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w13/analysis.ipynb](analysis/sims/2025w13/analysis.ipynb). New analyses focused on exploring simulator settings related to message delivery and CPU. The simulations resolved most of the prior outstanding issues that arose in comparing simulators, but they unearthed new ones.
+
+1. Studied how limiting available CPU affects the propagation of messages like IBs, where they might potentially be lost if insufficient CPU is available. *CPU can impact diffusion of IBs under some stressful scenarios.*
+2. Compared freshest-first versus oldest-first vote propagation. *Freshest first (arguably) may improve reliability of IB delivery.*
+3. Compared an extended voting period versus a limited one in the Haskell simulation. *Extended voting makes little difference except for rare improvements in reliable delivery of votes.*
+
+The qualitative discrepancies between the Haskell and Rust simulators' results are under investigation to determine whether they are *bona fide* differences due to the resolution of the simulators instead of infidelities in the simulations themselves.
+
 ### Tools
 
 ### Egress Traffic Calculator
