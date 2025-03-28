@@ -711,21 +711,6 @@ const LeiosTrafficCalculator: React.FC = () => {
                         })}
                     </tbody>
                 </table>
-                <div className={styles.note}>
-                    <div className={styles.noteTitle}>Network Revenue</div>
-                    <div className={styles.noteContent}>
-                        Transaction fees shown represent total network revenue
-                        before expenses and taxes. Actual earnings depend on:
-                        <ul>
-                            <li>Node operator's stake percentage</li>
-                            <li>
-                                SPO's pool configuration (fixed & margin fees)
-                            </li>
-                            <li>Treasury tax (20%)</li>
-                            <li>Other operational costs</li>
-                        </ul>
-                    </div>
-                </div>
             </div>
 
             <h3>Monthly Node Egress Cost by Cloud Provider ($)</h3>
