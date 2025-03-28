@@ -159,7 +159,7 @@ praosP2PSimVizRenderModel
                 Cairo.setSourceRGB r g b
                 Cairo.setLineWidth 1
                 Cairo.setDash [10, 5] 0
-                case vizNodeLinks Map.! (fromNode, toNode) of
+                case vizNodeLinks !!! (fromNode, toNode) of
                   LinkPointsNoWrap fromPos toPos -> do
                     withPoint Cairo.moveTo (toScreenPoint fromPos)
                     withPoint Cairo.lineTo (toScreenPoint toPos)
@@ -180,7 +180,7 @@ praosP2PSimVizRenderModel
                 Cairo.setSourceRGB r g b
                 Cairo.setDash [] 0
                 Cairo.setLineWidth 2
-                case vizNodeLinks Map.! (fromNode, toNode) of
+                case vizNodeLinks !!! (fromNode, toNode) of
                   LinkPointsNoWrap fromPos toPos -> do
                     withPoint Cairo.moveTo (toScreenPoint fromPos)
                     withPoint Cairo.lineTo (toScreenPoint toPos)
@@ -197,7 +197,7 @@ praosP2PSimVizRenderModel
       Cairo.restore
       -- draw the messages in flight on top
       sequence_
-        [ case vizNodeLinks Map.! (fromNode, toNode) of
+        [ case vizNodeLinks !!! (fromNode, toNode) of
           LinkPointsNoWrap fromPos toPos -> do
             let (msgTrailingEdge, _msgLeadingEdge) =
                   lineMessageInFlight now fromPos toPos msgforecast

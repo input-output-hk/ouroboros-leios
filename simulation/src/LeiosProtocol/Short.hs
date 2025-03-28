@@ -35,6 +35,8 @@ import LeiosProtocol.Common
 import LeiosProtocol.Config as OnDisk
 import ModelTCP
 import qualified PraosProtocol.Common.Chain as Chain
+import Statistics.Distribution
+import Statistics.Distribution.Poisson
 import Prelude hiding (id)
 
 -- | The sizes here are prescriptive, used to fill in fields that MessageSize will read from.
@@ -537,14 +539,18 @@ mkInputBlock _cfg header bodySize = assert (messageSizeBytes ib >= segmentSize) 
 mkEndorseBlock ::
   LeiosConfig -> EndorseBlockId -> SlotNo -> NodeId -> [EndorseBlockId] -> [InputBlockId] -> EndorseBlock
 mkEndorseBlock cfg@LeiosConfig{pipeline = _ :: SingPipeline p} id slot producer endorseBlocksEarlierPipeline inputBlocks =
-  assert (cfg.variant == Full || null endorseBlocksEarlierPipeline) $
+  assert
+    ( (cfg.variant == Full && length endorseBlocksEarlierPipeline <= cfg.pipelinesToReferenceFromEB)
+        || null endorseBlocksEarlierPipeline
+    )
+    $
     -- Endorse blocks are produced at the beginning of the stage.
-    assert (stageStart @p cfg Endorse slot Endorse == Just slot) $
-      rnf endorseBlocksEarlierPipeline `seq`
-        rnf inputBlocks `seq`
-          fixSize
-            cfg
-            EndorseBlock{endorseBlocksEarlierStage = [], size = 0, ..}
+    assert (stageStart @p cfg Endorse slot Endorse == Just slot)
+    $ rnf endorseBlocksEarlierPipeline
+    `seq` rnf inputBlocks
+    `seq` fixSize
+      cfg
+      EndorseBlock{endorseBlocksEarlierStage = [], size = 0, ..}
 
 mockEndorseBlock :: LeiosConfig -> Int -> EndorseBlock
 mockEndorseBlock cfg n =
@@ -646,8 +652,7 @@ newtype InputBlocksSnapshot = InputBlocksSnapshot
 
 data EndorseBlocksSnapshot = EndorseBlocksSnapshot
   { validEndorseBlocks :: (SlotNo, SlotNo) -> [EndorseBlock]
-  , --  , endorseBlocksInChain :: (SlotNo, SlotNo) -> [EndorseBlock]
-    certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
+  , certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
   }
 
 -- | Both constraints are inclusive.
@@ -682,15 +687,23 @@ endorseBlocksToReference ::
   [(PipelineNo, [EndorseBlock])]
 endorseBlocksToReference LeiosConfig{variant = Short} _ _ _ = []
 endorseBlocksToReference cfg@LeiosConfig{variant = Full} pl EndorseBlocksSnapshot{..} checkDeliveryTime =
-  [ (p, [eb | (eb, _, _) <- es])
-  | plRange <- maybeToList $ pipelinesToReferenceFromEB cfg.pipelinesToReferenceFromEB pl
-  , (p, es) <- certifiedEndorseBlocks plRange
-  , or [checkDeliveryTime p t | (_, _, t) <- es]
-  ]
+  assert
+    ( all (\(p, ebs) -> all (\eb -> p == endorseBlockPipeline cfg eb) ebs && succ (succ p) <= pl) result
+        && (\ps -> sort ps == ps) (map fst result)
+    )
+    result
+ where
+  result =
+    [ (p, [eb | (eb, _, _) <- es])
+    | plRange <- maybeToList $ pipelinesToReferenceFromEB cfg.pipelinesToReferenceFromEB pl
+    , (p, es) <- certifiedEndorseBlocks plRange
+    , or [checkDeliveryTime p t | (_, _, t) <- es]
+    ]
 
 pipelinesToReferenceFromEB :: Int -> PipelineNo -> Maybe (PipelineNo, PipelineNo)
-pipelinesToReferenceFromEB n pl =
-  case fromEnum (pred pl) - maxStagesAfterEndorse of
+pipelinesToReferenceFromEB n pl = do
+  predPl <- safePred pl
+  case fromEnum predPl - maxStagesAfterEndorse of
     newestIx
       | newestIx < 0 -> Nothing
       | otherwise ->
@@ -700,6 +713,9 @@ pipelinesToReferenceFromEB n pl =
             )
  where
   maxStagesAfterEndorse = 2
+  safePred x = do
+    guard $ x > minBound
+    pure $ pred x
 
 shouldVoteOnEB ::
   LeiosConfig ->
@@ -837,38 +853,30 @@ votingRatePerPipeline cfg stake = f
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
 nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)
 
--- | Returns a cache of thresholds for being awarded some number of wins.
---   Keys are calculated to match the accumulator values from `voter_check` in `crypto-benchmarks.rs`.
---
---   Note: We compute the keys using `Rational` for extra precision, then convert to Double to avoid memory issues.
---         We should be doing this with a quadruple precision floating point type to match the Rust code, but support for that is lacking.
-sortitionTable ::
-  StakeFraction ->
-  NetworkRate ->
-  Map Double Word64
-sortitionTable (StakeFraction s) (NetworkRate votes) = Map.fromAscList $ zip (map realToFrac $ scanl (+) 0 foos) [0 .. floor votes]
- where
-  foos = 1 : zipWith (\ii prev -> prev * x / ii) [1 ..] foos
-  x = realToFrac s * realToFrac votes :: Rational
-
 numWins ::
-  Num a =>
   StakeFraction ->
   NetworkRate ->
-  Map Double a ->
   -- | VRF value
   Double ->
-  a
-numWins (StakeFraction sigma) (NetworkRate rate) m p =
-  maybe 0 snd $ Map.lookupLT (realToFrac p / realToFrac (exp $ negate (rate * sigma))) m
+  Word64
+numWins (StakeFraction sigma) (NetworkRate rate) p =
+  case dropWhile ((p >) . snd) [(v, cumulative dist (fromIntegral v)) | v <- [0 ..]] of
+    [] -> error "internal"
+    ((v, _) : _) -> v
+ where
+  dist = poisson (sigma * rate)
 
 -- | Datatype used to mark a sortition closure that should be kept and reused across slots.
 --   `data` rather than `newtype` so setup computations can be triggered by matching.
-data Sortition = Sortition (Double -> Word64)
+data Sortition = Sortition !(Double -> Word64)
 
 sortition :: StakeFraction -> NetworkRate -> Sortition
-sortition stake rate =
-  let
-    !table = sortitionTable stake rate
-   in
-    Sortition (numWins stake rate table)
+sortition stake rate = Sortition (numWins stake rate)
+
+prop_sortition :: StakeFraction -> NetworkRate -> Double -> Bool
+prop_sortition x@(StakeFraction stake) y@(NetworkRate rate) = \p ->
+  let wins = fromIntegral $ f p
+      dist = cumulative (poisson (stake * rate))
+   in (p == 0 || dist (wins - 1) < p) && p <= dist wins
+ where
+  Sortition f = sortition x y

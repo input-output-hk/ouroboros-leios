@@ -25,6 +25,7 @@ import Control.Tracer as Tracer (
  )
 import Data.Bifoldable (Bifoldable (bifoldr))
 import Data.Dynamic (Typeable, fromDynamic)
+import P2P
 import STMCompat
 import SimTypes
 import TimeCompat
@@ -44,7 +45,7 @@ type TcpSimTrace = [(Time, TcpSimEvent)]
 
 data TcpSimEvent
   = -- | Declare the nodes and links
-    TcpSimEventSetup [(NodeId, (Int, Int))] [(NodeId, NodeId)]
+    TcpSimEventSetup [(NodeId, (Int, Int))] [Link]
   | -- | An event at a node
     TcpSimEventNode (LabelNode (NodeEvent TestMessage))
   | -- | An event on a tcp link between two nodes
@@ -191,7 +192,7 @@ traceTcpLinks1 tcpprops trafficPattern =
           [ (NodeId 0, (50, 50))
           , (NodeId 1, (450, 50))
           ]
-          [(NodeId 0, NodeId 1)]
+          [(NodeId 0 :<- NodeId 1)]
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       concurrently_
         (generatorNode (nodeTracer na) trafficPattern inChan)
@@ -229,9 +230,9 @@ traceTcpLinks4 a2bTcpProps b2cTcpProps c2dTcpProps trafficPattern =
           , (NodeId 2, (650, 70))
           , (NodeId 3, (950, 70))
           ]
-          [ (NodeId 0, NodeId 1)
-          , (NodeId 1, NodeId 2)
-          , (NodeId 2, NodeId 3)
+          [ (NodeId 0 :<- NodeId 1)
+          , (NodeId 1 :<- NodeId 2)
+          , (NodeId 2 :<- NodeId 3)
           ]
       (a2bInChan, a2bOutChan) <- newConnectionTCP (linkTracer na nb) a2bTcpProps
       (b2cInChan, b2cOutChan) <- newConnectionTCP (linkTracer nb nc) b2cTcpProps

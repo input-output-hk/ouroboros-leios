@@ -35,7 +35,7 @@ import LeiosProtocol.Short.Node (BlockEvent (..), LeiosEventBlock (..), LeiosMes
 import LeiosProtocol.Short.Sim (LeiosEvent (..), LeiosTrace, exampleTrace1)
 import ModelTCP
 import Network.TypedProtocol
-import P2P (linkPathLatenciesSquared)
+import P2P (Link, linkPathLatenciesSquared, pattern (:<-))
 import PraosProtocol.BlockFetch (Message (MsgBlock))
 import PraosProtocol.ChainSync (Message (MsgRollForward_StCanAwait, MsgRollForward_StMustReply))
 import PraosProtocol.PraosNode (PraosMessage (..))
@@ -102,7 +102,7 @@ data LeiosSimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
   , vizNodeStakes :: !(Map NodeId StakeFraction)
-  , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
+  , vizNodeLinks :: !(Map Link LinkPoints)
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
@@ -324,7 +324,7 @@ leiosSimVizModel LeiosModelConfig{recentSpan} =
       , vizNodeStakes = stakes
       , vizNodeLinks =
           Map.fromSet
-            ( \(n1, n2) ->
+            ( \(n1 :<- n2) ->
                 linkPoints
                   shape
                   (nodes Map.! n1)
@@ -779,7 +779,7 @@ leiosSimVizRenderModel
      where
       linksAndMsgs =
         [ (fromPos, toPos, msgs)
-        | (fromNode, toNode) <- Map.keys vizNodeLinks
+        | (fromNode :<- toNode) <- Map.keys vizNodeLinks
         , let (fromPos, toPos) =
                 translateLineNormal
                   displace
@@ -790,7 +790,7 @@ leiosSimVizRenderModel
               -- so they don't overlap each other, but for unidirectional
               -- links we can draw it centrally.
               displace
-                | Map.notMember (toNode, fromNode) vizNodeLinks = 0
+                | Map.notMember (toNode :<- fromNode) vizNodeLinks = 0
                 | otherwise = -10
 
               msgs =

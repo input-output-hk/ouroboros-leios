@@ -23,7 +23,7 @@ export const Canvas: FC = () => {
   } = useSimContext();
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
-  const pointerCapture = useRef<number>();
+  const pointerCapture = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const canvas = canvasRef.current;

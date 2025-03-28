@@ -20,6 +20,7 @@ import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short (LeiosConfig (..), convertConfig)
 import LeiosProtocol.Short.Node
 import LeiosProtocol.Short.Sim
+import P2P
 import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
@@ -50,39 +51,20 @@ traceLeiosP2P
             p2pNodes
             p2pNodeStakes
             (Map.keysSet p2pLinks)
-        tcplinks <-
-          sequence
-            [ do
-              (inChan, outChan) <-
-                newConnectionBundle @Leios
-                  (linkTracer na nb)
-                  (tcpprops (realToFrac latency) bandwidth)
-              return ((na, nb), (inChan, outChan))
-            | ((na, nb), (latency, bandwidth)) <- Map.toList p2pLinks
-            ]
-        let tcplinksInChan =
-              Map.fromListWith
-                (++)
-                [ (nfrom, [inChan])
-                | ((nfrom, _nto), (inChan, _outChan)) <- tcplinks
-                ]
-            tcplinksOutChan =
-              Map.fromListWith
-                (++)
-                [ (nto, [outChan])
-                | ((_nfrom, nto), (_inChan, outChan)) <- tcplinks
-                ]
-        -- Note that the incomming edges are the output ends of the
-        -- channels and vice versa. That's why it looks backwards.
 
+        (chansToDownstream :<- chansToUpstream) <-
+          traverseLinks p2pLinks $ \na nb (latency, bandwidth) ->
+            newConnectionBundle @Leios
+              (linkTracer na nb)
+              (tcpprops (realToFrac latency) bandwidth)
         -- Nested children threads are slow with IOSim, this impl forks them all as direct children.
         mapM_
           (\m -> mapM_ forkIO =<< m)
           [ leiosNode
             (nodeTracer nid)
             (leiosNodeConfig slotConfig nid rng)
-            (Map.findWithDefault [] nid tcplinksInChan)
-            (Map.findWithDefault [] nid tcplinksOutChan)
+            (Map.findWithDefault [] nid chansToDownstream)
+            (Map.findWithDefault [] nid chansToUpstream)
           | (nid, rng) <-
               zip
                 (Map.keys p2pNodes)

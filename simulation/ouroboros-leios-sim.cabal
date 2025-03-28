@@ -38,6 +38,7 @@ library
   default-extensions:
     DisambiguateRecordFields
     OverloadedRecordDot
+    PatternSynonyms
     ScopedTypeVariables
 
   exposed-modules:
@@ -67,7 +68,6 @@ library
     LeiosProtocol.SimTestRelay
     LeiosProtocol.VizSimTestRelay
     ModelTCP
-    JSONCompat
     P2P
     PlotTCP
     PraosProtocol.BlockFetch
@@ -152,6 +152,7 @@ library
     , si-timers
     , singletons
     , sqlite-simple              >=0.4
+    , statistics
     , temporary
     , text
     , time
@@ -203,6 +204,7 @@ test-suite ols-test
     , directory
     , fgl
     , fgl-arbitrary
+    , leios-trace-hs
     , ouroboros-leios-sim
     , QuickCheck
     , random

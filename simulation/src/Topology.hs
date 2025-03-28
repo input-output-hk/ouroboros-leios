@@ -21,8 +21,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
-module Topology where
+module Topology (
+  module LeiosTopology,
+  module Topology,
+)
+where
 
 import Codec.Compression.GZip as GZip (decompress)
 import Control.Arrow (Arrow ((&&&)), second)
@@ -30,10 +35,9 @@ import Control.Exception (Exception (displayException), assert)
 import Control.Monad (forM_, guard, unless, (<=<))
 import Data.Aeson (withObject)
 import qualified Data.Aeson as Json
-import qualified Data.Aeson.KeyMap as KeyMap
-import Data.Aeson.Types (Encoding, FromJSON (..), FromJSONKey, KeyValue ((.=)), Options (..), Parser, ToJSON (..), ToJSONKey, Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, pairs, typeMismatch, (.!=), (.:), (.:?))
+import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), Options (..), Parser, ToJSON (..), Value (..), defaultOptions, genericParseJSON, genericToEncoding, object, (.!=), (.:?))
 import qualified Data.ByteString.Lazy as BSL
-import Data.Coerce (Coercible, coerce)
+import Data.Coerce (coerce)
 import Data.Default (Default (..))
 import Data.Function (on)
 import qualified Data.Graph.Inductive.Graph as G
@@ -48,7 +52,7 @@ import Data.List (sort, sortBy, uncons)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
@@ -61,314 +65,23 @@ import qualified Database.SQLite.Simple as SQLlite
 import qualified Database.SQLite.Simple.ToField as SQLite (ToField)
 import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
-import JSONCompat (Getter, always, get, omitDefault, parseField, parseFieldOrDefault)
+import LeiosTopology
 import ModelTCP (Bytes, kilobytes)
-import P2P (Latency, P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography)
+import P2P (Latency, Link, Link' (..), P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography, pattern (:<-))
 import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
 import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose, hPutStrLn, stderr)
 import System.IO.Temp (withTempFile)
 import System.Random (RandomGen)
-import Text.Printf (PrintfArg, printf)
+import Text.Printf (printf)
 
---------------------------------------------------------------------------------
--- Node Properties
---------------------------------------------------------------------------------
-
-newtype NodeName = NodeName {unNodeName :: Text}
-  deriving newtype (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON, FromJSONKey, ToJSONKey)
-  deriving newtype (GVT.PrintDot)
-  deriving newtype (SQLite.ToField)
-  deriving newtype (PrintfArg)
-
--- | A cluster name.
-newtype ClusterName = ClusterName {unClusterName :: Text}
-  deriving stock (Show, Eq, Ord)
-  deriving newtype (FromJSON, ToJSON)
-
--- | Connection bandwidth, measured in bytes per second.
-newtype BandwidthBps = BandwidthBps {unBandwidthBps :: Maybe Word}
-  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON)
-
-instance Default BandwidthBps where
-  def = Unbounded
-
--- | The number of CPU cores.
-newtype CpuCoreCount = CpuCoreCount {unCpuCoreCount :: Maybe Word}
-  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON)
-
-instance Default CpuCoreCount where
-  def = Unbounded
-
--- | Connection latency, measured in milliseconds per trip.
-newtype LatencyMs = LatencyMs {unLatencyMs :: Double}
-  deriving newtype (Show, Eq, Ord, FromJSON, ToJSON, Num, Real, RealFrac, Fractional)
-
-pattern Unbounded :: forall a. Coercible a (Maybe Word) => a
-pattern Unbounded <- (coerce @a @(Maybe Word) -> Nothing)
-  where
-    Unbounded = coerce @(Maybe Word) @a Nothing
-{-# INLINE Unbounded #-}
-
-pattern Bounded :: forall a. Coercible a (Maybe Word) => Word -> a
-pattern Bounded w <- (coerce @a @(Maybe Word) -> Just w)
-  where
-    Bounded w = coerce @(Maybe Word) @a (Just w)
-{-# INLINE Bounded #-}
-
-{-# COMPLETE Unbounded, Bounded #-}
-
---------------------------------------------------------------------------------
--- Location
---------------------------------------------------------------------------------
-
-data LocationKind = CLUSTER | COORD2D
-
-data Location (lk :: LocationKind) where
-  LocCluster :: {clusterName :: {-# UNPACK #-} !(Maybe ClusterName)} -> Location CLUSTER
-  LocCoord2D :: {coord2D :: {-# UNPACK #-} !Point} -> Location COORD2D
-
-deriving instance Show (Location lk)
-deriving instance Eq (Location lk)
-
-instance ToJSON (Location lk) where
-  toJSON :: Location lk -> Value
-  toJSON (LocCluster clusterName) = object ["cluster" .= clusterName]
-  toJSON (LocCoord2D coord2d) = toJSON [coord2d._1, coord2d._2]
-
-  toEncoding :: Location lk -> Encoding
-  toEncoding (LocCluster clusterName) = pairs ("cluster" .= clusterName)
-  toEncoding (LocCoord2D coord2d) = toEncoding [coord2d._1, coord2d._2]
-
-instance FromJSON (Location 'CLUSTER) where
-  parseJSON :: Value -> Parser (Location 'CLUSTER)
-  parseJSON = withObject "Cluster" $ \o -> do
-    clusterName <- o .: "cluster"
-    pure $ LocCluster clusterName
-
-instance FromJSON (Location 'COORD2D) where
-  parseJSON :: Value -> Parser (Location 'COORD2D)
-  parseJSON (Array (V.toList -> [x, y])) =
-    LocCoord2D <$> (Point <$> parseJSON x <*> parseJSON y)
-  parseJSON value = typeMismatch "Coord2D" value
-
---------------------------------------------------------------------------------
--- Topology
---
--- As provided in 'data/simulation/topology-dense-52.json'.
---------------------------------------------------------------------------------
-
-data SLocationKind (lk :: LocationKind) where
-  SCLUSTER :: SLocationKind 'CLUSTER
-  SCOORD2D :: SLocationKind 'COORD2D
-
-data SomeTopology = forall lk. SomeTopology (SLocationKind lk) (Topology lk)
-
-instance ToJSON SomeTopology where
-  toJSON :: SomeTopology -> Value
-  toJSON (SomeTopology SCLUSTER clusterTopology) = toJSON clusterTopology
-  toJSON (SomeTopology SCOORD2D coord2DTopology) = toJSON coord2DTopology
-
-  toEncoding :: SomeTopology -> Encoding
-  toEncoding (SomeTopology SCLUSTER clusterTopology) = toEncoding clusterTopology
-  toEncoding (SomeTopology SCOORD2D coord2DTopology) = toEncoding coord2DTopology
-
-instance FromJSON SomeTopology where
-  parseJSON :: Value -> Parser SomeTopology
-  parseJSON v =
-    if isTopologyCoord2D v
-      then SomeTopology SCOORD2D <$> parseJSON v
-      else SomeTopology SCLUSTER <$> parseJSON v
-
-isTopologyCoord2D :: Value -> Bool
-isTopologyCoord2D v =
-  case v of
-    Object o ->
-      case KeyMap.lookup "nodes" o of
-        Just (Object nodes) ->
-          case KeyMap.elems nodes of
-            (Object node : _nodes) ->
-              case KeyMap.lookup "location" node of
-                Just loc
-                  | Json.Success{} <- Json.fromJSON @(Location 'COORD2D) loc ->
-                      True
-                Just loc
-                  | Json.Success{} <- Json.fromJSON @(Location 'CLUSTER) loc ->
-                      False
-                _otherwise ->
-                  error "Unrecognized location"
-            [] -> False
-            _otherwise -> error "Unrecognized topology.nodes contents"
-        _otherwise -> error "Unrecognized topology.nodes"
-    _otherwise -> error "Unrecognized topology"
-
-newtype Topology lk = Topology
-  { nodes :: Map NodeName (Node lk)
-  }
-  deriving stock (Show, Eq, Generic)
-
-instance HasField "stake" (Topology lk) Word where
-  getField :: Topology lk -> Word
-  getField topology = sum ((.stake) <$> M.elems topology.nodes)
-
-data Node (lk :: LocationKind) = Node
-  { nodeInfo :: !(NodeInfo lk)
-  , producers :: !(Map NodeName LinkInfo)
-  }
-  deriving stock (Show, Eq, Generic)
-
-instance HasField "stake" (Node lk) Word where
-  getField :: Node lk -> Word
-  getField node = node.nodeInfo.stake
-
-instance HasField "cpuCoreCount" (Node lk) CpuCoreCount where
-  getField :: Node lk -> CpuCoreCount
-  getField node = node.nodeInfo.cpuCoreCount
-
-instance HasField "location" (Node lk) (Location lk) where
-  getField :: Node lk -> Location lk
-  getField node = node.nodeInfo.location
-
-instance HasField "coord2D" (Node 'COORD2D) Point where
-  getField :: Node 'COORD2D -> Point
-  getField node = node.nodeInfo.location.coord2D
-
-instance Default (Node 'CLUSTER) where
-  def :: Node 'CLUSTER
-  def = Node{nodeInfo = def, producers = mempty}
-
-data NodeInfo (lk :: LocationKind) = NodeInfo
-  { stake :: {-# UNPACK #-} !Word
-  , cpuCoreCount :: {-# UNPACK #-} !CpuCoreCount
-  , location :: !(Location lk)
-  }
-  deriving stock (Show, Eq, Generic)
-
-instance HasField "coord2D" (NodeInfo 'COORD2D) Point where
-  getField :: NodeInfo 'COORD2D -> Point
-  getField nodeInfo = nodeInfo.location.coord2D
-
-instance Default (NodeInfo 'CLUSTER) where
-  def :: NodeInfo 'CLUSTER
-  def =
-    NodeInfo
-      { stake = 0
-      , cpuCoreCount = Unbounded
-      , location = LocCluster Nothing
-      }
-
-data LinkInfo = LinkInfo
-  { latencyMs :: !LatencyMs
-  , bandwidthBytesPerSecond :: !BandwidthBps
-  }
-  deriving stock (Show, Eq, Generic)
+deriving newtype instance GVT.PrintDot NodeName
+deriving newtype instance SQLite.ToField NodeName
 
 instance HasField "latencyS" LinkInfo Latency where
   getField :: LinkInfo -> Latency
   getField linkInfo = linkInfo.latencyMs.unLatencyMs / 1000
-
-instance Default LinkInfo where
-  def :: LinkInfo
-  def =
-    LinkInfo
-      { latencyMs = 0
-      , bandwidthBytesPerSecond = Unbounded
-      }
-
-topologyOptions :: Options
-topologyOptions = defaultOptions{unwrapUnaryRecords = False, omitNothingFields = True}
-
-nodeToKVs :: (ToJSON (Location lk), KeyValue e kv) => Getter (Node lk) -> Node lk -> [kv]
-nodeToKVs getter node =
-  catMaybes
-    [ get @"stake" getter node
-    , get @"cpuCoreCount" getter node
-    , get @"location" getter node
-    , get @"producers" getter node
-    ]
-
-instance ToJSON (Node 'CLUSTER) where
-  toJSON :: Node 'CLUSTER -> Value
-  toJSON = object . nodeToKVs omitDefault
-
-  toEncoding :: Node 'CLUSTER -> Encoding
-  toEncoding = pairs . mconcat . nodeToKVs omitDefault
-
-instance ToJSON (Node 'COORD2D) where
-  toJSON :: Node 'COORD2D -> Value
-  toJSON = object . nodeToKVs always
-
-  toEncoding :: Node 'COORD2D -> Encoding
-  toEncoding = pairs . mconcat . nodeToKVs always
-
-instance FromJSON (Node 'CLUSTER) where
-  parseJSON :: Value -> Parser (Node 'CLUSTER)
-  parseJSON = withObject "Node" $ \obj -> do
-    stake <- parseFieldOrDefault @(Node 'CLUSTER) @"stake" obj
-    cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
-    location <- parseFieldOrDefault @(Node 'CLUSTER) @"location" obj
-    producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
-    pure Node{nodeInfo = NodeInfo{..}, ..}
-
-instance FromJSON (Node 'COORD2D) where
-  parseJSON :: Value -> Parser (Node 'COORD2D)
-  parseJSON = withObject "Node" $ \obj -> do
-    -- NOTE: There is no default instance for @NodeInfo 'COORD2D@. Hence, this
-    --       function uses the default instance for @NodeInfo 'CLUSTER@, which
-    --       admittedly looks a bit shady.
-    stake <- parseFieldOrDefault @(NodeInfo 'CLUSTER) @"stake" obj
-    cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
-    location <- parseField @(Node 'COORD2D) @"location" obj
-    producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
-    pure Node{nodeInfo = NodeInfo{..}, ..}
-
-linkInfoToKVs :: KeyValue e kv => Getter LinkInfo -> LinkInfo -> [kv]
-linkInfoToKVs getter link =
-  catMaybes
-    [ get @"latencyMs" getter link
-    , get @"bandwidthBytesPerSecond" getter link
-    ]
-
-instance ToJSON LinkInfo where
-  toJSON :: LinkInfo -> Value
-  toJSON = object . linkInfoToKVs omitDefault
-
-  toEncoding :: LinkInfo -> Encoding
-  toEncoding = pairs . mconcat . linkInfoToKVs omitDefault
-
-instance FromJSON LinkInfo where
-  parseJSON :: Value -> Parser LinkInfo
-  parseJSON = withObject "LinkInfo" $ \obj -> do
-    latencyMs <- parseField @LinkInfo @"latencyMs" obj
-    bandwidthBytesPerSecond <- parseFieldOrDefault @LinkInfo @"bandwidthBytesPerSecond" obj
-    pure LinkInfo{..}
-
-topologyToKVs :: (ToJSON (Node lk), KeyValue e kv) => Getter (Topology lk) -> Topology lk -> [kv]
-topologyToKVs getter topology = catMaybes [get @"nodes" getter topology]
-
-instance ToJSON (Topology 'CLUSTER) where
-  toJSON :: Topology 'CLUSTER -> Value
-  toJSON = object . topologyToKVs always
-
-  toEncoding :: Topology 'CLUSTER -> Encoding
-  toEncoding = pairs . mconcat . topologyToKVs always
-
-instance ToJSON (Topology 'COORD2D) where
-  toJSON :: Topology 'COORD2D -> Value
-  toJSON = object . topologyToKVs always
-
-  toEncoding :: Topology 'COORD2D -> Encoding
-  toEncoding = pairs . mconcat . topologyToKVs always
-
-instance FromJSON (Topology 'CLUSTER) where
-  parseJSON :: Value -> Parser (Topology CLUSTER)
-  parseJSON = genericParseJSON topologyOptions
-
-instance FromJSON (Topology 'COORD2D) where
-  parseJSON :: Value -> Parser (Topology COORD2D)
-  parseJSON = genericParseJSON topologyOptions
 
 --------------------------------------------------------------------------------
 -- Convert between BenchTopology and Topology 'CLUSTER
@@ -438,7 +151,21 @@ someTopologyToGrCoord2D params = \case
   SomeTopology SCLUSTER topology -> layoutGr params $ topologyToGr topology
   SomeTopology SCOORD2D topology -> pure $ topologyToGr topology
 
+linkToEdge :: Link -> a -> G.LEdge a
+linkToEdge Link{..} x = (coerce upstream, coerce downstream, x)
+
+edgeToLink :: G.LEdge a -> (Link, a)
+edgeToLink (producer, consumer, x) =
+  ( Link
+      { upstream = NodeId producer
+      , downstream = NodeId consumer
+      }
+  , x
+  )
+
 -- | Convert 'Topology' to an FGL 'Gr'.
+--
+--   edges are in '(producer, consumer, info)' format, c.f. 'linkToEdge'/'edgeToLink' .
 topologyToGr :: Topology lk -> Gr (NodeName, NodeInfo lk) LinkInfo
 topologyToGr topology = G.mkGraph grNodes grLinks
  where
@@ -609,7 +336,7 @@ data P2PNetwork = P2PNetwork
   , p2pNodeNames :: !(Map NodeId Text)
   , p2pNodeCores :: !(Map NodeId NumCores)
   , p2pNodeStakes :: !(Map NodeId StakeFraction)
-  , p2pLinks :: !(Map (NodeId, NodeId) (Latency, Maybe BandwidthBytesPerSecond))
+  , p2pLinks :: !(Map Link (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -644,8 +371,8 @@ grToP2PNetwork p2pWorld gr = P2PNetwork{..}
       ]
   edgeInfoMap =
     M.fromList
-      [ ((NodeId grNode1, NodeId grNode2), latency)
-      | (grNode1, grNode2, latency) <- G.labEdges gr
+      [ edgeToLink e
+      | e <- G.labEdges gr
       ]
   p2pNodes = Map.map ((.coord2D) . snd) nodeInfoMap
   p2pNodeNames = Map.map (coerce . fst) nodeInfoMap
@@ -669,8 +396,8 @@ p2pNetworkToGr totalStake P2PNetwork{..} = G.mkGraph grNodes grLinks
     , let location = LocCoord2D point
     ]
   grLinks =
-    [ (coerce n, coerce m, linkInfo)
-    | ((n, m), (latency, bw)) <- M.toList p2pLinks
+    [ linkToEdge link linkInfo
+    | (link, (latency, bw)) <- M.toList p2pLinks
     , let linkInfo =
             LinkInfo
               { latencyMs = LatencyMs $ latency * 1000
@@ -711,8 +438,8 @@ p2pTopologyToGr P2PTopography{..} = G.mkGraph nodes edges
     | (NodeId grNode, point) <- M.assocs p2pNodes
     ]
   edges =
-    [ (grNode1, grNode2, latencyInSeconds)
-    | ((NodeId grNode1, NodeId grNode2), latencyInSeconds) <- M.assocs p2pLinks
+    [ linkToEdge link latencyInSeconds
+    | (link, latencyInSeconds) <- M.assocs p2pLinks
     ]
 
 readP2PTopographyFromSomeTopology ::
@@ -864,17 +591,17 @@ readLatenciesSqlite3 topology latencySqliteFile = do
         _otherwise -> error "impossible: SQL query for average returned multiple rows"
   readIORef latenciesRef
 
-type LinkLatency = ((NodeId, NodeId), Latency)
+type LinkLatency = (Link, Latency)
 
 -- | Returns nodes failing the expected triangle inequality for latencies.
-triangleInequalityCheck :: Map (NodeId, NodeId) Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
+triangleInequalityCheck :: Map Link Latency -> [(LinkLatency, LinkLatency, LinkLatency)]
 triangleInequalityCheck mls = do
   let ls = Map.toList mls
-  l1@((s, t), st) <- ls
-  l2@((s', middle), sm) <- ls
+  l1@((s :<- t), st) <- ls
+  l2@((s' :<- middle), sm) <- ls
   guard (s' == s)
-  Just mt <- pure $ Map.lookup (middle, t) mls
-  let l3 = ((middle, t), mt)
+  Just mt <- pure $ Map.lookup (middle :<- t) mls
+  let l3 = ((middle :<- t), mt)
   guard (st > (sm + mt))
   return (l1, l2, l3)
 

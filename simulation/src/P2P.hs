@@ -3,14 +3,16 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module P2P where
 
+import Control.Applicative ((<|>))
 import Control.Exception (assert)
 import Control.Monad (when)
 import Control.Monad.ST (ST)
-import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), ToJSON (..), defaultOptions, genericToEncoding, object, withObject, (.!=), (.:?))
+import Data.Aeson.Types (FromJSON (..), FromJSONKey, KeyValue ((.=)), ToJSON (..), ToJSONKey, defaultOptions, genericToEncoding, object, withObject, (.!=), (.:?))
 import Data.Array.ST as Array (
   Ix (range),
   MArray (newArray),
@@ -26,23 +28,72 @@ import qualified Data.KdMap.Static as KdMap
 import Data.List (mapAccumL, sortOn, unfoldr)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Maybe
 import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import SimTypes (NodeId (..), Point (..), World (..), WorldShape (..))
 import qualified System.Random as Random
 import TimeCompat
 
+data Link' a = Link {downstream :: !a, upstream :: !a}
+  deriving (Eq, Ord, Show, Generic)
+type Link = Link' NodeId
+
+pattern (:<-) :: a -> a -> Link' a
+pattern (:<-) d u = Link{downstream = d, upstream = u}
+{-# COMPLETE (:<-) #-}
+
 data P2PTopography = P2PTopography
   { p2pNodes :: !(Map NodeId Point)
-  , p2pLinks :: !(Map (NodeId, NodeId) Latency)
+  , p2pLinks :: !(Map Link Latency)
   , p2pWorld :: !World
   }
   deriving (Eq, Show, Generic)
+
+instance ToJSON a => ToJSON (Link' a) where
+  toJSON (Link a b) = toJSON (a, b)
+  toEncoding (Link a b) = toEncoding (a, b)
+
+instance FromJSON a => FromJSON (Link' a) where
+  parseJSON = (fmap . uncurry) Link . parseJSON
+
+instance ToJSON a => ToJSONKey (Link' a)
+instance FromJSON a => FromJSONKey (Link' a)
 
 instance ToJSON P2PTopography where
   toEncoding = genericToEncoding defaultOptions
 
 instance FromJSON P2PTopography
+
+-- | Communication over links is bidirectional, so it's useful to look
+-- up link information without knowing which end is upstream.
+(!!!) :: (Ord k, HasCallStack) => Map (Link' k) a -> (k, k) -> a
+(!!!) m (nid, nid') =
+  fromMaybe undefined $
+    Map.lookup (Link nid nid') m <|> Map.lookup (Link nid' nid) m
+
+traverseLinks :: (Ord k, Monad m) => Map.Map (Link' k) t -> (k -> k -> t -> m (c, c)) -> m (Link' (Map.Map k [c]))
+traverseLinks p2pLinks newConn = do
+  tcplinks <-
+    sequence
+      [ do
+        (aChan, bChan) <- newConn na nb info
+        return ((na :<- nb), (aChan :<- bChan))
+      | ((na :<- nb), info) <- Map.toList p2pLinks
+      ]
+  let chansToUpstream =
+        Map.fromListWith
+          (++)
+          [ (down, [downEnd])
+          | (down :<- _, (downEnd :<- _)) <- tcplinks
+          ]
+      chansToDownstream =
+        Map.fromListWith
+          (++)
+          [ (up, [upEnd])
+          | (_ :<- up, (_ :<- upEnd)) <- tcplinks
+          ]
+  return (chansToDownstream :<- chansToUpstream)
 
 -- | Latency in /seconds/.
 --
@@ -142,10 +193,10 @@ genArbitraryP2PTopography
         (x, !rng') = Random.uniformR (0, widthSeconds) rng
         (y, !rng'') = Random.uniformR (0, heightSeconds) rng'
 
-    nodeLinks :: Map (NodeId, NodeId) Latency
+    nodeLinks :: Map Link Latency
     nodeLinks =
       Map.fromList
-        [ ((nid, nid'), latency)
+        [ ((nid :<- nid'), latency)
         | (nid, rng) <- zip nodes (unfoldr (Just . Random.split) rngLinks)
         , let p = nodePositions Map.! nid
         , nid' <-
@@ -288,7 +339,7 @@ p2pGraphIdealDiffusionTimes
           p2pGraph
           ( \(a, b) ->
               let linkLatency :: Latency
-                  linkLatency = p2pLinks Map.! (NodeId a, NodeId b)
+                  linkLatency = p2pLinks !!! (NodeId a, NodeId b)
                   msgLatency :: DiffTime
                   msgLatency =
                     communicationDelay
@@ -303,7 +354,7 @@ p2pGraphIdealDiffusionTimes
     p2pGraph =
       Graph.buildG
         (0, Map.size p2pNodes - 1)
-        [(a, b) | (NodeId a, NodeId b) <- Map.keys p2pLinks]
+        [(a, b) | (NodeId a :<- NodeId b) <- Map.keys p2pLinks]
 
 allPairsMinWeights ::
   Graph ->

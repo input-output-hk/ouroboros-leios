@@ -493,7 +493,7 @@ idealDiffusionTimes p2pNetwork@P2PNetwork{p2pLinks} BlockDiffusionConfig{..} =
  where
   communicationDelay n1 n2 = latency * realToFrac hops + serialization
    where
-    (secondsToDiffTime -> latency, bandwidth) = fromMaybe undefined (Map.lookup (n1, n2) p2pLinks)
+    (secondsToDiffTime -> latency, bandwidth) = fromMaybe undefined (Map.lookup (n1 :<- n2) p2pLinks)
     serialization = case bandwidth of
       Nothing -> 0
       Just bps -> secondsToDiffTime $ realToFrac size / realToFrac bps
@@ -636,7 +636,7 @@ reportOnTopology prefixDir P2PNetwork{..} = do
           [ (d, Links{upstream = [u], downstream = []})
           , (u, Links{upstream = [], downstream = [d]})
           ]
-  let links = Map.fromListWith (<>) $ concat [mkLinks d u | (d, u) <- Map.keys p2pLinks]
+  let links = Map.fromListWith (<>) $ concat [mkLinks d u | (d :<- u) <- Map.keys p2pLinks]
   let mkCsv f = unlines . map (show . getSum . f) $ Map.elems links
   writeFile (prefixDir </> "downcounts.csv") $ mkCsv (.downstream)
   writeFile (prefixDir </> "upcounts.csv") $ mkCsv (.upstream)

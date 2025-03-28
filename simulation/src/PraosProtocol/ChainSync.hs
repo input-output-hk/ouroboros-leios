@@ -116,7 +116,7 @@ instance MessageSize (Message ChainSyncState st st') where
     MsgRollBackward_StCanAwait pt tip -> messageSizeBytes pt + messageSizeBytes tip
     MsgRollForward_StMustReply hdr tip -> messageSizeBytes hdr + messageSizeBytes tip
     MsgRollBackward_StMustReply pt tip -> messageSizeBytes pt + messageSizeBytes tip
-    MsgFindIntersect pts -> sum (messageSizeBytes <$> pts)
+    MsgFindIntersect pts -> 1 + sum (messageSizeBytes <$> pts)
     MsgIntersectFound pt tip -> messageSizeBytes pt + messageSizeBytes tip
     MsgIntersectNotFound tip -> messageSizeBytes tip
     MsgDone -> 1

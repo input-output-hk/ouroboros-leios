@@ -17,7 +17,7 @@ import LeiosProtocol.Relay (Message (MsgRespondBodies), relayMessageLabel)
 import LeiosProtocol.SimTestRelay
 import ModelTCP
 import Network.TypedProtocol (SomeMessage (..))
-import P2P (linkPathLatenciesSquared)
+import P2P (Link, linkPathLatenciesSquared, pattern (:<-))
 import SimTypes
 import System.Random (mkStdGen)
 import System.Random.Stateful (uniform)
@@ -124,7 +124,7 @@ type RelaySimVizModel =
 data RelaySimVizState = RelaySimVizState
   { vizWorld :: !World
   , vizNodePos :: !(Map NodeId Point)
-  , vizNodeLinks :: !(Map (NodeId, NodeId) LinkPoints)
+  , vizNodeLinks :: !(Map Link LinkPoints)
   , vizMsgsInTransit ::
       !( Map
           (NodeId, NodeId)
@@ -201,7 +201,7 @@ relaySimVizModel =
       , vizNodePos = nodes
       , vizNodeLinks =
           Map.fromSet
-            ( \(n1, n2) ->
+            ( \(n1 :<- n2) ->
                 linkPoints
                   shape
                   (nodes Map.! n1)
@@ -521,7 +521,7 @@ relaySimVizRenderModel
      where
       linksAndMsgs =
         [ (fromPos, toPos, msgs)
-        | (fromNode, toNode) <- Map.keys vizNodeLinks
+        | (fromNode :<- toNode) <- Map.keys vizNodeLinks
         , let (fromPos, toPos) =
                 translateLineNormal
                   displace
@@ -532,7 +532,7 @@ relaySimVizRenderModel
               -- so they don't overlap each other, but for unidirectional
               -- links we can draw it centrally.
               displace
-                | Map.notMember (toNode, fromNode) vizNodeLinks = 0
+                | Map.notMember (toNode :<- fromNode) vizNodeLinks = 0
                 | otherwise = -10
 
               msgs =

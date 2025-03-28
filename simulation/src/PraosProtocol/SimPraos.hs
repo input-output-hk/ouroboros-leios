@@ -23,6 +23,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
+import P2P
 import PraosProtocol.Common hiding (Point)
 import PraosProtocol.PraosNode (PraosMessage, runPraosNode)
 import SimTCPLinks
@@ -35,7 +36,7 @@ data PraosEvent
     PraosEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
-      !(Set (NodeId, NodeId)) -- links between nodes
+      !(Set Link) -- links between nodes
   | -- | An event at a node
     PraosEventNode (LabelNode (PraosNodeEvent BlockBody))
   | -- | An event on a tcp link between two nodes
@@ -63,11 +64,11 @@ traceRelayLink1 connectionConfig =
               ]
           )
           ( Set.fromList
-              [(nodeA, nodeB), (nodeB, nodeA)]
+              [(nodeA :<- nodeB), (nodeB :<- nodeA)]
           )
       let praosConfig = defaultPraosConfig
       let chainA =
-            mkChainSimple $
+            mkChainSimple praosConfig.headerSize $
               [ fix $ \b -> BlockBody (BS.singleton word) (praosConfig.bodySize b)
               | word <- [0 .. 9]
               ]

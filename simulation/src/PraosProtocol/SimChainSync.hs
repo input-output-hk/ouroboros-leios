@@ -24,6 +24,7 @@ import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import ModelTCP (mkTcpConnProps)
+import P2P
 import PraosProtocol.ChainSync (
   ChainConsumerState (..),
   ChainSyncState,
@@ -47,7 +48,7 @@ data ChainSyncEvent
     ChainSyncEventSetup
       !World
       !(Map NodeId Point) -- nodes and locations
-      !(Set (NodeId, NodeId)) -- links between nodes
+      !(Set Link) -- links between nodes
   | -- | An event at a node
     ChainSyncEventNode (LabelNode ChainSyncNodeEvent)
   | -- | An event on a tcp link between two nodes
@@ -78,7 +79,7 @@ traceRelayLink1 tcpprops =
               ]
           )
           ( Set.fromList
-              [(NodeId 0, NodeId 1), (NodeId 1, NodeId 0)]
+              [(NodeId 0 :<- NodeId 1), (NodeId 1 :<- NodeId 0)]
           )
       (inChan, outChan) <- newConnectionTCP (linkTracer na nb) tcpprops
       let praosConfig = defaultPraosConfig
@@ -93,7 +94,7 @@ traceRelayLink1 tcpprops =
     let nullTracer = Tracer $ const $ return ()
     runChainConsumer nullTracer cfg chan st
   producerNode chan = do
-    let chain = mkChainSimple $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
+    let chain = mkChainSimple (kilobytes 1) $ [BlockBody (BS.pack [i]) (kilobytes 95) | i <- [0 .. 10]]
     let (cps, fId) = initFollower GenesisPoint $ initChainProducerState chain
     st <- newTVarIO cps
     runChainProducer chan fId st

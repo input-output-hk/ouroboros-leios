@@ -104,7 +104,7 @@ export interface ISimulationIntermediateDataState {
 }
 
 export interface IGraphContextState {
-  canvasRef: RefObject<HTMLCanvasElement>;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
   canvasScale: number;
   canvasOffsetX: number;
   canvasOffsetY: number;
