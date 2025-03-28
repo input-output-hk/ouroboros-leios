@@ -1,0 +1,3572 @@
+nodes:
+  node-0:
+    cpu-core-count: 100
+    location:
+    - 0.12000040231003672
+    - 0.1631004621065356
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 141.01364015418432
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.62497828351891
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 225.06983448726078
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.5019621348724
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 12.471543415214697
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 260.93846644222566
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 129.91354711385455
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 390.7853532439275
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.82256110618355
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.269054565504064
+    stake: 100
+  node-1:
+    cpu-core-count: 100
+    location:
+    - 0.34276660615051174
+    - 0.2636899791034371
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 75.32530255486684
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 379.1167948193313
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 297.71308514863125
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.88481152791793
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 22.209559018501917
+      node-55:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 72.8035751809645
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 255.593573989363
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.08110914781949
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 162.47000749653887
+    stake: 100
+  node-10:
+    cpu-core-count: 100
+    location:
+    - 0.5150493264153491
+    - 0.27873594531347595
+    producers:
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 348.31457793649423
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 538.7874533654857
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.647123754807346
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 67.96355817728897
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 77.36296679488254
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.54530884493929
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 73.68841180182851
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 402.38425148478103
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 189.57830299638397
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 313.8463518143765
+    stake: 100
+  node-11:
+    cpu-core-count: 100
+    location:
+    - 0.3503537969220088
+    - 0.13879558055660354
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 160.75145032586968
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.19739576271447
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.949414146629483
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 5.072395950456049
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.54199513732768
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 139.55082847187765
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.03237051327406
+    stake: 100
+  node-12:
+    cpu-core-count: 100
+    location:
+    - 0.17160538356671576
+    - 0.22069024501050108
+    producers:
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.57623219035796
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.42527025492748
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 15.285711505360895
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 278.01330553664525
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 92.99313560279073
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 427.5095629201551
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.68310964112492
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.3886565871724
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 395.96606387880064
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 214.5032221062537
+    stake: 100
+  node-13:
+    cpu-core-count: 100
+    location:
+    - 0.42895829027753934
+    - 0.27901812655470937
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 87.54403758646986
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 86.09149859036351
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 93.43294610219512
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 163.52421536770527
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 155.52606832379632
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.89350790703558
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 122.52610279394857
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 186.04659062222078
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 219.79758279280955
+      node-97:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.49464235517106
+    stake: 100
+  node-14:
+    cpu-core-count: 100
+    location:
+    - 2.8996195648916444e-2
+    - 0.13437308404999246
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 339.37402648494367
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 515.5100730109825
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 63.66226677318318
+      node-47:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.645036060893364
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 260.5978390470959
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 60.665696868305936
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.96828685417517
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 446.1599224167351
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 398.7823331600077
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 71.76837858787131
+    stake: 100
+  node-15:
+    cpu-core-count: 100
+    location:
+    - 0.10160773659261609
+    - 9.361656352519343e-3
+    producers:
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.02220610283416
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.30672980989048
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.30025683650032
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 152.63558700874623
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 376.6927752186754
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 476.50133478519183
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 74.37652236249164
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 132.80116292373089
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.06951889556609
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.405362938260787
+    stake: 100
+  node-16:
+    cpu-core-count: 100
+    location:
+    - 6.652356036905045e-2
+    - 4.911659213067419e-2
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 349.7884485508085
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 84.74748325578906
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.0650225064015
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.10236560136047
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.095481215222527
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 124.14817772562161
+      node-9:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 199.87232228529214
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.87359858890831
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.47987799088577
+    stake: 100
+  node-17:
+    cpu-core-count: 100
+    location:
+    - 0.5753504956024953
+    - 3.876370194967853e-2
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 281.34119201105
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 480.29672187817135
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 432.36394820044444
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.731171488005366
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 429.2787836368652
+      node-62:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.529334727863848
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.900316193002162
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 549.2997278379119
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.85668256241169
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.508960017132328
+    stake: 100
+  node-18:
+    cpu-core-count: 100
+    location:
+    - 0.27069202907663686
+    - 0.24180033441458257
+    producers:
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.296809213116404
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 224.05432144319718
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 1.3733889642377728
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 252.57594397930472
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 161.86043426302282
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 217.6314502973309
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.322295942185896
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.0516200862179
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 130.96574400360257
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.91872306700395
+    stake: 100
+  node-19:
+    cpu-core-count: 100
+    location:
+    - 0.15713323339636093
+    - 9.518819559067748e-4
+    producers:
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.15874910202861
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.12370446655821
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.30394623968131
+      node-55:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 293.85172895374166
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 120.42755289557911
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.14018463511398
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 64.27516929110543
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 506.8540030857249
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 92.46219997823789
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 172.34494555206794
+    stake: 100
+  node-2:
+    cpu-core-count: 100
+    location:
+    - 2.183675167112644e-2
+    - 6.186437959256355e-2
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 337.40459199918985
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.395972763778477
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 356.9986386480196
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 316.485743010767
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 16.00764329633317
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.258526606410996
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 129.236449392061
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.438140591534626
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 162.61146091316152
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 15.482809661411787
+    stake: 100
+  node-20:
+    cpu-core-count: 100
+    location:
+    - 0.12351183248149726
+    - 0.2607251695034369
+    producers:
+      node-14:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 157.79117562241188
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.12480442232446
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 110.63079366215825
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.8004723582422
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 61.14798687737973
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.19672484128765
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 357.7313525741016
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 487.33133239070344
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.38706022843727
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 372.0747868109715
+    stake: 100
+  node-21:
+    cpu-core-count: 100
+    location:
+    - 5.06600112984803e-2
+    - 0.2688746066928737
+    producers:
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 130.1903060286739
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 73.30621512659656
+      node-47:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 118.0181456797709
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 66.69835432362673
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 547.6758929986756
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 82.40458293635997
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 383.83560194923723
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.48315438924442
+      node-9:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 30.8617013575863
+    stake: 100
+  node-22:
+    cpu-core-count: 100
+    location:
+    - 0.13020927359583195
+    - 0.21913618742718133
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.9580860382509
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 217.17656405674148
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.42527025492748
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.12480442232446
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 138.27250408043318
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.685336277628124
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 250.46458776365967
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 240.34720705399312
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.814003316995354
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.676256372358797
+    stake: 100
+  node-23:
+    cpu-core-count: 100
+    location:
+    - 0.3818972230380302
+    - 0.11387886137113705
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.19739576271447
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 255.3327359667387
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 151.5964442379009
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.142597158267776
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.389959799295035
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 147.62107692460955
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.068037718987032
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 344.4052253135719
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.933538634490798
+    stake: 100
+  node-24:
+    cpu-core-count: 100
+    location:
+    - 0.23233621122303788
+    - 0.13403793611068301
+    producers:
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 152.86394501152878
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.72808518886137
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 300.8884704835549
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 60.53238255824193
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 182.9104723460966
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.15951681331396
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 69.50773774870355
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.5544333840165
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.425011455492674
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 159.55154472371913
+    stake: 100
+  node-25:
+    cpu-core-count: 100
+    location:
+    - 0.539622700257307
+    - 0.11613802435777741
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 422.24204373067073
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.14070455641352
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.82558378614184
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.45819197722413
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.90748459958969
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 284.1573837777944
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 76.93613110049058
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 447.09506342885084
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.93264929942791
+    stake: 100
+  node-26:
+    cpu-core-count: 100
+    location:
+    - 0.26553940917767443
+    - 0.19076296434495926
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 106.21859269386248
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.296809213116404
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.72808518886137
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 102.75427073732337
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.9545136048418
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 337.90684903807346
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.876786217775404
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.096864200978878
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 334.2764892594356
+    stake: 100
+  node-27:
+    cpu-core-count: 100
+    location:
+    - 0.14450183903674263
+    - 5.666153541484049e-2
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 221.63264636904594
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 13.799431767222915
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.19488648043648
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.51633018490167
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 320.48956901185176
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 450.5129777945493
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.972568801657594
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 10.54474413739944
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 153.36858428536542
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.03748880400353
+    stake: 100
+  node-28:
+    cpu-core-count: 100
+    location:
+    - 0.14300674998794374
+    - 4.294333488290473e-2
+    producers:
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.30394623968131
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 13.799431767222915
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.0386041428376
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 403.64582454989653
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.84258090234408
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.9715458891292
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.41393744898209
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 193.37576676952892
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 95.24388539336539
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 452.7504599780976
+    stake: 100
+  node-29:
+    cpu-core-count: 100
+    location:
+    - 0.12661347883140558
+    - 0.10887726161636319
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.62497828351891
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 265.8743160697593
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 114.84064450621686
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 255.3327359667387
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.84756360864811
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 439.0992862458019
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 72.6140957296304
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.27141601099947
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.212393002423347
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.824943978267015
+    stake: 100
+  node-3:
+    cpu-core-count: 100
+    location:
+    - 0.5301091126766642
+    - 0.2555504694788691
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.647123754807346
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 221.4571861665297
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 406.6302076610287
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 429.3270972543718
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 199.51490089977628
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 221.5276243613616
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.907040644126425
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.68175628258274
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.90057235441857
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.70767806262625
+    stake: 100
+  node-30:
+    cpu-core-count: 100
+    location:
+    - 0.5385467853123018
+    - 5.6214066979121576e-2
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 223.7590599552635
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 248.29677244649443
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.731171488005366
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.688220446848565
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 392.4870510751948
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 209.69998193212388
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.881105090625184
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.165714995977595
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.292224465389296
+    stake: 100
+  node-31:
+    cpu-core-count: 100
+    location:
+    - 0.41581091853583224
+    - 0.18651481832402467
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 81.0046938335708
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.169756596584314
+      node-62:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 222.6436720557292
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.05038893830797
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 14.15280801317259
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 172.00742750879127
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.539753942390234
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 194.19574542182232
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 13.745482170737215
+    stake: 100
+  node-32:
+    cpu-core-count: 100
+    location:
+    - 9.618961239264252e-2
+    - 8.808949370324477e-2
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 302.71396453327264
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.97919660071759
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 186.4301522138156
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.84756360864811
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 322.2439591896839
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 274.6824629753017
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.67819778066231
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.799219511244885
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 31.84714374927361
+    stake: 100
+  node-33:
+    cpu-core-count: 100
+    location:
+    - 4.480302479918572e-2
+    - 7.270438564541981e-2
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 117.58442168958153
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.0650225064015
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.395972763778477
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 196.25763658176425
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 479.7170969406427
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 497.73525091430434
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 31.222672576122
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.002922616159847
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 479.1135987349921
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.439926647406395
+    stake: 100
+  node-34:
+    cpu-core-count: 100
+    location:
+    - 0.5214710802886804
+    - 7.263210845442442e-2
+    producers:
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 440.17106053220544
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.14070455641352
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.688220446848565
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 155.34909523032823
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.09397137569127
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 123.27128174204597
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.418510858793574
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.067693198042305
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 393.76902146310107
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 288.48192729626396
+    stake: 100
+  node-35:
+    cpu-core-count: 100
+    location:
+    - 0.5234542845193683
+    - 0.10466474649194908
+    producers:
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.82558378614184
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 151.03240757893224
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.74694005986394
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.09397137569127
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 195.61846064837215
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 102.12641440403645
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.94080403233338
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 89.88247508516119
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.303447726131886
+    stake: 100
+  node-36:
+    cpu-core-count: 100
+    location:
+    - 0.31031960587280744
+    - 0.2832463365731839
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.88481152791793
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.34209568604186
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 338.86128124277366
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 240.7541436929786
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.59666123768378
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.275263464925295
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 230.58913140847247
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 129.6638818709206
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.332804140045866
+    stake: 100
+  node-37:
+    cpu-core-count: 100
+    location:
+    - 0.4177950010495886
+    - 6.781282679131612e-2
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 209.75490182362287
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 294.80342939860947
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 103.32579241236533
+      node-58:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.589863638566264
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.90007149898696
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 16.80702246217753
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.76591113911307
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 43.989487928113036
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 170.42295145751197
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 105.72798107935456
+    stake: 100
+  node-38:
+    cpu-core-count: 100
+    location:
+    - 0.26954952230492757
+    - 0.24256248631787253
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 1.3733889642377728
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.9545136048418
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 166.38380293595748
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 120.55252048677471
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 146.22537463637863
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.487733574564274
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.36118914532368
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.450726929126446
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 315.9629355018996
+    stake: 100
+  node-39:
+    cpu-core-count: 100
+    location:
+    - 0.5100228959058687
+    - 0.21095851369755303
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 510.4456604255747
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.907040644126425
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 107.13900852092095
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.78747800795732
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.5932883329446
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 405.4611228068954
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.797341306595065
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 322.62803195063924
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.86725029677408
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.254972550769835
+    stake: 100
+  node-4:
+    cpu-core-count: 100
+    location:
+    - 0.1853494991648688
+    - 0.22737995820687423
+    producers:
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 15.285711505360895
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.25524989106626
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.753064780982065
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 389.5391632749726
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 337.83835344413376
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 366.82978127625137
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.391539729810674
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.37205143779761
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 241.01512531236395
+    stake: 100
+  node-40:
+    cpu-core-count: 100
+    location:
+    - 0.35700079973029564
+    - 1.903763876888953e-3
+    producers:
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 179.0334379763523
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 89.66570965708488
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 189.81544121184433
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 76.47900105900062
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 21.75744991901813
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 220.97123773655142
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 89.0684814522004
+      node-97:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 241.5542398018017
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 73.17129214080812
+    stake: 100
+  node-41:
+    cpu-core-count: 100
+    location:
+    - 0.322998788138787
+    - 0.25356585529682296
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 22.209559018501917
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 108.973548192565
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.61365987522454
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.275263464925295
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.57012137667923
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 298.1722502027946
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 227.31116531237612
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 233.55142952489086
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.42983988666118
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 125.97564140631695
+    stake: 100
+  node-42:
+    cpu-core-count: 100
+    location:
+    - 9.99973716424992e-2
+    - 5.5633899737223845e-2
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 397.6377733315276
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.10236560136047
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.51633018490167
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.84258090234408
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.67819778066231
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.782424328280385
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 120.91257349803521
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.88026522700977
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 43.36123150849172
+    stake: 100
+  node-43:
+    cpu-core-count: 100
+    location:
+    - 0.25420648017604947
+    - 6.0081688749704315e-3
+    producers:
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 246.57424750303647
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 167.15565234908155
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.285455235964776
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 92.8875436253304
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 224.63147042946778
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.573039808654976
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 257.11943499397495
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 110.06816046020639
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 5.3548607752101525
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 85.71875061161688
+    stake: 100
+  node-44:
+    cpu-core-count: 100
+    location:
+    - 0.5254319660370265
+    - 0.20207285493882127
+    producers:
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.78747800795732
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 261.6041337593995
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.542449070421796
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.47101526279596
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 463.4253066426254
+      node-55:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 150.64860439885695
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 21.4274822183897
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 173.8628460860267
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 217.91760830551286
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.67644692201437
+    stake: 100
+  node-45:
+    cpu-core-count: 100
+    location:
+    - 0.17374190505948509
+    - 0.14923256092965076
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.5019621348724
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 60.53238255824193
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.04545705690756
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 270.20059884138453
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.10255522159835
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 182.18907384629128
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 155.9416765451452
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.59007222017875
+    stake: 100
+  node-46:
+    cpu-core-count: 100
+    location:
+    - 0.33023393227047343
+    - 0.13295871500299541
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.949414146629483
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 310.86123415683244
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.07391785179492
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 97.90366951488991
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 100.95383490088017
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.96323861768988
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.80664873242958
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 109.65948763426597
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.26582893326282
+    stake: 100
+  node-47:
+    cpu-core-count: 100
+    location:
+    - 4.0867783775370016e-2
+    - 0.1512634040384188
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 80.01304431066879
+      node-14:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.645036060893364
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 376.5966230771826
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 78.65752025577132
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 289.9445283766772
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 402.77164572881054
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.92282986927519
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 165.4932411123378
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 79.99796105371185
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 225.55576360891175
+    stake: 100
+  node-48:
+    cpu-core-count: 100
+    location:
+    - 0.23252360020328844
+    - 0.2971239037449393
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 67.21254560058446
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 305.61671076347614
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 256.0663605821361
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 79.02408094206739
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.93835893565502
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 84.19984410911704
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 212.92586062641413
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 259.5673720096639
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 76.1170346276041
+    stake: 100
+  node-49:
+    cpu-core-count: 100
+    location:
+    - 0.5736847370258241
+    - 0.1967776256088355
+    producers:
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 389.5391632749726
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.542449070421796
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 402.75898750568336
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.32974797911093
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.289600032086966
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.39816304018178
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 487.9845120625942
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 155.171219028502
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.071548587714872
+    stake: 100
+  node-5:
+    cpu-core-count: 100
+    location:
+    - 1.372075315044936e-2
+    - 7.566203199849869e-2
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 16.00764329633317
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 31.222672576122
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 351.1146144724835
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 527.0939779112463
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.00245870365965
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.47122044327596
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 610.0479229448077
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 431.61844072126195
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 559.3315500319126
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.740716974539875
+    stake: 100
+  node-50:
+    cpu-core-count: 100
+    location:
+    - 0.4432939188389408
+    - 0.16794286508759898
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 187.7400812956702
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.169756596584314
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 361.2005301976597
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 88.94669754836029
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 380.02836198479883
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 43.04540693476786
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.4957100423148
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 224.58600418515763
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.690180200696076
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.41058565909269
+    stake: 100
+  node-51:
+    cpu-core-count: 100
+    location:
+    - 0.5496318964648089
+    - 0.2266210577353276
+    producers:
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 514.6858262229551
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.90057235441857
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 156.54273559747918
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.47101526279596
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 324.8512318790546
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.32974797911093
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 207.97617168750412
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.49712322876284
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 164.3150004206694
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 30.63978116055386
+    stake: 100
+  node-52:
+    cpu-core-count: 100
+    location:
+    - 6.326555689256065e-2
+    - 0.1679374613520824
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.94066425891365
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 465.17188054778546
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 120.50051546569374
+      node-14:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.96828685417517
+      node-47:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.92282986927519
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 511.23330732872773
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.603252247261324
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.200060873367555
+    stake: 100
+  node-53:
+    cpu-core-count: 100
+    location:
+    - 6.789568551160097e-2
+    - 6.6156919315714e-2
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 338.48682798889325
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.095481215222527
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.258526606410996
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.799219511244885
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.002922616159847
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.782424328280385
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 388.9527122182914
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 195.77457838735623
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 543.4073597251037
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 249.80029895739727
+    stake: 100
+  node-54:
+    cpu-core-count: 100
+    location:
+    - 0.3540774382592176
+    - 0.13535120893466251
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 5.072395950456049
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 282.16009218078915
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.142597158267776
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.96323861768988
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 215.80484569207113
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.414723558154186
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 261.9713648845192
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.925203533970794
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 353.9833079135398
+    stake: 100
+  node-55:
+    cpu-core-count: 100
+    location:
+    - 0.3748299359318428
+    - 0.19832711929403188
+    producers:
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.64940080932581
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 206.99437630311579
+      node-58:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 164.9214403782467
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 7.23699153370231
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.287901972156725
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 389.87643425664504
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.542058511782336
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.772370963033985
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 353.6966823949542
+    stake: 100
+  node-56:
+    cpu-core-count: 100
+    location:
+    - 0.11737128499556748
+    - 0.17529173510423124
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 12.471543415214697
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.685336277628124
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 125.65952672564887
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 412.17905577878
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 295.77980475065397
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.10255522159835
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.603252247261324
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 468.76260889414624
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.76606066444437
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 87.23084380558205
+    stake: 100
+  node-57:
+    cpu-core-count: 100
+    location:
+    - 0.4930354010107785
+    - 9.20240148522284e-2
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 197.66809032142677
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.45819197722413
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 366.8092923851837
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.418510858793574
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.94080403233338
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 132.2030043766574
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.64251795042302
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.725899789164714
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 254.62874015146082
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 177.63890291026414
+    stake: 100
+  node-58:
+    cpu-core-count: 100
+    location:
+    - 0.4549647180286148
+    - 5.418310035901521e-2
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 262.9765206406343
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 236.5169060245095
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 360.37372259047504
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.589863638566264
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.67785122758806
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.665486134626427
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.506833406893726
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.71278108086357
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 185.1027134882714
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 448.1841405729618
+    stake: 100
+  node-59:
+    cpu-core-count: 100
+    location:
+    - 0.46438277999836564
+    - 3.6919512851051585e-2
+    producers:
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 67.33842524715881
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.90007149898696
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 132.709678985008
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.10860513389961
+      node-58:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.665486134626427
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 146.410352644087
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 290.5565562070817
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 116.19895136015978
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.756750597149974
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 126.38337957209842
+    stake: 100
+  node-6:
+    cpu-core-count: 100
+    location:
+    - 0.26347722577397026
+    - 5.746516164845758e-2
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 220.94225755802242
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 246.78926660761178
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 332.1601304966625
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.285455235964776
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.083451141632445
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.575507265527115
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.52202472413465
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.55344585506409
+    stake: 100
+  node-60:
+    cpu-core-count: 100
+    location:
+    - 0.5920017232021848
+    - 0.10867880978814738
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 186.65771003180816
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 71.87061767260242
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.90748459958969
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 68.66486768443073
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 353.0536598261068
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 201.7373137048515
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.808101228033365
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 429.21080608699214
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 304.75713103377666
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.56724394608901
+    stake: 100
+  node-61:
+    cpu-core-count: 100
+    location:
+    - 0.1742914103348622
+    - 5.335452431048221e-2
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 195.69910082372564
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.14018463511398
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.972568801657594
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.9715458891292
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 405.8142086304322
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.979667562100428
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 247.2072252023475
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 232.10123445339326
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.227109696194006
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 326.580388555841
+    stake: 100
+  node-62:
+    cpu-core-count: 100
+    location:
+    - 0.5593776728133969
+    - 1.634198919826657e-2
+    producers:
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.529334727863848
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 499.70208082846966
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.985647273834246
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 67.86374055935441
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 430.89681864491536
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.011834078971447
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 528.1164988275665
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.83740224320732
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.39667548953857
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 506.73125436532575
+    stake: 100
+  node-63:
+    cpu-core-count: 100
+    location:
+    - 0.34922845154574556
+    - 0.10027001778394683
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.54199513732768
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.389959799295035
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.80664873242958
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.414723558154186
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 244.93753239659833
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 97.30504774385051
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.78221028390508
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 131.1496529952944
+      node-9:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 350.5106660437316
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.32558627408229
+    stake: 100
+  node-64:
+    cpu-core-count: 100
+    location:
+    - 0.3792650635294697
+    - 0.19260840530820894
+    producers:
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 293.3850250128248
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 209.69998193212388
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.05038893830797
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 113.88024725772652
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 180.15700506110548
+      node-55:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 7.23699153370231
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.674327840506102
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.72012383782723
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 271.8688400471098
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.23147388997942
+    stake: 100
+  node-65:
+    cpu-core-count: 100
+    location:
+    - 0.5780951103494417
+    - 1.300921750932651e-2
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 304.9631630093604
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.900316193002162
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 220.60892103056446
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.572425517054675
+      node-62:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.011834078971447
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 351.1127943733013
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.74641654730674
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.356303952611555
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 355.8804752363607
+    stake: 100
+  node-66:
+    cpu-core-count: 100
+    location:
+    - 0.5808395564078586
+    - 0.24554516841071933
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 238.76340548608303
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.70767806262625
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.289600032086966
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 592.0169060469212
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.49712322876284
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 368.9077633353165
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 18.03260202457239
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 481.4494073505336
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.18401987605303
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 129.1997384330935
+    stake: 100
+  node-67:
+    cpu-core-count: 100
+    location:
+    - 0.40250425074805296
+    - 0.18169459353223336
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 100.85477820809784
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.87752196280002
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 14.15280801317259
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 402.9832652972467
+      node-55:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.287901972156725
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.674327840506102
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.434763595746084
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 107.67894218256623
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.557448525762396
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 369.27893147131806
+    stake: 100
+  node-68:
+    cpu-core-count: 100
+    location:
+    - 0.4013837633486671
+    - 6.418690881541092e-2
+    producers:
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 53.37616885913238
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 256.9921288347472
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 16.80702246217753
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 158.25902332293813
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 243.0094207821753
+      node-58:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.506833406893726
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.88033355851287
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.317043866965864
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 123.35732517010074
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 68.75321450008776
+    stake: 100
+  node-69:
+    cpu-core-count: 100
+    location:
+    - 0.3642711011219955
+    - 2.2410576029255024e-2
+    producers:
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 262.9872950745408
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 305.75464883591786
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.186695589122
+      node-40:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 21.75744991901813
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 354.5719447810506
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 146.3771696358701
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.88033355851287
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 93.52753104969439
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 74.27144643528803
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.194602385827075
+    stake: 100
+  node-7:
+    cpu-core-count: 100
+    location:
+    - 0.15103666354297743
+    - 6.493726484468128e-2
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 422.1552966641928
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 212.5614510164921
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 10.54474413739944
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.41393744898209
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.27141601099947
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 270.2404605461744
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 191.67310401053777
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.979667562100428
+      node-62:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 411.2224223788579
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.08534625363586
+    stake: 100
+  node-70:
+    cpu-core-count: 100
+    location:
+    - 2.625786824984151e-2
+    - 2.3681341731073367e-2
+    producers:
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.62644144516068
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.438140591534626
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 561.3420541362003
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 572.0932432676087
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 331.92743630804085
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 408.0802961278175
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 292.735298812098
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 28.55559286937698
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.12545011261165
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.591355739114206
+    stake: 100
+  node-71:
+    cpu-core-count: 100
+    location:
+    - 0.11291164833362854
+    - 0.2928204655399524
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 231.69351927282983
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.8004723582422
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 66.69835432362673
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 75.68738785763325
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 418.85889850957165
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 369.19247399053904
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.48243396813103
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.614548608032905
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 329.70020819294865
+    stake: 100
+  node-72:
+    cpu-core-count: 100
+    location:
+    - 0.4197957761131606
+    - 0.21376475332020048
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 91.79336138655019
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 27.539753942390234
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 204.98686745631375
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.72012383782723
+      node-65:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 255.65888284657927
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.434763595746084
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 199.24710963918423
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.25562775606224
+      node-97:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.831544660084234
+    stake: 100
+  node-73:
+    cpu-core-count: 100
+    location:
+    - 0.27076009973989723
+    - 2.4168894762807036e-2
+    producers:
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 130.37223666228914
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 129.12551248559706
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.573039808654976
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.083451141632445
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 200.3626608920709
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 398.1761960216514
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 138.0003822757178
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 88.3818543609388
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.259821994437587
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 61.299900650744085
+    stake: 100
+  node-74:
+    cpu-core-count: 100
+    location:
+    - 0.5980425610595403
+    - 0.25095177240313704
+    producers:
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 68.08892291689779
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.39816304018178
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.18095719669357
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 467.55717318235975
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 18.03260202457239
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 484.1649196676714
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 398.1761960216514
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 497.22441746827207
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 371.94912240000923
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.37405968644897
+    stake: 100
+  node-75:
+    cpu-core-count: 100
+    location:
+    - 0.5100443409446612
+    - 0.18716118205358742
+    producers:
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.797341306595065
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 327.17623726926234
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 21.4274822183897
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.89504755234729
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 130.89267222585576
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 379.2429279119665
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 248.70599613479146
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.82158616253424
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.46330455580747
+    stake: 100
+  node-76:
+    cpu-core-count: 100
+    location:
+    - 0.10120410759732032
+    - 0.20379150890052047
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.82256110618355
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 72.40101477350811
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.814003316995354
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 90.76569211078659
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.200060873367555
+      node-56:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 32.76606066444437
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 147.52553922760492
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.490163167450994
+      node-89:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 248.61053098158777
+    stake: 100
+  node-77:
+    cpu-core-count: 100
+    location:
+    - 0.5140127220722054
+    - 6.445490077449285e-2
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 214.28355185893733
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.680293393553775
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.881105090625184
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.067693198042305
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.303447726131886
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.64251795042302
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.756750597149974
+      node-9:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 516.5442923140906
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 139.70359618738937
+    stake: 100
+  node-78:
+    cpu-core-count: 100
+    location:
+    - 0.3911340481355157
+    - 9.165384164648789e-2
+    producers:
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 224.39855102837498
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 370.49683564825386
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.068037718987032
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.76591113911307
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 220.19892660217369
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.78221028390508
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.317043866965864
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 138.0003822757178
+      node-9:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 392.3306803836979
+      node-93:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.632803474910105
+    stake: 100
+  node-79:
+    cpu-core-count: 100
+    location:
+    - 8.947859228204087e-2
+    - 0.2573853264836461
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 286.56482728169146
+      node-14:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 137.07710272340364
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 34.19672484128765
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.48315438924442
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 180.67998347876676
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 461.1805542105368
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.48243396813103
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 426.3882965198319
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.861507384888704
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.601858232494905
+    stake: 100
+  node-8:
+    cpu-core-count: 100
+    location:
+    - 0.31100469376419665
+    - 0.24091907631527731
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.08110914781949
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 207.5194634114368
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.322295942185896
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.332804140045866
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.487733574564274
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 17.42983988666118
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 241.67989469799346
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 239.05517188304395
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 108.9940745598633
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 188.5499462485408
+    stake: 100
+  node-80:
+    cpu-core-count: 100
+    location:
+    - 0.44448651873645034
+    - 0.10277906667709094
+    producers:
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 335.1255978919358
+      node-37:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 43.989487928113036
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 128.1070717253957
+      node-48:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 287.57293775323217
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.725899789164714
+      node-58:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.71278108086357
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 95.29110499546647
+      node-68:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.855009899229195
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 295.879738202861
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.500061937626725
+    stake: 100
+  node-81:
+    cpu-core-count: 100
+    location:
+    - 0.5730435994496828
+    - 7.254170047345211e-2
+    producers:
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.85668256241169
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 551.3102522347702
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.165714995977595
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.572598404724374
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 336.77936468094714
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 308.69426993874896
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 309.933285940172
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.808101228033365
+      node-88:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.490812158037544
+      node-95:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 127.47726037715113
+    stake: 100
+  node-82:
+    cpu-core-count: 100
+    location:
+    - 0.12803062046761876
+    - 8.871460949747458e-2
+    producers:
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 412.5046470383108
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 36.03748880400353
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.212393002423347
+      node-32:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 31.84714374927361
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 43.36123150849172
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 64.22662834448643
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 33.08534625363586
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 304.29104638784963
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 118.78603665400244
+    stake: 100
+  node-83:
+    cpu-core-count: 100
+    location:
+    - 0.22728627501322438
+    - 0.22118726314665235
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.0516200862179
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 111.05125376081351
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.876786217775404
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 103.66225266796309
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.36118914532368
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.391539729810674
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 216.856496461577
+      node-74:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 371.94912240000923
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 88.73933180625099
+      node-85:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.488100917191765
+    stake: 100
+  node-84:
+    cpu-core-count: 100
+    location:
+    - 0.13984212411206343
+    - 0.2362932051098303
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 75.83450106920576
+      node-12:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 35.3886565871724
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 201.02411854224619
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 29.38706022843727
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.676256372358797
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 193.37576676952892
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.37205143779761
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 381.5220702712184
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 186.15400681657667
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.490163167450994
+    stake: 100
+  node-85:
+    cpu-core-count: 100
+    location:
+    - 0.2615667788414887
+    - 0.1978182756847309
+    producers:
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 44.91872306700395
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.096864200978878
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 288.48192729626396
+      node-38:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.450726929126446
+      node-41:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 82.95591840797067
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 254.49980093124825
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 173.89256638427224
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 65.58800535844202
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 335.72612360800326
+      node-83:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.488100917191765
+    stake: 100
+  node-86:
+    cpu-core-count: 100
+    location:
+    - 0.16318318230295742
+    - 0.12702479144362647
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.269054565504064
+      node-19:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 126.21798757891517
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 69.50773774870355
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.824943978267015
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 24.59007222017875
+      node-57:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 331.7039953761082
+      node-7:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 63.26451514997386
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 51.99396738405879
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 111.73357249546503
+    stake: 100
+  node-87:
+    cpu-core-count: 100
+    location:
+    - 0.2872534180469137
+    - 0.11099816765796396
+    producers:
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.5544333840165
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 152.74319269093974
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.26582893326282
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.575507265527115
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 135.20628339578772
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 160.77455095029512
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 146.9719110664315
+      node-92:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.97665435990632
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.313607351128354
+    stake: 100
+  node-88:
+    cpu-core-count: 100
+    location:
+    - 0.5749585632666107
+    - 6.426965086752402e-2
+    producers:
+      node-17:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.508960017132328
+      node-30:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.292224465389296
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 530.2226322201446
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 146.43294330667894
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 132.51409737584814
+      node-60:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.56724394608901
+      node-62:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.39667548953857
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 185.85302329475525
+      node-81:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.490812158037544
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 467.8871860146295
+    stake: 100
+  node-89:
+    cpu-core-count: 100
+    location:
+    - 0.2573557692022261
+    - 1.0339047833275295e-2
+    producers:
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 221.5132152122918
+      node-43:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 5.3548607752101525
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.52202472413465
+      node-61:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 93.54153585764644
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 224.56804032819753
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.259821994437587
+      node-80:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 208.71769092505207
+      node-98:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 80.48353250412285
+    stake: 100
+  node-9:
+    cpu-core-count: 100
+    location:
+    - 3.0302423805679157e-2
+    - 0.24567949423016316
+    producers:
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 246.84117997369736
+      node-20:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 94.41592138047733
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 30.8617013575863
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 520.7610266092632
+      node-47:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 95.0053941541466
+      node-52:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 84.44164741950533
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 483.2977342386173
+      node-76:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 82.35078675681389
+      node-79:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 60.322843304086945
+    stake: 100
+  node-90:
+    cpu-core-count: 100
+    location:
+    - 0.42026761671794494
+    - 0.17351189090672328
+    producers:
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 358.45420726459486
+      node-25:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 132.42883571739327
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 13.745482170737215
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.690180200696076
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 45.23147388997942
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 19.557448525762396
+      node-71:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 329.70020819294865
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.25562775606224
+      node-77:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 143.81088927679573
+    stake: 100
+  node-91:
+    cpu-core-count: 100
+    location:
+    - 5.265880054411285e-2
+    - 1.2799583687681937e-2
+    producers:
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 49.06951889556609
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.87359858890831
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 216.75495382234493
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 420.3156354559607
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 55.49025075483914
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 28.55559286937698
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 347.53918804977286
+      node-86:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 158.94350269848562
+      node-96:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.890171889223932
+      node-99:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.2067454194515
+    stake: 100
+  node-92:
+    cpu-core-count: 100
+    location:
+    - 0.24072112723902697
+    - 0.12627751922993824
+    producers:
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 237.6071487676202
+      node-22:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 144.34542616591855
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.425011455492674
+      node-26:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 69.09645251435549
+      node-36:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 171.7066039681468
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 294.627213007018
+      node-45:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.80360261464087
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 232.57492853708501
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 72.47744874409976
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.97665435990632
+    stake: 100
+  node-93:
+    cpu-core-count: 100
+    location:
+    - 0.3918780693549729
+    - 0.13227983271939175
+    producers:
+      node-11:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 42.03237051327406
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 335.8149506836877
+      node-18:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 163.34257451720532
+      node-23:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.933538634490798
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.28081421040453
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.925203533970794
+      node-64:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 61.63298294386182
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 40.632803474910105
+      node-82:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 267.4199038193313
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 50.060453671914786
+    stake: 100
+  node-94:
+    cpu-core-count: 100
+    location:
+    - 0.567103773975587
+    - 0.20145104212518147
+    producers:
+      node-14:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 542.2722732282471
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 523.2459602419256
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 520.8263598043992
+      node-29:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 450.11288023550594
+      node-34:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 136.66257865704844
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.86725029677408
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.67644692201437
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 8.071548587714872
+      node-51:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 30.63978116055386
+      node-66:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.18401987605303
+    stake: 100
+  node-95:
+    cpu-core-count: 100
+    location:
+    - 0.48225876707138443
+    - 0.1620322928466634
+    producers:
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.81462157459664
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 446.4829240316748
+      node-35:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 70.62652499286254
+      node-39:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.254972550769835
+      node-44:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 58.882694584936104
+      node-46:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 154.77991899751112
+      node-50:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 39.41058565909269
+      node-75:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 37.46330455580747
+      node-78:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 115.13835501029426
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 63.04509412922843
+    stake: 100
+  node-96:
+    cpu-core-count: 100
+    location:
+    - 7.620895737784013e-2
+    - 8.78331352700874e-3
+    producers:
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 444.3635291439872
+      node-15:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 25.405362938260787
+      node-16:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 41.47987799088577
+      node-42:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.54394428921218
+      node-49:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 531.8120088071431
+      node-59:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 389.1921919569218
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 193.4924460660024
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 52.12545011261165
+      node-84:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 236.24125523848005
+      node-91:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 23.890171889223932
+    stake: 100
+  node-97:
+    cpu-core-count: 100
+    location:
+    - 0.42885441371666666
+    - 0.23252360023821306
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 316.5602193422551
+      node-10:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 97.80155322124826
+      node-13:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.49464235517106
+      node-31:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 47.82196963488434
+      node-4:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 243.5592339949872
+      node-67:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 57.25311355017323
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 453.5405906423199
+      node-72:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 20.831544660084234
+      node-90:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 59.633169636717234
+    stake: 100
+  node-98:
+    cpu-core-count: 100
+    location:
+    - 0.3176830408004661
+    - 6.361398852638522e-2
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 295.85146260078244
+      node-21:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 336.7984852319075
+      node-24:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 110.6508640376319
+      node-27:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 173.32070057727015
+      node-6:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 54.55344585506409
+      node-63:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 48.36090797348209
+      node-69:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 62.194602385827075
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 61.299900650744085
+      node-87:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 56.313607351128354
+      node-94:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 284.9732539773027
+    stake: 100
+  node-99:
+    cpu-core-count: 100
+    location:
+    - 6.938463834694941e-3
+    - 6.607845298470368e-2
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 15.482809661411787
+      node-28:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 138.02105703937565
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 556.4235552563283
+      node-33:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 38.439926647406395
+      node-5:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 11.740716974539875
+      node-53:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 60.95727217922865
+      node-54:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 353.9833079135398
+      node-70:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 46.591355739114206
+      node-73:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 267.1296813198632
+      node-8:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 350.74993335731955
+    stake: 100
