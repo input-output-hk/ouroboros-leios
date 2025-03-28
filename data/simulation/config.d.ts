@@ -85,7 +85,6 @@ export interface Config {
   "ib-diffusion-max-window-size": bigint;
   /** Only supported by Haskell simulation. */
   "ib-diffusion-max-headers-to-request": bigint;
-  /** Only supported by Haskell simulation. */
   "ib-diffusion-max-bodies-to-request": bigint;
 
   // Endorsement Block Configuration

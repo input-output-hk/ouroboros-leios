@@ -91,6 +91,7 @@ pub struct RawParameters {
     pub ib_body_avg_size_bytes: u64,
     pub ib_body_max_size_bytes: u64,
     pub ib_diffusion_strategy: DiffusionStrategy,
+    pub ib_diffusion_max_bodies_to_request: u64,
 
     // Endorsement block configuration
     pub eb_generation_probability: f64,
@@ -456,7 +457,7 @@ impl SimConfiguration {
             stage_length: params.leios_stage_length_slots,
             max_ib_size: params.ib_body_max_size_bytes,
             ib_diffusion_strategy: params.ib_diffusion_strategy,
-            max_ib_requests_per_peer: 1,
+            max_ib_requests_per_peer: params.ib_diffusion_max_bodies_to_request as usize,
             ib_shards: params.ib_shards,
             max_eb_age: params.eb_max_age_slots,
             cpu_times: CpuTimeConfig::new(&params),
