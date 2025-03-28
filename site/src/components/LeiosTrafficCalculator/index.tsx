@@ -48,6 +48,22 @@ const TX_FEE_PARAMS = {
     avgTxSize: 1400, // Average size based on mainnet data (Epoch 500+)
 };
 
+interface BlockTraffic {
+    headers: number;
+    bodies: number;
+}
+
+interface VoteTraffic {
+    votes: number;
+}
+
+interface TrafficBreakdown {
+    ib: BlockTraffic;
+    eb: BlockTraffic;
+    rb: BlockTraffic;
+    votes: VoteTraffic;
+}
+
 const LeiosTrafficCalculator: React.FC = () => {
     const [numPeers, setNumPeers] = useState(20);
     const [headerPropagationPercent, setHeaderPropagationPercent] = useState(
@@ -79,7 +95,14 @@ const LeiosTrafficCalculator: React.FC = () => {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    const calculateTraffic = (ibRate: number) => {
+    const calculateTraffic = (
+        ibRate: number,
+    ): {
+        traffic: TrafficBreakdown;
+        totalTraffic: number;
+        txFeeADA: number;
+        totalTxs: number;
+    } => {
         const ibCount = ibRate * SECONDS_PER_MONTH;
         const stagesPerMonth = SECONDS_PER_MONTH / 20;
         const ebRate = 1.5; // EBs per pipeline
@@ -91,7 +114,7 @@ const LeiosTrafficCalculator: React.FC = () => {
         );
         const bodyPeers = Math.round(numPeers * (bodyRequestPercent / 100));
 
-        const traffic = {
+        const traffic: TrafficBreakdown = {
             ib: {
                 headers: ibCount * blockSizes.ib.header * headerPeers,
                 bodies: ibCount * blockSizes.ib.body *
@@ -107,14 +130,19 @@ const LeiosTrafficCalculator: React.FC = () => {
                 headers: rbCount * blockSizes.rb.header * headerPeers,
                 bodies: rbCount * blockSizes.rb.body * bodyPeers,
             },
-            votes: ebCount * blockSizes.vote.size *
-                blockSizes.vote.countPerPipeline * headerPeers,
+            votes: {
+                votes: ebCount * blockSizes.vote.size *
+                    blockSizes.vote.countPerPipeline * headerPeers,
+            },
         };
 
         const totalTraffic = Object.values(traffic).reduce(
-            (acc, block) =>
-                acc + (block.headers || 0) + (block.bodies || 0) +
-                (block.votes || 0),
+            (acc, block) => {
+                if ("votes" in block) {
+                    return acc + block.votes;
+                }
+                return acc + block.headers + block.bodies;
+            },
             0,
         );
 
@@ -524,19 +552,18 @@ const LeiosTrafficCalculator: React.FC = () => {
                             )}
                         </li>
                         <li>
-                            EB Bodies:{" "}
-                            {((SECONDS_PER_MONTH / 20) * 1.5).toLocaleString()}
-                            {" "}
-                            seconds × {blockSizes.eb.body} bytes × {20}{" "}
-                            IBs/stage ×{" "}
+                            EB Bodies: 1 IB/s × {blockSizes.eb.body}{" "}
+                            bytes × 1.5 EBs ×{" "}
                             {Math.round(numPeers * (bodyRequestPercent / 100))}
                             {" "}
-                            peers = {formatTraffic(
-                                (SECONDS_PER_MONTH / 20) * 1.5 *
-                                    blockSizes.eb.body * 20 *
+                            peers × {(SECONDS_PER_MONTH / 20).toLocaleString()}
+                            {" "}
+                            stages = {formatTraffic(
+                                1 * blockSizes.eb.body * 1.5 *
                                     Math.round(
                                         numPeers * (bodyRequestPercent / 100),
-                                    ),
+                                    ) *
+                                    (SECONDS_PER_MONTH / 20),
                             )}
                         </li>
                         <li>
@@ -672,7 +699,9 @@ const LeiosTrafficCalculator: React.FC = () => {
                                     <td>{formatTraffic(traffic.ib.bodies)}</td>
                                     <td>{formatTraffic(traffic.eb.headers)}</td>
                                     <td>{formatTraffic(traffic.eb.bodies)}</td>
-                                    <td>{formatTraffic(traffic.votes)}</td>
+                                    <td>
+                                        {formatTraffic(traffic.votes.votes)}
+                                    </td>
                                     <td>{formatTraffic(traffic.rb.headers)}</td>
                                     <td>{formatTraffic(traffic.rb.bodies)}</td>
                                     <td>{formatTraffic(totalTraffic)}</td>
@@ -699,7 +728,7 @@ const LeiosTrafficCalculator: React.FC = () => {
                 </div>
             </div>
 
-            <h3>Monthly Cost by Cloud Provider ($)</h3>
+            <h3>Monthly Node Egress Cost by Cloud Provider ($)</h3>
             <div className={styles.tableContainer}>
                 <table className={styles.table}>
                     <thead>
