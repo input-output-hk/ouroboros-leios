@@ -25,6 +25,17 @@
   - The `close-and-random` peers chosen for each node are now properly listed as `producers`.
   - Variance in upstream peers, and hence access to blocks, is now much smaller.
 
+### Rust simulation
+
+- Investigated oddities in simulation results
+ - IB production broke down earlier than expected; this is due to low connectivity of the network.
+ - CPU usage is lower than Haskell sim: this may be related to slow IB propagation.
+ - IBs don't propagate as far when using oldest-first ordering. This may be because nodes can't make separate requests as effectively.
+- Refined Full Leios implementation
+- Added Full Leios support to visualizer
+- Moved visualizer off of Next.js and onto vite, so it is now a proper static site. Next step is to embed it in the public Leios website.
+- Bug fixes and performance improvements
+
 ### Analysis of simulations at tag `leios-2025w13`
 
 The Haskell and Rust simulators, at tag [leios-2025w13](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w13), were used to simulation 198 scenarios of Short Leios for varied IB production rate, IB size, and network topology, CPU limits, and protocol flags. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w13/analysis.ipynb](analysis/sims/2025w13/analysis.ipynb). New analyses focused on exploring simulator settings related to message delivery and CPU. The simulations resolved most of the prior outstanding issues that arose in comparing simulators, but they unearthed new ones.
