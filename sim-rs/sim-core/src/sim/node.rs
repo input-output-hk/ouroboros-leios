@@ -559,7 +559,7 @@ impl Node {
                 });
                 let ibs = self.select_ibs_for_eb(slot);
                 let ebs = self.select_ebs_for_eb(slot);
-                let bytes = self.sim_config.sizes.eb(ibs.len());
+                let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
                     pipeline: self.slot_to_pipeline(slot),
