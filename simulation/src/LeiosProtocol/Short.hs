@@ -127,60 +127,71 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
 data SomeStage = forall p. IsPipeline p => SomeStage (SingPipeline p) (Stage p)
 
 convertConfig :: OnDisk.Config -> LeiosConfig
-convertConfig disk =
-  ( if disk.treatBlocksAsFull
-      then delaysAndSizesAsFull
-      else (\x -> x)
-  )
-    $ case voting of
-      SomeStage pipeline voteSendStage -> do
-        let sliceLength = fromIntegral disk.leiosStageLengthSlots
-        LeiosConfig
-          { praos
-          , pipeline
-          , voteSendStage
-          , sliceLength
-          , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
-          , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
-          , maxEndorseBlockAgeSlots = fromIntegral disk.ebMaxAgeSlots
-          , maxEndorseBlockAgeForRelaySlots = fromIntegral disk.ebMaxAgeForRelaySlots
-          , cleanupPolicies = disk.cleanupPolicies
-          , variant = disk.leiosVariant
-          , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
-          , pipelinesToReferenceFromEB =
-              if disk.leiosVariant == Full
-                then
-                  ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
-                else 0
-          , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
-          , votingFrequencyPerStage = disk.voteGenerationProbability
-          , votesForCertificate = fromIntegral disk.voteThreshold
-          , sizes
-          , delays
-          , ibDiffusion =
-              RelayDiffusionConfig
-                { strategy = disk.ibDiffusionStrategy
-                , maxWindowSize = disk.ibDiffusionMaxWindowSize
-                , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
-                , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
-                }
-          , ebDiffusion =
-              RelayDiffusionConfig
-                { strategy = disk.ebDiffusionStrategy
-                , maxWindowSize = disk.ebDiffusionMaxWindowSize
-                , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
-                , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
-                }
-          , voteDiffusion =
-              RelayDiffusionConfig
-                { strategy = disk.voteDiffusionStrategy
-                , maxWindowSize = disk.voteDiffusionMaxWindowSize
-                , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
-                , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
-                }
-          , relayStrategy = disk.relayStrategy
-          }
+convertConfig disk = checkAssertions
+  $ ( if disk.treatBlocksAsFull
+        then delaysAndSizesAsFull
+        else (\x -> x)
+    )
+  $ case voting of
+    SomeStage pipeline voteSendStage -> do
+      let sliceLength = fromIntegral disk.leiosStageLengthSlots
+      LeiosConfig
+        { praos
+        , pipeline
+        , voteSendStage
+        , sliceLength
+        , inputBlockFrequencyPerSlot = disk.ibGenerationProbability
+        , endorseBlockFrequencyPerStage = disk.ebGenerationProbability
+        , maxEndorseBlockAgeSlots = fromIntegral disk.ebMaxAgeSlots
+        , maxEndorseBlockAgeForRelaySlots = fromIntegral disk.ebMaxAgeForRelaySlots
+        , cleanupPolicies = disk.cleanupPolicies
+        , variant = disk.leiosVariant
+        , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
+        , pipelinesToReferenceFromEB =
+            if disk.leiosVariant == Full
+              then
+                ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
+              else 0
+        , activeVotingStageLength = fromIntegral disk.leiosStageActiveVotingSlots
+        , votingFrequencyPerStage = disk.voteGenerationProbability
+        , votesForCertificate = fromIntegral disk.voteThreshold
+        , sizes
+        , delays
+        , ibDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ibDiffusionStrategy
+              , maxWindowSize = disk.ibDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ibDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ibDiffusionMaxBodiesToRequest
+              }
+        , ebDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.ebDiffusionStrategy
+              , maxWindowSize = disk.ebDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.ebDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.ebDiffusionMaxBodiesToRequest
+              }
+        , voteDiffusion =
+            RelayDiffusionConfig
+              { strategy = disk.voteDiffusionStrategy
+              , maxWindowSize = disk.voteDiffusionMaxWindowSize
+              , maxHeadersToRequest = disk.voteDiffusionMaxHeadersToRequest
+              , maxBodiesToRequest = disk.voteDiffusionMaxBodiesToRequest
+              }
+        , relayStrategy = disk.relayStrategy
+        }
  where
+  checkAssertions (cfg :: LeiosConfig) =
+    if cfg.variant /= Full || (oldestEBToReference < cfg.maxEndorseBlockAgeSlots)
+      then cfg
+      else error $ "Parameter `eb-max-age-slots` should be greater than " ++ show oldestEBToReference ++ " given the chosen praos-chain-quality and leios-stage-length-slots."
+   where
+    oldestEBToReference =
+      ( ceiling ((3 * disk.praosChainQuality) / fromIntegral cfg.sliceLength)
+          + 1 {-Endorse-}
+          + 1 {- Vote (Send) -}
+      )
+        * cfg.sliceLength
   forEach n xs = n * fromIntegral (length @[] xs)
   forEachKey n m = n * fromIntegral (Map.size m)
   durationMsToDiffTime (DurationMs d) = secondsToDiffTime $ d / 1000

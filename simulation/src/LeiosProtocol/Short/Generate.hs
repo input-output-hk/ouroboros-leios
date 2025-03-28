@@ -52,7 +52,7 @@ data LeiosGeneratorConfig m = LeiosGeneratorConfig
   { leios :: LeiosConfig
   , slotConfig :: SlotConfig
   , nodeId :: NodeId
-  , buffers :: BuffersView m
+  , buffers :: BuffersView m -- TODO: add SlotNo argument so expired blocks can be filtered out by the views.
   , schedule :: SlotNo -> m [(SomeRole, Word64)]
   , submit :: [(DiffTime, SomeAction)] -> m ()
   }
