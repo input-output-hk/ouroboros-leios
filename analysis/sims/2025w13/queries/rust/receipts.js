@@ -1,7 +1,14 @@
 db.receipts.deleteMany({simulator: "rust"})
 
 db["rust-scenario"].find().forEach(function(s) {
+print("-----")
 printjson(s["_id"])
+if (db.receipts.findOne(Object.assign({simulator: "rust"}, s["_id"]))) {
+  print("SKIP")
+  return
+} else {
+  print("COMPUTE")
+}
 db.rust.aggregate(
 [
   {

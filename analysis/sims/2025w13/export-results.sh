@@ -4,13 +4,6 @@ source env.sh
 
 mongoexport --host="$HOST" \
             --db="$DB" \
-            --collection=receipts \
-            --type=csv \
-            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,kind,item,producer,recipient,sent,size,received,elapsed' \
-| gzip -9vc > results/receipts.csv.gz
-
-mongoexport --host="$HOST" \
-            --db="$DB" \
             --collection=cpus \
             --type=csv \
             --fields 'simulator,network,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,label,slot,node,task,duration' \
@@ -36,3 +29,10 @@ mongoexport --host="$HOST" \
             --type=csv \
             --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,time,rb,eb-count,size' \
 | gzip -9vc > results/rbgen.csv.gz
+
+mongoexport --host="$HOST" \
+            --db="$DB" \
+            --collection=receipts \
+            --type=csv \
+            --fields='simulator,network,label,leios-stage-length-slots,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,kind,item,producer,recipient,sent,size,received,elapsed' \
+| gzip -9vc > results/receipts.csv.gz

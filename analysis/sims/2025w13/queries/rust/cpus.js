@@ -3,7 +3,6 @@ db.rust.aggregate(
 [
   {
     $match: {
-      "scenario.label": "default",
       "message.type": {
         $regex: "^CpuTaskFinished"
       }
