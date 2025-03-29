@@ -165,11 +165,11 @@ vote-generation-probability: 500.0
 # 60% of `vote-generation-probability`
 vote-threshold: 300
 # vote-spec#"Generate vote" 0.8*135e-3 + 0.2*280e-3
-vote-generation-cpu-time-ms-constant: 164e-3
+vote-generation-cpu-time-ms-constant: 164.0e-3
 # No benchmark yet.
 vote-generation-cpu-time-ms-per-ib: 0
 # vote-spec#"Verify vote" 0.8*670e-3 + 0.2*1.4
-vote-validation-cpu-time-ms: 816e-3
+vote-validation-cpu-time-ms: 816.0e-3
 # The `Vote` structure counted in the -per-eb already identifies slot
 # (in Eid) and voter. We can assume a vote bundle is all for the same
 # voter and slot, so for non-persistent voters we could factor their
