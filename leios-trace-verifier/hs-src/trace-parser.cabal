@@ -34,12 +34,14 @@ executable parser
     build-depends:
       , base
       , bytestring
+      , containers
       , leios-trace-hs
       , trace-parser
       , optparse-applicative
+      , yaml
 
-  default-language: Haskell2010
-  ghc-options:      -Wall
+    default-language: Haskell2010
+    ghc-options:      -Wall
 
 library
     import: globalOptions
