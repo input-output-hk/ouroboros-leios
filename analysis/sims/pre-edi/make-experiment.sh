@@ -46,8 +46,6 @@ set -e
 
 cd "\$(dirname "\${BASH_SOURCE[0]}")"
 
-echo "SCENARIO: $SIMULATOR | $MAX_SLOT | $LABEL | $NETWORK | $IB_RATE | $IB_SIZE | $EB_RATE | $STAGE_LENGTH"
-
 if [[ ! -p sim.log ]]
 then
   mkfifo sim.log
