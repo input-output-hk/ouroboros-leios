@@ -5,8 +5,6 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## High-level summary
-
 This week in Leios development, the team focused on simulation analysis, formal methods, and documentation updates. Key accomplishments include in-depth analysis of simulations at tag `leios-2025w10`, advancements in formal methods through a working trace verifier, and the development of technical reports.
 
 ## Cross-simulation analysis
