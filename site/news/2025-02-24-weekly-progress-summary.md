@@ -5,8 +5,6 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## High-level summary
-
 This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments include detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.
 
 ## Cross-simulation analysis

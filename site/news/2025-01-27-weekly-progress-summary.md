@@ -4,7 +4,6 @@ authors:
 - will
 tags: [progress, update, weekly]
 ---
-## High-level summary 
 
 The Leios team continued refining Haskell and Rust simulations, standardizing inputs, outputs, and event logging for better comparability. The team defined standard formats [for configuration parameters](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/config.schema.json) and [network topology](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/topology.d.ts) for running the Leios protocol. They also worked on logging identical simulation events to compare and feed them into the DeltaQ model and, consequently, the executable specification, ensuring alignment with formal methods.
 

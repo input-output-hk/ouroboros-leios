@@ -1,24 +1,22 @@
 ---
-title: Weekly Summary - 2025-03-24
+title: Weekly Summary - March 24, 2025
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
-**Weekly Summary (2025-03-24 to 2025-03-31)**
-
 This week, the Leios team continued working on various aspects of the protocol and simulation capabilities. The team made progress on implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.
 
 ## Simulation Progress
 
-- **Haskell simulation:**
+- **Haskell simulation**
   - Moved configuration and topology parsers to the `leios-trace-hs` package for reuse by formal methods.
   - Investigated differences in IBs referenced with Rust simulation: inconsistencies in their distribution are due to the same sequence of random samples being used across different runs.
   - Simplified sortition code by relying on the external statistics package.
   - Tested Full Leios, resolving tension between `r_EB`/`eb-max-age-slots` and `praos-chain-quality`/`η`.
   - Fixed `cabal run ols -- generate-topology close-and-random`, listing `producers` properly and decreasing variance in upstream peers.
 
-- **Rust simulation:**
+- **Rust simulation**
   - Investigated oddities in simulation results: IB production broke down earlier due to low connectivity, and CPU usage is lower than Haskell sim.
   - Refined Full Leios implementation.
   - Added Full Leios support to the visualizer.
@@ -34,7 +32,3 @@ This week, the Leios team continued working on various aspects of the protocol a
 ## Ongoing Investigations
 
 - Investigating qualitative discrepancies between Haskell and Rust simulators' results to determine whether they are due to simulator resolution or simulation infidelities.
-
-## Tools
-
-- **Egress Traffic Calculator:**

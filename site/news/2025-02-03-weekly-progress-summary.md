@@ -5,8 +5,6 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## High-level summary
-
 This week, the Leios team worked on cryptography benchmarking and cost calculator improvements. The team completed a reference implementation for Leios cryptography and enhanced the online cost calculator with user-requested features. They also updated both Haskell and Rust simulations to improve visualization and network modeling capabilities.
 
 ## Haskell simulation

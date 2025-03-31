@@ -5,8 +5,6 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## High-level summary
-
 This week, the Leios team made significant progress across multiple areas. Major developments included detailed DeltaQ analysis of network topologies, extensive BLS cryptography benchmarking, and improvements to both simulations. The team also explored succinct schemes for BLS key registration and conducted a detailed certificate performance analysis. Both Haskell and Rust simulations received substantial updates to improve visualization and support more realistic testing conditions.
 
 ## DeltaQ analysis
