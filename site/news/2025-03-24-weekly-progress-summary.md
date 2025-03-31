@@ -32,3 +32,7 @@ This week, the Leios team continued working on various aspects of the protocol a
 ## Ongoing Investigations
 
 - Investigating qualitative discrepancies between Haskell and Rust simulators' results to determine whether they are due to simulator resolution or simulation infidelities.
+
+## Additional Resources
+
+- [Monthly Review Meeting](https://www.youtube.com/watch?v=7K6qXiVsMXg) - March 2025
