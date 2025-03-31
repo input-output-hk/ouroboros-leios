@@ -8,48 +8,48 @@
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
     <entry>
-        <title type="html"><![CDATA[Weekly Summary - March 24, 2025]]></title>
+        <title type="html"><![CDATA[Weekly Summary – March 24, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary"/>
         <updated>2025-03-24T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team continued working on various aspects of the protocol and simulation capabilities. The team made progress on implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team continued working on various aspects of the protocol and simulation capabilities. The team made progress on implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation Progress<a class="hash-link" aria-label="Direct link to Simulation Progress" title="Direct link to Simulation Progress" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#simulation-progress">​</a></h2>
+        <summary type="html"><![CDATA[This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation progress<a class="hash-link" aria-label="Direct link to Simulation progress" title="Direct link to Simulation progress" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#simulation-progress">​</a></h2>
 <ul>
 <li>
 <p><strong>Haskell simulation</strong></p>
 <ul>
-<li>Moved configuration and topology parsers to the <code>leios-trace-hs</code> package for reuse by formal methods.</li>
-<li>Investigated differences in IBs referenced with Rust simulation: inconsistencies in their distribution are due to the same sequence of random samples being used across different runs.</li>
-<li>Simplified sortition code by relying on the external statistics package.</li>
-<li>Tested Full Leios, resolving tension between <code>r_EB</code>/<code>eb-max-age-slots</code> and <code>praos-chain-quality</code>/<code>η</code>.</li>
+<li>Moved configuration and topology parsers to the <code>leios-trace-hs</code> package for reuse in formal methods</li>
+<li>Investigated differences in IBs referenced with Rust simulation: identified that inconsistencies were caused by the same sequence of random samples being used across different runs</li>
+<li>Simplified sortition code by using an external statistics package</li>
+<li>Tested Full Leios, resolving tension between <code>r_EB</code>/<code>eb-max-age-slots</code> and <code>praos-chain-quality</code>/<code>η</code></li>
 <li>Fixed <code>cabal run ols -- generate-topology close-and-random</code>, listing <code>producers</code> properly and decreasing variance in upstream peers.</li>
 </ul>
 </li>
 <li>
 <p><strong>Rust simulation</strong></p>
 <ul>
-<li>Investigated oddities in simulation results: IB production broke down earlier due to low connectivity, and CPU usage is lower than Haskell sim.</li>
-<li>Refined Full Leios implementation.</li>
-<li>Added Full Leios support to the visualizer.</li>
-<li>Moved the visualizer off Next.js and onto vite.</li>
+<li>Investigated anomalies in simulation results: identified that earlier IB production failures were caused by low connectivity and lower CPU usage compared to the Haskell simulation</li>
+<li>Refined Full Leios implementation</li>
+<li>Added Full Leios support to the visualizer</li>
+<li>Migrated the visualizer from Next.js to Vite.</li>
 </ul>
 </li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-simulations">Analysis of Simulations<a class="hash-link" aria-label="Direct link to Analysis of Simulations" title="Direct link to Analysis of Simulations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#analysis-of-simulations">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-simulations">Analysis of simulations<a class="hash-link" aria-label="Direct link to Analysis of simulations" title="Direct link to Analysis of simulations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#analysis-of-simulations">​</a></h2>
 <ul>
-<li><strong>Tag <code>leios-2025w13</code>:</strong> Simulated 198 scenarios of Short Leios for varied IB production rate, IB size, and network topology, CPU limits, and protocol flags.</li>
-<li><strong>CPU limits:</strong> Studied how limiting available CPU affects IB propagation and discovered that CPU can impact diffusion under stressful scenarios.</li>
-<li><strong>Vote propagation:</strong> Compared freshest-first and oldest-first vote propagation, with freshest-first potentially improving IB delivery reliability.</li>
-<li><strong>Extended voting period:</strong> Compared an extended voting period versus a limited one in the Haskell simulation, revealing little difference except for rare improvements in reliable vote delivery.</li>
+<li><strong>Tag <code>leios-2025w13</code>:</strong> simulated 198 Short Leios scenarios, varying IB production rate, IB size, network topology, CPU limits, and protocol flags</li>
+<li><strong>CPU limits:</strong> analyzed the impact of CPU constraints on IB propagation, finding that diffusion can be affected under stress conditions</li>
+<li><strong>Vote propagation:</strong> compared freshest-first and oldest-first vote propagation, with freshest-first potentially improving IB delivery reliability</li>
+<li><strong>Extended voting period:</strong> compared an extended voting period to a limited one in the Haskell simulation, observing minimal differences except for occasional improvements in reliable vote delivery.</li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="ongoing-investigations">Ongoing Investigations<a class="hash-link" aria-label="Direct link to Ongoing Investigations" title="Direct link to Ongoing Investigations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#ongoing-investigations">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="ongoing-investigations">Ongoing investigations<a class="hash-link" aria-label="Direct link to Ongoing investigations" title="Direct link to Ongoing investigations" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#ongoing-investigations">​</a></h2>
 <ul>
-<li>Investigating qualitative discrepancies between Haskell and Rust simulators' results to determine whether they are due to simulator resolution or simulation infidelities.</li>
+<li>Investigating qualitative discrepancies between Haskell and Rust simulation results to determine whether they stem from differences in simulator resolution or simulation infidelities.</li>
 </ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="additional-resources">Additional Resources<a class="hash-link" aria-label="Direct link to Additional Resources" title="Direct link to Additional Resources" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#additional-resources">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="additional-resources">Additional resources<a class="hash-link" aria-label="Direct link to Additional resources" title="Direct link to Additional resources" href="https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary#additional-resources">​</a></h2>
 <ul>
-<li><a href="https://www.youtube.com/watch?v=7K6qXiVsMXg" target="_blank" rel="noopener noreferrer">Monthly Review Meeting</a> - March 2025</li>
+<li><a href="https://www.youtube.com/watch?v=7K6qXiVsMXg" target="_blank" rel="noopener noreferrer">Monthly review meeting</a> – March 2025.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
