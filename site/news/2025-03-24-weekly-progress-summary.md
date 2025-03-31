@@ -1,38 +1,38 @@
 ---
-title: Weekly Summary - March 24, 2025
+title: Weekly Summary – March 24, 2025
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
-This week, the Leios team continued working on various aspects of the protocol and simulation capabilities. The team made progress on implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.
+This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.
 
-## Simulation Progress
+## Simulation progress
 
 - **Haskell simulation**
-  - Moved configuration and topology parsers to the `leios-trace-hs` package for reuse by formal methods.
-  - Investigated differences in IBs referenced with Rust simulation: inconsistencies in their distribution are due to the same sequence of random samples being used across different runs.
-  - Simplified sortition code by relying on the external statistics package.
-  - Tested Full Leios, resolving tension between `r_EB`/`eb-max-age-slots` and `praos-chain-quality`/`η`.
+  - Moved configuration and topology parsers to the `leios-trace-hs` package for reuse in formal methods
+  - Investigated differences in IBs referenced with Rust simulation: identified that inconsistencies were caused by the same sequence of random samples being used across different runs
+  - Simplified sortition code by using an external statistics package
+  - Tested Full Leios, resolving tension between `r_EB`/`eb-max-age-slots` and `praos-chain-quality`/`η`
   - Fixed `cabal run ols -- generate-topology close-and-random`, listing `producers` properly and decreasing variance in upstream peers.
 
 - **Rust simulation**
-  - Investigated oddities in simulation results: IB production broke down earlier due to low connectivity, and CPU usage is lower than Haskell sim.
-  - Refined Full Leios implementation.
-  - Added Full Leios support to the visualizer.
-  - Moved the visualizer off Next.js and onto vite.
+  - Investigated anomalies in simulation results: identified that earlier IB production failures were caused by low connectivity and lower CPU usage compared to the Haskell simulation
+  - Refined Full Leios implementation
+  - Added Full Leios support to the visualizer
+  - Migrated the visualizer from Next.js to Vite.
 
-## Analysis of Simulations
+## Analysis of simulations
 
-- **Tag `leios-2025w13`:** Simulated 198 scenarios of Short Leios for varied IB production rate, IB size, and network topology, CPU limits, and protocol flags.
-- **CPU limits:** Studied how limiting available CPU affects IB propagation and discovered that CPU can impact diffusion under stressful scenarios.
-- **Vote propagation:** Compared freshest-first and oldest-first vote propagation, with freshest-first potentially improving IB delivery reliability.
-- **Extended voting period:** Compared an extended voting period versus a limited one in the Haskell simulation, revealing little difference except for rare improvements in reliable vote delivery.
+- **Tag `leios-2025w13`:** simulated 198 Short Leios scenarios, varying IB production rate, IB size, network topology, CPU limits, and protocol flags
+- **CPU limits:** analyzed the impact of CPU constraints on IB propagation, finding that diffusion can be affected under stress conditions
+- **Vote propagation:** compared freshest-first and oldest-first vote propagation, with freshest-first potentially improving IB delivery reliability
+- **Extended voting period:** compared an extended voting period to a limited one in the Haskell simulation, observing minimal differences except for occasional improvements in reliable vote delivery.
 
-## Ongoing Investigations
+## Ongoing investigations
 
-- Investigating qualitative discrepancies between Haskell and Rust simulators' results to determine whether they are due to simulator resolution or simulation infidelities.
+- Investigating qualitative discrepancies between Haskell and Rust simulation results to determine whether they stem from differences in simulator resolution or simulation infidelities.
 
-## Additional Resources
+## Additional resources
 
-- [Monthly Review Meeting](https://www.youtube.com/watch?v=7K6qXiVsMXg) - March 2025
+- [Monthly review meeting](https://www.youtube.com/watch?v=7K6qXiVsMXg) – March 2025.
