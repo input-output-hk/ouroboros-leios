@@ -2,29 +2,11 @@
 
 ## Ledger Design Solution Space Matrix
 
-```
-┌─────────────────────┬──────────────────────────────────┬──────────────────────────────────┐
-│                     │          Labeled UTxOs           │             Accounts             │
-│                     │        (Explicit Shards)         │        (Implicit Shards)         │
-├─────────────────────┼──────────────────────────────────┼──────────────────────────────────┤
-│        Fees         │ • Explicit shard labeling        │ • Staking credential             │
-│                     │ • Consumed on every tx           │   defines shard                  │
-│                     │ • Bootstrap: requires            │ • No replay protection           │
-│                     │   additional transaction         │ • No bootstrap transaction       │
-│                     │ • Strong guarantees              │   needed                         │
-│                     │                                  │ • Registration costs             │
-├─────────────────────┼──────────────────────────────────┼──────────────────────────────────┤
-│     Collateral      │ • Only consumed on               │ • Only consumed on               │
-│                     │   conflicts                      │   conflicts                      │
-│                     │ • Return address needed          │ • No replay protection           │
-│                     │ • Helps prevent conflicts        │                                  │
-├─────────────────────┼──────────────────────────────────┼──────────────────────────────────┤
-│ All-Labeled Inputs  │ • Every input gets labeled       │                                  │
-│    (Extension)      │ • Maximum conflict prevention    │                                  │
-│                     │ • Higher bootstrapping cost      │               N/A                │
-│                     │                                  │                                  │
-└─────────────────────┴──────────────────────────────────┴──────────────────────────────────┘
-```
+|                     | Labeled UTxOs (Explicit Shards) | Accounts (Implicit Shards) |
+|---------------------|--------------------------------|---------------------------|
+| **Fees**            | • Explicit shard labeling<br>• Consumed on every tx<br>• Bootstrap: requires additional transaction<br>• Strong guarantees | • Staking credential defines shard<br>• No replay protection<br>• No bootstrap transaction needed<br>• Registration costs |
+| **Collateral**      | • Only consumed on conflicts<br>• Return address needed<br>• Helps prevent conflicts | • Only consumed on conflicts<br>• No replay protection |
+| **All-Labeled Inputs (Extension)** | • Every input gets labeled<br>• Maximum conflict prevention<br>• Higher bootstrapping cost | N/A |
 
 ### Labeled UTxOs - Fees
 Explicit shard labeling of UTxOs with fees consumed on every transaction. Provides strong guarantees for conflict prevention. Requires one initial bootstrap transaction to transition from Praos to Leios, enabling immediate protocol participation.
