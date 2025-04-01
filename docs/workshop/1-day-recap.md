@@ -39,13 +39,6 @@ The Accounts approach uses staking credentials to implicitly define shards, elim
 ### Accounts - Collateral
 In the Accounts approach, collateral is only consumed on conflicts but lacks replay protection. This simpler mechanism avoids double spending but may be less robust against certain types of attacks. The integration with existing staking credentials makes it more user-friendly but potentially less secure.
 
-> [!NOTE]
-> 
-> **Edge Case: New User Onboarding**
-> 
-> A significant challenge arises when new users enter Cardano through exchanges. Since they don't have a registered reward account, their first transaction would need to both register a staking credential and handle the exchange withdrawal. This creates a complex transaction that would require the receiving wallet to sign it, which is impractical for exchange withdrawals. This limitation makes pure account-based approaches problematic for new user onboarding.
-
-
 ### Accounts - All-Labeled Inputs Extension
 This extension is not applicable to the Accounts approach.
 
@@ -112,6 +105,22 @@ This extension is not applicable to the Accounts approach.
      - Bootstrapping challenges for new users
      - Complexity of first-time transactions from exchanges
      - Handling empty reward accounts
+     - New user onboarding limitations:
+       - Exchange withdrawals require complex transactions
+       - Need for receiving wallet signatures on exchange withdrawals
+       - Impractical for first-time users entering through exchanges
+     - Recovery challenges:
+       - Users can become locked out if they accidentally empty their fee account
+       - No mechanism to recover from empty reward accounts
+       - Requires careful consideration of account balance management
+
+
+> [!NOTE]
+> 
+> **Edge Case: New User Onboarding**
+> 
+> A significant challenge arises when new users enter Cardano through exchanges. Since they don't have a registered reward account, their first transaction would need to both register a staking credential and handle the exchange withdrawal. This creates a complex transaction that would require the receiving wallet to sign it, which is impractical for exchange withdrawals. This limitation makes pure account-based approaches problematic for new user onboarding.
+
 
 ## Conclusion
 
