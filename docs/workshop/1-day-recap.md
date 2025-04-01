@@ -12,7 +12,7 @@
 Explicit shard labeling of UTxOs with fees consumed on every transaction. Provides strong guarantees for conflict prevention. Requires one initial bootstrap transaction to transition from Praos to Leios, enabling immediate protocol participation.
 
 ### Labeled UTxOs - Collateral
-Collateral consumed only when conflicts occur, requiring a return address. Offers weaker guarantees than the fees approach while maintaining system integrity through explicit shard labeling. Provides a more relaxed constraint on fee payment.
+Collateral consumed only when conflicts occur, requiring a return address. Offers weaker guarantees than the fees approach while maintaining system integrity through explicit shard labeling.
 
 ### Labeled UTxOs - All-Labeled Inputs Extension
 The all-labeled inputs extension represents the most comprehensive approach, where every input gets labeled. This provides maximum conflict prevention but comes with higher bootstrapping costs. This approach offers the strongest guarantees but requires significant upfront work for migration.
@@ -81,3 +81,50 @@ This extension is not applicable to the Accounts approach.
      - Treasury assertions
      - Parameter changes
      - Hardfork events
+
+### Conformance Testing Considerations
+
+Two complementary approaches were discussed for ensuring implementation correctness:
+
+1. **QuickCheck Dynamic Approach**
+   - Executable formal specification in Agda
+   - Specification converted to Haskell using standard Agda compiler
+   - QuickCheck Dynamic test driver for generating test cases
+   - Test adapters needed for both Haskell and Rust simulations
+   - Challenges:
+     - Complex generator development for meaningful test cases
+     - Need for adapters to interface with simulations
+     - Higher implementation effort but enables adversarial testing
+
+2. **Trace Verification Approach**
+   - Uses simulation log files as input
+   - Verifies traces against relational specification
+   - Lower implementation overhead
+   - Requires standardized log format between implementations
+   - Limitations:
+     - Only tests behaviors that naturally occur in simulations
+     - May miss edge cases or adversarial scenarios
+     - Cannot directly test invalid behaviors
+
+3. **Coverage Enhancement Strategy**
+   - Track which parts of specification are exercised by traces
+   - Use Haskell Program Coverage (HPC) on generated code
+   - Identify untested branches and conditions
+   - Benefits:
+     - Clear visibility of test coverage gaps
+     - Guide development of targeted test scenarios
+     - Help prioritize adversarial test case development
+
+4. **Implementation Requirements**
+   - Standardized logging format across implementations
+   - Support for negative events (e.g., "could not produce IB")
+   - Clear separation between node and environment
+   - Ability to track specification coverage
+   - Support for both valid and invalid test cases
+
+5. **Phased Testing Strategy**
+   - Start with trace verification for basic correctness
+   - Add coverage tracking to identify gaps
+   - Develop targeted test cases for uncovered scenarios
+   - Implement QuickCheck approach for adversarial testing?
+   - Focus on high-priority edge cases identified in coverage analysis
