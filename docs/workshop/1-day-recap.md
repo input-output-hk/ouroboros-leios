@@ -26,87 +26,58 @@ In the Accounts approach, collateral is only consumed on conflicts but lacks rep
 ### Accounts - All-Labeled Inputs Extension
 This extension is not applicable to the Accounts approach.
 
-## Hybrid Solution
+## Key Design Considerations & Insights
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Hybrid Ledger Design                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ 1. Default Transaction                                      │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │ • Implicit Shard (via Account)                      │  │
-│    │ • Required UTxO Input                               │  │
-│    │ • Optional Labeled Output                           │  │
-│    └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│ 2. Specialized Transaction                                  │
-│    ┌─────────────────────────────────────────────────────┐  │
-│    │ • Fully Labeled UTxOs                               │  │
-│    │ • High-throughput Use Cases                         │  │
-│    └─────────────────────────────────────────────────────┘  │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+### User Bootstrapping Flow
+- Initial transaction requires a UTxO input for replay protection
+- Uses implicit sharding via staking credential
+- Can create labeled outputs in same transaction
+- Provides seamless user experience without separate bootstrap transaction
 
-### How it works:
+### Network Transition Considerations
+- Existing Praos UTxOs and reward accounts remain valid
+- Need to consider both:
+  1. Network transition (Praos → Leios)
+  2. Individual user onboarding into Leios
+- Gradual transition possible without hard cutover
 
-1. **Default Behavior**: 
-   - Uses staking credential to implicitly define the shard
-   - Requires at least one UTxO input for replay protection
-   - Fees are covered by the reward account associated with the staking credential
-   - UTxO is only consumed to prevent replay, not for fee payment
+### Critical Edge Cases
 
-2. **Bootstrapping Process**:
-   - New users can immediately use Leios without explicit migration
-   - Transactions can only fail due to double spending (not fee insufficiency)
-   - Always pays transaction fees from the reward account
+1. **New User Onboarding**
+   - Exchange withdrawals are a critical flow
+   - Pure account-based approach problematic:
+     - Would require registering staking credential
+     - Complex transaction needing receiving wallet signature
+     - Impractical for exchange withdrawals
+   
+2. **Account Recovery**
+   - Risk of users accidentally emptying fee accounts
+   - No built-in recovery mechanism for empty reward accounts
+   - Requires careful balance management consideration
 
-3. **Migration Path**:
-   - Users can optionally create transaction outputs with explicit shard IDs
-   - High-throughput applications can migrate to fully labeled UTxOs
-   - Gradual transition path rather than a hard cutover
+3. **Fee Payment**
+   - Must ensure reward accounts have sufficient funds
+   - Need to consider initial distribution and maintenance
+   - Balance between user experience and security
 
-4. **Edge Cases Addressed**:
-   - **New Users**: Exchange withdrawals can work immediately without having to register reward accounts first
-   - **Replay Protection**: Required UTxO input prevents transaction replay attacks
-   - **Fee Payment**: Guaranteed through reward accounts, while maintaining strong conflict resolution
+### System Properties
 
-## Key Considerations
+1. **Replay Protection**
+   - UTxO input requirement prevents transaction replay
+   - Critical for system security
+   - Must be maintained regardless of sharding approach
 
-1. **Governance Interactions**:
-   - The hybrid model can handle UTxO and reference inputs
-   - Compatible with governance actions (votes and proposals)
-   - Supports reward account withdrawals
-   - Works with treasury assertions and parameter changes
+2. **Conflict Resolution**
+   - Explicit vs implicit sharding tradeoffs
+   - Impact on throughput and user experience
+   - Balance between complexity and guarantees
 
-2. **Pure Leios System**:
-   - The hybrid approach provides a path to eventually create a pure Leios system
-   - Can bootstrap with an initial distribution that includes both labeled UTxOs and account-based shards
-
-3. **Critical Insight**:
-   - A pure reward account approach is not viable due to:
-     - Bootstrapping challenges for new users
-     - Complexity of first-time transactions from exchanges
-     - Handling empty reward accounts
-     - New user onboarding limitations:
-       - Exchange withdrawals require complex transactions
-       - Need for receiving wallet signatures on exchange withdrawals
-       - Impractical for first-time users entering through exchanges
-     - Recovery challenges:
-       - Users can become locked out if they accidentally empty their fee account
-       - No mechanism to recover from empty reward accounts
-       - Requires careful consideration of account balance management
-
-
-> [!NOTE]
-> 
-> **Edge Case: New User Onboarding**
-> 
-> A significant challenge arises when new users enter Cardano through exchanges. Since they don't have a registered reward account, their first transaction would need to both register a staking credential and handle the exchange withdrawal. This creates a complex transaction that would require the receiving wallet to sign it, which is impractical for exchange withdrawals. This limitation makes pure account-based approaches problematic for new user onboarding.
-
-
-## Conclusion
-
-The hybrid approach to Leios ledger design offers the most pragmatic path forward, combining the security benefits of labeled UTxOs with the ease of adoption from account-based sharding. By requiring a UTxO input for replay protection while using reward accounts for fee payment, we can ensure both system security and a smooth transition from Praos to Leios.
-
+3. **Governance Compatibility**
+   - Must work with existing governance mechanisms
+   - Support for:
+     - UTxO and reference inputs
+     - Votes and proposals
+     - Reward account withdrawals
+     - Treasury assertions
+     - Parameter changes
+     - Hardfork events
