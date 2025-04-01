@@ -2,6 +2,7 @@
 
 ## Ledger Design Solution Space Matrix
 
+```
 ┌─────────────────────┬──────────────────────────────────┬──────────────────────────────────┐
 │                     │          Labeled UTxOs           │             Accounts             │
 │                     │        (Explicit Shards)         │        (Implicit Shards)         │
@@ -23,6 +24,7 @@
 │                     │ • Higher bootstrapping cost      │               N/A                │
 │                     │                                  │                                  │
 └─────────────────────┴──────────────────────────────────┴──────────────────────────────────┘
+```
 
 ### Labeled UTxOs - Fees
 Explicit shard labeling of UTxOs with fees consumed on every transaction. Provides strong guarantees for conflict prevention. Requires one initial bootstrap transaction to transition from Praos to Leios, enabling immediate protocol participation.
