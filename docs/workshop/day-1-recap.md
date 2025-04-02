@@ -8,7 +8,8 @@
 | **Collateral**      | • Only consumed on conflicts<br>• Return address needed<br>• Bootstrap: requires additional transaction| • Only consumed on conflicts<br>• Requires additional replay protection<br>• No bootstrap transaction needed<br>• Registration costs|
 | **Any-Labeled Inputs (Extension)** | • any labeled input gets labeled<br>• Maximum conflict prevention<br>• Higher bootstrapping cost | N/A |
 
-> [!Note] These different options are not either or. They shall just define the solution space.
+> [!Note] 
+> These different options are not either or. They shall just define the solution space.
 
 ### Labeled UTxOs - Fees
 Explicit shard labeling of UTxOs with fees consumed on every transaction. Provides strong guarantees for conflict prevention. Requires one initial bootstrap transaction to transition from Praos to Leios, enabling immediate protocol participation.
@@ -30,7 +31,7 @@ In the Accounts approach, collateral is only consumed on conflicts but lacks rep
 ### Accounts - All-Labeled Inputs Extension
 This extension is not applicable to the Accounts approach.
 
-> [!NOTE]
+> [!Note]
 > Considering any account based solution and making it too powerful could make builders design purely around it, disregarding UTxOs.
 > Simple constraints such as exclusively allowing to withdraw the entire balance from the account could prevent misue of accounts.
 > You likely do not want to present accounts to scripts to further avoid misuse.
@@ -60,7 +61,7 @@ This extension is not applicable to the Accounts approach.
      - Impractical for exchange withdrawals
    - shows technically infeasiable
 
-> [!NOTE]
+> [!Note]
 > You cannot have pure account solutions. We can either have only labeled UTxO or labeled UTxO with accounts.
    
 2. **Self-blocking Account**
