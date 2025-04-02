@@ -13,7 +13,6 @@ This document provides a comprehensive analysis of the costs associated with run
 | Storage (SSD) | $/GiB/mo | Cost per gibibyte of SSD storage per month |
 | Egress | $/GiB | Cost per gibibyte of data transferred out |
 | Ingress | $/GiB | Cost per gibibyte of data transferred in (if applicable) |
-| Static IP | $/mo | Cost per static IPv4 address per month |
 
 > [!Note]
 > Storage and data transfer use binary prefixes (GiB = 2³⁰ bytes), while RAM uses decimal prefixes (GB = 10⁹ bytes), following industry standards for cloud computing. 
