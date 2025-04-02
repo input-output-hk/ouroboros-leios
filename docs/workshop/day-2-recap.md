@@ -31,19 +31,38 @@ How much does it cost to run a Leios node at different TPS/ throughput levels?
 > [!Note]
 > The Compute column shows CPU usage as a percentage of a single core. For example, 100% means one full core is utilized, while 200% would indicate usage across two cores. This metric helps in determining the number of CPU cores needed for different TPS levels.
 
-### Key Findings
+### Key Findings and Trade-offs
 
 The analysis reveals important characteristics about Leios's performance at different throughput levels:
 
-- **Low TPS Overhead**: At low TPS (10 TPS), the protocol shows significant overhead compared to Praos, with resource usage increasing by 6x for compute and 1.8x for egress. This indicates a substantial baseline cost for running Leios at low throughput and points to more research.
+- **Low TPS Overhead**: At low TPS (10 TPS), the protocol shows significant overhead compared to Praos, with resource usage increasing by 6x for compute and 1.8x for egress. This indicates a substantial baseline cost for running Leios at low throughput.
 
 - **Scaling Efficiency**: As TPS increases, Leios's relative overhead decreases. At 1K TPS, while absolute resource usage is higher, the protocol becomes more efficient relative to the throughput achieved.
 
-- **Breakeven Point**: There exists a TPS threshold (yet to be precisely defined) where Leios's performance characteristics become more favorable compared to lower TPS levels. This suggests that Leios is particularly well-suited for high-throughput scenarios.
+- **Main Cost Driver**: The analysis identified that voting operations are the primary cost driver in the protocol. This finding sparked discussions about potential collaboration with Peras to reuse their voting mechanism, which could significantly reduce resource consumption and improve overall efficiency.
 
-These findings suggest that Leios may be most economically viable in high-throughput environments, where its resource utilization becomes more efficient relative to the achieved transaction throughput.
+- **Performance Characteristics**:
+  - High end: Achieves high throughput with lower-than-Praos latency
+  - Low end: Poor trade-off between latency and resource overheads
+  - Currently experiencing longer settlement times (quantification pending)
 
-## Next steps
+- **Resource Utilization**:
+  - Higher overhead at low utilization, primarily driven by the cost of votes
+  - Resource efficiency improves significantly at higher TPS levels
+  - Requires higher utilization to justify its trade-offs
+
+#### Recommendations
+1. **Integration Opportunity**: Explore clever integration possibilities between Leios and Peras, particularly focusing on:
+   - Potential reuse of Peras's voting mechanism
+   - Shared resource optimization
+   - Combined protocol benefits
+
+2. **Research Needs**: 
+   - Dedicated research team needed to investigate integration possibilities
+   - Further quantification of settlement times and their impact
+   - Detailed analysis of optimal utilization thresholds
+
+## Next steps for cost
 
 - calculate each cost item for different scenarios
     - one complete table with all cost items broken up
