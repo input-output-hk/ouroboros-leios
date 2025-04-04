@@ -17,7 +17,7 @@ trace.rust.schema.json: trace.rust.d.ts
 	npx prettier -w trace.rust.schema.json
 
 .PHONY: validate
-validate:
+validate: all
 	@echo "Validating config..."
 	@npx pajv -m schema.schema.json -s config.schema.json -d config.default.yaml > /dev/null && echo "config.default.yaml valid" || exit 1
 	@echo "Validating topology..."

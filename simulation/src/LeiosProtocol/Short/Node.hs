@@ -84,6 +84,14 @@ data LeiosNodeEvent
 ---- Node Config
 --------------------------------------------------------------
 
+data BlockGeneration
+  = Honest
+  | UnboundedIbs
+      { startingAtSlot :: SlotNo
+      , slotOfGeneratedIbs :: SlotNo
+      , ibsPerSlot :: Word64
+      }
+
 data LeiosNodeConfig = LeiosNodeConfig
   { leios :: !LeiosConfig
   , slotConfig :: !SlotConfig
@@ -93,7 +101,8 @@ data LeiosNodeConfig = LeiosNodeConfig
   -- ^ for block generation
   , baseChain :: !(Chain RankingBlock)
   , processingQueueBound :: !Natural
-  , processingCores :: NumCores
+  , processingCores :: !NumCores
+  , blockGeneration :: !BlockGeneration
   }
 
 --------------------------------------------------------------
@@ -812,7 +821,7 @@ generator tracer cfg st = do
             return (rb, chain :> rb)
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
           traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
-        SomeAction Generate.Propose ib -> (GenIB,) $ do
+        SomeAction Generate.Propose{} ib -> (GenIB,) $ do
           now <- getCurrentTime
           atomically $ do
             modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
@@ -929,9 +938,14 @@ mkSchedule cfg = do
   calcWins rate = Just $ \sample ->
     if sample <= coerce (nodeRate cfg.stake rate) then 1 else 0
   voteRate = votingRatePerPipeline cfg.leios cfg.stake
+  honestIBRate = inputBlockRate cfg.leios cfg.stake
+  ibRate Honest slot = (SomeRole (Generate.Propose Nothing Nothing), honestIBRate slot)
+  ibRate (UnboundedIbs{..}) slot =
+    if slot < startingAtSlot
+      then (SomeRole (Generate.Propose Nothing Nothing), honestIBRate slot)
+      else (SomeRole (Generate.Propose (Just slotOfGeneratedIbs) (Just 0)), Just (const $ ibsPerSlot))
   pureRates =
-    [ (SomeRole Generate.Propose, inputBlockRate cfg.leios cfg.stake)
-    , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
+    [ (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
   rates votingSlots slot = do
@@ -943,7 +957,11 @@ mkSchedule cfg = do
               writeTVar votingSlots sls
               pure (Just voteRate)
         _ -> pure Nothing
-    pure $ (SomeRole Generate.Vote, vote) : map (fmap ($ slot)) pureRates
+    pure $
+      [ (SomeRole Generate.Vote, vote)
+      , ibRate cfg.blockGeneration slot
+      ]
+        ++ map (fmap ($ slot)) pureRates
   pickFromRanges :: StdGen -> [(SlotNo, SlotNo)] -> [SlotNo]
   pickFromRanges rng0 rs = snd $ mapAccumL f rng0 rs
    where

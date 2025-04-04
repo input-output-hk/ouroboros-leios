@@ -25,6 +25,7 @@ import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
 import Topology (P2PNetwork (..))
+import qualified Topology
 
 traceLeiosP2P ::
   StdGen ->
@@ -109,6 +110,14 @@ exampleTrace2' rng0 leios@LeiosConfig{praos = PraosConfig{configureConnection}} 
       , processingCores
       , nodeId
       , rng
+      , blockGeneration = case Map.lookup nodeId =<< p2pAdversaries of
+          Nothing -> Honest
+          Just Topology.UnboundedIbs{..} ->
+            UnboundedIbs
+              { startingAtSlot = SlotNo $ fromIntegral startingAtSlot
+              , slotOfGeneratedIbs = SlotNo $ fromIntegral slotOfGeneratedIbs
+              , ibsPerSlot = fromIntegral ibsPerSlot
+              }
       }
    where
     processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores

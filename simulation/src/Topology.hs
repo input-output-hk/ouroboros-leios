@@ -106,6 +106,7 @@ benchTopologyToTopology benchTopology latencies stakeShareSize =
             { stake = maybe 0 (stakeShareSize *) benchTopologyNode.pools
             , cpuCoreCount = Unbounded
             , location = LocCluster (regionNameToClusterName <$> benchTopologyNode.region)
+            , adversarial = Nothing
             }
       , producers =
           M.fromList
@@ -336,6 +337,7 @@ data P2PNetwork = P2PNetwork
   , p2pNodeNames :: !(Map NodeId Text)
   , p2pNodeCores :: !(Map NodeId NumCores)
   , p2pNodeStakes :: !(Map NodeId StakeFraction)
+  , p2pAdversaries :: !(Maybe (Map NodeId Behaviour))
   , p2pLinks :: !(Map Link (Latency, Maybe BandwidthBytesPerSecond))
   , p2pWorld :: !World
   }
@@ -381,6 +383,7 @@ grToP2PNetwork p2pWorld gr = P2PNetwork{..}
   totalStake = fromIntegral . sum $ map (fromIntegral @_ @Integer . (.stake) . snd) $ Map.elems nodeInfoMap
   p2pLinks = flip Map.map edgeInfoMap $ \link ->
     (link.latencyS, fromIntegral <$> unBandwidthBps link.bandwidthBytesPerSecond)
+  p2pAdversaries = Just $ Map.fromList [(nid, b) | (nid, (_, NodeInfo{adversarial = Just b})) <- Map.toList nodeInfoMap]
 
 p2pNetworkToGr :: Word -> P2PNetwork -> Gr (NodeName, NodeInfo COORD2D) LinkInfo
 p2pNetworkToGr totalStake P2PNetwork{..} = G.mkGraph grNodes grLinks
@@ -394,6 +397,7 @@ p2pNetworkToGr totalStake P2PNetwork{..} = G.mkGraph grNodes grLinks
             Infinite -> Nothing
             Finite n -> Just $ fromIntegral n
     , let location = LocCoord2D point
+    , let adversarial = Map.lookup nId =<< p2pAdversaries
     ]
   grLinks =
     [ linkToEdge link linkInfo
@@ -420,6 +424,7 @@ topologyToNetwork P2PTopography{..} = P2PNetwork{p2pLinks = fmap (,defaultBandwi
   numNodes = fromIntegral $ Map.size p2pNodes
   -- TODO: unrestricted bandwidth is unsupported
   defaultBandwidthBps = Just (kilobytes 1000)
+  p2pAdversaries = Nothing
 
 overrideUnlimitedBandwidth :: Bytes -> P2PNetwork -> P2PNetwork
 overrideUnlimitedBandwidth x P2PNetwork{..} =

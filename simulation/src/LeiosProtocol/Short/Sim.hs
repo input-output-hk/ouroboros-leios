@@ -449,6 +449,7 @@ traceRelayLink1 connectionOptions =
               , -- \^ overall size of txs to include in IBs
                 processingQueueBound = 100
               , processingCores = Infinite
+              , blockGeneration = Honest
               , ..
               }
       (pA, cB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
