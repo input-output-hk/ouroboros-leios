@@ -9,9 +9,10 @@
 module JSONCompat where
 
 import Data.Aeson.Key (fromString)
-import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), Object, Parser, ToJSON (..), (.!=), (.:), (.:?))
+import Data.Aeson.Types (FromJSON (..), KeyValue ((.=)), Object, Parser, ToJSON (..), explicitParseFieldMaybe, parserCatchError, (.!=), (.:))
 import Data.Char (isUpper, toLower, toUpper)
 import Data.Default (Default (..))
+import Debug.Trace
 import GHC.Records (HasField (..))
 import GHC.TypeLits (KnownSymbol (..), SSymbol, fromSSymbol)
 
@@ -52,7 +53,15 @@ omitDefault = Getter $ \(fld :: SSymbol fld) obj ->
 
 parseFieldOrDefault :: forall obj fld a. (HasField fld obj a, Default obj, KnownSymbol fld, FromJSON a) => Object -> Parser a
 parseFieldOrDefault obj =
-  obj .:? fromString (camelToKebab (fromSSymbol (symbolSing @fld))) .!= getField @fld (def :: obj)
+  explicitParseFieldMaybe tracingParser obj (fromString (camelToKebab (fromSSymbol (symbolSing @fld))))
+    .!= defVal
+ where
+  defVal = getField @fld (def :: obj)
+  tracingParser v =
+    parseJSON v
+      `parserCatchError` ( \path msg ->
+                            trace ("Using default value for: " ++ show path ++ " , error: " ++ msg) (pure defVal)
+                         )
 
 parseField :: forall obj fld a. (HasField fld obj a, KnownSymbol fld, FromJSON a) => Object -> Parser a
 parseField obj = obj .: fromString (camelToKebab (fromSSymbol (symbolSing @fld)))
