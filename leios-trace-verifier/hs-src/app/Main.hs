@@ -17,8 +17,11 @@ main =
   do
     Command{..} <- execParser commandParser
     (top :: Topology CLUSTER) <- decodeFileThrow topologyFile
-    let nrNodes = toInteger $ Prelude.length $ elems $ nodes top
-    BSL.readFile logFile >>= print . verifyTrace nrNodes idSut . decodeJSONL
+    let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
+    let nodeNames = Prelude.map unNodeName (keys $ nodes top)
+    let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
+    let sd = Prelude.zip nodeNames stakes
+    BSL.readFile logFile >>= print . verifyTrace nrNodes idSut sd . decodeJSONL
 
 data Command = Command
   { logFile :: FilePath

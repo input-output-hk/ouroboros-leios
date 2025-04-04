@@ -6,6 +6,7 @@ open import Data.Bool using (if_then_else_)
 import Data.Nat.Show as S
 import Data.String as S
 open import Agda.Builtin.Word using (Word64; primWord64ToNat)
+open import Foreign.Haskell.Pair
 
 module Parser where
 
@@ -84,9 +85,7 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
-open import Leios.SpecStructure using (SpecStructure)
-
-module _ (numberOfParties : ℕ) (sutId : ℕ) where
+module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String ℕ)) where
 
   from-id : ℕ → Fin numberOfParties
   from-id n =
@@ -100,23 +99,28 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) where
   SUT-id : Fin numberOfParties
   SUT-id = from-id sutId
 
-  open import Leios.Defaults numberOfParties SUT-id hiding (LeiosInput; LeiosOutput; SLOT)
-  open import Leios.Trace.Verifier numberOfParties SUT-id
-  open import Leios.Short st
+  nodeId : String → Fin numberOfParties
+  nodeId s with S.readMaybe 10 (S.fromList (drop (S.length nodePrefix) $ S.toList s))
+  ... | nothing = error ("Unknown node: " S.++ s)
+  ... | just n = from-id n
+
+  open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
+
+  sd : TotalMap (Fin numberOfParties) ℕ
+  sd =
+    let (r , l) = fromListᵐ (L.map (λ (x , y) → (nodeId x , y)) stakeDistr)
+    in case (¿ total r ¿) of λ where
+         (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
+         (no _)  → error "Expected total map"
+
+  open import Leios.Defaults numberOfParties SUT-id using (hhs; hpe)
+  open import Leios.Short.Trace.Verifier numberOfParties SUT-id sd
 
   to-nodeId : ℕ → String
   to-nodeId n = nodePrefix S.++ show n
 
   SUT : String
   SUT = to-nodeId sutId
-
-  nodeId : String → Fin numberOfParties
-  nodeId s with S.readMaybe 10 (S.fromList (take (S.length nodePrefix) $ S.toList s))
-  ... | nothing = error ("Unknown node: " S.++ s)
-  ... | just n = from-id n
-
-  blockRefToString : BlockRef → String
-  blockRefToString record { id = ref } = ref
 
   EventLog = List TraceEvent
 
@@ -128,6 +132,17 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) where
   record State : Type where
     field refs : AssocList String Blk
           currentSlot : ℕ
+
+  instance
+    hhx : Hashable InputBlock (List ℕ)
+    hhx .hash record { header = h } = hash h
+
+  blockRefToNat : AssocList String Blk → String → IBRef
+  blockRefToNat refs r with refs ⁉ r
+  ... | just (IB-Blk ib) = hash ib
+  ... | just (EB-Blk _) = error "IB expected"
+  ... | just (VT-Blk _) = error "IB expected"
+  ... | nothing = error "IB expected"
 
   open State
 
@@ -167,19 +182,19 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) where
                            record { slotNumber = primWord64ToNat s
                                   ; producerID = nodeId p
                                   ; lotteryPf  = tt
-                                  ; bodyHash   = ""
+                                  ; bodyHash   = [] -- TODO: txs
                                   ; signature  = tt
                                   }
                                 ; body = record { txs = [] } } -- TODO: add transactions
                 in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
   traceEvent→action l record { message = EBGenerated p i s _ ibs }
     with p ≟ SUT
-  ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) (map blockRefToString ibs) , SLOT)) ∷ []
+  ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
   ... | no _ = let eb = record
                           { slotNumber = primWord64ToNat s
                           ; producerID = nodeId p
                           ; lotteryPf  = tt
-                          ; ibRefs     = map blockRefToString ibs
+                          ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
                           ; ebRefs     = []
                           ; signature  = tt
                           }
