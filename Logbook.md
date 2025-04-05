@@ -1,5 +1,19 @@
 # Leios logbook
 
+## 2025-04-04
+
+### EB ledger state / order of IBs discussion
+
+- Prompted by workshop discussion about EB ledger states, added some concerns about how to define them without "history rewriting" effects to [the relevant github discussion](https://github.com/input-output-hk/ouroboros-leios/discussions/243).
+
+### Haskell simulation
+
+- Added support for dishonest Nodes that diffuse an unbounded amount of old IBs.
+   - see `adversarial` field in network topology schema.
+   - should be useful to observe differences between freshest-first and oldest-first delivery.
+- Traced loss of Vote delivery to bug in config generation for the simulation runs.
+  - also explains why no difference was observed between default and uniform/extended voting: the default was actually extended as well.
+
 ## 2025-03-28
 
 ### Haskell simulation
