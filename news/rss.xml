@@ -4,10 +4,55 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Mon, 24 Mar 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 31 Mar 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary - March 31st, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary</guid>
+            <pubDate>Mon, 31 Mar 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. We've made significant progress in addressing various topics.]]></description>
+            <content:encoded><![CDATA[<p>This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. We've made significant progress in addressing various topics.</p>
+<p>On <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md" target="_blank" rel="noopener noreferrer">day one</a>, we have discussed topics such as ledger design and trade-offs as well as two different ways how we can link the formal specification to the simulations.
+<a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md" target="_blank" rel="noopener noreferrer">Day two</a> the team has made great progress towards estimating the cost of running a Leios node, considering different cost items like network egress, CPU and storage. We weren't able to finish all cost items just yet. The last two, IOPS and memory cost, will be added during this month.
+On the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md" target="_blank" rel="noopener noreferrer">last and third day</a>, the team has consolidated our options how optimistic validation of IBs can be accomplished. We have defined three candidates of which we are favoring one specifically. The main goal was to support chaining of transactions with Leios, which requires to define a "point in time"/ stage of the protocol at which a subsequent/ chained transaction can be built on top of an already submitted transaction. This can be achieved by having the node optimistically compute prospective ledger states using its local knowledge of IBs referenced in certified EBs or possibly RBs.</p>
+<ul>
+<li>
+<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md" target="_blank" rel="noopener noreferrer">Day 1</a></p>
+</li>
+<li>
+<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md" target="_blank" rel="noopener noreferrer">Day 2</a></p>
+</li>
+<li>
+<p><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md" target="_blank" rel="noopener noreferrer">Day 3</a></p>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation progress<a class="hash-link" aria-label="Direct link to Simulation progress" title="Direct link to Simulation progress" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#simulation-progress">​</a></h2>
+<ul>
+<li><strong>Haskell simulation</strong>
+<ul>
+<li>Added support for dishonest Nodes that diffuse an unbounded amount of old IBs, enabling further analysis of freshest-first and oldest-first vote delivery scenarios</li>
+<li>Identified and fixed a bug in config generation for simulation runs, which was causing inconsistencies in vote delivery between default and uniform/extended voting schemes</li>
+<li>Added an <code>adversarial</code> field to the network topology schema, allowing for the simulation of unbounded IB diffusion by dishonest nodes</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-simulations">Analysis of simulations<a class="hash-link" aria-label="Direct link to Analysis of simulations" title="Direct link to Analysis of simulations" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#analysis-of-simulations">​</a></h2>
+<p>No specific scenario analysis was reported for this week. However, the team continues to investigate the impact of dishonest nodes on vote delivery and IB diffusion.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="ongoing-investigations">Ongoing investigations<a class="hash-link" aria-label="Direct link to Ongoing investigations" title="Direct link to Ongoing investigations" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#ongoing-investigations">​</a></h2>
+<ul>
+<li>Investigating the effects of unbounded IB diffusion on IB delivery reliability and the performance of the protocol under such conditions.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="additional-resources">Additional resources<a class="hash-link" aria-label="Direct link to Additional resources" title="Direct link to Additional resources" href="https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary#additional-resources">​</a></h2>
+<ul>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/discussions/243" target="_blank" rel="noopener noreferrer">GitHub discussion</a> – EB ledger states and "history rewriting" effects.</li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – March 24, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/03/24/weekly-progress-summary</link>
@@ -1037,33 +1082,6 @@ coding standards.</li>
 <ul>
 <li>Discussed network simulation and ΔQ model of the pipeline.</li>
 <li>Gathered numbers on network latency and throughput.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary - November 11, 2024]]></title>
-            <link>https://leios.cardano-scaling.org/news/2024/11/11/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2024/11/11/weekly-progress-summary</guid>
-            <pubDate>Mon, 11 Nov 2024 00:00:00 GMT</pubDate>
-            <description><![CDATA[Network Simulation for Leios]]></description>
-            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="network-simulation-for-leios">Network Simulation for Leios<a class="hash-link" aria-label="Direct link to Network Simulation for Leios" title="Direct link to Network Simulation for Leios" href="https://leios.cardano-scaling.org/news/2024/11/11/weekly-progress-summary#network-simulation-for-leios">​</a></h2>
-<ul>
-<li>Discussed early simulations for Leios with researchers.</li>
-<li>Simulated block diffusion with bandwidth constraints.</li>
-<li>Modeled block propagation among nodes and observed variations in diffusion
-time.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="team-meeting">Team Meeting<a class="hash-link" aria-label="Direct link to Team Meeting" title="Direct link to Team Meeting" href="https://leios.cardano-scaling.org/news/2024/11/11/weekly-progress-summary#team-meeting">​</a></h2>
-<ul>
-<li>Explored potential use cases for "Blob Leios" in governance and auctions.</li>
-<li>Discussed incentives for SPOs to serve data and compared with Filecoin.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="presentation-by-sandro">Presentation by Sandro<a class="hash-link" aria-label="Direct link to Presentation by Sandro" title="Direct link to Presentation by Sandro" href="https://leios.cardano-scaling.org/news/2024/11/11/weekly-progress-summary#presentation-by-sandro">​</a></h2>
-<ul>
-<li>Sandro provided an introductory talk on Leios, explaining protocol decisions.</li>
-<li>Recording available for team review.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
