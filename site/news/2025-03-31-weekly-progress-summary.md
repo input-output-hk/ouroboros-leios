@@ -29,10 +29,6 @@ On the [last and third day](https://github.com/input-output-hk/ouroboros-leios/b
   - We identified and fixed a bug in config generation for simulation runs, which was causing inconsistencies in vote delivery between default and uniform/extended voting schemes
   - We added an `adversarial` field to the network topology schema, allowing for the simulation of unbounded IB diffusion by dishonest nodes
 
-## Analysis of simulations
-
-No specific scenario analysis was reported for this week. However, we continue to investigate the impact of dishonest nodes on vote delivery and IB diffusion.
-
 ## Ongoing investigations
 
 - We are investigating the effects of unbounded IB diffusion on IB delivery reliability and the performance of the protocol under such conditions.
