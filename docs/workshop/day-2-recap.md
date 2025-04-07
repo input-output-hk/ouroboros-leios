@@ -1,5 +1,9 @@
 # Edinburgh Workshop Day 2 Recap
 
+Agenda
+
+[1. Leios Node Costs Estimate](#cost-items)
+
 The goal is answer the question of:
 How much does it cost to run a Leios node at different TPS/ throughput levels?
 

@@ -1,5 +1,11 @@
 # Edinburgh Workshop Day 1 Recap
 
+Agenda
+
+[1. Ledger Design options](#ledger-design-solution-space-matrix)
+
+[2. Conformance Testing](#conformance-testing-considerations)
+
 ## Ledger Design Solution Space Matrix
 
 |                     | Labeled UTxOs (Explicit Shards) | Accounts (Implicit Shards) |
@@ -36,22 +42,22 @@ This extension is not applicable to the Accounts approach.
 > Simple constraints such as exclusively allowing to withdraw the entire balance from the account could prevent misue of accounts.
 > You likely do not want to present accounts to scripts to further avoid misuse.
 
-## Key Design Considerations & Insights
+### Key Design Considerations & Insights
 
-### User Bootstrapping Flow
+#### User Bootstrapping Flow
 - Initial transaction requires a UTxO input for replay protection
 - Uses implicit sharding via staking credential
 - Can create labeled outputs in same transaction
 - Provides seamless user experience without separate bootstrap transaction
 
-### Network Transition Considerations
+#### Network Transition Considerations
 - Existing Praos UTxOs and reward accounts remain valid
 - Need to consider both:
   1. Network transition (Praos → Leios)
   2. Individual user onboarding into Leios
 - Gradual transition possible without hard cutover
 
-### Critical Edge Cases
+#### Critical Edge Cases
 
 1. **New User Onboarding**
    - Exchange withdrawals are a critical flow
@@ -95,7 +101,7 @@ The following is an descending, ordered list of ways which transaction can confl
    - Parameter changes
    - Hardfork events
 
-### Conformance Testing Considerations
+## Conformance Testing Considerations
 
 Two complementary approaches were discussed for ensuring implementation correctness:
 

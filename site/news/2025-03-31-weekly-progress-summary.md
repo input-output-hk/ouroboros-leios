@@ -1,11 +1,24 @@
 ---
-title: Weekly Summary - 2025-03-31
+title: Weekly Summary - March 31st, 2025
 authors:
 - will
 tags: [progress, update, weekly]
 ---
 
-This week, the Leios team continued their efforts in refining the protocol and its simulation capabilities. They made significant progress in addressing various aspects of the Haskell simulator.
+This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. We've made significant progress in addressing various topics.
+
+# Workshop Summaries
+
+On [day one](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md), we have discussed topics such as ledger design and trade-offs as well as two different ways how we can link the formal specification to the simulations.
+[Day two](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md) the team has made great progress towards estimating the cost of running a Leios node, considering different cost items like network egress, CPU and storage. We weren't able to finish all cost items just yet. The last two, IOPS and memory cost, will be added during this month.
+On the [last and third day](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md), the team has consolidated our options how optimistic validation of IBs can be accomplished. We have defined three candidates of which we are favoring one specifically. The main goal was to support chaining of transactions with Leios, which requires to define a "point in time"/ stage of the protocol at which a subsequent/ chained transaction can be built on top of an already submitted transaction. This can be achieved by having the node optimistically compute prospective ledger states using its local knowledge of IBs referenced in certified EBs or possibly RBs.
+
+- [Day 1](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-1-recap.md)
+
+- [Day 2](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-2-recap.md)
+
+- [Day 3](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/workshop/day-3-recap.md)
+
 
 ## Simulation progress
 
@@ -25,5 +38,3 @@ No specific scenario analysis was reported for this week. However, the team cont
 ## Additional resources
 
 - [GitHub discussion](https://github.com/input-output-hk/ouroboros-leios/discussions/243) – EB ledger states and "history rewriting" effects.
-
-Note: A daily review was not available, however, notes were found for the dates 2025-04-04.
