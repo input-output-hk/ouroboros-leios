@@ -1,14 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
 
 module Main where
 
 import Data.ByteString.Lazy as BSL
 import Data.Map
 import Data.Yaml
+import LeiosConfig (Config (..))
 import LeiosEvents
-import LeiosTopology
+import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..), Topology (..))
 import Lib
 import Options.Applicative
 
@@ -17,14 +18,24 @@ main =
   do
     Command{..} <- execParser commandParser
     (top :: Topology CLUSTER) <- decodeFileThrow topologyFile
+    (config :: Config) <- decodeFileThrow configFile
     let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
     let nodeNames = Prelude.map unNodeName (keys $ nodes top)
     let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
-    let sd = Prelude.zip nodeNames stakes
-    BSL.readFile logFile >>= print . verifyTrace nrNodes idSut sd . decodeJSONL
+    let stakeDistribution = Prelude.zip nodeNames stakes
+    let stageLength = toInteger (leiosStageLengthSlots config)
+    BSL.readFile logFile
+      >>= print
+        . verifyTrace
+          nrNodes
+          idSut
+          stakeDistribution
+          stageLength
+        . decodeJSONL
 
 data Command = Command
   { logFile :: FilePath
+  , configFile :: FilePath
   , topologyFile :: FilePath
   , idSut :: Integer
   }
@@ -34,11 +45,12 @@ commandParser :: ParserInfo Command
 commandParser =
   info (com <**> helper) $
     fullDesc
-      <> progDesc "Short Leios trace verifier"
-      <> header "parser - a Short Leios trace verifier"
+      <> progDesc "Leios trace verifier"
+      <> header "parser - a Leios trace verifier"
  where
   com =
     Command
       <$> strOption (long "trace-file" <> help "Short Leios simulation trace log file")
+      <*> strOption (long "config-file" <> help "Short Leios configuration file")
       <*> strOption (long "topology-file" <> help "Short Leios topology file")
       <*> option auto (long "idSut" <> help "Id of system under test (SUT)")

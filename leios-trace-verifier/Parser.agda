@@ -85,7 +85,7 @@ record TraceEvent : Type where
 
 {-# COMPILE GHC TraceEvent = data TraceEvent (TraceEvent) #-}
 
-module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String ℕ)) where
+module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String ℕ)) (sl : ℕ) where
 
   from-id : ℕ → Fin numberOfParties
   from-id n =
@@ -98,6 +98,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
   SUT-id : Fin numberOfParties
   SUT-id = from-id sutId
+
+  instance
+    sl-NonZero : NonZero sl
+    sl-NonZero with sl ≟ 0
+    ... | yes _ = error "Stage length is 0"
+    ... | no ¬p = ≢-nonZero ¬p
 
   nodeId : String → Fin numberOfParties
   nodeId s with S.readMaybe 10 (S.fromList (drop (S.length nodePrefix) $ S.toList s))
@@ -113,8 +119,19 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
          (no _)  → error "Expected total map"
 
-  open import Leios.Defaults numberOfParties SUT-id using (hhs; hpe)
-  open import Leios.Short.Trace.Verifier numberOfParties SUT-id sd
+  open import Leios.Config
+
+  params : Params
+  params =
+    record
+      { numberOfParties = numberOfParties
+      ; sutId = SUT-id
+      ; stakeDistribution = sd
+      ; stageLength = sl
+      }
+
+  open import Leios.Defaults params using (hhs; hpe)
+  open import Leios.Short.Trace.Verifier params
 
   to-nodeId : ℕ → String
   to-nodeId n = nodePrefix S.++ show n
