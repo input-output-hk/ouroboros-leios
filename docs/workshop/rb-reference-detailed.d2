@@ -84,21 +84,21 @@ fast: {
 
 # Stable chain prefix
 stable.RB -> stable.RBs: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 
 # Volatile chain suffix
 volatile.RB -> volatile.RB1: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 volatile.RB1 -> volatile.RBs: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 volatile.RBs -> stable.RB: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 RB0 -> volatile.RB: {
-  class: rb_arrow
+  class: to_rb_arrow
   style: {
     stroke-dash: 7
   }
@@ -125,11 +125,11 @@ fast.EB -> fast.IB: "Ref(s)" {
 # IB links
 
 secure.IB -> stable.RB: "Ref" {
-  class: ib_arrow
+  class: to_rb_arrow
 }
 
 fast.IB -> volatile.RB: "Ref" {
-  class: ib_arrow
+  class: to_rb_arrow
 }
 
 direction: left
