@@ -71,6 +71,12 @@ The EB reference approach offers a middle ground between security and latency. C
 
 2. **EB Chain Reference**: IBs reference an EB which itself may reference another EB, which creates this chain of EBs which at some point need to reference an RB. This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles scenarios where multiple certified EBs have been produced in parallel in the recent past.
 
+TODO:
+- EBs reference one or more older EBs (that have not been referenced by RBs)
+- Each RB exactly ref one EB
+- IBs reference one of these EBs
+- No transactions in RBs!
+
 3. **RB + EB Hybrid Reference**: IBs can reference either an RB or a certified EB, with the EB itself referencing an older RB. This provides flexibility while ensuring security. This was regarded as a bootstrap mechanism.
 
 **Extensions and Implementation Details:**
