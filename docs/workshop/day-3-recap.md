@@ -60,7 +60,7 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 ![RB Reference Approach](rb-reference.svg)
 
 > [!Note]
-> There is a more detailed version of this including EBs, [here](./rb-reference-detailed.svg).
+> There are two more version of this, a [detailed](./rb-reference-detailed.svg) and a [complex](./rb-reference-complex.svg) including EBs.
 
 #### EB Reference Approach
 
@@ -69,7 +69,7 @@ The EB reference approach offers a middle ground between security and latency. C
 1. **Direct EB Reference**: IBs directly reference certified EBs, which themselves reference an older RB.
 ![EB Reference Approach](eb-reference-01.svg)
 
-2. **EB Chain Reference**: IBs reference a chain of certified EBs, where each EB references a previous EB, creating a chain of references back to an RB. This approach allows for more recent state references and covers edge cases where multiple certified EBs have been produced in parallel in the recent past.
+2. **EB Chain Reference**: IBs reference an EB which itself may reference another EB, which creates this chain of EBs which at some point need to reference an RB. This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles scenarios where multiple certified EBs have been produced in parallel in the recent past.
 
 3. **RB + EB Hybrid Reference**: IBs can reference either an RB or a certified EB, with the EB itself referencing an older RB. This provides flexibility while ensuring security. This was regarded as a bootstrap mechanism.
 

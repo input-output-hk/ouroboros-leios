@@ -1,7 +1,7 @@
 ...@styles
 
 title: {
-  label: "Direct certified IB-to-EB Reference Approach (a)"
+  label: "Direct certified IB-to-EB Reference Approach (b)"
   near: top-center
   style.font-size: 24
   style.bold: true
@@ -52,6 +52,16 @@ EB: {
 EB0: {
   class: eb
   label: "EB"
+}
+
+IB6: {
+  class: ib
+  label: "IB"
+}
+
+IB5: {
+  class: ib
+  label: "IB"
 }
 
 IB4: {
@@ -109,19 +119,39 @@ RB0 -> EB0: "Contains\nEB Certificate" {
 }
 
 # EB references
-EB1 -> volatile.RB2: "Ledger Ref" {
-  class: ledger_link
+EB1 -> IB6: "Ref" {
+  class: to_ib_arrow
 }
 
-EB -> volatile.RB1: "Ledger Ref" {
-  class: ledger_link
+EB1 -> IB5: "Ref" {
+  class: to_ib_arrow
 }
 
-EB0 -> volatile.RB: "Ledger Ref" {
-  class: ledger_link
+EB -> IB4: "Ref" {
+  class: to_ib_arrow
+}
+
+EB -> IB3: "Ref" {
+  class: to_ib_arrow
+}
+
+EB0 -> IB2: "Ref" {
+  class: to_ib_arrow
+}
+
+EB0 -> IB1: "Ref" {
+  class: to_ib_arrow
 }
 
 # IB references
+
+IB6 -> volatile.RBs: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB5 -> volatile.RB2: "Ledger Ref" {
+  class: ledger_link
+}
 
 IB4 -> EB1: {
   class: to_eb_arrow
