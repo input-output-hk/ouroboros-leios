@@ -4,12 +4,9 @@ Agenda
 
 [1. First Full Leios Simulation Analysis](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w13/analysis.ipynb)
 
-2. Optimistic Ledger State References
+[2. Optimistic Ledger State References](#2-optimistic-ledger-state-references)
 
 3. Community
-
-> [!Note]
-> Check again later this week.
 
 ## 2. Optimistic Ledger State References
 
@@ -63,7 +60,25 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 ![RB Reference Approach](rb-reference.svg)
 
 #### EB Reference Approach
-![EB Reference Approach](eb-reference.svg)
+
+The EB reference approach offers a middle ground between security and latency. Certified EBs (those that have received votes from a majority of stake) provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several core variations of the EB reference approach were discussed:
+
+1. **Direct EB Reference**: IBs directly reference certified EBs, which themselves reference an older RB.
+![EB Reference Approach](eb-reference-01.svg)
+
+2. **EB Chain Reference**: IBs reference a chain of certified EBs, where each EB references a previous EB, creating a chain of references back to an RB. This approach allows for more recent state references and covers edge cases where multiple certified EBs have been produced in parallel in the recent past.
+
+3. **RB + EB Hybrid Reference**: IBs can reference either an RB or a certified EB, with the EB itself referencing an older RB. This provides flexibility while ensuring security. This was regarded as a bootstrap mechanism.
+
+**Extensions and Implementation Details:**
+
+- **Minimum Age Requirement**: A constraint where EBs must reference an RB that is at least a certain age (e.g., 5 minutes old) to ensure it's widely available in the network.
+
+- **EB Ordering by Slot**: In the Leios protocol, multiple pipelines run in parallel, each ideally producing one RB. With parameters set for 1.5 EBs per stage (with randomness via VRF functions potentially producing more), there may be multiple EBs to choose from for inclusion in an RB. This approach orders EBs by slot number and VRF hash, with a predefined ordering function to resolve conflicts when multiple EBs exist for the same slot or from different pipelines.
+
+- **Orphan Prevention**: A mechanism where RBs should not include EBs that reference orphaned EBs (those not included in previous RBs), helping to maintain a clear reference chain across pipelines.
+
+- **EB State Reuse**: An optimization technique where, when computing ledger states for EBs in a chain, we reuse the ledger state from referenced EBs and only replay the IBs in the current EB, reducing computational overhead, especially important when dealing with multiple pipelines and stages.
 
 #### IB Reference Approach
 

@@ -1,0 +1,180 @@
+title: {
+  label: "Direct certified EB Reference Approach"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# Styles
+classes: {
+  rb: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#B0E2FF"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+    }
+  }
+  rb_stacked: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#B0E2FF"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+      multiple: true
+    }
+  }
+  eb: {
+    style: {
+      stroke: "#aaaaaa"
+      fill: "#FFE4C4"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+    }
+  }
+  ib: {
+    style: {
+      stroke: "#aaaaaa"
+      fill: "#FFFACD"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+    }
+  }
+  container: {
+    style: {
+      stroke: "#dedede"
+      fill: "#f5f5f5"
+      font-color: "#666666"
+      font-size: 16
+      border-radius: 8
+    }
+  }
+  rb_arrow: {
+    style: {
+      stroke: "#2a2a2a"
+    }
+  }
+  eb_cert: {
+    style: {
+      stroke: "#2a2a2a"
+      stroke-dash: 7
+    }
+  }
+  ib_arrow: {
+    style: {
+      stroke: "#aaaaaa"
+    }
+  }
+}
+
+# Blocks with explicit positioning
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-3)"
+  }
+
+  RB2: {
+    class: rb
+    label: "RB\n(tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+}
+
+EB1: {
+  class: eb
+  label: "EB"
+}
+
+EB: {
+  class: eb
+  label: "EB"
+}
+
+IB3: {
+  class: ib
+  label: "IB"
+}
+
+IB2: {
+  class: ib
+  label: "IB"
+}
+
+IB1: {
+  class: ib
+  label: "IB"
+}
+
+IB: {
+  class: ib
+  label: "IB"
+}
+
+# RB references
+volatile.RB -> volatile.RB1: {
+  class: rb_arrow
+}
+volatile.RB1 -> volatile.RB2: {
+  class: rb_arrow
+}
+volatile.RB2 -> volatile.RBs: {
+  class: rb_arrow
+}
+
+# EB certificates
+volatile.RB1 -> EB1: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+volatile.RB -> EB: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+# EB references
+EB1 -> volatile.RB2: "References" {
+  class: rb_arrow
+}
+
+EB -> volatile.RB1: "References" {
+  class: rb_arrow
+}
+
+# IB references
+
+IB3 -> EB1: {
+  class: ib_arrow
+}
+
+IB2 -> EB1: {
+  class: ib_arrow
+}
+
+IB1 -> EB1: {
+  class: ib_arrow
+}
+
+IB -> EB: {
+  class: ib_arrow
+}
+
+direction: left
