@@ -42,15 +42,11 @@ volatile: {
     class: rb
     label: "RB\n(tip)"
   }
+}
 
-  RB0: {
-    class: rb
-    label: "RB"
-    style: {
-      stroke-dash: 7
-      fill: "#D0F0FF"
-    }
-  }
+RB0: {
+  class: rb_unconfirmed
+  label: "RB"
 }
 
 # Most secure, highest latency
@@ -101,18 +97,18 @@ volatile.RB1 -> volatile.RBs: {
 volatile.RBs -> stable.RB: {
   class: rb_arrow
 }
-volatile.RB0 -> volatile.RB: {
+RB0 -> volatile.RB: {
   class: rb_arrow
   style: {
     stroke-dash: 7
   }
 }
 
-volatile.RB0 -> secure.EB: "Contains\nEB certificate" {
+RB0 -> secure.EB: "Contains\nEB certificate" {
   class: eb_cert
 }
 
-volatile.RB0 -> fast.EB: "Contains\nEB certificate" {
+RB0 -> fast.EB: "Contains\nEB certificate" {
   class: eb_cert
 }
 
