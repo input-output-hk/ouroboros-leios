@@ -1,0 +1,136 @@
+title: {
+  label: "RB Reference Approach"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# Styles
+classes: {
+  rb: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#B0E2FF"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+    }
+  }
+  rb_stacked: {
+    style: {
+      stroke: "#2a2a2a"
+      fill: "#B0E2FF"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+      multiple: true
+    }
+  }
+  ib: {
+    style: {
+      stroke: "#aaaaaa"
+      fill: "#FFFACD"
+      font-color: "#2a2a2a"
+      font-size: 16
+      border-radius: 10
+    }
+  }
+  horizon: {
+    style: {
+      stroke-dash: 7
+      stroke: "#2a2a2a"
+    }
+  }
+  container: {
+    style: {
+      stroke: "#dedede"
+      fill: "#f5f5f5"
+      font-color: "#666666"
+      font-size: 16
+      border-radius: 8
+    }
+  }
+  rb_arrow: {
+    style: {
+      stroke: "#2a2a2a"
+    }
+  }
+  ib_arrow: {
+    style: {
+      stroke: "#aaaaaa"
+    }
+  }
+}
+
+# Blocks with explicit positioning
+
+stable: {
+  label: "Stable chain prefix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(genesis, tip-k-2)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip-k-1)"
+  }
+}
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+}
+
+IB1: {
+  class: ib
+  label: "IB 1"
+}
+
+IB2: {
+  class: ib
+  label: "IB 2"
+}
+
+# References with explicit direction
+volatile.RB -> volatile.RB1: {
+  class: rb_arrow
+}
+volatile.RB1 -> volatile.RBs: {
+  class: rb_arrow
+}
+volatile.RBs -> stable.RB: {
+  class: rb_arrow
+}
+stable.RB -> stable.RBs: {
+  class: rb_arrow
+}
+
+IB1 -> stable.RB: "Highest latency\nmost secure" {
+  class: ib_arrow
+}
+
+IB2 -> volatile.RB: "Lowest latency\nleast secure" {
+  class: ib_arrow
+}
+
+direction: left
