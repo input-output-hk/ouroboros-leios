@@ -68,12 +68,12 @@ stable.RB -> stable.RBs: {
   class: to_rb_arrow
 }
 
-IB1 -> stable.RB: "Highest latency\nmost secure" {
-  class: to_rb_arrow
+IB1 -> stable.RB: "Highest latency,\nmost secure\nLedger Ref" {
+  class: ledger_link
 }
 
-IB2 -> volatile.RB: "Lowest latency\nleast secure" {
-  class: to_rb_arrow
+IB2 -> volatile.RB: "Lowest latency,\nleast secure\nLedger Ref" {
+  class: ledger_link
 }
 
 direction: left

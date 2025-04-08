@@ -1,7 +1,7 @@
 ...@styles
 
 title: {
-  label: "RB Reference Approach (detailed)"
+  label: "RB Reference Approach (complex)"
   near: top-center
   style.font-size: 24
   style.bold: true
@@ -60,8 +60,13 @@ secure: {
     label: "EB"
   }
 
+  IB1: {
+    class: ib
+    label: "IB"
+  }
+
   IB: {
-    class: ib_stacked
+    class: ib
     label: "IB"
   }
 }
@@ -74,8 +79,14 @@ fast: {
     class: eb
     label: "EB"
   }
+
+  IB1: {
+    class: ib
+    label: "IB"
+  }
+
   IB: {
-    class: ib_stacked
+    class: ib
     label: "IB"
   }
 }
@@ -91,12 +102,15 @@ stable.RB -> stable.RBs: {
 volatile.RB -> volatile.RB1: {
   class: to_rb_arrow
 }
+
 volatile.RB1 -> volatile.RBs: {
   class: to_rb_arrow
 }
+
 volatile.RBs -> stable.RB: {
   class: to_rb_arrow
 }
+
 RB0 -> volatile.RB: {
   class: to_rb_arrow
   style: {
@@ -114,11 +128,19 @@ RB0 -> fast.EB: "Contains\nEB certificate" {
 
 # EB links
 
-secure.EB -> secure.IB: "Ref(s)" {
+secure.EB -> secure.IB: "Ref" {
   class: to_ib_arrow
 }
 
-fast.EB -> fast.IB: "Ref(s)" {
+secure.EB -> secure.IB1: "Ref" {
+  class: to_ib_arrow
+}
+
+fast.EB -> fast.IB: "Ref" {
+  class: to_ib_arrow
+}
+
+fast.EB -> fast.IB1: "Ref" {
   class: to_ib_arrow
 }
 
@@ -128,7 +150,15 @@ secure.IB -> stable.RB: "Ledger Ref" {
   class: ledger_link
 }
 
-fast.IB -> volatile.RB: "Ledger Ref" {
+secure.IB1 -> stable.RBs: "Ledger Ref" {
+  class: ledger_link
+}
+
+fast.IB1 -> volatile.RB: "Ledger Ref" {
+  class: ledger_link
+}
+
+fast.IB -> volatile.RB1: "Ledger Ref" {
   class: ledger_link
 }
 
