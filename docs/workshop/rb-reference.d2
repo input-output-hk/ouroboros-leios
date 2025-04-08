@@ -56,24 +56,24 @@ IB2: {
 
 # References with explicit direction
 volatile.RB -> volatile.RB1: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 volatile.RB1 -> volatile.RBs: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 volatile.RBs -> stable.RB: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 stable.RB -> stable.RBs: {
-  class: rb_arrow
+  class: to_rb_arrow
 }
 
 IB1 -> stable.RB: "Highest latency\nmost secure" {
-  class: ib_arrow
+  class: to_rb_arrow
 }
 
 IB2 -> volatile.RB: "Lowest latency\nleast secure" {
-  class: ib_arrow
+  class: to_rb_arrow
 }
 
 direction: left
