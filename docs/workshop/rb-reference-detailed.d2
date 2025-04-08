@@ -1,0 +1,151 @@
+...@styles
+
+title: {
+  label: "RB Reference Approach (detailed)"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+stable: {
+  label: "Stable chain prefix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(genesis, tip-k-2)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip-k-1)"
+  }
+}
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+
+  RB0: {
+    class: rb
+    label: "RB"
+    style: {
+      stroke-dash: 7
+      fill: "#D0F0FF"
+    }
+  }
+}
+
+# Most secure, highest latency
+
+secure: {
+  label: "Most secure, highest latency"
+  class: container
+
+  EB: {
+    class: eb
+    label: "EB"
+  }
+  IB1: {
+    class: ib
+    label: "IB"
+  }
+
+  IB: {
+    class: ib
+    label: "IB"
+  }
+}
+
+fast: {
+  label: "Fast, least secure"
+  class: container
+
+  EB: {
+    class: eb
+    label: "EB"
+  }
+  IB: {
+    class: ib
+    label: "IB"
+  }
+}
+
+# Links
+
+# Stable chain prefix
+stable.RB -> stable.RBs: {
+  class: rb_arrow
+}
+
+# Volatile chain suffix
+volatile.RB -> volatile.RB1: {
+  class: rb_arrow
+}
+volatile.RB1 -> volatile.RBs: {
+  class: rb_arrow
+}
+volatile.RBs -> stable.RB: {
+  class: rb_arrow
+}
+volatile.RB0 -> volatile.RB: {
+  class: rb_arrow
+  style: {
+    stroke-dash: 7
+  }
+}
+
+volatile.RB0 -> secure.EB: "Contains\nEB certificate" {
+  class: eb_cert
+}
+
+volatile.RB0 -> fast.EB: "Contains\nEB certificate" {
+  class: eb_cert
+}
+
+# EB links
+
+secure.EB -> secure.IB1: "Ref" {
+  class: eb_arrow
+}
+
+secure.EB -> secure.IB: "Ref" {
+  class: eb_arrow
+}
+
+fast.EB -> fast.IB: "Ref" {
+  class: eb_arrow
+}
+
+# IB links
+
+secure.IB -> stable.RB: "Ref" {
+  class: ib_arrow
+}
+
+secure.IB1 -> stable.RB: "Ref" {
+  class: ib_arrow
+}
+
+fast.IB -> volatile.RB: "Ref" {
+  class: ib_arrow
+}
+
+direction: left
