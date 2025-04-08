@@ -59,6 +59,9 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 #### RB Reference Approach
 ![RB Reference Approach](rb-reference.svg)
 
+> [!Note]
+> There is a more detailed version of this including EBs, [here](./rb-reference-detailed.svg).
+
 #### EB Reference Approach
 
 The EB reference approach offers a middle ground between security and latency. Certified EBs (those that have received votes from a majority of stake) provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several core variations of the EB reference approach were discussed:
