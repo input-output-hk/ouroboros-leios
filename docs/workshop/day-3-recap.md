@@ -50,9 +50,9 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 
 | Reference | Description | Security | Latency | Implementation<br />Complexity | Computational<br />Cost |
 |-----------|-------------|----------|---------|--------------------------|-------------------|
-| RB | IBs reference an older RB | Best | Worst | Best | Min |
-| EB | IBs reference a certified Endorsement Block (EB) | Medium | Medium | Medium | Medium |
-| IB | IBs reference other IBs | Worst | Best | Worst | Max |
+| [RB](#rb-reference-approach) | IBs reference an older RB | Best | Worst | Best | Min |
+| [EB](#eb-reference-approach) | IBs reference a certified Endorsement Block (EB) | Medium | Medium | Medium | Medium |
+| [IB](#) | IBs reference other IBs | Worst | Best | Worst | Max |
 
 > [!Note]
 > The choice of referenceable ledger states cannot be arbitrary, not only due to security considerations but also due to practical system constraints. Maintaining too many potential reference states would lead to excessive memory usage and computational overhead as each node would need to track and validate multiple parallel ledger states. This creates a natural tension between flexibility in reference selection and system efficiency.
@@ -64,6 +64,15 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 
 #### EB Reference Approach
 ![EB Reference Approach](eb-reference.svg)
+
+#### IB Reference Approach
+
+> [!Warning]
+> We have not discussed this approach further and decided against progressing on it as it does not 
+> meet the security requirements. It also comes with a high implementation complexity and
+> computational overhead. The IB reference approach would require maintaining multiple speculative 
+> ledger states, creating potential for state explosion and significantly increasing validation costs
+> without providing adequate security guarantees.
 
 ### Key Considerations
 
