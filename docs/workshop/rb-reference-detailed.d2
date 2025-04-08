@@ -63,19 +63,15 @@ secure: {
     class: eb
     label: "EB"
   }
-  IB1: {
-    class: ib
-    label: "IB"
-  }
 
   IB: {
-    class: ib
+    class: ib_stacked
     label: "IB"
   }
 }
 
 fast: {
-  label: "Fast, least secure"
+  label: "Lowest latency, least secure"
   class: container
 
   EB: {
@@ -83,7 +79,7 @@ fast: {
     label: "EB"
   }
   IB: {
-    class: ib
+    class: ib_stacked
     label: "IB"
   }
 }
@@ -122,25 +118,17 @@ volatile.RB0 -> fast.EB: "Contains\nEB certificate" {
 
 # EB links
 
-secure.EB -> secure.IB1: "Ref" {
+secure.EB -> secure.IB: "Ref(s)" {
   class: eb_arrow
 }
 
-secure.EB -> secure.IB: "Ref" {
-  class: eb_arrow
-}
-
-fast.EB -> fast.IB: "Ref" {
+fast.EB -> fast.IB: "Ref(s)" {
   class: eb_arrow
 }
 
 # IB links
 
 secure.IB -> stable.RB: "Ref" {
-  class: ib_arrow
-}
-
-secure.IB1 -> stable.RB: "Ref" {
   class: ib_arrow
 }
 
