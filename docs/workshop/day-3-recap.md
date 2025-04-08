@@ -46,11 +46,13 @@ The trade-off between security and latency is fundamental:
 
 ### Approaches
 
-| Approach | Description | Pros | Cons |
-|----------|-------------|------|------|
-| RB Reference | IBs reference an older RB | - Simple to understand<br>- High security guarantees | - High latency<br>- Impractical for recent UTXOs |
-| EB Reference | IBs reference a certified Endorsement Block (EB) | - Lower latency than RB reference<br>- Certified EBs provide stability | - Need to handle EB ordering<br>- More complex state management |
-| IB Reference | IBs reference other IBs | - Lowest possible latency<br>- Most flexible | - Highest complexity<br>- Security challenges<br>- Harder to validate |
+Each of the following approaches describes a solution where an Input Block (IB) references a different block variant which provides a ledger reference for validation.
+
+| Reference | Description | Security | Latency | Implementation Complexity |
+|-----------|-------------|----------|---------|--------------------------|
+| RB | IBs reference an older RB | Best | Worst | Best |
+| EB | IBs reference a certified Endorsement Block (EB) | Medium | Medium | Medium |
+| IB | IBs reference other IBs | Worst | Best | Worst |
 
 ### Data Flow Diagrams
 
