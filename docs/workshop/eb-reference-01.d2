@@ -1,7 +1,7 @@
 ...@styles
 
 title: {
-  label: "Direct certified EB Reference Approach"
+  label: "Direct certified EB Reference Approach (a)"
   near: top-center
   style.font-size: 24
   style.bold: true
@@ -34,6 +34,11 @@ volatile: {
   }
 }
 
+RB0: {
+  class: rb_unconfirmed
+  label: "RB"
+}
+
 EB1: {
   class: eb
   label: "EB"
@@ -42,6 +47,16 @@ EB1: {
 EB: {
   class: eb
   label: "EB"
+}
+
+EB0: {
+  class: eb
+  label: "EB"
+}
+
+IB4: {
+  class: ib
+  label: "IB"
 }
 
 IB3: {
@@ -65,6 +80,11 @@ IB: {
 }
 
 # RB references
+
+RB0 -> volatile.RB: {
+  class: to_rb_arrow
+}
+
 volatile.RB -> volatile.RB1: {
   class: to_rb_arrow
 }
@@ -84,6 +104,10 @@ volatile.RB -> EB: "Contains\nEB Certificate" {
   class: eb_cert
 }
 
+RB0 -> EB0: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
 # EB references
 EB1 -> volatile.RB2: "References" {
   class: to_rb_arrow
@@ -93,13 +117,21 @@ EB -> volatile.RB1: "References" {
   class: to_rb_arrow
 }
 
+EB0 -> volatile.RB: "References" {
+  class: to_rb_arrow
+}
+
 # IB references
+
+IB4 -> EB1: {
+  class: to_eb_arrow
+}
 
 IB3 -> EB1: {
   class: to_eb_arrow
 }
 
-IB2 -> EB1: {
+IB2 -> EB: {
   class: to_eb_arrow
 }
 
@@ -107,7 +139,7 @@ IB1 -> EB: {
   class: to_eb_arrow
 }
 
-IB -> EB: {
+IB -> EB0: {
   class: to_eb_arrow
 }
 
