@@ -48,11 +48,11 @@ The trade-off between security and latency is fundamental:
 
 Each of the following approaches describes a solution where an Input Block (IB) references a different block variant which provides a ledger reference for validation.
 
-| Reference | Description | Security | Latency | Implementation Complexity |
-|-----------|-------------|----------|---------|--------------------------|
-| RB | IBs reference an older RB | Best | Worst | Best |
-| EB | IBs reference a certified Endorsement Block (EB) | Medium | Medium | Medium |
-| IB | IBs reference other IBs | Worst | Best | Worst |
+| Reference | Description | Security | Latency | Implementation<br />Complexity | Computational<br />Cost |
+|-----------|-------------|----------|---------|--------------------------|-------------------|
+| RB | IBs reference an older RB | Best | Worst | Best | Min |
+| EB | IBs reference a certified Endorsement Block (EB) | Medium | Medium | Medium | Medium |
+| IB | IBs reference other IBs | Worst | Best | Worst | Max |
 
 ### Data Flow Diagrams
 
