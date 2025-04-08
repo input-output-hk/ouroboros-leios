@@ -26,8 +26,8 @@ COPY sim-rs/ .
 COPY /data/simulation/config.default.yaml parameters/
 RUN cargo build --release
 
-# Build Haskell simulation
-FROM haskell:9.8.2-slim AS hs-builder
+# Build Haskell simulation - Split into dependency and build stages
+FROM haskell:9.8.2-slim AS hs-deps
 WORKDIR /build
 
 # Install git, SSL certificates, and GTK3 development dependencies
@@ -45,16 +45,36 @@ RUN apt-get update && \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
-COPY simulation /build/simulation/
-COPY conformance-testing /build/conformance-testing/
-COPY leios-trace-hs /build/leios-trace-hs/
+# Create necessary directories
+RUN mkdir -p /build/simulation \
+    /build/conformance-testing \
+    /build/leios-trace-hs
+
+# Copy only dependency files first
 COPY cabal.project /build/
+COPY simulation/ouroboros-leios-sim.cabal /build/simulation/simulation.cabal
+COPY conformance-testing/leios-conformance.cabal /build/conformance-testing/conformance-testing.cabal
+COPY leios-trace-hs/leios-trace-hs.cabal /build/leios-trace-hs/
+
+# Build dependencies
+RUN cabal update && \
+    cabal build --only-dependencies all
+
+# Build Haskell simulation
+FROM hs-deps AS hs-builder
+WORKDIR /build
+
+# Copy project files, excluding cabal files since we already have them
+COPY simulation/src /build/simulation/src
+COPY simulation/test /build/simulation/test
+COPY simulation/docs /build/simulation/docs
+COPY simulation/gnuplot /build/simulation/gnuplot
+COPY conformance-testing/src /build/conformance-testing/src
+COPY conformance-testing/app /build/conformance-testing/app
+COPY leios-trace-hs/src /build/leios-trace-hs/src
 
 # Build simulation
-WORKDIR /build
-RUN cabal update && \
-    cabal build all && \
+RUN cabal build all && \
     find /build/dist-newstyle -type f -name "ols" -exec cp {} /build/ols \;
 
 # Create Rust simulation image
