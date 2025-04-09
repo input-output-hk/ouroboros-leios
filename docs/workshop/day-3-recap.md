@@ -60,8 +60,11 @@ The above diagram displays a more realistic picture of different IBs referencing
 
 The EB reference approach offers a middle ground between security and latency. Certified EBs (those that have received votes from a majority of stake) provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several core variations of the EB reference approach were discussed:
 
-##### 1. **IB-to-EB-to-RB Reference**: IBs directly reference certified EBs, which themselves reference an older RB.
-![EB Reference Approach](eb-reference-01.svg)
+##### 1. **EB Reference**
+
+IBs directly reference certified EBs, which themselves reference an older RB.
+
+![EB Reference Approach](eb-reference.svg)
 
 Different to the [IB-to-RB referencing](#ib-to-rb-reference-approach), this approach has IBs reference an EB instead which itself references an RB.
 
@@ -70,24 +73,48 @@ We briefly discussed an alternative design choice, in which IBs reference an EB 
 In this design, one gets a ledger state for each RB which gives a ledger state for each EB to be reused and IBs are validated with respect to that same state. On the contrary, due to EBs referencing an RB, there is still the same trade-off to be made as in the [IB-to-RB reference approach](#ib-to-rb-reference-approach) - having to chose more or less stable RBs for EBs resulting in higher latency or higher loss in EBs.
 
 
-##### 2. **EB Chain/ IB-to-EB(-to-EB)*-to-RB**
+##### 2. **EB-Chain**
 
 In this approach IBs reference an EB which itself may reference another EB, which creates this chain of EBs that anchors on some older RB reference. Thus, EBs may have an RB reference or another EB reference of an EB that has not made it into an RB yet (full Leios variant). RBs on the other hand can only exactly reference one certified EB. IBs reference one of these EBs.
 
-This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles edge-case scenarios, where multiple EBs have been produced:
+As a downside of this approach, it doesn't allow for EBs to reference one or more EBs. Therefore, it still has the same trade-off from the previous [IB-to-EB-to-RB](#1-ib-to-eb-to-rb-reference) approach, since these chains of EBs are anchored to RBs, which comes with this disadvantageous property of high latency, older stable RBs vs low latency, less stable RBs.
 
-- from different pipelines in parallel (see EB ordering below)
-- from the same pipeline
+![EB Chain Approach](eb-chain.svg)
 
-![EB Chain Approach](eb-reference-02.svg)
+##### 3. **EB-DAG**
 
-**Extensions and Implementation Details:**
+The EB DAG approach represents a sophisticated approach that leverages a directed acyclic graph (DAG) structure of Endorsement Blocks (EBs) to achieve both low latency and strong security guarantees. In this design:
 
-- **Minimum Age Requirement**: A constraint where EBs must reference an RB that is at least a certain age (e.g., 5 minutes old) to ensure it's widely available in the network.
+![EB Chain Approach](eb-dag.svg)
 
-- **EB Ordering by Slot**: In the Leios protocol, multiple pipelines run in parallel, each ideally producing one RB. With parameters set for 1.5 EBs per stage (with randomness via VRF functions potentially producing more), there may be multiple EBs to choose from for inclusion in an RB.
+- EBs can reference one or more older EBs that haven't been referenced by other EBs yet
+- Ranking Blocks (RBs) reference exactly one EB
+- Input Blocks (IBs) reference one of these EBs
 
-- **EB State Reuse**: An optimization technique where, when computing ledger states for EBs in a chain, we reuse the ledger state from referenced EBs and only replay the IBs in the current EB, reducing computational overhead, especially important when dealing with multiple pipelines and stages.
+**Key Advantages:**
+
+1. **Low Latency with Security**: By allowing EBs to reference other EBs directly, the system achieves low latency while maintaining security. This is because EBs don't need to wait for RBs to be produced, creating a more efficient validation pipeline.
+
+2. **Strong Inclusion Guarantee**: With EBs referencing other EBs, there's a strong property that EBs almost always make it into the chain, assuming the EB rate is approximately 1.5x that of RB rate.
+
+3. **Efficient State Management**: Despite allowing multiple EB references, the system maintains computational efficiency. When computing ledger states for EBs in a chain, nodes can reuse the ledger state from referenced EBs and only replay the IBs in the current EB.
+
+4. **Complete History**: EBs form a chain back to genesis, with the first EB referencing an RB, and subsequent EBs referencing only other EBs. This creates a complete and verifiable history of the chain's state.
+
+5. **Deterministic State Count**: The number of ledger states a node needs to maintain is exactly equal to the number of EBs, providing predictable resource requirements.
+
+**Implementation Details:**
+
+1. **EB Ordering**: The system handles multiple pipelines running in parallel, each producing one RB. With parameters set for 1.5 EBs per stage (with randomness via VRF functions potentially producing more), there may be multiple EBs to choose from for inclusion in an RB.
+
+2. **State Reconstruction**: When computing ledger states, nodes can efficiently reconstruct the state by reusing states from referenced EBs and only replaying new IBs, preventing computational overhead.
+
+**Limitations:**
+
+1. **No Transactions in RBs**: A notable limitation of this scheme is that RBs cannot contain transactions themselves, as they serve primarily as ordering mechanisms for the EB DAG.
+
+> [!Note]
+> [Here](./eb-dag-detailed.svg) is a version of the EB-DAG including IBs.
 
 #### IB Reference Approach
 

@@ -1,0 +1,156 @@
+...@styles
+
+title: {
+  label: "EB-DAG"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# chain chain
+
+chain: {
+  label: "Ranking Blockchain"
+  class: container
+
+  Genesis: {
+    class: rb
+    label: "Genesis"
+  }
+
+  RBs: {
+    class: rb_stacked
+    label: "RBs"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB 1"
+  }
+
+  RB2: {
+    class: rb
+    label: "RB 2"
+  }
+
+  RB3: {
+    class: rb
+    label: "RB 3\n(tip)"
+  }
+}
+
+# RB references
+
+RB: {
+  class: rb_unconfirmed
+  label: "RB"
+}
+
+# EB references
+
+EB1: {
+  class: eb
+  label: "EB 1"
+}
+
+EB2: {
+  class: eb
+  label: "EB 2"
+}
+
+EB3: {
+  class: eb
+  label: "EB 3"
+}
+
+EB4: {
+  class: eb
+  label: "EB 4"
+}
+
+EB5: {
+  class: eb
+  label: "EB 5"
+}
+
+EB6: {
+  class: eb
+  label: "EB 6"
+}
+
+EB7: {
+  class: eb_unconfirmed
+  label: "EB 7"
+}
+
+# RB references
+
+chain.RBs -> chain.Genesis: {
+  class: to_rb_arrow
+}
+chain.RB1 -> chain.RBs: {
+  class: to_rb_arrow
+}
+chain.RB2 -> chain.RB1: {
+  class: to_rb_arrow
+}
+chain.RB3 -> chain.RB2: {
+  class: to_rb_arrow
+}
+RB -> chain.RB3: {
+  class: to_rb_arrow
+}
+
+# EB references
+
+EB1 -> chain.Genesis: "Ledger Ref" {
+  class: ledger_link
+}
+
+chain.RB1 -> EB1: "Holds\nCertificate" {
+  class: eb_cert
+}
+
+EB2 -> EB1: "Ref" {
+  class: to_eb_arrow
+}
+
+chain.RB2 -> EB2: "Holds\nCertificate" {
+  class: eb_cert
+}
+
+EB3 -> EB1: "Ref" {
+  class: to_eb_arrow
+}
+
+EB4 -> EB3: "Ref" {
+  class: to_eb_arrow
+}
+
+EB5 -> EB2: "Ref" {
+  class: to_eb_arrow
+}
+
+EB5 -> EB4: "Ref" {
+  class: to_eb_arrow
+}
+
+chain.RB3 -> EB5: "Holds\nCertificate" {
+  class: eb_cert
+}
+
+RB -> EB6: "Holds\nCertificate" {
+  class: eb_cert
+}
+
+EB6 -> EB5: "Ref" {
+  class: to_eb_arrow
+}
+
+EB7 -> EB6: "Ref" {
+  class: to_eb_arrow
+}
+
+direction: left

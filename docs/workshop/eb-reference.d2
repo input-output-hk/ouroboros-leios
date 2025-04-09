@@ -1,0 +1,146 @@
+...@styles
+
+title: {
+  label: "EB Reference"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-3)"
+  }
+
+  RB2: {
+    class: rb
+    label: "RB\n(tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+}
+
+RB0: {
+  class: rb_unconfirmed
+  label: "RB"
+}
+
+EB1: {
+  class: eb
+  label: "EB"
+}
+
+EB: {
+  class: eb
+  label: "EB"
+}
+
+EB0: {
+  class: eb
+  label: "EB"
+}
+
+IB4: {
+  class: ib
+  label: "IB"
+}
+
+IB3: {
+  class: ib
+  label: "IB"
+}
+
+IB2: {
+  class: ib
+  label: "IB"
+}
+
+IB1: {
+  class: ib
+  label: "IB"
+}
+
+IB: {
+  class: ib
+  label: "IB"
+}
+
+# RB references
+
+RB0 -> volatile.RB: {
+  class: to_rb_arrow
+}
+
+volatile.RB -> volatile.RB1: {
+  class: to_rb_arrow
+}
+volatile.RB1 -> volatile.RB2: {
+  class: to_rb_arrow
+}
+volatile.RB2 -> volatile.RBs: {
+  class: to_rb_arrow
+}
+
+# EB certificates
+volatile.RB1 -> EB1: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+volatile.RB -> EB: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+RB0 -> EB0: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+# EB references
+EB1 -> volatile.RB2: "Ledger Ref" {
+  class: ledger_link
+}
+
+EB -> volatile.RB1: "Ledger Ref" {
+  class: ledger_link
+}
+
+EB0 -> volatile.RB: "Ledger Ref" {
+  class: ledger_link
+}
+
+# IB references
+
+IB4 -> EB1: {
+  class: to_eb_arrow
+}
+
+IB3 -> EB1: {
+  class: to_eb_arrow
+}
+
+IB2 -> EB: {
+  class: to_eb_arrow
+}
+
+IB1 -> EB: {
+  class: to_eb_arrow
+}
+
+IB -> EB0: {
+  class: to_eb_arrow
+}
+
+direction: left
