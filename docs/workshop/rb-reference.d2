@@ -1,0 +1,79 @@
+...@styles
+
+title: {
+  label: "IB-to-RB Reference Approach"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+stable: {
+  label: "Stable chain prefix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(genesis, tip-k-2)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip-k-1)"
+  }
+}
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+}
+
+IB1: {
+  class: ib
+  label: "IB 1"
+}
+
+IB2: {
+  class: ib
+  label: "IB 2"
+}
+
+# References with explicit direction
+volatile.RB -> volatile.RB1: {
+  class: to_rb_arrow
+}
+volatile.RB1 -> volatile.RBs: {
+  class: to_rb_arrow
+}
+volatile.RBs -> stable.RB: {
+  class: to_rb_arrow
+}
+stable.RB -> stable.RBs: {
+  class: to_rb_arrow
+}
+
+IB1 -> stable.RB: "Highest latency,\nmost secure\nLedger Ref" {
+  class: ledger_link
+}
+
+IB2 -> volatile.RB: "Lowest latency,\nleast secure\nLedger Ref" {
+  class: ledger_link
+}
+
+direction: left
