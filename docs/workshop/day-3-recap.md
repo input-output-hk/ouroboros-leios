@@ -44,8 +44,6 @@ The simplified diagram below shows respective lower and upper bounds for selecti
 
 Thus, we can define a new parameter to define stability for Leios which ranges between k on the upper bound and zero on the lower (representing the tip of the chain).
 
-There are two more version of the same diagram detailing different aspects:
-
 ##### 1. Including EBs
 
 ![detailed](./rb-reference-detailed.svg)
@@ -56,7 +54,7 @@ This diagram shows the same ledger reference approach - pointing to RBs, but als
 
 ![complex](./rb-reference-complex.svg)
 
-The above diagram displays a more realistic picture of different IBs referencing different RBs as their ledger state reference for validation.
+The above diagram displays a more realistic picture of different IBs referencing different RBs as their ledger state reference for validation. In this diagram, there are design choices. One, the EB is always the latest EB available
 
 
 #### EB Reference Approach
