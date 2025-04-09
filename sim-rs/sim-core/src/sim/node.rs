@@ -39,7 +39,13 @@ enum TransactionView {
     Received(Arc<Transaction>),
 }
 
-enum CpuTask {
+struct CpuTask {
+    task_type: CpuTaskType,
+    start_time: Timestamp,
+    cpu_time: Duration,
+}
+
+enum CpuTaskType {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A Praos block has been generated and is ready to propagate
@@ -62,8 +68,8 @@ enum CpuTask {
     VTBundleValidated(NodeId, Arc<VoteBundle>),
 }
 
-impl CpuTask {
-    fn task_type(&self) -> String {
+impl CpuTaskType {
+    fn name(&self) -> String {
         match self {
             Self::TransactionValidated(_, _) => "TransactionValidated",
             Self::RBBlockGenerated(_) => "RBBlockGenerated",
@@ -277,11 +283,16 @@ impl Node {
         self.events.pop().unwrap().1
     }
 
-    fn schedule_cpu_task(&mut self, task: CpuTask) {
-        let cpu_times = self.task_cpu_times(&task);
-        let task_type = task.task_type();
+    fn schedule_cpu_task(&mut self, task_type: CpuTaskType) {
+        let cpu_times = self.task_cpu_times(&task_type);
+        let task = CpuTask {
+            task_type,
+            start_time: self.clock.now(),
+            cpu_time: cpu_times.iter().sum(),
+        };
+        let task_type = task.task_type.name();
         let subtask_count = cpu_times.len();
-        let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times, self.clock.now());
+        let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
         self.tracker.track_cpu_task_scheduled(
             CpuTaskId {
                 node: self.id,
@@ -309,11 +320,11 @@ impl Node {
         ))
     }
 
-    fn task_cpu_times(&self, task: &CpuTask) -> Vec<Duration> {
+    fn task_cpu_times(&self, task: &CpuTaskType) -> Vec<Duration> {
         let cpu_times = &self.sim_config.cpu_times;
         match task {
-            CpuTask::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
-            CpuTask::RBBlockGenerated(block) => {
+            CpuTaskType::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
+            CpuTaskType::RBBlockGenerated(block) => {
                 let mut time = cpu_times.rb_generation;
                 if let Some(endorsement) = &block.endorsement {
                     let nodes = endorsement.votes.len();
@@ -322,7 +333,7 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::RBBlockValidated(_, rb) => {
+            CpuTaskType::RBBlockValidated(_, rb) => {
                 let mut time = cpu_times.rb_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += cpu_times.rb_validation_per_byte * (bytes as u32);
@@ -333,15 +344,15 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
-            CpuTask::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
-            CpuTask::IBBlockValidated(_, ib) => vec![
+            CpuTaskType::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTaskType::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
+            CpuTaskType::IBBlockValidated(_, ib) => vec![
                 cpu_times.ib_body_validation_constant
                     + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
             ],
-            CpuTask::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
-            CpuTask::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
-            CpuTask::VTBundleGenerated(votes) => votes
+            CpuTaskType::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
+            CpuTaskType::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
+            CpuTaskType::VTBundleGenerated(votes) => votes
                 .ebs
                 .keys()
                 .map(|eb_id| {
@@ -352,9 +363,11 @@ impl Node {
                         + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
                 })
                 .collect(),
-            CpuTask::VTBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
-                .take(votes.ebs.len())
-                .collect(),
+            CpuTaskType::VTBundleValidated(_, votes) => {
+                std::iter::repeat(cpu_times.vote_validation)
+                    .take(votes.ebs.len())
+                    .collect()
+            }
         }
     }
 
@@ -390,22 +403,22 @@ impl Node {
                             if let Some(subtask) = next_subtask {
                                 self.start_cpu_subtask(subtask);
                             }
-                            let Some((task, cpu_time, start_time)) = finished_task else {
+                            let Some(task) = finished_task else {
                                 continue;
                             };
-                            let wall_time = self.clock.now() - start_time;
-                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, wall_time, task.extra());
-                            match task {
-                                CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
-                                CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block)?,
-                                CpuTask::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
-                                CpuTask::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
-                                CpuTask::IBHeaderValidated(from, ib, has_body) => self.finish_validating_ib_header(from, ib, has_body)?,
-                                CpuTask::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
-                                CpuTask::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
-                                CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
-                                CpuTask::VTBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
-                                CpuTask::VTBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
+                            let wall_time = self.clock.now() - task.start_time;
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type.name(), task.cpu_time, wall_time, task.task_type.extra());
+                            match task.task_type {
+                                CpuTaskType::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
+                                CpuTaskType::RBBlockGenerated(block) => self.finish_generating_block(block)?,
+                                CpuTaskType::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
+                                CpuTaskType::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTaskType::IBHeaderValidated(from, ib, has_body) => self.finish_validating_ib_header(from, ib, has_body)?,
+                                CpuTaskType::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
+                                CpuTaskType::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
+                                CpuTaskType::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                                CpuTaskType::VTBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
+                                CpuTaskType::VTBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
                             }
                         }
                     }
@@ -569,7 +582,7 @@ impl Node {
                     ibs,
                     ebs,
                 };
-                self.schedule_cpu_task(CpuTask::EBBlockGenerated(eb));
+                self.schedule_cpu_task(CpuTaskType::EBBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
                 return;
             }
@@ -643,7 +656,7 @@ impl Node {
             ebs: ebs.into_iter().map(|eb| (eb, votes_allowed)).collect(),
         };
         if !votes.ebs.is_empty() {
-            self.schedule_cpu_task(CpuTask::VTBundleGenerated(votes));
+            self.schedule_cpu_task(CpuTaskType::VTBundleGenerated(votes));
         }
     }
 
@@ -658,7 +671,7 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            self.schedule_cpu_task(CpuTask::IBBlockGenerated(ib));
+            self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
         }
     }
 
@@ -729,7 +742,7 @@ impl Node {
             transactions,
         };
         self.tracker.track_praos_block_lottery_won(&block);
-        self.schedule_cpu_task(CpuTask::RBBlockGenerated(block));
+        self.schedule_cpu_task(CpuTaskType::RBBlockGenerated(block));
 
         Ok(())
     }
@@ -889,7 +902,7 @@ impl Node {
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) {
         self.tracker
             .track_transaction_received(tx.id, from, self.id);
-        self.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
+        self.schedule_cpu_task(CpuTaskType::TransactionValidated(from, tx));
     }
 
     fn generate_tx(&mut self, tx: Arc<Transaction>) -> Result<()> {
@@ -938,7 +951,7 @@ impl Node {
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
-        self.schedule_cpu_task(CpuTask::RBBlockValidated(from, block));
+        self.schedule_cpu_task(CpuTaskType::RBBlockValidated(from, block));
     }
 
     fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
@@ -993,7 +1006,7 @@ impl Node {
         self.leios
             .ibs
             .insert(id, InputBlockState::Pending(header.clone()));
-        self.schedule_cpu_task(CpuTask::IBHeaderValidated(from, header, has_body));
+        self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
     fn finish_validating_ib_header(
@@ -1058,7 +1071,7 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
-        self.schedule_cpu_task(CpuTask::IBBlockValidated(from, ib));
+        self.schedule_cpu_task(CpuTaskType::IBBlockValidated(from, ib));
     }
 
     fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
@@ -1141,7 +1154,7 @@ impl Node {
 
     fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         self.tracker.track_eb_received(eb.id(), from, self.id);
-        self.schedule_cpu_task(CpuTask::EBBlockValidated(from, eb));
+        self.schedule_cpu_task(CpuTaskType::EBBlockValidated(from, eb));
     }
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
@@ -1186,7 +1199,7 @@ impl Node {
 
     fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
         self.tracker.track_votes_received(&votes, from, self.id);
-        self.schedule_cpu_task(CpuTask::VTBundleValidated(from, votes));
+        self.schedule_cpu_task(CpuTaskType::VTBundleValidated(from, votes));
     }
 
     fn finish_validating_vote_bundle(
