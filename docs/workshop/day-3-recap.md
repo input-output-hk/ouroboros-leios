@@ -35,15 +35,29 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 
 #### RB Reference Approach
 
-The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-6 might be more suitable. Note, that even the tip-6 example would introduce on average a delay of 6×20s = 120s before a user could reference outputs from a previously submitted transaction.
+The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-6 might be more suitable. Note, that even the tip-3 example would introduce on average a delay of 3×20s = 90s before a user could reference outputs from a previously submitted transaction.
 
 ![RB Reference Approach](rb-reference.svg)
 
 > [!Note]
 > The parameter k defines the stability horizon, which is the period during which the last k blocks of the chain remain mutable. After k blocks are added, all preceding blocks become immutable or in other words become part of the stable chain prefix.
 
-> [!Note]
-> There are two more versions of this diagram, a [detailed](./rb-reference-detailed.svg) showing EBs and a [complex](./rb-reference-complex.svg) version showing EBs and IBs with different ledger state references which is likely the most realistic example of this approach.
+Thus, we can define a new parameter to define stability for Leios which ranges between k on the upper bound and zero on the lower (representing the tip of the chain).
+
+There are two more version of the same diagram detailing different aspects:
+
+##### 1. Including EBs
+
+![detailed](./rb-reference-detailed.svg)
+
+This diagram shows the same ledger reference approach - pointing to RBs, but also includes EBs which have been hidden in the previous example for the stake of simplicity.
+
+##### 2. Different RB references
+
+![complex](./rb-reference-complex.svg)
+
+The above diagram displays a more realistic picture of different IBs referencing different RBs as their ledger state reference for validation.
+
 
 #### EB Reference Approach
 
