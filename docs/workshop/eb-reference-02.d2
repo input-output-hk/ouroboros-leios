@@ -1,7 +1,7 @@
 ...@styles
 
 title: {
-  label: "Direct certified IB-to-EB Reference Approach (b)"
+  label: "EB Chain/ IB-to-EB-(to-EB)*-to-RB Reference Approach"
   near: top-center
   style.font-size: 24
   style.bold: true
@@ -15,12 +15,7 @@ volatile: {
 
   RBs: {
     class: rb_stacked
-    label: "[RB]\n(tip-k, tip-3)"
-  }
-
-  RB2: {
-    class: rb
-    label: "RB\n(tip-2)"
+    label: "[RB]\n(tip-k, tip-2)"
   }
 
   RB1: {
@@ -39,138 +34,142 @@ RB0: {
   label: "RB"
 }
 
-EB1: {
-  class: eb
-  label: "EB"
+# EB Chain Example 1 - Simple chain with older RB reference
+eb_chain1: {
+  label: "EB Chain Example 1 (Older RB Reference)"
+  class: container
+
+  EB1: {
+    class: eb
+    label: "EB1"
+  }
+
+  EB2: {
+    class: eb
+    label: "EB2"
+  }
+
+  IB1: {
+    class: ib
+    label: "IB1"
+  }
+
+  IB2: {
+    class: ib
+    label: "IB2"
+  }
 }
 
-EB: {
-  class: eb
-  label: "EB"
+# EB Chain Example 2 - Multiple EBs from different pipelines with recent RB reference
+eb_chain2: {
+  label: "EB Chain Example 2 (Recent RB Reference)"
+  class: container
+
+  EB3: {
+    class: eb
+    label: "EB3\n(Pipeline A)"
+  }
+
+  EB4: {
+    class: eb
+    label: "EB4\n(Pipeline B)"
+  }
+
+  EB5: {
+    class: eb
+    label: "EB5\n(Pipeline A)"
+  }
+
+  IB3: {
+    class: ib
+    label: "IB3"
+  }
+
+  IB4: {
+    class: ib
+    label: "IB4"
+  }
 }
 
-EB0: {
-  class: eb
-  label: "EB"
-}
+# Links
 
-IB6: {
-  class: ib
-  label: "IB"
-}
-
-IB5: {
-  class: ib
-  label: "IB"
-}
-
-IB4: {
-  class: ib
-  label: "IB"
-}
-
-IB3: {
-  class: ib
-  label: "IB"
-}
-
-IB2: {
-  class: ib
-  label: "IB"
-}
-
-IB1: {
-  class: ib
-  label: "IB"
-}
-
-IB: {
-  class: ib
-  label: "IB"
-}
-
-# RB references
-
-RB0 -> volatile.RB: {
-  class: to_rb_arrow
-}
-
+# Volatile chain suffix
 volatile.RB -> volatile.RB1: {
   class: to_rb_arrow
 }
-volatile.RB1 -> volatile.RB2: {
+
+volatile.RB1 -> volatile.RBs: {
   class: to_rb_arrow
 }
-volatile.RB2 -> volatile.RBs: {
+
+RB0 -> volatile.RB: {
   class: to_rb_arrow
+  style: {
+    stroke-dash: 7
+  }
 }
 
-# EB certificates
-volatile.RB1 -> EB1: "Contains\nEB Certificate" {
+# EB Certificates
+RB0 -> eb_chain1.EB1: "Contains\nEB Certificate" {
   class: eb_cert
 }
 
-volatile.RB -> EB: "Contains\nEB Certificate" {
+RB0 -> eb_chain2.EB3: "Contains\nEB Certificate" {
   class: eb_cert
 }
 
-RB0 -> EB0: "Contains\nEB Certificate" {
+RB0 -> eb_chain2.EB4: "Contains\nEB Certificate" {
   class: eb_cert
 }
 
-# EB references
-EB1 -> IB6: "Ref" {
-  class: to_ib_arrow
+# EB Chain 1 - Simple chain with older RB reference
+eb_chain1.EB1 -> eb_chain1.EB2: "EB Ref" {
+  class: to_eb_arrow
 }
 
-EB1 -> IB5: "Ref" {
-  class: to_ib_arrow
-}
-
-EB -> IB4: "Ref" {
-  class: to_ib_arrow
-}
-
-EB -> IB3: "Ref" {
-  class: to_ib_arrow
-}
-
-EB0 -> IB2: "Ref" {
-  class: to_ib_arrow
-}
-
-EB0 -> IB1: "Ref" {
-  class: to_ib_arrow
-}
-
-# IB references
-
-IB6 -> volatile.RBs: "Ledger Ref" {
+eb_chain1.EB2 -> volatile.RBs: "Ledger Ref" {
   class: ledger_link
 }
 
-IB5 -> volatile.RB2: "Ledger Ref" {
+# EB to IB references for Example 1
+eb_chain1.EB1 -> eb_chain1.IB2: "Ref" {
+  class: to_ib_arrow
+}
+
+# IB validation references for Example 1
+eb_chain1.IB1 -> eb_chain1.EB1: "Validated against" {
   class: ledger_link
 }
 
-IB4 -> EB1: {
+eb_chain1.IB2 -> eb_chain1.EB2: "Validated against" {
+  class: ledger_link
+}
+
+# EB Chain 2 - Multiple pipelines with recent RB reference
+eb_chain2.EB3 -> eb_chain2.EB5: "EB Ref" {
   class: to_eb_arrow
 }
 
-IB3 -> EB1: {
-  class: to_eb_arrow
+eb_chain2.EB4 -> volatile.RB1: "Ledger Ref" {
+  class: ledger_link
 }
 
-IB2 -> EB: {
-  class: to_eb_arrow
+eb_chain2.EB5 -> volatile.RB: "Ledger Ref" {
+  class: ledger_link
 }
 
-IB1 -> EB: {
-  class: to_eb_arrow
+# EB to IB references for Example 2
+eb_chain2.EB3 -> eb_chain2.IB4: "Ref" {
+  class: to_ib_arrow
 }
 
-IB -> EB0: {
-  class: to_eb_arrow
+# IB validation references for Example 2
+eb_chain2.IB3 -> eb_chain2.EB3: "Validated against" {
+  class: ledger_link
+}
+
+eb_chain2.IB4 -> eb_chain2.EB4: "Validated against" {
+  class: ledger_link
 }
 
 direction: left

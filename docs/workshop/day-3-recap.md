@@ -60,18 +60,26 @@ The above diagram displays a more realistic picture of different IBs referencing
 
 The EB reference approach offers a middle ground between security and latency. Certified EBs (those that have received votes from a majority of stake) provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several core variations of the EB reference approach were discussed:
 
-1. **Direct EB Reference**: IBs directly reference certified EBs, which themselves reference an older RB.
+##### 1. **IB-to-EB-to-RB Reference**: IBs directly reference certified EBs, which themselves reference an older RB.
 ![EB Reference Approach](eb-reference-01.svg)
 
-2. **EB Chain Reference**: IBs reference an EB which itself may reference another EB, which creates this chain of EBs which at some point need to reference an RB. This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles scenarios where multiple certified EBs have been produced in parallel in the recent past.
+Different to the [IB-to-RB referencing](#ib-to-rb-reference-approach), this approach has IBs reference an EB instead which itself references an RB.
 
-TODO:
-- EBs reference one or more older EBs (that have not been referenced by RBs)
-- Each RB exactly ref one EB
-- IBs reference one of these EBs
-- No transactions in RBs!
+We briefly discussed an alternative design choice, in which IBs reference an EB and an RB. However, that design would result in many ledger states that would need to be computed and was therefore dismissed as too expensive.
 
-3. **RB + EB Hybrid Reference**: IBs can reference either an RB or a certified EB, with the EB itself referencing an older RB. This provides flexibility while ensuring security. This was regarded as a bootstrap mechanism.
+In this design, one gets a ledger state for each RB which gives a ledger state for each EB to be reused and IBs are validated with respect to that same state. On the contrary, due to EBs referencing an RB, there is still the same trade-off to be made as in the [IB-to-RB reference approach](#ib-to-rb-reference-approach) - having to chose more or less stable RBs for EBs resulting in higher latency or higher loss in EBs.
+
+
+##### 2. **EB Chain/ IB-to-EB-(to-EB)*-to-RB**
+
+In this approach IBs reference an EB which itself may reference another EB, which creates this chain of EBs that anchors on some older RB reference. Thus, EBs may have an RB reference or another EB reference of an EB that has not made it into an RB yet (full Leios variant). RBs on the other hand can only exactly reference one certified EB. IBs reference one of these EBs.
+
+This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles edge-case scenarios, where multiple EBs have been produced:
+
+- from different pipelines in parallel
+- from the same pipeline
+
+![EB Chain Approach](eb-reference-02.svg)
 
 **Extensions and Implementation Details:**
 
