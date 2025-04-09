@@ -70,13 +70,13 @@ We briefly discussed an alternative design choice, in which IBs reference an EB 
 In this design, one gets a ledger state for each RB which gives a ledger state for each EB to be reused and IBs are validated with respect to that same state. On the contrary, due to EBs referencing an RB, there is still the same trade-off to be made as in the [IB-to-RB reference approach](#ib-to-rb-reference-approach) - having to chose more or less stable RBs for EBs resulting in higher latency or higher loss in EBs.
 
 
-##### 2. **EB Chain/ IB-to-EB-(to-EB)*-to-RB**
+##### 2. **EB Chain/ IB-to-EB(-to-EB)*-to-RB**
 
 In this approach IBs reference an EB which itself may reference another EB, which creates this chain of EBs that anchors on some older RB reference. Thus, EBs may have an RB reference or another EB reference of an EB that has not made it into an RB yet (full Leios variant). RBs on the other hand can only exactly reference one certified EB. IBs reference one of these EBs.
 
 This approach allows for more recent state references while maintaining security through the chain of certified EBs, and handles edge-case scenarios, where multiple EBs have been produced:
 
-- from different pipelines in parallel
+- from different pipelines in parallel (see EB ordering below)
 - from the same pipeline
 
 ![EB Chain Approach](eb-reference-02.svg)
@@ -85,9 +85,7 @@ This approach allows for more recent state references while maintaining security
 
 - **Minimum Age Requirement**: A constraint where EBs must reference an RB that is at least a certain age (e.g., 5 minutes old) to ensure it's widely available in the network.
 
-- **EB Ordering by Slot**: In the Leios protocol, multiple pipelines run in parallel, each ideally producing one RB. With parameters set for 1.5 EBs per stage (with randomness via VRF functions potentially producing more), there may be multiple EBs to choose from for inclusion in an RB. This approach orders EBs by slot number and VRF hash, with a predefined ordering function to resolve conflicts when multiple EBs exist for the same slot or from different pipelines.
-
-- **Orphan Prevention**: A mechanism where RBs should not include EBs that reference orphaned EBs (those not included in previous RBs), helping to maintain a clear reference chain across pipelines.
+- **EB Ordering by Slot**: In the Leios protocol, multiple pipelines run in parallel, each ideally producing one RB. With parameters set for 1.5 EBs per stage (with randomness via VRF functions potentially producing more), there may be multiple EBs to choose from for inclusion in an RB.
 
 - **EB State Reuse**: An optimization technique where, when computing ledger states for EBs in a chain, we reuse the ledger state from referenced EBs and only replay the IBs in the current EB, reducing computational overhead, especially important when dealing with multiple pipelines and stages.
 
@@ -108,18 +106,9 @@ This approach allows for more recent state references while maintaining security
 
 3. **Certification**: Certified EBs provide stability similar to RBs but with lower latency, making them a promising middle ground.
 
-4. **Implementation Complexity**: The IB reference approach, while offering the lowest latency, introduces significant complexity in validation and security guarantees.
-
 ### Next Steps
 
-1. Further analysis of the EB reference approach, particularly around:
+Further analysis of the EB reference approach, particularly around:
    - EB ordering mechanisms
-   - State reconstruction efficiency
+   - State reconstruction efficiency (computational cost)
    - Security guarantees
-
-2. Simulation studies to quantify:
-   - Latency improvements
-   - State management overhead
-   - Security properties
-
-3. Consider hybrid approaches that combine elements from different strategies based on specific use cases.
