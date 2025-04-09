@@ -281,7 +281,7 @@ impl Node {
         let cpu_times = self.task_cpu_times(&task);
         let task_type = task.task_type();
         let subtask_count = cpu_times.len();
-        let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
+        let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times, self.clock.now());
         self.tracker.track_cpu_task_scheduled(
             CpuTaskId {
                 node: self.id,
@@ -390,10 +390,11 @@ impl Node {
                             if let Some(subtask) = next_subtask {
                                 self.start_cpu_subtask(subtask);
                             }
-                            let Some((task, cpu_time)) = finished_task else {
+                            let Some((task, cpu_time, start_time)) = finished_task else {
                                 continue;
                             };
-                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, task.extra());
+                            let wall_time = self.clock.now() - start_time;
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, wall_time, task.extra());
                             match task {
                                 CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
                                 CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block)?,

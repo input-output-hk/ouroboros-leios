@@ -69,6 +69,8 @@ pub enum Event {
         task_type: String,
         #[serde(serialize_with = "duration_as_secs")]
         cpu_time_s: Duration,
+        #[serde(serialize_with = "duration_as_secs")]
+        wall_time_s: Duration,
         extra: String,
     },
     CpuSubtaskStarted {
@@ -279,12 +281,14 @@ impl EventTracker {
         task_id: CpuTaskId,
         task_type: String,
         cpu_time: Duration,
+        wall_time: Duration,
         extra: String,
     ) {
         self.send(Event::CpuTaskFinished {
             task: self.to_task(task_id),
             task_type,
             cpu_time_s: cpu_time,
+            wall_time_s: wall_time,
             extra,
         });
     }

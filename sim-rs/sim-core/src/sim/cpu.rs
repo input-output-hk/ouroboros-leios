@@ -3,10 +3,13 @@ use std::{
     time::Duration,
 };
 
+use crate::clock::Timestamp;
+
 struct TaskState<T> {
     task: T,
     subtasks: usize,
     cpu_time: Duration,
+    start_time: Timestamp,
 }
 
 pub struct Subtask {
@@ -34,7 +37,12 @@ impl<T> CpuTaskQueue<T> {
         }
     }
 
-    pub fn schedule_task(&mut self, task: T, durations: Vec<Duration>) -> (u64, Vec<Subtask>) {
+    pub fn schedule_task(
+        &mut self,
+        task: T,
+        durations: Vec<Duration>,
+        start_time: Timestamp,
+    ) -> (u64, Vec<Subtask>) {
         assert!(!durations.is_empty());
 
         let task_id = self.next_task_id;
@@ -45,6 +53,7 @@ impl<T> CpuTaskQueue<T> {
                 task,
                 subtasks: durations.len(),
                 cpu_time: durations.iter().sum(),
+                start_time,
             },
         );
 
@@ -69,7 +78,7 @@ impl<T> CpuTaskQueue<T> {
     pub fn complete_subtask(
         &mut self,
         subtask: Subtask,
-    ) -> (Option<(T, Duration)>, Option<Subtask>) {
+    ) -> (Option<(T, Duration, Timestamp)>, Option<Subtask>) {
         self.available_cores = self.available_cores.map(|c| c + 1);
 
         let task = self
@@ -80,7 +89,7 @@ impl<T> CpuTaskQueue<T> {
         let finished_task = if task.subtasks == 0 {
             self.tasks
                 .remove(&subtask.task_id)
-                .map(|s| (s.task, s.cpu_time))
+                .map(|s| (s.task, s.cpu_time, s.start_time))
         } else {
             None
         };
