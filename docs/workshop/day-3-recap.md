@@ -10,38 +10,15 @@ Agenda
 
 ## 2. Optimistic Ledger State References
 
-The discussion focused on different approaches for handling optimistic ledger state references in the Leios protocol. The core problem is how to validate Input Blocks (IBs) against a ledger state that is not yet settled in a Ranking Block (RB). This is essential for enabling transaction chaining, where new transactions can build upon the outputs of previous transactions that haven't yet been settled in a stable chain state, striking a careful balance between security and latency.
+The discussion focused on different approaches for handling optimistic ledger state references in the Leios protocol. The core problem is how to validate Input Blocks (IBs) against a ledger state that is not yet settled in a Ranking Block (RB). This is essential for enabling transaction chaining, where new transactions can build upon the outputs of previous transactions.
 
 ### Problem Statement
 
-Validating an Input Block (IB) requires a reference to a ledger state that can be used to verify the validity of its transactions. The choice of this reference state involves a fundamental trade-off between security and latency. The most secure approach is to reference the RB from k blocks ago (the stability horizon in Praos), where k represents the length of the volatile suffix. This provides perfect security as we can be confident that such blocks will be included in all possible futures of the chain. However, this approach introduces significant latency (potentially hours), making it impractical for many use cases that require quick transaction confirmation.
+Validating an Input Block (IB) requires a reference to a ledger state that can be used to verify the validity of its transactions. The choice of this reference state involves a trade-off between security and latency. The most secure approach is to reference the RB from k blocks ago, where k is defined as the stability horizon and represents the length of the volatile chain suffix. This boundary provides perfect security as we can be confident that any older block referenced will be included in all possible futures of the chain. However, this approach introduces significant latency (potentially hours), making it impractical for many use cases that require quick transaction confirmation.
 
 As we move to more recent blocks to reduce latency, we face increasing security challenges. Not every node in the network may have seen the same recent blocks due to network latency or temporary forks. For example, if an IB references the most recent RB, nodes that haven't received that RB yet cannot validate the IB. This creates a coordination problem where we need to ensure that the reference state is available to enough nodes to reach consensus on IB validity.
 
-### Validation Requirements
-
-For an IB to be valid, it must be validated against a ledger state that:
-1. Is available to a majority of nodes in the network
-2. Has sufficient security guarantees (e.g., certified or stable)
-3. Contains all necessary UTXOs and account states for transaction validation
-
-The validation process requires:
-- A deterministic way to reconstruct the ledger state
-- Agreement among nodes about which state to use for validation
-- Ability to handle cases where different nodes might have different views of the chain
-
-This is particularly challenging because:
-- Nodes may be at different points in the chain due to network conditions
-- Short forks can create temporary inconsistencies
-- The need for low latency conflicts with the need for stable reference points
-- The stability horizon (k blocks) provides perfect security but introduces impractical latency
-
-The trade-off between security and latency is fundamental:
-- Using the stability horizon (k blocks back) provides perfect security but high latency
-- Using more recent blocks reduces latency but requires additional mechanisms to ensure security
-- Certified Endorsement Blocks (EBs) offer a middle ground, providing security guarantees with lower latency than the stability horizon
-
-### Approaches
+### Solution Space
 
 Each of the following approaches describes a solution where an Input Block (IB) references a different block variant which provides a ledger reference for validation.
 
@@ -52,15 +29,21 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 | [IB](#) | IBs reference other IBs | Worst | Best | Worst | Max |
 
 > [!Note]
-> The choice of referenceable ledger states cannot be arbitrary, not only due to security considerations but also due to practical system constraints. Maintaining too many potential reference states would lead to excessive memory usage and computational overhead as each node would need to track and validate multiple parallel ledger states. This creates a natural tension between flexibility in reference selection and system efficiency.
+> The choice of referenceable ledger states cannot be arbitrary, not only due to security considerations but also due to practical system constraints. Maintaining too many potential reference states would lead to excessive memory usage and computational overhead as each node would need to track and validate numerous parallel ledger states. We have estimated the associated computation cost in the last column of each approach.
 
 ### Data Flow Diagrams
 
 #### RB Reference Approach
+
+The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-6 might be more suitable. Note, that even the tip-6 example would introduce on average a delay of 6×20s = 120s before a user could reference outputs from a previously submitted transaction.
+
 ![RB Reference Approach](rb-reference.svg)
 
 > [!Note]
-> There are two more version of this, a [detailed](./rb-reference-detailed.svg) and a [complex](./rb-reference-complex.svg) including EBs.
+> The parameter k defines the stability horizon, which is the period during which the last k blocks of the chain remain mutable. After k blocks are added, all preceding blocks become immutable or in other words become part of the stable chain prefix.
+
+> [!Note]
+> There are two more versions of this diagram, a [detailed](./rb-reference-detailed.svg) showing EBs and a [complex](./rb-reference-complex.svg) version showing EBs and IBs with different ledger state references which is likely the most realistic example of this approach.
 
 #### EB Reference Approach
 
