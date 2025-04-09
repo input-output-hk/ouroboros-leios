@@ -144,6 +144,9 @@
             },
             "type": {
               "$ref": "#/definitions/RustCpuMessageType"
+            },
+            "wall_time_s": {
+              "type": "number"
             }
           },
           "type": "object"

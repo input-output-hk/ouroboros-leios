@@ -38,6 +38,7 @@ interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
         subtask_id?: number;
         duration_s?: number;
         cpu_time_s?: number;
+        wall_time_s?: number;
         extra?: string;
     };
 }
