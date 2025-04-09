@@ -258,6 +258,7 @@ impl EventMonitor {
                     header_bytes,
                     total_bytes,
                     transactions,
+                    ..
                 } => {
                     generated_ibs += 1;
                     if transactions.is_empty() {
