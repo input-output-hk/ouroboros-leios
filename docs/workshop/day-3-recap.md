@@ -35,7 +35,7 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 
 #### IB-to-RB Reference Approach
 
-The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for IB validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-6 might be more suitable. Note, that even the tip-3 example would introduce on average a delay of 3×20s = 90s before a user could reference outputs from a previously submitted transaction.
+The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for IB validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-3 might be more suitable. Note, that even the tip-3 example would introduce on average a delay of 3×20s = 60s before a user could reference outputs from a previously submitted transaction.
 
 ![RB Reference Approach](rb-reference.svg)
 
