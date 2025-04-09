@@ -1,4 +1,6 @@
 open import Prelude.AssocList
+
+open import Leios.Config
 open import Leios.Prelude hiding (id)
 open import Leios.Foreign.Util
 
@@ -119,8 +121,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
          (no _)  → error "Expected total map"
 
-  open import Leios.Config
-
   params : Params
   params =
     record
@@ -130,7 +130,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       ; stageLength = sl
       }
 
-  open import Leios.Defaults params using (hhs; hpe)
   open import Leios.Short.Trace.Verifier params
 
   to-nodeId : ℕ → String
@@ -236,7 +235,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     verifyTrace : EventLog → ℕ
     verifyTrace l =
       let s₀ = record { refs = [] ; currentSlot = 0 }
-          αs = L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
+          αs = L.reverse $ L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
       in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
 
     {-# COMPILE GHC verifyTrace as verifyTrace #-}
