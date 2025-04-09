@@ -9,7 +9,7 @@ import Data.Aeson.Encoding
 import qualified Data.ByteString.Lazy as BSL
 import Data.List (foldl')
 import GHC.Generics
-import System.IO (IOMode (WriteMode), hFlush, stdout, withFile)
+import System.IO (Handle, IOMode (WriteMode), hFlush, stdout, withFile)
 import TimeCompat
 import VizSim
 
@@ -31,12 +31,12 @@ runSampleModel ::
   [(Time, event)] ->
   IO ()
 runSampleModel traceFile logEvent =
-  runSampleModel' (Just traceFile) (\t -> fmap (toEncoding . SampleEvent t) . logEvent)
+  runSampleModel' (Just traceFile) (jsonlLog (\t -> fmap (toEncoding . SampleEvent t) . logEvent))
 
 runSampleModel' ::
   forall event state.
   Maybe FilePath ->
-  (DiffTime -> event -> Maybe Encoding) ->
+  (Handle -> DiffTime -> event -> IO ()) ->
   SampleModel event state ->
   Time ->
   [(Time, event)] ->
@@ -63,9 +63,17 @@ runSampleModel' traceFile logEvent (SampleModel s0 accum render) stop =
           render st'
   writeEvents _h (SimVizModel [] st) = return st
   writeEvents h (SimVizModel ((t'@(Time t), e) : es) st) = do
-    case logEvent t e of
-      Nothing -> return ()
-      Just x -> do
-        BSL.hPutStr h (encodingToLazyByteString x)
-        BSL.hPutStr h "\n"
+    logEvent h t e
     writeEvents h (SimVizModel es (accum t' e st))
+
+jsonlLog :: (t1 -> t2 -> Maybe (Encoding' a)) -> Handle -> t1 -> t2 -> IO ()
+jsonlLog logEvent h t e = case logEvent t e of
+  Nothing -> return ()
+  Just x -> do
+    BSL.hPutStr h (encodingToLazyByteString x)
+    BSL.hPutStr h "\n"
+
+binaryLog :: (t1 -> t2 -> Maybe BSL.ByteString) -> Handle -> t1 -> t2 -> IO ()
+binaryLog logEvent h t e = case logEvent t e of
+  Nothing -> return ()
+  Just x -> BSL.hPutStr h x

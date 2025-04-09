@@ -44,6 +44,7 @@ import Data.Ord
 import qualified Data.Set as Set
 import Diffusion
 import GHC.Generics
+import LeiosEvents (encodeCBOR)
 import LeiosProtocol.Common hiding (Point)
 import qualified LeiosProtocol.Config as OnDisk
 import LeiosProtocol.Short
@@ -230,13 +231,14 @@ accumDataTransmitted _msg TcpMsgForecast{..} = [(start, end, msgSize)]
   !start = realToFrac msgSendLeadingEdge.unTime
   !end = realToFrac msgSendTrailingEdge.unTime
 
+data LogFormat = Shared {cbor :: Bool} | Legacy {verbosity :: Int}
+
 data SimOutputConfig = SimOutputConfig
   { logFile :: Maybe FilePath
-  , logVerbosity :: Int
   , dataFile :: Maybe FilePath
   , analize :: Bool
   , stop :: Time
-  , sharedFormat :: Bool
+  , logFormat :: LogFormat
   }
 
 rawDataFromState :: OnDisk.Config -> P2PNetwork -> LeiosSimState -> Time -> RawLeiosData
@@ -336,9 +338,11 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
   runModel model =
     runSampleModel' logFile logEvent model stop $
       exampleTrace2 seed cfg p2pNetwork
-  logEvent = case sharedFormat of
-    False -> logLeiosTraceEvent p2pNodeNames logVerbosity
-    True -> (fmap toEncoding .) . sharedTraceEvent p2pNodeNames
+  logEvent = case logFormat of
+    Legacy{..} -> jsonlLog $ logLeiosTraceEvent p2pNodeNames verbosity
+    Shared{cbor}
+      | cbor -> binaryLog $ (fmap (encodeCBOR . (: [])) .) . sharedTraceEvent p2pNodeNames
+      | otherwise -> jsonlLog $ (fmap toEncoding .) . sharedTraceEvent p2pNodeNames
   renderState fp st = do
     let diffusionData = maybeAnalizeRawData analize (rawDataFromState cfg p2pNetwork st stop)
     encodeFile fp diffusionData
