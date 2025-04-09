@@ -67,3 +67,11 @@ source-repository-package
     --sha256: WFEmGcnCdEXmo2MCC5g+C3laGjFaBnFksgHbFeAZUQo=
     subdir:
       generated
+
+source-repository-package
+    type: git
+    location: https://github.com/well-typed/cborg.git
+    tag: 7a4feb69bbbc09b0b29ed41ff3b9b8526e349c62
+    --sha256: 1YE6LP4YZNATEOfZ+/USDx/sIOi9rFbHmHVn6ONDrTc=
+    subdir:
+      cborg-json

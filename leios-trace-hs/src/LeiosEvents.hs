@@ -144,10 +144,9 @@ decodeJSONL = mapMaybe decode . BSL8.lines
 encodeJSONL :: [TraceEvent] -> BSL8.ByteString
 encodeJSONL = BSL8.unlines . map encode
 
--- | Throws exception on CBOR decoding errors, skips values that do not decode as TraceEvent.
---   WARNING: seems not to be compatible with CBOR format produced by rust-sim.
-decodeCBOR :: BSL8.ByteString -> [TraceEvent]
-decodeCBOR = go
+-- | Generic version of @decodeCBOR@
+decodeCBORJSON :: FromJSON a => BSL8.ByteString -> [a]
+decodeCBORJSON = go
  where
   go s | BSL8.null s = []
   go s =
@@ -156,6 +155,11 @@ decodeCBOR = go
       Right (s', v) -> case fromJSON v of
         Success x -> x : go s'
         Error _ -> go s'
+
+-- | Throws exception on CBOR decoding errors, skips values that do not decode as TraceEvent.
+--   WARNING: seems not to be compatible with CBOR format produced by rust-sim.
+decodeCBOR :: BSL8.ByteString -> [TraceEvent]
+decodeCBOR = decodeCBORJSON
 
 -- | Uses standard CBOR encoding of JSON values, encoded events are concatenated with no separator.
 encodeCBOR :: [TraceEvent] -> BSL8.ByteString
