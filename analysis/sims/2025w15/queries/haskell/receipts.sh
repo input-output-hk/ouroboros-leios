@@ -40,7 +40,6 @@ jq --slurpfile idx "$IDX" -c '
   }
 | (. + $idx[0][.kind + "|" + .item])
 | (. + {elapsed: (.received - .sent)})
-| del(.received)
 ' "$1" \
 | sort \
 | dasel -r json -w csv \
