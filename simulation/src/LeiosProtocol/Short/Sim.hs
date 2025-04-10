@@ -269,21 +269,24 @@ sharedEvent nodeNames e = case e of
   sharedNode node (PraosNodeEvent pe) =
     case pe of
       PraosNodeEventGenerate blk ->
-        Just
-          Shared.RBGenerated
-            { producer = node
-            , block_id = Just (rbId blk)
-            , vrf = Nothing
-            , slot = fromIntegral . fromEnum $ blockSlot blk
-            , size_bytes = Nothing
-            , endorsement = Nothing
-            , endorsements = Just . map (Shared.Endorsement . Shared.BlockRef . T.pack . mkStringId . fst) $ blk.blockBody.endorseBlocks
-            , payload_bytes = Just . fromIntegral $ blk.blockBody.payload
-            , parent = do
-                h@BlockHash{} <- pure $ blockPrevHash blk
-                Just $! Shared.BlockRef{id = rbRef h}
-            , ..
-            }
+        let
+          (endorsement, endorsements) = headAndTail $ map (Shared.Endorsement . Shared.BlockRef . T.pack . mkStringId . fst) $ blk.blockBody.endorseBlocks
+         in
+          Just
+            Shared.RBGenerated
+              { producer = node
+              , block_id = Just (rbId blk)
+              , vrf = Nothing
+              , slot = fromIntegral . fromEnum $ blockSlot blk
+              , size_bytes = Nothing
+              , endorsement
+              , endorsements
+              , payload_bytes = Just . fromIntegral $ blk.blockBody.payload
+              , parent = do
+                  h@BlockHash{} <- pure $ blockPrevHash blk
+                  Just $! Shared.BlockRef{id = rbRef h}
+              , ..
+              }
       PraosNodeEventReceived blk ->
         Just
           Shared.RBReceived
@@ -307,9 +310,10 @@ sharedEvent nodeNames e = case e of
    where
     rbId blk = T.pack $ show (coerce @_ @Int (blockHash blk))
   sharedNode _ _ = Nothing
-  blockIds xs = case map (T.pack . mkStringId . fst) xs of
+  headAndTail xs = case xs of
     [] -> (Nothing, Nothing)
-    (y : ys) -> (Just y, Just ys)
+    (x : xs') -> (Just x, guard (not . null $ xs') >> Just xs')
+  blockIds xs = headAndTail $ map (T.pack . mkStringId . fst) xs
   sharedMsg :: T.Text -> T.Text -> DiffTime -> Shared.Bytes -> LeiosMessage -> Maybe Shared.Event
   sharedMsg (Just -> sender) recipient (Just . realToFrac @_ @Shared.Time -> sending_s) (Just . fromIntegral @_ @Shared.Bytes -> msg_size_bytes) = \case
     RelayIB (ProtocolMessage (SomeMessage (MsgRespondBodies xs)))
