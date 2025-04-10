@@ -1,7 +1,7 @@
 ...@styles
 
 title: {
-  label: "EB-DAG Approach"
+  label: "EB-DAG"
   near: top-center
   style.font-size: 24
   style.bold: true
@@ -192,8 +192,6 @@ EB7 -> EB6: "Ref" {
   class: to_eb_arrow
 }
 
-# IB references
-
 EB1 -> IB1: "Ref" {
   class: to_ib_arrow
 }
@@ -228,6 +226,44 @@ EB7 -> IB8: "Ref" {
 
 EB7 -> IB9: "Ref" {
   class: to_ib_arrow
+}
+
+# IB references
+
+IB1 -> chain.Genesis: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB2 -> chain.Genesis: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB3 -> EB1: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB4 -> chain.Genesis: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB5 -> EB2: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB6 -> EB3: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB7 -> EB5: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB8 -> EB5: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB9 -> EB6: "Ledger Ref" {
+  class: ledger_link
 }
 
 direction: left

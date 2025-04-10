@@ -20,11 +20,6 @@ chain: {
     label: "Genesis"
   }
 
-  RBs: {
-    class: rb_stacked
-    label: "RBs"
-  }
-
   RB1: {
     class: rb
     label: "RB 1"
@@ -87,10 +82,7 @@ EB7: {
 
 # RB references
 
-chain.RBs -> chain.Genesis: {
-  class: to_rb_arrow
-}
-chain.RB1 -> chain.RBs: {
+chain.RB1 -> chain.Genesis: {
   class: to_rb_arrow
 }
 chain.RB2 -> chain.RB1: {

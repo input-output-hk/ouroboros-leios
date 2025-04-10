@@ -36,6 +36,7 @@ Each of the following approaches describes a solution where an Input Block (IB) 
 #### IB-to-RB Reference Approach
 
 The simplified diagram below shows respective lower and upper bounds for selecting an RB as ledger state reference for IB validation - each showing the extreme ends of trading off latency for security. Realistically, both are not good choices and some RB such as tip-3 might be more suitable. Note, that even the tip-3 example would introduce on average a delay of 3×20s = 60s before a user could reference outputs from a previously submitted transaction.
+The figure below illustrates how one can select different degrees of latency using this IB-to-RB reference approach.
 
 ![RB Reference Approach](rb-reference.svg)
 
@@ -48,17 +49,17 @@ Thus, we can define a new parameter to define stability for Leios which ranges b
 
 ![detailed](./rb-reference-detailed.svg)
 
-This diagram shows the same ledger reference approach - pointing to RBs, but also includes EBs which have been hidden in the previous example for the stake of simplicity.
+This diagram shows the same ledger reference approach - IBs pointing to RBs, but also includes EBs which have been hidden in the previous example for the stake of simplicity. As a reminder EBs store IBs by reference.
 
 ##### 2. Different IB-to-RB references
 
 ![complex](./rb-reference-realistic.svg)
 
-The above diagram displays a more realistic picture of different IBs referencing different RBs as their ledger state reference for validation.
+The above diagram displays a more realistic picture of IBs referencing different RBs as their ledger state reference for validation.
 
 #### EB Reference Approach
 
-The EB reference approach offers a middle ground between security and latency. Certified EBs (those that have received votes from a majority of stake) provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several core variations of the EB reference approach were discussed:
+In the following context, when we refer to EBs, we implicitely mean certified EBs that have received votes from a majority of stake. The EB reference approach offers a middle ground between security and latency. Certified EBs provide security guarantees with lower latency than the [RB-reference approach](#rb-reference-approach), as they indicate that enough nodes have seen and validated them. Several variations of the EB reference approach were discussed:
 
 ##### 1. **EB Reference**
 
@@ -71,13 +72,13 @@ Different to the [IB-to-RB referencing](#ib-to-rb-reference-approach), this appr
 We briefly discussed an alternative design choice, in which IBs reference an EB and an RB. However, that design would result in many ledger states that would need to be computed and was therefore dismissed as too expensive.
 
 In this design, one gets a ledger state for each RB which gives a ledger state for each EB to be reused and IBs are validated with respect to that same state. On the contrary, due to EBs referencing an RB, there is still the same trade-off to be made as in the [IB-to-RB reference approach](#ib-to-rb-reference-approach) - having to chose more or less stable RBs for EBs resulting in higher latency or higher loss in EBs.
-
+This scheme also doesn't handle edge cases well, such as two EBs being produced in parallel or within the same pipeline unless we include multiple EB certificates in RBs.
 
 ##### 2. **EB-Chain**
 
-In this approach IBs reference an EB which itself may reference another EB, which creates this chain of EBs that anchors on some older RB reference. Thus, EBs may have an RB reference or another EB reference of an EB that has not made it into an RB yet (full Leios variant). RBs on the other hand can only exactly reference one certified EB. IBs reference one of these EBs.
+In this approach IBs reference an EB which itself may reference another EB, which creates this chain of EBs that anchors on some older RB reference. Thus, EBs may have an RB reference or another EB reference of an EB that has not made it into an RB yet (full Leios variant). RBs on the other hand can only exactly reference one certified EB. IBs reference one of these EBs. This solves for multiple EBs having been produced concurrently because one can be incoporated into an RB and the other temporarily orphaned one can be referenced by a new EB constructing a chain of EBs.
 
-As a downside of this approach, it doesn't allow for EBs to reference one or more EBs. Therefore, it still has the same trade-off from the previous [IB-to-EB-to-RB](#1-ib-to-eb-to-rb-reference) approach, since these chains of EBs are anchored to RBs, which comes with this disadvantageous property of high latency, older stable RBs vs low latency, less stable RBs.
+This scheme still has the same trade-off from the previous [IB-to-EB-to-RB](#1-ib-to-eb-to-rb-reference) approach, since these chains of EBs are anchored to RBs, which comes with this disadvantageous property of high latency, older stable RBs vs low latency, less stable RBs.
 
 ![EB Chain Approach](eb-chain.svg)
 
@@ -85,11 +86,11 @@ As a downside of this approach, it doesn't allow for EBs to reference one or mor
 
 The EB DAG approach represents a sophisticated approach that leverages a directed acyclic graph (DAG) structure of Endorsement Blocks (EBs) to achieve both low latency and strong security guarantees. In this design:
 
-![EB Chain Approach](eb-dag.svg)
-
 - EBs can reference one or more older EBs that haven't been referenced by other EBs yet
 - Ranking Blocks (RBs) reference exactly one EB
 - Input Blocks (IBs) reference one of these EBs
+
+![EB Chain Approach](eb-dag.svg)
 
 **Key Advantages:**
 
