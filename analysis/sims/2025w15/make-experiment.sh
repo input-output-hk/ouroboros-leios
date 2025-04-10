@@ -45,7 +45,7 @@ EOI
 
 case "$SIMULATOR" in
   haskell)
-    echo "../../ols sim short-leios --leios-config-file config.json --topology-file network.yaml --output-file sim.log --output-seconds $MAX_SLOT > stdout 2> stderr" >> "$RUN_DIR/run.sh"
+    echo "../../ols sim short-leios --leios-config-file config.json --topology-file network.yaml --shared-log-format --output-file sim.log --output-seconds $MAX_SLOT > stdout 2> stderr" >> "$RUN_DIR/run.sh"
   ;;
 rust)
     echo "../../sim-cli --parameters config.json network.yaml --slots $MAX_SLOT sim.log > stdout 2> stderr" >> "$RUN_DIR/run.sh"
@@ -59,7 +59,7 @@ do
   ../../queries/$SIMULATOR/\$f.sh sim.log \$f.csv.gz
 done
 
-echo "CASE: $SIMULATOR | $MAX_SLOT | $LABEL | $NETWORK | $IB_RATE | $IB_SIZE | $EB_RATE | $STAGE_LENGTH"
+echo "FINISHED: $SIMULATOR | $MAX_SLOT | $LABEL | $NETWORK | $IB_RATE | $IB_SIZE | $EB_RATE | $STAGE_LENGTH"
 EOI
 
 chmod +x "$RUN_DIR/run.sh"

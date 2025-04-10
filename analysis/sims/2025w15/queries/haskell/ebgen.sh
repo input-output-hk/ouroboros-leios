@@ -8,15 +8,16 @@ function cleanup {
 trap cleanup EXIT
 
 jq -c '
-  select(.message.type == "RBGenerated" and .message.endorsement)
+  select(.message.type == "RBGenerated")
+| .message.endorsements[]
 | {
-    "eb": .message.endorsement.eb.id
+    "eb": .eb.id
   }
 ' "$1" \
 | sort \
 | jq --slurp '
   group_by(.eb)
-| map({"\(.[0].eb)": (. | length)})
+  | map({"\(.[0].eb)": (. | length)})
 | add
 ' > "$IDX"
 
@@ -28,7 +29,7 @@ jq --slurpfile idx "$IDX" -c '
     "time": .time_s,
     "size": .message.bytes,
     "ib-count": (.message.input_blocks | length),
-    "eb-count": (.message.endorser_blocks | length),
+    "eb-count": "NA",
     "rb-count": ($idx[0][.message.id] // 0)
   }
 ' "$1" \
