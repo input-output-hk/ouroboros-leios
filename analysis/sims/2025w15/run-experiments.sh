@@ -7,4 +7,4 @@ else
   J=$1
 fi
 
-find runs -type f -name run.sh | parallel --jobs=$J
+find runs -type f -name run.sh | sort -R | parallel --jobs=$J
