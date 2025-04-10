@@ -123,6 +123,7 @@ $( deriveJSON
       { sumEncoding = defaultTaggedObject{tagFieldName = "type"}
       , fieldLabelModifier = \fl -> case fl of
           ('b' : 'l' : 'o' : 'c' : 'k' : '_' : xs) -> xs
+          "bytes" -> "size_bytes"
           xs -> xs
       }
     ''Event
