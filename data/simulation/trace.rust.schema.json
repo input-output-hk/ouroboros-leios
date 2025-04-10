@@ -74,7 +74,7 @@
                   },
                   "type": "object"
                 },
-                "total_bytes": {
+                "size_bytes": {
                   "type": "number"
                 },
                 "transactions": {

@@ -789,11 +789,11 @@ impl Node {
         };
 
         let votes = self.leios.votes_by_eb.get(&block)?.clone();
-        let bytes = self.sim_config.sizes.cert(votes.len());
+        let size_bytes = self.sim_config.sizes.cert(votes.len());
 
         Some(Endorsement {
             eb: block,
-            bytes,
+            size_bytes,
             votes,
         })
     }

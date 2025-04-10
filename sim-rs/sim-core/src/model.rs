@@ -78,7 +78,7 @@ impl Block {
             + self
                 .endorsement
                 .as_ref()
-                .map(|e| e.bytes)
+                .map(|e| e.size_bytes)
                 .unwrap_or_default()
             + self.transactions.iter().map(|t| t.bytes).sum::<u64>()
     }
@@ -219,6 +219,6 @@ pub enum NoVoteReason {
 #[derive(Clone, Debug, Serialize)]
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,
-    pub bytes: u64,
+    pub size_bytes: u64,
     pub votes: BTreeMap<Node, usize>,
 }

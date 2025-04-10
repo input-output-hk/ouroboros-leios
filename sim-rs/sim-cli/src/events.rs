@@ -177,8 +177,8 @@ impl EventMonitor {
                 Event::CpuTaskScheduled { .. } => {}
                 Event::CpuTaskFinished { .. } => {}
                 Event::CpuSubtaskStarted { .. } => {}
-                Event::TransactionGenerated { id, bytes, .. } => {
-                    txs.insert(id, Transaction::new(bytes, time));
+                Event::TransactionGenerated { id, size_bytes, .. } => {
+                    txs.insert(id, Transaction::new(size_bytes, time));
                     pending_txs.insert(id);
                 }
                 Event::TransactionSent { .. } => {
@@ -256,7 +256,7 @@ impl EventMonitor {
                 Event::IBGenerated {
                     id,
                     header_bytes,
-                    total_bytes,
+                    size_bytes,
                     transactions,
                     ..
                 } => {
@@ -266,7 +266,7 @@ impl EventMonitor {
                     }
                     pending_ibs.insert(id.clone());
                     ib_txs.insert(id.clone(), transactions.clone());
-                    bytes_in_ib.insert(id.clone(), total_bytes as f64);
+                    bytes_in_ib.insert(id.clone(), size_bytes as f64);
                     let mut tx_bytes = header_bytes;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(id.clone()).or_default() += 1.;

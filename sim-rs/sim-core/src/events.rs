@@ -82,7 +82,7 @@ pub enum Event {
     TransactionGenerated {
         id: TransactionId,
         publisher: Node,
-        bytes: u64,
+        size_bytes: u64,
     },
     TransactionSent {
         id: TransactionId,
@@ -106,6 +106,7 @@ pub enum Event {
         vrf: u64,
         parent: Option<BlockId<Node>>,
         header_bytes: u64,
+        size_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
@@ -137,7 +138,7 @@ pub enum Event {
         producer: Node,
         index: u64,
         header_bytes: u64,
-        total_bytes: u64,
+        size_bytes: u64,
         transactions: Vec<TransactionId>,
     },
     IBSent {
@@ -169,7 +170,7 @@ pub enum Event {
         slot: u64,
         pipeline: u64,
         producer: Node,
-        bytes: u64,
+        size_bytes: u64,
         input_blocks: Vec<InputBlockId<Node>>,
         endorser_blocks: Vec<EndorserBlockId<Node>>,
     },
@@ -200,7 +201,7 @@ pub enum Event {
         slot: u64,
         pipeline: u64,
         producer: Node,
-        bytes: u64,
+        size_bytes: u64,
         votes: Votes<Node>,
     },
     VTBundleNotGenerated {
@@ -322,9 +323,10 @@ impl EventTracker {
             vrf: block.vrf,
             parent: block.parent.map(|id| self.to_block(id)),
             header_bytes: block.header_bytes,
+            size_bytes: block.bytes(),
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
                 eb: self.to_endorser_block(e.eb),
-                bytes: e.bytes,
+                size_bytes: e.size_bytes,
                 votes: e
                     .votes
                     .iter()
@@ -359,7 +361,7 @@ impl EventTracker {
         self.send(Event::TransactionGenerated {
             id: transaction.id,
             publisher: self.to_node(publisher),
-            bytes: transaction.bytes,
+            size_bytes: transaction.bytes,
         });
     }
 
@@ -397,7 +399,7 @@ impl EventTracker {
             producer: self.to_node(block.header.id.producer),
             index: block.header.id.index,
             header_bytes: block.header.bytes,
-            total_bytes: block.header.bytes
+            size_bytes: block.header.bytes
                 + block.transactions.iter().map(|tx| tx.bytes).sum::<u64>(),
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
@@ -442,7 +444,7 @@ impl EventTracker {
             slot: block.slot,
             pipeline: block.pipeline,
             producer: self.to_node(block.producer),
-            bytes: block.bytes,
+            size_bytes: block.bytes,
             input_blocks: block
                 .ibs
                 .iter()
@@ -493,7 +495,7 @@ impl EventTracker {
             slot: votes.id.slot,
             pipeline: votes.id.pipeline,
             producer: self.to_node(votes.id.producer),
-            bytes: votes.bytes,
+            size_bytes: votes.bytes,
             votes: Votes(
                 votes
                     .ebs
