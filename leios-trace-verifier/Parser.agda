@@ -165,7 +165,9 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
   traceEvent→action l record { message = Cpu _ _ _ ; time_s = t }
     with trunc t ≟ suc (currentSlot l)
-  ... | yes p = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
+  ... | yes p =
+    record l { currentSlot = suc (currentSlot l) }
+      , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
   ... | no _ = l , []
   traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
   traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
