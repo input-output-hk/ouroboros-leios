@@ -58,6 +58,7 @@ for f in rbgen ebgen ibgen cpus receipts
 do
   ../../queries/$SIMULATOR/\$f.sh sim.log \$f.csv.gz
 done
+gzip -9f sim.log
 
 echo "FINISHED: $SIMULATOR | $MAX_SLOT | $LABEL | $NETWORK | $IB_RATE | $IB_SIZE | $EB_RATE | $STAGE_LENGTH"
 EOI
