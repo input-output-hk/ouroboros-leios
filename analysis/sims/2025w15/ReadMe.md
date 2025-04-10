@@ -1,27 +1,30 @@
-# Simulation experiments
+# Simulation experiments at tag `leios-2025w15`
+
 
 ## Workflow for running experiments
 
 1. Copy the Haskell and Rust executables to this folder.
-2. Edit [env.sh](env.sh) to set the MongoDB host and database names.
-3. Execute [run-experiment.sh](run-experiment.sh).
-4. Execute [run-queries.sh](run-queries.sh).
-5. Optionally execute [export-results.sh](export-results.sh) to create CSV files.
+2. Execute [build-experiments.sh](build-experiments.sh).
+3. Execute [run-experiments.sh](run-experiments.sh).
+4. Execute [combine-results.sh](combine-results.sh).
+5. The results are in the `results/` folder.
 6. Execute `nix run ..` to launch a Jupyter server.
 7. Run Jupyter notebook [analysis.ipynb](analysis.ipynb).
 
+
 ## Archive of results
 
-| Results             | 100-node network                                                            | Realistic network                                                           |
-|---------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| CPU usage           | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/cpus.csv.gz     | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/cpus.csv.gz     |
-| IB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/ibgen.csv.gz    | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/ibgen.csv.gz    |
-| EB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/ebgen.csv.gz    | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/ebgen.csv.gz    |
-| RB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/rbgen.csv.gz    | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/rbgen.csv.gz    |
-| Receipt of messages | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/receipts.csv.gz | https://leios-sim-output.s3.us-east-1.amazonaws.com/pre-edi/receipts.csv.gz |
+| Results             | 100-node network                                                            |
+|---------------------|-----------------------------------------------------------------------------|
+| CPU usage           | https://leios-sim-output.s3.us-east-1.amazonaws.com/2025w15/cpus.csv.gz     |
+| IB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/2025w15/ibgen.csv.gz    |
+| EB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/2025w15/ebgen.csv.gz    |
+| RB generation       | https://leios-sim-output.s3.us-east-1.amazonaws.com/2025w15/rbgen.csv.gz    |
+| Receipt of messages | https://leios-sim-output.s3.us-east-1.amazonaws.com/2025w15/receipts.csv.gz |
 
 
 ### Data dictionary
+
 
 #### CPU usage
 
