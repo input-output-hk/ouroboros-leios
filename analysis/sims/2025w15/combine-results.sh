@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 mkdir -p results
 
 for f in rbgen ebgen ibgen cpus receipts
@@ -10,7 +12,7 @@ do
   echo "$HL,$HR" > results/$f.csv
   for g in $(find runs -type f -name $f.csv.gz -printf %h\\n)
   do
-  BL=$(sed -n -e '2p' "$g/case.csv")
+    BL=$(sed -n -e '2p' "$g/case.csv")
     zcat "$g/$f.csv.gz" | sed -e "1d;s/^/$BL,/" >> results/$f.csv
   done
   gzip -9 results/$f.csv

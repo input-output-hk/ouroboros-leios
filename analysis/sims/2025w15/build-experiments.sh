@@ -4,13 +4,13 @@ set -ev
 
 MAX_SLOT=600
 
-for SIMULATOR in rust
+for SIMULATOR in rust haskell
 do
   for LABEL in default
   do
     for NETWORK in 100-nodes
     do
-      for IB_RATE in 1.0 2.0 3.0 4.0 5.0
+      for IB_RATE in 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5 6.0 6.5 7.0 7.5 8.0 8.5 9.0 9.5 10.0
       do
         for IB_SIZE in 98304
         do
