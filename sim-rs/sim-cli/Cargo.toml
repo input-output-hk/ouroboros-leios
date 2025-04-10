@@ -7,12 +7,12 @@ rust-version = "1.82"
 
 [dependencies]
 anyhow = "1"
-average = "0.15"
+average = "0.16"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
 figment = { version = "0.10", features = ["yaml"] }
 itertools = "0.14"
-minicbor-serde = { version = "0.3", features = ["alloc"] }
+minicbor-serde = { version = "0.4", features = ["alloc"] }
 netsim-core = { git = "https://github.com/input-output-hk/ce-netsim", rev = "9d1e26c" }
 pretty-bytes-rust = "0.3.0"
 rand = "0.9"
