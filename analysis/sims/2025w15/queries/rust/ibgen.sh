@@ -16,6 +16,7 @@ jq -c '
     "eb": $x.message.id,
   }
 ' "$1" \
+| sort \
 | jq --slurp '
   group_by(.ib)
 | map({"\(.[0].ib)": (. | length)})

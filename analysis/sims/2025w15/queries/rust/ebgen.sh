@@ -13,6 +13,7 @@ select(.message.type == "RBGenerated" and .message.endorsement)
     "eb": .message.endorsement.eb.id
   }
 ' "$1" \
+| sort \
 | jq --slurp '
   group_by(.eb)
 | map({"\(.[0].eb)": 1})
