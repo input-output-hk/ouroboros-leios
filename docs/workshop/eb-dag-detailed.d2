@@ -127,6 +127,16 @@ IB9: {
   label: "IB 9"
 }
 
+IB10: {
+  class: ib_unconfirmed
+  label: "IB 10"
+}
+
+IB11: {
+  class: ib_unconfirmed
+  label: "IB 11"
+}
+
 # RB references
 
 chain.RB1 -> chain.Genesis: {
@@ -263,6 +273,14 @@ IB8 -> EB5: "Ledger Ref" {
 }
 
 IB9 -> EB6: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB10 -> EB7: "Ledger Ref" {
+  class: ledger_link
+}
+
+IB11 -> EB7: "Ledger Ref" {
   class: ledger_link
 }
 
