@@ -53,7 +53,7 @@ interface RustBaseBlockEvent {
     recipient?: string;
 }
 
-type BlockType = "IB" | "EB" | "RB";
+type BlockType = "IB" | "EB" | "RB" | "VT";
 type BlockAction = "Sent" | "Received" | "LotteryWon" | "Generated";
 type RustBlockMessageType = `${BlockType}${BlockAction}`;
 
@@ -101,7 +101,7 @@ interface RustVoteEvent extends Omit<RustBaseEvent, "message"> {
         producer: string;
         sender?: string;
         recipient?: string;
-        votes?: Record<string, number>;
+        votes?: { [eb: string]: number };
     };
 }
 

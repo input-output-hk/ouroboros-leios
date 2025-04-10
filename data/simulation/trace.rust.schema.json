@@ -18,9 +18,6 @@
     }
   ],
   "definitions": {
-    "Record<string,number>": {
-      "type": "object"
-    },
     "RustBaseBlockEvent": {
       "properties": {
         "id": {
@@ -117,7 +114,11 @@
         "RBGenerated",
         "RBLotteryWon",
         "RBReceived",
-        "RBSent"
+        "RBSent",
+        "VTGenerated",
+        "VTLotteryWon",
+        "VTReceived",
+        "VTSent"
       ],
       "type": "string"
     },
@@ -286,7 +287,10 @@
               "$ref": "#/definitions/RustVoteMessageType"
             },
             "votes": {
-              "$ref": "#/definitions/Record<string,number>"
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
             }
           },
           "required": ["id", "producer", "slot", "type"],
