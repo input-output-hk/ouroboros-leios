@@ -42,6 +42,7 @@
           "type": "number"
         }
       },
+      "required": ["id", "producer", "slot"],
       "type": "object"
     },
     "RustBlockEvent": {
@@ -72,6 +73,7 @@
                       "type": "number"
                     }
                   },
+                  "required": ["id", "producer", "slot"],
                   "type": "object"
                 },
                 "size_bytes": {
@@ -90,6 +92,7 @@
                   "type": "number"
                 }
               },
+              "required": ["type"],
               "type": "object"
             }
           ]
@@ -98,6 +101,7 @@
           "type": "number"
         }
       },
+      "required": ["message", "time_s"],
       "type": "object"
     },
     "RustBlockMessageType": {
@@ -140,7 +144,21 @@
               "$ref": "#/definitions/RustTaskInfo"
             },
             "task_type": {
-              "$ref": "#/definitions/RustCpuTaskType"
+              "enum": [
+                "EBBlockGenerated",
+                "EBBlockValidated",
+                "IBBlockGenerated",
+                "IBBlockValidated",
+                "IBHeaderGenerated",
+                "IBHeaderValidated",
+                "RBBlockGenerated",
+                "RBBlockValidated",
+                "TransactionGenerated",
+                "TransactionValidated",
+                "VTBundleGenerated",
+                "VTBundleValidated"
+              ],
+              "type": "string"
             },
             "type": {
               "$ref": "#/definitions/RustCpuMessageType"
@@ -149,12 +167,14 @@
               "type": "number"
             }
           },
+          "required": ["task", "type"],
           "type": "object"
         },
         "time_s": {
           "type": "number"
         }
       },
+      "required": ["message", "time_s"],
       "type": "object"
     },
     "RustCpuMessageType": {
@@ -165,23 +185,6 @@
         "CpuTaskFinished",
         "CpuTaskScheduled",
         "CpuTaskStarted"
-      ],
-      "type": "string"
-    },
-    "RustCpuTaskType": {
-      "enum": [
-        "EBBlockGenerated",
-        "EBBlockValidated",
-        "IBBlockGenerated",
-        "IBBlockValidated",
-        "IBHeaderGenerated",
-        "IBHeaderValidated",
-        "RBBlockGenerated",
-        "RBBlockValidated",
-        "TransactionGenerated",
-        "TransactionValidated",
-        "VTBundleGenerated",
-        "VTBundleValidated"
       ],
       "type": "string"
     },
@@ -197,12 +200,14 @@
               "type": "string"
             }
           },
+          "required": ["number", "type"],
           "type": "object"
         },
         "time_s": {
           "type": "number"
         }
       },
+      "required": ["message", "time_s"],
       "type": "object"
     },
     "RustTaskInfo": {
@@ -214,6 +219,7 @@
           "type": "string"
         }
       },
+      "required": ["index", "node"],
       "type": "object"
     },
     "RustTransactionEvent": {
@@ -239,12 +245,14 @@
               "$ref": "#/definitions/RustTransactionMessageType"
             }
           },
+          "required": ["id", "type"],
           "type": "object"
         },
         "time_s": {
           "type": "number"
         }
       },
+      "required": ["message", "time_s"],
       "type": "object"
     },
     "RustTransactionMessageType": {
@@ -281,12 +289,14 @@
               "$ref": "#/definitions/Record<string,number>"
             }
           },
+          "required": ["id", "producer", "slot", "type"],
           "type": "object"
         },
         "time_s": {
           "type": "number"
         }
       },
+      "required": ["message", "time_s"],
       "type": "object"
     },
     "RustVoteMessageType": {

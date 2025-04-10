@@ -7,6 +7,7 @@
           "type": "string"
         }
       },
+      "required": ["id"],
       "type": "object"
     },
     "Endorsement": {
@@ -15,6 +16,7 @@
           "$ref": "#/definitions/BlockRef"
         }
       },
+      "required": ["eb"],
       "type": "object"
     },
     "EnteredStateBlock": {
@@ -42,13 +44,11 @@
           "type": "string"
         }
       },
+      "required": ["id", "node", "slot", "type"],
       "type": "object"
     },
     "GeneratedEndorserBlock": {
       "properties": {
-        "bytes": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -81,6 +81,14 @@
           "type": "string"
         }
       },
+      "required": [
+        "id",
+        "input_blocks",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type"
+      ],
       "type": "object"
     },
     "GeneratedInputBlock": {
@@ -117,6 +125,7 @@
           "type": "string"
         }
       },
+      "required": ["id", "producer", "size_bytes", "slot", "type"],
       "type": "object"
     },
     "GeneratedRankingBlock": {
@@ -139,6 +148,7 @@
               "type": "string"
             }
           },
+          "required": ["id"],
           "type": "object"
         },
         "payload_bytes": {
@@ -170,13 +180,11 @@
           "type": "number"
         }
       },
+      "required": ["producer", "size_bytes", "slot", "type"],
       "type": "object"
     },
     "GeneratedVote": {
       "properties": {
-        "bytes": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -206,6 +214,7 @@
           "$ref": "#/definitions/Record<string,number>"
         }
       },
+      "required": ["id", "producer", "size_bytes", "slot", "type", "votes"],
       "type": "object"
     },
     "HaskellCpuEvent": {
@@ -224,6 +233,7 @@
           "type": "string"
         }
       },
+      "required": ["cpu_time_s", "node", "task_label", "type"],
       "type": "object"
     },
     "HaskellEvent": {
@@ -288,6 +298,7 @@
           "type": "string"
         }
       },
+      "required": ["id", "recipient", "type"],
       "type": "object"
     },
     "Record<string,number>": {
@@ -296,12 +307,13 @@
   },
   "description": "Haskell simulation trace format",
   "properties": {
-    "event": {
+    "message": {
       "$ref": "#/definitions/HaskellEvent"
     },
     "time_s": {
       "type": "number"
     }
   },
+  "required": ["message", "time_s"],
   "type": "object"
 }

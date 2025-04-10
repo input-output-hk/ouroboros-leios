@@ -1,7 +1,7 @@
 /** Haskell simulation trace format */
 export interface HaskellTraceEvent {
     time_s: number;
-    event: HaskellEvent;
+    message: HaskellEvent;
 }
 
 type BlockKind = "IB" | "EB" | "RB" | "VTBundle";
@@ -28,7 +28,7 @@ interface BaseBlockEvent {
 
 // Additional fields for Generated events
 interface GeneratedBlockEvent extends BaseBlockEvent {
-    size_bytes?: number;
+    size_bytes: number;
     producer: string;
 }
 
@@ -47,7 +47,6 @@ interface Endorsement {
 interface GeneratedEndorserBlock extends GeneratedBlockEvent {
     id: string;
     input_blocks: BlockRef[];
-    bytes: number;
 }
 
 interface GeneratedRankingBlock extends GeneratedBlockEvent {
@@ -63,7 +62,6 @@ interface GeneratedRankingBlock extends GeneratedBlockEvent {
 
 interface GeneratedVote extends GeneratedBlockEvent {
     id: string;
-    bytes: number;
     votes: Record<string, number>;
 }
 
@@ -89,3 +87,6 @@ interface HaskellNetworkEvent {
     id: string;
     ids?: string[];
 }
+
+// Type to validate `jq '.' -cs` of a log.
+type TraceEvents = HaskellTraceEvent[]

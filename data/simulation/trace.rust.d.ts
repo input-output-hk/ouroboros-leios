@@ -120,3 +120,6 @@ export type RustTraceEvent =
     | RustTransactionEvent
     | RustVoteEvent
     | RustSlotEvent;
+
+// Type to validate `jq '.' -cs` of a log.
+type TraceEvents = RustTraceEvent[]
