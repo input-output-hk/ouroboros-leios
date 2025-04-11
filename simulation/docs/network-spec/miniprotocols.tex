@@ -1,0 +1,297 @@
+\chapter{Mini Protocols}
+\label{chapter:mini-protocols}
+
+\newcommand{\Producer}{\textcolor{mygreen}{\textbf{Producer}}}
+\newcommand{\Consumer}{\textcolor{myblue}{\textbf{Consumer}}}
+
+\newcommand{\miniProtocolsUrl}{\url{https://ouroboros-network.cardano.intersectmbo.org/pdfs/network-spec/network-spec.pdf\#chapter.3}}
+\section{Mini Protocols}
+For background information on mini protocols see sections 3.1-3.4 of
+the \emph{Ouroboros NetworkSpecification}\footnote{\miniProtocolsUrl},
+and rest of that chapter for the mini protocols already in use. Here
+we will present the additional node-to-node mini protocols needed for
+Leios.
+
+\newcommand{\miniEntry}[5]{
+  \begin{framed}
+      \noindent\textbf{#1}\hfill  Section \ref{#2}
+      \newline {#3}
+      \newline {\href{#5}{\small\texttt{#4}}}
+  \end{framed}
+}
+
+\newcommand{\relay}{\text{Relay}}
+\newcommand{\catchup}{\text{CatchUp}}
+\newcommand{\fetch}{\text{Fetch}}
+
+\section{\relay{} mini-protocol}
+\label{ptcl:relay}
+
+\newcommand{\StInit}  {\state{StInit}}
+\newcommand{\MsgInit} {\trans{MsgInit}}
+\newcommand{\StIdsBlocking}    {\state{StIdsBlocking}}
+\newcommand{\StIdsNonBlocking} {\state{StIdsNonBlocking}}
+\newcommand{\StData}              {\state{StData}}
+\newcommand{\MsgRequestIdsNB}  {\trans{MsgRequestIdsNonBlocking}}
+\newcommand{\MsgRequestIdsB}   {\trans{MsgRequestIdsBlocking}}
+\newcommand{\MsgReplyIds}      {\trans{MsgReplyIds}}
+\newcommand{\MsgReplyIdsAndAnns}  {\trans{MsgReplyIdsAndAnns}}
+\newcommand{\MsgReplyIdsSlashAnns}  {\trans{MsgReplyIds\langle AndAnns\rangle}}
+\newcommand{\MsgRequestData}      {\trans{MsgRequestData}}
+\newcommand{\MsgReplyData}        {\trans{MsgReplyData}}
+\newcommand{\option}[1]{\text{#1}}
+\newcommand{\BoundedWindow} {\option{BoundedWindow}}
+\newcommand{\Announcements} {\option{Announcements}}
+\newcommand{\annCond}{\text{Ann. Condition}}
+\newcommand{\info}{\text{info}}
+\newcommand{\ann}{\text{ann}}
+\newcommand{\ack}{\text{ack}}
+\newcommand{\req}{\text{req}}
+\newcommand{\id}{\text{id}}
+%% \newcommand{\ids}{\text{ids}}
+\newcommand{\datum}{\text{datum}}
+%% \newcommand{\datums}{\text{datums}}
+\newcommand{\parameter}{\text{parameter}}
+
+\subsubsection{Description}
+The \relay protocol presented here is a generalization of the tx
+submission protocol used to transfer transactions between full
+nodes. We will use the term \emph{datum} as a generic term for the
+payloads being diffused, which we expect to be generally small:
+transactions, input block headers, endorse block headers\footnote{at
+the network layer we split an endorse block into header and body,
+where the latter contains the references to other blocks}, vote
+bundles for a single pipeline and voter.
+
+The protocol follows a pull-based strategy where the consumer asks for
+new ids/datums and the producer sends them back. It is designed to be
+suitable for a trustless setting where both sides need to guard
+against resource consumption attacks from the other side.
+
+\paragraph{Options and Parameters} A \relay{} instance is specified by these options and parameters
+\begin{description}
+\item [\BoundedWindow] The peers manage a bounded window (i.e. FIFO queue) of datums available to be requested. Useful for datums that are otherwise unbounded in number.
+\item [\Announcements] Producers provide additional announcements about datums, when available.
+\item [\id{}] Identifier for a datum to be relayed, used when requesting the datum.
+\item [\info{}] Extra information provided with a new id.
+\item [\datum{}] The datum itself.
+\item [\annCond{} (If \Announcements)] Condition for announcement.
+\item [\ann{} (If \Announcements)] Announcement representation.
+\end{description}
+
+\paragraph{Instances} are listed in Table~\ref{table:relay-instances}.
+Tx-submission is further parameterized by the maximum window size
+allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by
+the maximum age beyond which a datum is no longer
+relayed\footnote{older EBs and IBs referenced by the blockchain can be
+accessed from the \catchup{} in Sec.\ref{ptcl:catch-up}}. IB-relay and
+EB-relay rely on \Announcements{} to let consumers know when block bodies
+are available as well. Consumers request IB and EB bodies through the corresponding
+\fetch{} protocol (Sec.~\ref{ptcl:fetch}).
+
+\begin{table}[h!]
+\begin{tabular}{l l l l l l l l}
+\header{instance} & \header{\BoundedWindow} & \header{\Announcements} & \header{\id{}} & \header{\info{}}
+                  & \header{\datum} & \header{\annCond{}} & \header{\ann{}} \\\hline
+Tx-submission & Yes & No & txid & size & tx & N/A & N/A \\
+IB-relay  & No & Yes & hash & slot & ib-header & body available & unit \\
+EB-relay  & No & Yes & hash & slot & eb-header & body available & unit \\
+Vote-relay  & No & No & hash & slot & vote-bundle & N/A & N/A \\
+\end{tabular}
+\caption{\relay{} mini-protocol instances.}
+\label{table:relay-instances}
+\end{table}
+\todo{Review \info{} wrt equivocation.}
+
+\subsection{State machine}
+
+\begin{figure}[h!]
+\begin{tikzpicture}[->,shorten >=1pt,auto,node distance=4.5cm, semithick]
+  \tikzstyle{every state}=[fill=red,draw=none,text=white]
+  \node[state, mygreen, initial] (I) at (-4,  0) {\StInit};
+  \node[state, myblue]           (A) at ( 0,  0) {\StIdle};
+  \node[state]                   (B) at ( 9, -4) {\StDone};
+  \node[state, mygreen]          (C) at ( 4, -4) {\StIdsBlocking};
+  \node[state, mygreen]          (D) at (-4, -4) {\StIdsNonBlocking};
+  \node[state, mygreen]          (E) at ( 0,  4) {\StData};
+  \draw (I)  edge[above]                    node[above]{\MsgInit}                                                (A);
+  \draw (C)  edge[above]                    node[below]{\MsgDone}                                                (B);
+  \draw (A)  edge[left, bend left=45]       node[fill = white, anchor = center]{\MsgRequestIdsB}               (C);
+  \draw (C)  edge[right, bend left=15]      node[fill = white, anchor = center, above = 2pt]{\MsgReplyIdsSlashAnns}     (A);
+  \draw (D)  edge[right, bend left=45]      node[fill = white, anchor = center]{\MsgReplyIdsSlashAnns}                  (A);
+  \draw (A)  edge[right, bend left=15]      node[fill = white, anchor = center, below = 2pt]{\MsgRequestIdsNB} (D);
+  \draw (A)  edge[left, bend right=45]      node[fill = white, anchor = center, above = 2pt]{\MsgRequestData}     (E);
+  \draw (E)  edge[right,bend right=45]      node[fill = white, anchor = center, below = 2pt]{\MsgReplyData}       (A);
+\end{tikzpicture}
+  \caption{State machine of the Relay mini-protocol.}
+\label{fig:relay-automata}
+\end{figure}
+
+\begin{figure}[h]
+  \begin{center}
+    \begin{tabular}{l|l}
+      \header{state}      & \header{agency} \\\hline
+      \StInit             & \Producer \\
+      \StIdle             & \Consumer \\
+      \StIdsBlocking    & \Producer \\
+      \StIdsNonBlocking & \Producer \\
+      \StData              & \Producer \\
+    \end{tabular}
+    \caption{Relay state agencies}
+  \end{center}
+\end{figure}
+\paragraph{Grammar}
+\[
+\begin{array}{l c l l}
+\ack{} & ::= & \text{number} & \text{if}\,\BoundedWindow{}\\
+       & |  & \text{unit} & \text{otherwise}\\
+\req{} & ::= & \text{number} \\
+\end{array}
+\]
+\paragraph{Protocol messages}
+\begin{description}
+\item [\MsgInit] initial message of the protocol
+\item [\MsgRequestIdsNB{} {\boldmath $(\ack{},\req{})$}]
+      The consumer asks for new ids and acknowledges old ids.
+      The producer replies immediatly, possibly with an empty reply if nothing new is available.
+\item [\MsgRequestIdsB{} {\boldmath $(\ack{},\req{})$}]
+      Same as \MsgRequestIdsNB{} but the producer will block until the reply will be non-empty.
+\item [\MsgReplyIds{} {\boldmath ($\langle (\id{}, \info) \rangle$) }]
+      The producer replies with a list of available datums.
+      The list contains pairs of ids and corresponding information about the identified datum.
+      In the blocking case the reply is guaranteed to contain at least one id.
+      In the non-blocking case, the reply may contain an empty list.
+\item [\MsgReplyIdsAndAnns{} {($\langle (\id{}, \info{}) \rangle, \langle (\id{}, \ann{}) \rangle$) } (Requires \Announcements{})]
+      Same as \MsgReplyIds{} but additionally the producer might, at most once, also
+      provide an announcement for any id it has sent, in this message or
+      previously.
+\item [\MsgRequestData{} {\boldmath ($\langle \id{} \rangle$)}]
+      The consumer requests datums by sending a list of ids.
+\item [\MsgReplyData{} {($\langle \datum{} \rangle$)}]
+      The producer replies with a list of the requested datums, some may be missing if no longer available for relay.
+\item [\MsgDone{}]
+      The producer terminates the mini protocol.
+\end{description}
+
+\begin{table}[h!]
+  \begin{tabular}{l|l|l|l}
+    \header{from state} & \header{message}    & \header{parameters}           & \header{to state}   \\\hline
+    \StInit             & \MsgInit            &                               & \StIdle             \\
+    \StIdle             & \MsgRequestIdsB   & $\ack{}$,$\req{}$                   & \StIdsBlocking    \\
+    \StIdsBlocking    & \MsgReplyIds      & $\langle (\id{}, \info{}) \rangle$  & \StIdle             \\
+    \StIdsBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
+    \StIdle             & \MsgRequestIdsNB  & $\ack{}$,$\req{}$                   & \StIdsNonBlocking \\
+    \StIdsNonBlocking & \MsgReplyIds      & $\langle (\id{}, \info{}) \rangle$  & \StIdle             \\
+    \StIdsNonBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
+    \StIdle             & \MsgRequestData      & $\langle \id{} \rangle$         & \StData              \\
+    \StData              & \MsgReplyData        & $\langle \datum{} \rangle$         & \StIdle             \\
+    \StIdsBlocking   & \MsgDone            &                               & \StDone             \\
+\multicolumn{4}{l}{If \Announcements{} is set, \MsgReplyIds{} messages are replaced with \MsgReplyIdsAndAnns{}:}\\
+    \StIdsBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
+    \StIdsNonBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
+  \end{tabular}
+  \caption{\relay{} mini-protocol messages.}
+  \label{table:relay-messages}
+\end{table}
+
+\iffalse
+\subsection{Size limits per state}
+
+Table~\ref{table:tx-submission-size-limits} specifies how may bytes can be send
+in a given state, indirectly this limits payload size of each message.  If
+a space limit is violated the connection SHOULD be torn down.
+
+\begin{table}[h!]
+  \begin{center}
+    \begin{tabular}{l|r}
+      \header{state}      & \header{size limit in bytes} \\\hline
+      \StInit             & \texttt{5760} \\
+      \StIdle             & \texttt{5760} \\
+      \StIdsBlocking    & \texttt{2500000} \\
+      \StIdsNonBlocking & \texttt{2500000} \\
+      \StData              & \texttt{2500000} \\
+    \end{tabular}
+    \caption{size limits per state}
+    \label{table:tx-submission-size-limits}
+  \end{center}
+\end{table}
+
+\subsection{Timeouts per state}
+
+The table~\ref{table:tx-submission-timeouts} specify message timeouts in
+a given state.  If a timeout is violated the connection SHOULD be torn down.
+
+\begin{table}[h!]
+  \begin{center}
+    \begin{tabular}{l|r}
+      \header{state}      & \header{timeout} \\\hline
+      \StInit             & - \\
+      \StIdle             & - \\
+      \StIdsBlocking    & - \\
+      \StIdsNonBlocking & \texttt{10}s \\
+      \StData              & \texttt{10}s \\
+    \end{tabular}
+    \caption{timeouts per state}
+    \label{table:tx-submission-timeouts}
+  \end{center}
+\end{table}
+
+\subsection{CDDL encoding specification}\label{tx-submission2-cddl}
+\lstinputlisting[style=cddl]{tx-submission2.cddl}
+\fi
+
+\subsection{Producer and Consumer Implementation}
+The protocol has two design goals: It must diffuse datums with high efficiency
+and, at the same time, it must rule out
+asymmetric resource attacks from the consumer against the provider.
+
+The protocol is based on two pull-based operations.
+The consumer can ask for a number of ids and it can use these
+ids to request a batch of datums.
+The consumer has flexibility in the number of ids it requests,
+whether to actually download the datum of a given id
+and flexibility in how it batches the download of datums.
+The consumer can also switch between requesting ids and downloading
+datums at any time. The protocol supports blocking and non-blocking requests for new ids.
+The producer must reply immediately (i.e. within a small timeout) to a non-blocking request.
+It replies with not more than the requested number of ids (possibly with an empty list).
+A blocking request on the other hand, waits until at least one datum is available.
+
+
+It must however observe several constraints that are necessary for a
+memory efficient implementation of the provider.
+
+\paragraph{With \BoundedWindow{}}
+Conceptually, the provider maintains a limited size FIFO of outstanding transactions per consumer.
+(The actual implementation can of course use the data structure that works best).
+The maximum FIFO size is a protocol parameter.
+The protocol guarantees that, at any time, the consumer and producer agree on the current size of
+that FIFO and on the outstanding transaction ids.
+The consumer can use a variety of heuristics for requesting transaction ids and transactions.
+One possible implementation for a consumer is to maintain a FIFO which mirrors the producer's FIFO
+but only contains the \id{} and \info{} pairs and not the \datum{}.
+%
+After the consumer requests new ids, the provider replies with a list of ids and
+puts these datums in its FIFO. If the FIFO is empty the consumer must use a blocking
+request otherwise a non-blocking request.
+As part of a request a consumer also acknowledges the number of old datums,
+which are removed from the FIFO at the same time.
+The provider checks that the size of the FIFO, i.e. the number of outstanding datums,
+never exceeds the protocol limit and aborts the connection if a request violates the limit.
+The consumer can request any batch of datums from the current FIFO in any order.
+Note however, that the reply will omit any datums that have become invalid in the meantime.
+(More precisely the producer will omit invalid datums from the reply but they will still be counted in the FIFO
+size and they still require an acknowledgement from the consumer).
+
+\paragraph{Without \BoundedWindow{}} A \relay{} mini protocol instance that does not make use of \BoundedWindow{} will want to rely on other ways to bound the amount of datums that can be requested at a given time.
+The consumer shall request ids in a blocking way when it does not
+intend on requesting any of the available datums.
+
+
+\section{\catchup{} mini-protocol}
+\label{ptcl:catch-up}
+TBD
+
+\section{\fetch{} mini-protocol}
+\label{ptcl:fetch}
+TBD
