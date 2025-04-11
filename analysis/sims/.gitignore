@@ -5,3 +5,7 @@ sim-cli
 tmp/
 plots/
 results/
+stdout
+stderr
+*.csv.gz
+*.log.gz

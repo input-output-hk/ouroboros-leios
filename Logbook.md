@@ -1,5 +1,21 @@
 # Leios logbook
 
+## 2025-04-11
+
+### Refactored and optimized simulation-analysis workflow
+
+The [workflow for analyzing the Haskell and Rust simulations](analysis/sims/2025w15/) was thoroughly reworked to improve its speed, flexibility, and automation:
+
+- Replaced use of MongoDB with faster `jq` queries, organized as map-reduce operations.
+- Created library functions for plotting with R.
+- Revised scripts for creating, executing, and analyzing simulations.
+- Genericized the Jupyter notebook for analyses.
+- Tested new workflow on tag `leios-2025w15`.
+
+In the course of this work, new discrepancies between the two simulations were discovered and documented as github issues.
+
+Future simulation experiments will be fast to set up and easier to complete with quick turnaround.
+
 ## 2025-04-04
 
 ### EB ledger state / order of IBs discussion
