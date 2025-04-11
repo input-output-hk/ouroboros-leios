@@ -555,7 +555,7 @@ impl Node {
                 .map(|(index, vrf)| InputBlockHeader {
                     id: InputBlockId {
                         slot,
-                        pipeline: self.slot_to_pipeline(slot),
+                        pipeline: self.slot_to_pipeline(slot) + 4,
                         producer: self.id,
                         index: index as u64,
                     },
@@ -573,7 +573,7 @@ impl Node {
             if self.run_vrf(next_p).is_some() {
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot),
+                    pipeline: self.slot_to_pipeline(slot) + 1,
                     producer: self.id,
                 });
                 let ibs = self.select_ibs_for_eb(slot);
@@ -581,7 +581,7 @@ impl Node {
                 let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot),
+                    pipeline: self.slot_to_pipeline(slot) + 1,
                     producer: self.id,
                     bytes,
                     ibs,
