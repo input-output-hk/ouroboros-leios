@@ -7,7 +7,7 @@ jq -c '
     "idx": {
       "slot": (.time_s | floor),
       "node": .message.node,
-      "task": .message.task_label
+      "task": (.message.task_label | split(":") | .[0])
     },
     "duration": .message.cpu_time_s
   }

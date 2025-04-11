@@ -18,7 +18,7 @@ jq -c '
     "\(.message.type[0:2] + "|" + .message.id)": {
       "producer": .message.producer,
       "sent": .time_s,
-      "size": (.message.total_bytes // .message.bytes)
+      "size": (.message.size_bytes // .message.bytes)
     }
   }
 ' "$1" \
