@@ -33,7 +33,7 @@ QUERY := '.definitions.UnknownType = {"type": "string", "not": $$k[0] }'
 	jq -cs '.' $< > $@
 
 .PHONY: validate
-validate: validate-config validate-topology validate-rust-trace validate-haskell-trace
+validate: validate-config validate-topology validate-rust-trace validate-haskell-trace validate-rust-trace-against-shared validate-haskell-trace-against-shared
 
 .PHONY: validate-config
 validate-config: config.schema.json config.default.yaml
@@ -54,3 +54,13 @@ validate-haskell-trace: example.haskell.trace.json trace.haskell.array.schema.js
 validate-rust-trace: example.rust.trace.json trace.rust.array.schema.json
 	@echo "Validating Rust trace events..."
 	@npx pajv -m schema.schema.json -s trace.rust.array.schema.json -d example.rust.trace.json && echo "example.rust.jsonl valid"
+
+.PHONY: validate-rust-trace-against-shared
+validate-rust-trace-against-shared: example.rust.trace.json trace.shared.array.schema.json
+	@echo "Validating Rust trace events against shared schema..."
+	@npx pajv -m schema.schema.json -s $(word 2,$^) -d $(word 1,$^) && echo "example.rust.jsonl valid against shared schema."
+
+.PHONY: validate-haskell-trace-against-shared
+validate-haskell-trace-against-shared: example.haskell.trace.json trace.shared.array.schema.json
+	@echo "Validating Haskell trace events against shared schema..."
+	@npx pajv -m schema.schema.json -s $(word 2,$^) -d $(word 1,$^) && echo "example.haskell.jsonl valid against shared schema."
