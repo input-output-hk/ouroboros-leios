@@ -278,7 +278,7 @@ sharedEvent nodeNames e = case e of
               , block_id = Just (rbId blk)
               , vrf = Nothing
               , slot = fromIntegral . fromEnum $ blockSlot blk
-              , size_bytes = Nothing
+              , size_bytes = Just $ fromIntegral $ messageSizeBytes blk
               , endorsement
               , endorsements
               , payload_bytes = Just . fromIntegral $ blk.blockBody.payload

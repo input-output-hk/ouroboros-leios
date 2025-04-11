@@ -123,3 +123,6 @@ export type RustTraceEvent =
 
 // Type to validate `jq '.' -cs` of a log.
 type TraceEvents = RustTraceEvent[]
+
+// TODO: collect the known types here.
+type KnownType = string

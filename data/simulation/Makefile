@@ -18,9 +18,12 @@ trace.rust.schema.json: trace.rust.d.ts
 	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) trace.rust.d.ts RustTraceEvent > trace.rust.schema.json
 	npx prettier -w trace.rust.schema.json
 
-%.array.schema.json: %.d.ts
-	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) $< TraceEvents > $@
+QUERY := '.definitions.UnknownType = {"type": "string", "not": $$k[0] }'
 
+%.knowntype.schema.json: %.d.ts
+	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) $< KnownType > $@
+%.array.schema.json: %.d.ts %.knowntype.schema.json
+	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) $< TraceEvents | jq --slurpfile k $(word 2, $^) $(QUERY) > $@
 
 %.trace.json: %.jsonl
 	jq -cs '.' $< > $@
@@ -44,6 +47,6 @@ validate-haskell-trace: example.haskell.trace.json trace.haskell.array.schema.js
 	@npx ajv-cli validate -s trace.haskell.array.schema.json -d example.haskell.trace.json && echo "example.haskell.jsonl valid"
 
 .PHONY: validate-rust-trace
-validate-rust-trace: all example.rust.trace.json trace.rust.array.schema.json
+validate-rust-trace: example.rust.trace.json trace.rust.array.schema.json
 	@echo "Validating Rust trace events..."
 	@npx pajv -m schema.schema.json -s trace.rust.array.schema.json -d example.rust.trace.json && echo "example.rust.jsonl valid"
