@@ -11,7 +11,7 @@ use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
-    events::{Event, Node},
+    events::{BlockRef, Event, Node},
     model::{BlockId, TransactionId},
 };
 use tokio::{
@@ -204,13 +204,13 @@ impl EventMonitor {
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
-                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.slot);
+                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.id.slot);
 
                         let all_eb_ids = eb_ebs
-                            .get(&endorsement.eb)
+                            .get(&endorsement.eb.id)
                             .unwrap()
                             .iter()
-                            .chain(std::iter::once(&endorsement.eb));
+                            .chain(std::iter::once(&endorsement.eb.id));
                         let block_leios_txs: Vec<_> = all_eb_ids
                             .flat_map(|eb| eb_ibs.get(eb).unwrap())
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
@@ -302,9 +302,15 @@ impl EventMonitor {
                 } => {
                     generated_ebs += 1;
                     pending_ebs.insert(id.clone());
-                    eb_ibs.insert(id.clone(), input_blocks.clone());
-                    eb_ebs.insert(id.clone(), endorser_blocks);
-                    for ib_id in &input_blocks {
+                    eb_ibs.insert(
+                        id.clone(),
+                        input_blocks.iter().map(|r| r.id.clone()).collect(),
+                    );
+                    eb_ebs.insert(
+                        id.clone(),
+                        endorser_blocks.into_iter().map(|r| r.id.clone()).collect(),
+                    );
+                    for BlockRef { id: ib_id } in &input_blocks {
                         *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
                         *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;
                         pending_ibs.remove(ib_id);

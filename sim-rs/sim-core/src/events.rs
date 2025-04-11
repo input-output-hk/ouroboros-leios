@@ -8,8 +8,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, BlockId, CpuTaskId, Endorsement, EndorserBlockId, InputBlockId, NoVoteReason,
-        Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
+        TransactionId, VoteBundle, VoteBundleId,
     },
 };
 
@@ -51,6 +51,18 @@ impl Ord for Node {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.id.cmp(&other.id)
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BlockRef<Id> {
+    pub id: Id,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Endorsement<Node: Display = NodeId> {
+    pub eb: BlockRef<EndorserBlockId<Node>>,
+    pub size_bytes: u64,
+    pub votes: BTreeMap<Node, usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -107,7 +119,7 @@ pub enum Event {
         slot: u64,
         producer: Node,
         vrf: u64,
-        parent: Option<BlockId<Node>>,
+        parent: Option<BlockRef<BlockId<Node>>>,
         header_bytes: u64,
         size_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
@@ -175,8 +187,8 @@ pub enum Event {
         pipeline: u64,
         producer: Node,
         size_bytes: u64,
-        input_blocks: Vec<InputBlockId<Node>>,
-        endorser_blocks: Vec<EndorserBlockId<Node>>,
+        input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
+        endorser_blocks: Vec<BlockRef<EndorserBlockId<Node>>>,
     },
     EBSent {
         id: EndorserBlockId<Node>,
@@ -331,11 +343,15 @@ impl EventTracker {
             slot: block.id.slot,
             producer: self.to_node(block.id.producer),
             vrf: block.vrf,
-            parent: block.parent.map(|id| self.to_block(id)),
+            parent: block.parent.map(|id| BlockRef {
+                id: self.to_block(id),
+            }),
             header_bytes: block.header_bytes,
             size_bytes: block.bytes(),
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
-                eb: self.to_endorser_block(e.eb),
+                eb: BlockRef {
+                    id: self.to_endorser_block(e.eb),
+                },
                 size_bytes: e.size_bytes,
                 votes: e
                     .votes
@@ -460,12 +476,16 @@ impl EventTracker {
             input_blocks: block
                 .ibs
                 .iter()
-                .map(|id| self.to_input_block(*id))
+                .map(|id| BlockRef {
+                    id: self.to_input_block(*id),
+                })
                 .collect(),
             endorser_blocks: block
                 .ebs
                 .iter()
-                .map(|id| self.to_endorser_block(*id))
+                .map(|id| BlockRef {
+                    id: self.to_endorser_block(*id),
+                })
                 .collect(),
         });
     }
