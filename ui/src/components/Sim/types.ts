@@ -49,9 +49,9 @@ export interface ITransformedNodeMap {
 }
 
 export enum EMessageType {
-  TransactionGenerated = "TransactionGenerated",
-  TransactionReceived = "TransactionReceived",
-  TransactionSent = "TransactionSent",
+  TransactionGenerated = "TXGenerated",
+  TransactionReceived = "TXReceived",
+  TransactionSent = "TXSent",
   IBGenerated = "IBGenerated",
   IBReceived = "IBReceived",
   IBSent = "IBSent",
@@ -64,14 +64,13 @@ export enum EMessageType {
   VTBundleGenerated = "VTBundleGenerated",
   VTBundleReceived = "VTBundleReceived",
   VTBundleSent = "VTBundleSent",
-  Slot = "Slot",
 }
 
 export interface ITransactionGenerated {
   type: EMessageType.TransactionGenerated;
   id: string;
   publisher: string;
-  bytes: number;
+  size_bytes: number;
 }
 
 export interface ITransactionReceived {
@@ -121,11 +120,6 @@ export interface IInputBlockSent {
   recipient: string;
 }
 
-export interface ISlot {
-  type: EMessageType.Slot;
-  number: number;
-}
-
 export interface IPraosBlockGenerated {
   type: EMessageType.RBGenerated;
   id: string;
@@ -137,8 +131,8 @@ export interface IPraosBlockGenerated {
 }
 
 export interface IEndorsement {
-  eb: { id: string }
-  bytes: number;
+  eb: { id: string };
+  size_bytes: number;
   votes: {}
 }
 
@@ -164,7 +158,7 @@ export interface IEndorserBlockGenerated {
   slot: number;
   pipeline: number;
   producer: string;
-  bytes: number;
+  size_bytes: number;
   input_blocks: IInputBlock[]
   endorser_blocks: IEndorserBlock[]
 }
@@ -198,7 +192,7 @@ export interface IVotesGenerated {
   id: string;
   slot: number;
   producer: string;
-  bytes: number;
+  size_bytes: number;
   votes: any[] // @todo
 }
 
@@ -218,6 +212,10 @@ export interface IVotesSent {
   recipient: string;
 }
 
+export interface IUnknown {
+  type: '__unknown';
+}
+
 export type TMessageType =
   | IInputBlockGenerated
   | IInputBlockReceived
@@ -231,10 +229,10 @@ export type TMessageType =
   | IVotesGenerated
   | IVotesReceived
   | IVotesSent
-  | ISlot
   | ITransactionGenerated
   | ITransactionReceived
-  | ITransactionSent;
+  | ITransactionSent
+  | IUnknown;
 
 export interface IServerMessage<T = TMessageType> {
   time_s: number;

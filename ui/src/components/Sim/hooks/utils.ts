@@ -89,8 +89,8 @@ export const processMessage = (
   const { message } = json;
 
   if (message.type === EMessageType.TransactionGenerated) {
-    trackDataGenerated(aggregatedData, intermediate, message.publisher, "tx", message.id, message.bytes);
-    intermediate.txs.push({ id: Number(message.id), bytes: message.bytes });
+    trackDataGenerated(aggregatedData, intermediate, message.publisher, "tx", message.id, message.size_bytes);
+    intermediate.txs.push({ id: Number(message.id), bytes: message.size_bytes });
   } else if (message.type === EMessageType.TransactionSent) {
     trackDataSent(aggregatedData, intermediate, message.sender, "tx", message.id);
   } else if (message.type === EMessageType.TransactionReceived) {
@@ -120,10 +120,10 @@ export const processMessage = (
       intermediate.praosTxs.add(id);
     }
     if (message.endorsement != null) {
-      bytes += message.endorsement.bytes;
+      bytes += message.endorsement.size_bytes;
       const ebId = message.endorsement.eb.id;
       block.cert = {
-        bytes: message.endorsement.bytes,
+        bytes: message.endorsement.size_bytes,
         eb: extractEb(intermediate, ebId),
       }
     }
@@ -136,11 +136,11 @@ export const processMessage = (
   } else if (message.type === EMessageType.RBReceived) {
     trackDataReceived(aggregatedData, intermediate, message.recipient, "pb", message.id);
   } else if (message.type === EMessageType.EBGenerated) {
-    trackDataGenerated(aggregatedData, intermediate, message.producer, "eb", message.id, message.bytes);
+    trackDataGenerated(aggregatedData, intermediate, message.producer, "eb", message.id, message.size_bytes);
     intermediate.ebs.set(message.id, {
       slot: message.slot,
       pipeline: message.pipeline,
-      bytes: message.bytes,
+      bytes: message.size_bytes,
       ibs: message.input_blocks.map(ib => ib.id),
       ebs: message.endorser_blocks.map(eb => eb.id),
     });
@@ -149,7 +149,7 @@ export const processMessage = (
   } else if (message.type === EMessageType.EBReceived) {
     trackDataReceived(aggregatedData, intermediate, message.recipient, "eb", message.id);
   } else if (message.type === EMessageType.VTBundleGenerated) {
-    trackDataGenerated(aggregatedData, intermediate, message.producer, "votes", message.id, message.bytes);
+    trackDataGenerated(aggregatedData, intermediate, message.producer, "votes", message.id, message.size_bytes);
   } else if (message.type === EMessageType.VTBundleSent) {
     trackDataSent(aggregatedData, intermediate, message.sender, "votes", message.id);
   } else if (message.type === EMessageType.VTBundleReceived) {
