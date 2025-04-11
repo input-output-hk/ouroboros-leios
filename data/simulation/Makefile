@@ -1,4 +1,4 @@
-all: config.schema.json topology.schema.json trace.haskell.schema.json trace.rust.schema.json
+all: config.schema.json topology.schema.json trace.haskell.schema.json trace.rust.schema.json trace.shared.schema.json
 
 config.schema.json: config.d.ts
 	npx typescript-json-schema config.d.ts Config > config.schema.json
@@ -9,6 +9,10 @@ topology.schema.json: topology.d.ts
 	npx prettier -w topology.schema.json
 
 TRACE_SCHEMA_OPTS := --required --strictNullChecks
+
+trace.shared.schema.json: trace.shared.d.ts
+	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) $< TraceEvent > $@
+	npx prettier -w $@
 
 trace.haskell.schema.json: trace.haskell.d.ts
 	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) trace.haskell.d.ts HaskellTraceEvent > trace.haskell.schema.json
