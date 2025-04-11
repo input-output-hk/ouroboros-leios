@@ -1,41 +1,68 @@
 /** Haskell simulation trace format */
 export interface HaskellTraceEvent {
     time_s: number;
-    event: HaskellEvent;
+    message: HaskellEvent;
 }
 
-type BlockKind = "IB" | "EB" | "RB" | "VTBundle";
+type LeiosBlockKind = "IB" | "EB" | "VTBundle"
+type BlockKind = LeiosBlockKind | "RB";
 type BlockAction = "Generated" | "EnteredState";
 
 type HaskellEvent =
     | HaskellCpuEvent
-    | HaskellBlockEvent // Unified block event type
-    | HaskellNetworkEvent; // Combine Sent/Received into network events
+    | HaskellBlockEvent
+    | HaskellNetworkEvent
+    | HaskellSlotEvent
+    | HaskellNoBlockEvent;
 
+type HaskellEventType =
+    | CpuEventType
+    | BlockEventType
+    | NetworkEventType
+    | SlotEventType
+    | NoBlockEventType;
+
+type SlotEventType = "Slot"
+interface HaskellSlotEvent {
+    type: SlotEventType;
+    node: string;
+    slot: number;
+}
+
+type NoBlockEventType = `No${LeiosBlockKind}Generated`
+interface HaskellNoBlockEvent {
+    type: NoBlockEventType;
+    node: string;
+    slot: number;
+}
+
+
+type CpuEventType = "Cpu"
 interface HaskellCpuEvent {
-    type: "Cpu";
+    type: CpuEventType;
     node: string;
     cpu_time_s: number;
     // CPU task types: Block validation (ValIB, ValEB, ValRB), Header validation (ValIH, ValRH), Vote validation (ValVote). Format: "<task_type>: <id>"
     task_label: string; // e.g., "ValIB: 6-29" or "ValRH: 6253064077348247640"
 }
 
+type BlockEventType = `${BlockKind}${BlockAction}`
 // Base block event interface with just identification info
 interface BaseBlockEvent {
-    type: `${BlockKind}${BlockAction}`;
+    type: BlockEventType;
     slot: number;
 }
 
 // Additional fields for Generated events
 interface GeneratedBlockEvent extends BaseBlockEvent {
-    size_bytes?: number;
+    size_bytes: number;
     producer: string;
 }
 
 interface GeneratedInputBlock extends GeneratedBlockEvent {
     id: string;
-    payload_bytes?: number;
-    rb_ref?: string;
+    payload_bytes?: number|null;
+    rb_ref?: string|null;
 }
 interface BlockRef {
   id : string;
@@ -47,23 +74,21 @@ interface Endorsement {
 interface GeneratedEndorserBlock extends GeneratedBlockEvent {
     id: string;
     input_blocks: BlockRef[];
-    bytes: number;
 }
 
 interface GeneratedRankingBlock extends GeneratedBlockEvent {
-    endorsement?: Endorsement;
-    endorsements?: Endorsement[];
+    endorsement?: Endorsement|null;
+    endorsements?: Endorsement[]|null;
     vrf? : number;
     id? : string;
-    payload_bytes? : number;
+    payload_bytes? : number|null;
     parent?: {
         id: string;
-    };
+    }|null;
 }
 
 interface GeneratedVote extends GeneratedBlockEvent {
     id: string;
-    bytes: number;
     votes: Record<string, number>;
 }
 
@@ -79,13 +104,32 @@ type HaskellBlockEvent =
     | GeneratedRankingBlock
     | GeneratedVote
     | EnteredStateBlock;
+
+
 type NetworkAction = "Sent" | "Received"
+type NetworkEventType = `${BlockKind}${NetworkAction}`
+
 interface HaskellNetworkEvent {
-    type: `${BlockKind}${NetworkAction}`;
-    sender?: string;
+    type: NetworkEventType;
+    sender?: string|null;
     recipient: string;
-    msg_size_bytes?: number;
-    sending_s?: number;
+    msg_size_bytes?: number|null;
+    sending_s?: number|null;
     id: string;
-    ids?: string[];
+    ids?: string[]|null;
 }
+
+export interface UnknownEvent {
+    time_s: number;
+    message: UnknownMessage;
+}
+
+export interface UnknownMessage {
+  /** @$ref "#/definitions/UnknownType" */
+  type;
+}
+
+// Type to validate `jq '.' -cs` of a log.
+type TraceEvents = (HaskellTraceEvent|UnknownEvent)[]
+
+type KnownType = HaskellEventType
