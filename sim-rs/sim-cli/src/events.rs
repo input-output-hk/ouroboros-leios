@@ -152,7 +152,7 @@ impl EventMonitor {
             };
             output.write(output_event).await?;
             match event {
-                Event::Slot { number } => {
+                Event::GlobalSlot { slot: number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
                     if let Some(oldest_live_ib_slot) = number.checked_sub(self.maximum_ib_age) {
@@ -176,15 +176,15 @@ impl EventMonitor {
                 }
                 Event::CpuTaskScheduled { .. } => {}
                 Event::CpuTaskFinished { .. } => {}
-                Event::CpuSubtaskStarted { .. } => {}
-                Event::TransactionGenerated { id, size_bytes, .. } => {
+                Event::Cpu { .. } => {}
+                Event::TXGenerated { id, size_bytes, .. } => {
                     txs.insert(id, Transaction::new(size_bytes, time));
                     pending_txs.insert(id);
                 }
-                Event::TransactionSent { .. } => {
+                Event::TXSent { .. } => {
                     tx_messages.sent += 1;
                 }
-                Event::TransactionReceived { .. } => {
+                Event::TXReceived { .. } => {
                     tx_messages.received += 1;
                 }
                 Event::RBLotteryWon { .. } => {}

@@ -56,8 +56,8 @@ impl Ord for Node {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum Event {
-    Slot {
-        number: u64,
+    GlobalSlot {
+        slot: u64,
     },
     CpuTaskScheduled {
         task: CpuTaskId<Node>,
@@ -73,23 +73,25 @@ pub enum Event {
         wall_time_s: Duration,
         extra: String,
     },
-    CpuSubtaskStarted {
+    Cpu {
         task: CpuTaskId<Node>,
-        subtask_id: u64,
+        node: String,
         #[serde(serialize_with = "duration_as_secs")]
-        duration_s: Duration,
+        cpu_time_s: Duration,
+        task_type: String,
+        id: String,
     },
-    TransactionGenerated {
+    TXGenerated {
         id: TransactionId,
         publisher: Node,
         size_bytes: u64,
     },
-    TransactionSent {
+    TXSent {
         id: TransactionId,
         sender: Node,
         recipient: Node,
     },
-    TransactionReceived {
+    TXReceived {
         id: TransactionId,
         sender: Node,
         recipient: Node,
@@ -138,6 +140,7 @@ pub enum Event {
         producer: Node,
         index: u64,
         header_bytes: u64,
+        tx_payload_bytes: u64,
         size_bytes: u64,
         transactions: Vec<TransactionId>,
     },
@@ -266,7 +269,7 @@ impl EventTracker {
     }
 
     pub fn track_slot(&self, number: u64) {
-        self.send(Event::Slot { number });
+        self.send(Event::GlobalSlot { slot: number });
     }
 
     pub fn track_cpu_task_scheduled(&self, task_id: CpuTaskId, task_type: String, subtasks: usize) {
@@ -297,13 +300,18 @@ impl EventTracker {
     pub fn track_cpu_subtask_started(
         &self,
         task_id: CpuTaskId,
+        task_type: String,
         subtask_id: u64,
         duration: Duration,
     ) {
-        self.send(Event::CpuSubtaskStarted {
-            task: self.to_task(task_id),
-            subtask_id,
-            duration_s: duration,
+        let task = self.to_task(task_id);
+        let id = format!("{}-{}", task.to_string(), subtask_id);
+        self.send(Event::Cpu {
+            node: task.node.to_string(),
+            task,
+            id,
+            task_type,
+            cpu_time_s: duration,
         });
     }
 
@@ -358,7 +366,7 @@ impl EventTracker {
     }
 
     pub fn track_transaction_generated(&self, transaction: &Transaction, publisher: NodeId) {
-        self.send(Event::TransactionGenerated {
+        self.send(Event::TXGenerated {
             id: transaction.id,
             publisher: self.to_node(publisher),
             size_bytes: transaction.bytes,
@@ -366,7 +374,7 @@ impl EventTracker {
     }
 
     pub fn track_transaction_sent(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
-        self.send(Event::TransactionSent {
+        self.send(Event::TXSent {
             id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
@@ -374,7 +382,7 @@ impl EventTracker {
     }
 
     pub fn track_transaction_received(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
-        self.send(Event::TransactionReceived {
+        self.send(Event::TXReceived {
             id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
@@ -392,15 +400,17 @@ impl EventTracker {
     }
 
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
+        let header_bytes = block.header.bytes;
+        let tx_payload_bytes = block.transactions.iter().map(|tx| tx.bytes).sum();
         self.send(Event::IBGenerated {
             id: self.to_input_block(block.header.id),
             slot: block.header.id.slot,
             pipeline: block.header.id.pipeline,
             producer: self.to_node(block.header.id.producer),
             index: block.header.id.index,
-            header_bytes: block.header.bytes,
-            size_bytes: block.header.bytes
-                + block.transactions.iter().map(|tx| tx.bytes).sum::<u64>(),
+            header_bytes,
+            tx_payload_bytes,
+            size_bytes: header_bytes + tx_payload_bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }

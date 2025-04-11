@@ -19,7 +19,7 @@
       "required": ["id"],
       "type": "object"
     },
-    "CpuSubtaskEvent": {
+    "CpuEvent": {
       "properties": {
         "cpu_time_s": {
           "type": "number"
@@ -41,36 +41,8 @@
       "required": ["cpu_time_s", "id", "node", "task_type", "type"],
       "type": "object"
     },
-    "CpuTaskFinishedEvent": {
-      "properties": {
-        "cpu_time_s": {
-          "type": "number"
-        },
-        "task_type": {
-          "$ref": "#/definitions/CpuTaskType"
-        },
-        "type": {
-          "const": "CpuTaskFinished",
-          "type": "string"
-        }
-      },
-      "required": ["cpu_time_s", "task_type", "type"],
-      "type": "object"
-    },
     "CpuTaskType": {
-      "enum": [
-        "GenEB",
-        "GenIB",
-        "GenRB",
-        "GenVote",
-        "ValEB",
-        "ValIB",
-        "ValIH",
-        "ValRB",
-        "ValRH",
-        "ValTX",
-        "ValVote"
-      ],
+      "enum": ["ValEB", "ValIB", "ValIH", "ValRB", "ValRH", "ValVote"],
       "type": "string"
     },
     "Endorsement": {
@@ -81,6 +53,34 @@
       },
       "required": ["eb"],
       "type": "object"
+    },
+    "Event": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CpuEvent"
+        },
+        {
+          "$ref": "#/definitions/GeneratedInputBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedEndorserBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedRankingBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedVote"
+        },
+        {
+          "$ref": "#/definitions/NetworkEvent"
+        },
+        {
+          "$ref": "#/definitions/SlotEvent"
+        },
+        {
+          "$ref": "#/definitions/NoBlockEvent"
+        }
+      ]
     },
     "GeneratedEndorserBlock": {
       "properties": {
@@ -224,25 +224,6 @@
       ],
       "type": "object"
     },
-    "GeneratedTransaction": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "publisher": {
-          "type": "string"
-        },
-        "size_bytes": {
-          "type": "number"
-        },
-        "type": {
-          "const": "TXGenerated",
-          "type": "string"
-        }
-      },
-      "required": ["id", "publisher", "size_bytes", "type"],
-      "type": "object"
-    },
     "GeneratedVote": {
       "properties": {
         "id": {
@@ -279,25 +260,6 @@
         "type",
         "votes"
       ],
-      "type": "object"
-    },
-    "LotteryWon": {
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "producer": {
-          "type": "string"
-        },
-        "slot": {
-          "type": "number"
-        },
-        "type": {
-          "enum": ["EBLotteryWon", "IBLotteryWon", "VTLotteryWon"],
-          "type": "string"
-        }
-      },
-      "required": ["id", "producer", "slot", "type"],
       "type": "object"
     },
     "NetworkEvent": {
@@ -338,83 +300,51 @@
         "IBSent",
         "RBReceived",
         "RBSent",
-        "TXReceived",
-        "TXSent",
         "VTBundleReceived",
         "VTBundleSent"
       ],
       "type": "string"
     },
-    "RustEvent": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/GeneratedInputBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedEndorserBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedRankingBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedVote"
-        },
-        {
-          "$ref": "#/definitions/CpuSubtaskEvent"
-        },
-        {
-          "$ref": "#/definitions/ScheduledCpuTaskEvent"
-        },
-        {
-          "$ref": "#/definitions/CpuTaskFinishedEvent"
-        },
-        {
-          "$ref": "#/definitions/LotteryWon"
-        },
-        {
-          "$ref": "#/definitions/GeneratedTransaction"
-        },
-        {
-          "$ref": "#/definitions/NetworkEvent"
-        },
-        {
-          "$ref": "#/definitions/SlotEvent"
-        }
-      ]
-    },
-    "ScheduledCpuTaskEvent": {
+    "NoBlockEvent": {
       "properties": {
-        "subtasks": {
-          "type": "number"
-        },
-        "task_type": {
-          "$ref": "#/definitions/CpuTaskType"
-        },
-        "type": {
-          "const": "CpuTaskScheduled",
+        "node": {
           "type": "string"
-        }
-      },
-      "required": ["subtasks", "task_type", "type"],
-      "type": "object"
-    },
-    "SlotEvent": {
-      "properties": {
+        },
         "slot": {
           "type": "number"
         },
         "type": {
-          "const": "GlobalSlot",
+          "$ref": "#/definitions/NoBlockEventType"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "NoBlockEventType": {
+      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
+      "type": "string"
+    },
+    "SlotEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "Slot",
           "type": "string"
         }
       },
-      "required": ["slot", "type"],
+      "required": ["node", "slot", "type"],
       "type": "object"
     }
   },
+  "description": "Base simulation trace format",
   "properties": {
     "message": {
-      "$ref": "#/definitions/RustEvent"
+      "$ref": "#/definitions/Event"
     },
     "time_s": {
       "type": "number"

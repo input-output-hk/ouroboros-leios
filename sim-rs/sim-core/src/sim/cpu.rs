@@ -65,7 +65,7 @@ impl<T> CpuTaskQueue<T> {
         (task_id, scheduled_subtasks)
     }
 
-    pub fn complete_subtask(&mut self, subtask: Subtask) -> (Option<T>, Option<Subtask>) {
+    pub fn complete_subtask(&mut self, subtask: Subtask) -> (Option<T>, Option<(Subtask, &T)>) {
         let task = self
             .tasks
             .get_mut(&subtask.task_id)
@@ -77,7 +77,10 @@ impl<T> CpuTaskQueue<T> {
             None
         };
 
-        let next_subtask = self.pending_subtasks.pop_front();
+        let next_subtask = self.pending_subtasks.pop_front().map(|subtask| {
+            let task_state = self.tasks.get(&subtask.task_id).unwrap();
+            (subtask, &task_state.task)
+        });
         if next_subtask.is_none() {
             self.available_cores = self.available_cores.map(|c| c + 1);
         }
@@ -134,7 +137,8 @@ mod tests {
         let mut next_subtask = scheduled_subtasks.pop().unwrap();
 
         for _ in 0..11 {
-            let (None, Some(subtask)) = queue.complete_subtask(next_subtask) else {
+            let (None, Some((subtask, CpuTask::Something))) = queue.complete_subtask(next_subtask)
+            else {
                 panic!("unexpected end");
             };
             next_subtask = subtask;
@@ -152,7 +156,8 @@ mod tests {
         let (_, mut scheduled_subtasks) =
             queue.schedule_task(CpuTask::Something, vec![Duration::from_secs(1); 2]);
         assert_eq!(scheduled_subtasks.len(), 1);
-        let (None, Some(subtask)) = queue.complete_subtask(scheduled_subtasks.pop().unwrap())
+        let (None, Some((subtask, CpuTask::Something))) =
+            queue.complete_subtask(scheduled_subtasks.pop().unwrap())
         else {
             panic!("unexpected end");
         };
@@ -163,7 +168,8 @@ mod tests {
         let (_, mut scheduled_subtasks) =
             queue.schedule_task(CpuTask::Something, vec![Duration::from_secs(1); 2]);
         assert_eq!(scheduled_subtasks.len(), 1);
-        let (None, Some(subtask)) = queue.complete_subtask(scheduled_subtasks.pop().unwrap())
+        let (None, Some((subtask, CpuTask::Something))) =
+            queue.complete_subtask(scheduled_subtasks.pop().unwrap())
         else {
             panic!("unexpected end");
         };

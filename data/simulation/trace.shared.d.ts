@@ -63,13 +63,13 @@ interface GeneratedInputBlock extends GeneratedBlockEvent {
     id: string;
     pipeline: number;
     tx_payload_bytes: number;
-    rb_ref?: string|null;
+    rb_ref?: string | null;
 }
 interface BlockRef {
-  id : string;
+    id: string;
 }
 interface Endorsement {
-  eb : BlockRef;
+    eb: BlockRef;
 }
 
 interface GeneratedEndorserBlock extends GeneratedBlockEvent {
@@ -85,11 +85,11 @@ interface GeneratedVote extends GeneratedBlockEvent {
 }
 
 interface GeneratedRankingBlock extends GeneratedBlockEvent {
-    endorsement: Endorsement|null;
-    endorsements?: Endorsement[]|null;
-    id : string;
-    tx_payload_bytes : number;
-    parent: BlockRef|null;
+    endorsement: Endorsement | null;
+    endorsements?: Endorsement[] | null;
+    id: string;
+    tx_payload_bytes: number;
+    parent: BlockRef | null;
 }
 
 type BlockEvent =
@@ -118,11 +118,11 @@ export interface UnknownEvent {
 }
 
 export interface UnknownMessage {
-  /** @$ref "#/definitions/UnknownType" */
-  type;
+    /** @$ref "#/definitions/UnknownType" */
+    type;
 }
 
 // Type to validate `jq '.' -cs` of a log.
-type TraceEvents = (TraceEvent|UnknownEvent)[]
+type TraceEvents = (TraceEvent | UnknownEvent)[]
 
 type KnownType = EventType

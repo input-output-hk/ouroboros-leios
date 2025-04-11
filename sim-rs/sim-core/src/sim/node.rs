@@ -71,16 +71,16 @@ enum CpuTaskType {
 impl CpuTaskType {
     fn name(&self) -> String {
         match self {
-            Self::TransactionValidated(_, _) => "TransactionValidated",
-            Self::RBBlockGenerated(_) => "RBBlockGenerated",
-            Self::RBBlockValidated(_, _) => "RBBlockValidated",
-            Self::IBBlockGenerated(_) => "IBBlockGenerated",
-            Self::IBHeaderValidated(_, _, _) => "IBHeaderValidated",
-            Self::IBBlockValidated(_, _) => "IBBlockValidated",
-            Self::EBBlockGenerated(_) => "EBBlockGenerated",
-            Self::EBBlockValidated(_, _) => "EBBlockValidated",
-            Self::VTBundleGenerated(_) => "VTBundleGenerated",
-            Self::VTBundleValidated(_, _) => "VTBundleValidated",
+            Self::TransactionValidated(_, _) => "ValTX",
+            Self::RBBlockGenerated(_) => "GenRB",
+            Self::RBBlockValidated(_, _) => "ValRB",
+            Self::IBBlockGenerated(_) => "GenIB",
+            Self::IBHeaderValidated(_, _, _) => "ValIH",
+            Self::IBBlockValidated(_, _) => "ValIB",
+            Self::EBBlockGenerated(_) => "GenEB",
+            Self::EBBlockValidated(_, _) => "ValEB",
+            Self::VTBundleGenerated(_) => "GenVote",
+            Self::VTBundleValidated(_, _) => "ValVote",
         }
         .to_string()
     }
@@ -298,21 +298,25 @@ impl Node {
                 node: self.id,
                 index: task_id,
             },
-            task_type,
+            task_type.clone(),
             subtask_count,
         );
         for subtask in subtasks {
-            self.start_cpu_subtask(subtask);
+            self.start_cpu_subtask(subtask, task_type.clone());
         }
     }
 
-    fn start_cpu_subtask(&mut self, subtask: Subtask) {
+    fn start_cpu_subtask(&mut self, subtask: Subtask, task_type: String) {
         let task_id = CpuTaskId {
             node: self.id,
             index: subtask.task_id,
         };
-        self.tracker
-            .track_cpu_subtask_started(task_id, subtask.subtask_id, subtask.duration);
+        self.tracker.track_cpu_subtask_started(
+            task_id,
+            task_type,
+            subtask.subtask_id,
+            subtask.duration,
+        );
         let timestamp = self.clock.now() + subtask.duration;
         self.events.push(FutureEvent(
             timestamp,
@@ -400,8 +404,9 @@ impl Node {
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
                             let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
-                            if let Some(subtask) = next_subtask {
-                                self.start_cpu_subtask(subtask);
+                            if let Some((subtask, task)) = next_subtask {
+                                let task_type = task.task_type.name();
+                                self.start_cpu_subtask(subtask, task_type);
                             }
                             let Some(task) = finished_task else {
                                 continue;
