@@ -4,18 +4,37 @@ export interface HaskellTraceEvent {
     message: HaskellEvent;
 }
 
-type BlockKind = "IB" | "EB" | "RB" | "VTBundle";
+type LeiosBlockKind = "IB" | "EB" | "VTBundle"
+type BlockKind = LeiosBlockKind | "RB";
 type BlockAction = "Generated" | "EnteredState";
 
 type HaskellEvent =
     | HaskellCpuEvent
     | HaskellBlockEvent
-    | HaskellNetworkEvent;
+    | HaskellNetworkEvent
+    | HaskellSlotEvent
+    | HaskellNoBlockEvent;
 
 type HaskellEventType =
     | CpuEventType
     | BlockEventType
-    | NetworkEventType;
+    | NetworkEventType
+    | SlotEventType
+    | NoBlockEventType;
+
+type SlotEventType = "Slot"
+interface HaskellSlotEvent {
+    type: SlotEventType;
+    node: string;
+    slot: number;
+}
+
+type NoBlockEventType = `No${LeiosBlockKind}Generated`
+interface HaskellNoBlockEvent {
+    type: NoBlockEventType;
+    node: string;
+    slot: number;
+}
 
 
 type CpuEventType = "Cpu"

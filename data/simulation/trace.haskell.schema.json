@@ -1,6 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "BlockEventType": {
+      "enum": [
+        "EBEnteredState",
+        "EBGenerated",
+        "IBEnteredState",
+        "IBGenerated",
+        "RBEnteredState",
+        "RBGenerated",
+        "VTBundleEnteredState",
+        "VTBundleGenerated"
+      ],
+      "type": "string"
+    },
     "BlockRef": {
       "properties": {
         "id": {
@@ -31,17 +44,7 @@
           "type": "number"
         },
         "type": {
-          "enum": [
-            "EBEnteredState",
-            "EBGenerated",
-            "IBEnteredState",
-            "IBGenerated",
-            "RBEnteredState",
-            "RBGenerated",
-            "VTBundleEnteredState",
-            "VTBundleGenerated"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/BlockEventType"
         }
       },
       "required": ["id", "node", "slot", "type"],
@@ -68,17 +71,7 @@
           "type": "number"
         },
         "type": {
-          "enum": [
-            "EBEnteredState",
-            "EBGenerated",
-            "IBEnteredState",
-            "IBGenerated",
-            "RBEnteredState",
-            "RBGenerated",
-            "VTBundleEnteredState",
-            "VTBundleGenerated"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/BlockEventType"
         }
       },
       "required": [
@@ -97,13 +90,13 @@
           "type": "string"
         },
         "payload_bytes": {
-          "type": "number"
+          "type": ["null", "number"]
         },
         "producer": {
           "type": "string"
         },
         "rb_ref": {
-          "type": "string"
+          "type": ["null", "string"]
         },
         "size_bytes": {
           "type": "number"
@@ -112,17 +105,7 @@
           "type": "number"
         },
         "type": {
-          "enum": [
-            "EBEnteredState",
-            "EBGenerated",
-            "IBEnteredState",
-            "IBGenerated",
-            "RBEnteredState",
-            "RBGenerated",
-            "VTBundleEnteredState",
-            "VTBundleGenerated"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/BlockEventType"
         }
       },
       "required": ["id", "producer", "size_bytes", "slot", "type"],
@@ -131,28 +114,49 @@
     "GeneratedRankingBlock": {
       "properties": {
         "endorsement": {
-          "$ref": "#/definitions/Endorsement"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Endorsement"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "endorsements": {
-          "items": {
-            "$ref": "#/definitions/Endorsement"
-          },
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/Endorsement"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "id": {
           "type": "string"
         },
         "parent": {
-          "properties": {
-            "id": {
-              "type": "string"
+          "anyOf": [
+            {
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": ["id"],
+              "type": "object"
+            },
+            {
+              "type": "null"
             }
-          },
-          "required": ["id"],
-          "type": "object"
+          ]
         },
         "payload_bytes": {
-          "type": "number"
+          "type": ["null", "number"]
         },
         "producer": {
           "type": "string"
@@ -164,17 +168,7 @@
           "type": "number"
         },
         "type": {
-          "enum": [
-            "EBEnteredState",
-            "EBGenerated",
-            "IBEnteredState",
-            "IBGenerated",
-            "RBEnteredState",
-            "RBGenerated",
-            "VTBundleEnteredState",
-            "VTBundleGenerated"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/BlockEventType"
         },
         "vrf": {
           "type": "number"
@@ -198,17 +192,7 @@
           "type": "number"
         },
         "type": {
-          "enum": [
-            "EBEnteredState",
-            "EBGenerated",
-            "IBEnteredState",
-            "IBGenerated",
-            "RBEnteredState",
-            "RBGenerated",
-            "VTBundleEnteredState",
-            "VTBundleGenerated"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/BlockEventType"
         },
         "votes": {
           "$ref": "#/definitions/Record<string,number>"
@@ -258,6 +242,12 @@
         },
         {
           "$ref": "#/definitions/HaskellNetworkEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellSlotEvent"
+        },
+        {
+          "$ref": "#/definitions/HaskellNoBlockEvent"
         }
       ]
     },
@@ -267,39 +257,84 @@
           "type": "string"
         },
         "ids": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "msg_size_bytes": {
-          "type": "number"
+          "type": ["null", "number"]
         },
         "recipient": {
           "type": "string"
         },
         "sender": {
-          "type": "string"
+          "type": ["null", "string"]
         },
         "sending_s": {
-          "type": "number"
+          "type": ["null", "number"]
         },
         "type": {
-          "enum": [
-            "EBReceived",
-            "EBSent",
-            "IBReceived",
-            "IBSent",
-            "RBReceived",
-            "RBSent",
-            "VTBundleReceived",
-            "VTBundleSent"
-          ],
-          "type": "string"
+          "$ref": "#/definitions/NetworkEventType"
         }
       },
       "required": ["id", "recipient", "type"],
       "type": "object"
+    },
+    "HaskellNoBlockEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/NoBlockEventType"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "HaskellSlotEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "Slot",
+          "type": "string"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "NetworkEventType": {
+      "enum": [
+        "EBReceived",
+        "EBSent",
+        "IBReceived",
+        "IBSent",
+        "RBReceived",
+        "RBSent",
+        "VTBundleReceived",
+        "VTBundleSent"
+      ],
+      "type": "string"
+    },
+    "NoBlockEventType": {
+      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
+      "type": "string"
     },
     "Record<string,number>": {
       "type": "object"
