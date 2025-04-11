@@ -22,6 +22,7 @@ interface CpuSubtaskEvent {
     type: "Cpu";
     node: string;
     cpu_time_s: number;
+    task_label: string;
     task_type: CpuTaskType;
     id: string;
 }

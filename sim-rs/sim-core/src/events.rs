@@ -78,6 +78,7 @@ pub enum Event {
         node: String,
         #[serde(serialize_with = "duration_as_secs")]
         cpu_time_s: Duration,
+        task_label: String,
         task_type: String,
         id: String,
     },
@@ -305,10 +306,11 @@ impl EventTracker {
         duration: Duration,
     ) {
         let task = self.to_task(task_id);
-        let id = format!("{}-{}", task.to_string(), subtask_id);
+        let id = format!("{}-{}", task, subtask_id);
         self.send(Event::Cpu {
             node: task.node.to_string(),
             task,
+            task_label: format!("{task_type}: {id}"),
             id,
             task_type,
             cpu_time_s: duration,

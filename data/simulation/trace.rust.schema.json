@@ -30,6 +30,9 @@
         "node": {
           "type": "string"
         },
+        "task_label": {
+          "type": "string"
+        },
         "task_type": {
           "$ref": "#/definitions/CpuTaskType"
         },
@@ -38,7 +41,14 @@
           "type": "string"
         }
       },
-      "required": ["cpu_time_s", "id", "node", "task_type", "type"],
+      "required": [
+        "cpu_time_s",
+        "id",
+        "node",
+        "task_label",
+        "task_type",
+        "type"
+      ],
       "type": "object"
     },
     "CpuTaskFinishedEvent": {
