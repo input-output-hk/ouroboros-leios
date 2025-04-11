@@ -101,7 +101,7 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "yarn"
           cache-dependency-path: ./site/yarn.lock  # Changed from site/yarn.lock to ./site/yarn.lock
 
