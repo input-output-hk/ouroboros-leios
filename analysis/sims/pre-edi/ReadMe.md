@@ -1,4 +1,4 @@
-# Simulation experiments at tag `leios-2025w12`
+# Simulation experiments
 
 ## Workflow for running experiments
 
