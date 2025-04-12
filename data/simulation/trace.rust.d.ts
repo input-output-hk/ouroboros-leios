@@ -39,13 +39,7 @@ interface CpuTaskFinishedEvent {
     cpu_time_s: number;
 }
 
-type CpuTaskType =
-    | shared.CpuTaskType
-    | "GenIB"
-    | "GenEB"
-    | "GenRB"
-    | "GenVote"
-    | "ValTX";
+type CpuTaskType = shared.CpuTaskType;
 
 type BlockEvent = shared.BlockEvent | LotteryWon | GeneratedTransaction;
 

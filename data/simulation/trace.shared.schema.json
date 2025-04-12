@@ -42,7 +42,18 @@
       "type": "object"
     },
     "CpuTaskType": {
-      "enum": ["ValEB", "ValIB", "ValIH", "ValRB", "ValRH", "ValVote"],
+      "enum": [
+        "GenEB",
+        "GenIB",
+        "GenRB",
+        "GenVote",
+        "ValEB",
+        "ValIB",
+        "ValIH",
+        "ValRB",
+        "ValRH",
+        "ValVote"
+      ],
       "type": "string"
     },
     "Endorsement": {
