@@ -16,6 +16,11 @@ In the course of this work, new discrepancies between the two simulations were d
 
 Future simulation experiments will be fast to set up and easier to complete with quick turnaround.
 
+### Rust simulation
+
+- Updated traces to match the noew "standardized" trace format.
+- Fixed bug with CPU scheduling causing nodes to use more cores than they had
+
 ## 2025-04-04
 
 ### EB ledger state / order of IBs discussion
