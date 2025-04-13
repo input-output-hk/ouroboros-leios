@@ -28,6 +28,7 @@ import GHC.Generics
 
 type Bytes = Word64
 type SlotNo = Word64
+type PipelineNo = Word64
 type Time = Micro
 
 data NetworkAction = Sent | Received
@@ -44,11 +45,34 @@ data Endorsement = Endorsement {eb :: BlockRef}
 data BlockRef = BlockRef {id :: Text}
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+newtype Nullable a = Nullable (Maybe a)
+  deriving (Eq, Show)
+
+instance ToJSON a => ToJSON (Nullable a) where
+  omitField _ = False
+  toJSON (Nullable x) = toJSON x
+  toEncoding (Nullable x) = toEncoding x
+instance FromJSON a => FromJSON (Nullable a) where
+  parseJSON v = Nullable <$> parseJSON v
+
 data Event where
+  Slot ::
+    { node :: !Text
+    , slot :: !SlotNo
+    } ->
+    Event
   Cpu ::
     { node :: !Text
     , cpu_time_s :: !Time
-    , task_label :: !Text
+    , task_type :: !Text
+    , block_id :: !Text
+    } ->
+    Event
+  NoIBGenerated
+    , NoEBGenerated
+    , NoVTBundleGenerated ::
+    { node :: !Text
+    , slot :: !SlotNo
     } ->
     Event
   IBSent
@@ -64,7 +88,7 @@ data Event where
     , recipient :: !Node
     , msg_size_bytes :: !(Maybe Bytes)
     , sending_s :: !(Maybe Time)
-    , block_id :: !(Maybe Text)
+    , block_id :: !Text
     , block_ids :: !(Maybe [Text])
     -- ^ used by Haskell when sending more blocks in one message.
     } ->
@@ -82,8 +106,9 @@ data Event where
     { producer :: !Text
     , id :: !Text
     , slot :: !SlotNo
-    , size_bytes :: !(Maybe Bytes)
-    , payload_bytes :: !(Maybe Bytes)
+    , pipeline :: !PipelineNo
+    , size_bytes :: !Bytes
+    , payload_bytes :: !Bytes
     , rb_ref :: !(Maybe Text)
     } ->
     Event
@@ -91,26 +116,27 @@ data Event where
     { producer :: !Text
     , id :: !Text
     , slot :: !Word64
+    , pipeline :: !PipelineNo
     , bytes :: !Word64
     , input_blocks :: ![BlockRef]
     } ->
     Event
   RBGenerated ::
     { producer :: !Text
-    , block_id :: !(Maybe Text)
-    , vrf :: !(Maybe Int)
+    , block_id :: !Text
     , slot :: !Word64
-    , size_bytes :: !(Maybe Word64)
-    , endorsement :: !(Maybe Endorsement)
+    , size_bytes :: !Word64
+    , endorsement :: !(Nullable Endorsement)
     , endorsements :: !(Maybe [Endorsement])
-    , payload_bytes :: !(Maybe Word64)
-    , parent :: !(Maybe BlockRef)
+    , payload_bytes :: !Word64
+    , parent :: !(Nullable BlockRef)
     } ->
     Event
   VTBundleGenerated ::
     { producer :: !Text
     , id :: !Text
     , slot :: !Word64
+    , pipeline :: !PipelineNo
     , bytes :: !Word64
     , votes :: !(Map Text Word64)
     } ->
@@ -124,7 +150,10 @@ $( deriveJSON
       , fieldLabelModifier = \fl -> case fl of
           ('b' : 'l' : 'o' : 'c' : 'k' : '_' : xs) -> xs
           "bytes" -> "size_bytes"
+          "payload_bytes" -> "tx_payload_bytes"
           xs -> xs
+      , allowOmittedFields = True
+      , omitNothingFields = True
       }
     ''Event
  )
