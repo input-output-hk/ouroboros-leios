@@ -334,6 +334,7 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
     Nothing | Nothing <- logFile -> do
       putStrLn "No output chosen, terminating."
  where
+  leios = convertConfig cfg
   runModel :: SampleModel LeiosEvent state -> IO ()
   runModel model =
     runSampleModel' logFile logEvent model stop $
@@ -341,8 +342,8 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
   logEvent = case logFormat of
     Legacy{..} -> jsonlLog $ logLeiosTraceEvent p2pNodeNames verbosity
     Shared{cbor}
-      | cbor -> binaryLog $ (fmap (encodeCBOR . (: [])) .) . sharedTraceEvent p2pNodeNames
-      | otherwise -> jsonlLog $ (fmap toEncoding .) . sharedTraceEvent p2pNodeNames
+      | cbor -> binaryLog $ (fmap (encodeCBOR . (: [])) .) . sharedTraceEvent leios p2pNodeNames
+      | otherwise -> jsonlLog $ (fmap toEncoding .) . sharedTraceEvent leios p2pNodeNames
   renderState fp st = do
     let diffusionData = maybeAnalizeRawData analize (rawDataFromState cfg p2pNetwork st stop)
     encodeFile fp diffusionData

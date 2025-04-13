@@ -515,6 +515,12 @@ lastUnadoptedEB leios@LeiosConfig{pipeline = (_ :: SingPipeline p), maxEndorseBl
 endorseBlockPipeline :: LeiosConfig -> EndorseBlock -> PipelineNo
 endorseBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} eb = pipelineOf @p cfg Endorse eb.slot
 
+inputBlockPipeline :: LeiosConfig -> InputBlock -> PipelineNo
+inputBlockPipeline cfg@LeiosConfig{pipeline = _ :: SingPipeline p} ib = pipelineOf @p cfg Propose ib.header.slot
+
+voteMsgPipeline :: LeiosConfig -> VoteMsg -> PipelineNo
+voteMsgPipeline cfg@LeiosConfig{voteSendStage} vt = pipelineOf cfg voteSendStage vt.slot
+
 ----------------------------------------------------------------------------------------------
 ---- Smart constructors
 ----------------------------------------------------------------------------------------------
