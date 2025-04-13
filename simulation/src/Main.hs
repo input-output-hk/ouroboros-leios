@@ -385,6 +385,7 @@ runSimOptions SimOptions{..} = case simCommand of
             , logFormat = case sharedFormat of
                 Just x -> DataShortLeiosP2P.Shared (x == CBOR)
                 Nothing -> DataShortLeiosP2P.Legacy logVerbosity
+            , conformanceEvents
             }
     DataShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
@@ -421,6 +422,7 @@ data SimCommand
       , logVerbosity :: Int
       , analize :: Bool
       , sharedFormat :: Maybe OutputFormat
+      , conformanceEvents :: Bool
       }
 
 parserSimCommand :: Parser SimCommand
@@ -449,6 +451,7 @@ parserShortLeios =
     <*> logVerbosity
     <*> switch (long "analize" <> help "Calculate metrics and statistics.")
     <*> optional sharedLogFormat
+    <*> switch (long "conformance-events" <> help "Emits `Slot` and `No*Generated` events in the shared log format.")
  where
   logVerbosity =
     option

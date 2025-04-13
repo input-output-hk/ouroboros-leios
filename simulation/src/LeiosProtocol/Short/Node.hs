@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
@@ -73,11 +74,18 @@ data BlockEvent
   | Pruned
   deriving (Show)
 
+data ConformanceEvent
+  = Slot {slot :: !SlotNo}
+  | NoIBGenerated {slot :: !SlotNo}
+  | NoEBGenerated {slot :: !SlotNo}
+  | NoVTGenerated {slot :: !SlotNo}
+  deriving (Show)
 data LeiosNodeEvent
   = PraosNodeEvent !(PraosNode.PraosNodeEvent RankingBlockBody)
   | LeiosNodeEventCPU !CPUTask
   | LeiosNodeEvent !BlockEvent !LeiosEventBlock
   | LeiosNodeEventLedgerState !RankingBlockId
+  | LeiosNodeEventConformance !ConformanceEvent
   deriving (Show)
 
 --------------------------------------------------------------
@@ -103,6 +111,7 @@ data LeiosNodeConfig = LeiosNodeConfig
   , processingQueueBound :: !Natural
   , processingCores :: !NumCores
   , blockGeneration :: !BlockGeneration
+  , conformanceEvents :: !Bool
   }
 
 --------------------------------------------------------------
@@ -801,7 +810,7 @@ generator ::
   LeiosNodeState m ->
   m ()
 generator tracer cfg st = do
-  schedule <- mkSchedule cfg
+  schedule <- mkSchedule tracer cfg
   let buffers = mkBuffersView cfg st
   let
     withDelay d (lbl, m) = do
@@ -926,13 +935,14 @@ mkBuffersView cfg st = BuffersView{..}
               ]
     return EndorseBlocksSnapshot{..}
 
-mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
-mkSchedule cfg = do
+mkSchedule :: MonadSTM m => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
+mkSchedule tracer cfg = do
   -- For each pipeline, we want to deploy all our votes in a single
   -- message to cut down on traffic, so we pick one slot out of each
   -- active voting range (they are assumed not to overlap).
   votingSlots <- newTVarIO $ pickFromRanges rng1 $ votingRanges cfg.leios
-  mkScheduler rng2 (rates votingSlots)
+  sched <- mkScheduler' rng2 (rates votingSlots)
+  pure $! if cfg.conformanceEvents then logMissedBlocks sched else fmap filterWins . sched
  where
   (rng1, rng2) = split cfg.rng
   calcWins rate = Just $ \sample ->
@@ -949,6 +959,7 @@ mkSchedule cfg = do
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
   rates votingSlots slot = do
+    when cfg.conformanceEvents $ traceWith tracer $ LeiosNodeEventConformance Slot{..}
     vote <- atomically $ do
       vs <- readTVar votingSlots
       case vs of
@@ -966,7 +977,20 @@ mkSchedule cfg = do
   pickFromRanges rng0 rs = snd $ mapAccumL f rng0 rs
    where
     f rng r = coerce $ swap $ uniformR (coerce r :: (Word64, Word64)) rng
-
+  logMissedBlocks sched slot = do
+    xs <- sched slot
+    forM_ xs $ \(SomeRole role, wins) -> do
+      when (wins == 0) $
+        case role of
+          Generate.Propose{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoIBGenerated{..}
+          Generate.Endorse{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoEBGenerated{..}
+          Generate.Vote{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoVTGenerated{..}
+          Generate.Base{} -> return ()
+    return $ filterWins xs
+  filterWins = filter ((>= 1) . snd)
 -- * Utils
 
 partitionRBVar ::

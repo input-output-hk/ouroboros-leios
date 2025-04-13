@@ -239,6 +239,7 @@ data SimOutputConfig = SimOutputConfig
   , analize :: Bool
   , stop :: Time
   , logFormat :: LogFormat
+  , conformanceEvents :: Bool
   }
 
 rawDataFromState :: OnDisk.Config -> P2PNetwork -> LeiosSimState -> Time -> RawLeiosData
@@ -338,7 +339,7 @@ exampleSim seed cfg p2pNetwork@P2PNetwork{..} SimOutputConfig{..} = do
   runModel :: SampleModel LeiosEvent state -> IO ()
   runModel model =
     runSampleModel' logFile logEvent model stop $
-      exampleTrace2 seed cfg p2pNetwork
+      exampleTrace2 seed cfg p2pNetwork conformanceEvents
   logEvent = case logFormat of
     Legacy{..} -> jsonlLog $ logLeiosTraceEvent p2pNodeNames verbosity
     Shared{cbor}

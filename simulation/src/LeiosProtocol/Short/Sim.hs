@@ -168,6 +168,7 @@ logLeiosEvent nodeNames loudness e = case e of
       EventIB ib -> mconcat [ibKind, "id" .= ib.stringId]
       EventEB eb -> mconcat [ebKind, "id" .= eb.stringId]
       EventVote vt -> mconcat [vtKind, "id" .= vt.stringId]
+  logNode _nid LeiosNodeEventConformance{} = Nothing
   logPraos nid (PraosNodeEventGenerate blk@(Block h b)) =
     Just $
       mconcat
@@ -312,6 +313,11 @@ sharedEvent leios nodeNames e = case e of
       _ -> Nothing
    where
     rbId blk = T.pack $ show (coerce @_ @Int (blockHash blk))
+  sharedNode node (LeiosNodeEventConformance ev) = Just $ case ev of
+    Slot{..} -> Shared.Slot{slot = coerce slot, ..}
+    NoIBGenerated{..} -> Shared.NoIBGenerated{slot = coerce slot, ..}
+    NoEBGenerated{..} -> Shared.NoEBGenerated{slot = coerce slot, ..}
+    NoVTGenerated{..} -> Shared.NoVTBundleGenerated{slot = coerce slot, ..}
   sharedNode _ _ = Nothing
   headAndTail xs = case xs of
     [] -> (Nothing, Nothing)
@@ -470,6 +476,7 @@ traceRelayLink1 connectionOptions =
                 processingQueueBound = 100
               , processingCores = Infinite
               , blockGeneration = Honest
+              , conformanceEvents = False
               , ..
               }
       (pA, cB) <- newConnectionBundle (leiosTracer nodeA nodeB) (uncurry configureConnection connectionOptions)
