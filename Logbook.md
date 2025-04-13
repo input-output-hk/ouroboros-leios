@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-04-13
+
+### Haskell simulation
+
+- Started spec of new relay protocol for IB header diffusion without body.
+  - see `simulation/docs/network-spec`
+- Removed redundancies and harmonized naming in --shared-log-format.
+  - see `data/simulation/trace.shared.d.ts` for base schema both sims share.
+- Added support for extra events required by conformance testing.
+  - see `SlotEvent` and `NoBlockEvent` in schema.
+  - use flag `--conformance-events` with `--shared-log-format` to enable them, otherwise too numerous.
+
 ## 2025-04-11
 
 ### Refactored and optimized simulation-analysis workflow
