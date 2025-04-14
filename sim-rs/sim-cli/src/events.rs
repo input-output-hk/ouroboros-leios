@@ -174,6 +174,7 @@ impl EventMonitor {
                         });
                     }
                 }
+                Event::Slot { .. } => {}
                 Event::CpuTaskScheduled { .. } => {}
                 Event::CpuTaskFinished { .. } => {}
                 Event::Cpu { .. } => {}
@@ -286,6 +287,7 @@ impl EventMonitor {
                         pretty_bytes(tx_bytes, pbo.clone()),
                     )
                 }
+                Event::NoIBGenerated { .. } => {}
                 Event::IBSent { .. } => {
                     ib_messages.sent += 1;
                 }
@@ -328,6 +330,7 @@ impl EventMonitor {
                         id.slot,
                     )
                 }
+                Event::NoEBGenerated { .. } => {}
                 Event::EBSent { .. } => {
                     eb_messages.sent += 1;
                 }
@@ -343,6 +346,7 @@ impl EventMonitor {
                         *votes_per_pool.entry(id.producer.id).or_default() += count as f64;
                     }
                 }
+                Event::NoVTBundleGenerated { .. } => {}
                 Event::VTBundleNotGenerated { .. } => {}
                 Event::VTBundleSent { .. } => {
                     vote_messages.sent += 1;

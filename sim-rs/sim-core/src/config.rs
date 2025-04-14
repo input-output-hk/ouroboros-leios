@@ -410,6 +410,7 @@ impl MockTransactionConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
+    pub emit_conformance_events: bool,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -440,6 +441,7 @@ impl SimConfiguration {
         Self {
             seed: 0,
             slots: None,
+            emit_conformance_events: false,
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
             links: topology.links,

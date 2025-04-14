@@ -71,6 +71,10 @@ pub enum Event {
     GlobalSlot {
         slot: u64,
     },
+    Slot {
+        node: Node,
+        slot: u64,
+    },
     CpuTaskScheduled {
         task: CpuTaskId<Node>,
         task_type: String,
@@ -159,6 +163,10 @@ pub enum Event {
         size_bytes: u64,
         transactions: Vec<TransactionId>,
     },
+    NoIBGenerated {
+        node: Node,
+        slot: u64,
+    },
     IBSent {
         id: InputBlockId<Node>,
         slot: u64,
@@ -193,6 +201,10 @@ pub enum Event {
         input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
         endorser_blocks: Vec<BlockRef<EndorserBlockId<Node>>>,
     },
+    NoEBGenerated {
+        node: Node,
+        slot: u64,
+    },
     EBSent {
         id: EndorserBlockId<Node>,
         slot: u64,
@@ -223,6 +235,10 @@ pub enum Event {
         producer: Node,
         size_bytes: u64,
         votes: Votes<Node>,
+    },
+    NoVTBundleGenerated {
+        node: Node,
+        slot: u64,
     },
     VTBundleNotGenerated {
         slot: u64,
@@ -286,8 +302,15 @@ impl EventTracker {
         }
     }
 
-    pub fn track_slot(&self, number: u64) {
-        self.send(Event::GlobalSlot { slot: number });
+    pub fn track_global_slot(&self, slot: u64) {
+        self.send(Event::GlobalSlot { slot });
+    }
+
+    pub fn track_slot(&self, node: NodeId, slot: u64) {
+        self.send(Event::Slot {
+            node: self.to_node(node),
+            slot,
+        });
     }
 
     pub fn track_cpu_task_scheduled(&self, task_id: CpuTaskId, task_type: String, subtasks: usize) {
@@ -445,6 +468,13 @@ impl EventTracker {
         });
     }
 
+    pub fn track_no_ib_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoIBGenerated {
+            node: self.to_node(node),
+            slot,
+        });
+    }
+
     pub fn track_ib_sent(
         &self,
         block: &crate::model::InputBlock,
@@ -509,6 +539,13 @@ impl EventTracker {
         });
     }
 
+    pub fn track_no_eb_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoEBGenerated {
+            node: self.to_node(node),
+            slot,
+        });
+    }
+
     pub fn track_eb_sent(
         &self,
         block: &crate::model::EndorserBlock,
@@ -560,6 +597,13 @@ impl EventTracker {
                     .map(|(node, count)| (self.to_endorser_block(*node), *count))
                     .collect(),
             ),
+        });
+    }
+
+    pub fn track_no_vote_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoVTBundleGenerated {
+            node: self.to_node(node),
+            slot,
         });
     }
 

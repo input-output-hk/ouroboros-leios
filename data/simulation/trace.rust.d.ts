@@ -10,6 +10,7 @@ interface RustTraceEvent {
 type RustEvent =
     | CpuEvent
     | BlockEvent
+    | shared.NoBlockEvent
     | NetworkEvent
     | SlotEvent;
 
@@ -63,7 +64,7 @@ interface NetworkEvent extends Omit<shared.NetworkEvent, "type"> {
 
 type NetworkEventType = shared.NetworkEventType | "TXSent" | "TXReceived";
 
-interface SlotEvent {
+type SlotEvent = shared.SlotEvent | {
     type: "GlobalSlot";
     slot: number;
 }

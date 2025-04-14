@@ -505,8 +505,9 @@ impl Node {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
-        // The beginning of a new slot is the end of an old slot.
-        // Publish any input blocks left over from the last slot
+        if self.sim_config.emit_conformance_events {
+            self.tracker.track_slot(self.id, slot);
+        }
 
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
@@ -592,6 +593,9 @@ impl Node {
                 return;
             }
         }
+        if self.sim_config.emit_conformance_events {
+            self.tracker.track_no_eb_generated(self.id, slot);
+        }
     }
 
     fn schedule_endorser_block_votes(&mut self, slot: u64) {
@@ -614,18 +618,24 @@ impl Node {
     }
 
     fn vote_for_endorser_blocks(&mut self, slot: u64) {
+        if !self.try_vote_for_endorser_blocks(slot) && self.sim_config.emit_conformance_events {
+            self.tracker.track_no_vote_generated(self.id, slot);
+        }
+    }
+
+    fn try_vote_for_endorser_blocks(&mut self, slot: u64) -> bool {
         let Some(vote_count) = self.leios.votes_to_generate.remove(&slot) else {
-            return;
+            return false;
         };
         // When we vote, we vote for EBs which were sent at the start of the prior stage.
         let eb_slot = match slot.checked_sub(self.sim_config.stage_length) {
             Some(s) => s - (s % self.sim_config.stage_length),
             None => {
-                return;
+                return false;
             }
         };
         let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
-            return;
+            return false;
         };
         let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
@@ -647,7 +657,7 @@ impl Node {
             }
         });
         if ebs.is_empty() {
-            return;
+            return false;
         }
         // For every VRF lottery you won, you can vote for every EB
         let votes_allowed = vote_count * ebs.len();
@@ -662,11 +672,17 @@ impl Node {
         };
         if !votes.ebs.is_empty() {
             self.schedule_cpu_task(CpuTaskType::VTBundleGenerated(votes));
+            true
+        } else {
+            false
         }
     }
 
     fn generate_input_blocks(&mut self, slot: u64) {
         let Some(headers) = self.leios.ibs_to_generate.remove(&slot) else {
+            if self.sim_config.emit_conformance_events {
+                self.tracker.track_no_ib_generated(self.id, slot);
+            }
             return;
         };
         for header in headers {

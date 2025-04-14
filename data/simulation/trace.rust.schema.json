@@ -355,6 +355,25 @@
       ],
       "type": "string"
     },
+    "NoBlockEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/NoBlockEventType"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "NoBlockEventType": {
+      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
+      "type": "string"
+    },
     "RustEvent": {
       "anyOf": [
         {
@@ -368,6 +387,12 @@
         },
         {
           "$ref": "#/definitions/GeneratedVote"
+        },
+        {
+          "$ref": "#/definitions/SlotEvent"
+        },
+        {
+          "$ref": "#/definitions/NoBlockEvent"
         },
         {
           "$ref": "#/definitions/CpuSubtaskEvent"
@@ -388,7 +413,17 @@
           "$ref": "#/definitions/NetworkEvent"
         },
         {
-          "$ref": "#/definitions/SlotEvent"
+          "properties": {
+            "slot": {
+              "type": "number"
+            },
+            "type": {
+              "const": "GlobalSlot",
+              "type": "string"
+            }
+          },
+          "required": ["slot", "type"],
+          "type": "object"
         }
       ]
     },
@@ -410,15 +445,18 @@
     },
     "SlotEvent": {
       "properties": {
+        "node": {
+          "type": "string"
+        },
         "slot": {
           "type": "number"
         },
         "type": {
-          "const": "GlobalSlot",
+          "const": "Slot",
           "type": "string"
         }
       },
-      "required": ["slot", "type"],
+      "required": ["node", "slot", "type"],
       "type": "object"
     }
   },
