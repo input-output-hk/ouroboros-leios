@@ -5,7 +5,7 @@ set -e
 
 mkdir -p results
 
-for f in rbgen ebgen ibgen cpus receipts
+for f in rbgen ebgen ibgen cpus receipts resources
 do
   echo "----- $f -----"
   DIR=$(find runs -type f -name $f.csv.gz -printf %h\\n -quit)
