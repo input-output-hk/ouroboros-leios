@@ -1,5 +1,5 @@
 ---
-title: Weekly Summary - 2025-04-07
+title: Weekly Summary - April 7, 2025
 authors:
 - will
 tags: [progress, update, weekly]
@@ -7,23 +7,57 @@ tags: [progress, update, weekly]
 
 This week, the team continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.
 
-# Workshop summaries
+### Simulation improvements
 
-Unfortunately, there are no workshop summaries for this week. If another week is provided, I can assist further.
+#### Haskell simulation
+- Started specification of a new relay protocol for IB header diffusion without body
+- Improved the shared log format by removing redundancies and harmonizing naming
+- Added support for extra events required by conformance testing, including `SlotEvent` and `NoBlockEvent`
+  - These events can be enabled using the `--conformance-events` flag with `--shared-log-format`.
 
-## Simulation progress
+#### Rust simulation
+- Updated traces to match the new standardized trace format
+- Fixed a critical bug related to CPU scheduling where nodes were using more cores than allocated.
 
-- **Haskell simulation**
-  - Started specification of a new relay protocol for IB header diffusion without body, documented in `simulation/docs/network-spec`.
-  - Removed redundancies and harmonized naming in `--shared-log-format`, with a new base schema both simulations share in `data/simulation/trace.shared.d.ts`.
-  - Added support for extra events required by conformance testing, including `SlotEvent` and `NoBlockEvent` in the schema.
+### Analysis workflow optimization
 
-## Ongoing investigations
+The team significantly improved the workflow for analyzing both Haskell and Rust simulations:
 
-- Investigating the effects of dishonest nodes that diffuse unbounded amounts of old IBs on IB delivery reliability and protocol performance under such conditions.
-- Working on quantifying settlement times and their impact on protocol performance.
-- Exploring integration possibilities with Ouroboros Peras, mainly focusing on potentially reusing their voting mechanism to reduce resource consumption.
+- Replaced MongoDB with more efficient `jq` queries using map-reduce operations
+- Created reusable library functions for plotting with R
+- Revised and streamlined scripts for creating, executing, and analyzing simulations
+- Made the Jupyter notebook for analyses more generic and reusable
+- Successfully tested the new workflow on tag `leios-2025w15`
 
-## Additional resources
+These improvements will enable faster setup and execution of future simulation experiments, with quicker turnaround times for analysis. During this optimization work, several discrepancies between the Haskell and Rust simulations were identified and documented as GitHub issues for future investigation.
 
-- [GitHub discussions](https://github.com/input-output-hk/ouroboros-leios/discussions/243) – EB ledger states and 'history rewriting' effects.
+### Edinburgh Workshop Recaps
+
+The Edinburgh Workshop documentation has been made available, covering key discussions and decisions:
+
+#### Day 1 Highlights
+- Explored ledger design options comparing Labeled UTxOs (Explicit Shards) vs Accounts (Implicit Shards) approaches
+- Discussed conformance testing strategies including QuickCheck Dynamic and Trace Verification approaches
+- Analyzed critical edge cases for user onboarding and system properties
+
+#### Day 2 Highlights
+- Detailed analysis of Leios node costs at different TPS levels
+- Key findings on resource usage:
+  - At 10 TPS: 1.8x increase in egress and 6x increase in compute compared to Praos
+  - At 1K TPS: Significant scaling improvements with better resource efficiency
+- Recommendations for potential integration with Peras, particularly for voting mechanism optimization
+- Discussion of performance characteristics at both high and low throughput levels
+
+#### Day 3 Highlights
+- In-depth discussion of optimistic ledger state references, exploring three main approaches:
+  1. RB Reference: Highest security but highest latency
+  2. EB Reference: Balanced approach with medium security and latency
+  3. EB-DAG: Advanced approach using directed acyclic graph structure
+- Key advantages of the EB-DAG approach:
+  - Achieves low latency while maintaining security
+  - Provides strong inclusion guarantees for EBs
+  - Enables efficient state management and reconstruction
+  - Creates complete, verifiable chain history
+- Implementation considerations for state management and block ordering in the EB-DAG approach
+
+For detailed information, see the full workshop recaps in the [Leios documentation](https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/workshop).
