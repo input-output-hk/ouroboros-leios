@@ -103,6 +103,7 @@ pub enum Event {
         id: TransactionId,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     TXReceived {
         id: TransactionId,
@@ -131,6 +132,7 @@ pub enum Event {
         producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     RBReceived {
         id: BlockId<Node>,
@@ -165,6 +167,7 @@ pub enum Event {
         index: u64,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     IBReceived {
         id: InputBlockId<Node>,
@@ -197,6 +200,7 @@ pub enum Event {
         producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     EBReceived {
         id: EndorserBlockId<Node>,
@@ -234,6 +238,7 @@ pub enum Event {
         producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     VTBundleReceived {
         id: VoteBundleId<Node>,
@@ -370,6 +375,7 @@ impl EventTracker {
             producer: self.to_node(block.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes(),
         });
     }
 
@@ -391,11 +397,17 @@ impl EventTracker {
         });
     }
 
-    pub fn track_transaction_sent(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
+    pub fn track_transaction_sent(
+        &self,
+        transaction: &Transaction,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
         self.send(Event::TXSent {
-            id,
+            id: transaction.id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: transaction.bytes,
         });
     }
 
@@ -433,7 +445,13 @@ impl EventTracker {
         });
     }
 
-    pub fn track_ib_sent(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
+    pub fn track_ib_sent(
+        &self,
+        block: &crate::model::InputBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        let id = block.header.id;
         self.send(Event::IBSent {
             id: self.to_input_block(id),
             slot: id.slot,
@@ -442,6 +460,7 @@ impl EventTracker {
             index: id.index,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes(),
         });
     }
 
@@ -490,14 +509,20 @@ impl EventTracker {
         });
     }
 
-    pub fn track_eb_sent(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
+    pub fn track_eb_sent(
+        &self,
+        block: &crate::model::EndorserBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
         self.send(Event::EBSent {
-            id: self.to_endorser_block(id),
-            slot: id.slot,
-            pipeline: id.pipeline,
-            producer: self.to_node(id.producer),
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: block.pipeline,
+            producer: self.to_node(block.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes,
         });
     }
 
@@ -563,6 +588,7 @@ impl EventTracker {
             producer: self.to_node(votes.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: votes.bytes,
         });
     }
 
