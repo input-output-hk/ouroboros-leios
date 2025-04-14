@@ -52,6 +52,7 @@
         "ValIH",
         "ValRB",
         "ValRH",
+        "ValTX",
         "ValVote"
       ],
       "type": "string"

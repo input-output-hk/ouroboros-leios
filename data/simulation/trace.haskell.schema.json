@@ -3,13 +3,9 @@
   "definitions": {
     "BlockEventType": {
       "enum": [
-        "EBEnteredState",
         "EBGenerated",
-        "IBEnteredState",
         "IBGenerated",
-        "RBEnteredState",
         "RBGenerated",
-        "VTBundleEnteredState",
         "VTBundleGenerated"
       ],
       "type": "string"
@@ -23,6 +19,44 @@
       "required": ["id"],
       "type": "object"
     },
+    "CpuEvent": {
+      "properties": {
+        "cpu_time_s": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "task_type": {
+          "$ref": "#/definitions/CpuTaskType"
+        },
+        "type": {
+          "const": "Cpu",
+          "type": "string"
+        }
+      },
+      "required": ["cpu_time_s", "id", "node", "task_type", "type"],
+      "type": "object"
+    },
+    "CpuTaskType": {
+      "enum": [
+        "GenEB",
+        "GenIB",
+        "GenRB",
+        "GenVote",
+        "ValEB",
+        "ValIB",
+        "ValIH",
+        "ValRB",
+        "ValRH",
+        "ValTX",
+        "ValVote"
+      ],
+      "type": "string"
+    },
     "Endorsement": {
       "properties": {
         "eb": {
@@ -32,23 +66,33 @@
       "required": ["eb"],
       "type": "object"
     },
-    "EnteredStateBlock": {
-      "properties": {
-        "id": {
-          "type": "string"
+    "Event": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CpuEvent"
         },
-        "node": {
-          "type": "string"
+        {
+          "$ref": "#/definitions/GeneratedInputBlock"
         },
-        "slot": {
-          "type": "number"
+        {
+          "$ref": "#/definitions/GeneratedEndorserBlock"
         },
-        "type": {
-          "$ref": "#/definitions/BlockEventType"
+        {
+          "$ref": "#/definitions/GeneratedRankingBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedVote"
+        },
+        {
+          "$ref": "#/definitions/NetworkEvent"
+        },
+        {
+          "$ref": "#/definitions/SlotEvent"
+        },
+        {
+          "$ref": "#/definitions/NoBlockEvent"
         }
-      },
-      "required": ["id", "node", "slot", "type"],
-      "type": "object"
+      ]
     },
     "GeneratedEndorserBlock": {
       "properties": {
@@ -60,6 +104,9 @@
             "$ref": "#/definitions/BlockRef"
           },
           "type": "array"
+        },
+        "pipeline": {
+          "type": "number"
         },
         "producer": {
           "type": "string"
@@ -77,6 +124,7 @@
       "required": [
         "id",
         "input_blocks",
+        "pipeline",
         "producer",
         "size_bytes",
         "slot",
@@ -89,8 +137,8 @@
         "id": {
           "type": "string"
         },
-        "payload_bytes": {
-          "type": ["null", "number"]
+        "pipeline": {
+          "type": "number"
         },
         "producer": {
           "type": "string"
@@ -104,11 +152,22 @@
         "slot": {
           "type": "number"
         },
+        "tx_payload_bytes": {
+          "type": "number"
+        },
         "type": {
           "$ref": "#/definitions/BlockEventType"
         }
       },
-      "required": ["id", "producer", "size_bytes", "slot", "type"],
+      "required": [
+        "id",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "tx_payload_bytes",
+        "type"
+      ],
       "type": "object"
     },
     "GeneratedRankingBlock": {
@@ -142,21 +201,12 @@
         "parent": {
           "anyOf": [
             {
-              "properties": {
-                "id": {
-                  "type": "string"
-                }
-              },
-              "required": ["id"],
-              "type": "object"
+              "$ref": "#/definitions/BlockRef"
             },
             {
               "type": "null"
             }
           ]
-        },
-        "payload_bytes": {
-          "type": ["null", "number"]
         },
         "producer": {
           "type": "string"
@@ -167,20 +217,32 @@
         "slot": {
           "type": "number"
         },
+        "tx_payload_bytes": {
+          "type": "number"
+        },
         "type": {
           "$ref": "#/definitions/BlockEventType"
-        },
-        "vrf": {
-          "type": "number"
         }
       },
-      "required": ["producer", "size_bytes", "slot", "type"],
+      "required": [
+        "endorsement",
+        "id",
+        "parent",
+        "producer",
+        "size_bytes",
+        "slot",
+        "tx_payload_bytes",
+        "type"
+      ],
       "type": "object"
     },
     "GeneratedVote": {
       "properties": {
         "id": {
           "type": "string"
+        },
+        "pipeline": {
+          "type": "number"
         },
         "producer": {
           "type": "string"
@@ -195,128 +257,51 @@
           "$ref": "#/definitions/BlockEventType"
         },
         "votes": {
-          "$ref": "#/definitions/Record<string,number>"
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
         }
       },
-      "required": ["id", "producer", "size_bytes", "slot", "type", "votes"],
+      "required": [
+        "id",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type",
+        "votes"
+      ],
       "type": "object"
     },
-    "HaskellCpuEvent": {
-      "properties": {
-        "cpu_time_s": {
-          "type": "number"
-        },
-        "node": {
-          "type": "string"
-        },
-        "task_label": {
-          "type": "string"
-        },
-        "type": {
-          "const": "Cpu",
-          "type": "string"
-        }
-      },
-      "required": ["cpu_time_s", "node", "task_label", "type"],
-      "type": "object"
-    },
-    "HaskellEvent": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/HaskellCpuEvent"
-        },
-        {
-          "$ref": "#/definitions/GeneratedInputBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedEndorserBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedRankingBlock"
-        },
-        {
-          "$ref": "#/definitions/GeneratedVote"
-        },
-        {
-          "$ref": "#/definitions/EnteredStateBlock"
-        },
-        {
-          "$ref": "#/definitions/HaskellNetworkEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellSlotEvent"
-        },
-        {
-          "$ref": "#/definitions/HaskellNoBlockEvent"
-        }
-      ]
-    },
-    "HaskellNetworkEvent": {
+    "NetworkEvent": {
       "properties": {
         "id": {
           "type": "string"
         },
         "ids": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "msg_size_bytes": {
-          "type": ["null", "number"]
+          "type": "number"
         },
         "recipient": {
           "type": "string"
         },
         "sender": {
-          "type": ["null", "string"]
+          "type": "string"
         },
         "sending_s": {
-          "type": ["null", "number"]
+          "type": "number"
         },
         "type": {
           "$ref": "#/definitions/NetworkEventType"
         }
       },
       "required": ["id", "recipient", "type"],
-      "type": "object"
-    },
-    "HaskellNoBlockEvent": {
-      "properties": {
-        "node": {
-          "type": "string"
-        },
-        "slot": {
-          "type": "number"
-        },
-        "type": {
-          "$ref": "#/definitions/NoBlockEventType"
-        }
-      },
-      "required": ["node", "slot", "type"],
-      "type": "object"
-    },
-    "HaskellSlotEvent": {
-      "properties": {
-        "node": {
-          "type": "string"
-        },
-        "slot": {
-          "type": "number"
-        },
-        "type": {
-          "const": "Slot",
-          "type": "string"
-        }
-      },
-      "required": ["node", "slot", "type"],
       "type": "object"
     },
     "NetworkEventType": {
@@ -332,18 +317,46 @@
       ],
       "type": "string"
     },
+    "NoBlockEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/NoBlockEventType"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
     "NoBlockEventType": {
       "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
       "type": "string"
     },
-    "Record<string,number>": {
+    "SlotEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "Slot",
+          "type": "string"
+        }
+      },
+      "required": ["node", "slot", "type"],
       "type": "object"
     }
   },
-  "description": "Haskell simulation trace format",
+  "description": "Base simulation trace format",
   "properties": {
     "message": {
-      "$ref": "#/definitions/HaskellEvent"
+      "$ref": "#/definitions/Event"
     },
     "time_s": {
       "type": "number"
