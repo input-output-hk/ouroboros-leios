@@ -1,5 +1,5 @@
-#! /usr/bin/env nix-shell
-#! nix-shell -i bash -p jq dasel gnused gzip
+#!/usr/bin/env nix-shell
+#!nix-shell -i bash -p jq dasel gnused gzip
 
 jq -c '
   select(.message.type == "RBGenerated")
