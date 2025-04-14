@@ -1,3 +1,4 @@
+{"time_s":0.0,"message":{"type":"GlobalSlot","slot":0}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-0","slot":0,"pipeline":0,"producer":"node-0"}}
 {"time_s":0.0,"message":{"type":"IBLotteryWon","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0}}
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-0","index":0},"task_type":"GenIB","subtasks":1}}
@@ -5,29 +6,28 @@
 {"time_s":0.0,"message":{"type":"IBLotteryWon","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1}}
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-0","index":1},"task_type":"GenIB","subtasks":1}}
 {"time_s":0.0,"message":{"type":"Cpu","task":{"node":"node-0","index":1},"node":"node-0","cpu_time_s":0.13,"task_label":"GenIB: node-0-1-0","task_type":"GenIB","id":"node-0-1-0"}}
-{"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-2","slot":0,"pipeline":0,"producer":"node-2"}}
-{"time_s":0.0,"message":{"type":"GlobalSlot","slot":0}}
-{"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-3","slot":0,"pipeline":0,"producer":"node-3"}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-1","slot":0,"pipeline":0,"producer":"node-1"}}
+{"time_s":0.0,"message":{"type":"TXGenerated","id":"0","publisher":"node-11","size_bytes":156}}
+{"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-3","slot":0,"pipeline":0,"producer":"node-3"}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-4","slot":0,"pipeline":0,"producer":"node-4"}}
 {"time_s":0.0,"message":{"type":"EBLotteryWon","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4"}}
+{"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-2","slot":0,"pipeline":0,"producer":"node-2"}}
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":0},"task_type":"GenEB","subtasks":1}}
 {"time_s":0.0,"message":{"type":"Cpu","task":{"node":"node-4","index":0},"node":"node-4","cpu_time_s":0.075,"task_label":"GenEB: node-4-0-0","task_type":"GenEB","id":"node-4-0-0"}}
-{"time_s":0.0,"message":{"type":"TXGenerated","id":"0","publisher":"node-11","size_bytes":156}}
 {"time_s":0.0,"message":{"type":"IBLotteryWon","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0}}
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":1},"task_type":"GenIB","subtasks":1}}
 {"time_s":0.0,"message":{"type":"Cpu","task":{"node":"node-4","index":1},"node":"node-4","cpu_time_s":0.13,"task_label":"GenIB: node-4-1-0","task_type":"GenIB","id":"node-4-1-0"}}
 {"time_s":0.0,"message":{"type":"IBLotteryWon","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1}}
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":2},"task_type":"GenIB","subtasks":1}}
 {"time_s":0.0,"message":{"type":"Cpu","task":{"node":"node-4","index":2},"node":"node-4","cpu_time_s":0.13,"task_label":"GenIB: node-4-2-0","task_type":"GenIB","id":"node-4-2-0"}}
-{"time_s":0.026,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-4"}}
+{"time_s":0.026,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-4","msg_size_bytes":156}}
 {"time_s":0.039,"message":{"type":"TXReceived","id":"0","sender":"node-11","recipient":"node-4"}}
 {"time_s":0.039,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":3},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.039,"message":{"type":"Cpu","task":{"node":"node-4","index":3},"node":"node-4","cpu_time_s":0.0015,"task_label":"ValTX: node-4-3-0","task_type":"ValTX","id":"node-4-3-0"}}
 {"time_s":0.0405,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":3},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
-{"time_s":0.048,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-12"}}
-{"time_s":0.064,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-10"}}
-{"time_s":0.064,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-5"}}
+{"time_s":0.048,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-12","msg_size_bytes":156}}
+{"time_s":0.064,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-10","msg_size_bytes":156}}
+{"time_s":0.064,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-5","msg_size_bytes":156}}
 {"time_s":0.072,"message":{"type":"TXReceived","id":"0","sender":"node-11","recipient":"node-12"}}
 {"time_s":0.072,"message":{"type":"CpuTaskScheduled","task":{"node":"node-12","index":0},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.072,"message":{"type":"Cpu","task":{"node":"node-12","index":0},"node":"node-12","cpu_time_s":0.0015,"task_label":"ValTX: node-12-0-0","task_type":"ValTX","id":"node-12-0-0"}}
@@ -42,19 +42,19 @@
 {"time_s":0.096,"message":{"type":"Cpu","task":{"node":"node-10","index":0},"node":"node-10","cpu_time_s":0.0015,"task_label":"ValTX: node-10-0-0","task_type":"ValTX","id":"node-10-0-0"}}
 {"time_s":0.0975,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
 {"time_s":0.0975,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
-{"time_s":0.101,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-4","recipient":"node-11"}}
-{"time_s":0.102,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-9"}}
-{"time_s":0.108,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-7"}}
+{"time_s":0.101,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-4","recipient":"node-11","msg_size_bytes":240}}
+{"time_s":0.102,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-9","msg_size_bytes":156}}
+{"time_s":0.108,"message":{"type":"TXSent","id":"0","sender":"node-11","recipient":"node-7","msg_size_bytes":156}}
 {"time_s":0.114,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-4","recipient":"node-11"}}
 {"time_s":0.114,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":0},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.114,"message":{"type":"Cpu","task":{"node":"node-11","index":0},"node":"node-11","cpu_time_s":0.001,"task_label":"ValEB: node-11-0-0","task_type":"ValEB","id":"node-11-0-0"}}
 {"time_s":0.115,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":0},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":0.1195,"message":{"type":"TXSent","id":"0","sender":"node-5","recipient":"node-0"}}
+{"time_s":0.1195,"message":{"type":"TXSent","id":"0","sender":"node-5","recipient":"node-0","msg_size_bytes":156}}
 {"time_s":0.13,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":0},"task_type":"GenIB","cpu_time_s":0.13,"wall_time_s":0.13,"extra":"0-0-0"}}
 {"time_s":0.13,"message":{"type":"IBGenerated","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"header_bytes":304,"tx_payload_bytes":0,"size_bytes":304,"transactions":[]}}
+{"time_s":0.13,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":2},"task_type":"GenIB","cpu_time_s":0.13,"wall_time_s":0.13,"extra":"0-7-1"}}
 {"time_s":0.13,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":1},"task_type":"GenIB","cpu_time_s":0.13,"wall_time_s":0.13,"extra":"0-0-1"}}
 {"time_s":0.13,"message":{"type":"IBGenerated","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"header_bytes":304,"tx_payload_bytes":0,"size_bytes":304,"transactions":[]}}
-{"time_s":0.13,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":2},"task_type":"GenIB","cpu_time_s":0.13,"wall_time_s":0.13,"extra":"0-7-1"}}
 {"time_s":0.13,"message":{"type":"IBGenerated","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"header_bytes":304,"tx_payload_bytes":0,"size_bytes":304,"transactions":[]}}
 {"time_s":0.13,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":1},"task_type":"GenIB","cpu_time_s":0.13,"wall_time_s":0.13,"extra":"0-7-0"}}
 {"time_s":0.13,"message":{"type":"IBGenerated","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"header_bytes":304,"tx_payload_bytes":0,"size_bytes":304,"transactions":[]}}
@@ -66,13 +66,13 @@
 {"time_s":0.153,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":0},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.153,"message":{"type":"Cpu","task":{"node":"node-9","index":0},"node":"node-9","cpu_time_s":0.0015,"task_label":"ValTX: node-9-0-0","task_type":"ValTX","id":"node-9-0-0"}}
 {"time_s":0.1545,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
-{"time_s":0.1615,"message":{"type":"TXSent","id":"0","sender":"node-12","recipient":"node-6"}}
+{"time_s":0.1615,"message":{"type":"TXSent","id":"0","sender":"node-12","recipient":"node-6","msg_size_bytes":156}}
 {"time_s":0.162,"message":{"type":"TXReceived","id":"0","sender":"node-11","recipient":"node-7"}}
 {"time_s":0.162,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":0},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.162,"message":{"type":"Cpu","task":{"node":"node-7","index":0},"node":"node-7","cpu_time_s":0.0015,"task_label":"ValTX: node-7-0-0","task_type":"ValTX","id":"node-7-0-0"}}
-{"time_s":0.163,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-12"}}
 {"time_s":0.163,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":1},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.163,"message":{"type":"Cpu","task":{"node":"node-5","index":1},"node":"node-5","cpu_time_s":0.001,"task_label":"ValIH: node-5-1-0","task_type":"ValIH","id":"node-5-1-0"}}
+{"time_s":0.163,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-12","msg_size_bytes":240}}
 {"time_s":0.163,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":2},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.163,"message":{"type":"Cpu","task":{"node":"node-5","index":2},"node":"node-5","cpu_time_s":0.001,"task_label":"ValIH: node-5-2-0","task_type":"ValIH","id":"node-5-2-0"}}
 {"time_s":0.1635,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
@@ -84,11 +84,11 @@
 {"time_s":0.169,"message":{"type":"Cpu","task":{"node":"node-11","index":2},"node":"node-11","cpu_time_s":0.001,"task_label":"ValIH: node-11-2-0","task_type":"ValIH","id":"node-11-2-0"}}
 {"time_s":0.17,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":1},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.17,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
-{"time_s":0.175,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-0","recipient":"node-5"}}
-{"time_s":0.179,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-10"}}
-{"time_s":0.179,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-5"}}
-{"time_s":0.1805,"message":{"type":"TXSent","id":"0","sender":"node-9","recipient":"node-3"}}
-{"time_s":0.183,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-4","recipient":"node-11"}}
+{"time_s":0.175,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-0","recipient":"node-5","msg_size_bytes":304}}
+{"time_s":0.179,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-10","msg_size_bytes":240}}
+{"time_s":0.179,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-5","msg_size_bytes":240}}
+{"time_s":0.1805,"message":{"type":"TXSent","id":"0","sender":"node-9","recipient":"node-3","msg_size_bytes":156}}
+{"time_s":0.183,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-4","recipient":"node-11","msg_size_bytes":304}}
 {"time_s":0.186,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-0","recipient":"node-5"}}
 {"time_s":0.186,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":3},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.186,"message":{"type":"Cpu","task":{"node":"node-5","index":3},"node":"node-5","cpu_time_s":0.050152,"task_label":"ValIB: node-5-3-0","task_type":"ValIB","id":"node-5-3-0"}}
@@ -109,17 +109,17 @@
 {"time_s":0.196,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-4","recipient":"node-11"}}
 {"time_s":0.196,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":3},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.196,"message":{"type":"Cpu","task":{"node":"node-11","index":3},"node":"node-11","cpu_time_s":0.050152,"task_label":"ValIB: node-11-3-0","task_type":"ValIB","id":"node-11-3-0"}}
-{"time_s":0.1975,"message":{"type":"TXSent","id":"0","sender":"node-7","recipient":"node-2"}}
-{"time_s":0.2035,"message":{"type":"TXSent","id":"0","sender":"node-12","recipient":"node-8"}}
+{"time_s":0.1975,"message":{"type":"TXSent","id":"0","sender":"node-7","recipient":"node-2","msg_size_bytes":156}}
+{"time_s":0.2035,"message":{"type":"TXSent","id":"0","sender":"node-12","recipient":"node-8","msg_size_bytes":156}}
 {"time_s":0.2055,"message":{"type":"TXReceived","id":"0","sender":"node-12","recipient":"node-6"}}
 {"time_s":0.2055,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":0},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.2055,"message":{"type":"Cpu","task":{"node":"node-6","index":0},"node":"node-6","cpu_time_s":0.0015,"task_label":"ValTX: node-6-0-0","task_type":"ValTX","id":"node-6-0-0"}}
 {"time_s":0.207,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
 {"time_s":0.211,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-5"}}
 {"time_s":0.211,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":4},"task_type":"ValEB","subtasks":1}}
+{"time_s":0.211,"message":{"type":"Cpu","task":{"node":"node-5","index":4},"node":"node-5","cpu_time_s":0.001,"task_label":"ValEB: node-5-4-0","task_type":"ValEB","id":"node-5-4-0"}}
 {"time_s":0.211,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-10"}}
 {"time_s":0.211,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":1},"task_type":"ValEB","subtasks":1}}
-{"time_s":0.211,"message":{"type":"Cpu","task":{"node":"node-5","index":4},"node":"node-5","cpu_time_s":0.001,"task_label":"ValEB: node-5-4-0","task_type":"ValEB","id":"node-5-4-0"}}
 {"time_s":0.211,"message":{"type":"Cpu","task":{"node":"node-10","index":1},"node":"node-10","cpu_time_s":0.001,"task_label":"ValEB: node-10-1-0","task_type":"ValEB","id":"node-10-1-0"}}
 {"time_s":0.212,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":4},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
 {"time_s":0.212,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":1},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
@@ -127,10 +127,10 @@
 {"time_s":0.2145,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":0},"task_type":"ValTX","subtasks":1}}
 {"time_s":0.2145,"message":{"type":"Cpu","task":{"node":"node-2","index":0},"node":"node-2","cpu_time_s":0.0015,"task_label":"ValTX: node-2-0-0","task_type":"ValTX","id":"node-2-0-0"}}
 {"time_s":0.216,"message":{"type":"CpuTaskFinished","task":{"node":"node-2","index":0},"task_type":"ValTX","cpu_time_s":0.0015,"wall_time_s":0.0015,"extra":""}}
-{"time_s":0.217,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-9"}}
-{"time_s":0.223,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-7"}}
-{"time_s":0.227,"message":{"type":"TXSent","id":"0","sender":"node-6","recipient":"node-1"}}
-{"time_s":0.234,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-5","recipient":"node-0"}}
+{"time_s":0.217,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-9","msg_size_bytes":240}}
+{"time_s":0.223,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-7","msg_size_bytes":240}}
+{"time_s":0.227,"message":{"type":"TXSent","id":"0","sender":"node-6","recipient":"node-1","msg_size_bytes":156}}
+{"time_s":0.234,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-5","recipient":"node-0","msg_size_bytes":240}}
 {"time_s":0.236152,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":3},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.237,"message":{"type":"TXReceived","id":"0","sender":"node-6","recipient":"node-1"}}
 {"time_s":0.237,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":0},"task_type":"ValTX","subtasks":1}}
@@ -147,39 +147,39 @@
 {"time_s":0.245,"message":{"type":"Cpu","task":{"node":"node-0","index":3},"node":"node-0","cpu_time_s":0.001,"task_label":"ValEB: node-0-3-0","task_type":"ValEB","id":"node-0-3-0"}}
 {"time_s":0.246,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":3},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
 {"time_s":0.246152,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":3},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
-{"time_s":0.247152,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-0","recipient":"node-5"}}
-{"time_s":0.256152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-12"}}
+{"time_s":0.247152,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-0","recipient":"node-5","msg_size_bytes":304}}
+{"time_s":0.256152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-12","msg_size_bytes":304}}
 {"time_s":0.258152,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-0","recipient":"node-5"}}
 {"time_s":0.258152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":5},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.258152,"message":{"type":"Cpu","task":{"node":"node-5","index":5},"node":"node-5","cpu_time_s":0.050152,"task_label":"ValIB: node-5-5-0","task_type":"ValIB","id":"node-5-5-0"}}
-{"time_s":0.259152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-4","recipient":"node-11"}}
+{"time_s":0.259152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-4","recipient":"node-11","msg_size_bytes":304}}
 {"time_s":0.26,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":4},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.26,"message":{"type":"Cpu","task":{"node":"node-11","index":4},"node":"node-11","cpu_time_s":0.001,"task_label":"ValIH: node-11-4-0","task_type":"ValIH","id":"node-11-4-0"}}
 {"time_s":0.26,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.26,"message":{"type":"Cpu","task":{"node":"node-11","index":5},"node":"node-11","cpu_time_s":0.001,"task_label":"ValIH: node-11-5-0","task_type":"ValIH","id":"node-11-5-0"}}
 {"time_s":0.261,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.261,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
+{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":2},"task_type":"ValIH","subtasks":1}}
+{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-10","index":2},"node":"node-10","cpu_time_s":0.001,"task_label":"ValIH: node-10-2-0","task_type":"ValIH","id":"node-10-2-0"}}
+{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":3},"task_type":"ValIH","subtasks":1}}
+{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-10","index":3},"node":"node-10","cpu_time_s":0.001,"task_label":"ValIH: node-10-3-0","task_type":"ValIH","id":"node-10-3-0"}}
 {"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":1},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-6","index":1},"node":"node-6","cpu_time_s":0.001,"task_label":"ValIH: node-6-1-0","task_type":"ValIH","id":"node-6-1-0"}}
-{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":2},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":2},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-10","index":2},"node":"node-10","cpu_time_s":0.001,"task_label":"ValIH: node-10-2-0","task_type":"ValIH","id":"node-10-2-0"}}
-{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-6","index":2},"node":"node-6","cpu_time_s":0.001,"task_label":"ValIH: node-6-2-0","task_type":"ValIH","id":"node-6-2-0"}}
 {"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":6},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":3},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-5","index":6},"node":"node-5","cpu_time_s":0.001,"task_label":"ValIH: node-5-6-0","task_type":"ValIH","id":"node-5-6-0"}}
+{"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":2},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.266,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":7},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-10","index":3},"node":"node-10","cpu_time_s":0.001,"task_label":"ValIH: node-10-3-0","task_type":"ValIH","id":"node-10-3-0"}}
+{"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-6","index":2},"node":"node-6","cpu_time_s":0.001,"task_label":"ValIH: node-6-2-0","task_type":"ValIH","id":"node-6-2-0"}}
 {"time_s":0.266,"message":{"type":"Cpu","task":{"node":"node-5","index":7},"node":"node-5","cpu_time_s":0.001,"task_label":"ValIH: node-5-7-0","task_type":"ValIH","id":"node-5-7-0"}}
 {"time_s":0.266152,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-12"}}
 {"time_s":0.266152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-12","index":6},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.266152,"message":{"type":"Cpu","task":{"node":"node-12","index":6},"node":"node-12","cpu_time_s":0.050152,"task_label":"ValIB: node-12-6-0","task_type":"ValIB","id":"node-12-6-0"}}
-{"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":1},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
-{"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
 {"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":3},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
 {"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":6},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
+{"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":1},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":7},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
+{"time_s":0.267,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
 {"time_s":0.268,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-9"}}
 {"time_s":0.268,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":1},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.268,"message":{"type":"Cpu","task":{"node":"node-9","index":1},"node":"node-9","cpu_time_s":0.001,"task_label":"ValEB: node-9-1-0","task_type":"ValEB","id":"node-9-1-0"}}
@@ -191,13 +191,13 @@
 {"time_s":0.272152,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-4","recipient":"node-11"}}
 {"time_s":0.272152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":6},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.272152,"message":{"type":"Cpu","task":{"node":"node-11","index":6},"node":"node-11","cpu_time_s":0.050152,"task_label":"ValIB: node-11-6-0","task_type":"ValIB","id":"node-11-6-0"}}
-{"time_s":0.276,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-12","recipient":"node-6"}}
+{"time_s":0.276,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-12","recipient":"node-6","msg_size_bytes":240}}
 {"time_s":0.277,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-11","recipient":"node-7"}}
 {"time_s":0.277,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":1},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.277,"message":{"type":"Cpu","task":{"node":"node-7","index":1},"node":"node-7","cpu_time_s":0.001,"task_label":"ValEB: node-7-1-0","task_type":"ValEB","id":"node-7-1-0"}}
 {"time_s":0.278,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":1},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":0.294152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-12"}}
-{"time_s":0.295,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-9","recipient":"node-3"}}
+{"time_s":0.294152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-12","msg_size_bytes":304}}
+{"time_s":0.295,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-9","recipient":"node-3","msg_size_bytes":240}}
 {"time_s":0.297,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":1},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.297,"message":{"type":"Cpu","task":{"node":"node-1","index":1},"node":"node-1","cpu_time_s":0.001,"task_label":"ValIH: node-1-1-0","task_type":"ValIH","id":"node-1-1-0"}}
 {"time_s":0.297,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":2},"task_type":"ValIH","subtasks":1}}
@@ -212,22 +212,22 @@
 {"time_s":0.3,"message":{"type":"Cpu","task":{"node":"node-4","index":4},"node":"node-4","cpu_time_s":0.001,"task_label":"ValIH: node-4-4-0","task_type":"ValIH","id":"node-4-4-0"}}
 {"time_s":0.3,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.3,"message":{"type":"Cpu","task":{"node":"node-4","index":5},"node":"node-4","cpu_time_s":0.001,"task_label":"ValIH: node-4-5-0","task_type":"ValIH","id":"node-4-5-0"}}
-{"time_s":0.300152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-11"}}
+{"time_s":0.300152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-11","msg_size_bytes":304}}
 {"time_s":0.301,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.301,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
 {"time_s":0.301,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.301,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
-{"time_s":0.304152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-6"}}
+{"time_s":0.304152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-5","recipient":"node-6","msg_size_bytes":304}}
 {"time_s":0.308,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-9","recipient":"node-3"}}
 {"time_s":0.308,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":1},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.308,"message":{"type":"Cpu","task":{"node":"node-3","index":1},"node":"node-3","cpu_time_s":0.001,"task_label":"ValEB: node-3-1-0","task_type":"ValEB","id":"node-3-1-0"}}
 {"time_s":0.308304,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":5},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.309,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":1},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":0.310152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-5"}}
-{"time_s":0.310152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-10"}}
-{"time_s":0.312,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-7","recipient":"node-2"}}
+{"time_s":0.310152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-10","msg_size_bytes":304}}
+{"time_s":0.310152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-5","msg_size_bytes":304}}
+{"time_s":0.312,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-7","recipient":"node-2","msg_size_bytes":240}}
 {"time_s":0.316304,"message":{"type":"CpuTaskFinished","task":{"node":"node-12","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
-{"time_s":0.318,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-12","recipient":"node-8"}}
+{"time_s":0.318,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-12","recipient":"node-8","msg_size_bytes":240}}
 {"time_s":0.318152,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-12"}}
 {"time_s":0.318152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-12","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.318152,"message":{"type":"Cpu","task":{"node":"node-12","index":7},"node":"node-12","cpu_time_s":0.050152,"task_label":"ValIB: node-12-7-0","task_type":"ValIB","id":"node-12-7-0"}}
@@ -242,7 +242,7 @@
 {"time_s":0.323,"message":{"type":"Cpu","task":{"node":"node-9","index":3},"node":"node-9","cpu_time_s":0.001,"task_label":"ValIH: node-9-3-0","task_type":"ValIH","id":"node-9-3-0"}}
 {"time_s":0.324,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.324,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":3},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
-{"time_s":0.328304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-12"}}
+{"time_s":0.328304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-12","msg_size_bytes":304}}
 {"time_s":0.329,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-7","recipient":"node-2"}}
 {"time_s":0.329,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":1},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.329,"message":{"type":"Cpu","task":{"node":"node-2","index":1},"node":"node-2","cpu_time_s":0.001,"task_label":"ValEB: node-2-1-0","task_type":"ValEB","id":"node-2-1-0"}}
@@ -262,7 +262,7 @@
 {"time_s":0.338304,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-12"}}
 {"time_s":0.338304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-12","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.338304,"message":{"type":"Cpu","task":{"node":"node-12","index":8},"node":"node-12","cpu_time_s":0.050152,"task_label":"ValIB: node-12-8-0","task_type":"ValIB","id":"node-12-8-0"}}
-{"time_s":0.341,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-6","recipient":"node-1"}}
+{"time_s":0.341,"message":{"type":"EBSent","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-6","recipient":"node-1","msg_size_bytes":240}}
 {"time_s":0.342152,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-5"}}
 {"time_s":0.342152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.342152,"message":{"type":"Cpu","task":{"node":"node-5","index":8},"node":"node-5","cpu_time_s":0.050152,"task_label":"ValIB: node-5-8-0","task_type":"ValIB","id":"node-5-8-0"}}
@@ -287,9 +287,9 @@
 {"time_s":0.364,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":3},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
 {"time_s":0.368304,"message":{"type":"CpuTaskFinished","task":{"node":"node-12","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.375,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":5},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.375,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-9"}}
 {"time_s":0.375,"message":{"type":"Cpu","task":{"node":"node-6","index":5},"node":"node-6","cpu_time_s":0.001,"task_label":"ValIH: node-6-5-0","task_type":"ValIH","id":"node-6-5-0"}}
 {"time_s":0.375,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":6},"task_type":"ValIH","subtasks":1}}
+{"time_s":0.375,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-9","msg_size_bytes":304}}
 {"time_s":0.375,"message":{"type":"Cpu","task":{"node":"node-6","index":6},"node":"node-6","cpu_time_s":0.001,"task_label":"ValIH: node-6-6-0","task_type":"ValIH","id":"node-6-6-0"}}
 {"time_s":0.376,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.376,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":6},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
@@ -297,20 +297,20 @@
 {"time_s":0.383,"message":{"type":"EBReceived","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4","sender":"node-12","recipient":"node-8"}}
 {"time_s":0.383,"message":{"type":"CpuTaskScheduled","task":{"node":"node-8","index":1},"task_type":"ValEB","subtasks":1}}
 {"time_s":0.383,"message":{"type":"Cpu","task":{"node":"node-8","index":1},"node":"node-8","cpu_time_s":0.001,"task_label":"ValEB: node-8-1-0","task_type":"ValEB","id":"node-8-1-0"}}
-{"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":2},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.384,"message":{"type":"CpuTaskFinished","task":{"node":"node-8","index":1},"task_type":"ValEB","cpu_time_s":0.001,"wall_time_s":0.001,"extra":""}}
-{"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-2","index":2},"node":"node-2","cpu_time_s":0.001,"task_label":"ValIH: node-2-2-0","task_type":"ValIH","id":"node-2-2-0"}}
-{"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":3},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-2","index":3},"node":"node-2","cpu_time_s":0.001,"task_label":"ValIH: node-2-3-0","task_type":"ValIH","id":"node-2-3-0"}}
 {"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":4},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-9","index":4},"node":"node-9","cpu_time_s":0.001,"task_label":"ValIH: node-9-4-0","task_type":"ValIH","id":"node-9-4-0"}}
 {"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-9","index":5},"node":"node-9","cpu_time_s":0.001,"task_label":"ValIH: node-9-5-0","task_type":"ValIH","id":"node-9-5-0"}}
+{"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":2},"task_type":"ValIH","subtasks":1}}
+{"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-2","index":2},"node":"node-2","cpu_time_s":0.001,"task_label":"ValIH: node-2-2-0","task_type":"ValIH","id":"node-2-2-0"}}
+{"time_s":0.384,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":3},"task_type":"ValIH","subtasks":1}}
+{"time_s":0.384,"message":{"type":"Cpu","task":{"node":"node-2","index":3},"node":"node-2","cpu_time_s":0.001,"task_label":"ValIH: node-2-3-0","task_type":"ValIH","id":"node-2-3-0"}}
+{"time_s":0.385,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.385,"message":{"type":"CpuTaskFinished","task":{"node":"node-2","index":2},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.385,"message":{"type":"CpuTaskFinished","task":{"node":"node-2","index":3},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
-{"time_s":0.385,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.385,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
-{"time_s":0.387,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-7"}}
+{"time_s":0.387,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-11","recipient":"node-7","msg_size_bytes":304}}
 {"time_s":0.388304,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":4},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.388456,"message":{"type":"CpuTaskFinished","task":{"node":"node-12","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.39,"message":{"type":"CpuTaskScheduled","task":{"node":"node-8","index":2},"task_type":"ValIH","subtasks":1}}
@@ -321,17 +321,17 @@
 {"time_s":0.391,"message":{"type":"CpuTaskFinished","task":{"node":"node-8","index":3},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
 {"time_s":0.392304,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.392304,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":4},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
-{"time_s":0.392304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-12"}}
+{"time_s":0.392304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-12","msg_size_bytes":304}}
 {"time_s":0.406,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":4},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.406,"message":{"type":"Cpu","task":{"node":"node-1","index":4},"node":"node-1","cpu_time_s":0.001,"task_label":"ValIH: node-1-4-0","task_type":"ValIH","id":"node-1-4-0"}}
 {"time_s":0.406,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.406,"message":{"type":"Cpu","task":{"node":"node-1","index":5},"node":"node-1","cpu_time_s":0.001,"task_label":"ValIH: node-1-5-0","task_type":"ValIH","id":"node-1-5-0"}}
 {"time_s":0.407,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-1"}}
 {"time_s":0.407,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-7-0"}}
-{"time_s":0.408304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-11","recipient":"node-4"}}
-{"time_s":0.408304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-1"}}
-{"time_s":0.414304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-11"}}
-{"time_s":0.414304,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-5","recipient":"node-0"}}
+{"time_s":0.408304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-11","recipient":"node-4","msg_size_bytes":304}}
+{"time_s":0.408304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-1","msg_size_bytes":304}}
+{"time_s":0.414304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-11","msg_size_bytes":304}}
+{"time_s":0.414304,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-5","recipient":"node-0","msg_size_bytes":304}}
 {"time_s":0.416304,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-12"}}
 {"time_s":0.416304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-12","index":9},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.416304,"message":{"type":"Cpu","task":{"node":"node-12","index":9},"node":"node-12","cpu_time_s":0.050152,"task_label":"ValIB: node-12-9-0","task_type":"ValIB","id":"node-12-9-0"}}
@@ -341,19 +341,19 @@
 {"time_s":0.421304,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-11","recipient":"node-4"}}
 {"time_s":0.421304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":6},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.421304,"message":{"type":"Cpu","task":{"node":"node-4","index":6},"node":"node-4","cpu_time_s":0.050152,"task_label":"ValIB: node-4-6-0","task_type":"ValIB","id":"node-4-6-0"}}
-{"time_s":0.422304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-6"}}
+{"time_s":0.422304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-6","msg_size_bytes":304}}
 {"time_s":0.423,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":4},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.423,"message":{"type":"Cpu","task":{"node":"node-7","index":4},"node":"node-7","cpu_time_s":0.001,"task_label":"ValIH: node-7-4-0","task_type":"ValIH","id":"node-7-4-0"}}
 {"time_s":0.423,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.423,"message":{"type":"Cpu","task":{"node":"node-7","index":5},"node":"node-7","cpu_time_s":0.001,"task_label":"ValIH: node-7-5-0","task_type":"ValIH","id":"node-7-5-0"}}
 {"time_s":0.424,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":4},"task_type":"ValIH","subtasks":1}}
-{"time_s":0.424,"message":{"type":"Cpu","task":{"node":"node-3","index":4},"node":"node-3","cpu_time_s":0.001,"task_label":"ValIH: node-3-4-0","task_type":"ValIH","id":"node-3-4-0"}}
 {"time_s":0.424,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
+{"time_s":0.424,"message":{"type":"Cpu","task":{"node":"node-3","index":4},"node":"node-3","cpu_time_s":0.001,"task_label":"ValIH: node-3-4-0","task_type":"ValIH","id":"node-3-4-0"}}
 {"time_s":0.424,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":5},"task_type":"ValIH","subtasks":1}}
 {"time_s":0.424,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
 {"time_s":0.424,"message":{"type":"Cpu","task":{"node":"node-3","index":5},"node":"node-3","cpu_time_s":0.001,"task_label":"ValIH: node-3-5-0","task_type":"ValIH","id":"node-3-5-0"}}
-{"time_s":0.424304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-10"}}
-{"time_s":0.424304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-5"}}
+{"time_s":0.424304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-10","msg_size_bytes":304}}
+{"time_s":0.424304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-5","msg_size_bytes":304}}
 {"time_s":0.425,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":4},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-0"}}
 {"time_s":0.425,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":5},"task_type":"ValIH","cpu_time_s":0.001,"wall_time_s":0.001,"extra":"0-0-1"}}
 {"time_s":0.425304,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-5","recipient":"node-0"}}
@@ -380,24 +380,24 @@
 {"time_s":0.446304,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-11"}}
 {"time_s":0.446304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-11","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.446304,"message":{"type":"Cpu","task":{"node":"node-11","index":8},"node":"node-11","cpu_time_s":0.050152,"task_label":"ValIB: node-11-8-0","task_type":"ValIB","id":"node-11-8-0"}}
-{"time_s":0.456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-12","recipient":"node-8"}}
-{"time_s":0.456304,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-10"}}
-{"time_s":0.456304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":7},"task_type":"ValIB","subtasks":1}}
-{"time_s":0.456304,"message":{"type":"Cpu","task":{"node":"node-10","index":7},"node":"node-10","cpu_time_s":0.050152,"task_label":"ValIB: node-10-7-0","task_type":"ValIB","id":"node-10-7-0"}}
+{"time_s":0.456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-12","recipient":"node-8","msg_size_bytes":304}}
+{"time_s":0.456304,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-12","recipient":"node-6","msg_size_bytes":304}}
 {"time_s":0.456304,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-5"}}
 {"time_s":0.456304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-5","index":9},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.456304,"message":{"type":"Cpu","task":{"node":"node-5","index":9},"node":"node-5","cpu_time_s":0.050152,"task_label":"ValIB: node-5-9-0","task_type":"ValIB","id":"node-5-9-0"}}
+{"time_s":0.456304,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-10"}}
+{"time_s":0.456304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":7},"task_type":"ValIB","subtasks":1}}
+{"time_s":0.456304,"message":{"type":"Cpu","task":{"node":"node-10","index":7},"node":"node-10","cpu_time_s":0.050152,"task_label":"ValIB: node-10-7-0","task_type":"ValIB","id":"node-10-7-0"}}
 {"time_s":0.456304,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-5","recipient":"node-6"}}
 {"time_s":0.456304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.456304,"message":{"type":"Cpu","task":{"node":"node-6","index":7},"node":"node-6","cpu_time_s":0.050152,"task_label":"ValIB: node-6-7-0","task_type":"ValIB","id":"node-6-7-0"}}
-{"time_s":0.456304,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-12","recipient":"node-6"}}
-{"time_s":0.466304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-9"}}
+{"time_s":0.466304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-9","msg_size_bytes":304}}
 {"time_s":0.466456,"message":{"type":"CpuTaskFinished","task":{"node":"node-12","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.468456,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.471456,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.475456,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.476152,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
-{"time_s":0.490152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-8"}}
+{"time_s":0.490152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-8","msg_size_bytes":304}}
 {"time_s":0.491152,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.496456,"message":{"type":"CpuTaskFinished","task":{"node":"node-11","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.497152,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-8"}}
@@ -406,13 +406,13 @@
 {"time_s":0.500304,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-12","recipient":"node-6"}}
 {"time_s":0.500304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-6","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.500304,"message":{"type":"Cpu","task":{"node":"node-6","index":8},"node":"node-6","cpu_time_s":0.050152,"task_label":"ValIB: node-6-8-0","task_type":"ValIB","id":"node-6-8-0"}}
-{"time_s":0.502152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-3"}}
-{"time_s":0.502304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-10"}}
+{"time_s":0.502152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-3","msg_size_bytes":304}}
+{"time_s":0.502304,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-10","msg_size_bytes":304}}
 {"time_s":0.505304,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-9"}}
 {"time_s":0.505304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.505304,"message":{"type":"Cpu","task":{"node":"node-9","index":7},"node":"node-9","cpu_time_s":0.050152,"task_label":"ValIB: node-9-7-0","task_type":"ValIB","id":"node-9-7-0"}}
-{"time_s":0.506456,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.506456,"message":{"type":"CpuTaskFinished","task":{"node":"node-5","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
+{"time_s":0.506456,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.506456,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.515152,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-9","recipient":"node-3"}}
 {"time_s":0.515152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":6},"task_type":"ValIB","subtasks":1}}
@@ -420,11 +420,11 @@
 {"time_s":0.521,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-12","recipient":"node-8"}}
 {"time_s":0.521,"message":{"type":"CpuTaskScheduled","task":{"node":"node-8","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.521,"message":{"type":"Cpu","task":{"node":"node-8","index":7},"node":"node-8","cpu_time_s":0.050152,"task_label":"ValIB: node-8-7-0","task_type":"ValIB","id":"node-8-7-0"}}
-{"time_s":0.522456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-4"}}
-{"time_s":0.525152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-7","recipient":"node-2"}}
-{"time_s":0.526456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-1"}}
-{"time_s":0.527152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-9"}}
-{"time_s":0.528456,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-5","recipient":"node-0"}}
+{"time_s":0.522456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-4","msg_size_bytes":304}}
+{"time_s":0.525152,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-7","recipient":"node-2","msg_size_bytes":304}}
+{"time_s":0.526456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-1","msg_size_bytes":304}}
+{"time_s":0.527152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-9","msg_size_bytes":304}}
+{"time_s":0.528456,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-5","recipient":"node-0","msg_size_bytes":304}}
 {"time_s":0.535456,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-4"}}
 {"time_s":0.535456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-4","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.535456,"message":{"type":"Cpu","task":{"node":"node-4","index":7},"node":"node-4","cpu_time_s":0.050152,"task_label":"ValIB: node-4-7-0","task_type":"ValIB","id":"node-4-7-0"}}
@@ -437,23 +437,23 @@
 {"time_s":0.542152,"message":{"type":"IBReceived","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-7","recipient":"node-2"}}
 {"time_s":0.542152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-2","index":6},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.542152,"message":{"type":"Cpu","task":{"node":"node-2","index":6},"node":"node-2","cpu_time_s":0.050152,"task_label":"ValIB: node-2-6-0","task_type":"ValIB","id":"node-2-6-0"}}
-{"time_s":0.545152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-7"}}
+{"time_s":0.545152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-7","msg_size_bytes":304}}
 {"time_s":0.547304,"message":{"type":"CpuTaskFinished","task":{"node":"node-8","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.550456,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
 {"time_s":0.555456,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.559304,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-6","recipient":"node-10"}}
 {"time_s":0.559304,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.559304,"message":{"type":"Cpu","task":{"node":"node-10","index":8},"node":"node-10","cpu_time_s":0.050152,"task_label":"ValIB: node-10-8-0","task_type":"ValIB","id":"node-10-8-0"}}
-{"time_s":0.560456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-10"}}
+{"time_s":0.560456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-10","msg_size_bytes":304}}
 {"time_s":0.565304,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":6},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
-{"time_s":0.570456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-8"}}
+{"time_s":0.570456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-8","msg_size_bytes":304}}
 {"time_s":0.571152,"message":{"type":"CpuTaskFinished","task":{"node":"node-8","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
-{"time_s":0.574456,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-5","recipient":"node-6"}}
+{"time_s":0.574456,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-5","recipient":"node-6","msg_size_bytes":304}}
 {"time_s":0.578152,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-9"}}
 {"time_s":0.578152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.578152,"message":{"type":"Cpu","task":{"node":"node-9","index":8},"node":"node-9","cpu_time_s":0.050152,"task_label":"ValIB: node-9-8-0","task_type":"ValIB","id":"node-9-8-0"}}
-{"time_s":0.581456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-7"}}
-{"time_s":0.581456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-3"}}
+{"time_s":0.581456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-3","msg_size_bytes":304}}
+{"time_s":0.581456,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-7","msg_size_bytes":304}}
 {"time_s":0.585608,"message":{"type":"CpuTaskFinished","task":{"node":"node-4","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.586608,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.589608,"message":{"type":"CpuTaskFinished","task":{"node":"node-0","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
@@ -461,15 +461,15 @@
 {"time_s":0.592456,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-10"}}
 {"time_s":0.592456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-10","index":9},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.592456,"message":{"type":"Cpu","task":{"node":"node-10","index":9},"node":"node-10","cpu_time_s":0.050152,"task_label":"ValIB: node-10-9-0","task_type":"ValIB","id":"node-10-9-0"}}
-{"time_s":0.594456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-9"}}
-{"time_s":0.594456,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-7"}}
-{"time_s":0.594456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":7},"task_type":"ValIB","subtasks":1}}
-{"time_s":0.594456,"message":{"type":"Cpu","task":{"node":"node-7","index":7},"node":"node-7","cpu_time_s":0.050152,"task_label":"ValIB: node-7-7-0","task_type":"ValIB","id":"node-7-7-0"}}
 {"time_s":0.594456,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-3"}}
 {"time_s":0.594456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":7},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.594456,"message":{"type":"Cpu","task":{"node":"node-3","index":7},"node":"node-3","cpu_time_s":0.050152,"task_label":"ValIB: node-3-7-0","task_type":"ValIB","id":"node-3-7-0"}}
-{"time_s":0.596608,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-6","recipient":"node-1"}}
-{"time_s":0.597152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-8","recipient":"node-2"}}
+{"time_s":0.594456,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-9","msg_size_bytes":304}}
+{"time_s":0.594456,"message":{"type":"IBReceived","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-9","recipient":"node-7"}}
+{"time_s":0.594456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":7},"task_type":"ValIB","subtasks":1}}
+{"time_s":0.594456,"message":{"type":"Cpu","task":{"node":"node-7","index":7},"node":"node-7","cpu_time_s":0.050152,"task_label":"ValIB: node-7-7-0","task_type":"ValIB","id":"node-7-7-0"}}
+{"time_s":0.596608,"message":{"type":"IBSent","id":"0-node-4-1","slot":0,"pipeline":4,"producer":"node-4","index":1,"sender":"node-6","recipient":"node-1","msg_size_bytes":304}}
+{"time_s":0.597152,"message":{"type":"IBSent","id":"0-node-0-0","slot":0,"pipeline":4,"producer":"node-0","index":0,"sender":"node-8","recipient":"node-2","msg_size_bytes":304}}
 {"time_s":0.599152,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-11","recipient":"node-7"}}
 {"time_s":0.599152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-7","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.599152,"message":{"type":"Cpu","task":{"node":"node-7","index":8},"node":"node-7","cpu_time_s":0.050152,"task_label":"ValIB: node-7-8-0","task_type":"ValIB","id":"node-7-8-0"}}
@@ -490,22 +490,22 @@
 {"time_s":0.633456,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-6","recipient":"node-9"}}
 {"time_s":0.633456,"message":{"type":"CpuTaskScheduled","task":{"node":"node-9","index":9},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.633456,"message":{"type":"Cpu","task":{"node":"node-9","index":9},"node":"node-9","cpu_time_s":0.050152,"task_label":"ValIB: node-9-9-0","task_type":"ValIB","id":"node-9-9-0"}}
-{"time_s":0.636152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-12","recipient":"node-8"}}
+{"time_s":0.636152,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-12","recipient":"node-8","msg_size_bytes":304}}
 {"time_s":0.642608,"message":{"type":"CpuTaskFinished","task":{"node":"node-10","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
-{"time_s":0.644608,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.644608,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
+{"time_s":0.644608,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.649304,"message":{"type":"CpuTaskFinished","task":{"node":"node-7","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.652608,"message":{"type":"CpuTaskFinished","task":{"node":"node-8","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.65676,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-1"}}
-{"time_s":0.657608,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-9","recipient":"node-3"}}
+{"time_s":0.657608,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-9","recipient":"node-3","msg_size_bytes":304}}
 {"time_s":0.658608,"message":{"type":"CpuTaskFinished","task":{"node":"node-6","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.660304,"message":{"type":"CpuTaskFinished","task":{"node":"node-2","index":7},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-0"}}
 {"time_s":0.670608,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-9","recipient":"node-3"}}
 {"time_s":0.670608,"message":{"type":"CpuTaskScheduled","task":{"node":"node-3","index":8},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.670608,"message":{"type":"Cpu","task":{"node":"node-3","index":8},"node":"node-3","cpu_time_s":0.050152,"task_label":"ValIB: node-3-8-0","task_type":"ValIB","id":"node-3-8-0"}}
-{"time_s":0.678608,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-8","recipient":"node-2"}}
-{"time_s":0.678608,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-6","recipient":"node-1"}}
-{"time_s":0.683304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-7","recipient":"node-2"}}
+{"time_s":0.678608,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-8","recipient":"node-2","msg_size_bytes":304}}
+{"time_s":0.678608,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-6","recipient":"node-1","msg_size_bytes":304}}
+{"time_s":0.683304,"message":{"type":"IBSent","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-7","recipient":"node-2","msg_size_bytes":304}}
 {"time_s":0.683608,"message":{"type":"CpuTaskFinished","task":{"node":"node-9","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.688608,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-6","recipient":"node-1"}}
 {"time_s":0.688608,"message":{"type":"CpuTaskScheduled","task":{"node":"node-1","index":9},"task_type":"ValIB","subtasks":1}}
@@ -519,9 +519,9 @@
 {"time_s":0.701152,"message":{"type":"IBReceived","id":"0-node-4-0","slot":0,"pipeline":4,"producer":"node-4","index":0,"sender":"node-12","recipient":"node-8"}}
 {"time_s":0.701152,"message":{"type":"CpuTaskScheduled","task":{"node":"node-8","index":9},"task_type":"ValIB","subtasks":1}}
 {"time_s":0.701152,"message":{"type":"Cpu","task":{"node":"node-8","index":9},"node":"node-8","cpu_time_s":0.050152,"task_label":"ValIB: node-8-9-0","task_type":"ValIB","id":"node-8-9-0"}}
-{"time_s":0.703304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-7"}}
+{"time_s":0.703304,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-11","recipient":"node-7","msg_size_bytes":304}}
 {"time_s":0.72076,"message":{"type":"CpuTaskFinished","task":{"node":"node-3","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
-{"time_s":0.73376,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-9","recipient":"node-3"}}
+{"time_s":0.73376,"message":{"type":"IBSent","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-9","recipient":"node-3","msg_size_bytes":304}}
 {"time_s":0.73876,"message":{"type":"CpuTaskFinished","task":{"node":"node-1","index":9},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-7-0"}}
 {"time_s":0.74176,"message":{"type":"CpuTaskFinished","task":{"node":"node-2","index":8},"task_type":"ValIB","cpu_time_s":0.050152,"wall_time_s":0.050152,"extra":"0-0-1"}}
 {"time_s":0.74676,"message":{"type":"IBReceived","id":"0-node-0-1","slot":0,"pipeline":4,"producer":"node-0","index":1,"sender":"node-9","recipient":"node-3"}}
