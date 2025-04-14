@@ -45,6 +45,7 @@ postulate
 
 Bytes = Word64
 SlotNo = Word64
+PipelineNo = Word64
 Time = Micro
 
 data NetworkAction : Type where
@@ -69,17 +70,24 @@ record Endorsement : Type where
 
 {-# COMPILE GHC Endorsement = data Endorsement (Endorsement) #-}
 
-data Event : Type where
-  Cpu : String → Time → String → Event
-  IBSent EBSent VTBundleSent RBSent IBReceived EBReceived VTBundleReceived RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → Maybe String → Maybe (List String) → Event
-  IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
-  IBGenerated : String → String → SlotNo → Maybe Bytes → Maybe Bytes → Maybe String → Event
-  EBGenerated : String → String → Word64 → Word64 → List BlockRef → Event
-  RBGenerated : String → Maybe String → Maybe Int → Word64 → Maybe Word64 → Maybe Endorsement → Maybe (List Endorsement) → Maybe Word64 → Maybe BlockRef → Event
-  VTBundleGenerated : String → String → Word64 → Word64 → Map String Word64 → Event
+postulate
+  Nullable : Type → Type
 
-{-# COMPILE GHC Event = data Event (Cpu | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived
-  | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
+{-# COMPILE GHC Nullable = type Nullable #-}
+
+data Event : Type where
+  Slot : String → SlotNo → Event
+  Cpu : String → Time → String → String → Event
+  NoIBGenerated NoEBGenerated NoVTBundleGenerated : String → SlotNo → Event
+  IBSent EBSent VTBundleSent RBSent IBReceived EBReceived VTBundleReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
+  RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
+  IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
+  IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
+  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → Event
+  RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
+  VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
+
+{-# COMPILE GHC Event = data Event (Slot | Cpu | NoIBGenerated | NoEBGenerated | NoVTBundleGenerated | IBSent | EBSent | VTBundleSent | RBSent | IBReceived | EBReceived | VTBundleReceived | RBReceived | IBEnteredState | EBEnteredState | VTBundleEnteredState | RBEnteredState | IBGenerated | EBGenerated | RBGenerated | VTBundleGenerated) #-}
 
 record TraceEvent : Type where
   field time_s : Time
@@ -147,7 +155,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
   record State : Type where
     field refs : AssocList String Blk
-          currentSlot : ℕ
 
   instance
     hhx : Hashable InputBlock (List ℕ)
@@ -163,37 +170,36 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   open State
 
   traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
-  traceEvent→action l record { message = Cpu _ _ _ ; time_s = t }
-    with trunc t ≟ suc (currentSlot l)
-  ... | yes p =
-    record l { currentSlot = suc (currentSlot l) }
-      , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (currentSlot l) , SLOT)) ∷ []
+  traceEvent→action l record { message = Slot p s }
+    with p ≟ SUT
+  ... | yes _ = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
   ... | no _ = l , []
+  traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
+  traceEvent→action l record { message = NoIBGenerated _ _ } = l , (inj₁ (No-IB-Role-Action , SLOT) ∷ [])
+  traceEvent→action l record { message = NoEBGenerated _ _ } = l , (inj₁ (No-EB-Role-Action , SLOT) ∷ [])
+  traceEvent→action l record { message = NoVTBundleGenerated _ _ } = l , (inj₁ (No-VT-Role-Action , SLOT) ∷ [])
   traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
   traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
   traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
   traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = IBReceived _ p _ _ (just i) _ }
+  traceEvent→action l record { message = IBReceived _ p _ _ i _ }
     with p ≟ SUT | refs l ⁉ i
   ... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
   ... | _ | _ = l , []
-  traceEvent→action l record { message = IBReceived _ _ _ _ nothing _ } = l , []
-  traceEvent→action l record { message = EBReceived _ p _ _ (just i) _ }
+  traceEvent→action l record { message = EBReceived _ p _ _ i _ }
     with p ≟ SUT | refs l ⁉ i
   ... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
   ... | _ | _ = l , []
-  traceEvent→action l record { message = EBReceived _ _ _ _ nothing _ } = l , []
-  traceEvent→action l record { message = VTBundleReceived _ p _ _ (just i) _ }
+  traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
     with p ≟ SUT | refs l ⁉ i
   ... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
   ... | _ | _ = l , []
-  traceEvent→action l record { message = VTBundleReceived _ _ _ _ nothing _ } = l , []
   traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
   traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
   traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
   traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
   traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
-  traceEvent→action l record { message = IBGenerated p i s _ _ _ }
+  traceEvent→action l record { message = IBGenerated p i s _ _ _ _}
     with p ≟ SUT
   ... | yes _ = l , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
   ... | no _  = let ib = record { header =
@@ -205,7 +211,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
                                   }
                                 ; body = record { txs = [] } } -- TODO: add transactions
                 in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
-  traceEvent→action l record { message = EBGenerated p i s _ ibs }
+  traceEvent→action l record { message = EBGenerated p i s _ _ ibs }
     with p ≟ SUT
   ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
   ... | no _ = let eb = record
@@ -217,12 +223,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
                           ; signature  = tt
                           }
                in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
-  traceEvent→action l record { message = VTBundleGenerated p i s _ vts }
+  traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts }
     with p ≟ SUT
   ... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
   ... | no _ = let vt = map (const tt) (elems vts)
                in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
-  traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ _ } = l , []
+  traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
 
   mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
   mapAccuml f s []       = s , []
@@ -236,7 +242,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
     verifyTrace : EventLog → ℕ
     verifyTrace l =
-      let s₀ = record { refs = [] ; currentSlot = 0 }
+      let s₀ = record { refs = [] }
           αs = L.reverse $ L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
       in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
 
