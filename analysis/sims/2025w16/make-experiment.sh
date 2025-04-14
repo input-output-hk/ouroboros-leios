@@ -56,7 +56,7 @@ cat << EOI >> "$RUN_DIR/run.sh"
 
 for f in rbgen ebgen ibgen cpus receipts
 do
-  ../../queries/$SIMULATOR/\$f.sh sim.log \$f.csv.gz
+  ../../queries/\$f.sh sim.log \$f.csv.gz
 done
 gzip -9f sim.log
 
