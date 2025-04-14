@@ -55,9 +55,10 @@ esac
 
 cat << EOI >> "$RUN_DIR/run.sh"
 
-for f in rbgen ebgen ibgen cpus receipts
+for f in ../../queries/*.sh
 do
-  ../../queries/\$f.sh sim.log \$f.csv.gz
+  n=\$(basename \${f%%.sh})
+  \$f sim.log \$n.csv.gz
 done
 gzip -9f sim.log
 
