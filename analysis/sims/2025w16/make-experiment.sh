@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env nix-shell
+#!nix-shell -i bash -p gzip remarshal
 
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
