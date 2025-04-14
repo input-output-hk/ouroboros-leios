@@ -4,10 +4,87 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Mon, 31 Mar 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 07 Apr 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary - April 7, 2025]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary</guid>
+            <pubDate>Mon, 07 Apr 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[This week, the team continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.]]></description>
+            <content:encoded><![CDATA[<p>This week, the team continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#simulation-improvements">​</a></h3>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#haskell-simulation">​</a></h4>
+<ul>
+<li>Started specification of a new relay protocol for IB header diffusion without body</li>
+<li>Improved the shared log format by removing redundancies and harmonizing naming</li>
+<li>Added support for extra events required by conformance testing, including <code>SlotEvent</code> and <code>NoBlockEvent</code>
+<ul>
+<li>These events can be enabled using the <code>--conformance-events</code> flag with <code>--shared-log-format</code>.</li>
+</ul>
+</li>
+</ul>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#rust-simulation">​</a></h4>
+<ul>
+<li>Updated traces to match the new standardized trace format</li>
+<li>Fixed a critical bug related to CPU scheduling where nodes were using more cores than allocated.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-workflow-optimization">Analysis workflow optimization<a class="hash-link" aria-label="Direct link to Analysis workflow optimization" title="Direct link to Analysis workflow optimization" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#analysis-workflow-optimization">​</a></h3>
+<p>The team significantly improved the workflow for analyzing both Haskell and Rust simulations:</p>
+<ul>
+<li>Replaced MongoDB with more efficient <code>jq</code> queries using map-reduce operations</li>
+<li>Created reusable library functions for plotting with R</li>
+<li>Revised and streamlined scripts for creating, executing, and analyzing simulations</li>
+<li>Made the Jupyter notebook for analyses more generic and reusable</li>
+<li>Successfully tested the new workflow on tag <code>leios-2025w15</code></li>
+</ul>
+<p>These improvements will enable faster setup and execution of future simulation experiments, with quicker turnaround times for analysis. During this optimization work, several discrepancies between the Haskell and Rust simulations were identified and documented as GitHub issues for future investigation.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="edinburgh-workshop-recaps">Edinburgh Workshop Recaps<a class="hash-link" aria-label="Direct link to Edinburgh Workshop Recaps" title="Direct link to Edinburgh Workshop Recaps" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#edinburgh-workshop-recaps">​</a></h3>
+<p>The Edinburgh Workshop documentation has been made available, covering key discussions and decisions:</p>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-1-highlights">Day 1 Highlights<a class="hash-link" aria-label="Direct link to Day 1 Highlights" title="Direct link to Day 1 Highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-1-highlights">​</a></h4>
+<ul>
+<li>Explored ledger design options comparing Labeled UTxOs (Explicit Shards) vs Accounts (Implicit Shards) approaches</li>
+<li>Discussed conformance testing strategies including QuickCheck Dynamic and Trace Verification approaches</li>
+<li>Analyzed critical edge cases for user onboarding and system properties</li>
+</ul>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-2-highlights">Day 2 Highlights<a class="hash-link" aria-label="Direct link to Day 2 Highlights" title="Direct link to Day 2 Highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-2-highlights">​</a></h4>
+<ul>
+<li>Detailed analysis of Leios node costs at different TPS levels</li>
+<li>Key findings on resource usage:<!-- -->
+<ul>
+<li>At 10 TPS: 1.8x increase in egress and 6x increase in compute compared to Praos</li>
+<li>At 1K TPS: Significant scaling improvements with better resource efficiency</li>
+</ul>
+</li>
+<li>Recommendations for potential integration with Peras, particularly for voting mechanism optimization</li>
+<li>Discussion of performance characteristics at both high and low throughput levels</li>
+</ul>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="day-3-highlights">Day 3 Highlights<a class="hash-link" aria-label="Direct link to Day 3 Highlights" title="Direct link to Day 3 Highlights" href="https://leios.cardano-scaling.org/news/2025/04/07/weekly-progress-summary#day-3-highlights">​</a></h4>
+<ul>
+<li>In-depth discussion of optimistic ledger state references, exploring three main approaches:<!-- -->
+<ol>
+<li>RB Reference: Highest security but highest latency</li>
+<li>EB Reference: Balanced approach with medium security and latency</li>
+<li>EB-DAG: Advanced approach using directed acyclic graph structure</li>
+</ol>
+</li>
+<li>Key advantages of the EB-DAG approach:<!-- -->
+<ul>
+<li>Achieves low latency while maintaining security</li>
+<li>Provides strong inclusion guarantees for EBs</li>
+<li>Enables efficient state management and reconstruction</li>
+<li>Creates complete, verifiable chain history</li>
+</ul>
+</li>
+<li>Implementation considerations for state management and block ordering in the EB-DAG approach</li>
+</ul>
+<p>For detailed information, see the full workshop recaps in the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/docs/workshop" target="_blank" rel="noopener noreferrer">Leios documentation</a>.</p>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – March 31, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/03/31/weekly-progress-summary</link>
@@ -1058,31 +1135,6 @@ simulation.</li>
 <ul>
 <li><a href="https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing" target="_blank" rel="noopener noreferrer">Meeting Recording</a></li>
 <li><a href="https://docs.google.com/presentation/d/11LHQeUuv-TQfiy9GwXkrffSimFjSq8tdTB8qIB-Pk3U/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Meeting Slides</a></li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary - November 18, 2024]]></title>
-            <link>https://leios.cardano-scaling.org/news/2024/11/18/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2024/11/18/weekly-progress-summary</guid>
-            <pubDate>Mon, 18 Nov 2024 00:00:00 GMT</pubDate>
-            <description><![CDATA[Structuring Repository for Open-source]]></description>
-            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="structuring-repository-for-open-source">Structuring Repository for Open-source<a class="hash-link" aria-label="Direct link to Structuring Repository for Open-source" title="Direct link to Structuring Repository for Open-source" href="https://leios.cardano-scaling.org/news/2024/11/18/weekly-progress-summary#structuring-repository-for-open-source">​</a></h2>
-<ul>
-<li>Added basic instructions for Code of Conduct, Contribution guidelines, and
-coding standards.</li>
-<li>Restructured code to merge <code>leios</code> and <code>leios-sim</code> packages.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="designing-test-environment">Designing Test Environment<a class="hash-link" aria-label="Direct link to Designing Test Environment" title="Direct link to Designing Test Environment" href="https://leios.cardano-scaling.org/news/2024/11/18/weekly-progress-summary#designing-test-environment">​</a></h2>
-<ul>
-<li>Sketched ideas for exploring Leios behavior with respect to networking.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="leios-meeting">Leios Meeting<a class="hash-link" aria-label="Direct link to Leios Meeting" title="Direct link to Leios Meeting" href="https://leios.cardano-scaling.org/news/2024/11/18/weekly-progress-summary#leios-meeting">​</a></h2>
-<ul>
-<li>Discussed network simulation and ΔQ model of the pipeline.</li>
-<li>Gathered numbers on network latency and throughput.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
