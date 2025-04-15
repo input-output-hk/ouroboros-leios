@@ -1,0 +1,2 @@
+simulator,label,network,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,leios-stage-length-slots
+rust,default,100-nodes,16.0,65536,1.5,10
