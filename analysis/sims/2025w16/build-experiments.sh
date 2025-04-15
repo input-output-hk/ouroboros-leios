@@ -8,7 +8,7 @@ for SIMULATOR in rust haskell
 do
   for LABEL in default
   do
-    for NETWORK in 100-nodes
+    for NETWORK in 100-nodes 100-nodes-4cpus
     do
       for IB_RATE in 0.5 1.0 2.0 4.0 8.0 16.0
       do
