@@ -205,12 +205,11 @@ For any node type, we calculate egress using these formulas:
 
 5. **Vote Egress**:
 
-   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times N_{ebs\_per\_stage} \times P_{total}$$
+   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times P_{total}$$
    where:
    - $N_{ebs}$ = Number of EBs per month (197,100)
    - $V$ = Vote size in bytes
    - $N_{voters}$ = Number of voters (600)
-   - $N_{ebs\_per\_stage}$ = EBs per stage (1.5)
 
 6. **RB Header Egress**:
 
