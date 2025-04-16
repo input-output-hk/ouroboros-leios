@@ -22,11 +22,12 @@ Cardano Mainnet, April 2025.
 | ----------------------- | ---------------------- | ------------------------- |
 | Epoch length            | 5 days (432,000 slots) | Protocol parameter        |
 | Active slot coefficient | 0.05                   | Protocol parameter        |
-| Blocks per epoch        | 21,600                 | $432,000 \times 0.05$     |
-| Epochs per month        | ~6.0833                | $\frac{365}{5 \times 12}$ |
-| **Blocks per month**    | **131,400**            | $21,600 \times 6.0833$    |
+| Blocks per epoch        | 21,600                 | $$432,000 \times 0.05$$   |
+| Epochs per month        | ~6.0833                | $$\frac{365}{5 \times 12}$$ |
+| **Blocks per month**    | **131,400**            | $$21,600 \times 6.0833$$   |
 
-> [!Note] On Cardano Mainnet one slot equals the duration of one second.
+> [!Note] 
+> On Cardano Mainnet one slot equals the duration of one second.
 
 ### Network Topology Assumptions
 
