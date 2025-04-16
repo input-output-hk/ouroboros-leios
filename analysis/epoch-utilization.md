@@ -92,7 +92,7 @@ select
 ```
 
 | Reserve depletion [%/year] |
-|----------------------------|
+|---------------------------:|
 |                    `12.81` |
 
 At this rate, the Reserve (and hence the rewards from it) will drop to half of its current amount in five years.
