@@ -135,8 +135,8 @@ but with its unique block types and propagation model.
 
 > [!NOTE]
 > The EB body size consists only of the IB reference (32 bytes per reference).
-> The RB body in Leios contains only a certificate, not the full 88 KiB as in
-> Praos.
+> The RB body in Leios contains exactly one certificate of size 7 * 1024 = 7,168 bytes,
+> not the full 88 KiB as in Praos.
 
 ### Blocks per Month Calculation
 
@@ -221,9 +221,11 @@ For any node type, we calculate egress using these formulas:
 
 7. **RB Body Egress**:
 
-   $$E_{rb\_bodies} = N_{rbs} \times B_{rb} \times P_{requesting}$$
+   $$E_{rb\_bodies} = N_{rbs} \times C_{rb} \times P_{requesting}$$
    where:
-   - $B_{rb}$ = RB body size in bytes
+   - $N_{rbs}$ = Number of RBs per month
+   - $C_{rb}$ = Certificate size (7,168 bytes)
+   - $P_{requesting}$ = Number of peers requesting bodies
 
 ### Edge Node Egress Calculation
 
@@ -337,14 +339,16 @@ other components contribute less than 1% each to the total traffic.
 > comparison. However, it's crucial to note that different components scale
 > differently with higher IB/s rates:
 >
-> - Vote traffic stays at ~330.41 GiB/month
-> - IB body traffic to edge nodes increases to ~21.65 TiB/month (36.09 GiB
->   × 600)
-> - IB body traffic to relay nodes increases to ~14.44 TiB/month (24.06 GiB
->   × 600)
+> | IB/s Rate | Vote Traffic | IB Body to Edge Nodes | IB Body to Relay Nodes | Total Traffic |
+> |-----------|--------------|------------------------|------------------------|---------------|
+> | 0.05      | 330.41 GiB (82.7%) | 36.09 GiB (9.0%) | 24.06 GiB (6.0%) | 399.73 GiB |
+> | 1         | 330.41 GiB (21.4%) | 0.72 TiB (47.7%) | 0.48 TiB (31.8%) | 1.51 TiB |
+> | 10        | 330.41 GiB (2.6%) | 7.22 TiB (59.1%) | 4.81 TiB (39.4%) | 12.22 TiB |
+> | 20        | 330.41 GiB (1.3%) | 14.44 TiB (59.9%) | 9.62 TiB (39.9%) | 24.11 TiB |
+> | 30        | 330.41 GiB (0.9%) | 21.65 TiB (60.1%) | 14.44 TiB (40.1%) | 36.01 TiB |
 >
-> At this rate, IB body traffic alone would be about 36 TiB/month, making it the
-> dominant traffic component and far exceeding the constant vote traffic.
+> As shown above, at 30 IB/s (600 times the baseline rate), IB body traffic dominates at over 99% of the total traffic,
+> while vote traffic—initially the largest component at 0.05 IB/s—becomes less than 1% of the total.
 
 ### Monthly Traffic per Node
 
