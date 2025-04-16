@@ -144,10 +144,10 @@ struct NodeLeiosState {
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
-    ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
+    ibs_by_pipeline: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
-    ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
-    earliest_eb_cert_times_by_slot: BTreeMap<u64, Timestamp>,
+    ebs_by_pipeline: BTreeMap<u64, Vec<EndorserBlockId>>,
+    earliest_eb_cert_times_by_pipeline: BTreeMap<u64, Timestamp>,
     votes_to_generate: BTreeMap<u64, usize>,
     votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
@@ -572,17 +572,18 @@ impl Node {
     fn generate_endorser_blocks(&mut self, slot: u64) {
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
+                let pipeline = self.slot_to_pipeline(slot) + 1;
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot) + 1,
+                    pipeline,
                     producer: self.id,
                 });
-                let ibs = self.select_ibs_for_eb(slot);
-                let ebs = self.select_ebs_for_eb(slot);
+                let ibs = self.select_ibs_for_eb(pipeline);
+                let ebs = self.select_ebs_for_eb(pipeline);
                 let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot) + 1,
+                    pipeline,
                     producer: self.id,
                     bytes,
                     ibs,
@@ -628,13 +629,10 @@ impl Node {
             return false;
         };
         // When we vote, we vote for EBs which were sent at the start of the prior stage.
-        let eb_slot = match slot.checked_sub(self.sim_config.stage_length) {
-            Some(s) => s - (s % self.sim_config.stage_length),
-            None => {
-                return false;
-            }
+        let Some(eb_pipeline) = (slot / self.sim_config.stage_length).checked_sub(1) else {
+            return false;
         };
-        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
+        let Some(ebs) = self.leios.ebs_by_pipeline.get(&eb_pipeline) else {
             return false;
         };
         let mut ebs = ebs.clone();
@@ -815,7 +813,7 @@ impl Node {
         })
     }
 
-    fn choose_endorsed_block_from_slot(&self, slot: u64) -> Option<EndorserBlockId> {
+    fn choose_endorsed_block_from_pipeline(&self, pipeline: u64) -> Option<EndorserBlockId> {
         // an EB is eligible for endorsement if it has this many votes
         let vote_threshold = self.sim_config.vote_threshold;
 
@@ -824,8 +822,8 @@ impl Node {
         //  - the number of votes (more votes is better)
         let (&block, _) = self
             .leios
-            .ebs_by_slot
-            .get(&slot)
+            .ebs_by_pipeline
+            .get(&pipeline)
             .iter()
             .flat_map(|ids| ids.iter())
             .filter_map(|eb| {
@@ -1093,7 +1091,7 @@ impl Node {
 
     fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id;
-        let slot = ib.header.id.slot;
+        let pipeline = ib.header.id.pipeline;
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
@@ -1106,7 +1104,11 @@ impl Node {
         {
             return Ok(());
         }
-        self.leios.ibs_by_slot.entry(slot).or_default().push(id);
+        self.leios
+            .ibs_by_pipeline
+            .entry(pipeline)
+            .or_default()
+            .push(id);
 
         for peer in &self.consumers {
             if *peer == from {
@@ -1184,7 +1186,11 @@ impl Node {
         {
             return Ok(());
         }
-        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
+        self.leios
+            .ebs_by_pipeline
+            .entry(id.pipeline)
+            .or_default()
+            .push(id);
         // We haven't seen this EB before, so propagate it to our neighbors
         for peer in &self.consumers {
             if *peer == from {
@@ -1244,8 +1250,8 @@ impl Node {
             *eb_votes += count;
             if *eb_votes as u64 > self.sim_config.vote_threshold {
                 self.leios
-                    .earliest_eb_cert_times_by_slot
-                    .entry(eb.slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .entry(eb.pipeline)
                     .or_insert(self.clock.now());
             }
         }
@@ -1302,8 +1308,8 @@ impl Node {
 
         let id = ib.header.id;
         self.leios
-            .ibs_by_slot
-            .entry(ib.header.id.slot)
+            .ibs_by_pipeline
+            .entry(ib.header.id.pipeline)
             .or_default()
             .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
@@ -1313,45 +1319,40 @@ impl Node {
         Ok(())
     }
 
-    fn select_ibs_for_eb(&mut self, slot: u64) -> Vec<InputBlockId> {
-        let config = &self.sim_config;
-        let Some(earliest_slot) = slot.checked_sub(config.stage_length * 3) else {
-            return vec![];
-        };
-        let mut ibs = vec![];
-        for slot in earliest_slot..(earliest_slot + config.stage_length) {
-            let Some(slot_ibs) = self.leios.ibs_by_slot.remove(&slot) else {
-                continue;
-            };
-            ibs.extend(slot_ibs);
-        }
-        ibs
+    fn select_ibs_for_eb(&mut self, pipeline: u64) -> Vec<InputBlockId> {
+        self.leios
+            .ibs_by_pipeline
+            .get(&pipeline)
+            .cloned()
+            .unwrap_or_default()
     }
 
-    fn select_ebs_for_eb(&self, slot: u64) -> Vec<EndorserBlockId> {
-        let Some(referenced_slots) = self.slots_referenced_by_ebs(slot) else {
+    fn select_ebs_for_eb(&self, pipeline: u64) -> Vec<EndorserBlockId> {
+        let Some(referenced_pipelines) = self.pipelines_referenced_by_ebs(pipeline) else {
             return vec![];
         };
 
         // include one certified EB from each of these pipelines
         let mut ebs = vec![];
-        for pipeline_slot in referenced_slots {
-            if let Some(eb) = self.choose_endorsed_block_from_slot(pipeline_slot) {
+        for referenced_pipeline in referenced_pipelines {
+            if let Some(eb) = self.choose_endorsed_block_from_pipeline(referenced_pipeline) {
                 ebs.push(eb);
             }
         }
         ebs
     }
 
-    fn slots_referenced_by_ebs(&self, slot: u64) -> Option<impl Iterator<Item = u64> + use<'_>> {
+    fn pipelines_referenced_by_ebs(
+        &self,
+        pipeline: u64,
+    ) -> Option<impl Iterator<Item = u64> + use<'_>> {
         if self.sim_config.variant != LeiosVariant::Full {
             // EBs don't reference other EBs unless we're running Full Leios
             return None;
         }
 
-        let current_pipeline = slot / self.sim_config.stage_length;
         // The newest pipeline to include EBs from is i-3, where i is the current pipeline.
-        let Some(newest_included_pipeline) = current_pipeline.checked_sub(3) else {
+        let Some(newest_included_pipeline) = pipeline.checked_sub(3) else {
             // If there haven't been 3 pipelines yet, just don't recurse.
             return None;
         };
@@ -1360,14 +1361,11 @@ impl Node {
         // η is the "quality parameter" (expected block rate), and L is stage length.
         let old_pipelines =
             (3 * self.sim_config.praos_chain_quality).div_ceil(self.sim_config.stage_length);
-        let oldest_included_pipeline = current_pipeline
+        let oldest_included_pipeline = pipeline
             .checked_sub(old_pipelines)
             .unwrap_or(newest_included_pipeline);
 
-        Some(
-            (oldest_included_pipeline..=newest_included_pipeline)
-                .map(|i| i * self.sim_config.stage_length),
-        )
+        Some(oldest_included_pipeline..=newest_included_pipeline)
     }
 
     fn finish_generating_eb(&mut self, eb: EndorserBlock) -> Result<()> {
@@ -1378,7 +1376,11 @@ impl Node {
         self.leios
             .ebs
             .insert(id, EndorserBlockState::Received(eb.clone()));
-        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
+        self.leios
+            .ebs_by_pipeline
+            .entry(id.pipeline)
+            .or_default()
+            .push(id);
         for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
         }
@@ -1386,41 +1388,19 @@ impl Node {
     }
 
     fn should_vote_for(&self, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
-        let stage_length = self.sim_config.stage_length;
-
-        let ib_slot_start = match eb.pipeline.checked_sub(4) {
-            Some(x) => x * stage_length,
-            None => {
-                // The IBs for this EB were "generated" before the sim began.
-                // It's valid iff there are no IBs.
-                return if eb.ibs.is_empty() {
-                    Ok(())
-                } else {
-                    Err(NoVoteReason::ExtraIB)
-                };
-            }
-        };
-        let ib_slot_end = ib_slot_start + stage_length;
-        let ib_slot_range = ib_slot_start..ib_slot_end;
-
         let mut ib_set = HashSet::new();
         for ib in &eb.ibs {
             if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
                 return Err(NoVoteReason::MissingIB);
             }
-            if !ib_slot_range.contains(&ib.slot) {
+            if ib.pipeline != eb.pipeline {
                 return Err(NoVoteReason::InvalidSlot);
             }
             ib_set.insert(*ib);
         }
-        for ib_slot in ib_slot_range {
-            for ib in self
-                .leios
-                .ibs_by_slot
-                .get(&ib_slot)
-                .iter()
-                .flat_map(|f| f.iter())
-            {
+
+        if let Some(ibs) = self.leios.ibs_by_pipeline.get(&eb.pipeline) {
+            for ib in ibs {
                 if !ib_set.contains(ib) {
                     return Err(NoVoteReason::ExtraIB);
                 }
@@ -1428,19 +1408,20 @@ impl Node {
         }
 
         // If this EB is meant to reference other EBs, validate that it references whatever it needs
-        if let Some(expected_referenced_slots) = self.slots_referenced_by_ebs(eb.slot) {
-            let actual_referenced_slots: HashSet<u64> = eb.ebs.iter().map(|id| id.slot).collect();
-            for expected_slot in expected_referenced_slots {
+        if let Some(expected_referenced_pipelines) = self.pipelines_referenced_by_ebs(eb.pipeline) {
+            let actual_referenced_pipelines: HashSet<u64> =
+                eb.ebs.iter().map(|id| id.pipeline).collect();
+            for expected_pipeline in expected_referenced_pipelines {
                 let Some(certified_at) = self
                     .leios
-                    .earliest_eb_cert_times_by_slot
-                    .get(&expected_slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .get(&expected_pipeline)
                 else {
                     // We don't require an EB referenced from this pipeline if none of that pipeline's EBs have been certified yet,
                     continue;
                 };
 
-                let last_pipeline_slot = expected_slot + self.sim_config.stage_length - 1;
+                let last_pipeline_slot = (expected_pipeline + 1) * self.sim_config.stage_length - 1;
                 let cutoff = Timestamp::from_secs(last_pipeline_slot)
                     .checked_sub_duration(self.sim_config.header_diffusion_time)
                     .unwrap_or_default();
@@ -1449,7 +1430,7 @@ impl Node {
                     continue;
                 }
 
-                if !actual_referenced_slots.contains(&expected_slot) {
+                if !actual_referenced_pipelines.contains(&expected_pipeline) {
                     return Err(NoVoteReason::MissingEB);
                 }
             }
@@ -1481,8 +1462,8 @@ impl Node {
             *eb_votes += count;
             if *eb_votes as u64 > self.sim_config.vote_threshold {
                 self.leios
-                    .earliest_eb_cert_times_by_slot
-                    .entry(eb.slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .entry(eb.pipeline)
                     .or_insert(self.clock.now());
             }
         }
