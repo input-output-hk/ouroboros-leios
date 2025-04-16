@@ -1,63 +1,100 @@
 # Egress cost estimation per node
 
-> [!Note]
-> **100% filled blocks assumption:**
->
-> This analysis assumes fully utilized block space (filled blocks) for both Ouroboros Praos and Leios protocols. In practice, block utilization may vary, but this provides a conservative upper bound for egress traffic estimation. Transaction sizes are based on mainnet data from Epoch 500 onwards, where average transaction size is ~1,400 bytes.
+Network egress is metered for most cloud providers even though many have some monthly budget that's free.
+In the following example calculation, we try to be as precise as possible given today's [p2p default configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json) of the node.
 
 ## Ouroboros Praos
 
-### Back of envelope calculation
+We start with Ouroboros Praos to have a baseline. The following numbers are from Cardano Mainnet, April 2025.
 
-#### Blocks/ month
-- epoch length 5 days (432,000 slots)
-- active slot coefficient 0.05
-- yielding 21,600 blocks per epoch
-- ~6.0833 epochs per month (365/5/12)
-- **131,400 blocks per month**
+| Component  | Size (bytes) | Size (KiB) |
+|------------|--------------|------------|
+| Header (H) | 1,024        | 1 |
+| Body   (B) | 90,112       | 88 |
 
-#### Total block data
-- block size 90,112 bytes (88 KiB)
-- average transaction size: 1,400 bytes (based on mainnet data)
-- average transactions per block: ~13.5 (based on mainnet data)
-- **131,400 blocks x 90,112 bytes = 11,840,724,480 bytes ~11.03 GiB**
+### Blocks per Month Calculation
+
+| Parameter | Value | Formula |
+|-----------|-------|---------|
+| Epoch length | 5 days (432,000 slots) | Given |
+| Active slot coefficient | 0.05 | Given |
+| Blocks per epoch | 21,600 | $432,000 \times 0.05$ |
+| Epochs per month | ~6.0833 | $\frac{365}{5 \times 12}$ |
+| **Blocks per month** | **131,400** | $21,600 \times 6.0833$ |
 
 > [!Note]
->
-> For reference, during epoch 500, blocks had an average size of 18.9 KiB
-> which is ~21.5% of what's available.
+> On Cardano Mainnet one slot equals the duration of one second.
 
-#### Egress traffic for p2p block propagation
-- Peers (P): assume:
-```
-    (A) 20 peers from TargetNumberOfActivePeers default configuration
-    (B) ~35 downstream peers per node
-```
-- Block header size: 1,024 bytes (1 KiB)
-- Block body size: 90,112 bytes (88 KiB)
-- Propagation model: 100% header propagation, 25% body requests
+### Network Topology Assumptions
 
-#### Node traffic
-```
-(A) Headers: 131,400 blocks x 1,024 bytes x 20 peers = 2.51 GiB
-    Bodies: 131,400 blocks x 90,112 bytes x 5 peers = 55.13 GiB
-    Total: 57.64 GiB
+For our calculations, we consider a network with two types of nodes:
+- Relay nodes: Connect to multiple edge nodes and other relays
+- Edge nodes: Connect to relay nodes but not to other edge nodes
 
-(B) Headers: 131,400 blocks x 1,024 bytes x 35 peers = 4.39 GiB
-    Bodies: 131,400 blocks x 90,112 bytes x 9 peers = 99.23 GiB
-    Total: 103.62 GiB
-```
+We make the following assumptions about the network:
+- [Default p2p configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json): 20 peers per node
+- Network ratio: ~3 edge nodes per relay node
+- Block propagation model:
+  - Headers: Propagated to 100% of peers
+  - Bodies: Requested by ~10% of peers (2 out of 20)
 
-- additional traffic from transactions (5-10 GiB?) and consensus (~1-2 GiB?)
+### Base Egress Formulas
 
-#### Final total egress per month/ node
-```
-(A) Low end: 57.64 GiB + 5 GiB + 1 GiB = 63.64 GiB
-    High end: 57.64 GiB + 10 GiB + 2 GiB = 69.64 GiB
+For any node type, we can calculate egress using these formulas:
 
-(B) Low end: 103.62 GiB + 5 GiB + 1 GiB = 109.62 GiB
-    High end: 103.62 GiB + 10 GiB + 2 GiB = 115.62 GiB
-```
+1. **Header Egress**:
+   $$E_{headers} = N_{blocks} \times H \times P_{total}$$
+   where:
+   - $N_{blocks}$ = Number of blocks per month
+   - $H$ = Header size in bytes
+   - $P_{total}$ = Total number of peers
+
+2. **Body Egress**:
+   $$E_{bodies} = N_{blocks} \times B \times P_{requesting}$$
+   where:
+   - $B$ = Body size in bytes
+   - $P_{requesting}$ = Number of peers requesting bodies
+
+### Edge Node Egress Calculation
+
+Edge nodes have minimal egress compared to relay nodes. Their egress consists of:
+1. Transaction data sent to relay nodes
+2. Block body responses when requested
+
+Using our base formulas with a typical edge node configuration:
+- Total peers ($P_{total}$) = 1 (single relay connection)
+- Requesting peers ($P_{requesting}$) = 1 (when relay requests body)
+
+The monthly egress for a typical edge node:
+$$E_{edge} = N_{blocks} \times B \approx 131,400 \times 90,112 \text{ bytes} \approx 11.03 \text{ GiB/month}$$
+
+This forms our baseline for minimal node egress in a Praos network.
+
+### Relay Node Egress Calculation
+
+Using our assumptions:
+- Total peers ($P_{total}$) = 20
+- Edge nodes per relay = 3
+- Relay peers = 20
+- Requesting relay peers = 2
+
+1. **Header egress to edge nodes**:
+   $$E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.39 \text{ GiB}$$
+
+2. **Body egress to edge nodes**:
+   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 33.09 \text{ GiB}$$
+
+3. **Header egress to relay nodes**:
+   $$E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes} \approx 2.51 \text{ GiB}$$
+
+4. **Body egress to relay nodes**:
+   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.06 \text{ GiB}$$
+
+5. **Total relay node egress**:
+   $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
+   $$E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}$$
+
+This shows how relay nodes handle significantly more egress than edge nodes due to their role in the network topology.
 
 ## Ouroboros Leios
 
