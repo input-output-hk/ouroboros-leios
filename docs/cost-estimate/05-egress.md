@@ -114,9 +114,7 @@ Using our assumptions:
 
    $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
 
-$$
-E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}
-$$
+$$E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}$$
 
 ## Ouroboros Leios
 
