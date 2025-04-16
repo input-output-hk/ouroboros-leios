@@ -18,13 +18,13 @@ Cardano Mainnet, April 2025.
 
 ### Blocks per Month Calculation
 
-| Parameter               | Value                  | Formula                   |
-| ----------------------- | ---------------------- | ------------------------- |
-| Epoch length            | 5 days (432,000 slots) | Protocol parameter        |
-| Active slot coefficient | 0.05                   | Protocol parameter        |
-| Blocks per epoch        | 21,600                 | $$432,000 \times 0.05$$   |
+| Parameter               | Value                  | Formula                     |
+| ----------------------- | ---------------------- | --------------------------- |
+| Epoch length            | 5 days (432,000 slots) | Protocol parameter          |
+| Active slot coefficient | 0.05                   | Protocol parameter          |
+| Blocks per epoch        | 21,600                 | $$432,000 \times 0.05$$     |
 | Epochs per month        | ~6.0833                | $$\frac{365}{5 \times 12}$$ |
-| **Blocks per month**    | **131,400**            | $$21,600 \times 6.0833$$   |
+| **Blocks per month**    | **131,400**            | $$21,600 \times 6.0833$$    |
 
 > [!NOTE]
 > On Cardano Mainnet one slot equals the duration of one second.
@@ -134,9 +134,9 @@ but with its unique block types and propagation model.
 | Ranking Block (RB) Body       | 7,168        | 7          |
 
 > [!NOTE]
-> The EB body size consists only of the IB reference (32 bytes per
-> reference). The RB body in Leios contains only a certificate, not the full 88
-> KiB as in Praos.
+> The EB body size consists only of the IB reference (32 bytes per reference).
+> The RB body in Leios contains only a certificate, not the full 88 KiB as in
+> Praos.
 
 ### Blocks per Month Calculation
 
@@ -205,9 +205,9 @@ For any node type, we calculate egress using these formulas:
 
 5. **Vote Egress**:
 
-   $$E_{votes} = N_{stages} \times V \times N_{voters} \times N_{ebs\_per\_stage} \times P_{total}$$
+   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times N_{ebs\_per\_stage} \times P_{total}$$
    where:
-   - $N_{stages}$ = Number of stages per month
+   - $N_{ebs}$ = Number of EBs per month (197,100)
    - $V$ = Vote size in bytes
    - $N_{voters}$ = Number of voters (600)
    - $N_{ebs\_per\_stage}$ = EBs per stage (1.5)
@@ -245,143 +245,99 @@ Using our assumptions:
 
 1. **IB header egress to edge nodes**:
 
-   $$
-   E_{ib\_headers}^{edge} = 131,400 \times 304 \times 3 = 119,825,280 \text{ bytes} \approx 0.11 \text{ GiB}
-   $$
+   $$E_{ib\_headers}^{edge} = 131,400 \times 304 \times 3 = 119,825,280 \text{ bytes} \approx 0.112 \text{ GiB}$$
 
 2. **IB body egress to edge nodes**:
 
-   $$
-   E_{ib\_bodies}^{edge} = 131,400 \times 98,304 \times 3 = 38,747,566,080 \text{ bytes} \approx 36.09 \text{ GiB}
-   $$
+   $$E_{ib\_bodies}^{edge} = 131,400 \times 98,304 \times 3 = 38,747,566,080 \text{ bytes} \approx 36.09 \text{ GiB}$$
 
 3. **EB header egress to edge nodes**:
 
-   $$
-   E_{eb\_headers}^{edge} = 197,100 \times 240 \times 3 = 141,912,000 \text{ bytes} \approx 0.13 \text{ GiB}
-   $$
+   $$E_{eb\_headers}^{edge} = 197,100 \times 240 \times 3 = 141,912,000 \text{ bytes} \approx 0.132 \text{ GiB}$$
 
 4. **EB body egress to edge nodes**:
 
-   $$
-   E_{eb\_bodies}^{edge} = 197,100 \times 32 \times 3 = 18,921,600 \text{ bytes} \approx 0.02 \text{ GiB}
-   $$
+   $$E_{eb\_bodies}^{edge} = 197,100 \times 32 \times 3 = 18,921,600 \text{ bytes} \approx 0.018 \text{ GiB}$$
 
 5. **RB header egress to edge nodes**:
 
-   $$
-   E_{rb\_headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,430,400 \text{ bytes} \approx 0.38 \text{ GiB}
-   $$
+   $$E_{rb\_headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,939,200 \text{ bytes} \approx 0.376 \text{ GiB}$$
 
 6. **RB body egress to edge nodes**:
 
-   $$
-   E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,825,395,200 \text{ bytes} \approx 2.63 \text{ GiB}
-   $$
+   $$E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,827,571,200 \text{ bytes} \approx 2.633 \text{ GiB}$$
 
 Total relay-to-edge traffic:
 
-$$
-\approx 0.11 + 36.09 + 0.13 + 0.02 + 0.38 + 2.63 \approx 37.50 \text{ GiB/month}
-$$
+$$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.633 \approx 39.36 \text{ GiB/month}$$
 
 #### Relay-to-Relay Traffic
 
 1. **IB header egress to relay nodes**:
 
-   $$
-   E_{ib\_headers}^{relay} = 131,400 \times 304 \times 20 = 798,835,200 \text{ bytes} \approx 0.74 \text{ GiB}
-   $$
+   $$E_{ib\_headers}^{relay} = 131,400 \times 304 \times 20 = 798,835,200 \text{ bytes} \approx 0.744 \text{ GiB}$$
 
 2. **IB body egress to relay nodes**:
 
-   $$
-   E_{ib\_bodies}^{relay} = 131,400 \times 98,304 \times 2 = 25,831,710,720 \text{ bytes} \approx 24.06 \text{ GiB}
-   $$
+   $$E_{ib\_bodies}^{relay} = 131,400 \times 98,304 \times 2 = 25,831,711,200 \text{ bytes} \approx 24.06 \text{ GiB}$$
 
 3. **EB header egress to relay nodes**:
 
-   $$
-   E_{eb\_headers}^{relay} = 197,100 \times 240 \times 20 = 946,080,000 \text{ bytes} \approx 0.88 \text{ GiB}
-   $$
+   $$E_{eb\_headers}^{relay} = 197,100 \times 240 \times 20 = 946,080,000 \text{ bytes} \approx 0.881 \text{ GiB}$$
 
 4. **EB body egress to relay nodes**:
 
-   $$
-   E_{eb\_bodies}^{relay} = 197,100 \times 32 \times 2 = 12,614,400 \text{ bytes} \approx 0.01 \text{ GiB}
-   $$
+   $$E_{eb\_bodies}^{relay} = 197,100 \times 32 \times 2 = 12,614,400 \text{ bytes} \approx 0.012 \text{ GiB}$$
 
 5. **Vote egress to relay nodes**:
 
-   $$
-   E_{votes}^{relay} = 131,400 \times 150 \times 600 \times 1.5 \times 20 = 354,060,000,000 \text{ bytes} \approx 329.80 \text{ GiB}
-   $$
+   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 20 = 354,780,000,000 \text{ bytes} \approx 330.41 \text{ GiB}$$
 
 6. **RB header egress to relay nodes**:
 
-   $$
-   E_{rb\_headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,689,587,200 \text{ bytes} \approx 2.51 \text{ GiB}
-   $$
+   $$E_{rb\_headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,689,536,000 \text{ bytes} \approx 2.505 \text{ GiB}$$
 
 7. **RB body egress to relay nodes**:
 
-   $$
-   E_{rb\_bodies}^{relay} = 131,400 \times 7,168 \times 2 = 1,883,596,800 \text{ bytes} \approx 1.75 \text{ GiB}
-   $$
+   $$E_{rb\_bodies}^{relay} = 131,400 \times 7,168 \times 2 = 1,883,596,800 \text{ bytes} \approx 1.754 \text{ GiB}$$
 
 Total relay-to-relay traffic:
 
-$$
-\approx 0.74 + 24.06 + 0.88 + 0.01 + 329.80 + 2.51 + 1.75 \approx 359.75 \text{ GiB/month}
-$$
+$$\approx 0.744 + 24.06 + 0.881 + 0.012 + 330.41 + 2.505 + 1.754 \approx 360.37 \text{ GiB/month}$$
 
 #### Total Relay Node Egress
 
-$$
-E_{total} = E_{ib\_headers}^{edge} + E_{ib\_bodies}^{edge} + E_{eb\_headers}^{edge} + E_{eb\_bodies}^{edge} + E_{rb\_headers}^{edge} + E_{rb\_bodies}^{edge} + E_{ib\_headers}^{relay} + E_{ib\_bodies}^{relay} + E_{eb\_headers}^{relay} + E_{eb\_bodies}^{relay} + E_{votes}^{relay} + E_{rb\_headers}^{relay} + E_{rb\_bodies}^{relay}
-$$
-
-$$
-E_{total} \approx 37.50 + 359.75 \approx 397.25 \text{ GiB/month}
-$$
+$$E_{total} = 39.36 + 360.37 \approx 399.73 \text{ GiB/month}$$
 
 ### Traffic Components by Size (Descending)
 
 | Component                       | Size (GiB) | Percentage of Total |
 | ------------------------------- | ---------- | ------------------- |
-| Vote egress to relay nodes      | 329.80     | 83.0%               |
-| IB body egress to edge nodes    | 36.09      | 9.1%                |
-| IB body egress to relay nodes   | 24.06      | 6.1%                |
+| Vote egress to relay nodes      | 330.41     | 82.7%               |
+| IB body egress to edge nodes    | 36.09      | 9.0%                |
+| IB body egress to relay nodes   | 24.06      | 6.0%                |
 | RB body egress to edge nodes    | 2.63       | 0.7%                |
 | RB header egress to relay nodes | 2.51       | 0.6%                |
 | RB body egress to relay nodes   | 1.75       | 0.4%                |
-| IB header egress to relay nodes | 0.74       | 0.2%                |
 | EB header egress to relay nodes | 0.88       | 0.2%                |
-| IB header egress to edge nodes  | 0.11       | 0.03%               |
+| IB header egress to relay nodes | 0.74       | 0.2%                |
+| RB header egress to edge nodes  | 0.38       | 0.1%                |
 | EB header egress to edge nodes  | 0.13       | 0.03%               |
+| IB header egress to edge nodes  | 0.11       | 0.03%               |
 | EB body egress to relay nodes   | 0.01       | 0.003%              |
 | EB body egress to edge nodes    | 0.02       | 0.005%              |
 
 This breakdown shows that vote propagation dominates the network traffic,
-accounting for over 83% of the total egress. Input block (IB) body propagation
-is the second largest component at about 15% combined (edge + relay). All other
-components contribute less than 1% each to the total traffic.
+accounting for over 82.7% of the total egress. Input block (IB) body propagation
+is the second largest component at about 15.0% combined (edge + relay). All
+other components contribute less than 1% each to the total traffic.
 
 > [!Important] The above traffic breakdown is based on the baseline Leios
 > configuration of 0.05 IB/s, which is equivalent to Praos's block rate for fair
 > comparison. However, it's crucial to note that different components scale
 > differently with higher IB/s rates:
 >
-> - Vote traffic remains constant regardless of IB/s rate since votes are tied
->   to EBs (1.5 per stage) and stages are time-based
-> - IB traffic (headers and bodies) scales linearly with IB/s rate
-> - EB traffic remains constant since EBs per stage is fixed at 1.5
-> - RB traffic remains constant since RBs are produced at a fixed rate
->
-> This means that as IB/s increases, IB traffic will eventually become the
-> dominant component. For example, at 30 IB/s:
->
-> - Vote traffic stays at ~329.80 GiB/month
+> - Vote traffic stays at ~330.41 GiB/month
 > - IB body traffic to edge nodes increases to ~21.65 TiB/month (36.09 GiB
 >   × 600)
 > - IB body traffic to relay nodes increases to ~14.44 TiB/month (24.06 GiB
@@ -392,29 +348,29 @@ components contribute less than 1% each to the total traffic.
 
 ### Monthly Traffic per Node
 
-| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies  | Votes      | RB Headers | RB Bodies | Total     | vs Praos |
-| ---- | ---------- | --------- | ---------- | ---------- | ---------- | ---------- | --------- | --------- | -------- |
-| 0.05 | 0.40 GiB   | 13.00 GiB | 869.38 MiB | 0.63 GiB   | 26.24 GiB  | 2.47 GiB   | 1.18 GiB  | 69.50 GiB | +19.5%   |
-| 1    | 7.96 GiB   | 0.26 TiB  | 869.38 MiB | 12.61 GiB  | 524.88 GiB | 2.47 GiB   | 23.68 GiB | 1.39 TiB  | +2,670%  |
-| 5    | 39.80 GiB  | 1.30 TiB  | 869.38 MiB | 63.05 GiB  | 2.62 TiB   | 2.47 GiB   | 23.68 GiB | 6.95 TiB  | +13,260% |
-| 10   | 79.60 GiB  | 2.60 TiB  | 869.38 MiB | 126.10 GiB | 5.25 TiB   | 2.47 GiB   | 23.68 GiB | 13.90 TiB | +26,590% |
-| 20   | 159.20 GiB | 5.20 TiB  | 869.38 MiB | 252.20 GiB | 10.50 TiB  | 2.47 GiB   | 23.68 GiB | 27.80 TiB | +53,130% |
-| 30   | 238.80 GiB | 7.80 TiB  | 869.38 MiB | 378.30 GiB | 15.75 TiB  | 2.47 GiB   | 23.68 GiB | 41.70 TiB | +79,670% |
+| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes      | RB Headers | RB Bodies | Total      | vs Praos |
+| ---- | ---------- | --------- | ---------- | --------- | ---------- | ---------- | --------- | ---------- | -------- |
+| 0.05 | 0.86 GiB   | 60.15 GiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 399.73 GiB | +578%    |
+| 1    | 17.12 GiB  | 1.17 TiB  | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 1.51 TiB   | +2,812%  |
+| 5    | 85.60 GiB  | 5.86 TiB  | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 6.27 TiB   | +11,965% |
+| 10   | 171.20 GiB | 11.73 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 12.22 TiB  | +23,358% |
+| 20   | 342.40 GiB | 23.45 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 24.11 TiB  | +46,144% |
+| 30   | 513.60 GiB | 35.18 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 36.01 TiB  | +68,929% |
 
 ### Monthly Cost by Cloud Provider ($)
 
-| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s    | 10 IB/s   | 20 IB/s   | 30 IB/s   | vs Praos |
-| --------------- | -------- | ------------------- | --------- | ------- | --------- | --------- | --------- | --------- | -------- |
-| Google Cloud    | $0.120   | 0                   | $8.34     | $230.40 | $1,088.40 | $2,167.20 | $4,325.40 | $6,483.60 | +8,340%  |
-| Railway         | $0.100   | 0                   | $6.95     | $192.00 | $907.00   | $1,806.00 | $3,604.00 | $5,403.00 | +7,000%  |
-| AWS             | $0.090   | 100                 | $0.00     | $172.80 | $816.30   | $1,625.40 | $3,243.60 | $4,862.70 | +6,300%  |
-| Microsoft Azure | $0.087   | 100                 | $0.00     | $167.04 | $788.73   | $1,570.89 | $3,135.09 | $4,699.29 | +6,084%  |
-| Alibaba Cloud   | $0.074   | 10                  | $4.40     | $142.08 | $670.74   | $1,335.78 | $2,665.38 | $3,995.08 | +5,170%  |
-| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $19.20  | $90.70    | $180.60   | $360.40   | $540.30   | +699%    |
-| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $16.32  | $77.09    | $153.51   | $306.34   | $459.26   | +594%    |
-| Linode          | $0.005   | 1,024–20,480        | $0.00     | $9.60   | $45.35    | $90.30    | $180.20   | $270.15   | +350%    |
-| Hetzner         | $0.00108 | 1,024               | $0.00     | $2.07   | $9.80     | $19.50    | $38.92    | $58.35    | +75%     |
-| UpCloud         | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00     | $0.00     | $0.00     | $0.00     | 0%       |
+| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s  | 10 IB/s   | 20 IB/s   | 30 IB/s   | vs Praos |
+| --------------- | -------- | ------------------- | --------- | ------- | ------- | --------- | --------- | --------- | -------- |
+| Google Cloud    | $0.120   | 0                   | $47.97    | $181.20 | $752.40 | $1,466.40 | $2,893.20 | $4,321.20 | +578%    |
+| Railway         | $0.100   | 0                   | $39.97    | $151.00 | $627.00 | $1,222.00 | $2,411.00 | $3,601.00 | +578%    |
+| AWS             | $0.090   | 100                 | $26.98    | $135.90 | $564.30 | $1,099.80 | $2,169.90 | $3,240.90 | +578%    |
+| Microsoft Azure | $0.087   | 100                 | $26.08    | $131.37 | $545.49 | $1,063.14 | $2,097.57 | $3,132.87 | +578%    |
+| Alibaba Cloud   | $0.074   | 10                  | $28.88    | $111.74 | $463.98 | $904.28   | $1,784.14 | $2,664.74 | +578%    |
+| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $15.10  | $62.70  | $122.20   | $241.10   | $360.10   | +578%    |
+| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $12.84  | $53.30  | $103.87   | $204.94   | $306.09   | +578%    |
+| Linode          | $0.005   | 1,024–20,480        | $0.00     | $7.55   | $31.35  | $61.10    | $120.55   | $180.05   | +578%    |
+| Hetzner         | $0.00108 | 1,024               | $0.00     | $1.63   | $6.77   | $13.20    | $26.04    | $38.89    | +578%    |
+| UpCloud         | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00   | $0.00     | $0.00     | $0.00     | 0%       |
 
 Note: Percentage increases are calculated against Praos scenario A (20 peers)
 baseline of 63.64 GiB/month and $7.73/month (using average cost across
