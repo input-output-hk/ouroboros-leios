@@ -84,10 +84,10 @@ Tx-submission is further parameterized by the maximum window size
 allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by
 the maximum age beyond which a datum is no longer
 relayed\footnote{older EBs and IBs referenced by the blockchain can be
-accessed from the \catchup{} in Sec.\ref{ptcl:catch-up}}. IB-relay and
+accessed from the \catchup{} mini protocol (Sec.~\ref{ptcl:catch-up}).}. IB-relay and
 EB-relay rely on \Announcements{} to let consumers know when block bodies
 are available as well. Consumers request IB and EB bodies through the corresponding
-\fetch{} protocol (Sec.~\ref{ptcl:fetch}).
+\fetch{} mini protocol (Sec.~\ref{ptcl:fetch}). For EB-relay we specify the \datum{} to be eb-header, by which we mean the constant size part of an Endorse block, while the references (to IBs and EBs) are considered the body.
 
 \begin{table}[h!]
 \begin{tabular}{l l l l l l l l}
@@ -288,10 +288,154 @@ The consumer shall request ids in a blocking way when it does not
 intend on requesting any of the available datums.
 
 
-\section{\catchup{} mini-protocol}
-\label{ptcl:catch-up}
-TBD
-
 \section{\fetch{} mini-protocol}
 \label{ptcl:fetch}
+
+\renewcommand{\StIdle}{\state{StIdle}}
+\renewcommand{\StBusy}{\state{StBusy}}
+\newcommand{\StStreaming}{\state{StStreaming}}
+\renewcommand{\StDone}{\state{StDone}}
+\newcommand{\MsgRequestBodies}{\msg{MsgRequestBodies}}
+\newcommand{\MsgStartBatch}{\msg{MsgStartBatch}}
+\newcommand{\MsgNoBlocks}{\msg{MsgNoBlocks}}
+\newcommand{\MsgBody}{\msg{MsgBody}}
+\newcommand{\MsgBatchDone}{\msg{MsgBatchDone}}
+\newcommand{\MsgConsumerDone}{\msg{MsgConsumerDone}}
+\newcommand{\point}{\text{point}}
+\newcommand{\slot}{\text{slot}}
+\newcommand{\body}{\text{body}}
+
+\subsection{Description}
+
+The \fetch{} mini protocol enables a node to download block bodies identified by a pair of slot and block id (i.e. hash). It is intended for on-the-fly block diffusion, complementing the \relay{} mini protocol.
+
+It is a minor variation of the Block Fetch mini protocol used for
+Praos blocks: IBs and EBs do not have a notion of range, so they are
+requested by individual identifiers.
+
+\paragraph{Parameters} A \fetch{} instance is specified by these parameters
+\begin{description}
+\item [\id{}] Identifier for a body to fetch.
+\item [\body{}] Block body itself.
+\end{description}
+
+\paragraph{Instances} are listed in Table~{table:fetch-instances}. The \body{} descriptions included here are for illustration, in particular to clarify what we mean by \body{} of an Endorse block.
+\begin{table}[h!]
+\begin{tabular}{l l l l l l l l}
+\header{instance} &  \header{\id{}} & \header{\body{}} \\\hline
+IB-fetch  & hash & $[\text{Tx}]$ \\
+EB-fetch  & hash & $([\text{IBRef}],[\text{EBRef}])$\\
+\end{tabular}
+\caption{\fetch{} mini-protocol instances.}
+\label{table:fetch-instances}
+\end{table}
+
+\subsection{State machine}
+
+\begin{figure}[h]
+  \begin{tikzpicture}[->,shorten >=1pt,auto,node distance=4.5cm, semithick]
+    \tikzstyle{every state}=[fill=red,draw=none,text=white]
+    \node[state, mygreen,initial] at (-1cm,0cm)  (Idle)      {\StIdle};
+    \node[state]                  at (4cm,0cm)   (Done)      {\StDone};
+    \node[state, myblue]          at (-3cm,-3cm) (Busy)      {\StBusy};
+    \node[state, myblue]          at (4cm,-3cm)  (Streaming) {\StStreaming};
+
+    \draw (Idle)      edge[above]            node[fill=white]{\MsgConsumerDone}           (Done);
+    \draw (Idle)      edge[left,bend right]  node[fill=white]{\MsgRequestBodies}         (Busy);
+    \draw (Busy)      edge[above,bend right] node[fill=white]{\MsgNoBlocks}             (Idle);
+    \draw (Busy)      edge[below]            node[fill=white]{\MsgStartBatch}           (Streaming);
+    \draw (Streaming) edge[loop right]       node[fill=white,left=-10mm]{\MsgBody}     (Streaming);
+    \draw (Streaming) edge[right]            node[fill=white,left=-15mm]{\MsgBatchDone} (Idle);
+  \end{tikzpicture}
+  \caption{State machine of the \fetch{} mini-protocol}
+\end{figure}
+
+\begin{figure}[h]
+  \begin{center}
+    \begin{tabular}{l|l}
+      \header{state} & \header{agency} \\\hline
+      \StIdle        & \Consumer \\
+      \StBusy        & \Producer \\
+      \StStreaming   & \Producer \\
+    \end{tabular}
+    \caption{\fetch{} state agencies}
+  \end{center}
+\end{figure}
+
+\paragraph{Protocol messages}
+Let \point be a pair $(\slot{},\id)$. 
+\begin{description}
+\item [\MsgRequestBodies{} {\boldmath $[\point{}]$}]
+  The consumer requests a sequence of bodies from the producer.
+  \todo{If we keep the streaming setup, we could abstract from $[\point{}]$ to a \emph{sequence} parameter, allowing the original Block Fetch as an instance.} 
+\item [\MsgNoBlocks]
+  The producer tells the consumer that it does not have all of the blocks in the requested sequence.
+\item [\MsgStartBatch]
+  The producer starts body streaming.
+  \todo{Does a streaming setup still makes sense, or should we drop it in favor of pipelining?}
+\item [\MsgBody{} {\boldmath $(\body{})$}]
+  Stream a single block's body.
+\item [\MsgBatchDone]
+  The producer ends block streaming.
+\item [\MsgConsumerDone]
+  The consumer terminates the protocol.
+\end{description}
+
+Transition table is shown in table~\ref{table:fetch}.
+
+\begin{table}[h!]
+  \begin{center}
+    \begin{tabular}{l|l|l|l}
+      \header{from state} & \header{message} & \header{parameters} & \header{to state} \\\hline
+      \StIdle       & \MsgConsumerDone   &            & \StDone      \\
+      \StIdle       & \MsgRequestBodies & $[\point{}]$    & \StBusy      \\
+      \StBusy       & \MsgNoBlocks     &            & \StIdle      \\
+      \StBusy       & \MsgStartBatch   &            & \StStreaming \\
+      \StStreaming  & \MsgBody        & $\body{}$     & \StStreaming \\
+      \StStreaming  & \MsgBatchDone    &            & \StIdle      \\
+    \end{tabular}
+  \end{center}
+  \caption{\fetch{} mini-protocol messages.}
+  \label{table:fetch}
+\end{table}
+
+\iffalse
+\subsection{Size limits per state}
+
+These limits bound how many bytes can be send in a given state, indirectly this
+limits payload size of each message.  If a space limit is violated the
+connection SHOULD be torn down.
+
+\begin{table}[h!]
+  \begin{center}
+    \begin{tabular}{l|r}
+      \header{state} & \header{size limit in bytes} \\\hline
+      \StIdle        & \texttt{65535} \\
+      \StBusy        & \texttt{65535} \\
+      \StStreaming   & \texttt{2500000} \\
+    \end{tabular}
+    % \caption{size limits per state}
+  \end{center}
+\end{table}
+
+\subsection{Timeouts per state}
+
+These limits bound how much time the receiver side can wait for arrival of
+a message.  If a timeout is violated the connection SHOULD be torn down.
+
+\begin{table}[h!]
+  \begin{center}
+    \begin{tabular}{l|r}
+      \header{state} & \header{timeout} \\\hline
+      \StIdle        & - \\
+      \StBusy        & \texttt{60}s \\
+      \StStreaming   & \texttt{60}s \\
+    \end{tabular}
+    % \caption{timeouts per state}
+  \end{center}
+\end{table}
+\fi
+
+\section{\catchup{} mini-protocol}
+\label{ptcl:catch-up}
 TBD
