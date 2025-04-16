@@ -173,9 +173,7 @@ For any node type, we calculate egress using these formulas:
 
 1. **IB Header Egress**:
 
-   $$
-   E_{ib\_headers} = N_{ibs} \times H_{ib} \times P_{total}
-   $$
+   $$E_{ib\_headers} = N_{ibs} \times H_{ib} \times P_{total}$$
    where:
    - $N_{ibs}$ = Number of IBs per month
    - $H_{ib}$ = IB header size in bytes
@@ -183,27 +181,21 @@ For any node type, we calculate egress using these formulas:
 
 2. **IB Body Egress**:
 
-   $$
-   E_{ib\_bodies} = N_{ibs} \times B_{ib} \times P_{requesting}
-   $$
+   $$E_{ib\_bodies} = N_{ibs} \times B_{ib} \times P_{requesting}$$
    where:
    - $B_{ib}$ = IB body size in bytes
    - $P_{requesting}$ = Number of peers requesting bodies
 
 3. **EB Header Egress**:
 
-   $$
-   E_{eb\_headers} = N_{ebs} \times H_{eb} \times P_{total}
-   $$
+   $$E_{eb\_headers} = N_{ebs} \times H_{eb} \times P_{total}$$
    where:
    - $N_{ebs}$ = Number of EBs per month
    - $H_{eb}$ = EB header size in bytes
 
 4. **EB Body Egress**:
 
-   $$
-   E_{eb\_bodies} = N_{ebs} \times N_{ib\_refs} \times R_{ib} \times P_{requesting}
-   $$
+   $$E_{eb\_bodies} = N_{ebs} \times N_{ib\_refs} \times R_{ib} \times P_{requesting}$$
    where:
    - $N_{ebs}$ = Number of EBs per month (197,100)
    - $N_{ib\_refs}$ = Number of IB references per EB (1, due to stage length and
@@ -213,9 +205,7 @@ For any node type, we calculate egress using these formulas:
 
 5. **Vote Egress**:
 
-   $$
-   E_{votes} = N_{stages} \times V \times N_{voters} \times N_{ebs\_per\_stage} \times P_{total}
-   $$
+   $$E_{votes} = N_{stages} \times V \times N_{voters} \times N_{ebs\_per\_stage} \times P_{total}$$
    where:
    - $N_{stages}$ = Number of stages per month
    - $V$ = Vote size in bytes
@@ -224,18 +214,14 @@ For any node type, we calculate egress using these formulas:
 
 6. **RB Header Egress**:
 
-   $$
-   E_{rb\_headers} = N_{rbs} \times H_{rb} \times P_{total}
-   $$
+   $$E_{rb\_headers} = N_{rbs} \times H_{rb} \times P_{total}$$
    where:
    - $N_{rbs}$ = Number of RBs per month
    - $H_{rb}$ = RB header size in bytes
 
 7. **RB Body Egress**:
 
-   $$
-   E_{rb\_bodies} = N_{rbs} \times B_{rb} \times P_{requesting}
-   $$
+   $$E_{rb\_bodies} = N_{rbs} \times B_{rb} \times P_{requesting}$$
    where:
    - $B_{rb}$ = RB body size in bytes
 
