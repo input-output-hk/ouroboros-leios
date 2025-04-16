@@ -1,38 +1,44 @@
 # Egress cost estimation per node
 
-Network egress is metered for most cloud providers even though many have some monthly budget that's free.
-In the following example calculation, we try to be as precise as possible given today's [p2p default configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json) of the node.
+Network egress is metered for most cloud providers even though many have some
+monthly budget that's free. In the following example calculation, we try to be
+as precise as possible given today's
+[p2p default configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json)
+of the node.
 
 ## Ouroboros Praos
 
-We start with Ouroboros Praos to have a baseline. The following numbers are from Cardano Mainnet, April 2025.
+We start with Ouroboros Praos to have a baseline. The following numbers are from
+Cardano Mainnet, April 2025.
 
 | Component  | Size (bytes) | Size (KiB) |
-|------------|--------------|------------|
-| Header (H) | 1,024        | 1 |
-| Body   (B) | 90,112       | 88 |
+| ---------- | ------------ | ---------- |
+| Header (H) | 1,024        | 1          |
+| Body (B)   | 90,112       | 88         |
 
 ### Blocks per Month Calculation
 
-| Parameter | Value | Formula |
-|-----------|-------|---------|
-| Epoch length | 5 days (432,000 slots) | Protocol parameter |
-| Active slot coefficient | 0.05 | Protocol parameter |
-| Blocks per epoch | 21,600 | $432,000 \times 0.05$ |
-| Epochs per month | ~6.0833 | $\frac{365}{5 \times 12}$ |
-| **Blocks per month** | **131,400** | $21,600 \times 6.0833$ |
+| Parameter               | Value                  | Formula                   |
+| ----------------------- | ---------------------- | ------------------------- |
+| Epoch length            | 5 days (432,000 slots) | Protocol parameter        |
+| Active slot coefficient | 0.05                   | Protocol parameter        |
+| Blocks per epoch        | 21,600                 | $432,000 \times 0.05$     |
+| Epochs per month        | ~6.0833                | $\frac{365}{5 \times 12}$ |
+| **Blocks per month**    | **131,400**            | $21,600 \times 6.0833$    |
 
-> [!Note]
-> On Cardano Mainnet one slot equals the duration of one second.
+> [!Note] On Cardano Mainnet one slot equals the duration of one second.
 
 ### Network Topology Assumptions
 
 For our calculations, we consider a network with two types of nodes:
+
 - Relay nodes: Connect to multiple edge nodes and other relays
 - Edge nodes: Connect to relay nodes but not to other edge nodes
 
 We make the following assumptions about the network:
-- [Default p2p configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json): 20 peers per node
+
+- [Default p2p configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json):
+  20 peers per node
 - Network ratio: ~3 edge nodes per relay node
 - Block propagation model:
   - Headers: Propagated to 100% of peers
@@ -59,11 +65,14 @@ For any node type, we can calculate egress using these formulas:
 
 ### Edge Node Egress Calculation
 
-Edge nodes have minimal egress compared to relay nodes. Their egress consists of:
+Edge nodes have minimal egress compared to relay nodes. Their egress consists
+of:
+
 1. Transaction data sent to relay nodes
 2. Block body responses when requested
 
 Using our base formulas with a typical edge node configuration:
+
 - Total peers ($P_{total}$) = 1 (single relay connection)
 - Requesting peers ($P_{requesting}$) = 1 (when relay requests body)
 
@@ -75,6 +84,7 @@ This forms our baseline for minimal node egress in a Praos network.
 ### Relay Node Egress Calculation
 
 Using our assumptions:
+
 - Total peers ($P_{total}$) = 20
 - Edge nodes per relay = 3
 - Relay peers = 20
@@ -98,41 +108,47 @@ Using our assumptions:
 
 ## Ouroboros Leios
 
-We analyze Ouroboros Leios with the same network topology assumptions as Praos, but with its unique block types and propagation model.
+We analyze Ouroboros Leios with the same network topology assumptions as Praos,
+but with its unique block types and propagation model.
 
 ### Block Size Components
 
-| Component | Size (bytes) | Size (KiB) |
-|-----------|--------------|------------|
-| Input Block (IB) Header | 304 | 0.3 |
-| Input Block (IB) Body | 98,304 | 96 |
-| Endorsement Block (EB) Header | 240 | 0.2 |
-| Endorsement Block (EB) Body | 32 | 0.03 |
-| Vote | 150 | 0.15 |
-| Ranking Block (RB) Header | 1,024 | 1 |
-| Ranking Block (RB) Body | 7,168 | 7 |
+| Component                     | Size (bytes) | Size (KiB) |
+| ----------------------------- | ------------ | ---------- |
+| Input Block (IB) Header       | 304          | 0.3        |
+| Input Block (IB) Body         | 98,304       | 96         |
+| Endorsement Block (EB) Header | 240          | 0.2        |
+| Endorsement Block (EB) Body   | 32           | 0.03       |
+| Vote                          | 150          | 0.15       |
+| Ranking Block (RB) Header     | 1,024        | 1          |
+| Ranking Block (RB) Body       | 7,168        | 7          |
 
-> [!Note]: 
-> The EB body size consists only of the IB reference (32 bytes per reference). The RB body in Leios contains only a certificate, not the full 88 KiB as in Praos.
+> [!Note]: The EB body size consists only of the IB reference (32 bytes per
+> reference). The RB body in Leios contains only a certificate, not the full 88
+> KiB as in Praos.
 
 ### Blocks per Month Calculation
 
-For a fair comparison with Praos, we use the same block rate (0.05 blocks/s) for Leios' IBs. This ensures that both protocols are compared under similar conditions, with Leios producing the same number of IBs per month as Praos produces blocks per month (131,400).
+For a fair comparison with Praos, we use the same block rate (0.05 blocks/s) for
+Leios' IBs. This ensures that both protocols are compared under similar
+conditions, with Leios producing the same number of IBs per month as Praos
+produces blocks per month (131,400).
 
-| Parameter | Value | Formula |
-|-----------|-------|---------|
-| Stage length | 20 slots | Protocol parameter |
-| EBs per stage | 1.5 | Protocol parameter |
-| Days per month | 30.4167 | $\frac{365}{12}$ |
-| Seconds per month | 2,628,000 | $30.4167 \times 24 \times 60 \times 60$ |
-| Stages per month | 131,400 | $\frac{2,628,000}{20}$ |
-| **IBs per month** | **131,400** | $0.05 \text{ IB/s} \times 2,628,000$ |
-| **EBs per month** | **197,100** | $1.5 \times 131,400$ |
-| **RBs per month** | **131,400** | $1 \times 131,400$ |
+| Parameter         | Value       | Formula                                 |
+| ----------------- | ----------- | --------------------------------------- |
+| Stage length      | 20 slots    | Protocol parameter                      |
+| EBs per stage     | 1.5         | Protocol parameter                      |
+| Days per month    | 30.4167     | $\frac{365}{12}$                        |
+| Seconds per month | 2,628,000   | $30.4167 \times 24 \times 60 \times 60$ |
+| Stages per month  | 131,400     | $\frac{2,628,000}{20}$                  |
+| **IBs per month** | **131,400** | $0.05 \text{ IB/s} \times 2,628,000$    |
+| **EBs per month** | **197,100** | $1.5 \times 131,400$                    |
+| **RBs per month** | **131,400** | $1 \times 131,400$                      |
 
 ### Network Topology Assumptions
 
 We maintain the same network assumptions as Praos:
+
 - Default p2p configuration: 20 peers per node
 - Network ratio: ~3 edge nodes per relay node
 - Block propagation model:
@@ -171,7 +187,8 @@ For any node type, we calculate egress using these formulas:
    $$E_{eb\_bodies} = N_{ebs} \times N_{ib\_refs} \times R_{ib} \times P_{requesting}$$
    where:
    - $N_{ebs}$ = Number of EBs per month (197,100)
-   - $N_{ib\_refs}$ = Number of IB references per EB (1, due to stage length and IB rate)
+   - $N_{ib\_refs}$ = Number of IB references per EB (1, due to stage length and
+     IB rate)
    - $R_{ib}$ = Size of IB reference in bytes (32)
    - $P_{requesting}$ = Number of peers requesting bodies (2)
 
@@ -199,11 +216,15 @@ For any node type, we calculate egress using these formulas:
 
 ### Edge Node Egress Calculation
 
-The edge node egress calculation for Leios is identical to that of Praos, as edge nodes only handle block body responses and transaction data. See the [Edge Node Egress Calculation](#edge-node-egress-calculation) section in the Praos part for details.
+The edge node egress calculation for Leios is identical to that of Praos, as
+edge nodes only handle block body responses and transaction data. See the
+[Edge Node Egress Calculation](#edge-node-egress-calculation) section in the
+Praos part for details.
 
 ### Relay Node Egress Calculation
 
 Using our assumptions:
+
 - Total peers ($P_{total}$) = 20
 - Edge nodes per relay = 3
 - Relay peers = 20
@@ -235,7 +256,8 @@ Using our assumptions:
 
    $$E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,825,395,200 \text{ bytes} \approx 2.63 \text{ GiB}$$
 
-Total relay-to-edge traffic: $\approx 0.11 + 36.09 + 0.13 + 0.02 + 0.38 + 2.63 \approx 37.50 \text{ GiB/month}$
+Total relay-to-edge traffic:
+$\approx 0.11 + 36.09 + 0.13 + 0.02 + 0.38 + 2.63 \approx 37.50 \text{ GiB/month}$
 
 #### Relay-to-Relay Traffic
 
@@ -267,7 +289,8 @@ Total relay-to-edge traffic: $\approx 0.11 + 36.09 + 0.13 + 0.02 + 0.38 + 2.63 \
 
    $$E_{rb\_bodies}^{relay} = 131,400 \times 7,168 \times 2 = 1,883,596,800 \text{ bytes} \approx 1.75 \text{ GiB}$$
 
-Total relay-to-relay traffic: $\approx 0.74 + 24.06 + 0.88 + 0.01 + 329.80 + 2.51 + 1.75 \approx 359.75 \text{ GiB/month}$
+Total relay-to-relay traffic:
+$\approx 0.74 + 24.06 + 0.88 + 0.01 + 329.80 + 2.51 + 1.75 \approx 359.75 \text{ GiB/month}$
 
 #### Total Relay Node Egress
 
@@ -277,83 +300,96 @@ $$E_{total} \approx 37.50 + 359.75 \approx 397.25 \text{ GiB/month}$$
 
 ### Traffic Components by Size (Descending)
 
-| Component | Size (GiB) | Percentage of Total |
-|-----------|------------|-------------------|
-| Vote egress to relay nodes | 329.80 | 83.0% |
-| IB body egress to edge nodes | 36.09 | 9.1% |
-| IB body egress to relay nodes | 24.06 | 6.1% |
-| RB body egress to edge nodes | 2.63 | 0.7% |
-| RB header egress to relay nodes | 2.51 | 0.6% |
-| RB body egress to relay nodes | 1.75 | 0.4% |
-| IB header egress to relay nodes | 0.74 | 0.2% |
-| EB header egress to relay nodes | 0.88 | 0.2% |
-| IB header egress to edge nodes | 0.11 | 0.03% |
-| EB header egress to edge nodes | 0.13 | 0.03% |
-| EB body egress to relay nodes | 0.01 | 0.003% |
-| EB body egress to edge nodes | 0.02 | 0.005% |
+| Component                       | Size (GiB) | Percentage of Total |
+| ------------------------------- | ---------- | ------------------- |
+| Vote egress to relay nodes      | 329.80     | 83.0%               |
+| IB body egress to edge nodes    | 36.09      | 9.1%                |
+| IB body egress to relay nodes   | 24.06      | 6.1%                |
+| RB body egress to edge nodes    | 2.63       | 0.7%                |
+| RB header egress to relay nodes | 2.51       | 0.6%                |
+| RB body egress to relay nodes   | 1.75       | 0.4%                |
+| IB header egress to relay nodes | 0.74       | 0.2%                |
+| EB header egress to relay nodes | 0.88       | 0.2%                |
+| IB header egress to edge nodes  | 0.11       | 0.03%               |
+| EB header egress to edge nodes  | 0.13       | 0.03%               |
+| EB body egress to relay nodes   | 0.01       | 0.003%              |
+| EB body egress to edge nodes    | 0.02       | 0.005%              |
 
-This breakdown shows that vote propagation dominates the network traffic, accounting for over 83% of the total egress. Input block (IB) body propagation is the second largest component at about 15% combined (edge + relay). All other components contribute less than 1% each to the total traffic.
+This breakdown shows that vote propagation dominates the network traffic,
+accounting for over 83% of the total egress. Input block (IB) body propagation
+is the second largest component at about 15% combined (edge + relay). All other
+components contribute less than 1% each to the total traffic.
 
-> [!Important]
-> The above traffic breakdown is based on the baseline Leios configuration of 0.05 IB/s, which is equivalent to Praos's block rate for fair comparison. However, it's crucial to note that different components scale differently with higher IB/s rates:
-> - Vote traffic remains constant regardless of IB/s rate since votes are tied to EBs (1.5 per stage) and stages are time-based
+> [!Important] The above traffic breakdown is based on the baseline Leios
+> configuration of 0.05 IB/s, which is equivalent to Praos's block rate for fair
+> comparison. However, it's crucial to note that different components scale
+> differently with higher IB/s rates:
+>
+> - Vote traffic remains constant regardless of IB/s rate since votes are tied
+>   to EBs (1.5 per stage) and stages are time-based
 > - IB traffic (headers and bodies) scales linearly with IB/s rate
 > - EB traffic remains constant since EBs per stage is fixed at 1.5
 > - RB traffic remains constant since RBs are produced at a fixed rate
 >
-> This means that as IB/s increases, IB traffic will eventually become the dominant component. For example, at 30 IB/s:
-> - Vote traffic stays at ~329.80 GiB/month
-> - IB body traffic to edge nodes increases to ~21.65 TiB/month (36.09 GiB × 600)
-> - IB body traffic to relay nodes increases to ~14.44 TiB/month (24.06 GiB × 600)
+> This means that as IB/s increases, IB traffic will eventually become the
+> dominant component. For example, at 30 IB/s:
 >
-> At this rate, IB body traffic alone would be about 36 TiB/month, making it the dominant traffic component and far exceeding the constant vote traffic.
+> - Vote traffic stays at ~329.80 GiB/month
+> - IB body traffic to edge nodes increases to ~21.65 TiB/month (36.09 GiB
+>   × 600)
+> - IB body traffic to relay nodes increases to ~14.44 TiB/month (24.06 GiB
+>   × 600)
+>
+> At this rate, IB body traffic alone would be about 36 TiB/month, making it the
+> dominant traffic component and far exceeding the constant vote traffic.
 
 ### Monthly Traffic per Node
 
-| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes | RB Headers | RB Bodies | Total | vs Praos |
-|------|------------|-----------|------------|-----------|-------|------------|-----------|-------|----------|
-| 0.05 | 0.40 GiB   | 13.00 GiB | 869.38 MiB | 0.63 GiB  | 26.24 GiB | 2.47 GiB   | 1.18 GiB  | 69.50 GiB | +19.5% |
-| 1    | 7.96 GiB   | 0.26 TiB  | 869.38 MiB | 12.61 GiB | 524.88 GiB | 2.47 GiB   | 23.68 GiB  | 1.39 TiB | +2,670% |
-| 5    | 39.80 GiB  | 1.30 TiB  | 869.38 MiB | 63.05 GiB  | 2.62 TiB   | 2.47 GiB   | 23.68 GiB  | 6.95 TiB | +13,260% |
-| 10   | 79.60 GiB  | 2.60 TiB  | 869.38 MiB | 126.10 GiB  | 5.25 TiB   | 2.47 GiB   | 23.68 GiB  | 13.90 TiB | +26,590% |
-| 20   | 159.20 GiB | 5.20 TiB  | 869.38 MiB | 252.20 GiB  | 10.50 TiB  | 2.47 GiB   | 23.68 GiB  | 27.80 TiB | +53,130% |
-| 30   | 238.80 GiB | 7.80 TiB  | 869.38 MiB | 378.30 GiB  | 15.75 TiB  | 2.47 GiB   | 23.68 GiB  | 41.70 TiB | +79,670% |
+| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies  | Votes      | RB Headers | RB Bodies | Total     | vs Praos |
+| ---- | ---------- | --------- | ---------- | ---------- | ---------- | ---------- | --------- | --------- | -------- |
+| 0.05 | 0.40 GiB   | 13.00 GiB | 869.38 MiB | 0.63 GiB   | 26.24 GiB  | 2.47 GiB   | 1.18 GiB  | 69.50 GiB | +19.5%   |
+| 1    | 7.96 GiB   | 0.26 TiB  | 869.38 MiB | 12.61 GiB  | 524.88 GiB | 2.47 GiB   | 23.68 GiB | 1.39 TiB  | +2,670%  |
+| 5    | 39.80 GiB  | 1.30 TiB  | 869.38 MiB | 63.05 GiB  | 2.62 TiB   | 2.47 GiB   | 23.68 GiB | 6.95 TiB  | +13,260% |
+| 10   | 79.60 GiB  | 2.60 TiB  | 869.38 MiB | 126.10 GiB | 5.25 TiB   | 2.47 GiB   | 23.68 GiB | 13.90 TiB | +26,590% |
+| 20   | 159.20 GiB | 5.20 TiB  | 869.38 MiB | 252.20 GiB | 10.50 TiB  | 2.47 GiB   | 23.68 GiB | 27.80 TiB | +53,130% |
+| 30   | 238.80 GiB | 7.80 TiB  | 869.38 MiB | 378.30 GiB | 15.75 TiB  | 2.47 GiB   | 23.68 GiB | 41.70 TiB | +79,670% |
 
 ### Monthly Cost by Cloud Provider ($)
 
-| Provider         | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s | 5 IB/s | 10 IB/s | 20 IB/s | 30 IB/s | vs Praos |
-|------------------|----------|---------------------|-----------|---------|---------|----------|----------|----------|----------|
-| Google Cloud     | $0.120   | 0                   | $8.34     | $230.40 | $1,088.40| $2,167.20| $4,325.40| $6,483.60| +8,340% |
-| Railway          | $0.100   | 0                   | $6.95     | $192.00 | $907.00  | $1,806.00| $3,604.00| $5,403.00| +7,000% |
-| AWS              | $0.090   | 100                 | $0.00     | $172.80 | $816.30  | $1,625.40| $3,243.60| $4,862.70| +6,300% |
-| Microsoft Azure  | $0.087   | 100                 | $0.00     | $167.04 | $788.73  | $1,570.89| $3,135.09| $4,699.29| +6,084% |
-| Alibaba Cloud    | $0.074   | 10                  | $4.40     | $142.08 | $670.74  | $1,335.78| $2,665.38| $3,995.08| +5,170% |
-| DigitalOcean     | $0.010   | 100–10,000          | $0.00     | $19.20  | $90.70   | $180.60  | $360.40  | $540.30  | +699% |
-| Oracle Cloud     | $0.0085  | 10,240              | $0.00     | $16.32  | $77.09   | $153.51  | $306.34  | $459.26  | +594% |
-| Linode           | $0.005   | 1,024–20,480        | $0.00     | $9.60   | $45.35   | $90.30   | $180.20  | $270.15  | +350% |
-| Hetzner          | $0.00108 | 1,024               | $0.00     | $2.07   | $9.80    | $19.50   | $38.92   | $58.35   | +75% |
-| UpCloud          | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00    | $0.00    | $0.00    | $0.00    | 0% |
+| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s    | 10 IB/s   | 20 IB/s   | 30 IB/s   | vs Praos |
+| --------------- | -------- | ------------------- | --------- | ------- | --------- | --------- | --------- | --------- | -------- |
+| Google Cloud    | $0.120   | 0                   | $8.34     | $230.40 | $1,088.40 | $2,167.20 | $4,325.40 | $6,483.60 | +8,340%  |
+| Railway         | $0.100   | 0                   | $6.95     | $192.00 | $907.00   | $1,806.00 | $3,604.00 | $5,403.00 | +7,000%  |
+| AWS             | $0.090   | 100                 | $0.00     | $172.80 | $816.30   | $1,625.40 | $3,243.60 | $4,862.70 | +6,300%  |
+| Microsoft Azure | $0.087   | 100                 | $0.00     | $167.04 | $788.73   | $1,570.89 | $3,135.09 | $4,699.29 | +6,084%  |
+| Alibaba Cloud   | $0.074   | 10                  | $4.40     | $142.08 | $670.74   | $1,335.78 | $2,665.38 | $3,995.08 | +5,170%  |
+| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $19.20  | $90.70    | $180.60   | $360.40   | $540.30   | +699%    |
+| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $16.32  | $77.09    | $153.51   | $306.34   | $459.26   | +594%    |
+| Linode          | $0.005   | 1,024–20,480        | $0.00     | $9.60   | $45.35    | $90.30    | $180.20   | $270.15   | +350%    |
+| Hetzner         | $0.00108 | 1,024               | $0.00     | $2.07   | $9.80     | $19.50    | $38.92    | $58.35    | +75%     |
+| UpCloud         | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00     | $0.00     | $0.00     | $0.00     | 0%       |
 
-Note: Percentage increases are calculated against Praos scenario A (20 peers) baseline of 63.64 GiB/month and $7.73/month (using average cost across providers)
+Note: Percentage increases are calculated against Praos scenario A (20 peers)
+baseline of 63.64 GiB/month and $7.73/month (using average cost across
+providers)
 
 ### Data Egress Cost Sources
 
-| Provider | Price/GB | Source | Last Updated |
-|----------|----------|---------|--------------|
-| Google Cloud | $0.120 | https://cloud.google.com/vpc/pricing | Feb 2025 |
-| Railway | $0.100 | https://railway.app/pricing | - |
-| AWS | $0.090 | https://aws.amazon.com/ec2/pricing/ | 2023 |
-| Microsoft Azure | $0.087 | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024 |
-| Alibaba Cloud | $0.074 | https://www.alibabacloud.com/pricing | 2024 |
-| DigitalOcean | $0.010 | https://www.digitalocean.com/pricing/ | - |
-| Oracle Cloud | $0.0085 | https://www.oracle.com/cloud/pricing/ | Dec 2024 |
-| Linode | $0.005 | https://www.linode.com/pricing/ | Apr 2023 |
-| Hetzner | $0.00108 | https://www.hetzner.com/cloud/pricing | 2024 |
-| UpCloud | $0.000 | https://upcloud.com/pricing/ | - |
+| Provider        | Price/GB | Source                                                 | Last Updated |
+| --------------- | -------- | ------------------------------------------------------ | ------------ |
+| Google Cloud    | $0.120   | https://cloud.google.com/vpc/pricing                   | Feb 2025     |
+| Railway         | $0.100   | https://railway.app/pricing                            | -            |
+| AWS             | $0.090   | https://aws.amazon.com/ec2/pricing/                    | 2023         |
+| Microsoft Azure | $0.087   | https://azure.microsoft.com/pricing/details/bandwidth/ | Dec 2024     |
+| Alibaba Cloud   | $0.074   | https://www.alibabacloud.com/pricing                   | 2024         |
+| DigitalOcean    | $0.010   | https://www.digitalocean.com/pricing/                  | -            |
+| Oracle Cloud    | $0.0085  | https://www.oracle.com/cloud/pricing/                  | Dec 2024     |
+| Linode          | $0.005   | https://www.linode.com/pricing/                        | Apr 2023     |
+| Hetzner         | $0.00108 | https://www.hetzner.com/cloud/pricing                  | 2024         |
+| UpCloud         | $0.000   | https://upcloud.com/pricing/                           | -            |
 
-Note: Prices may vary by region and volume. Some providers offer free tiers or volume discounts not reflected in these base rates. The table shows the standard outbound data transfer rates for the most commonly used regions.
+Note: Prices may vary by region and volume. Some providers offer free tiers or
+volume discounts not reflected in these base rates. The table shows the standard
+outbound data transfer rates for the most commonly used regions.
 
-
-no reserves
-fully filled blocks
-how many tx fees needed for covering SPO cost
+no reserves fully filled blocks how many tx fees needed for covering SPO cost
