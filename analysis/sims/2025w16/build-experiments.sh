@@ -6,7 +6,7 @@ MAX_SLOT=600
 
 for SIMULATOR in rust haskell
 do
-  for LABEL in default
+  for LABEL in default full
   do
     for NETWORK in 100-nodes 100-nodes-4cpus
     do
