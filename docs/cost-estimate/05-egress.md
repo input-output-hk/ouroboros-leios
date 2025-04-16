@@ -26,7 +26,7 @@ Cardano Mainnet, April 2025.
 | Epochs per month        | ~6.0833                | $$\frac{365}{5 \times 12}$$ |
 | **Blocks per month**    | **131,400**            | $$21,600 \times 6.0833$$   |
 
-> [!Note] 
+> [!NOTE]
 > On Cardano Mainnet one slot equals the duration of one second.
 
 ### Network Topology Assumptions
@@ -149,7 +149,8 @@ but with its unique block types and propagation model.
 | Ranking Block (RB) Header     | 1,024        | 1          |
 | Ranking Block (RB) Body       | 7,168        | 7          |
 
-> [!Note]: The EB body size consists only of the IB reference (32 bytes per
+> [!NOTE]
+> The EB body size consists only of the IB reference (32 bytes per
 > reference). The RB body in Leios contains only a certificate, not the full 88
 > KiB as in Praos.
 
