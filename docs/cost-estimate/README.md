@@ -19,6 +19,7 @@ percentages.
 
 Follow the links above to see detailed cost estimates per item.
 
-> [!Note] Storage and data transfer use binary prefixes (GiB = 2³⁰ bytes), while
+> [!Note] 
+> Storage and data transfer use binary prefixes (GiB = 2³⁰ bytes), while
 > RAM uses decimal prefixes (GB = 10⁹ bytes), following industry standards for
 > cloud computing.
