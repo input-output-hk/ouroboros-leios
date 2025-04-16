@@ -79,7 +79,7 @@ against resource consumption attacks from the other side.
 \item [\ann{} (If \Announcements)] Announcement representation.
 \end{description}
 
-\paragraph{Instances} are listed in Table~\ref{table:relay-instances}.
+\paragraph{Instances} \relay{} protocol instances are listed in Table~\ref{table:relay-instances}.
 Tx-submission is further parameterized by the maximum window size
 allowed. IB-relay, EB-relay, and Vote-relay are each parametrized by
 the maximum age beyond which a datum is no longer
@@ -319,7 +319,7 @@ requested by individual identifiers.
 \item [\body{}] Block body itself.
 \end{description}
 
-\paragraph{Instances} are listed in Table~{table:fetch-instances}. The \body{} descriptions included here are for illustration, in particular to clarify what we mean by \body{} of an Endorse block.
+\paragraph{Instances} \fetch{} instances are listed in Table~{table:fetch-instances}. The \body{} descriptions included here are for illustration, in particular to clarify what we mean by \body{} of an Endorse block.
 \begin{table}[h!]
 \begin{tabular}{l l l l l l l l}
 \header{instance} &  \header{\id{}} & \header{\body{}} \\\hline
@@ -438,4 +438,41 @@ a message.  If a timeout is violated the connection SHOULD be torn down.
 
 \section{\catchup{} mini-protocol}
 \label{ptcl:catch-up}
-TBD
+
+\subsection{Description}
+The \catchup{} mini protocol allows for nodes to obtain IB and EB
+blocks referenced by the chain. These will typically be too old to be
+diffused by the \relay{} and \fetch{} mini protocols, but are still
+relevant to reconstruct the ledger state. Additionally it covers
+certified EBs which are still recent enough for inclusion in a future
+ranking block, and any blocks they reference. This data, together with
+the base chain, is what is needed for a node to participate in future
+pipelines.
+
+The protocol should allow the consumer to divide the requests between
+different producers, and for the producer to have an efficient way to
+retrieve the requested blocks.
+
+The consumer should be able to retrieve the base chain through the
+other mini protocols, and so the EB references within. However, the
+slots of those EBs are unknown, as well as any indirect references.
+
+\paragraph{Requests}
+\begin{description}
+\item[EBs by RB range] given an RB range from its chain, the producer
+  should reply with all EBs which are (i) transitively referenced by RBs in that
+  range, (ii) not referenced by earlier RBs.
+\item[Recent certified EBs by slot range] given a slot range, the
+  producer should reply with all certified EBs which are (i) generated
+  in the slot range, (ii) not referenced by RBs\footnote{Restriction
+  (ii) is to avoid overlap with an RB range query, but could be dropped to save on complexity if not worth the saved bandwidth}. The start of the
+  slot range should be no earlier than the oldest slot an EB could be
+  generated in and still referenced in a future RB.
+\item[IBs by EB \point{} and slot range] given a \point{} for a
+  certified EB, the producer should reply with all the IBs which are (i)
+  generated in the given slot range, (ii) directly referenced by
+  the EB. The slot range allows for partitioning request about the
+  same EB across different peers.
+\end{description}
+\todo{Another option for IBs could be a list of refs and a slot range. The refs come from EB bodies, and the slot range can be calculated from the slot of the EB.}
+\todo{The protocol itself could be another variation of \fetch{} where requests are one of the above, and replies contain full blocks rather than just bodies.}
