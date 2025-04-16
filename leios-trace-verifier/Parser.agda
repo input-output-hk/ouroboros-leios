@@ -38,8 +38,8 @@ postulate
 #-}
 
 {-# COMPILE GHC Micro = type Data.Fixed.Micro #-}
-{-# COMPILE GHC Map = type M.Map #-}
-{-# COMPILE GHC Int = type Int #-}
+{-# COMPILE GHC Map   = type M.Map #-}
+{-# COMPILE GHC Int   = type Int #-}
 {-# COMPILE GHC elems = elems' #-}
 {-# COMPILE GHC trunc = trunc' #-}
 
@@ -118,7 +118,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   nodeId : String → Fin numberOfParties
   nodeId s with S.readMaybe 10 (S.fromList (drop (S.length nodePrefix) $ S.toList s))
   ... | nothing = error ("Unknown node: " S.++ s)
-  ... | just n = from-id n
+  ... | just n  = from-id n
 
   open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
@@ -129,121 +129,169 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
          (yes p) → record { rel = r ; left-unique-rel = l ; total-rel = p }
          (no _)  → error "Expected total map"
 
-  params : Params
-  params =
-    record
-      { numberOfParties = numberOfParties
-      ; sutId = SUT-id
-      ; stakeDistribution = sd
-      ; stageLength = sl
-      }
-
-  open import Leios.Short.Trace.Verifier params
-
   to-nodeId : ℕ → String
   to-nodeId n = nodePrefix S.++ show n
 
   SUT : String
   SUT = to-nodeId sutId
 
+  winningSlot : TraceEvent → Maybe (BlockType × ℕ)
+  winningSlot record { message = Slot _ _ }                     = nothing
+  winningSlot record { message = Cpu _ _ _ _ }                  = nothing
+  winningSlot record { message = NoIBGenerated _ _ }            = nothing
+  winningSlot record { message = NoEBGenerated _ _ }            = nothing
+  winningSlot record { message = NoVTBundleGenerated p _ }      = nothing
+  winningSlot record { message = IBSent _ _ _ _ _ _ }           = nothing
+  winningSlot record { message = EBSent _ _ _ _ _ _ }           = nothing
+  winningSlot record { message = VTBundleSent _ _ _ _ _ _ }     = nothing
+  winningSlot record { message = RBSent _ _ _ _ _ _ }           = nothing
+  winningSlot record { message = IBReceived _ _ _ _ _ _ }       = nothing
+  winningSlot record { message = EBReceived _ _ _ _ _ _ }       = nothing
+  winningSlot record { message = VTBundleReceived _ _ _ _ _ _ } = nothing
+  winningSlot record { message = RBReceived _ _ _ _ _ _ }       = nothing
+  winningSlot record { message = IBEnteredState _ _ _ }         = nothing
+  winningSlot record { message = EBEnteredState _ _ _ }         = nothing
+  winningSlot record { message = VTBundleEnteredState _ _ _ }   = nothing
+  winningSlot record { message = RBEnteredState _ _ _ }         = nothing
+  winningSlot record { message = IBGenerated p _ s _ _ _ _}
+    with p ≟ SUT
+  ... | yes _ = just (IB , primWord64ToNat s)
+  ... | no _  = nothing
+  winningSlot record { message = EBGenerated p _ s _ _ ibs }
+    with p ≟ SUT
+  ... | yes _ = just (EB , primWord64ToNat s)
+  ... | no _  = nothing
+  winningSlot record { message = VTBundleGenerated p i s _ _ vts }
+    with p ≟ SUT
+  ... | yes _ = just (VT , primWord64ToNat s)
+  ... | no _  = nothing
+  winningSlot record { message = RBGenerated _ _ _ _ _ _ _ _ }  = nothing
+
   EventLog = List TraceEvent
 
-  data Blk : Type where
-    IB-Blk : InputBlock → Blk
-    EB-Blk : EndorserBlock → Blk
-    VT-Blk : List Vote → Blk
+  module _ (l : EventLog) where
 
-  record State : Type where
-    field refs : AssocList String Blk
+    params : Params
+    params =
+      record
+        { numberOfParties   = numberOfParties
+        ; sutId             = SUT-id
+        ; stakeDistribution = sd
+        ; stageLength       = sl
+        ; winning-slots     = fromList (L.catMaybes $ L.map winningSlot l)
+        }
 
-  instance
-    hhx : Hashable InputBlock (List ℕ)
-    hhx .hash record { header = h } = hash h
+    open import Leios.Short.Trace.Verifier params
 
-  blockRefToNat : AssocList String Blk → String → IBRef
-  blockRefToNat refs r with refs ⁉ r
-  ... | just (IB-Blk ib) = hash ib
-  ... | just (EB-Blk _) = error "IB expected"
-  ... | just (VT-Blk _) = error "IB expected"
-  ... | nothing = error "IB expected"
+    data Blk : Type where
+      IB-Blk : InputBlock → Blk
+      EB-Blk : EndorserBlock → Blk
+      VT-Blk : List Vote → Blk
 
-  open State
+    record State : Type where
+      field refs : AssocList String Blk
+            ib-lottery : List ℕ
+            eb-lottery : List ℕ
+            vt-lottery : List ℕ
 
-  traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
-  traceEvent→action l record { message = Slot p s }
-    with p ≟ SUT
-  ... | yes _ = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
-  ... | no _ = l , []
-  traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
-  traceEvent→action l record { message = NoIBGenerated _ _ } = l , (inj₁ (No-IB-Role-Action , SLOT) ∷ [])
-  traceEvent→action l record { message = NoEBGenerated _ _ } = l , (inj₁ (No-EB-Role-Action , SLOT) ∷ [])
-  traceEvent→action l record { message = NoVTBundleGenerated _ _ } = l , (inj₁ (No-VT-Role-Action , SLOT) ∷ [])
-  traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = IBReceived _ p _ _ i _ }
-    with p ≟ SUT | refs l ⁉ i
-  ... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
-  ... | _ | _ = l , []
-  traceEvent→action l record { message = EBReceived _ p _ _ i _ }
-    with p ≟ SUT | refs l ⁉ i
-  ... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
-  ... | _ | _ = l , []
-  traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
-    with p ≟ SUT | refs l ⁉ i
-  ... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
-  ... | _ | _ = l , []
-  traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
-  traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
-  traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
-  traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
-  traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
-  traceEvent→action l record { message = IBGenerated p i s _ _ _ _}
-    with p ≟ SUT
-  ... | yes _ = l , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-  ... | no _  = let ib = record { header =
-                           record { slotNumber = primWord64ToNat s
-                                  ; producerID = nodeId p
-                                  ; lotteryPf  = tt
-                                  ; bodyHash   = [] -- TODO: txs
-                                  ; signature  = tt
-                                  }
-                                ; body = record { txs = [] } } -- TODO: add transactions
-                in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
-  traceEvent→action l record { message = EBGenerated p i s _ _ ibs }
-    with p ≟ SUT
-  ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
-  ... | no _ = let eb = record
-                          { slotNumber = primWord64ToNat s
-                          ; producerID = nodeId p
-                          ; lotteryPf  = tt
-                          ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
-                          ; ebRefs     = []
-                          ; signature  = tt
-                          }
-               in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
-  traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts }
-    with p ≟ SUT
-  ... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-  ... | no _ = let vt = map (const tt) (elems vts)
-               in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
-  traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
+    instance
+      hhx : Hashable InputBlock (List ℕ)
+      hhx .hash record { header = h } = hash h
 
-  mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
-  mapAccuml f s []       = s , []
-  mapAccuml f s (x ∷ xs) =
-    let (s' , y)   = f s x
-        (s'' , ys) = mapAccuml f s' xs
-    in s'' , y ∷ ys
+    blockRefToNat : AssocList String Blk → String → IBRef
+    blockRefToNat refs r with refs ⁉ r
+    ... | just (IB-Blk ib) = hash ib
+    ... | just (EB-Blk _)  = error "IB expected"
+    ... | just (VT-Blk _)  = error "IB expected"
+    ... | nothing          = error "IB expected"
 
-  opaque
-    unfolding List-Model
+    open State
 
-    verifyTrace : EventLog → ℕ
-    verifyTrace l =
-      let s₀ = record { refs = [] }
-          αs = L.reverse $ L.concat $ proj₂ (mapAccuml traceEvent→action s₀ l)
-      in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+    traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
+    traceEvent→action l record { message = Slot p s }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
+    ... | no _  = l , []
+    traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
+    traceEvent→action l record { message = NoIBGenerated p _ }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (No-IB-Role-Action , SLOT) ∷ [])
+    ... | no _  = l , []
+    traceEvent→action l record { message = NoEBGenerated p _ }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (No-EB-Role-Action , SLOT) ∷ [])
+    ... | no _  = l , []
+    traceEvent→action l record { message = NoVTBundleGenerated p _ }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (No-VT-Role-Action , SLOT) ∷ [])
+    ... | no _  = l , []
+    traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = RBSent _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = IBReceived _ p _ _ i _ }
+      with p ≟ SUT | refs l ⁉ i
+    ... | yes _ | just (IB-Blk ib) = l , inj₂ (IB-Recv-Update ib) ∷ []
+    ... | _ | _ = l , []
+    traceEvent→action l record { message = EBReceived _ p _ _ i _ }
+      with p ≟ SUT | refs l ⁉ i
+    ... | yes _ | just (EB-Blk eb) = l , inj₂ (EB-Recv-Update eb) ∷ []
+    ... | _ | _ = l , []
+    traceEvent→action l record { message = VTBundleReceived _ p _ _ i _ }
+      with p ≟ SUT | refs l ⁉ i
+    ... | yes _ | just (VT-Blk vt) = l , inj₂ (VT-Recv-Update vt) ∷ []
+    ... | _ | _ = l , []
+    traceEvent→action l record { message = RBReceived _ _ _ _ _ _ } = l , []
+    traceEvent→action l record { message = IBEnteredState _ _ _ } = l , []
+    traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
+    traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
+    traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
+    traceEvent→action l record { message = IBGenerated p i s _ _ _ _}
+      with p ≟ SUT
+    ... | yes _ = record l { ib-lottery = (primWord64ToNat s) ∷ ib-lottery l } , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+    ... | no _  = let ib = record { header =
+                             record { slotNumber = primWord64ToNat s
+                                    ; producerID = nodeId p
+                                    ; lotteryPf  = tt
+                                    ; bodyHash   = [] -- TODO: txs
+                                    ; signature  = tt
+                                    }
+                                  ; body = record { txs = [] } } -- TODO: add transactions
+                  in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
+    traceEvent→action l record { message = EBGenerated p i s _ _ ibs }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
+    ... | no _  = let eb = record
+                             { slotNumber = primWord64ToNat s
+                             ; producerID = nodeId p
+                             ; lotteryPf  = tt
+                             ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
+                             ; ebRefs     = []
+                             ; signature  = tt
+                             }
+                  in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
+    traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts }
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+    ... | no _  = let vt = map (const tt) (elems vts)
+                  in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
+    traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
 
-    {-# COMPILE GHC verifyTrace as verifyTrace #-}
+    mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
+    mapAccuml f s []       = s , []
+    mapAccuml f s (x ∷ xs) =
+      let (s' , y)   = f s x
+          (s'' , ys) = mapAccuml f s' xs
+      in s'' , y ∷ ys
+
+    opaque
+      unfolding List-Model
+
+      verifyTrace : ℕ
+      verifyTrace =
+        let s₀ = record { refs = [] ; ib-lottery = [] ; eb-lottery = []  ; vt-lottery = [] }
+            l' = proj₂ $ mapAccuml traceEvent→action s₀ l
+            αs = L.reverse (L.concat l')
+        in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+
+      {-# COMPILE GHC verifyTrace as verifyTrace #-}
