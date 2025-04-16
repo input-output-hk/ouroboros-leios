@@ -6,7 +6,7 @@ Agenda
 
 [2. Optimistic Ledger State References](#2-optimistic-ledger-state-references)
 
-3. Community
+[3. Community Discussion](#3-community-discussion)
 
 ## 2. Optimistic Ledger State References
 
@@ -140,3 +140,19 @@ Further analysis of the EB reference approach, particularly around:
    - EB ordering mechanisms
    - State reconstruction efficiency (computational cost)
    - Security guarantees
+
+## 3. Community Discussion
+### Summary of the Community Discussion
+
+On Day 3, the Leios team held a community-focused session to brainstorm ways to provide value to the Cardano community and collaborate on building a better Leios protocol. The discussion covered several key questions, with team members offering insights on communication, testing, use cases, and challenges:
+
+- **Community Feedback Needs**: The team debated how to explain Praos vs. Leios to the community, considering simple tags like “Cardano Safe” (Praos) vs. “Cardano Fast” (Leios), but felt these terms weren’t quite right. They agreed on seeking more community input on branding and explaining Leios’s benefits clearly.
+- **Communication Challenges**: The team noted that some Leios content risks being “engagement farmed” on platforms like X, where posts can be taken out of context. They emphasized staying proactive and clear to avoid misunderstandings.
+- **Testnet Opportunities**: There was excitement about letting the community test-drive Leios via a high-TPS testnet prototype (mentioned in a CEO call with Charles Hoskinson). This could let users experience Leios’s potential firsthand.
+- **Demonstrating Interest**: The team discussed measuring Leios’s impact, like estimating how much traffic it could bring to Cardano, and exploring commitments (e.g., MOUs) from community projects to use the high-throughput testnet.
+- **Beyond TPS Metrics**: To shift focus from just TPS, the team proposed creating a scorecard comparing Leios to other platforms, inspired by metrics from the Wyoming Stablecoin project. This is a to-do for DevRel to showcase Leios’s broader value.
+- **Tough Challenges**: The team acknowledged “tough pills” for Leios, including higher SPO costs, increased chaining delays, longer times to produce Ranking Blocks (RBs), loss of fee determinism, and sustainability concerns. Fees won’t decrease, and ideas like Mithril or heterogeneous node types were floated as potential solutions.
+- **Community Events**: Suggestions included a monthly “recap” meeting to distill insights for the community and a feedback-focused development sprint to gather requirements from the Leios community.
+- **Use Case Ideas**: The team brainstormed high-impact use cases to share, like a high-throughput trading competition, a multi-vendor point-of-sale solution, simulating all U.S. retail card swipes, or enabling safe collateral addition before liquidation.
+
+Overall, the session highlighted the team’s commitment to transparency, community collaboration, and showcasing Leios’s real-world potential, while addressing challenges head-on.
