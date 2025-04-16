@@ -5,7 +5,7 @@ set -e
 
 mkdir -p results
 
-for f in rbgen ebgen ibgen cpus receipts resources
+for f in resources rbgen ebgen ibgen cpus receipts
 do
   echo "----- $f -----"
   DIR=$(find runs -type f -name $f.csv.gz -printf %h\\n -quit)
@@ -25,5 +25,8 @@ do
       zcat "$g/$f.csv.gz" | sed -e "1d;s/^/$BL,/;s/null/NA/g" >> results/$f.csv
     fi
   done
-  gzip -9f results/$f.csv
+  gawk 'BEGIN {FS=","} {print NF}' results/$f.csv | sort -u
+  gzip -9f results/$f.csv &
 done
+echo "-----  -------"
+wait
