@@ -334,7 +334,8 @@ accounting for over 82.7% of the total egress. Input block (IB) body propagation
 is the second largest component at about 15.0% combined (edge + relay). All
 other components contribute less than 1% each to the total traffic.
 
-> [!Important] The above traffic breakdown is based on the baseline Leios
+> [!Important] 
+> The above traffic breakdown is based on the baseline Leios
 > configuration of 0.05 IB/s, which is equivalent to Praos's block rate for fair
 > comparison. However, it's crucial to note that different components scale
 > differently with higher IB/s rates:
