@@ -51,9 +51,7 @@ For any node type, we can calculate egress using these formulas:
 
 1. **Header Egress**:
 
-   $$
-   E_{headers} = N_{blocks} \times H \times P_{total}
-   $$
+   $$E_{headers} = N_{blocks} \times H \times P_{total}$$
    where:
    - $N_{blocks}$ = Number of blocks per month
    - $H$ = Header size in bytes
@@ -61,9 +59,7 @@ For any node type, we can calculate egress using these formulas:
 
 2. **Body Egress**:
 
-   $$
-   E_{bodies} = N_{blocks} \times B \times P_{requesting}
-   $$
+   $$E_{bodies} = N_{blocks} \times B \times P_{requesting}$$
    where:
    - $B$ = Body size in bytes
    - $P_{requesting}$ = Number of peers requesting bodies
