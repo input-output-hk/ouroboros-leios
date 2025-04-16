@@ -642,7 +642,7 @@ impl Node {
             let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
                 panic!("Tried voting for EB which we haven't received");
             };
-            match self.should_vote_for(slot, eb) {
+            match self.should_vote_for(eb) {
                 Ok(()) => true,
                 Err(reason) => {
                     self.tracker.track_no_vote(
@@ -670,12 +670,8 @@ impl Node {
             bytes: self.sim_config.sizes.vote_bundle(ebs.len()),
             ebs: ebs.into_iter().map(|eb| (eb, votes_allowed)).collect(),
         };
-        if !votes.ebs.is_empty() {
-            self.schedule_cpu_task(CpuTaskType::VTBundleGenerated(votes));
-            true
-        } else {
-            false
-        }
+        self.schedule_cpu_task(CpuTaskType::VTBundleGenerated(votes));
+        true
     }
 
     fn generate_input_blocks(&mut self, slot: u64) {
@@ -1389,17 +1385,20 @@ impl Node {
         Ok(())
     }
 
-    fn should_vote_for(&self, slot: u64, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
+    fn should_vote_for(&self, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
         let stage_length = self.sim_config.stage_length;
 
-        let Some(ib_slot_start) = slot.checked_sub(stage_length * 4) else {
-            // The IBs for this EB were "generated" before the sim began.
-            // It's valid iff there are no IBs.
-            return if eb.ibs.is_empty() {
-                Ok(())
-            } else {
-                Err(NoVoteReason::ExtraIB)
-            };
+        let ib_slot_start = match eb.pipeline.checked_sub(4) {
+            Some(x) => x * stage_length,
+            None => {
+                // The IBs for this EB were "generated" before the sim began.
+                // It's valid iff there are no IBs.
+                return if eb.ibs.is_empty() {
+                    Ok(())
+                } else {
+                    Err(NoVoteReason::ExtraIB)
+                };
+            }
         };
         let ib_slot_end = ib_slot_start + stage_length;
         let ib_slot_range = ib_slot_start..ib_slot_end;
