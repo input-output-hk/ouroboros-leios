@@ -31,16 +31,16 @@ Cardano Mainnet, April 2025.
 
 ### Network Topology Assumptions
 
-For our calculations, we consider a network with two types of nodes:
+For our calculations, we consider two types of nodes:
 
-- Relay nodes: Connect to multiple edge nodes and other relays
+- Relay nodes: Connect to other relays
 - Edge nodes: Connect to relay nodes but not to other edge nodes
 
 We make the following assumptions about the network:
 
 - [Default p2p configuration](https://book.world.dev.cardano.org/environments/mainnet/config.json):
-  20 peers per node
-- Network ratio: ~3 edge nodes per relay node
+  20 (upstream) peers per relay node
+- ~3 edge nodes per relay node
 - Block propagation model:
   - Headers: Propagated to 100% of peers
   - Bodies: Requested by ~10% of peers (2 out of 20)
