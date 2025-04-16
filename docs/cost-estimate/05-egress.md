@@ -96,37 +96,27 @@ Using our assumptions:
 
 1. **Header egress to edge nodes**:
 
-   $$
-   E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.39 \text{ GiB}
-   $$
+   $$E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.39 \text{ GiB}$$
 
 2. **Body egress to edge nodes**:
 
-   $$
-   E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 33.09 \text{ GiB}
-   $$
+   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 33.09 \text{ GiB}$$
 
 3. **Header egress to relay nodes**:
 
-   $$
-   E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes} \approx 2.51 \text{ GiB}
-   $$
+   $$E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes} \approx 2.51 \text{ GiB}$$
 
 4. **Body egress to relay nodes**:
 
-   $$
-   E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.06 \text{ GiB}
-   $$
+   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.06 \text{ GiB}$$
 
 5. **Total relay node egress**:
 
-   $$
-   E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}
-   $$
+   $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
 
-   $$
-   E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}
-   $$
+$$
+E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}
+$$
 
 ## Ouroboros Leios
 
