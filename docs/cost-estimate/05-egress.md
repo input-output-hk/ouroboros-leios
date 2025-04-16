@@ -165,7 +165,7 @@ We maintain the same network assumptions as Praos:
 - Block propagation model:
   - Headers: Propagated to 100% of peers
   - Bodies: Requested by ~10% of peers (2 out of 20)
-  - Votes: Propagated to 100% of relay nodes (not to edge nodes)
+  - Votes: Propagated only to downstream peers that request them (typically 1 peer requests each vote)
 
 ### Base Egress Formulas
 
@@ -205,11 +205,12 @@ For any node type, we calculate egress using these formulas:
 
 5. **Vote Egress**:
 
-   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times P_{total}$$
+   $$E_{votes} = N_{ebs} \times V \times N_{voters} \times P_{requesting\_votes}$$
    where:
    - $N_{ebs}$ = Number of EBs per month (197,100)
    - $V$ = Vote size in bytes
    - $N_{voters}$ = Number of voters (600)
+   - $P_{requesting\_votes}$ = Number of peers requesting votes (typically 1)
 
 6. **RB Header Egress**:
 
@@ -292,7 +293,7 @@ $$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.633 \approx 39.36 \text{ GiB
 
 5. **Vote egress to relay nodes**:
 
-   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 20 = 354,780,000,000 \text{ bytes} \approx 330.41 \text{ GiB}$$
+   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 1 = 17,739,000,000 \text{ bytes} \approx 16.52 \text{ GiB}$$
 
 6. **RB header egress to relay nodes**:
 
@@ -304,34 +305,32 @@ $$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.633 \approx 39.36 \text{ GiB
 
 Total relay-to-relay traffic:
 
-$$\approx 0.744 + 24.06 + 0.881 + 0.012 + 330.41 + 2.505 + 1.754 \approx 360.37 \text{ GiB/month}$$
+$$\approx 0.744 + 24.06 + 0.881 + 0.012 + 16.52 + 2.505 + 1.754 \approx 46.48 \text{ GiB/month}$$
 
 #### Total Relay Node Egress
 
-$$E_{total} = 39.36 + 360.37 \approx 399.73 \text{ GiB/month}$$
+$$E_{total} = 39.36 + 46.48 \approx 85.84 \text{ GiB/month}$$
 
 ### Traffic Components by Size (Descending)
 
 | Component                       | Size (GiB) | Percentage of Total |
 | ------------------------------- | ---------- | ------------------- |
-| Vote egress to relay nodes      | 330.41     | 82.7%               |
-| IB body egress to edge nodes    | 36.09      | 9.0%                |
-| IB body egress to relay nodes   | 24.06      | 6.0%                |
-| RB body egress to edge nodes    | 2.63       | 0.7%                |
-| RB header egress to relay nodes | 2.51       | 0.6%                |
-| RB body egress to relay nodes   | 1.75       | 0.4%                |
-| EB header egress to relay nodes | 0.88       | 0.2%                |
-| IB header egress to relay nodes | 0.74       | 0.2%                |
-| RB header egress to edge nodes  | 0.38       | 0.1%                |
-| EB header egress to edge nodes  | 0.13       | 0.03%               |
-| IB header egress to edge nodes  | 0.11       | 0.03%               |
-| EB body egress to relay nodes   | 0.01       | 0.003%              |
-| EB body egress to edge nodes    | 0.02       | 0.005%              |
+| IB body egress to edge nodes    | 36.09      | 42.0%               |
+| IB body egress to relay nodes   | 24.06      | 28.0%               |
+| Vote egress to relay nodes      | 16.52      | 19.2%               |
+| RB body egress to edge nodes    | 2.63       | 3.1%                |
+| RB header egress to relay nodes | 2.51       | 2.9%                |
+| RB body egress to relay nodes   | 1.75       | 2.0%                |
+| EB header egress to relay nodes | 0.88       | 1.0%                |
+| IB header egress to relay nodes | 0.74       | 0.9%                |
+| RB header egress to edge nodes  | 0.38       | 0.4%                |
+| EB header egress to edge nodes  | 0.13       | 0.2%                |
+| IB header egress to edge nodes  | 0.11       | 0.1%                |
+| EB body egress to edge nodes    | 0.02       | 0.02%               |
+| EB body egress to relay nodes   | 0.01       | 0.01%               |
 
-This breakdown shows that vote propagation dominates the network traffic,
-accounting for over 82.7% of the total egress. Input block (IB) body propagation
-is the second largest component at about 15.0% combined (edge + relay). All
-other components contribute less than 1% each to the total traffic.
+
+This breakdown shows IB body propagation dominates the network traffic, accounting for 70.0% of the total egress (42.0% to edge nodes and 28.0% to relay nodes). Vote propagation is the third largest component at 19.2% of the total traffic. All other components contribute less than 4% each to the total traffic.
 
 > [!Important] 
 > The above traffic breakdown is based on the baseline Leios
@@ -341,39 +340,42 @@ other components contribute less than 1% each to the total traffic.
 >
 > | IB/s Rate | Vote Traffic | IB Body to Edge Nodes | IB Body to Relay Nodes | Total Traffic |
 > |-----------|--------------|------------------------|------------------------|---------------|
-> | 0.05      | 330.41 GiB (82.7%) | 36.09 GiB (9.0%) | 24.06 GiB (6.0%) | 399.73 GiB |
-> | 1         | 330.41 GiB (21.4%) | 0.72 TiB (47.7%) | 0.48 TiB (31.8%) | 1.51 TiB |
-> | 10        | 330.41 GiB (2.6%) | 7.22 TiB (59.1%) | 4.81 TiB (39.4%) | 12.22 TiB |
-> | 20        | 330.41 GiB (1.3%) | 14.44 TiB (59.9%) | 9.62 TiB (39.9%) | 24.11 TiB |
-> | 30        | 330.41 GiB (0.9%) | 21.65 TiB (60.1%) | 14.44 TiB (40.1%) | 36.01 TiB |
+> | 0.05      | 16.52 GiB (19.2%) | 36.09 GiB (42.0%) | 24.06 GiB (28.0%) | 85.84 GiB |
+> | 1         | 16.52 GiB (1.4%) | 0.72 TiB (61.2%) | 0.48 TiB (40.8%) | 1.18 TiB |
+> | 10        | 16.52 GiB (0.1%) | 7.22 TiB (60.6%) | 4.81 TiB (40.4%) | 11.91 TiB |
+> | 20        | 16.52 GiB (0.1%) | 14.44 TiB (60.0%) | 9.62 TiB (40.0%) | 24.01 TiB |
+> | 30        | 16.52 GiB (0.0%) | 21.65 TiB (60.0%) | 14.44 TiB (40.0%) | 36.04 TiB |
 >
 > As shown above, at 30 IB/s (600 times the baseline rate), IB body traffic dominates at over 99% of the total traffic,
-> while vote traffic—initially the largest component at 0.05 IB/s—becomes less than 1% of the total.
+> while vote traffic—initially a significant component at 0.05 IB/s—becomes less than 0.1% of the total.
 
 ### Monthly Traffic per Node
 
-| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes      | RB Headers | RB Bodies | Total      | vs Praos |
-| ---- | ---------- | --------- | ---------- | --------- | ---------- | ---------- | --------- | ---------- | -------- |
-| 0.05 | 0.86 GiB   | 60.15 GiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 399.73 GiB | +578%    |
-| 1    | 17.12 GiB  | 1.17 TiB  | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 1.51 TiB   | +2,812%  |
-| 5    | 85.60 GiB  | 5.86 TiB  | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 6.27 TiB   | +11,965% |
-| 10   | 171.20 GiB | 11.73 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 12.22 TiB  | +23,358% |
-| 20   | 342.40 GiB | 23.45 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 24.11 TiB  | +46,144% |
-| 30   | 513.60 GiB | 35.18 TiB | 1.01 GiB   | 0.03 GiB  | 330.41 GiB | 2.88 GiB   | 4.39 GiB  | 36.01 TiB  | +68,929% |
+| IB/s | IB Headers | IB Bodies | EB Headers | EB Bodies | Votes     | RB Headers | RB Bodies | Total      | vs Praos |
+| ---- | ---------- | --------- | ---------- | --------- | --------- | ---------- | --------- | ---------- | -------- |
+| 0.05 | 0.86 GiB   | 60.15 GiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 85.84 GiB  | +48%     |
+| 1    | 17.12 GiB  | 1.17 TiB  | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 1.18 TiB   | +2,089%  |
+| 5    | 85.60 GiB  | 5.86 TiB  | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 5.95 TiB   | +11,350% |
+| 10   | 171.20 GiB | 11.73 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 11.91 TiB  | +22,743% |
+| 20   | 342.40 GiB | 23.45 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 23.80 TiB  | +45,529% |
+| 30   | 513.60 GiB | 35.18 TiB | 1.01 GiB   | 0.03 GiB  | 16.52 GiB | 2.88 GiB   | 4.39 GiB  | 35.69 TiB  | +68,314% |
+
+> [!NOTE]
+> These calculations assume fully utilized block space for Input Blocks (IBs). In practice, if blocks are not fully utilized, the actual egress for IB bodies would be proportionally lower based on the actual block utilization rate.
 
 ### Monthly Cost by Cloud Provider ($)
 
 | Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s  | 10 IB/s   | 20 IB/s   | 30 IB/s   | vs Praos |
 | --------------- | -------- | ------------------- | --------- | ------- | ------- | --------- | --------- | --------- | -------- |
-| Google Cloud    | $0.120   | 0                   | $47.97    | $181.20 | $752.40 | $1,466.40 | $2,893.20 | $4,321.20 | +578%    |
-| Railway         | $0.100   | 0                   | $39.97    | $151.00 | $627.00 | $1,222.00 | $2,411.00 | $3,601.00 | +578%    |
-| AWS             | $0.090   | 100                 | $26.98    | $135.90 | $564.30 | $1,099.80 | $2,169.90 | $3,240.90 | +578%    |
-| Microsoft Azure | $0.087   | 100                 | $26.08    | $131.37 | $545.49 | $1,063.14 | $2,097.57 | $3,132.87 | +578%    |
-| Alibaba Cloud   | $0.074   | 10                  | $28.88    | $111.74 | $463.98 | $904.28   | $1,784.14 | $2,664.74 | +578%    |
-| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $15.10  | $62.70  | $122.20   | $241.10   | $360.10   | +578%    |
-| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $12.84  | $53.30  | $103.87   | $204.94   | $306.09   | +578%    |
-| Linode          | $0.005   | 1,024–20,480        | $0.00     | $7.55   | $31.35  | $61.10    | $120.55   | $180.05   | +578%    |
-| Hetzner         | $0.00108 | 1,024               | $0.00     | $1.63   | $6.77   | $13.20    | $26.04    | $38.89    | +578%    |
+| Google Cloud    | $0.120   | 0                   | $10.30    | $141.60 | $714.00 | $1,429.20 | $2,856.00 | $4,282.80 | +48%     |
+| Railway         | $0.100   | 0                   | $8.58     | $118.00 | $595.00 | $1,191.00 | $2,380.00 | $3,569.00 | +48%     |
+| AWS             | $0.090   | 100                 | $0.00     | $108.00 | $535.50 | $1,071.90 | $2,142.00 | $3,212.10 | +48%     |
+| Microsoft Azure | $0.087   | 100                 | $0.00     | $104.40 | $518.50 | $1,036.17 | $2,070.60 | $3,105.03 | +48%     |
+| Alibaba Cloud   | $0.074   | 10                  | $5.61     | $87.32  | $440.30 | $881.34   | $1,761.20 | $2,641.06 | +48%     |
+| DigitalOcean    | $0.010   | 100–10,000          | $0.00     | $11.80  | $59.50  | $119.10   | $238.00   | $356.90   | +48%     |
+| Oracle Cloud    | $0.0085  | 10,240              | $0.00     | $0.00   | $50.58  | $101.24   | $202.30   | $303.37   | +48%     |
+| Linode          | $0.005   | 1,024–20,480        | $0.00     | $5.90   | $29.75  | $59.55    | $119.00   | $178.45   | +48%     |
+| Hetzner         | $0.00108 | 1,024               | $0.00     | $0.00   | $6.43   | $12.87    | $25.70    | $38.54    | +48%     |
 | UpCloud         | $0.000   | 1,024–24,576        | $0.00     | $0.00   | $0.00   | $0.00     | $0.00     | $0.00     | 0%       |
 
 Note: Percentage increases are calculated against Praos scenario A (20 peers)
