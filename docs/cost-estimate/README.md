@@ -11,11 +11,11 @@ percentages.
 
 | Cost Item                             | Unit      | Description                                |
 | ------------------------------------- | --------- | ------------------------------------------ |
-| [Compute (vCPU)](./02-compute-cpu.md) | $/vCPU/h  | Cost per virtual CPU per hour              |
-| [Compute (RAM)](./03-compute-ram.md)  | $/GB/h    | Cost per gigabyte of RAM per hour          |
-| [Storage (SSD)](./04-storage.md)      | $/GiB/mo  | Cost per gibibyte of SSD storage per month |
-| [Egress](./05-egress.md)              | $/GiB     | Cost per gibibyte of data transferred out  |
-| [IOPS](./06-iops.md)                  | $/IOPS/mo | Cost per IOPS per month                    |
+| [Compute (vCPU)](./01-compute-cpu.md) | $/vCPU/h  | Cost per virtual CPU per hour              |
+| [Compute (RAM)](./02-compute-ram.md)  | $/GB/h    | Cost per gigabyte of RAM per hour          |
+| [Storage (SSD)](./03-storage.md)      | $/GiB/mo  | Cost per gibibyte of SSD storage per month |
+| [Egress](./04-egress.md)              | $/GiB     | Cost per gibibyte of data transferred out  |
+| [IOPS](./05-iops.md)                  | $/IOPS/mo | Cost per IOPS per month                    |
 
 Follow the links above to see detailed cost estimates per item.
 
