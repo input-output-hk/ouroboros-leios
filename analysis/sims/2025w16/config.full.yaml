@@ -142,7 +142,7 @@ eb-diffusion-max-window-size: 100
 # In short leios we expect votes to diffuse within 3 stages lengths of
 # EB generation, we allow for 2 more stage lengths to account for
 # variance in the interval within RBs.
-eb-max-age-slots: 100
+eb-max-age-slots: 240
 
 # The maximum age of EBs to be relayed.
 # An EB from slot `s` will only be relayed
