@@ -1,5 +1,23 @@
 # Leios logbook
 
+## 2025-04-17
+
+### Simulation and analysis of Full Leios
+
+The Haskell and Rust simulators, at tag [leios-2025w16](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w16), were used to simulation 648 scenarios of Full and Short Leios for varied IB production rate, IB size, and EB production rate, stage length, and CPU contrainsts. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w16/analysis.ipynb](analysis/sims/2025w16/analysis.ipynb). These analyses were performed on the 100-node network and were adapted to the latest changes in the simulation log format.
+
+Two new output files are now computed:
+
+1. Summary of network, disk, and CPU resource usage over the course of the simulation.
+2. Vertices and edges of the "Leios graph", showing linkages between transactions, IBs, EBs, RBs, and votes. This can be visualized as an interactive web page.
+
+Findings:
+
+- Agreement between the Rust and Haskell simulations is generally quite close.
+- The Haskell simulation experiences network congestion at 16 IB/s, but the Rust simulation does not.
+- The Rust simulation uses more CPU at high IB rates than the Haskell simulation does.
+- The Rust simulation sometimes does not produce enough votes to certify an EB.
+
 ## 2025-04-13
 
 ### Haskell simulation
