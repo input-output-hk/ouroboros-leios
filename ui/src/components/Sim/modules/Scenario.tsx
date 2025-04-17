@@ -10,7 +10,7 @@ export const Scenario: FC = () => {
 
   useEffect(() => {
     (async () => {
-      const response = await fetch("scenarios.json");
+      const response = await fetch("visualizer/scenarios.json");
       const body: { scenarios: IScenario[] } = await response.json();
       const scenarios = body.scenarios.map(scenario => ({
         ...scenario,

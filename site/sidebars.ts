@@ -36,7 +36,7 @@ const sidebars: SidebarsConfig = {
         "development/cost-estimator",
         {
           type: "link",
-          href: "/visualizer/index.html",
+          href: "https://leios.cardano-scaling.org/visualizer",
           label: "Visualizer",
         },
       ],
