@@ -5,7 +5,7 @@
 > Ouroboros Praos and Leios consensus protocols. IOPS is a critical metric that 
 > directly impacts storage performance and cloud costs.
 >
-> **Note on Votes and Certifications**: In the Leios protocol, votes are ephemeral and not
+> **Assumption on Votes and Certifications**: In the Leios protocol, votes are ephemeral and not
 > persisted to disk. Votes are used to certify EBs, and these certifications are then
 > included in RBs. The certifications become part of the permanent blockchain record
 > once included in an RB.
