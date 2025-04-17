@@ -5,6 +5,7 @@ jq -c '
   select(.message.type == "RBGenerated")
 | {
     "rb": .message.id,
+    "node": .message.producer,
     "time": .time_s,
     "size": .message.size_bytes,
     "eb-count": (if .message.endorsement == null then 0 else 1 end)
