@@ -3,9 +3,6 @@ import { printBytes } from "@/utils";
 import { FC, useMemo, useRef } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-interface ILabelProps {
-}
-
 export const NodeStats: FC = () => {
   const {
     state: {
