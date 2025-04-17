@@ -28,17 +28,17 @@ Leios.
 \label{ptcl:relay}
 
 \newcommand{\StInit}  {\state{StInit}}
-\newcommand{\MsgInit} {\trans{MsgInit}}
+\newcommand{\MsgInit} {\msg{MsgInit}}
 \newcommand{\StIdsBlocking}    {\state{StIdsBlocking}}
 \newcommand{\StIdsNonBlocking} {\state{StIdsNonBlocking}}
 \newcommand{\StData}              {\state{StData}}
-\newcommand{\MsgRequestIdsNB}  {\trans{MsgRequestIdsNonBlocking}}
-\newcommand{\MsgRequestIdsB}   {\trans{MsgRequestIdsBlocking}}
-\newcommand{\MsgReplyIds}      {\trans{MsgReplyIds}}
-\newcommand{\MsgReplyIdsAndAnns}  {\trans{MsgReplyIdsAndAnns}}
-\newcommand{\MsgReplyIdsSlashAnns}  {\trans{MsgReplyIds\langle AndAnns\rangle}}
-\newcommand{\MsgRequestData}      {\trans{MsgRequestData}}
-\newcommand{\MsgReplyData}        {\trans{MsgReplyData}}
+\newcommand{\MsgRequestIdsNB}  {\msg{MsgRequestIdsNonBlocking}}
+\newcommand{\MsgRequestIdsB}   {\msg{MsgRequestIdsBlocking}}
+\newcommand{\MsgReplyIds}      {\msg{MsgReplyIds}}
+\newcommand{\MsgReplyIdsAndAnns}  {\msg{MsgReplyIdsAndAnns}}
+\newcommand{\MsgReplyIdsSlashAnns}  {\msg{MsgReplyIds\langle AndAnns\rangle}}
+\newcommand{\MsgRequestData}      {\msg{MsgRequestData}}
+\newcommand{\MsgReplyData}        {\msg{MsgReplyData}}
 \newcommand{\option}[1]{\text{#1}}
 \newcommand{\BoundedWindow} {\option{BoundedWindow}}
 \newcommand{\Announcements} {\option{Announcements}}
@@ -443,10 +443,10 @@ The \catchup{} mini protocol allows for nodes to obtain IB and EB
 blocks referenced by the chain. These will typically be too old to be
 diffused by the \relay{} and \fetch{} mini protocols, but are still
 relevant to reconstruct the ledger state. Additionally it covers
-certified EBs which are still recent enough for inclusion in a future
-ranking block, and any blocks they reference. This data, together with
-the base chain, is what is needed for a node to participate in future
-pipelines.
+certified EBs not yet in the chain but which are still recent enough
+for inclusion in a future ranking block, and any blocks they
+reference. This data, together with the base chain, is what is needed
+for a node to participate in future pipelines.
 
 The protocol should allow the consumer to divide the requests between
 different producers, and for the producer to have an efficient way to
@@ -474,6 +474,8 @@ slots of those EBs are unknown, as well as any indirect references.
   same EB across different peers.
 \end{description}
 \todo{Another option for IBs could be a list of refs and a slot range. The refs come from EB bodies, and the slot range can be calculated from the slot of the EB.}
+\todo{The \emph{IBs by EB \point{}, and \slot{} range} request could be replaced by just a list of IB \point{}s, if IB references are augmented with the slot.}
+\todo{The \emph{EBs by RB \rbrange{}} request could similarly be a list of EB \point{}s instead, if EB refs in RBs and EBs contain slot, and let the consumer discover referenced EBs it needs as it fetches the one it knows about.}
 
 \paragraph{Definition} The \catchup{} protocol is defined as a new instance of the \fetch{} protocol. We give the parameters as a grammar
 \[
