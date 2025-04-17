@@ -255,7 +255,6 @@ The producer must reply immediately (i.e. within a small timeout) to a non-block
 It replies with not more than the requested number of ids (possibly with an empty list).
 A blocking request on the other hand, waits until at least one datum is available.
 
-
 It must however observe several constraints that are necessary for a
 memory efficient implementation of the provider.
 
@@ -286,6 +285,16 @@ The consumer shall request ids in a blocking way when it does not
 intend on requesting any of the available datums.
 
 
+\paragraph{Equivocation handling} IB-relay, EB-relay, and Vote-relay must guard against the possibility of equivocations, i.e. the reuse of a generation opportunity for multiple different blocks.
+The \emph{message identifier} of an header is the pair of its
+generating node id and the slot it was generated for\footnote{for IBs/EBs also its subslot, in
+case generation frequency is greater than $1/\text{slot}$}. Two headers
+with the same message identifier constitute a \emph{proof of
+equivocation}, and the first header received with a given message
+identifier is the \emph{preferred header}. For headers with the same
+message identifier, only the first two should be relayed, furthermore
+only the body of the preferred header should be fetched.
+
 \section{\fetch{} mini-protocol}
 \label{ptcl:fetch}
 
@@ -299,12 +308,9 @@ intend on requesting any of the available datums.
 \newcommand{\MsgBody}{\msg{MsgBody}}
 \newcommand{\MsgBatchDone}{\msg{MsgBatchDone}}
 \newcommand{\MsgConsumerDone}{\msg{MsgConsumerDone}}
-\newcommand{\point}{\text{point}}
-\newcommand{\slot}{\text{slot}}
-\newcommand{\body}{\text{body}}
-\newcommand{\request}{\text{request}}
-\newcommand{\hash}{\text{hash}}
-\newcommand{\rbrange}{\text{range}}
+\newcommand{\point}{\text{point}} \newcommand{\slot}{\text{slot}}
+\newcommand{\body}{\text{body}} \newcommand{\request}{\text{request}}
+\newcommand{\hash}{\text{hash}} \newcommand{\rbrange}{\text{range}}
 \subsection{Description}
 
 The \fetch{} mini protocol enables a node to download block bodies.
