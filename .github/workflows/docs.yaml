@@ -5,12 +5,14 @@ on:
     paths:
       - "**/*.d2"
       - "site/**"
+      - "ui/**"
   push:
     branches:
       - main
     paths:
       - "**/*.d2"
       - "site/**"
+      - "ui/**"
 
 jobs:
   docs-generate-d2-diagrams:
