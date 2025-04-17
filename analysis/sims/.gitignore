@@ -9,3 +9,4 @@ stdout
 stderr
 *.csv.gz
 *.log.gz
+index.html
