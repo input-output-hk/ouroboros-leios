@@ -80,7 +80,7 @@ Using our base formulas with a typical edge node configuration:
 The monthly egress for a typical edge node:
 
 $$
-E_{edge} = N_{blocks} \times B \approx 131,400 \times 90,112 \text{ bytes} \approx 11.03 \text{ GiB/month}
+E_{edge} = N_{blocks} \times B \approx 131,400 \times 90,112 \text{ bytes} = 11,840,722,560 \text{ bytes} \approx 11.03 \text{ GiB/month}
 $$
 
 This forms our baseline for minimal node egress in a Praos network.
@@ -96,11 +96,11 @@ Using our assumptions:
 
 1. **Header egress to edge nodes**:
 
-   $$E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.39 \text{ GiB}$$
+   $$E_{headers}^{edge} = 131,400 \times 1,024 \times 3 = 403,983,360 \text{ bytes} \approx 0.376 \text{ GiB}$$
 
 2. **Body egress to edge nodes**:
 
-   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 33.09 \text{ GiB}$$
+   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 32.35 \text{ GiB}$$
 
 3. **Header egress to relay nodes**:
 
@@ -108,13 +108,13 @@ Using our assumptions:
 
 4. **Body egress to relay nodes**:
 
-   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.06 \text{ GiB}$$
+   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.05 \text{ GiB}$$
 
 5. **Total relay node egress**:
 
    $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
 
-$$E_{total} = 0.39 + 33.09 + 2.51 + 22.06 \approx 58.05 \text{ GiB/month}$$
+$$E_{total} = 0.376 + 32.35 + 2.51 + 22.05 \approx 57.29 \text{ GiB/month}$$
 
 ## Ouroboros Leios
 
