@@ -1,6 +1,7 @@
 # Compute (CPU) cost estimation per node
 
-> [!Note] This analysis assumes fully utilized block space for conservative
+> [!Note] 
+> This analysis assumes fully utilized block space for conservative
 > upper bound estimation.
 
 All CPU time values in this document are derived from the simulation
