@@ -36,7 +36,7 @@ const sidebars: SidebarsConfig = {
         "development/cost-estimator",
         {
           type: "link",
-          href: "/visualizer",
+          href: "/visualizer/index.html",
           label: "Visualizer",
         },
       ],
