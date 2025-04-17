@@ -18,6 +18,32 @@ Findings:
 - The Rust simulation uses more CPU at high IB rates than the Haskell simulation does.
 - The Rust simulation sometimes does not produce enough votes to certify an EB.
 
+## 2025-04-16
+
+### Leios IB rate for counteracting depletion of Reserves
+
+The analysis [Motivating Leios: Fees and rewards](analysis/epoch-utiilization.md) estimates the transaction throughput needed to maintain current reward levels on `mainnet` in the future. It assumes that fee-related protocol parameters remain the same in the future.
+
+- If Praos were fully utilized in terms of bytes and Plutus execution, it would generate approximately 446 thousand ADA per epoch.
+- Current rewards are approximately 8 million ADA per epoch.
+- The Reserve is being depleted at the rate of 12.8% per year.
+- In five years, the Reserve's contribution to rewards may drop by half.
+- The following table shows the rate of maximum-fee Praos-like blocks needed to maintain make up for the diminishing contribution of the Reserve. These correspond to the Leios input block (IB) production rate if Leios and Praos blocks were the same size and had the same fee structure.
+
+| Year   | IB rate [block/slot] |
+|-------:|----------------------|
+| `2025` |              `0.008` |
+| `2026` |              `0.112` |
+| `2027` |              `0.203` |
+| `2028` |              `0.284` |
+| `2029` |              `0.355` |
+| `2030` |              `0.418` |
+| `2031` |              `0.472` |
+| `2032` |              `0.521` |
+| `2033` |              `0.563` |
+| `2034` |              `0.601` |
+| `2035` |              `0.634` |
+
 ## 2025-04-13
 
 ### Haskell simulation
