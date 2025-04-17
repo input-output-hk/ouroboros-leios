@@ -100,21 +100,24 @@ Using our assumptions:
 
 2. **Body egress to edge nodes**:
 
-   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes} \approx 32.35 \text{ GiB}$$
+   $$E_{bodies}^{edge} = 131,400 \times 90,112 \times 3 = 35,522,167,680 \text{ bytes}$$
+   $$ \approx 33.08 \text{ GiB}$$
 
 3. **Header egress to relay nodes**:
 
-   $$E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes} \approx 2.51 \text{ GiB}$$
+   $$E_{headers}^{relay} = 131,400 \times 1,024 \times 20 = 2,693,222,400 \text{ bytes}$$
+   $$\approx 2.51 \text{ GiB}$$
 
 4. **Body egress to relay nodes**:
 
-   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes} \approx 22.05 \text{ GiB}$$
+   $$E_{bodies}^{relay} = 131,400 \times 90,112 \times 2 = 23,681,445,120 \text{ bytes}$$
+   $$\approx 22.05 \text{ GiB}$$
 
 5. **Total relay node egress**:
 
    $$E_{total} = E_{headers}^{edge} + E_{bodies}^{edge} + E_{headers}^{relay} + E_{bodies}^{relay}$$
 
-$$E_{total} = 0.376 + 32.35 + 2.51 + 22.05 \approx 57.29 \text{ GiB/month}$$
+$$E_{total} \approx 58.02 \text{ GiB/month}$$
 
 ## Ouroboros Leios
 
@@ -247,15 +250,18 @@ Using our assumptions:
 
 1. **IB header egress to edge nodes**:
 
-   $$E_{ib\_headers}^{edge} = 131,400 \times 304 \times 3 = 119,825,280 \text{ bytes} \approx 0.112 \text{ GiB}$$
+   $$E_{ib\_headers}^{edge} = 131,400 \times 304 \times 3 = 119,825,280 \text{ bytes}$$
+   $$\approx 0.112 \text{ GiB}$$
 
 2. **IB body egress to edge nodes**:
 
-   $$E_{ib\_bodies}^{edge} = 131,400 \times 98,304 \times 3 = 38,747,566,080 \text{ bytes} \approx 36.09 \text{ GiB}$$
+   $$E_{ib\_bodies}^{edge} = 131,400 \times 98,304 \times 3 = 38,747,566,080 \text{ bytes}$$
+   $$\approx 36.09 \text{ GiB}$$
 
 3. **EB header egress to edge nodes**:
 
-   $$E_{eb\_headers}^{edge} = 197,100 \times 240 \times 3 = 141,912,000 \text{ bytes} \approx 0.132 \text{ GiB}$$
+   $$E_{eb\_headers}^{edge} = 197,100 \times 240 \times 3 = 141,912,000 \text{ bytes}$$
+   $$\approx 0.132 \text{ GiB}$$
 
 4. **EB body egress to edge nodes**:
 
@@ -267,11 +273,12 @@ Using our assumptions:
 
 6. **RB body egress to edge nodes**:
 
-   $$E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,827,571,200 \text{ bytes} \approx 2.633 \text{ GiB}$$
+   $$E_{rb\_bodies}^{edge} = 131,400 \times 7,168 \times 3 = 2,827,571,200 \text{ bytes}$$
+   $$\approx 2.63 \text{ GiB}$$
 
 Total relay-to-edge traffic:
 
-$$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.633 \approx 39.36 \text{ GiB/month}$$
+$$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.63 \approx 39.36 \text{ GiB/month}$$
 
 #### Relay-to-Relay Traffic
 
@@ -293,7 +300,8 @@ $$\approx 0.112 + 36.09 + 0.132 + 0.018 + 0.376 + 2.633 \approx 39.36 \text{ GiB
 
 5. **Vote egress to relay nodes**:
 
-   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 1 = 17,739,000,000 \text{ bytes} \approx 16.52 \text{ GiB}$$
+   $$E_{votes}^{relay} = 197,100 \times 150 \times 600 \times 1 = 17,739,000,000 \text{ bytes}$$
+   $$\approx 16.52 \text{ GiB}$$
 
 6. **RB header egress to relay nodes**:
 
