@@ -1,6 +1,8 @@
 # Storage cost estimation per node
 
-> [!Note] **100% filled blocks assumption:**
+> [!Note] 
+> 
+> **100% filled blocks assumption:**
 >
 > This analysis assumes fully utilized block space for both Ouroboros Praos and
 > Leios protocols, similar to the egress analysis. We'll calculate storage
@@ -46,7 +48,7 @@ where:
 
 $$S_{monthly} = 91,136 \times 0.05 \times 2,628,000$$
 
-$$S_{monthly} = 11,973,196,800 \text{ bytes} \approx 11.97 \text{ GiB}$$
+$$S_{monthly} = 11,973,196,800 \text{ bytes} \approx 11.15 \text{ GiB}$$
 
 ### Ledger State
 
@@ -124,43 +126,43 @@ For a fair comparison, we calculate Leios storage at the same transaction
 throughput as Praos (0.05 blocks or IBs per second):
 
 1. **IB Storage**:
-   $$S_{IB} = 0.05 \times 2,628,000 \times 98,608 = 12,957,091,200 \text{ bytes} \approx 12.39 \text{ GiB}$$
+   $$S_{IB} = 0.05 \times 2,628,000 \times 98,608 = 12,957,091,200 \text{ bytes} \approx 12.07 \text{ GiB}$$
 
 2. **EB Storage**: At 0.05 IB/s and 20-second stages, each EB contains
    references to approximately 1 IB:
-   $$S_{EB} = 1.5 \times 131,400 \times (240 + 32 \times 1) = 1,065,744,000 \text{ bytes} \approx 1.02 \text{ GiB}$$
+   $$S_{EB} = 1.5 \times 131,400 \times (240 + 32 \times 1) = 53,690,400 \text{ bytes} \approx 0.05 \text{ GiB}$$
 
 3. **RB Storage**:
    $$S_{RB} = 1 \times 131,400 \times 8,192 = 1,076,428,800 \text{ bytes} \approx 1.00 \text{ GiB}$$
 
-4. **Total Storage**: $$S_{total} = 12.39 + 1.02 + 1.00 = 14.41 \text{ GiB}$$
+4. **Total Storage**: $$S_{total} = 12.07 + 0.05 + 1.00 = 13.12 \text{ GiB}$$
 
 ### Storage Component Analysis (at 0.05 IB/s)
 
 | Component | Storage Size | % of Total Chain State |
 | --------- | ------------ | ---------------------- |
-| IB        | 12.39 GiB    | 86.0%                  |
-| EB        | 1.02 GiB     | 7.1%                   |
-| RB        | 1.00 GiB     | 6.9%                   |
+| IB        | 12.07 GiB    | 92.0%                  |
+| EB        | 0.05 GiB     | 0.4%                   |
+| RB        | 1.00 GiB     | 7.6%                   |
 
-At the baseline rate, Input Blocks dominate the storage requirements (86.0%),
-with Endorsement Blocks and Ranking Blocks contributing similar smaller
-portions.
+At the baseline rate, Input Blocks dominate the storage requirements (92.0%),
+with Ranking Blocks contributing a smaller portion, and Endorsement Blocks
+having minimal impact.
 
 ### Monthly Storage at Higher IB Rates
 
 | IB/s | IB Storage   | EB Storage | RB Storage | Total Storage | vs Praos |
 | ---- | ------------ | ---------- | ---------- | ------------- | -------- |
-| 0.05 | 12.39 GiB    | 1.02 GiB   | 1.00 GiB   | 14.41 GiB     | +20%     |
-| 1    | 247.70 GiB   | 1.07 GiB   | 1.00 GiB   | 249.77 GiB    | +1,987%  |
-| 5    | 1,238.50 GiB | 1.27 GiB   | 1.00 GiB   | 1,240.77 GiB  | +10,266% |
-| 10   | 2,477.00 GiB | 1.52 GiB   | 1.00 GiB   | 2,479.52 GiB  | +20,615% |
-| 20   | 4,954.00 GiB | 2.01 GiB   | 1.00 GiB   | 4,957.01 GiB  | +41,312% |
-| 30   | 7,431.00 GiB | 2.51 GiB   | 1.00 GiB   | 7,434.51 GiB  | +62,009% |
+| 0.05 | 12.07 GiB    | 0.05 GiB   | 1.00 GiB   | 13.12 GiB     | +18%     |
+| 1    | 241.40 GiB   | 0.10 GiB   | 1.00 GiB   | 242.50 GiB    | +2,075%  |
+| 5    | 1,207.01 GiB | 0.25 GiB   | 1.00 GiB   | 1,208.26 GiB  | +10,737% |
+| 10   | 2,414.02 GiB | 0.45 GiB   | 1.00 GiB   | 2,415.47 GiB  | +21,563% |
+| 20   | 4,828.04 GiB | 0.85 GiB   | 1.00 GiB   | 4,829.89 GiB  | +43,217% |
+| 30   | 7,242.06 GiB | 1.25 GiB   | 1.00 GiB   | 7,244.31 GiB  | +64,872% |
 
 > [!Note]
 >
-> - Percentage increases are calculated against Praos baseline of 11.97
+> - Percentage increases are calculated against Praos baseline of 11.15
 >   GiB/month
 > - EB sizes vary slightly with IB/s rates as they contain references to IBs
 > - While Leios chain state could potentially be compressed by >70% based on
@@ -174,11 +176,11 @@ As the IB rate increases, the storage profile changes dramatically:
 
 | IB/s | IB Storage % | EB Storage % | RB Storage % |
 | ---- | ------------ | ------------ | ------------ |
-| 0.05 | 86.0%        | 7.1%         | 6.9%         |
-| 1    | 99.2%        | 0.4%         | 0.4%         |
-| 5    | 99.8%        | 0.1%         | 0.1%         |
-| 10   | 99.9%        | 0.1%         | <0.1%        |
-| 20   | 99.9%        | <0.1%        | <0.1%        |
+| 0.05 | 92.0%        | 0.4%         | 7.6%         |
+| 1    | 99.5%        | <0.1%        | 0.4%         |
+| 5    | 99.9%        | <0.1%        | <0.1%        |
+| 10   | >99.9%       | <0.1%        | <0.1%        |
+| 20   | >99.9%       | <0.1%        | <0.1%        |
 | 30   | >99.9%       | <0.1%        | <0.1%        |
 
 This shows that as throughput increases, Input Block storage completely
@@ -189,18 +191,18 @@ IB/s.
 
 ### Monthly Storage Cost by Cloud Provider ($)
 
-| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s | 5 IB/s  | 10 IB/s | 20 IB/s | 30 IB/s   |
-| --------------- | -------- | ------------------- | --------- | ------ | ------- | ------- | ------- | --------- |
-| Google Cloud    | $0.040   | 0                   | $0.58     | $9.99  | $49.63  | $99.18  | $198.28 | $297.38   |
-| Railway         | $0.150   | 0                   | $2.16     | $37.47 | $186.12 | $371.93 | $743.55 | $1,115.18 |
-| AWS             | $0.080   | 100                 | $0.00     | $12.00 | $91.26  | $190.36 | $388.56 | $586.76   |
-| Microsoft Azure | $0.075   | 100                 | $0.00     | $11.23 | $85.56  | $178.46 | $366.28 | $554.09   |
-| Alibaba Cloud   | $0.050   | 10                  | $0.22     | $12.00 | $61.54  | $123.48 | $247.61 | $371.73   |
-| DigitalOcean    | $0.100   | 100                 | $0.00     | $15.00 | $114.08 | $237.95 | $485.70 | $733.45   |
-| Oracle Cloud    | $0.0425  | 10,240              | $0.00     | $0.00  | $0.00   | $0.00   | $0.00   | $0.00     |
-| Linode          | $0.100   | 1,024               | $0.00     | $0.00  | $21.68  | $145.55 | $393.30 | $641.05   |
-| Hetzner         | $0.046   | 0                   | $0.66     | $11.49 | $57.07  | $114.06 | $228.02 | $342.00   |
-| UpCloud         | $0.056   | 1,024               | $0.00     | $0.00  | $12.15  | $81.56  | $219.83 | $358.15   |
+| Provider        | Price/GB | Free Allowance (GB) | 0.05 IB/s | 1 IB/s  | 5 IB/s  | 10 IB/s  | 20 IB/s  | 30 IB/s   |
+| --------------- | -------- | ------------------- | --------- | ------- | ------- | -------- | -------- | --------- |
+| Google Cloud    | $0.040   | 0                   | $0.52     | $9.70   | $48.33  | $96.62   | $193.20  | $289.77   |
+| Railway         | $0.150   | 0                   | $1.97     | $36.38  | $181.24 | $362.32  | $724.48  | $1,086.65 |
+| AWS             | $0.080   | 100                 | $0.00     | $11.40  | $88.66  | $185.24  | $378.39  | $571.54   |
+| Microsoft Azure | $0.075   | 100                 | $0.00     | $10.69  | $83.12  | $173.66  | $357.74  | $541.82   |
+| Alibaba Cloud   | $0.050   | 10                  | $0.16     | $11.63  | $59.91  | $120.27  | $241.00  | $361.72   |
+| DigitalOcean    | $0.100   | 100                 | $0.00     | $14.25  | $110.83 | $231.55  | $472.99  | $714.43   |
+| Oracle Cloud    | $0.0425  | 10,240              | $0.00     | $0.00   | $0.00   | $0.00    | $0.00    | $0.00     |
+| Linode          | $0.100   | 1,024               | $0.00     | $0.00   | $18.43  | $139.15  | $380.59  | $622.03   |
+| Hetzner         | $0.046   | 0                   | $0.60     | $11.16  | $55.58  | $111.11  | $222.17  | $333.24   |
+| UpCloud         | $0.056   | 1,024               | $0.00     | $0.00   | $10.30  | $77.88   | $213.67  | $349.27   |
 
 ## Storage Cost Sources
 
