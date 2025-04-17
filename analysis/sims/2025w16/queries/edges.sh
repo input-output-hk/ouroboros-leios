@@ -5,7 +5,7 @@ jq -c '
   select(.message.type | match("(RB|EB|IB|VTBundle)Generated$"))
 | (.message.type[0:2] + "|" + .message.id) as $from
 | (.time_s) as $time
-| if .message.type == "IBGenerated" then
+| if .message.type == "IBGenerated" and .message.transactions then
     [
       .message.transactions.[] | {
         from: $from,
@@ -13,7 +13,7 @@ jq -c '
         time: $time
       }
     ]
-  elif .message.type == "EBGenerated" then
+  elif .message.type == "EBGenerated" and .message.endorser_blocks then
     [
       .message.input_blocks.[] | {
         from: $from,
@@ -27,11 +27,18 @@ jq -c '
         time: $time
       }
     ]
+  elif .message.type == "EBGenerated" then
+    [
+      .message.input_blocks.[] | {
+        from: $from,
+        to: ("IB|" + .id),
+        time: $time
+      }
+    ]
   elif .message.type == "RBGenerated" and .message.endorsement then
     [
       {
-        from: $from,
-        to: ("RB|" + .message.parent.id),
+        from: $from, to: ("RB|" + .message.parent.id),
         time: $time
       }
     ] + [
