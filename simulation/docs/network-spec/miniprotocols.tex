@@ -179,10 +179,8 @@ Vote-relay  & No & No & hash & slot & vote-bundle & N/A & N/A \\
     \StInit             & \MsgInit            &                               & \StIdle             \\
     \StIdle             & \MsgRequestIdsB   & $\ack{}$,$\req{}$                   & \StIdsBlocking    \\
     \StIdsBlocking    & \MsgReplyIds      & $\langle (\id{}, \info{}) \rangle$  & \StIdle             \\
-    \StIdsBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
     \StIdle             & \MsgRequestIdsNB  & $\ack{}$,$\req{}$                   & \StIdsNonBlocking \\
     \StIdsNonBlocking & \MsgReplyIds      & $\langle (\id{}, \info{}) \rangle$  & \StIdle             \\
-    \StIdsNonBlocking    & \MsgReplyIdsAndAnns & $\langle (\id{}, \info{}) \rangle$,$\langle (\id{}, \ann{}) \rangle$   & \StIdle             \\
     \StIdle             & \MsgRequestData      & $\langle \id{} \rangle$         & \StData              \\
     \StData              & \MsgReplyData        & $\langle \datum{} \rangle$         & \StIdle             \\
     \StIdsBlocking   & \MsgDone            &                               & \StDone             \\
@@ -304,27 +302,31 @@ intend on requesting any of the available datums.
 \newcommand{\point}{\text{point}}
 \newcommand{\slot}{\text{slot}}
 \newcommand{\body}{\text{body}}
-
+\newcommand{\request}{\text{request}}
+\newcommand{\hash}{\text{hash}}
+\newcommand{\rbrange}{\text{range}}
 \subsection{Description}
 
-The \fetch{} mini protocol enables a node to download block bodies identified by a pair of slot and block id (i.e. hash). It is intended for on-the-fly block diffusion, complementing the \relay{} mini protocol.
-
-It is a minor variation of the Block Fetch mini protocol used for
-Praos blocks: IBs and EBs do not have a notion of range, so they are
+The \fetch{} mini protocol enables a node to download block bodies.
+It is a generalization of the BlockFetch mini protocol used for
+base blocks: IBs and EBs do not have a notion of range, so they are
 requested by individual identifiers.
+\todo{Generalizing from BlockFetch means we deliver bodies in a streaming fashion, is that appropriate for IBs and EBs?}
 
 \paragraph{Parameters} A \fetch{} instance is specified by these parameters
 \begin{description}
-\item [\id{}] Identifier for a body to fetch.
+\item [\request{}] request format for a sequence of blocks.
 \item [\body{}] Block body itself.
 \end{description}
 
-\paragraph{Instances} \fetch{} instances are listed in Table~{table:fetch-instances}. The \body{} descriptions included here are for illustration, in particular to clarify what we mean by \body{} of an Endorse block.
+\paragraph{Instances} \fetch{} instances are listed in Table~{table:fetch-instances}. The \body{} descriptions included here are for illustration, in particular to clarify what we mean by \body{} of an Endorse block. A \point{} is a pair of \slot{} and \hash{}, the \slot{} allows for better indexing. A \rbrange{} is a pair of two of $\point{} \mid \text{origin}$.
+The IB-fetch and EB-fetch instances are intended for on-the-fly block diffusion, complementing the corresponding \relay{} mini protocols.
 \begin{table}[h!]
 \begin{tabular}{l l l l l l l l}
-\header{instance} &  \header{\id{}} & \header{\body{}} \\\hline
-IB-fetch  & hash & $[\text{Tx}]$ \\
-EB-fetch  & hash & $([\text{IBRef}],[\text{EBRef}])$\\
+\header{instance} &  \header{\request{}} & \header{\body{}} \\\hline
+IB-fetch  & $[\point{}]$ & $[\text{Tx}]$ \\
+EB-fetch  & $[\point{}]$ & $([\text{IBRef}],[\text{EBRef}])$\\
+BlockFetch  & $\rbrange{}$ & $\text{RB body}$\\
 \end{tabular}
 \caption{\fetch{} mini-protocol instances.}
 \label{table:fetch-instances}
@@ -363,16 +365,13 @@ EB-fetch  & hash & $([\text{IBRef}],[\text{EBRef}])$\\
 \end{figure}
 
 \paragraph{Protocol messages}
-Let \point be a pair $(\slot{},\id)$. 
 \begin{description}
-\item [\MsgRequestBodies{} {\boldmath $[\point{}]$}]
+\item [\MsgRequestBodies{} {\boldmath $\request{}$}]
   The consumer requests a sequence of bodies from the producer.
-  \todo{If we keep the streaming setup, we could abstract from $[\point{}]$ to a \emph{sequence} parameter, allowing the original Block Fetch as an instance.} 
 \item [\MsgNoBlocks]
   The producer tells the consumer that it does not have all of the blocks in the requested sequence.
 \item [\MsgStartBatch]
   The producer starts body streaming.
-  \todo{Does a streaming setup still makes sense, or should we drop it in favor of pipelining?}
 \item [\MsgBody{} {\boldmath $(\body{})$}]
   Stream a single block's body.
 \item [\MsgBatchDone]
@@ -388,7 +387,7 @@ Transition table is shown in table~\ref{table:fetch}.
     \begin{tabular}{l|l|l|l}
       \header{from state} & \header{message} & \header{parameters} & \header{to state} \\\hline
       \StIdle       & \MsgConsumerDone   &            & \StDone      \\
-      \StIdle       & \MsgRequestBodies & $[\point{}]$    & \StBusy      \\
+      \StIdle       & \MsgRequestBodies & $\request{}$    & \StBusy      \\
       \StBusy       & \MsgNoBlocks     &            & \StIdle      \\
       \StBusy       & \MsgStartBatch   &            & \StStreaming \\
       \StStreaming  & \MsgBody        & $\body{}$     & \StStreaming \\
@@ -459,20 +458,31 @@ slots of those EBs are unknown, as well as any indirect references.
 
 \paragraph{Requests}
 \begin{description}
-\item[EBs by RB range] given an RB range from its chain, the producer
+\item[EBs by RB \rbrange{}] given an RB \rbrange{} from its chain, the producer
   should reply with all EBs which are (i) transitively referenced by RBs in that
   range, (ii) not referenced by earlier RBs.
-\item[Recent certified EBs by slot range] given a slot range, the
+\item[Recent certified EBs by \slot{} range] given a slot range, the
   producer should reply with all certified EBs which are (i) generated
   in the slot range, (ii) not referenced by RBs\footnote{Restriction
   (ii) is to avoid overlap with an RB range query, but could be dropped to save on complexity if not worth the saved bandwidth}. The start of the
   slot range should be no earlier than the oldest slot an EB could be
   generated in and still referenced in a future RB.
-\item[IBs by EB \point{} and slot range] given a \point{} for a
+\item[IBs by EB \point{}, and \slot{} range] given a \point{} for a
   certified EB, the producer should reply with all the IBs which are (i)
   generated in the given slot range, (ii) directly referenced by
   the EB. The slot range allows for partitioning request about the
   same EB across different peers.
 \end{description}
 \todo{Another option for IBs could be a list of refs and a slot range. The refs come from EB bodies, and the slot range can be calculated from the slot of the EB.}
-\todo{The protocol itself could be another variation of \fetch{} where requests are one of the above, and replies contain full blocks rather than just bodies.}
+
+\paragraph{Definition} The \catchup{} protocol is defined as a new instance of the \fetch{} protocol. We give the parameters as a grammar
+\[
+\begin{array}{l c l l}
+\request{}_{\catchup{}} & ::= & \text{ebs-by-rb-range}(\rbrange{})\\
+       & \mid  & \text{ebs-by-slot-range}(\slot{},\slot{})\\
+       & \mid  & \text{ibs-by-eb-and-slot-range}(\point{},(\slot{},\slot{}))\\
+\body{}_{\catchup{}} & ::= & \text{ib-block}(\text{ib-header},\text{ib-body}) \\
+        & \mid & \text{eb-block}(\text{eb-header}, \text{eb-body})\\
+\end{array}
+\]
+alternatively there could be separate protocols for IB and EB \catchup{}, so that there cannot be a format mismatch between requests and replies.
