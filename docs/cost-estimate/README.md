@@ -99,7 +99,7 @@ Where:
 
 We analyze three transaction size scenarios based on observed Cardano network data:
 
-| Transaction Type            | Size (bytes) | Txs/ Block (TPB) | Txs/sec (TPS) | Fee/Tx (ADA) |
+| Transaction Type            | Size (bytes) | Txs/ Block (TPB) | TPS (Praos)   | Fee/Tx (ADA) |
 | --------------------------- | ------------ | ---------------- | ------------- | ------------ |
 | **Average** since epoch 500 | 1,400        | ~70              | ~3.5          | 0.217062     |
 | **Minimum** size            | 250          | ~393             | ~19.65        | 0.166395     |
@@ -107,22 +107,6 @@ We analyze three transaction size scenarios based on observed Cardano network da
 
 > [!Note]
 > TPB and TPS calculations assume fully utilized blocks. In practice, utilization varies based on network demand.
-
-### Projected Revenue
-
-The following table shows projected revenue in ADA based on the different transaction size scenarios:
-
-| Transaction Type | Per Second | Per Minute | Per Hour   | Per Day     | Per Month (30d) |
-| --------------- | ---------- | ---------- | ---------- | ----------- | --------------- |
-| **Average**     | 0.76       | 45.60      | 2,735.79   | 65,658.96   | 1,969,768.85    |
-| **Minimum**     | 3.27       | 196.18     | 11,770.76  | 282,498.17  | 8,474,945.16    |
-| **Maximum**     | 0.26       | 15.50      | 930.21     | 22,325.01   | 669,750.34      |
-
-> [!Important]
-> These projections represent theoretical maximum revenue based on 100% block utilization and consistent transaction patterns. Actual revenue would vary based on network usage, transaction complexity, and market conditions.
-
-> [!Note]
-> The above calculations use current mainnet fee parameters and do not account for potential future parameter adjustments or protocol upgrades that might affect fee structures.
 
 ### Cost vs Revenue Analysis by IB Rate
 
