@@ -70,7 +70,6 @@ Blocks (RBs).
 | --------------- | -------------- | ----------------------------- |
 | Stage length    | 20 slots (20s) | `leios-stage-length-slots`    |
 | EBs per stage   | 1.5            | `eb-generation-probability`   |
-| RBs per stage   | 1              | Protocol parameter            |
 | Votes per EB    | 600            | `vote-generation-probability` |
 | Votes per stage | 900            | 600 votes/EB × 1.5 EBs/stage  |
 
