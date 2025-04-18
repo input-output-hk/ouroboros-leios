@@ -2,6 +2,17 @@
 
 ## 2025-04-18
 
+### Haskell simulation
+
+- Completed first draft of new mini protocols for leios diffusion
+  - see `simulation/docs/network-spec`
+  - Protocols modeled after BlockFetch and node-to-node Tx-Submission ones from ouroboros-network.
+  - IB-relay, EB-relay, Vote-relay for header diffusion and body (for IB and EB) announcements.
+  - IB-fetch, EB-fetch, for body diffusion.
+  - CatchUp protocol for older blocks.
+- renamed `short-leios` command to `leios` since it covers full variant too.
+  - `short-leios` is kept as alias for compatibility.
+
 ### Analysis of transaction lifecycle
 
 The Jupyter notebook [Analysis of transaction lifecycle](analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
