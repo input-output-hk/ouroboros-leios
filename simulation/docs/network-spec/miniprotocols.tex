@@ -441,6 +441,17 @@ a message.  If a timeout is violated the connection SHOULD be torn down.
 \end{table}
 \fi
 
+\paragraph{Implementation}
+The high-level description of the Leios protocol specifies
+freshest-first delivery for IB bodies, to circumvent attacks where a
+large amount of old IBs gets released by an adversary. The \relay{}
+mini protocol already takes a parameter that specifies which IBs are
+still new enough to be diffused, so older IBs are already
+deprioritized to only be accessible through the \catchup{} protocol,
+and only if referenced by other blocks.
+%
+Nevertheless consumers should take care to send approximately just enough body requests to utilize the available bandwidth, so that they have more choices, and more up to date information, when deciding which blocks to request from which peers.
+
 \section{\catchup{} mini-protocol}
 \label{ptcl:catch-up}
 
