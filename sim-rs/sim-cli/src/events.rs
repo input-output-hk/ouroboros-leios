@@ -1,10 +1,12 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
+    pin::Pin,
 };
 
 use aggregate::TraceAggregator;
 use anyhow::Result;
+use async_compression::tokio::write::GzipEncoder;
 use average::Variance;
 use itertools::Itertools as _;
 use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
@@ -17,7 +19,7 @@ use sim_core::{
 };
 use tokio::{
     fs::{self, File},
-    io::{AsyncWriteExt as _, BufWriter},
+    io::{AsyncWrite, AsyncWriteExt as _, BufWriter},
     sync::mpsc,
 };
 use tracing::{info, info_span};
@@ -27,6 +29,8 @@ mod aggregate;
 type InputBlockId = sim_core::model::InputBlockId<Node>;
 type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
 type VoteBundleId = sim_core::model::VoteBundleId<Node>;
+
+type TraceSink = Pin<Box<dyn AsyncWrite + Send + Sync + 'static>>;
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
@@ -130,9 +134,27 @@ impl EventMonitor {
             }
         }
 
-        let mut output = match self.output_path {
-            Some(ref path) => {
-                let file = File::create(path).await?;
+        let mut output = match self.output_path.as_mut() {
+            Some(path) => {
+                let file = File::create(&path).await?;
+
+                let mut gzipped = false;
+                if path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext == "gz")
+                {
+                    path.set_extension("");
+                    gzipped = true;
+                }
+
+                let file: TraceSink = if gzipped {
+                    let encoder = GzipEncoder::new(file);
+                    Box::pin(BufWriter::new(encoder))
+                } else {
+                    Box::pin(BufWriter::new(file))
+                };
+
                 let format = if path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -146,13 +168,10 @@ impl EventMonitor {
                     OutputTarget::AggregatedEventStream {
                         aggregation: TraceAggregator::new(),
                         format,
-                        file: BufWriter::new(file),
+                        file,
                     }
                 } else {
-                    OutputTarget::EventStream {
-                        format,
-                        file: BufWriter::new(file),
-                    }
+                    OutputTarget::EventStream { format, file }
                 }
             }
             None => OutputTarget::None,
@@ -592,11 +611,11 @@ enum OutputTarget {
     AggregatedEventStream {
         aggregation: TraceAggregator,
         format: OutputFormat,
-        file: BufWriter<File>,
+        file: TraceSink,
     },
     EventStream {
         format: OutputFormat,
-        file: BufWriter<File>,
+        file: TraceSink,
     },
     None,
 }
@@ -621,9 +640,9 @@ impl OutputTarget {
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(
+    async fn write_line<T: Serialize, W: AsyncWrite + Unpin>(
         format: OutputFormat,
-        file: &mut BufWriter<File>,
+        file: &mut W,
         event: T,
     ) -> Result<()> {
         match format {

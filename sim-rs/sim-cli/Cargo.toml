@@ -7,6 +7,7 @@ rust-version = "1.82"
 
 [dependencies]
 anyhow = "1"
+async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 average = "0.16"
 clap = { version = "4", features = ["derive"] }
 ctrlc = "3"
