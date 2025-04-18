@@ -7,10 +7,10 @@ import { parse } from "yaml";
 import { Coord2D, Node } from "../../../../data/simulation/topology";
 import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
-import { BatchSize } from "./modules/BatchSize";
 import { Controls } from "./modules/Controls";
 import { Scenario } from "./modules/Scenario";
 import { Progress } from "./modules/Slider";
+import { Speed } from "./modules/Speed";
 import { Stats } from "./modules/Stats";
 import { ITransformedNode } from "./types";
 
@@ -98,7 +98,7 @@ export const SimWrapper: FC = ({
             <Progress />
           </div>
           <div className="flex border-2 rounded-md p-4 border-gray-200 items-end justify-center gap-4 my-4 mx-auto bg-white/80 backdrop-blur-xs">
-            <BatchSize />
+            <Speed />
           </div>
         </div>
       </div>

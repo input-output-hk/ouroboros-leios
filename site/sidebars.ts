@@ -34,6 +34,11 @@ const sidebars: SidebarsConfig = {
         "development/throughput-simulation",
         "development/simulation-demonstration",
         "development/cost-estimator",
+        {
+          type: "link",
+          href: "https://leios.cardano-scaling.org/visualizer",
+          label: "Visualizer",
+        },
       ],
     },
   ],

@@ -1,9 +1,12 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
+    pin::Pin,
 };
 
+use aggregate::TraceAggregator;
 use anyhow::Result;
+use async_compression::tokio::write::GzipEncoder;
 use average::Variance;
 use itertools::Itertools as _;
 use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
@@ -16,14 +19,18 @@ use sim_core::{
 };
 use tokio::{
     fs::{self, File},
-    io::{AsyncWriteExt as _, BufWriter},
+    io::{AsyncWrite, AsyncWriteExt as _, BufWriter},
     sync::mpsc,
 };
 use tracing::{info, info_span};
 
+mod aggregate;
+
 type InputBlockId = sim_core::model::InputBlockId<Node>;
 type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
 type VoteBundleId = sim_core::model::VoteBundleId<Node>;
+
+type TraceSink = Pin<Box<dyn AsyncWrite + Send + Sync + 'static>>;
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
@@ -44,6 +51,7 @@ pub struct EventMonitor {
     maximum_eb_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
+    aggregate: bool,
 }
 
 impl EventMonitor {
@@ -67,6 +75,7 @@ impl EventMonitor {
             maximum_eb_age: config.max_eb_age,
             events_source,
             output_path,
+            aggregate: config.aggregate_events,
         }
     }
 
@@ -125,9 +134,27 @@ impl EventMonitor {
             }
         }
 
-        let mut output = match self.output_path {
-            Some(ref path) => {
-                let file = File::create(path).await?;
+        let mut output = match self.output_path.as_mut() {
+            Some(path) => {
+                let file = File::create(&path).await?;
+
+                let mut gzipped = false;
+                if path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext == "gz")
+                {
+                    path.set_extension("");
+                    gzipped = true;
+                }
+
+                let file: TraceSink = if gzipped {
+                    let encoder = GzipEncoder::new(file);
+                    Box::pin(BufWriter::new(encoder))
+                } else {
+                    Box::pin(BufWriter::new(file))
+                };
+
                 let format = if path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -137,9 +164,14 @@ impl EventMonitor {
                 } else {
                     OutputFormat::JsonStream
                 };
-                OutputTarget::EventStream {
-                    format,
-                    file: BufWriter::new(file),
+                if self.aggregate {
+                    OutputTarget::AggregatedEventStream {
+                        aggregation: TraceAggregator::new(),
+                        format,
+                        file,
+                    }
+                } else {
+                    OutputTarget::EventStream { format, file }
                 }
             }
             None => OutputTarget::None,
@@ -576,9 +608,14 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
 }
 
 enum OutputTarget {
+    AggregatedEventStream {
+        aggregation: TraceAggregator,
+        format: OutputFormat,
+        file: TraceSink,
+    },
     EventStream {
         format: OutputFormat,
-        file: BufWriter<File>,
+        file: TraceSink,
     },
     None,
 }
@@ -586,6 +623,15 @@ enum OutputTarget {
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                file,
+            } => {
+                if let Some(summary) = aggregation.process(event) {
+                    Self::write_line(*format, file, summary).await?;
+                }
+            }
             Self::EventStream { format, file } => {
                 Self::write_line(*format, file, event).await?;
             }
@@ -594,9 +640,9 @@ impl OutputTarget {
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(
+    async fn write_line<T: Serialize, W: AsyncWrite + Unpin>(
         format: OutputFormat,
-        file: &mut BufWriter<File>,
+        file: &mut W,
         event: T,
     ) -> Result<()> {
         match format {
@@ -615,6 +661,16 @@ impl OutputTarget {
 
     async fn flush(self) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                mut file,
+            } => {
+                if let Some(summary) = aggregation.finish() {
+                    Self::write_line(format, &mut file, summary).await?;
+                }
+                file.flush().await?;
+            }
             Self::EventStream { mut file, .. } => {
                 file.flush().await?;
             }
