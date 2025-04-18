@@ -169,6 +169,13 @@ This shows that at the Praos-equivalent rate of 0.05 IB/s, vote processing
 dominates CPU usage (75.2%), followed by certificate processing (14.3%) and IB
 processing (10.3%).
 
+> [!Note]
+> This analysis does not yet include estimates for:
+> - Transaction and mempool operations
+> - Ledger computation and state reconciliation
+> 
+> These components will contribute additional CPU overhead in a complete implementation.
+
 ### Comparative Efficiency (Leios vs. Praos)
 
 | IB/s | Leios CPU Time | Praos Equivalent CPU Time | Ratio (Leios:Praos) |
