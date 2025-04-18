@@ -1,5 +1,26 @@
 # Leios logbook
 
+## 2025-04-18
+
+### Analysis of transaction lifecycle
+
+The Jupyter notebook [Analysis of transaction lifecycle](analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
+
+![Probability of delay from transaction submission to its being referenced by an RB](analysis/tx-to-block.svg)
+
+The plot hints at the following:
+
+1. There seems little advantage to moving to stage lengths less than 10 slots.
+2. The number of shards should be kept small enough so that the IB rate per shard is high relative to the stage length.
+3. Low EB rates result in many orphaned IBs.
+4. Realistic parameter settings result in an approximately two-minute delay between transaction submission and its referencing by an RB.
+
+Potential next steps:
+
+- Translating this model into Delta QSD, so that network effects can be included.
+- Compare this model's results to output of the Rust simulator.
+- Elaborate the model in order to represent the memory-pool and ledger variants under consideration.
+
 ## 2025-04-17
 
 ### Simulation and analysis of Full Leios
