@@ -18,6 +18,9 @@ const createEventStream = async <T>(path: string, signal: AbortSignal): Promise<
   if (!res.body) {
     throw new Error("body not streamed");
   }
+  if (path.endsWith('.gz')) {
+    path = path.substring(0, path.length - 3);
+  }
   const transform = path.endsWith('.cbor') ? createCborTransformer() : createJsonTransformer();
   return res.body.pipeThrough(transform) as unknown as ReadableStream<T>;
 }
