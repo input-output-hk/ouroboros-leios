@@ -179,8 +179,6 @@ Altogether, a key registration occupies $28 + 96 + 2 \times 48 + 448 = 668$ byte
 
 Figure 7 of the [Fait Accompli paper](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/) provides the algorithm for determining which pools are persistent voters. The inequality for this determination can be computed exactly using rational arithmetic, so there is no danger of round-off errors. The input to the formula is the size of the committee and the distribution of stake among the pools. The Rust type [`fait_accompli::FaSortition`](src/fait_accompli.rs) implements this algorithm.
 
-[The Leios sortition](technical-report-1.md#sortition) for input blocks (IB), endorser blocks (EB), and votes allows the possibility that a block-producing node may be elected several times in the same slot (for IBs) or pipeline (for EBs and votes).
-
 The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the SHA-256 hash of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is 
 
 $$
@@ -196,6 +194,7 @@ Each vote has a weight, measured as stake. A quorum is achieved if the weights o
 
 The Rust function [`sortition::voter_check`](src/sortition.rs) implements this using rational arithmetic. The same implementation (but different $n$) applies to IBs, EBs, and votes.
 
+[The Leios sortition](../docs/technical-report-1.md#sortition) for input blocks (IB), endorser blocks (EB), and votes allows the possibility that a block-producing node may be elected several times in the same slot (for IBs) or pipeline (for EBs and votes). However, it may be desirable for to limit IBs and/or EBs to one per producer per slot: in this case, the probability of producing the block would be $\mathcal{P} := 1 - e^{- n\sigma}$.
 
 ##### Votes
 
