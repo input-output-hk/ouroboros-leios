@@ -21,6 +21,13 @@ License: Apache-2.0
 >
 > A short (\~200 word) description of the proposed solution and the technical issue being addressed.
 
+As Cardano evolves, there will be increasing demand for greater network  
+capacity to support new and existing users and applications. The long term  
+solution is to rebase Cardano on the new Ouroboros Leios protocol.  
+Ouroboros Leios is a new member of the Ouroboros family that is designed  
+specifically for high throughput, without compromising security. This will  
+meet expected future demands, providing a basis for continuing Cardano growth  
+and scalability.
 
 ## Motivation: why is this CIP necessary?
 
@@ -28,7 +35,30 @@ License: Apache-2.0
 > 
 > A clear explanation that introduces a proposal's purpose, use cases, and stakeholders. If the CIP changes an established design, it must outline design issues that motivate a rework. For complex proposals, authors must write a [Cardano Problem Statement (CPS) as defined in CIP-9999][CPS] and link to it as the `Motivation`.
 
+Cardano's current throughput (measured both in data rate and available script  
+execution time) is adequate for the current demand. There is also some  
+opportunity to increase the block sizes and script execution limits to meet  
+emerging future demands for increased network capacity. There are however  
+fundamental limits to how far the block size and the script execution budget  
+can be pushed, while maintaining system security.
 
+Under Ouroboros Praos, in order to ensure the security of the overall system,  
+blocks must be distributed across the network reliably in "" time slots.  
+This is set to be 5 seconds on the Cardano mainnet. The block relaying process  
+is an essentially serial process: blocks must be relayed between consecutive  
+block producer nodes through a series of intermediate relay nodes. The overall  
+time that this takes is proportional to the number of network hops between one  
+block producer and the next, and the network latency of each of those hops  
+(which must in general span the whole globe). Given that this must always  
+happen within 5 seconds, this puts a hard upper limit on how large each block  
+can be and also on how much time can be spent validating transactions and  
+scripts.
+
+In order to substantially scale beyond this requires changes to the underlying  
+blockchain algorithm. There are significant opportunities to scale: the  
+network and CPU resources on most nodes are almost idle much of the time. With  
+a different algorithm, these resources can be used to increase the total chain  
+bandwidth.
 ## Specification
 
 > [!NOTE]
@@ -149,8 +179,6 @@ Altogether, a key registration occupies $28 + 96 + 2 \times 48 + 448 = 668$ byte
 
 Figure 7 of the [Fait Accompli paper](https://iohk.io/en/research/library/papers/fait-accompli-committee-selection-improving-the-size-security-tradeoff-of-stake-based-committees/) provides the algorithm for determining which pools are persistent voters. The inequality for this determination can be computed exactly using rational arithmetic, so there is no danger of round-off errors. The input to the formula is the size of the committee and the distribution of stake among the pools. The Rust type [`fait_accompli::FaSortition`](src/fait_accompli.rs) implements this algorithm.
 
-[The Leios sortition](technical-report-1.md#sortition) for input blocks (IB), endorser blocks (EB), and votes allows the possibility that a block-producing node may be elected several times in the same slot (for IBs) or pipeline (for EBs and votes).
-
 The non-persistent pools are subject to local sortition (LS) for each vote, based on an updated stake distribution where the persistent voters have been removed and where the distribution is normalized to unit probability. The VRF value for that sortition is the bytes of the SHA-256 hash of the BLS signature on the election identifier $eid$. The probability that a pool with fraction $\sigma$ of the stake is awarded $k$ votes of the committee of $n$ votes is 
 
 $$
@@ -166,6 +194,7 @@ Each vote has a weight, measured as stake. A quorum is achieved if the weights o
 
 The Rust function [`sortition::voter_check`](src/sortition.rs) implements this using rational arithmetic. The same implementation (but different $n$) applies to IBs, EBs, and votes.
 
+[The Leios sortition](../docs/technical-report-1.md#sortition) for input blocks (IB), endorser blocks (EB), and votes allows the possibility that a block-producing node may be elected several times in the same slot (for IBs) or pipeline (for EBs and votes). However, it may be desirable for to limit IBs and/or EBs to one per producer per slot: in this case, the probability of producing the block would be $\mathcal{P} := 1 - e^{- n\sigma}$.
 
 ##### Votes
 

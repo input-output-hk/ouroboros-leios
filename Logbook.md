@@ -13,6 +13,10 @@
 - renamed `short-leios` command to `leios` since it covers full variant too.
   - `short-leios` is kept as alias for compatibility.
 
+### Revisions to cost dashboard
+
+The [cost dashboard](https://leios.cardano-scaling.org/cost-estimator/) was updated with lower and more realistic IO estimates.
+
 ### Analysis of transaction lifecycle
 
 The Jupyter notebook [Analysis of transaction lifecycle](analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
