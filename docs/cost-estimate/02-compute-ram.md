@@ -23,15 +23,15 @@ direct correlation between ledger size and RAM requirements.
 
 ### Memory Usage Formula
 
-$$M_{praos} = M_{base} + M_{utxo} + M_{stake} + M_{mempool} + M_{processing} + M_{runtime}$$
+$$M_{\text{praos}} = M_{\text{base}} + M_{\text{utxo}} + M_{\text{stake}} + M_{\text{mempool}} + M_{\text{processing}} + M_{\text{runtime}}$$
 
 where:
-- $M_{base}$ = Base process memory (500 MB)
-- $M_{utxo}$ = UTxO set size (varies with network activity)
-- $M_{stake}$ = Stake distribution data
-- $M_{mempool}$ = Mempool size (configurable)
-- $M_{processing}$ = Block processing memory
-- $M_{runtime}$ = Other runtime data
+- $M_{\text{base}}$ = Base process memory (500 MB)
+- $M_{\text{utxo}}$ = UTxO set size (varies with network activity)
+- $M_{\text{stake}}$ = Stake distribution data
+- $M_{\text{mempool}}$ = Mempool size (configurable)
+- $M_{\text{processing}}$ = Block processing memory
+- $M_{\text{runtime}}$ = Other runtime data
 
 ### Current State & Projection
 
@@ -60,16 +60,16 @@ The implementation favors write-optimized structures (e.g., LSM trees) and keeps
 
 ### Memory Component Formula
 
-$$M_{leios} = M_{base} + M_{cache} + M_{indexes} + M_{buffers} + M_{stake} + M_{mempool} + M_{consensus}$$
+$$M_{\text{leios}} = M_{\text{base}} + M_{\text{cache}} + M_{\text{indexes}} + M_{\text{buffers}} + M_{\text{stake}} + M_{\text{mempool}} + M_{\text{consensus}}$$
 
 where:
-- $M_{base}$ = Base process memory (500 MB)
-- $M_{cache}$ = Hot UTxO cache (200-500 MB)
-- $M_{indexes}$ = In-memory indexes and filters (100-300 MB)
-- $M_{buffers}$ = Write buffers (100-500 MB)
-- $M_{stake}$ = Stake distribution data
-- $M_{mempool}$ = Mempool size
-- $M_{consensus}$ = Consensus mechanism overhead (votes, certificates, etc.)
+- $M_{\text{base}}$ = Base process memory (500 MB)
+- $M_{\text{cache}}$ = Hot UTxO cache (200-500 MB)
+- $M_{\text{indexes}}$ = In-memory indexes and filters (100-300 MB)
+- $M_{\text{buffers}}$ = Write buffers (100-500 MB)
+- $M_{\text{stake}}$ = Stake distribution data
+- $M_{\text{mempool}}$ = Mempool size
+- $M_{\text{consensus}}$ = Consensus mechanism overhead (votes, certificates, etc.)
 
 ### Memory Component Sizes
 

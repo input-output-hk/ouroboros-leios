@@ -32,15 +32,15 @@ and ledger state updates.
 
 ### IOPS Rate Calculation
 
-$$IOPS_{praos} = R_{block} \times IOPS_{block}$$
+$$IOPS_{\text{praos}} = R_{\text{block}} \times IOPS_{\text{block}}$$
 
 where:
-- $R_{block}$ = Block production rate (blocks per second)
-- $IOPS_{block}$ = IOPS per block (4.1)
+- $R_{\text{block}}$ = Block production rate (blocks per second)
+- $IOPS_{\text{block}}$ = IOPS per block (4.1)
 
 ### Praos IOPS Calculation (0.05 blocks/s)
 
-$$IOPS_{praos} = 0.05 \times 4.1 = 0.205 \text{ IOPS/s}$$
+$$IOPS_{\text{praos}} = 0.05 \times 4.1 = 0.205 \text{ IOPS/s}$$
 
 At 0.05 blocks per second, Praos requires approximately:
 - 0.205 IOPS per second
@@ -98,18 +98,18 @@ are persistently stored as part of RBs.
 
 ### IOPS Formula for Leios
 
-$$IOPS_{total} = IOPS_{ib} + IOPS_{eb} + IOPS_{rb}$$
+$$IOPS_{\text{total}} = IOPS_{\text{ib}} + IOPS_{\text{eb}} + IOPS_{\text{rb}}$$
 
 Where:
 
 1. **IB IOPS**:
-   $$IOPS_{ib} = R_{ib} \times (Write_{ib} + Read_{ib} + State_{ib})$$
+   $$IOPS_{\text{ib}} = R_{\text{ib}} \times (Write_{\text{ib}} + Read_{\text{ib}} + State_{\text{ib}})$$
 
 2. **EB IOPS**:
-   $$IOPS_{eb} = \frac{N_{eb\_stage} \times (Write_{eb} + Read_{eb})}{S_{length}}$$
+   $$IOPS_{\text{eb}} = \frac{N_{\text{eb\_stage}} \times (Write_{\text{eb}} + Read_{\text{eb}})}{S_{\text{length}}}$$
 
 3. **RB IOPS**:
-   $$IOPS_{rb} = \frac{N_{rb\_stage} \times (Write_{rb} + Read_{rb} + State_{rb})}{S_{length}}$$
+   $$IOPS_{\text{rb}} = \frac{N_{\text{rb\_stage}} \times (Write_{\text{rb}} + Read_{\text{rb}} + State_{\text{rb}})}{S_{\text{length}}}$$
 
 ### IOPS Calculation at 0.05 IB/s
 
@@ -117,16 +117,16 @@ For a fair comparison, we calculate Leios IOPS at the same transaction throughpu
 as Praos (0.05 blocks or IBs per second):
 
 1. **IB IOPS**:
-   $$IOPS_{ib} = 0.05 \times (1 + 0.1 + 3) = 0.205 \text{ IOPS/s}$$
+   $$IOPS_{\text{ib}} = 0.05 \times (1 + 0.1 + 3) = 0.205 \text{ IOPS/s}$$
 
 2. **EB IOPS**:
-   $$IOPS_{eb} = \frac{1.5 \times (1 + 0.2)}{20} = 0.09 \text{ IOPS/s}$$
+   $$IOPS_{\text{eb}} = \frac{1.5 \times (1 + 0.2)}{20} = 0.09 \text{ IOPS/s}$$
 
 3. **RB IOPS**:
-   $$IOPS_{rb} = \frac{1 \times (1 + 0.2 + 1)}{20} = 0.11 \text{ IOPS/s}$$
+   $$IOPS_{\text{rb}} = \frac{1 \times (1 + 0.2 + 1)}{20} = 0.11 \text{ IOPS/s}$$
 
 4. **Total IOPS**:
-   $$IOPS_{total} = 0.205 + 0.09 + 0.11 = 0.405 \text{ IOPS/s}$$
+   $$IOPS_{\text{total}} = 0.205 + 0.09 + 0.11 = 0.405 \text{ IOPS/s}$$
 
 At 0.05 IB/s, Leios requires approximately 0.405 IOPS per second, which is about 
 24.3 IOPS per minute or 1,458 IOPS per hour. This is approximately 2 times higher 

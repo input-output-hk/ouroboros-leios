@@ -35,20 +35,20 @@ In Praos, storage is primarily used for maintaining the blockchain history.
 
 ### Monthly Storage Formula
 
-$$S_{monthly} = B_{size} \times R_{block} \times T_{month}$$
+$$S_{\text{monthly}} = B_{\text{size}} \times R_{\text{block}} \times T_{\text{month}}$$
 
 where:
 
-- $S_{monthly}$ = Monthly storage requirement in bytes
-- $B_{size}$ = Size of each block in bytes
-- $R_{block}$ = Block production rate (blocks per second)
-- $T_{month}$ = Number of seconds in a month (30.4167 days = 2,628,000 seconds)
+- $S_{\text{monthly}}$ = Monthly storage requirement in bytes
+- $B_{\text{size}}$ = Size of each block in bytes
+- $R_{\text{block}}$ = Block production rate (blocks per second)
+- $T_{\text{month}}$ = Number of seconds in a month (30.4167 days = 2,628,000 seconds)
 
 ### Monthly Storage Calculation
 
-$$S_{monthly} = 91,136 \times 0.05 \times 2,628,000$$
+$$S_{\text{monthly}} = 91,136 \times 0.05 \times 2,628,000$$
 
-$$S_{monthly} = 11,973,196,800 \text{ bytes} \approx 11.15 \text{ GiB}$$
+$$S_{\text{monthly}} = 11,973,196,800 \text{ bytes} \approx 11.15 \text{ GiB}$$
 
 ### Ledger State
 
@@ -97,28 +97,28 @@ requirements.
 
 ### Storage Formulas
 
-1. **IB Storage**: $$S_{IB} = R_{IB} \times T_{month} \times Size_{IB}$$
+1. **IB Storage**: $$S_{\text{IB}} = R_{\text{IB}} \times T_{\text{month}} \times \text{Size}_{\text{IB}}$$
    where:
-   - $R_{IB}$ = Input Block rate (IB/s)
-   - $T_{month}$ = Number of seconds in a month (2,628,000)
-   - $Size_{IB}$ = Size of each IB in bytes (98,608)
+   - $R_{\text{IB}}$ = Input Block rate (IB/s)
+   - $T_{\text{month}}$ = Number of seconds in a month (2,628,000)
+   - $\text{Size}_{\text{IB}}$ = Size of each IB in bytes (98,608)
 
 2. **EB Storage**:
-   $$S_{EB} = N_{EB\_stage} \times N_{stages} \times (Size_{EB\_header} + Size_{EB\_body} \times N_{IB\_refs})$$
+   $$S_{\text{EB}} = N_{\text{EB\_stage}} \times N_{\text{stages}} \times (\text{Size}_{\text{EB\_header}} + \text{Size}_{\text{EB\_body}} \times N_{\text{IB\_refs}})$$
    where:
-   - $N_{EB\_stage}$ = Number of EBs per stage (1.5)
-   - $N_{stages}$ = Number of stages per month (131,400)
-   - $Size_{EB\_header}$ = EB header size (240 bytes)
-   - $Size_{EB\_body}$ = EB body size per reference (32 bytes)
-   - $N_{IB\_refs}$ = Number of IB references per EB (varies by IB rate)
+   - $N_{\text{EB\_stage}}$ = Number of EBs per stage (1.5)
+   - $N_{\text{stages}}$ = Number of stages per month (131,400)
+   - $\text{Size}_{\text{EB\_header}}$ = EB header size (240 bytes)
+   - $\text{Size}_{\text{EB\_body}}$ = EB body size per reference (32 bytes)
+   - $N_{\text{IB\_refs}}$ = Number of IB references per EB (varies by IB rate)
 
-3. **RB Storage**: $$S_{RB} = N_{RB\_stage} \times N_{stages} \times Size_{RB}$$
+3. **RB Storage**: $$S_{\text{RB}} = N_{\text{RB\_stage}} \times N_{\text{stages}} \times \text{Size}_{\text{RB}}$$
    where:
-   - $N_{RB\_stage}$ = Number of RBs per stage (1)
-   - $N_{stages}$ = Number of stages per month (131,400)
-   - $Size_{RB}$ = Size of each RB (8,192 bytes = header + certificate)
+   - $N_{\text{RB\_stage}}$ = Number of RBs per stage (1)
+   - $N_{\text{stages}}$ = Number of stages per month (131,400)
+   - $\text{Size}_{\text{RB}}$ = Size of each RB (8,192 bytes = header + certificate)
 
-4. **Total Chain State Storage**: $$S_{total} = S_{IB} + S_{EB} + S_{RB}$$
+4. **Total Chain State Storage**: $$S_{\text{total}} = S_{\text{IB}} + S_{\text{EB}} + S_{\text{RB}}$$
 
 ### Storage Calculation (0.05 IB/s)
 
@@ -126,16 +126,16 @@ For a fair comparison, we calculate Leios storage at the same transaction
 throughput as Praos (0.05 blocks or IBs per second):
 
 1. **IB Storage**:
-   $$S_{IB} = 0.05 \times 2,628,000 \times 98,608 = 12,957,091,200 \text{ bytes} \approx 12.07 \text{ GiB}$$
+   $$S_{\text{IB}} = 0.05 \times 2,628,000 \times 98,608 = 12,957,091,200 \text{ bytes} \approx 12.07 \text{ GiB}$$
 
 2. **EB Storage**: At 0.05 IB/s and 20-second stages, each EB contains
    references to approximately 1 IB:
-   $$S_{EB} = 1.5 \times 131,400 \times (240 + 32 \times 1) = 53,690,400 \text{ bytes} \approx 0.05 \text{ GiB}$$
+   $$S_{\text{EB}} = 1.5 \times 131,400 \times (240 + 32 \times 1) = 53,690,400 \text{ bytes} \approx 0.05 \text{ GiB}$$
 
 3. **RB Storage**:
-   $$S_{RB} = 1 \times 131,400 \times 8,192 = 1,076,428,800 \text{ bytes} \approx 1.00 \text{ GiB}$$
+   $$S_{\text{RB}} = 1 \times 131,400 \times 8,192 = 1,076,428,800 \text{ bytes} \approx 1.00 \text{ GiB}$$
 
-4. **Total Storage**: $$S_{total} = 12.07 + 0.05 + 1.00 = 13.12 \text{ GiB}$$
+4. **Total Storage**: $$S_{\text{total}} = 12.07 + 0.05 + 1.00 = 13.12 \text{ GiB}$$
 
 ### Storage Component Analysis (at 0.05 IB/s)
 

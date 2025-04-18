@@ -29,21 +29,21 @@ comes from block validation:
 
 ### CPU Utilization Formula
 
-$$C_{praos} = N_{blocks} \times (H_{validation} + B_{validation})$$
+$$C_{\text{praos}} = N_{\text{blocks}} \times (H_{\text{validation}} + B_{\text{validation}})$$
 
 where:
 
-- $N_{blocks}$ = Blocks per second
-- $H_{validation}$ = Header validation time in ms
-- $B_{validation}$ = Body validation time in ms (constant + per-byte component)
+- $N_{\text{blocks}}$ = Blocks per second
+- $H_{\text{validation}}$ = Header validation time in ms
+- $B_{\text{validation}}$ = Body validation time in ms (constant + per-byte component)
 
 ### Praos CPU Calculation (0.05 blocks/s)
 
-$$C_{praos} = 0.05 \times (1 + (50 + 90,112 \times 0.0005))$$
+$$C_{\text{praos}} = 0.05 \times (1 + (50 + 90,112 \times 0.0005))$$
 
-$$C_{praos} = 0.05 \times (1 + 95.06)$$
+$$C_{\text{praos}} = 0.05 \times (1 + 95.06)$$
 
-$$C_{praos} = 0.05 \times 96.06 \approx 4.8\text{ ms/s}$$
+$$C_{\text{praos}} = 0.05 \times 96.06 \approx 4.8\text{ ms/s}$$
 
 Thus, Praos at 0.05 blocks/s consumes approximately 4.8ms of CPU time per
 second, which is about 0.48% of a single CPU core.
@@ -78,61 +78,61 @@ Blocks (RBs).
 
 1. **IB Processing CPU**:
 
-   $$C_{ib} = N_{ib} \times (H_{ib} + B_{ib})$$
+   $$C_{\text{ib}} = N_{\text{ib}} \times (H_{\text{ib}} + B_{\text{ib}})$$
    where:
-   - $N_{ib}$ = Number of IBs per second
-   - $H_{ib}$ = IB header validation time (1ms)
-   - $B_{ib}$ = IB body validation time (50ms + 98,304×0.0005ms = 99.15ms)
+   - $N_{\text{ib}}$ = Number of IBs per second
+   - $H_{\text{ib}}$ = IB header validation time (1ms)
+   - $B_{\text{ib}}$ = IB body validation time (50ms + 98,304×0.0005ms = 99.15ms)
 
 2. **EB Processing CPU**:
 
-   $$C_{eb} = \frac{N_{eb} \times T_{eb}}{S_{length}}$$
+   $$C_{\text{eb}} = \frac{N_{\text{eb}} \times T_{\text{eb}}}{S_{\text{length}}}$$
    where:
-   - $N_{eb}$ = Number of EBs per stage (1.5)
-   - $T_{eb}$ = EB validation time (1ms)
-   - $S_{length}$ = Stage length in seconds (20s)
+   - $N_{\text{eb}}$ = Number of EBs per stage (1.5)
+   - $T_{\text{eb}}$ = EB validation time (1ms)
+   - $S_{\text{length}}$ = Stage length in seconds (20s)
 
 3. **Vote Processing CPU**:
 
-   $$C_{vote} = \frac{N_{votes} \times T_{vote}}{S_{length}}$$
+   $$C_{\text{vote}} = \frac{N_{\text{votes}} \times T_{\text{vote}}}{S_{\text{length}}}$$
    where:
-   - $N_{votes}$ = Number of votes per stage (900)
-   - $T_{vote}$ = Vote validation time (0.816ms)
-   - $S_{length}$ = Stage length in seconds (20s)
+   - $N_{\text{votes}}$ = Number of votes per stage (900)
+   - $T_{\text{vote}}$ = Vote validation time (0.816ms)
+   - $S_{\text{length}}$ = Stage length in seconds (20s)
 
 4. **Certificate Processing CPU**:
 
-   $$C_{cert} = \frac{N_{cert} \times T_{cert}}{S_{length}}$$
+   $$C_{\text{cert}} = \frac{N_{\text{cert}} \times T_{\text{cert}}}{S_{\text{length}}}$$
    where:
-   - $N_{cert}$ = Number of certificates per stage (1)
-   - $T_{cert}$ = Certificate validation time (140ms)
-   - $S_{length}$ = Stage length in seconds (20s)
+   - $N_{\text{cert}}$ = Number of certificates per stage (1)
+   - $T_{\text{cert}}$ = Certificate validation time (140ms)
+   - $S_{\text{length}}$ = Stage length in seconds (20s)
 
 5. **Total CPU Usage**:
 
-   $$C_{total} = C_{ib} + C_{eb} + C_{vote} + C_{cert}$$
+   $$C_{\text{total}} = C_{\text{ib}} + C_{\text{eb}} + C_{\text{vote}} + C_{\text{cert}}$$
 
 ### CPU Time Calculation at 0.05 IB/s (equivalent to Praos rate)
 
 1. **IB Processing**:
 
-   $$C_{ib} = 0.05 \times (1 + 99.15) = 5.01\text{ ms/s}$$
+   $$C_{\text{ib}} = 0.05 \times (1 + 99.15) = 5.01\text{ ms/s}$$
 
 2. **EB Processing**:
 
-   $$C_{eb} = \frac{1.5 \times 1}{20} = 0.075\text{ ms/s}$$
+   $$C_{\text{eb}} = \frac{1.5 \times 1}{20} = 0.075\text{ ms/s}$$
 
 3. **Vote Processing**:
 
-   $$C_{vote} = \frac{900 \times 0.816}{20} = 36.72\text{ ms/s}$$
+   $$C_{\text{vote}} = \frac{900 \times 0.816}{20} = 36.72\text{ ms/s}$$
 
 4. **Certificate Processing**:
 
-   $$C_{cert} = \frac{1 \times 140}{20} = 7.0\text{ ms/s}$$
+   $$C_{\text{cert}} = \frac{1 \times 140}{20} = 7.0\text{ ms/s}$$
 
 5. **Total CPU Usage**:
 
-   $$C_{total} = 5.01 + 0.075 + 36.72 + 7.0 = 48.81\text{ ms/s}$$
+   $$C_{\text{total}} = 5.01 + 0.075 + 36.72 + 7.0 = 48.81\text{ ms/s}$$
 
 Thus, at 0.05 IB/s, Leios consumes approximately 48.8ms of CPU time per second,
 which is about 4.9% of a single CPU core.
