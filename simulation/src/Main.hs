@@ -262,10 +262,15 @@ parserVizSubCommand =
     , command "short-leios-1" . info (pure VizShortLeios1) $
         progDesc
           "A simulation of two nodes running Short Leios."
-    , command "short-leios-p2p-1" . info (parserShortLeiosP2P1 <**> helper) $
+    , command "short-leios-p2p-1" . info leiosP2P $
         progDesc
-          "A simulation of 100 nodes running Short Leios."
+          "Alias for leios-p2p-1."
+    , command "leios-p2p-1" . info leiosP2P $
+        progDesc
+          "A simulation of 100 nodes running Leios."
     ]
+ where
+  leiosP2P = parserShortLeiosP2P1 <**> helper
 
 parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
@@ -430,10 +435,14 @@ parserSimCommand =
   subparser . mconcat $
     [ commandGroup "Available simulations:"
     , command "praos-diffusion" . info (parserSimPraosDiffusion <**> helper) $
-        progDesc ""
-    , command "short-leios" . info (parserShortLeios <**> helper) $
-        progDesc ""
+        progDesc "Praos simulation."
+    , command "short-leios" . info leios $
+        progDesc "Alias for `leios`."
+    , command "leios" . info leios $
+        progDesc "Leios simulation."
     ]
+ where
+  leios = parserShortLeios <**> helper
 
 parserSimPraosDiffusion :: Parser SimCommand
 parserSimPraosDiffusion =
