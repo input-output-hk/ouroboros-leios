@@ -16,6 +16,7 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
 export const defaultState: ISimContextState = {
   allScenarios: [],
   activeScenario: '',
+  aggregated: true,
   graph: {
     canvasRef: { current: null },
     canvasOffsetX: 0,
@@ -25,6 +26,7 @@ export const defaultState: ISimContextState = {
   blocks: {},
   activeTab: Tab.Graph,
   batchSize: 5000,
+  speedMultiplier: 1,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   tracePath: '',

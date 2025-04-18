@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
 };
 
+use aggregate::TraceAggregator;
 use anyhow::Result;
 use average::Variance;
 use itertools::Itertools as _;
@@ -20,6 +21,8 @@ use tokio::{
     sync::mpsc,
 };
 use tracing::{info, info_span};
+
+mod aggregate;
 
 type InputBlockId = sim_core::model::InputBlockId<Node>;
 type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
@@ -44,6 +47,7 @@ pub struct EventMonitor {
     maximum_eb_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
+    aggregate: bool,
 }
 
 impl EventMonitor {
@@ -67,6 +71,7 @@ impl EventMonitor {
             maximum_eb_age: config.max_eb_age,
             events_source,
             output_path,
+            aggregate: config.aggregate_events,
         }
     }
 
@@ -137,9 +142,17 @@ impl EventMonitor {
                 } else {
                     OutputFormat::JsonStream
                 };
-                OutputTarget::EventStream {
-                    format,
-                    file: BufWriter::new(file),
+                if self.aggregate {
+                    OutputTarget::AggregatedEventStream {
+                        aggregation: TraceAggregator::new(),
+                        format,
+                        file: BufWriter::new(file),
+                    }
+                } else {
+                    OutputTarget::EventStream {
+                        format,
+                        file: BufWriter::new(file),
+                    }
                 }
             }
             None => OutputTarget::None,
@@ -576,6 +589,11 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
 }
 
 enum OutputTarget {
+    AggregatedEventStream {
+        aggregation: TraceAggregator,
+        format: OutputFormat,
+        file: BufWriter<File>,
+    },
     EventStream {
         format: OutputFormat,
         file: BufWriter<File>,
@@ -586,6 +604,15 @@ enum OutputTarget {
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                file,
+            } => {
+                if let Some(summary) = aggregation.process(event) {
+                    Self::write_line(*format, file, summary).await?;
+                }
+            }
             Self::EventStream { format, file } => {
                 Self::write_line(*format, file, event).await?;
             }
@@ -615,6 +642,16 @@ impl OutputTarget {
 
     async fn flush(self) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                mut file,
+            } => {
+                if let Some(summary) = aggregation.finish() {
+                    Self::write_line(format, &mut file, summary).await?;
+                }
+                file.flush().await?;
+            }
             Self::EventStream { mut file, .. } => {
                 file.flush().await?;
             }
