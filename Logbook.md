@@ -13,6 +13,12 @@
 - renamed `short-leios` command to `leios` since it covers full variant too.
   - `short-leios` is kept as alias for compatibility.
 
+### Rust simulation
+
+- Fixed conformance with shared trace format
+- Fixed bug with voting logic which was preventing EBs from receiving enough votes to get on-chain
+- Updated visualization to use smaller trace files, to prepare for hosting on docs site
+
 ### Revisions to cost dashboard
 
 The [cost dashboard](https://leios.cardano-scaling.org/cost-estimator/) was updated with lower and more realistic IO estimates.
