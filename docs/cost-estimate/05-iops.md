@@ -115,10 +115,10 @@ Where:
    $$IOPS_{\text{ib}} = R_{\text{ib}} \times (Write_{\text{ib-header}} + Read_{\text{ib-header}} + Write_{\text{ib-body}} + Read_{\text{ib-body}} + State_{\text{ib}})$$
 
 2. **EB IOPS**:
-   $$IOPS_{\text{eb}} = \frac{N_{\text{eb\_stage}} \times (Write_{\text{eb}} + Read_{\text{eb}})}{S_{\text{length}}}$$
+   $$IOPS_{\text{eb}} = \frac{N_{\text{eb-stage}} \times (Write_{\text{eb}} + Read_{\text{eb}})}{S_{\text{length}}}$$
 
 3. **RB IOPS**:
-   $$IOPS_{\text{rb}} = \frac{N_{\text{rb\_stage}} \times (Write_{\text{rb-header}} + Read_{\text{rb-header}} + Write_{\text{rb-body}} + Read_{\text{rb-body}} + State_{\text{rb}})}{S_{\text{length}}}$$
+   $$IOPS_{\text{rb}} = \frac{N_{\text{rb-stage}} \times (Write_{\text{rb-header}} + Read_{\text{rb-header}} + Write_{\text{rb-body}} + Read_{\text{rb-body}} + State_{\text{rb}})}{S_{\text{length}}}$$
 
 ### Leios IOPS Calculation (0.05 IB/s)
 
