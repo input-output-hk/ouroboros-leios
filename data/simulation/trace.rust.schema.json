@@ -321,17 +321,11 @@
           },
           "type": "array"
         },
-        "msg_size_bytes": {
-          "type": "number"
-        },
         "recipient": {
           "type": "string"
         },
         "sender": {
           "type": "string"
-        },
-        "sending_s": {
-          "type": "number"
         },
         "type": {
           "$ref": "#/definitions/NetworkEventType"

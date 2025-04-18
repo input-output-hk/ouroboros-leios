@@ -14,11 +14,11 @@ trace.shared.schema.json: trace.shared.d.ts
 	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) $< TraceEvent > $@
 	npx prettier -w $@
 
-trace.haskell.schema.json: trace.haskell.d.ts
+trace.haskell.schema.json: trace.haskell.d.ts trace.shared.d.ts
 	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) trace.haskell.d.ts HaskellTraceEvent > trace.haskell.schema.json
 	npx prettier -w trace.haskell.schema.json
 
-trace.rust.schema.json: trace.rust.d.ts
+trace.rust.schema.json: trace.rust.d.ts trace.shared.d.ts
 	npx typescript-json-schema $(TRACE_SCHEMA_OPTS) trace.rust.d.ts RustTraceEvent > trace.rust.schema.json
 	npx prettier -w trace.rust.schema.json
 

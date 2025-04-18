@@ -15,12 +15,7 @@ type Event =
     | SlotEvent
     | NoBlockEvent;
 
-type EventType =
-    | CpuEventType
-    | BlockEventType
-    | NetworkEventType
-    | SlotEventType
-    | NoBlockEventType;
+type EventType = Event["type"];
 
 type SlotEventType = "Slot"
 interface SlotEvent {
@@ -100,14 +95,24 @@ type BlockEvent =
 
 
 type NetworkAction = "Sent" | "Received"
-type NetworkEventType = `${BlockKind}${NetworkAction}`
 
-interface NetworkEvent {
-    type: NetworkEventType;
+type NetworkEvent = SentEvent | ReceivedEvent;
+type NetworkEventType = NetworkEvent["type"];
+
+interface SentEvent {
+    type: `${BlockKind}Sent`;
+    sender: string;
+    recipient: string;
+    msg_size_bytes: number;
+    sending_s?: number;
+    id: string;
+    ids?: string[];
+}
+
+interface ReceivedEvent {
+    type: `${BlockKind}Received`;
     sender?: string;
     recipient: string;
-    msg_size_bytes?: number;
-    sending_s?: number;
     id: string;
     ids?: string[];
 }

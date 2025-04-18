@@ -84,7 +84,10 @@
           "$ref": "#/definitions/GeneratedVote"
         },
         {
-          "$ref": "#/definitions/NetworkEvent"
+          "$ref": "#/definitions/SentEvent"
+        },
+        {
+          "$ref": "#/definitions/ReceivedEvent"
         },
         {
           "$ref": "#/definitions/SlotEvent"
@@ -274,7 +277,56 @@
       ],
       "type": "object"
     },
-    "NetworkEvent": {
+    "NoBlockEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/NoBlockEventType"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
+    },
+    "NoBlockEventType": {
+      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
+      "type": "string"
+    },
+    "ReceivedEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "EBReceived",
+            "IBReceived",
+            "RBReceived",
+            "VTBundleReceived"
+          ],
+          "type": "string"
+        }
+      },
+      "required": ["id", "recipient", "type"],
+      "type": "object"
+    },
+    "SentEvent": {
       "properties": {
         "id": {
           "type": "string"
@@ -298,43 +350,12 @@
           "type": "number"
         },
         "type": {
-          "$ref": "#/definitions/NetworkEventType"
-        }
-      },
-      "required": ["id", "recipient", "type"],
-      "type": "object"
-    },
-    "NetworkEventType": {
-      "enum": [
-        "EBReceived",
-        "EBSent",
-        "IBReceived",
-        "IBSent",
-        "RBReceived",
-        "RBSent",
-        "VTBundleReceived",
-        "VTBundleSent"
-      ],
-      "type": "string"
-    },
-    "NoBlockEvent": {
-      "properties": {
-        "node": {
+          "enum": ["EBSent", "IBSent", "RBSent", "VTBundleSent"],
           "type": "string"
-        },
-        "slot": {
-          "type": "number"
-        },
-        "type": {
-          "$ref": "#/definitions/NoBlockEventType"
         }
       },
-      "required": ["node", "slot", "type"],
+      "required": ["id", "msg_size_bytes", "recipient", "sender", "type"],
       "type": "object"
-    },
-    "NoBlockEventType": {
-      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
-      "type": "string"
     },
     "SlotEvent": {
       "properties": {
