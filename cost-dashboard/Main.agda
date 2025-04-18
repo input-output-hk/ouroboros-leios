@@ -26,24 +26,24 @@ baseScenario =
   ; verify_vcpu_ms_per_tx   = 1.50
 
   ; ib_per_slot             = 0.25
-  ; io_per_ib               = 1000.0
+  ; io_per_ib               = 10.0
   ; build_vcpu_ms_per_ib    = 300.0
   ; verify_vcpu_ms_per_ib   = 100.0
    
   ; eb_per_pipeline         = 0.8
-  ; io_per_eb               = 200.0
+  ; io_per_eb               = 2.0
   ; build_vcpu_ms_per_eb    = 300.0
   ; verify_vcpu_ms_per_eb   = 100.0
 
   ; vote_per_pipeline       = 500.0
   ; kb_per_vote             = 0.250
-  ; io_per_vote             = 25.0
+  ; io_per_vote             = 1.0
   ; build_vcpu_ms_per_vote  = 2.0
   ; verify_vcpu_ms_per_vote = 3.0
 
   ; cert_per_pipeline       = 1.0
-  ; kb_per_cert             = 75.0
-  ; io_per_cert             = 1000.0
+  ; kb_per_cert             = 7.0
+  ; io_per_cert             = 2.0
   ; build_vcpu_ms_per_cert  = 200.0
   ; verify_vcpu_ms_per_cert = 200.0
 
