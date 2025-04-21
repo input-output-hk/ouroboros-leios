@@ -1,5 +1,5 @@
 import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
-import * as cbor from 'cbor';
+import * as cbor from 'cborg';
 import type { ReadableStream } from 'stream/web';
 import { IServerMessage } from '../types';
 import { processMessage } from './utils';
@@ -49,11 +49,11 @@ const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
       buffer = buffer ? Buffer.concat([buffer, chunk]) : Buffer.from(chunk);
       while (buffer != null) {
         try {
-          const { value, unused } = cbor.decodeFirstSync(buffer, { extendedResults: true });
+          const [value, unused] = cbor.decodeFirst(buffer);
           buffer = unused as Buffer;
           controller.enqueue(value);
         } catch (error: any) {
-          if (error.message === 'Insufficient data') {
+          if (error.message.startsWith('CBOR decode error:')) {
             break;
           } else {
             throw error;

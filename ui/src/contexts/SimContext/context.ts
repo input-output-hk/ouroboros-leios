@@ -26,7 +26,7 @@ export const defaultState: ISimContextState = {
   blocks: {},
   activeTab: Tab.Graph,
   batchSize: 5000,
-  speedMultiplier: 1,
+  speedMultiplier: 10,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   tracePath: '',
