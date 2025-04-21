@@ -22,8 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# don't commit these large files until we're ready
-public/scenarios.json
-public/topologies
-public/traces
