@@ -125,6 +125,7 @@ export interface IScenario {
   topology: string;
   duration: number;
   trace: string;
+  aggregated: boolean;
 }
 
 export interface ISimContextState {
@@ -136,10 +137,12 @@ export interface ISimContextState {
   aggregatedData: ISimulationAggregatedDataState;
   maxTime: number;
   tracePath: string;
+  aggregated: boolean;
   topography: ITransformedNodeMap;
   topologyPath: string;
   topologyLoaded: boolean;
   batchSize: number;
+  speedMultiplier: number;
 }
 
 export type TSimContextActions =
@@ -148,7 +151,12 @@ export type TSimContextActions =
   | { type: "SET_ACTIVE_TAB"; payload: Tab }
   | { type: "SET_CURRENT_NODE"; payload: string | undefined }
   | { type: "SET_CURRENT_BLOCK"; payload: number | undefined }
-  | { type: "SET_BATCH_SIZE"; payload: number }
+  | {
+    type: "SET_SPEED"; payload: {
+      batchSize: number,
+      speedMultiplier: number,
+    }
+  }
   | {
     type: "SET_CANVAS_PROPS"; payload: Partial<{
       canvasScale: ((prev: number) => number) | number,

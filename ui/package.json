@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "cbor": "^10.0.3",
+    "cborg": "^4.2.10",
     "classnames": "^2.5.1",
     "debounce": "^2.2.0",
     "react": "^19.1.0",

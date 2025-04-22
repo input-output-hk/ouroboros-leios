@@ -1,27 +1,31 @@
 import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
-import * as cbor from 'cbor';
+import * as cbor from 'cborg';
 import type { ReadableStream } from 'stream/web';
 import { IServerMessage } from '../types';
 import { processMessage } from './utils';
 
 export type TWorkerRequest =
-  { type: "START", tracePath: string, batchSize: number } |
+  { type: "START", tracePath: string, aggregated: true, speedMultiplier: number } |
+  { type: "START", tracePath: string, aggregated?: false, batchSize: number } |
   { type: "STOP" };
 
 export type TWorkerResponse =
   { type: "EVENT", tracePath: string, aggregatedData: ISimulationAggregatedDataState } |
   { type: "DONE", tracePath: string };
 
-const createEventStream = async (path: string, signal: AbortSignal): Promise<ReadableStream<IServerMessage>> => {
+const createEventStream = async <T>(path: string, signal: AbortSignal): Promise<ReadableStream<T>> => {
   const res = await fetch(path, { signal });
   if (!res.body) {
     throw new Error("body not streamed");
   }
+  if (path.endsWith('.gz')) {
+    path = path.substring(0, path.length - 3);
+  }
   const transform = path.endsWith('.cbor') ? createCborTransformer() : createJsonTransformer();
-  return res.body.pipeThrough(transform) as unknown as ReadableStream<IServerMessage>;
+  return res.body.pipeThrough(transform) as unknown as ReadableStream<T>;
 }
 
-const createJsonTransformer = (): TransformStream<Uint8Array, IServerMessage> => {
+const createJsonTransformer = <T>(): TransformStream<Uint8Array, T> => {
   let buffer = "";
   const decoder = new TextDecoder();
   return new TransformStream({
@@ -38,18 +42,18 @@ const createJsonTransformer = (): TransformStream<Uint8Array, IServerMessage> =>
   });
 }
 
-const createCborTransformer = (): TransformStream<Uint8Array, IServerMessage> => {
+const createCborTransformer = <T>(): TransformStream<Uint8Array, T> => {
   let buffer: Buffer | null = null;
   return new TransformStream({
     transform(chunk, controller) {
       buffer = buffer ? Buffer.concat([buffer, chunk]) : Buffer.from(chunk);
       while (buffer != null) {
         try {
-          const { value, unused } = cbor.decodeFirstSync(buffer, { extendedResults: true });
+          const [value, unused] = cbor.decodeFirst(buffer);
           buffer = unused as Buffer;
           controller.enqueue(value);
         } catch (error: any) {
-          if (error.message === 'Insufficient data') {
+          if (error.message.startsWith('CBOR decode error:')) {
             break;
           } else {
             throw error;
@@ -126,6 +130,32 @@ const consumeStream = async (
   postMessage({ type: "DONE", tracePath });
 }
 
+const consumeAggregateStream = async (
+  stream: ReadableStream<ISimulationAggregatedDataState>,
+  tracePath: string,
+  speedMultiplier: number,
+) => {
+  let lastTimestamp = 0;
+  for await (const aggregatedData of stream) {
+    const nodes = new Map();
+    for (const [id, stats] of Object.entries(aggregatedData.nodes)) {
+      nodes.set(id, stats);
+    }
+    aggregatedData.nodes = nodes;
+
+    const elapsedMs = (aggregatedData.progress - lastTimestamp) * 1000;
+    lastTimestamp = aggregatedData.progress;
+    await new Promise(resolve => setTimeout(resolve, elapsedMs / speedMultiplier));
+
+    postMessage({
+      type: "EVENT",
+      tracePath,
+      aggregatedData,
+    } as TWorkerResponse);
+  }
+  postMessage({ type: "DONE", tracePath });
+}
+
 let controller = new AbortController();
 onmessage = (e: MessageEvent<TWorkerRequest>) => {
   controller.abort();
@@ -135,11 +165,22 @@ onmessage = (e: MessageEvent<TWorkerRequest>) => {
   }
 
   controller = new AbortController();
-  createEventStream(request.tracePath, controller.signal)
-    .then(stream => consumeStream(stream, request.tracePath, request.batchSize))
-    .catch(err => {
-      if (err.name !== "AbortError") {
-        throw err;
-      }
-    });
+  if (request.aggregated) {
+    createEventStream<ISimulationAggregatedDataState>(request.tracePath, controller.signal)
+      .then(stream => consumeAggregateStream(stream, request.tracePath, request.speedMultiplier))
+      .catch(err => {
+        if (err.name !== "AbortError") {
+          throw err;
+        }
+      });
+
+  } else {
+    createEventStream<IServerMessage>(request.tracePath, controller.signal)
+      .then(stream => consumeStream(stream, request.tracePath, request.batchSize))
+      .catch(err => {
+        if (err.name !== "AbortError") {
+          throw err;
+        }
+      });
+  }
 }

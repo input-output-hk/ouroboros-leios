@@ -15,6 +15,7 @@ export const reducer = (
         activeScenario: scenario.name,
         maxTime: scenario.duration,
         tracePath: scenario.trace,
+        aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
       }
     }
@@ -30,6 +31,7 @@ export const reducer = (
         activeScenario: scenario.name,
         maxTime: scenario.duration,
         tracePath: scenario.trace,
+        aggregated: scenario.aggregated,
         topologyPath: scenario.topology,
         topologyLoaded: state.topologyLoaded && scenario.topology === state.topologyPath,
         graph: {
@@ -99,10 +101,11 @@ export const reducer = (
       };
     }
 
-    case "SET_BATCH_SIZE": {
+    case "SET_SPEED": {
       return {
         ...state,
-        batchSize: action.payload
+        batchSize: action.payload.batchSize,
+        speedMultiplier: action.payload.speedMultiplier,
       }
     }
 
