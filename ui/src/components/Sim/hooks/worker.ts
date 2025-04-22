@@ -18,11 +18,15 @@ const createEventStream = async <T>(path: string, signal: AbortSignal): Promise<
   if (!res.body) {
     throw new Error("body not streamed");
   }
+  let stream = res.body;
   if (path.endsWith('.gz')) {
     path = path.substring(0, path.length - 3);
+    if (res.headers.get('Content-Encoding') !== 'gzip') {
+      stream = stream.pipeThrough(new DecompressionStream('gzip'));
+    }
   }
   const transform = path.endsWith('.cbor') ? createCborTransformer() : createJsonTransformer();
-  return res.body.pipeThrough(transform) as unknown as ReadableStream<T>;
+  return stream.pipeThrough(transform) as unknown as ReadableStream<T>;
 }
 
 const createJsonTransformer = <T>(): TransformStream<Uint8Array, T> => {
