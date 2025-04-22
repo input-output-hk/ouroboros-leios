@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-04-22
+
+### Simulation and analysis of Full Leios, including transaction lifecycle
+
+The Haskell and Rust simulators, at tag [leios-2025w17](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w17), were used to simulation 270 scenarios of Full Leios for varied IB production rate, IB size, and EB production rate, stage length, and CPU constraints. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w17/analysis.ipynb](analysis/sims/2025w17/analysis.ipynb). These analyses were performed on the 100-node network.
+
+New measurements of the transaction lifecyle were added to the analyses, and transaction rates of 1 tx/s and 10 tx/s were studied. (Higher rates will be scrutinized after [#305](https://github.com/input-output-hk/ouroboros-leios/issues/305) is fixed.)
+
+Findings:
+
+- All outstanding discrepancies between Rust and Haskell simulation results have either been resolved or explained.
+- In the initial study of transaction lifecycle . . .
+    - Inclusion of a transaction in an IB typically occurs in 2.4 seconds.
+    - Referencing of a transaction via an EB typically occurs in 27.6 seconds.
+    - Referencing of a transaction via an RB typically occurs in 67.2 seconds.
+    - The current version of Full Leios exhibits some undesirable side effects of never referencing some transactions in RBs and duplicating inclusion or referencing of transactions.
+
+![Example measurements of transaction lifecycle](analysis/sims/2025w17/plots/lifecycle-timeseries.png)
+
 ## 2025-04-18
 
 ### Haskell simulation
