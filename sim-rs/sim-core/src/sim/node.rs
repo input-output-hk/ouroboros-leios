@@ -1498,7 +1498,7 @@ impl Node {
         }
         self.clock.start_task();
         self.msg_sink
-            .send_to(to, msg.bytes_size(), msg.protocol(), msg, self.clock.now())
+            .send_to(to, msg.bytes_size(), msg.protocol(), msg)
     }
 
     fn slot_to_pipeline(&self, slot: u64) -> u64 {
