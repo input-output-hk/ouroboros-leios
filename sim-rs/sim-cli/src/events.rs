@@ -669,10 +669,10 @@ impl OutputTarget {
                 if let Some(summary) = aggregation.finish() {
                     Self::write_line(format, &mut file, summary).await?;
                 }
-                file.flush().await?;
+                file.shutdown().await?;
             }
             Self::EventStream { mut file, .. } => {
-                file.flush().await?;
+                file.shutdown().await?;
             }
             Self::None => {}
         };
