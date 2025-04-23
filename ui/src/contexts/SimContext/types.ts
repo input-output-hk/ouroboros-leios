@@ -37,6 +37,14 @@ export interface ISimulationGlobalData {
   leiosTxOnChain: number;
 }
 
+export interface ISimulationTransactionData {
+  timestamp: number;
+  created: number;
+  inIb: number;
+  inEb: number;
+  onChain: number;
+}
+
 export interface ISimulationTransaction {
   id: number;
   bytes: number;
@@ -76,6 +84,7 @@ export interface ISimulationAggregatedDataState {
   nodes: Map<string, ISimulationAggregatedData>;
   global: ISimulationGlobalData;
   blocks: ISimulationBlock[],
+  transactions: ISimulationTransactionData[];
   lastNodesUpdated: string[];
 }
 
@@ -94,8 +103,11 @@ export interface ISimulationIntermediateEndorsementBlock {
   ebs: string[];
 }
 
+type TxStatus = 'created' | 'inIb' | 'inEb' | 'onChain';
+
 export interface ISimulationIntermediateDataState {
   txs: ISimulationTransaction[];
+  txStatuses: TxStatus[];
   praosTxs: Set<number>;
   leiosTxs: Set<number>;
   ibs: Map<string, ISimulationIntermediateInputBlock>;
@@ -118,6 +130,7 @@ export interface IBlocksContextState {
 export enum Tab {
   Graph,
   Blocks,
+  Transactions,
 }
 
 export interface IScenario {

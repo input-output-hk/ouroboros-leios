@@ -59,6 +59,7 @@ const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string)
     for (const tx of ib.txs) {
       if (!intermediate.praosTxs.has(tx)) {
         intermediate.leiosTxs.add(tx);
+        intermediate.txStatuses[tx] = 'onChain';
       }
     }
     const txs = ib.txs.map(tx => intermediate.txs[tx]);
@@ -89,6 +90,7 @@ export const processMessage = (
   const { message } = json;
 
   if (message.type === EMessageType.TransactionGenerated) {
+    intermediate.txStatuses[Number(message.id)] = 'created';
     trackDataGenerated(aggregatedData, intermediate, message.publisher, "tx", message.id, message.size_bytes);
     intermediate.txs.push({ id: Number(message.id), bytes: message.size_bytes });
   } else if (message.type === EMessageType.TransactionSent) {
@@ -98,6 +100,11 @@ export const processMessage = (
   } else if (message.type === EMessageType.IBGenerated) {
     const bytes = message.transactions.reduce((sum, tx) => sum + (intermediate.bytes.get(`tx-${tx}`) ?? 0), message.header_bytes);
     trackDataGenerated(aggregatedData, intermediate, message.producer, "ib", message.id, bytes);
+    for (const id of message.transactions) {
+      if (intermediate.txStatuses[id] === 'created') {
+        intermediate.txStatuses[id] = 'inIb';
+      }
+    }
     intermediate.ibs.set(message.id, {
       slot: message.slot,
       pipeline: message.pipeline,
@@ -118,6 +125,7 @@ export const processMessage = (
     };
     for (const id of message.transactions) {
       intermediate.praosTxs.add(id);
+      intermediate.txStatuses[id] = 'onChain';
     }
     if (message.endorsement != null) {
       bytes += message.endorsement.size_bytes;
@@ -137,6 +145,13 @@ export const processMessage = (
     trackDataReceived(aggregatedData, intermediate, message.recipient, "pb", message.id);
   } else if (message.type === EMessageType.EBGenerated) {
     trackDataGenerated(aggregatedData, intermediate, message.producer, "eb", message.id, message.size_bytes);
+    for (const { id: ibId } of message.input_blocks) {
+      for (const tx of intermediate.ibs.get(ibId)?.txs ?? []) {
+        if (intermediate.txStatuses[tx] === 'created' || intermediate.txStatuses[tx] === 'inIb') {
+          intermediate.txStatuses[tx] = 'inEb';
+        }
+      }
+    }
     intermediate.ebs.set(message.id, {
       slot: message.slot,
       pipeline: message.pipeline,

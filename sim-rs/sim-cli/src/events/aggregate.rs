@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::Duration,
+};
 
 use serde::Serialize;
 use sim_core::{
@@ -9,6 +12,24 @@ use sim_core::{
 
 use super::{EndorserBlockId, InputBlockId, OutputEvent, VoteBundleId};
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum TransactionStatus {
+    Created,
+    InIb,
+    InEb,
+    OnChain,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct TransactionCounts {
+    timestamp: Timestamp,
+    created: u64,
+    in_ib: u64,
+    in_eb: u64,
+    on_chain: u64,
+}
+
 #[derive(Default)]
 pub struct TraceAggregator {
     current_time: Timestamp,
@@ -17,15 +38,19 @@ pub struct TraceAggregator {
     ibs: BTreeMap<InputBlockId, InputBlock>,
     ebs: BTreeMap<EndorserBlockId, EndorsementBlock>,
     rbs: Vec<Block>,
+    tx_counts: Vec<TransactionCounts>,
     nodes: BTreeMap<Node, NodeAggregatedData>,
     bytes: BTreeMap<MessageId, u64>,
+    tx_statuses: BTreeMap<TransactionId, TransactionStatus>,
     leios_txs: BTreeSet<TransactionId>,
     praos_txs: BTreeSet<TransactionId>,
 }
 
 impl TraceAggregator {
     pub fn new() -> Self {
-        Self::default()
+        let mut me = Self::default();
+        me.tx_counts.push(TransactionCounts::default());
+        me
     }
 
     pub fn process(&mut self, event: OutputEvent) -> Option<AggregatedData> {
@@ -42,6 +67,7 @@ impl TraceAggregator {
                         bytes: size_bytes,
                     },
                 );
+                self.tx_statuses.insert(id, TransactionStatus::Created);
                 self.track_data_generated(MessageId::TX(id), publisher, size_bytes);
             }
             Event::TXSent { id, sender, .. } => {
@@ -73,6 +99,15 @@ impl TraceAggregator {
                             .collect(),
                     },
                 );
+                for tx in transactions {
+                    let status = self
+                        .tx_statuses
+                        .entry(tx)
+                        .or_insert(TransactionStatus::InIb);
+                    if *status == TransactionStatus::Created {
+                        *status = TransactionStatus::InIb;
+                    }
+                }
                 self.track_data_generated(MessageId::IB(id), producer, size_bytes);
             }
             Event::IBSent { id, sender, .. } => {
@@ -108,6 +143,19 @@ impl TraceAggregator {
                             .collect(),
                     },
                 );
+                for tx in input_blocks
+                    .iter()
+                    .map(|ib| self.ibs.get(&ib.id).unwrap())
+                    .flat_map(|ib| ib.txs.iter())
+                {
+                    let status = self
+                        .tx_statuses
+                        .entry(tx.id)
+                        .or_insert(TransactionStatus::InEb);
+                    if matches!(status, TransactionStatus::Created | TransactionStatus::InIb) {
+                        *status = TransactionStatus::InEb;
+                    }
+                }
                 self.track_data_generated(MessageId::EB(id), producer, size_bytes);
             }
             Event::EBSent { id, sender, .. } => {
@@ -140,6 +188,7 @@ impl TraceAggregator {
                 ..
             } => {
                 for id in &transactions {
+                    self.tx_statuses.insert(*id, TransactionStatus::OnChain);
                     self.praos_txs.insert(*id);
                 }
                 for tx in endorsement
@@ -149,6 +198,7 @@ impl TraceAggregator {
                     .flat_map(|eb| &eb.ibs)
                     .flat_map(|ib| ib.txs.iter())
                 {
+                    self.tx_statuses.insert(tx.id, TransactionStatus::OnChain);
                     self.leios_txs.insert(tx.id);
                 }
                 self.rbs.push(Block {
@@ -180,6 +230,10 @@ impl TraceAggregator {
         let new_chunk = (event.time_s - Timestamp::zero()).as_millis() / 250;
         self.current_time = event.time_s;
         if current_chunk != new_chunk {
+            if new_chunk % 4 == 0 {
+                let timestamp = Duration::from_secs((new_chunk / 4) as u64).into();
+                self.tx_counts.push(self.produce_tx_counts(timestamp));
+            }
             Some(self.produce_message())
         } else {
             None
@@ -194,6 +248,22 @@ impl TraceAggregator {
         }
     }
 
+    fn produce_tx_counts(&self, timestamp: Timestamp) -> TransactionCounts {
+        let mut tx_counts = TransactionCounts {
+            timestamp,
+            ..TransactionCounts::default()
+        };
+        for status in self.tx_statuses.values() {
+            match status {
+                TransactionStatus::Created => tx_counts.created += 1,
+                TransactionStatus::InIb => tx_counts.in_ib += 1,
+                TransactionStatus::InEb => tx_counts.in_eb += 1,
+                TransactionStatus::OnChain => tx_counts.on_chain += 1,
+            }
+        }
+        tx_counts
+    }
+
     fn produce_message(&mut self) -> AggregatedData {
         let nodes_updated = std::mem::take(&mut self.nodes_updated);
         AggregatedData {
@@ -204,6 +274,7 @@ impl TraceAggregator {
                 leios_tx_on_chain: self.leios_txs.len() as u64,
             },
             blocks: std::mem::take(&mut self.rbs),
+            transactions: std::mem::take(&mut self.tx_counts),
             last_nodes_updated: nodes_updated.into_iter().collect(),
         }
     }
@@ -243,6 +314,7 @@ pub struct AggregatedData {
     nodes: BTreeMap<Node, NodeAggregatedData>,
     global: GlobalAggregatedData,
     blocks: Vec<Block>,
+    transactions: Vec<TransactionCounts>,
     last_nodes_updated: Vec<Node>,
 }
 

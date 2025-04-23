@@ -1,4 +1,4 @@
-import { ISimulationAggregatedDataState, ISimulationBlock, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
+import { ISimulationAggregatedDataState, ISimulationBlock, ISimulationIntermediateDataState, ISimulationTransactionData } from '@/contexts/SimContext/types';
 import * as cbor from 'cborg';
 import type { ReadableStream } from 'stream/web';
 import { IServerMessage } from '../types';
@@ -81,10 +81,12 @@ const consumeStream = async (
       leiosTxOnChain: 0,
     },
     blocks: [],
+    transactions: [],
     lastNodesUpdated: [],
   };
   const intermediate: ISimulationIntermediateDataState = {
     txs: [],
+    txStatuses: [],
     leiosTxs: new Set(),
     praosTxs: new Set(),
     ibs: new Map(),
@@ -94,6 +96,7 @@ const consumeStream = async (
 
   const nodesUpdated = new Set<string>();
   let batchEvents = 0;
+  let lastSec = null;
   for await (const { time_s, message } of stream) {
     if (message.type.endsWith("Received") && "recipient" in message) {
       nodesUpdated.add(message.recipient);
@@ -105,6 +108,19 @@ const consumeStream = async (
       nodesUpdated.add(message.id);
     }
     processMessage({ time_s, message }, aggregatedData, intermediate);
+    if (lastSec !== Math.floor(time_s)) {
+      lastSec = Math.floor(time_s);
+      aggregatedData.transactions.push(intermediate.txStatuses.reduce((acc, curr) => {
+        acc[curr] += 1;
+        return acc;
+      }, {
+        timestamp: lastSec,
+        created: 0,
+        inIb: 0,
+        inEb: 0,
+        onChain: 0,
+      }));
+    }
     aggregatedData.progress = time_s;
     batchEvents++;
     if (batchEvents === batchSize) {
@@ -141,6 +157,7 @@ const consumeAggregateStream = async (
 ) => {
   let lastTimestamp = 0;
   let blocks: ISimulationBlock[] = [];
+  let transactions: ISimulationTransactionData[] = [];
   for await (const aggregatedData of stream) {
     const nodes = new Map();
     for (const [id, stats] of Object.entries(aggregatedData.nodes)) {
@@ -149,6 +166,8 @@ const consumeAggregateStream = async (
     aggregatedData.nodes = nodes;
     blocks.push(...aggregatedData.blocks);
     aggregatedData.blocks = blocks;
+    transactions.push(...aggregatedData.transactions);
+    aggregatedData.transactions = transactions;
 
     const elapsedMs = (aggregatedData.progress - lastTimestamp) * 1000;
     lastTimestamp = aggregatedData.progress;

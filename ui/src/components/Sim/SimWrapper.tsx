@@ -7,6 +7,7 @@ import { parse } from "yaml";
 import { Coord2D, Node } from "../../../../data/simulation/topology";
 import { BlocksView } from "../Blocks/BlocksView";
 import { GraphWrapper } from "../Graph/GraphWrapper";
+import { TransactionsView } from "../Transactions/TransactionsView";
 import { Controls } from "./modules/Controls";
 import { Scenario } from "./modules/Scenario";
 import { Progress } from "./modules/Slider";
@@ -81,12 +82,14 @@ export const SimWrapper: FC = ({
         <Stats />
       </div>
       <div className="flex items-center justify-center gap-4 relative h-screen w-screen">
-        {activeTab == Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
-        {activeTab == Tab.Blocks ? <BlocksView /> : null}
+        {activeTab === Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
+        {activeTab === Tab.Blocks ? <BlocksView /> : null}
+        {activeTab === Tab.Transactions ? <TransactionsView /> : null}
         <div className="absolute top-10 w-full">
           <div className="flex justify-center gap-4 min-w-[200px]">
-            <TabButton name="Graph" active={activeTab == Tab.Graph} onClick={() => setActiveTab(Tab.Graph)} />
-            <TabButton name="Blocks" active={activeTab == Tab.Blocks && currentBlock === undefined} onClick={() => setActiveTab(Tab.Blocks)} />
+            <TabButton name="Graph" active={activeTab === Tab.Graph} onClick={() => setActiveTab(Tab.Graph)} />
+            <TabButton name="Blocks" active={activeTab === Tab.Blocks && currentBlock === undefined} onClick={() => setActiveTab(Tab.Blocks)} />
+            <TabButton name="Transactions" active={activeTab === Tab.Transactions} onClick={() => setActiveTab(Tab.Transactions)} />
           </div>
         </div>
         <div className="absolute bottom-12 flex w-1/2 gap-4 justify-center">
