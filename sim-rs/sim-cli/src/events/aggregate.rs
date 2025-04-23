@@ -203,7 +203,7 @@ impl TraceAggregator {
                 praos_tx_on_chain: self.praos_txs.len() as u64,
                 leios_tx_on_chain: self.leios_txs.len() as u64,
             },
-            blocks: self.rbs.clone(),
+            blocks: std::mem::take(&mut self.rbs),
             last_nodes_updated: nodes_updated.into_iter().collect(),
         }
     }

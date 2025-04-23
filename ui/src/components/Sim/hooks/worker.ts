@@ -1,4 +1,4 @@
-import { ISimulationAggregatedDataState, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
+import { ISimulationAggregatedDataState, ISimulationBlock, ISimulationIntermediateDataState } from '@/contexts/SimContext/types';
 import * as cbor from 'cborg';
 import type { ReadableStream } from 'stream/web';
 import { IServerMessage } from '../types';
@@ -140,12 +140,15 @@ const consumeAggregateStream = async (
   speedMultiplier: number,
 ) => {
   let lastTimestamp = 0;
+  let blocks: ISimulationBlock[] = [];
   for await (const aggregatedData of stream) {
     const nodes = new Map();
     for (const [id, stats] of Object.entries(aggregatedData.nodes)) {
       nodes.set(id, stats);
     }
     aggregatedData.nodes = nodes;
+    blocks.push(...aggregatedData.blocks);
+    aggregatedData.blocks = blocks;
 
     const elapsedMs = (aggregatedData.progress - lastTimestamp) * 1000;
     lastTimestamp = aggregatedData.progress;
