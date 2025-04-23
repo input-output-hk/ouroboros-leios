@@ -12,48 +12,48 @@
         <id>https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary"/>
         <updated>2025-04-14T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the team achieved significant milestones in both the Haskell and Rust simulations, improved cost estimates, and conducted comprehensive analyses of transaction lifecycle and Full Leios simulations.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the team achieved significant milestones in both the Haskell and Rust simulations, improved cost estimates, and conducted comprehensive analyses of transaction lifecycle and Full Leios simulations.</p>
+        <summary type="html"><![CDATA[This week, the team made substantial progress in both the Haskell and Rust simulations, refined cost estimates, and carried out detailed analyses of the transaction lifecycle and Full Leios simulations.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the team made substantial progress in both the Haskell and Rust simulations, refined cost estimates, and carried out detailed analyses of the transaction lifecycle and Full Leios simulations.</p>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-improvements">​</a></h3>
 <h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#haskell-simulation">​</a></h4>
 <ul>
-<li>Completed first draft of new mini protocols for leios diffusion<!-- -->
+<li>Completed the first draft of new mini protocols for Leios diffusion<!-- -->
 <ul>
-<li>Protocols modeled after BlockFetch and node-to-node Tx-Submission from ouroboros-network</li>
-<li>IB-relay, EB-relay, Vote-relay for header diffusion and body announcements</li>
-<li>IB-fetch, EB-fetch for body diffusion</li>
-<li>CatchUp protocol for older blocks</li>
-<li>See <code>simulation/docs/network-spec</code> for complete protocol details</li>
+<li>Modeled protocols after block-fetch and node-to-node transaction submission from <code>ouroboros-network</code></li>
+<li>Included IB relay, EB relay, and vote relay for header diffusion and body announcements</li>
+<li>Included IB fetch and EB fetch for body diffusion</li>
+<li>Worked on the CatchUp protocol for older blocks</li>
+<li>See <code>simulation/docs/network-spec</code> for full protocol details</li>
 </ul>
 </li>
-<li>Renamed <code>short-leios</code> command to <code>leios</code> since it now covers full variant as well<!-- -->
+<li>Renamed <code>short-leios</code> command to <code>leios</code> as it now covers the full variant as well<!-- -->
 <ul>
-<li><code>short-leios</code> is kept as alias for compatibility</li>
+<li><code>short-leios</code> is kept as alias for compatibility.</li>
 </ul>
 </li>
 </ul>
 <h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#rust-simulation">​</a></h4>
 <ul>
-<li>Fixed conformance with shared trace format</li>
-<li>Fixed bug with voting logic which was preventing EBs from receiving enough votes to get on-chain</li>
-<li>Updated visualization to use smaller trace files to prepare for hosting on docs site</li>
+<li>Fixed conformance issues with the shared trace format</li>
+<li>Fixed a bug in the voting logic that prevented EBs from receiving enough votes to be included on-chain</li>
+<li>Updated visualizations to use smaller trace files in preparation for hosting on the documentation site.</li>
 </ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="revisions-to-cost-dashboard">Revisions to cost dashboard<a class="hash-link" aria-label="Direct link to Revisions to cost dashboard" title="Direct link to Revisions to cost dashboard" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#revisions-to-cost-dashboard">​</a></h3>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="revisions-to-the-cost-dashboard">Revisions to the cost dashboard<a class="hash-link" aria-label="Direct link to Revisions to the cost dashboard" title="Direct link to Revisions to the cost dashboard" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#revisions-to-the-cost-dashboard">​</a></h3>
 <p>The <a href="https://leios.cardano-scaling.org/cost-estimator/" target="_blank" rel="noopener noreferrer">cost dashboard</a> was updated with lower and more realistic IO estimates.</p>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-transaction-lifecycle">Analysis of transaction lifecycle<a class="hash-link" aria-label="Direct link to Analysis of transaction lifecycle" title="Direct link to Analysis of transaction lifecycle" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#analysis-of-transaction-lifecycle">​</a></h3>
-<p>The Jupyter notebook <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w17/analysis/tx-to-block.ipynb" target="_blank" rel="noopener noreferrer">Analysis of transaction lifecycle</a> estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="transaction-lifecycle-analysis">Transaction lifecycle analysis<a class="hash-link" aria-label="Direct link to Transaction lifecycle analysis" title="Direct link to Transaction lifecycle analysis" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#transaction-lifecycle-analysis">​</a></h3>
+<p>The Jupyter notebook <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w17/analysis/tx-to-block.ipynb" target="_blank" rel="noopener noreferrer">Analysis of transaction lifecycle</a> estimates the delay introduced at each of the seven stages of Full Leios as a transaction progresses from the memory pool to being referenced by a Praos block.</p>
 <p>Key findings from the analysis:</p>
 <ol>
-<li>There seems little advantage to moving to stage lengths less than 10 slots</li>
-<li>The number of shards should be kept small enough so that the IB rate per shard is high relative to the stage length</li>
+<li>Reducing stage lengths below 10 slots offers little benefit</li>
+<li>The number of shards should remain low enough to maintain a high IB rate per shard relative to the stage length</li>
 <li>Low EB rates result in many orphaned IBs</li>
-<li>Realistic parameter settings result in an approximately two-minute delay between transaction submission and its referencing by an RB</li>
+<li>With realistic parameters, the delay from transaction submission to its inclusion in an RB is approximately two minutes.</li>
 </ol>
 <p>Potential next steps:</p>
 <ul>
-<li>Translating this model into Delta QSD to include network effects</li>
-<li>Comparing this model's results to output of the Rust simulator</li>
-<li>Elaborating the model to represent the memory-pool and ledger variants under consideration</li>
+<li>Translate the model into Delta QSD to capture network effects</li>
+<li>Compare the model’s output with results from the Rust simulator</li>
+<li>Extend the model to account for different memory pool and ledger variants under evaluation.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-and-analysis-of-full-leios">Simulation and analysis of Full Leios<a class="hash-link" aria-label="Direct link to Simulation and analysis of Full Leios" title="Direct link to Simulation and analysis of Full Leios" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-and-analysis-of-full-leios">​</a></h3>
 <p>The team conducted comprehensive simulations using both Haskell and Rust simulators at tag <a href="https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w16" target="_blank" rel="noopener noreferrer">leios-2025w16</a>. The simulations covered 648 scenarios of Full and Short Leios with varied parameters:</p>
@@ -62,19 +62,19 @@
 <li>IB size</li>
 <li>EB production rate</li>
 <li>Stage length</li>
-<li>CPU constraints</li>
+<li>CPU constraints.</li>
 </ul>
 <p>Two new output files were generated:</p>
 <ol>
-<li>Summary of network, disk, and CPU resource usage over the course of the simulation</li>
-<li>Vertices and edges of the "Leios graph" showing linkages between transactions, IBs, EBs, RBs, and votes (can be visualized as an interactive web page)</li>
+<li>A summary of network, disk, and CPU resource usage over the course of the simulation</li>
+<li>The vertices and edges of the Leios graph, showing linkages between transactions, IBs, EBs, RBs, and votes (can be visualized as an interactive web page).</li>
 </ol>
 <p>Key findings:</p>
 <ul>
-<li>Agreement between Rust and Haskell simulations is generally quite close</li>
-<li>The Haskell simulation experiences network congestion at 16 IB/s, but the Rust simulation does not</li>
-<li>The Rust simulation uses more CPU at high IB rates than the Haskell simulation</li>
-<li>The Rust simulation sometimes does not produce enough votes to certify an EB</li>
+<li>The Rust and Haskell simulations show generally close agreement</li>
+<li>The Haskell simulation encounters network congestion at 16 IB/s, while the Rust simulation does not</li>
+<li>The Rust simulation consumes more CPU at high IB rates than the Haskell simulation</li>
+<li>In some cases, the Rust simulation does not produce enough votes to certify an EB.</li>
 </ul>
 <p>Detailed results are available in the Jupyter notebook <a href="https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w17/analysis/sims/2025w16/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis/sims/2025w16/analysis.ipynb</a>.</p>]]></content>
         <author>
