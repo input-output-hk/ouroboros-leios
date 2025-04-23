@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-04-23
+
+### Benchmarking Plutus
+
+If we decide to undertake experiments where we radically increase the Plutus execution budget in IBs, here is the [workflow for benchmarking Plutus](https://github.com/IntersectMBO/plutus/blob/master/plutus-core/cost-model/CostModelGeneration.md), which can be used to relate Plutus execution units to actual CPU time.
+
 ## 2025-04-22
 
 ### Simulation and analysis of Full Leios, including transaction lifecycle
