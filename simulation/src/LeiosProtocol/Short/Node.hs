@@ -80,6 +80,7 @@ data ConformanceEvent
   | NoEBGenerated {slot :: !SlotNo}
   | NoVTGenerated {slot :: !SlotNo}
   deriving (Show)
+
 data LeiosNodeEvent
   = PraosNodeEvent !(PraosNode.PraosNodeEvent RankingBlockBody)
   | LeiosNodeEventCPU !CPUTask
@@ -172,6 +173,7 @@ data LeiosNodeTask
   | GenVote
   | GenRB
   deriving (Eq, Ord, Ix, Bounded, Show)
+
 data NodeRelayState id header body m = NodeRelayState
   { relayBufferVar :: !(TVar m (RB.RelayBuffer id (header, body)))
   }
@@ -682,7 +684,9 @@ computeLedgerStateThread tracer _cfg st = forever $ do
   readyLedgerState <- atomically $ do
     -- TODO: this will get more costly as the base chain grows,
     -- however it grows much more slowly than anything else.
-    blocks <- readTVar st.praosState.blockFetchControllerState.blocksVar
+    chain <- PraosNode.preferredChain st.praosState
+    let rbsOnChain = Chain.toNewestFirst $ chain
+    let blocks = Map.fromList [(blockHash block, block) | block <- rbsOnChain]
     when (Map.null blocks) retry
     ledgerState <- readTVar st.ledgerStateVar
     let ledgerMissing = Map.elems $ blocks Map.\\ ledgerState
