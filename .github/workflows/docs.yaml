@@ -5,12 +5,14 @@ on:
     paths:
       - "**/*.d2"
       - "site/**"
+      - "ui/**"
   push:
     branches:
       - main
     paths:
       - "**/*.d2"
       - "site/**"
+      - "ui/**"
 
 jobs:
   docs-generate-d2-diagrams:
@@ -72,9 +74,43 @@ jobs:
           git commit -m "Auto-generate diagram PNGs [skip ci]"
           git push origin HEAD:${{ github.head_ref || github.ref_name }}
 
+  viz-build:
+    name: "Build Visualizer"
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 2
+      
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "yarn"
+          cache-dependency-path: ./ui/yarn.lock 
+
+      - name: 📦 Install dependencies
+        working-directory: ui
+        run: yarn install
+  
+      - name: 🏗️ Build visualizer
+        working-directory: ui
+        run: |
+          yarn build
+
+      - name: 🚢 Upload visualizer static site
+        id: upload_viz
+        uses: actions/upload-artifact@v4
+        with:
+          name: visualizer
+          path: ui/dist
+
   docs-build:
     name: "Build"
     runs-on: ubuntu-22.04
+    needs: viz-build
     outputs:
       has_changes: ${{ steps.check_changes.outputs.has_changes }}
     steps:
@@ -83,11 +119,12 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check for site changes
+      - name: Check for site or visualizer changes
         id: check_changes
         run: |
           SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
-          if [ -z "$SITE_CHANGES" ]; then
+          VIZ_CHANGES=$(git diff --name-only HEAD^ HEAD -- ui/ || true)
+          if [ -z "$SITE_CHANGES" ] && [ -z "$VIZ_CHANGES" ]; then
             echo "No changes in site directory"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
@@ -101,7 +138,7 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "yarn"
           cache-dependency-path: ./site/yarn.lock  # Changed from site/yarn.lock to ./site/yarn.lock
 
@@ -109,6 +146,13 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: yarn install
+
+      - name: 👁️ Unpack visualizer
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: visualizer
+          path: site/static/visualizer
 
       - name: 🏗️ Build Docusaurus site
         if: steps.check_changes.outputs.has_changes == 'true'

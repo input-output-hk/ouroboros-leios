@@ -211,7 +211,6 @@
     },
     "ib-diffusion-max-bodies-to-request": {
       "additionalProperties": false,
-      "description": "Only supported by Haskell simulation.",
       "properties": {},
       "type": "number"
     },

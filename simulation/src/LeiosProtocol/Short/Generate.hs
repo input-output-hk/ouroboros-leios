@@ -38,7 +38,7 @@ data BuffersView m = BuffersView
 
 data Role :: Type -> Type where
   Base :: Role RankingBlock
-  Propose :: Role InputBlock
+  Propose :: {ibSlot :: Maybe SlotNo, delay :: Maybe DiffTime} -> Role InputBlock
   Endorse :: Role EndorseBlock
   Vote :: Role VoteMsg
 
@@ -52,7 +52,7 @@ data LeiosGeneratorConfig m = LeiosGeneratorConfig
   { leios :: LeiosConfig
   , slotConfig :: SlotConfig
   , nodeId :: NodeId
-  , buffers :: BuffersView m
+  , buffers :: BuffersView m -- TODO: add SlotNo argument so expired blocks can be filtered out by the views.
   , schedule :: SlotNo -> m [(SomeRole, Word64)]
   , submit :: [(DiffTime, SomeAction)] -> m ()
   }
@@ -81,13 +81,13 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
     let !rb = mkPartialBlock slot body
     let !task = leios.praos.blockGenerationDelay rb
     return [(task, rb)]
-  execute' slot Propose wins = do
+  execute' slot Propose{ibSlot, delay} wins = do
     ibData <- lift $ atomically buffers.newIBData
     forM [toEnum $ fromIntegral sub | sub <- [0 .. wins - 1]] $ \sub -> do
       i <- nextBlkId InputBlockId
-      let header = mkInputBlockHeader leios i slot sub nodeId ibData.referenceRankingBlock
+      let header = mkInputBlockHeader leios i (fromMaybe slot ibSlot) sub nodeId ibData.referenceRankingBlock
       let !ib = mkInputBlock leios header ibData.txsPayload
-      let !task = leios.delays.inputBlockGeneration ib
+      let !task = fromMaybe (leios.delays.inputBlockGeneration ib) delay
       return (task, ib)
   execute' slot Endorse _wins = do
     i <- nextBlkId EndorseBlockId

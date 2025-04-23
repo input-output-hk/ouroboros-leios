@@ -23,6 +23,11 @@ export interface Node<Location> {
   "cpu-core-count"?: bigint | null;
   location: Location;
   producers: { [producer: NodeName]: LinkInfo };
+  /** If not null, the node will behave according to the given Behaviour.
+  *
+  * Only supported by Haskell simulation.
+  */
+  adversarial?: Behaviour | null;
 }
 
 /** Link information. */
@@ -38,3 +43,20 @@ export interface Cluster {
 }
 
 export type Coord2D = [number, number];
+
+export type Behaviour =
+  | UnboundedIbs
+  ;
+
+/** A node that after some time stops respecting IB sortition and
+instead starts generating old IBs every slot.
+
+Only supported by Haskell simulation.
+*/
+export interface UnboundedIbs {
+  behaviour: "unbounded-ibs";
+  /* When to start the adversarial generation. */
+  "starting-at-slot": number;
+  "slot-of-generated-ibs": number;
+  "ibs-per-slot": number;
+}

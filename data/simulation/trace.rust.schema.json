@@ -1,27 +1,136 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "anyOf": [
-    {
-      "$ref": "#/definitions/RustCpuEvent"
-    },
-    {
-      "$ref": "#/definitions/RustBlockEvent"
-    },
-    {
-      "$ref": "#/definitions/RustTransactionEvent"
-    },
-    {
-      "$ref": "#/definitions/RustVoteEvent"
-    },
-    {
-      "$ref": "#/definitions/RustSlotEvent"
-    }
-  ],
   "definitions": {
-    "Record<string,number>": {
+    "BlockEventType": {
+      "enum": [
+        "EBGenerated",
+        "IBGenerated",
+        "RBGenerated",
+        "VTBundleGenerated"
+      ],
+      "type": "string"
+    },
+    "BlockRef": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": ["id"],
       "type": "object"
     },
-    "RustBaseBlockEvent": {
+    "CpuSubtaskEvent": {
+      "properties": {
+        "cpu_time_s": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "task_label": {
+          "type": "string"
+        },
+        "task_type": {
+          "$ref": "#/definitions/CpuTaskType"
+        },
+        "type": {
+          "const": "Cpu",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cpu_time_s",
+        "id",
+        "node",
+        "task_label",
+        "task_type",
+        "type"
+      ],
+      "type": "object"
+    },
+    "CpuTaskFinishedEvent": {
+      "properties": {
+        "cpu_time_s": {
+          "type": "number"
+        },
+        "task_type": {
+          "$ref": "#/definitions/CpuTaskType"
+        },
+        "type": {
+          "const": "CpuTaskFinished",
+          "type": "string"
+        }
+      },
+      "required": ["cpu_time_s", "task_type", "type"],
+      "type": "object"
+    },
+    "CpuTaskType": {
+      "enum": [
+        "GenEB",
+        "GenIB",
+        "GenRB",
+        "GenVote",
+        "ValEB",
+        "ValIB",
+        "ValIH",
+        "ValRB",
+        "ValRH",
+        "ValTX",
+        "ValVote"
+      ],
+      "type": "string"
+    },
+    "Endorsement": {
+      "properties": {
+        "eb": {
+          "$ref": "#/definitions/BlockRef"
+        }
+      },
+      "required": ["eb"],
+      "type": "object"
+    },
+    "GeneratedEndorserBlock": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "input_blocks": {
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
+        "pipeline": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/BlockEventType"
+        }
+      },
+      "required": [
+        "id",
+        "input_blocks",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type"
+      ],
+      "type": "object"
+    },
+    "GeneratedInputBlock": {
       "properties": {
         "id": {
           "type": "string"
@@ -32,268 +141,327 @@
         "producer": {
           "type": "string"
         },
+        "rb_ref": {
+          "type": ["null", "string"]
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "tx_payload_bytes": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/BlockEventType"
+        }
+      },
+      "required": [
+        "id",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "tx_payload_bytes",
+        "type"
+      ],
+      "type": "object"
+    },
+    "GeneratedRankingBlock": {
+      "properties": {
+        "endorsement": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Endorsement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endorsements": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/definitions/Endorsement"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BlockRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "tx_payload_bytes": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/BlockEventType"
+        }
+      },
+      "required": [
+        "endorsement",
+        "id",
+        "parent",
+        "producer",
+        "size_bytes",
+        "slot",
+        "tx_payload_bytes",
+        "type"
+      ],
+      "type": "object"
+    },
+    "GeneratedTransaction": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "type": {
+          "const": "TXGenerated",
+          "type": "string"
+        }
+      },
+      "required": ["id", "publisher", "size_bytes", "type"],
+      "type": "object"
+    },
+    "GeneratedVote": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "pipeline": {
+          "type": "number"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "number"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/BlockEventType"
+        },
+        "votes": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "pipeline",
+        "producer",
+        "size_bytes",
+        "slot",
+        "type",
+        "votes"
+      ],
+      "type": "object"
+    },
+    "LotteryWon": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "producer": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "enum": ["EBLotteryWon", "IBLotteryWon", "VTLotteryWon"],
+          "type": "string"
+        }
+      },
+      "required": ["id", "producer", "slot", "type"],
+      "type": "object"
+    },
+    "NetworkEvent": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "recipient": {
           "type": "string"
         },
         "sender": {
           "type": "string"
         },
-        "slot": {
-          "type": "number"
+        "type": {
+          "$ref": "#/definitions/NetworkEventType"
         }
       },
+      "required": ["id", "recipient", "type"],
       "type": "object"
     },
-    "RustBlockEvent": {
-      "properties": {
-        "message": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/RustBaseBlockEvent"
-            },
-            {
-              "properties": {
-                "endorsement": {},
-                "header_bytes": {
-                  "type": "number"
-                },
-                "index": {
-                  "type": "number"
-                },
-                "parent": {
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "producer": {
-                      "type": "string"
-                    },
-                    "slot": {
-                      "type": "number"
-                    }
-                  },
-                  "type": "object"
-                },
-                "total_bytes": {
-                  "type": "number"
-                },
-                "transactions": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": {
-                  "$ref": "#/definitions/RustBlockMessageType"
-                },
-                "vrf": {
-                  "type": "number"
-                }
-              },
-              "type": "object"
-            }
-          ]
-        },
-        "time_s": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustBlockMessageType": {
+    "NetworkEventType": {
       "enum": [
-        "EBGenerated",
-        "EBLotteryWon",
         "EBReceived",
         "EBSent",
-        "IBGenerated",
-        "IBLotteryWon",
         "IBReceived",
         "IBSent",
-        "RBGenerated",
-        "RBLotteryWon",
         "RBReceived",
-        "RBSent"
+        "RBSent",
+        "TXReceived",
+        "TXSent",
+        "VTBundleReceived",
+        "VTBundleSent"
       ],
       "type": "string"
     },
-    "RustCpuEvent": {
+    "NoBlockEvent": {
       "properties": {
-        "message": {
-          "properties": {
-            "cpu_time_s": {
-              "type": "number"
-            },
-            "duration_s": {
-              "type": "number"
-            },
-            "extra": {
-              "type": "string"
-            },
-            "subtask_id": {
-              "type": "number"
-            },
-            "subtasks": {
-              "type": "number"
-            },
-            "task": {
-              "$ref": "#/definitions/RustTaskInfo"
-            },
-            "task_type": {
-              "$ref": "#/definitions/RustCpuTaskType"
-            },
-            "type": {
-              "$ref": "#/definitions/RustCpuMessageType"
-            }
-          },
-          "type": "object"
-        },
-        "time_s": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustCpuMessageType": {
-      "enum": [
-        "CpuSubtaskFinished",
-        "CpuSubtaskScheduled",
-        "CpuSubtaskStarted",
-        "CpuTaskFinished",
-        "CpuTaskScheduled",
-        "CpuTaskStarted"
-      ],
-      "type": "string"
-    },
-    "RustCpuTaskType": {
-      "enum": [
-        "EBBlockGenerated",
-        "EBBlockValidated",
-        "IBBlockGenerated",
-        "IBBlockValidated",
-        "IBHeaderGenerated",
-        "IBHeaderValidated",
-        "RBBlockGenerated",
-        "RBBlockValidated",
-        "TransactionGenerated",
-        "TransactionValidated",
-        "VTBundleGenerated",
-        "VTBundleValidated"
-      ],
-      "type": "string"
-    },
-    "RustSlotEvent": {
-      "properties": {
-        "message": {
-          "properties": {
-            "number": {
-              "type": "number"
-            },
-            "type": {
-              "const": "Slot",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "time_s": {
-          "type": "number"
-        }
-      },
-      "type": "object"
-    },
-    "RustTaskInfo": {
-      "properties": {
-        "index": {
-          "type": "number"
-        },
         "node": {
           "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "RustTransactionEvent": {
-      "properties": {
-        "message": {
-          "properties": {
-            "bytes": {
-              "type": "number"
-            },
-            "id": {
-              "type": "string"
-            },
-            "publisher": {
-              "type": "string"
-            },
-            "recipient": {
-              "type": "string"
-            },
-            "sender": {
-              "type": "string"
-            },
-            "type": {
-              "$ref": "#/definitions/RustTransactionMessageType"
-            }
-          },
-          "type": "object"
         },
-        "time_s": {
+        "slot": {
           "type": "number"
+        },
+        "type": {
+          "$ref": "#/definitions/NoBlockEventType"
         }
       },
+      "required": ["node", "slot", "type"],
       "type": "object"
     },
-    "RustTransactionMessageType": {
-      "enum": [
-        "TransactionGenerated",
-        "TransactionReceived",
-        "TransactionSent"
-      ],
+    "NoBlockEventType": {
+      "enum": ["NoEBGenerated", "NoIBGenerated", "NoVTBundleGenerated"],
       "type": "string"
     },
-    "RustVoteEvent": {
-      "properties": {
-        "message": {
+    "RustEvent": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/GeneratedInputBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedEndorserBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedRankingBlock"
+        },
+        {
+          "$ref": "#/definitions/GeneratedVote"
+        },
+        {
+          "$ref": "#/definitions/SlotEvent"
+        },
+        {
+          "$ref": "#/definitions/NoBlockEvent"
+        },
+        {
+          "$ref": "#/definitions/CpuSubtaskEvent"
+        },
+        {
+          "$ref": "#/definitions/ScheduledCpuTaskEvent"
+        },
+        {
+          "$ref": "#/definitions/CpuTaskFinishedEvent"
+        },
+        {
+          "$ref": "#/definitions/LotteryWon"
+        },
+        {
+          "$ref": "#/definitions/GeneratedTransaction"
+        },
+        {
+          "$ref": "#/definitions/NetworkEvent"
+        },
+        {
           "properties": {
-            "id": {
-              "type": "string"
-            },
-            "producer": {
-              "type": "string"
-            },
-            "recipient": {
-              "type": "string"
-            },
-            "sender": {
-              "type": "string"
-            },
             "slot": {
               "type": "number"
             },
             "type": {
-              "$ref": "#/definitions/RustVoteMessageType"
-            },
-            "votes": {
-              "$ref": "#/definitions/Record<string,number>"
+              "const": "GlobalSlot",
+              "type": "string"
             }
           },
+          "required": ["slot", "type"],
           "type": "object"
-        },
-        "time_s": {
+        }
+      ]
+    },
+    "ScheduledCpuTaskEvent": {
+      "properties": {
+        "subtasks": {
           "type": "number"
+        },
+        "task_type": {
+          "$ref": "#/definitions/CpuTaskType"
+        },
+        "type": {
+          "const": "CpuTaskScheduled",
+          "type": "string"
         }
       },
+      "required": ["subtasks", "task_type", "type"],
       "type": "object"
     },
-    "RustVoteMessageType": {
-      "enum": [
-        "VotesGenerated",
-        "VotesLotteryWon",
-        "VotesReceived",
-        "VotesSent"
-      ],
-      "type": "string"
+    "SlotEvent": {
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "slot": {
+          "type": "number"
+        },
+        "type": {
+          "const": "Slot",
+          "type": "string"
+        }
+      },
+      "required": ["node", "slot", "type"],
+      "type": "object"
     }
-  }
+  },
+  "properties": {
+    "message": {
+      "$ref": "#/definitions/RustEvent"
+    },
+    "time_s": {
+      "type": "number"
+    }
+  },
+  "required": ["message", "time_s"],
+  "type": "object"
 }

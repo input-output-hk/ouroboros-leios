@@ -785,4 +785,4 @@ example2
     processingCores = maximum $ Map.elems p2pNodeCores
     config = defaultVizConfig voteSendStage 5 processingCores (10 * kilobytes 1000) -- TODO: calculate from p2pLinks
     modelConfig = config.model
-    model = leiosSimVizModel modelConfig (exampleTrace2' rng leiosConfig p2pNetwork)
+    model = leiosSimVizModel modelConfig (exampleTrace2' rng leiosConfig p2pNetwork False)

@@ -1,0 +1,25 @@
+{
+  "scenarios": [
+    {
+      "name": "1x",
+      "topology": "topologies/thousand.yaml",
+      "duration": 300,
+      "trace": "traces/1xsummary.jsonl.gz",
+      "aggregated": true
+    },
+    {
+      "name": "10x",
+      "topology": "topologies/thousand.yaml",
+      "duration": 300,
+      "trace": "traces/10xsummary.jsonl.gz",
+      "aggregated": true
+    },
+    {
+      "name": "100x",
+      "topology": "topologies/thousand.yaml",
+      "duration": 300,
+      "trace": "traces/100xsummary.jsonl.gz",
+      "aggregated": true
+    }
+  ]
+}

@@ -1,9 +1,12 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::PathBuf,
+    pin::Pin,
 };
 
+use aggregate::TraceAggregator;
 use anyhow::Result;
+use async_compression::tokio::write::GzipEncoder;
 use average::Variance;
 use itertools::Itertools as _;
 use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
@@ -11,19 +14,23 @@ use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
     config::{NodeId, SimConfiguration},
-    events::{Event, Node},
+    events::{BlockRef, Event, Node},
     model::{BlockId, TransactionId},
 };
 use tokio::{
     fs::{self, File},
-    io::{AsyncWriteExt as _, BufWriter},
+    io::{AsyncWrite, AsyncWriteExt as _, BufWriter},
     sync::mpsc,
 };
 use tracing::{info, info_span};
 
+mod aggregate;
+
 type InputBlockId = sim_core::model::InputBlockId<Node>;
 type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
 type VoteBundleId = sim_core::model::VoteBundleId<Node>;
+
+type TraceSink = Pin<Box<dyn AsyncWrite + Send + Sync + 'static>>;
 
 #[derive(Clone, Serialize)]
 struct OutputEvent {
@@ -44,6 +51,7 @@ pub struct EventMonitor {
     maximum_eb_age: u64,
     events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
     output_path: Option<PathBuf>,
+    aggregate: bool,
 }
 
 impl EventMonitor {
@@ -67,6 +75,7 @@ impl EventMonitor {
             maximum_eb_age: config.max_eb_age,
             events_source,
             output_path,
+            aggregate: config.aggregate_events,
         }
     }
 
@@ -125,9 +134,27 @@ impl EventMonitor {
             }
         }
 
-        let mut output = match self.output_path {
-            Some(ref path) => {
-                let file = File::create(path).await?;
+        let mut output = match self.output_path.as_mut() {
+            Some(path) => {
+                let file = File::create(&path).await?;
+
+                let mut gzipped = false;
+                if path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|ext| ext == "gz")
+                {
+                    path.set_extension("");
+                    gzipped = true;
+                }
+
+                let file: TraceSink = if gzipped {
+                    let encoder = GzipEncoder::new(file);
+                    Box::pin(BufWriter::new(encoder))
+                } else {
+                    Box::pin(BufWriter::new(file))
+                };
+
                 let format = if path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -137,9 +164,14 @@ impl EventMonitor {
                 } else {
                     OutputFormat::JsonStream
                 };
-                OutputTarget::EventStream {
-                    format,
-                    file: BufWriter::new(file),
+                if self.aggregate {
+                    OutputTarget::AggregatedEventStream {
+                        aggregation: TraceAggregator::new(),
+                        format,
+                        file,
+                    }
+                } else {
+                    OutputTarget::EventStream { format, file }
                 }
             }
             None => OutputTarget::None,
@@ -152,7 +184,7 @@ impl EventMonitor {
             };
             output.write(output_event).await?;
             match event {
-                Event::Slot { number } => {
+                Event::GlobalSlot { slot: number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
                     if let Some(oldest_live_ib_slot) = number.checked_sub(self.maximum_ib_age) {
@@ -174,17 +206,18 @@ impl EventMonitor {
                         });
                     }
                 }
+                Event::Slot { .. } => {}
                 Event::CpuTaskScheduled { .. } => {}
                 Event::CpuTaskFinished { .. } => {}
-                Event::CpuSubtaskStarted { .. } => {}
-                Event::TransactionGenerated { id, bytes, .. } => {
-                    txs.insert(id, Transaction::new(bytes, time));
+                Event::Cpu { .. } => {}
+                Event::TXGenerated { id, size_bytes, .. } => {
+                    txs.insert(id, Transaction::new(size_bytes, time));
                     pending_txs.insert(id);
                 }
-                Event::TransactionSent { .. } => {
+                Event::TXSent { .. } => {
                     tx_messages.sent += 1;
                 }
-                Event::TransactionReceived { .. } => {
+                Event::TXReceived { .. } => {
                     tx_messages.received += 1;
                 }
                 Event::RBLotteryWon { .. } => {}
@@ -204,13 +237,13 @@ impl EventMonitor {
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         leios_blocks_with_endorsements += 1;
-                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.slot);
+                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.id.slot);
 
                         let all_eb_ids = eb_ebs
-                            .get(&endorsement.eb)
+                            .get(&endorsement.eb.id)
                             .unwrap()
                             .iter()
-                            .chain(std::iter::once(&endorsement.eb));
+                            .chain(std::iter::once(&endorsement.eb.id));
                         let block_leios_txs: Vec<_> = all_eb_ids
                             .flat_map(|eb| eb_ibs.get(eb).unwrap())
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
@@ -256,8 +289,9 @@ impl EventMonitor {
                 Event::IBGenerated {
                     id,
                     header_bytes,
-                    total_bytes,
+                    size_bytes,
                     transactions,
+                    ..
                 } => {
                     generated_ibs += 1;
                     if transactions.is_empty() {
@@ -265,7 +299,7 @@ impl EventMonitor {
                     }
                     pending_ibs.insert(id.clone());
                     ib_txs.insert(id.clone(), transactions.clone());
-                    bytes_in_ib.insert(id.clone(), total_bytes as f64);
+                    bytes_in_ib.insert(id.clone(), size_bytes as f64);
                     let mut tx_bytes = header_bytes;
                     for tx_id in &transactions {
                         *txs_in_ib.entry(id.clone()).or_default() += 1.;
@@ -285,6 +319,7 @@ impl EventMonitor {
                         pretty_bytes(tx_bytes, pbo.clone()),
                     )
                 }
+                Event::NoIBGenerated { .. } => {}
                 Event::IBSent { .. } => {
                     ib_messages.sent += 1;
                 }
@@ -301,9 +336,15 @@ impl EventMonitor {
                 } => {
                     generated_ebs += 1;
                     pending_ebs.insert(id.clone());
-                    eb_ibs.insert(id.clone(), input_blocks.clone());
-                    eb_ebs.insert(id.clone(), endorser_blocks);
-                    for ib_id in &input_blocks {
+                    eb_ibs.insert(
+                        id.clone(),
+                        input_blocks.iter().map(|r| r.id.clone()).collect(),
+                    );
+                    eb_ebs.insert(
+                        id.clone(),
+                        endorser_blocks.into_iter().map(|r| r.id.clone()).collect(),
+                    );
+                    for BlockRef { id: ib_id } in &input_blocks {
                         *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
                         *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;
                         pending_ibs.remove(ib_id);
@@ -321,6 +362,7 @@ impl EventMonitor {
                         id.slot,
                     )
                 }
+                Event::NoEBGenerated { .. } => {}
                 Event::EBSent { .. } => {
                     eb_messages.sent += 1;
                 }
@@ -336,6 +378,7 @@ impl EventMonitor {
                         *votes_per_pool.entry(id.producer.id).or_default() += count as f64;
                     }
                 }
+                Event::NoVTBundleGenerated { .. } => {}
                 Event::VTBundleNotGenerated { .. } => {}
                 Event::VTBundleSent { .. } => {
                     vote_messages.sent += 1;
@@ -565,9 +608,14 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
 }
 
 enum OutputTarget {
+    AggregatedEventStream {
+        aggregation: TraceAggregator,
+        format: OutputFormat,
+        file: TraceSink,
+    },
     EventStream {
         format: OutputFormat,
-        file: BufWriter<File>,
+        file: TraceSink,
     },
     None,
 }
@@ -575,6 +623,15 @@ enum OutputTarget {
 impl OutputTarget {
     async fn write(&mut self, event: OutputEvent) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                file,
+            } => {
+                if let Some(summary) = aggregation.process(event) {
+                    Self::write_line(*format, file, summary).await?;
+                }
+            }
             Self::EventStream { format, file } => {
                 Self::write_line(*format, file, event).await?;
             }
@@ -583,9 +640,9 @@ impl OutputTarget {
         Ok(())
     }
 
-    async fn write_line<T: Serialize>(
+    async fn write_line<T: Serialize, W: AsyncWrite + Unpin>(
         format: OutputFormat,
-        file: &mut BufWriter<File>,
+        file: &mut W,
         event: T,
     ) -> Result<()> {
         match format {
@@ -604,8 +661,18 @@ impl OutputTarget {
 
     async fn flush(self) -> Result<()> {
         match self {
+            Self::AggregatedEventStream {
+                aggregation,
+                format,
+                mut file,
+            } => {
+                if let Some(summary) = aggregation.finish() {
+                    Self::write_line(format, &mut file, summary).await?;
+                }
+                file.shutdown().await?;
+            }
             Self::EventStream { mut file, .. } => {
-                file.flush().await?;
+                file.shutdown().await?;
             }
             Self::None => {}
         };

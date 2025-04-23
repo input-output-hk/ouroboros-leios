@@ -91,6 +91,7 @@ pub struct RawParameters {
     pub ib_body_avg_size_bytes: u64,
     pub ib_body_max_size_bytes: u64,
     pub ib_diffusion_strategy: DiffusionStrategy,
+    pub ib_diffusion_max_bodies_to_request: u64,
 
     // Endorsement block configuration
     pub eb_generation_probability: f64,
@@ -349,8 +350,8 @@ impl BlockSizeConfig {
         self.cert_constant + self.cert_per_node * nodes as u64
     }
 
-    pub fn eb(&self, ibs: usize) -> u64 {
-        self.eb_constant + self.eb_per_ib * ibs as u64
+    pub fn eb(&self, ibs: usize, ebs: usize) -> u64 {
+        self.eb_constant + self.eb_per_ib * (ibs + ebs) as u64
     }
 
     pub fn vote_bundle(&self, ebs: usize) -> u64 {
@@ -409,6 +410,8 @@ impl MockTransactionConfig {
 pub struct SimConfiguration {
     pub seed: u64,
     pub slots: Option<u64>,
+    pub emit_conformance_events: bool,
+    pub aggregate_events: bool,
     pub trace_nodes: HashSet<NodeId>,
     pub nodes: Vec<NodeConfiguration>,
     pub links: Vec<LinkConfiguration>,
@@ -439,6 +442,8 @@ impl SimConfiguration {
         Self {
             seed: 0,
             slots: None,
+            aggregate_events: false,
+            emit_conformance_events: false,
             nodes: topology.nodes,
             trace_nodes: HashSet::new(),
             links: topology.links,
@@ -456,7 +461,7 @@ impl SimConfiguration {
             stage_length: params.leios_stage_length_slots,
             max_ib_size: params.ib_body_max_size_bytes,
             ib_diffusion_strategy: params.ib_diffusion_strategy,
-            max_ib_requests_per_peer: 1,
+            max_ib_requests_per_peer: params.ib_diffusion_max_bodies_to_request as usize,
             ib_shards: params.ib_shards,
             max_eb_age: params.eb_max_age_slots,
             cpu_times: CpuTimeConfig::new(&params),

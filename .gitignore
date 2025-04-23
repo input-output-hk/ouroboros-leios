@@ -27,3 +27,5 @@ _build
 /simulation/docs/scenario*/sim-data.json
 /simulation/docs/*/sim-data.json
 /simulation/docs/_minted-sim-realism/
+/data/simulation/*.trace.json
+/data/simulation/*.array.schema.json

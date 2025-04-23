@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
@@ -73,16 +74,31 @@ data BlockEvent
   | Pruned
   deriving (Show)
 
+data ConformanceEvent
+  = Slot {slot :: !SlotNo}
+  | NoIBGenerated {slot :: !SlotNo}
+  | NoEBGenerated {slot :: !SlotNo}
+  | NoVTGenerated {slot :: !SlotNo}
+  deriving (Show)
 data LeiosNodeEvent
   = PraosNodeEvent !(PraosNode.PraosNodeEvent RankingBlockBody)
   | LeiosNodeEventCPU !CPUTask
   | LeiosNodeEvent !BlockEvent !LeiosEventBlock
   | LeiosNodeEventLedgerState !RankingBlockId
+  | LeiosNodeEventConformance !ConformanceEvent
   deriving (Show)
 
 --------------------------------------------------------------
 ---- Node Config
 --------------------------------------------------------------
+
+data BlockGeneration
+  = Honest
+  | UnboundedIbs
+      { startingAtSlot :: SlotNo
+      , slotOfGeneratedIbs :: SlotNo
+      , ibsPerSlot :: Word64
+      }
 
 data LeiosNodeConfig = LeiosNodeConfig
   { leios :: !LeiosConfig
@@ -93,7 +109,9 @@ data LeiosNodeConfig = LeiosNodeConfig
   -- ^ for block generation
   , baseChain :: !(Chain RankingBlock)
   , processingQueueBound :: !Natural
-  , processingCores :: NumCores
+  , processingCores :: !NumCores
+  , blockGeneration :: !BlockGeneration
+  , conformanceEvents :: !Bool
   }
 
 --------------------------------------------------------------
@@ -121,7 +139,6 @@ data LeiosNodeState m = LeiosNodeState
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
   , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
-  -- ^ TODO: prune of EBs that won't make it into chain anymore.
   }
 
 type CertificatesProgress = Map EndorseBlockId CertificateProgress
@@ -478,8 +495,6 @@ leiosNode tracer cfg followers peers = do
 
   let computeLedgerStateThreads = [computeLedgerStateThread tracer cfg leiosState]
 
-  -- TODO: expiration times to be decided. At least need EB/IBs to be
-  -- around long enough to compute ledger state if they end in RB.
   let pruningThreads =
         concat
           [ [ pruneExpiredVotes tracer cfg leiosState
@@ -795,7 +810,7 @@ generator ::
   LeiosNodeState m ->
   m ()
 generator tracer cfg st = do
-  schedule <- mkSchedule cfg
+  schedule <- mkSchedule tracer cfg
   let buffers = mkBuffersView cfg st
   let
     withDelay d (lbl, m) = do
@@ -815,7 +830,7 @@ generator tracer cfg st = do
             return (rb, chain :> rb)
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
           traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
-        SomeAction Generate.Propose ib -> (GenIB,) $ do
+        SomeAction Generate.Propose{} ib -> (GenIB,) $ do
           now <- getCurrentTime
           atomically $ do
             modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
@@ -920,24 +935,31 @@ mkBuffersView cfg st = BuffersView{..}
               ]
     return EndorseBlocksSnapshot{..}
 
-mkSchedule :: MonadSTM m => LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
-mkSchedule cfg = do
+mkSchedule :: MonadSTM m => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> m (SlotNo -> m [(SomeRole, Word64)])
+mkSchedule tracer cfg = do
   -- For each pipeline, we want to deploy all our votes in a single
   -- message to cut down on traffic, so we pick one slot out of each
   -- active voting range (they are assumed not to overlap).
   votingSlots <- newTVarIO $ pickFromRanges rng1 $ votingRanges cfg.leios
-  mkScheduler rng2 (rates votingSlots)
+  sched <- mkScheduler' rng2 (rates votingSlots)
+  pure $! if cfg.conformanceEvents then logMissedBlocks sched else fmap filterWins . sched
  where
   (rng1, rng2) = split cfg.rng
   calcWins rate = Just $ \sample ->
     if sample <= coerce (nodeRate cfg.stake rate) then 1 else 0
   voteRate = votingRatePerPipeline cfg.leios cfg.stake
+  honestIBRate = inputBlockRate cfg.leios cfg.stake
+  ibRate Honest slot = (SomeRole (Generate.Propose Nothing Nothing), honestIBRate slot)
+  ibRate (UnboundedIbs{..}) slot =
+    if slot < startingAtSlot
+      then (SomeRole (Generate.Propose Nothing Nothing), honestIBRate slot)
+      else (SomeRole (Generate.Propose (Just slotOfGeneratedIbs) (Just 0)), Just (const $ ibsPerSlot))
   pureRates =
-    [ (SomeRole Generate.Propose, inputBlockRate cfg.leios cfg.stake)
-    , (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
+    [ (SomeRole Generate.Endorse, endorseBlockRate cfg.leios cfg.stake)
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
   rates votingSlots slot = do
+    when cfg.conformanceEvents $ traceWith tracer $ LeiosNodeEventConformance Slot{..}
     vote <- atomically $ do
       vs <- readTVar votingSlots
       case vs of
@@ -946,12 +968,29 @@ mkSchedule cfg = do
               writeTVar votingSlots sls
               pure (Just voteRate)
         _ -> pure Nothing
-    pure $ (SomeRole Generate.Vote, vote) : map (fmap ($ slot)) pureRates
+    pure $
+      [ (SomeRole Generate.Vote, vote)
+      , ibRate cfg.blockGeneration slot
+      ]
+        ++ map (fmap ($ slot)) pureRates
   pickFromRanges :: StdGen -> [(SlotNo, SlotNo)] -> [SlotNo]
   pickFromRanges rng0 rs = snd $ mapAccumL f rng0 rs
    where
     f rng r = coerce $ swap $ uniformR (coerce r :: (Word64, Word64)) rng
-
+  logMissedBlocks sched slot = do
+    xs <- sched slot
+    forM_ xs $ \(SomeRole role, wins) -> do
+      when (wins == 0) $
+        case role of
+          Generate.Propose{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoIBGenerated{..}
+          Generate.Endorse{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoEBGenerated{..}
+          Generate.Vote{} -> do
+            traceWith tracer $ LeiosNodeEventConformance $ NoVTGenerated{..}
+          Generate.Base{} -> return ()
+    return $ filterWins xs
+  filterWins = filter ((>= 1) . snd)
 -- * Utils
 
 partitionRBVar ::

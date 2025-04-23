@@ -39,7 +39,13 @@ enum TransactionView {
     Received(Arc<Transaction>),
 }
 
-enum CpuTask {
+struct CpuTask {
+    task_type: CpuTaskType,
+    start_time: Timestamp,
+    cpu_time: Duration,
+}
+
+enum CpuTaskType {
     /// A transaction has been received and validated, and is ready to propagate
     TransactionValidated(NodeId, Arc<Transaction>),
     /// A Praos block has been generated and is ready to propagate
@@ -62,19 +68,19 @@ enum CpuTask {
     VTBundleValidated(NodeId, Arc<VoteBundle>),
 }
 
-impl CpuTask {
-    fn task_type(&self) -> String {
+impl CpuTaskType {
+    fn name(&self) -> String {
         match self {
-            Self::TransactionValidated(_, _) => "TransactionValidated",
-            Self::RBBlockGenerated(_) => "RBBlockGenerated",
-            Self::RBBlockValidated(_, _) => "RBBlockValidated",
-            Self::IBBlockGenerated(_) => "IBBlockGenerated",
-            Self::IBHeaderValidated(_, _, _) => "IBHeaderValidated",
-            Self::IBBlockValidated(_, _) => "IBBlockValidated",
-            Self::EBBlockGenerated(_) => "EBBlockGenerated",
-            Self::EBBlockValidated(_, _) => "EBBlockValidated",
-            Self::VTBundleGenerated(_) => "VTBundleGenerated",
-            Self::VTBundleValidated(_, _) => "VTBundleValidated",
+            Self::TransactionValidated(_, _) => "ValTX",
+            Self::RBBlockGenerated(_) => "GenRB",
+            Self::RBBlockValidated(_, _) => "ValRB",
+            Self::IBBlockGenerated(_) => "GenIB",
+            Self::IBHeaderValidated(_, _, _) => "ValIH",
+            Self::IBBlockValidated(_, _) => "ValIB",
+            Self::EBBlockGenerated(_) => "GenEB",
+            Self::EBBlockValidated(_, _) => "ValEB",
+            Self::VTBundleGenerated(_) => "GenVote",
+            Self::VTBundleValidated(_, _) => "ValVote",
         }
         .to_string()
     }
@@ -138,10 +144,10 @@ struct NodeLeiosState {
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
-    ibs_by_slot: BTreeMap<u64, Vec<InputBlockId>>,
+    ibs_by_pipeline: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
-    ebs_by_slot: BTreeMap<u64, Vec<EndorserBlockId>>,
-    earliest_eb_cert_times_by_slot: BTreeMap<u64, Timestamp>,
+    ebs_by_pipeline: BTreeMap<u64, Vec<EndorserBlockId>>,
+    earliest_eb_cert_times_by_pipeline: BTreeMap<u64, Timestamp>,
     votes_to_generate: BTreeMap<u64, usize>,
     votes_by_eb: BTreeMap<EndorserBlockId, BTreeMap<NodeId, usize>>,
     votes: BTreeMap<VoteBundleId, VoteBundleState>,
@@ -277,9 +283,14 @@ impl Node {
         self.events.pop().unwrap().1
     }
 
-    fn schedule_cpu_task(&mut self, task: CpuTask) {
-        let cpu_times = self.task_cpu_times(&task);
-        let task_type = task.task_type();
+    fn schedule_cpu_task(&mut self, task_type: CpuTaskType) {
+        let cpu_times = self.task_cpu_times(&task_type);
+        let task = CpuTask {
+            task_type,
+            start_time: self.clock.now(),
+            cpu_time: cpu_times.iter().sum(),
+        };
+        let task_type = task.task_type.name();
         let subtask_count = cpu_times.len();
         let (task_id, subtasks) = self.cpu.schedule_task(task, cpu_times);
         self.tracker.track_cpu_task_scheduled(
@@ -287,21 +298,25 @@ impl Node {
                 node: self.id,
                 index: task_id,
             },
-            task_type,
+            task_type.clone(),
             subtask_count,
         );
         for subtask in subtasks {
-            self.start_cpu_subtask(subtask);
+            self.start_cpu_subtask(subtask, task_type.clone());
         }
     }
 
-    fn start_cpu_subtask(&mut self, subtask: Subtask) {
+    fn start_cpu_subtask(&mut self, subtask: Subtask, task_type: String) {
         let task_id = CpuTaskId {
             node: self.id,
             index: subtask.task_id,
         };
-        self.tracker
-            .track_cpu_subtask_started(task_id, subtask.subtask_id, subtask.duration);
+        self.tracker.track_cpu_subtask_started(
+            task_id,
+            task_type,
+            subtask.subtask_id,
+            subtask.duration,
+        );
         let timestamp = self.clock.now() + subtask.duration;
         self.events.push(FutureEvent(
             timestamp,
@@ -309,11 +324,11 @@ impl Node {
         ))
     }
 
-    fn task_cpu_times(&self, task: &CpuTask) -> Vec<Duration> {
+    fn task_cpu_times(&self, task: &CpuTaskType) -> Vec<Duration> {
         let cpu_times = &self.sim_config.cpu_times;
         match task {
-            CpuTask::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
-            CpuTask::RBBlockGenerated(block) => {
+            CpuTaskType::TransactionValidated(_, _) => vec![cpu_times.tx_validation],
+            CpuTaskType::RBBlockGenerated(block) => {
                 let mut time = cpu_times.rb_generation;
                 if let Some(endorsement) = &block.endorsement {
                     let nodes = endorsement.votes.len();
@@ -322,7 +337,7 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::RBBlockValidated(_, rb) => {
+            CpuTaskType::RBBlockValidated(_, rb) => {
                 let mut time = cpu_times.rb_validation_constant;
                 let bytes: u64 = rb.transactions.iter().map(|tx| tx.bytes).sum();
                 time += cpu_times.rb_validation_per_byte * (bytes as u32);
@@ -333,15 +348,15 @@ impl Node {
                 }
                 vec![time]
             }
-            CpuTask::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
-            CpuTask::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
-            CpuTask::IBBlockValidated(_, ib) => vec![
+            CpuTaskType::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
+            CpuTaskType::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
+            CpuTaskType::IBBlockValidated(_, ib) => vec![
                 cpu_times.ib_body_validation_constant
                     + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
             ],
-            CpuTask::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
-            CpuTask::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
-            CpuTask::VTBundleGenerated(votes) => votes
+            CpuTaskType::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
+            CpuTaskType::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
+            CpuTaskType::VTBundleGenerated(votes) => votes
                 .ebs
                 .keys()
                 .map(|eb_id| {
@@ -352,9 +367,11 @@ impl Node {
                         + (cpu_times.vote_generation_per_ib * eb.ibs.len() as u32)
                 })
                 .collect(),
-            CpuTask::VTBundleValidated(_, votes) => std::iter::repeat(cpu_times.vote_validation)
-                .take(votes.ebs.len())
-                .collect(),
+            CpuTaskType::VTBundleValidated(_, votes) => {
+                std::iter::repeat(cpu_times.vote_validation)
+                    .take(votes.ebs.len())
+                    .collect()
+            }
         }
     }
 
@@ -387,24 +404,26 @@ impl Node {
                         NodeEvent::CpuSubtaskCompleted(subtask) => {
                             let task_id = CpuTaskId { node: self.id, index: subtask.task_id };
                             let (finished_task, next_subtask) = self.cpu.complete_subtask(subtask);
-                            if let Some(subtask) = next_subtask {
-                                self.start_cpu_subtask(subtask);
+                            if let Some((subtask, task)) = next_subtask {
+                                let task_type = task.task_type.name();
+                                self.start_cpu_subtask(subtask, task_type);
                             }
-                            let Some((task, cpu_time)) = finished_task else {
+                            let Some(task) = finished_task else {
                                 continue;
                             };
-                            self.tracker.track_cpu_task_finished(task_id, task.task_type(), cpu_time, task.extra());
-                            match task {
-                                CpuTask::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
-                                CpuTask::RBBlockGenerated(block) => self.finish_generating_block(block)?,
-                                CpuTask::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
-                                CpuTask::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
-                                CpuTask::IBHeaderValidated(from, ib, has_body) => self.finish_validating_ib_header(from, ib, has_body)?,
-                                CpuTask::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
-                                CpuTask::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
-                                CpuTask::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
-                                CpuTask::VTBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
-                                CpuTask::VTBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
+                            let wall_time = self.clock.now() - task.start_time;
+                            self.tracker.track_cpu_task_finished(task_id, task.task_type.name(), task.cpu_time, wall_time, task.task_type.extra());
+                            match task.task_type {
+                                CpuTaskType::TransactionValidated(from, tx) => self.propagate_tx(from, tx)?,
+                                CpuTaskType::RBBlockGenerated(block) => self.finish_generating_block(block)?,
+                                CpuTaskType::RBBlockValidated(from, block) => self.finish_validating_block(from, block)?,
+                                CpuTaskType::IBBlockGenerated(ib) => self.finish_generating_ib(ib)?,
+                                CpuTaskType::IBHeaderValidated(from, ib, has_body) => self.finish_validating_ib_header(from, ib, has_body)?,
+                                CpuTaskType::IBBlockValidated(from, ib) => self.finish_validating_ib(from, ib)?,
+                                CpuTaskType::EBBlockGenerated(eb) => self.finish_generating_eb(eb)?,
+                                CpuTaskType::EBBlockValidated(from, eb) => self.finish_validating_eb(from, eb)?,
+                                CpuTaskType::VTBundleGenerated(votes) => self.finish_generating_vote_bundle(votes)?,
+                                CpuTaskType::VTBundleValidated(from, votes) => self.finish_validating_vote_bundle(from, votes)?,
                             }
                         }
                     }
@@ -486,8 +505,9 @@ impl Node {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
-        // The beginning of a new slot is the end of an old slot.
-        // Publish any input blocks left over from the last slot
+        if self.sim_config.emit_conformance_events {
+            self.tracker.track_slot(self.id, slot);
+        }
 
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
@@ -536,7 +556,7 @@ impl Node {
                 .map(|(index, vrf)| InputBlockHeader {
                     id: InputBlockId {
                         slot,
-                        pipeline: self.slot_to_pipeline(slot),
+                        pipeline: self.slot_to_pipeline(slot) + 4,
                         producer: self.id,
                         index: index as u64,
                     },
@@ -552,26 +572,30 @@ impl Node {
     fn generate_endorser_blocks(&mut self, slot: u64) {
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
+                let pipeline = self.slot_to_pipeline(slot) + 1;
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot),
+                    pipeline,
                     producer: self.id,
                 });
-                let ibs = self.select_ibs_for_eb(slot);
-                let ebs = self.select_ebs_for_eb(slot);
-                let bytes = self.sim_config.sizes.eb(ibs.len());
+                let ibs = self.select_ibs_for_eb(pipeline);
+                let ebs = self.select_ebs_for_eb(pipeline);
+                let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
-                    pipeline: self.slot_to_pipeline(slot),
+                    pipeline,
                     producer: self.id,
                     bytes,
                     ibs,
                     ebs,
                 };
-                self.schedule_cpu_task(CpuTask::EBBlockGenerated(eb));
+                self.schedule_cpu_task(CpuTaskType::EBBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
                 return;
             }
+        }
+        if self.sim_config.emit_conformance_events {
+            self.tracker.track_no_eb_generated(self.id, slot);
         }
     }
 
@@ -595,25 +619,28 @@ impl Node {
     }
 
     fn vote_for_endorser_blocks(&mut self, slot: u64) {
+        if !self.try_vote_for_endorser_blocks(slot) && self.sim_config.emit_conformance_events {
+            self.tracker.track_no_vote_generated(self.id, slot);
+        }
+    }
+
+    fn try_vote_for_endorser_blocks(&mut self, slot: u64) -> bool {
         let Some(vote_count) = self.leios.votes_to_generate.remove(&slot) else {
-            return;
+            return false;
         };
         // When we vote, we vote for EBs which were sent at the start of the prior stage.
-        let eb_slot = match slot.checked_sub(self.sim_config.stage_length) {
-            Some(s) => s - (s % self.sim_config.stage_length),
-            None => {
-                return;
-            }
+        let Some(eb_pipeline) = (slot / self.sim_config.stage_length).checked_sub(1) else {
+            return false;
         };
-        let Some(ebs) = self.leios.ebs_by_slot.get(&eb_slot) else {
-            return;
+        let Some(ebs) = self.leios.ebs_by_pipeline.get(&eb_pipeline) else {
+            return false;
         };
         let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
             let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
                 panic!("Tried voting for EB which we haven't received");
             };
-            match self.should_vote_for(slot, eb) {
+            match self.should_vote_for(eb) {
                 Ok(()) => true,
                 Err(reason) => {
                     self.tracker.track_no_vote(
@@ -628,7 +655,7 @@ impl Node {
             }
         });
         if ebs.is_empty() {
-            return;
+            return false;
         }
         // For every VRF lottery you won, you can vote for every EB
         let votes_allowed = vote_count * ebs.len();
@@ -641,13 +668,15 @@ impl Node {
             bytes: self.sim_config.sizes.vote_bundle(ebs.len()),
             ebs: ebs.into_iter().map(|eb| (eb, votes_allowed)).collect(),
         };
-        if !votes.ebs.is_empty() {
-            self.schedule_cpu_task(CpuTask::VTBundleGenerated(votes));
-        }
+        self.schedule_cpu_task(CpuTaskType::VTBundleGenerated(votes));
+        true
     }
 
     fn generate_input_blocks(&mut self, slot: u64) {
         let Some(headers) = self.leios.ibs_to_generate.remove(&slot) else {
+            if self.sim_config.emit_conformance_events {
+                self.tracker.track_no_ib_generated(self.id, slot);
+            }
             return;
         };
         for header in headers {
@@ -657,7 +686,7 @@ impl Node {
                 transactions: vec![],
             };
             self.try_filling_ib(&mut ib);
-            self.schedule_cpu_task(CpuTask::IBBlockGenerated(ib));
+            self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
         }
     }
 
@@ -728,7 +757,7 @@ impl Node {
             transactions,
         };
         self.tracker.track_praos_block_lottery_won(&block);
-        self.schedule_cpu_task(CpuTask::RBBlockGenerated(block));
+        self.schedule_cpu_task(CpuTaskType::RBBlockGenerated(block));
 
         Ok(())
     }
@@ -775,16 +804,16 @@ impl Node {
         };
 
         let votes = self.leios.votes_by_eb.get(&block)?.clone();
-        let bytes = self.sim_config.sizes.cert(votes.len());
+        let size_bytes = self.sim_config.sizes.cert(votes.len());
 
         Some(Endorsement {
             eb: block,
-            bytes,
+            size_bytes,
             votes,
         })
     }
 
-    fn choose_endorsed_block_from_slot(&self, slot: u64) -> Option<EndorserBlockId> {
+    fn choose_endorsed_block_from_pipeline(&self, pipeline: u64) -> Option<EndorserBlockId> {
         // an EB is eligible for endorsement if it has this many votes
         let vote_threshold = self.sim_config.vote_threshold;
 
@@ -793,8 +822,8 @@ impl Node {
         //  - the number of votes (more votes is better)
         let (&block, _) = self
             .leios
-            .ebs_by_slot
-            .get(&slot)
+            .ebs_by_pipeline
+            .get(&pipeline)
             .iter()
             .flat_map(|ids| ids.iter())
             .filter_map(|eb| {
@@ -879,7 +908,7 @@ impl Node {
 
     fn receive_request_tx(&mut self, from: NodeId, id: TransactionId) -> Result<()> {
         if let Some(TransactionView::Received(tx)) = self.txs.get(&id) {
-            self.tracker.track_transaction_sent(tx.id, self.id, from);
+            self.tracker.track_transaction_sent(tx, self.id, from);
             self.send_to(from, SimulationMessage::Tx(tx.clone()))?;
         }
         Ok(())
@@ -888,7 +917,7 @@ impl Node {
     fn receive_tx(&mut self, from: NodeId, tx: Arc<Transaction>) {
         self.tracker
             .track_transaction_received(tx.id, from, self.id);
-        self.schedule_cpu_task(CpuTask::TransactionValidated(from, tx));
+        self.schedule_cpu_task(CpuTaskType::TransactionValidated(from, tx));
     }
 
     fn generate_tx(&mut self, tx: Arc<Transaction>) -> Result<()> {
@@ -937,7 +966,7 @@ impl Node {
     fn receive_block(&mut self, from: NodeId, block: Arc<Block>) {
         self.tracker
             .track_praos_block_received(&block, from, self.id);
-        self.schedule_cpu_task(CpuTask::RBBlockValidated(from, block));
+        self.schedule_cpu_task(CpuTaskType::RBBlockValidated(from, block));
     }
 
     fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
@@ -992,7 +1021,7 @@ impl Node {
         self.leios
             .ibs
             .insert(id, InputBlockState::Pending(header.clone()));
-        self.schedule_cpu_task(CpuTask::IBHeaderValidated(from, header, has_body));
+        self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
     fn finish_validating_ib_header(
@@ -1049,7 +1078,7 @@ impl Node {
 
     fn receive_request_ib(&mut self, from: NodeId, id: InputBlockId) -> Result<()> {
         if let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(&id) {
-            self.tracker.track_ib_sent(id, self.id, from);
+            self.tracker.track_ib_sent(ib, self.id, from);
             self.send_to(from, SimulationMessage::IB(ib.clone()))?;
         }
         Ok(())
@@ -1057,12 +1086,12 @@ impl Node {
 
     fn receive_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) {
         self.tracker.track_ib_received(ib.header.id, from, self.id);
-        self.schedule_cpu_task(CpuTask::IBBlockValidated(from, ib));
+        self.schedule_cpu_task(CpuTaskType::IBBlockValidated(from, ib));
     }
 
     fn finish_validating_ib(&mut self, from: NodeId, ib: Arc<InputBlock>) -> Result<()> {
         let id = ib.header.id;
-        let slot = ib.header.id.slot;
+        let pipeline = ib.header.id.pipeline;
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
@@ -1075,7 +1104,11 @@ impl Node {
         {
             return Ok(());
         }
-        self.leios.ibs_by_slot.entry(slot).or_default().push(id);
+        self.leios
+            .ibs_by_pipeline
+            .entry(pipeline)
+            .or_default()
+            .push(id);
 
         for peer in &self.consumers {
             if *peer == from {
@@ -1132,7 +1165,7 @@ impl Node {
 
     fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
         if let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(&id) {
-            self.tracker.track_eb_sent(id, self.id, from);
+            self.tracker.track_eb_sent(eb, self.id, from);
             self.send_to(from, SimulationMessage::EB(eb.clone()))?;
         }
         Ok(())
@@ -1140,7 +1173,7 @@ impl Node {
 
     fn receive_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) {
         self.tracker.track_eb_received(eb.id(), from, self.id);
-        self.schedule_cpu_task(CpuTask::EBBlockValidated(from, eb));
+        self.schedule_cpu_task(CpuTaskType::EBBlockValidated(from, eb));
     }
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
@@ -1153,7 +1186,11 @@ impl Node {
         {
             return Ok(());
         }
-        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
+        self.leios
+            .ebs_by_pipeline
+            .entry(id.pipeline)
+            .or_default()
+            .push(id);
         // We haven't seen this EB before, so propagate it to our neighbors
         for peer in &self.consumers {
             if *peer == from {
@@ -1185,7 +1222,7 @@ impl Node {
 
     fn receive_votes(&mut self, from: NodeId, votes: Arc<VoteBundle>) {
         self.tracker.track_votes_received(&votes, from, self.id);
-        self.schedule_cpu_task(CpuTask::VTBundleValidated(from, votes));
+        self.schedule_cpu_task(CpuTaskType::VTBundleValidated(from, votes));
     }
 
     fn finish_validating_vote_bundle(
@@ -1213,8 +1250,8 @@ impl Node {
             *eb_votes += count;
             if *eb_votes as u64 > self.sim_config.vote_threshold {
                 self.leios
-                    .earliest_eb_cert_times_by_slot
-                    .entry(eb.slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .entry(eb.pipeline)
                     .or_insert(self.clock.now());
             }
         }
@@ -1271,8 +1308,8 @@ impl Node {
 
         let id = ib.header.id;
         self.leios
-            .ibs_by_slot
-            .entry(ib.header.id.slot)
+            .ibs_by_pipeline
+            .entry(ib.header.id.pipeline)
             .or_default()
             .push(id);
         self.leios.ibs.insert(id, InputBlockState::Received(ib));
@@ -1282,45 +1319,40 @@ impl Node {
         Ok(())
     }
 
-    fn select_ibs_for_eb(&mut self, slot: u64) -> Vec<InputBlockId> {
-        let config = &self.sim_config;
-        let Some(earliest_slot) = slot.checked_sub(config.stage_length * 3) else {
-            return vec![];
-        };
-        let mut ibs = vec![];
-        for slot in earliest_slot..(earliest_slot + config.stage_length) {
-            let Some(slot_ibs) = self.leios.ibs_by_slot.remove(&slot) else {
-                continue;
-            };
-            ibs.extend(slot_ibs);
-        }
-        ibs
+    fn select_ibs_for_eb(&mut self, pipeline: u64) -> Vec<InputBlockId> {
+        self.leios
+            .ibs_by_pipeline
+            .get(&pipeline)
+            .cloned()
+            .unwrap_or_default()
     }
 
-    fn select_ebs_for_eb(&self, slot: u64) -> Vec<EndorserBlockId> {
-        let Some(referenced_slots) = self.slots_referenced_by_ebs(slot) else {
+    fn select_ebs_for_eb(&self, pipeline: u64) -> Vec<EndorserBlockId> {
+        let Some(referenced_pipelines) = self.pipelines_referenced_by_ebs(pipeline) else {
             return vec![];
         };
 
         // include one certified EB from each of these pipelines
         let mut ebs = vec![];
-        for pipeline_slot in referenced_slots {
-            if let Some(eb) = self.choose_endorsed_block_from_slot(pipeline_slot) {
+        for referenced_pipeline in referenced_pipelines {
+            if let Some(eb) = self.choose_endorsed_block_from_pipeline(referenced_pipeline) {
                 ebs.push(eb);
             }
         }
         ebs
     }
 
-    fn slots_referenced_by_ebs(&self, slot: u64) -> Option<impl Iterator<Item = u64> + use<'_>> {
+    fn pipelines_referenced_by_ebs(
+        &self,
+        pipeline: u64,
+    ) -> Option<impl Iterator<Item = u64> + use<'_>> {
         if self.sim_config.variant != LeiosVariant::Full {
             // EBs don't reference other EBs unless we're running Full Leios
             return None;
         }
 
-        let current_pipeline = slot / self.sim_config.stage_length;
         // The newest pipeline to include EBs from is i-3, where i is the current pipeline.
-        let Some(newest_included_pipeline) = current_pipeline.checked_sub(3) else {
+        let Some(newest_included_pipeline) = pipeline.checked_sub(3) else {
             // If there haven't been 3 pipelines yet, just don't recurse.
             return None;
         };
@@ -1329,14 +1361,11 @@ impl Node {
         // η is the "quality parameter" (expected block rate), and L is stage length.
         let old_pipelines =
             (3 * self.sim_config.praos_chain_quality).div_ceil(self.sim_config.stage_length);
-        let oldest_included_pipeline = current_pipeline
+        let oldest_included_pipeline = pipeline
             .checked_sub(old_pipelines)
             .unwrap_or(newest_included_pipeline);
 
-        Some(
-            (oldest_included_pipeline..=newest_included_pipeline)
-                .map(|i| i * self.sim_config.stage_length),
-        )
+        Some(oldest_included_pipeline..=newest_included_pipeline)
     }
 
     fn finish_generating_eb(&mut self, eb: EndorserBlock) -> Result<()> {
@@ -1347,46 +1376,31 @@ impl Node {
         self.leios
             .ebs
             .insert(id, EndorserBlockState::Received(eb.clone()));
-        self.leios.ebs_by_slot.entry(id.slot).or_default().push(id);
+        self.leios
+            .ebs_by_pipeline
+            .entry(id.pipeline)
+            .or_default()
+            .push(id);
         for peer in &self.consumers {
             self.send_to(*peer, SimulationMessage::AnnounceEB(id))?;
         }
         Ok(())
     }
 
-    fn should_vote_for(&self, slot: u64, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
-        let stage_length = self.sim_config.stage_length;
-
-        let Some(ib_slot_start) = slot.checked_sub(stage_length * 4) else {
-            // The IBs for this EB were "generated" before the sim began.
-            // It's valid iff there are no IBs.
-            return if eb.ibs.is_empty() {
-                Ok(())
-            } else {
-                Err(NoVoteReason::ExtraIB)
-            };
-        };
-        let ib_slot_end = ib_slot_start + stage_length;
-        let ib_slot_range = ib_slot_start..ib_slot_end;
-
+    fn should_vote_for(&self, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
         let mut ib_set = HashSet::new();
         for ib in &eb.ibs {
             if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
                 return Err(NoVoteReason::MissingIB);
             }
-            if !ib_slot_range.contains(&ib.slot) {
+            if ib.pipeline != eb.pipeline {
                 return Err(NoVoteReason::InvalidSlot);
             }
             ib_set.insert(*ib);
         }
-        for ib_slot in ib_slot_range {
-            for ib in self
-                .leios
-                .ibs_by_slot
-                .get(&ib_slot)
-                .iter()
-                .flat_map(|f| f.iter())
-            {
+
+        if let Some(ibs) = self.leios.ibs_by_pipeline.get(&eb.pipeline) {
+            for ib in ibs {
                 if !ib_set.contains(ib) {
                     return Err(NoVoteReason::ExtraIB);
                 }
@@ -1394,19 +1408,20 @@ impl Node {
         }
 
         // If this EB is meant to reference other EBs, validate that it references whatever it needs
-        if let Some(expected_referenced_slots) = self.slots_referenced_by_ebs(eb.slot) {
-            let actual_referenced_slots: HashSet<u64> = eb.ebs.iter().map(|id| id.slot).collect();
-            for expected_slot in expected_referenced_slots {
+        if let Some(expected_referenced_pipelines) = self.pipelines_referenced_by_ebs(eb.pipeline) {
+            let actual_referenced_pipelines: HashSet<u64> =
+                eb.ebs.iter().map(|id| id.pipeline).collect();
+            for expected_pipeline in expected_referenced_pipelines {
                 let Some(certified_at) = self
                     .leios
-                    .earliest_eb_cert_times_by_slot
-                    .get(&expected_slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .get(&expected_pipeline)
                 else {
                     // We don't require an EB referenced from this pipeline if none of that pipeline's EBs have been certified yet,
                     continue;
                 };
 
-                let last_pipeline_slot = expected_slot + self.sim_config.stage_length - 1;
+                let last_pipeline_slot = (expected_pipeline + 1) * self.sim_config.stage_length - 1;
                 let cutoff = Timestamp::from_secs(last_pipeline_slot)
                     .checked_sub_duration(self.sim_config.header_diffusion_time)
                     .unwrap_or_default();
@@ -1415,9 +1430,20 @@ impl Node {
                     continue;
                 }
 
-                if !actual_referenced_slots.contains(&expected_slot) {
+                if !actual_referenced_pipelines.contains(&expected_pipeline) {
                     return Err(NoVoteReason::MissingEB);
                 }
+            }
+        }
+
+        // If this EB _does_ reference other EBs, make sure we trust them
+        for referenced_eb in &eb.ebs {
+            let Some(votes) = self.leios.votes_by_eb.get(referenced_eb) else {
+                return Err(NoVoteReason::UncertifiedEBReference);
+            };
+            let vote_count = votes.values().copied().sum::<usize>() as u64;
+            if vote_count < self.sim_config.vote_threshold {
+                return Err(NoVoteReason::UncertifiedEBReference);
             }
         }
         Ok(())
@@ -1436,8 +1462,8 @@ impl Node {
             *eb_votes += count;
             if *eb_votes as u64 > self.sim_config.vote_threshold {
                 self.leios
-                    .earliest_eb_cert_times_by_slot
-                    .entry(eb.slot)
+                    .earliest_eb_cert_times_by_pipeline
+                    .entry(eb.pipeline)
                     .or_insert(self.clock.now());
             }
         }
@@ -1472,7 +1498,7 @@ impl Node {
         }
         self.clock.start_task();
         self.msg_sink
-            .send_to(to, msg.bytes_size(), msg.protocol(), msg, self.clock.now())
+            .send_to(to, msg.bytes_size(), msg.protocol(), msg)
     }
 
     fn slot_to_pipeline(&self, slot: u64) -> u64 {

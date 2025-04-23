@@ -1,5 +1,4 @@
 "use client";
-import { DEFAULT_SCALE } from "@/app/constants";
 import { Context, createContext, useContext } from "react";
 import { ISimContext, ISimContextState, ISimulationAggregatedDataState, Tab } from "./types";
 
@@ -17,15 +16,17 @@ export const defaultAggregatedData: ISimulationAggregatedDataState = {
 export const defaultState: ISimContextState = {
   allScenarios: [],
   activeScenario: '',
+  aggregated: true,
   graph: {
     canvasRef: { current: null },
     canvasOffsetX: 0,
     canvasOffsetY: 0,
-    canvasScale: DEFAULT_SCALE,
+    canvasScale: 6,
   },
   blocks: {},
   activeTab: Tab.Graph,
   batchSize: 5000,
+  speedMultiplier: 10,
   aggregatedData: defaultAggregatedData,
   maxTime: 0,
   tracePath: '',

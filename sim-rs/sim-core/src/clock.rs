@@ -50,6 +50,7 @@ impl<T> Ord for FutureEvent<T> {
 pub struct Clock {
     time: Arc<AtomicTimestamp>,
     waiters: Arc<AtomicUsize>,
+    tasks: Arc<AtomicUsize>,
     tx: mpsc::UnboundedSender<ClockEvent>,
 }
 
@@ -57,9 +58,15 @@ impl Clock {
     fn new(
         time: Arc<AtomicTimestamp>,
         waiters: Arc<AtomicUsize>,
+        tasks: Arc<AtomicUsize>,
         tx: mpsc::UnboundedSender<ClockEvent>,
     ) -> Self {
-        Self { time, waiters, tx }
+        Self {
+            time,
+            waiters,
+            tasks,
+            tx,
+        }
     }
 
     pub fn now(&self) -> Timestamp {
@@ -73,6 +80,7 @@ impl Clock {
         ClockBarrier {
             id,
             time: self.time.clone(),
+            tasks: self.tasks.clone(),
             tx: self.tx.clone(),
         }
     }
@@ -81,6 +89,7 @@ impl Clock {
 pub struct ClockBarrier {
     id: usize,
     time: Arc<AtomicTimestamp>,
+    tasks: Arc<AtomicUsize>,
     tx: mpsc::UnboundedSender<ClockEvent>,
 }
 
@@ -90,7 +99,7 @@ impl ClockBarrier {
     }
 
     pub fn start_task(&self) {
-        let _ = self.tx.send(ClockEvent::StartTask);
+        self.tasks.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     }
 
     pub fn finish_task(&self) {

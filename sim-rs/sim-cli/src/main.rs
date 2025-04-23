@@ -44,6 +44,10 @@ struct Args {
     trace_node: Vec<usize>,
     #[clap(short, long)]
     slots: Option<u64>,
+    #[clap(short, long)]
+    conformance_events: bool,
+    #[clap(short, long)]
+    aggregate_events: bool,
 }
 
 fn get_default_topology() -> Result<String> {
@@ -89,6 +93,12 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     let mut config = SimConfiguration::build(params, topology);
     if let Some(slots) = args.slots {
         config.slots = Some(slots);
+    }
+    if args.conformance_events {
+        config.emit_conformance_events = true;
+    }
+    if args.aggregate_events {
+        config.aggregate_events = true;
     }
     for id in &args.trace_node {
         config.trace_nodes.insert(NodeId::new(*id));
@@ -164,6 +174,8 @@ mod tests {
                 timescale: None,
                 trace_node: vec![],
                 slots: None,
+                conformance_events: false,
+                aggregate_events: false,
             };
             read_config(&args)?;
         }

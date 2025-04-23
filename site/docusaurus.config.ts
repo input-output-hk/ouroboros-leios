@@ -102,6 +102,10 @@ const config: Config = {
                             to: "https://leios.cardano-scaling.org/cost-estimator/",
                             label: "Cost Estimator",
                         },
+                        {
+                            to: "/traffic-estimator",
+                            label: "Traffic Estimator",
+                        },
                     ],
                 },
                 {

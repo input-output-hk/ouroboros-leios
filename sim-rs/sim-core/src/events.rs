@@ -8,8 +8,8 @@ use crate::{
     clock::{Clock, Timestamp},
     config::{NodeConfiguration, NodeId},
     model::{
-        Block, BlockId, CpuTaskId, Endorsement, EndorserBlockId, InputBlockId, NoVoteReason,
-        Transaction, TransactionId, VoteBundle, VoteBundleId,
+        Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
+        TransactionId, VoteBundle, VoteBundleId,
     },
 };
 
@@ -53,11 +53,27 @@ impl Ord for Node {
     }
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct BlockRef<Id> {
+    pub id: Id,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Endorsement<Node: Display = NodeId> {
+    pub eb: BlockRef<EndorserBlockId<Node>>,
+    pub size_bytes: u64,
+    pub votes: BTreeMap<Node, usize>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum Event {
+    GlobalSlot {
+        slot: u64,
+    },
     Slot {
-        number: u64,
+        node: Node,
+        slot: u64,
     },
     CpuTaskScheduled {
         task: CpuTaskId<Node>,
@@ -69,109 +85,160 @@ pub enum Event {
         task_type: String,
         #[serde(serialize_with = "duration_as_secs")]
         cpu_time_s: Duration,
+        #[serde(serialize_with = "duration_as_secs")]
+        wall_time_s: Duration,
         extra: String,
     },
-    CpuSubtaskStarted {
+    Cpu {
         task: CpuTaskId<Node>,
-        subtask_id: u64,
+        node: String,
         #[serde(serialize_with = "duration_as_secs")]
-        duration_s: Duration,
+        cpu_time_s: Duration,
+        task_label: String,
+        task_type: String,
+        id: String,
     },
-    TransactionGenerated {
+    TXGenerated {
         id: TransactionId,
         publisher: Node,
-        bytes: u64,
+        size_bytes: u64,
     },
-    TransactionSent {
+    TXSent {
         id: TransactionId,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
-    TransactionReceived {
+    TXReceived {
         id: TransactionId,
         sender: Node,
         recipient: Node,
     },
     RBLotteryWon {
-        #[serde(flatten)]
         id: BlockId<Node>,
+        slot: u64,
+        producer: Node,
     },
     RBGenerated {
-        #[serde(flatten)]
         id: BlockId<Node>,
+        slot: u64,
+        producer: Node,
         vrf: u64,
-        parent: Option<BlockId<Node>>,
+        parent: Option<BlockRef<BlockId<Node>>>,
         header_bytes: u64,
+        size_bytes: u64,
         endorsement: Option<Endorsement<Node>>,
         transactions: Vec<TransactionId>,
     },
     RBSent {
-        #[serde(flatten)]
         id: BlockId<Node>,
+        slot: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     RBReceived {
-        #[serde(flatten)]
         id: BlockId<Node>,
+        slot: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
     },
     IBLotteryWon {
-        #[serde(flatten)]
         id: InputBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        index: u64,
     },
     IBGenerated {
-        #[serde(flatten)]
         id: InputBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        index: u64,
         header_bytes: u64,
-        total_bytes: u64,
+        tx_payload_bytes: u64,
+        size_bytes: u64,
         transactions: Vec<TransactionId>,
     },
+    NoIBGenerated {
+        node: Node,
+        slot: u64,
+    },
     IBSent {
-        #[serde(flatten)]
         id: InputBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        index: u64,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     IBReceived {
-        #[serde(flatten)]
         id: InputBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        index: u64,
         sender: Node,
         recipient: Node,
     },
     EBLotteryWon {
-        #[serde(flatten)]
         id: EndorserBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
     },
     EBGenerated {
-        #[serde(flatten)]
         id: EndorserBlockId<Node>,
-        bytes: u64,
-        input_blocks: Vec<InputBlockId<Node>>,
-        endorser_blocks: Vec<EndorserBlockId<Node>>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        size_bytes: u64,
+        input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
+        endorser_blocks: Vec<BlockRef<EndorserBlockId<Node>>>,
+    },
+    NoEBGenerated {
+        node: Node,
+        slot: u64,
     },
     EBSent {
-        #[serde(flatten)]
         id: EndorserBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     EBReceived {
-        #[serde(flatten)]
         id: EndorserBlockId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
     },
     VTLotteryWon {
-        #[serde(flatten)]
         id: VoteBundleId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
     },
     VTBundleGenerated {
-        #[serde(flatten)]
         id: VoteBundleId<Node>,
-        bytes: u64,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
+        size_bytes: u64,
         votes: Votes<Node>,
+    },
+    NoVTBundleGenerated {
+        node: Node,
+        slot: u64,
     },
     VTBundleNotGenerated {
         slot: u64,
@@ -181,14 +248,19 @@ pub enum Event {
         reason: NoVoteReason,
     },
     VTBundleSent {
-        #[serde(flatten)]
         id: VoteBundleId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
+        msg_size_bytes: u64,
     },
     VTBundleReceived {
-        #[serde(flatten)]
         id: VoteBundleId<Node>,
+        slot: u64,
+        pipeline: u64,
+        producer: Node,
         sender: Node,
         recipient: Node,
     },
@@ -230,8 +302,15 @@ impl EventTracker {
         }
     }
 
-    pub fn track_slot(&self, number: u64) {
-        self.send(Event::Slot { number });
+    pub fn track_global_slot(&self, slot: u64) {
+        self.send(Event::GlobalSlot { slot });
+    }
+
+    pub fn track_slot(&self, node: NodeId, slot: u64) {
+        self.send(Event::Slot {
+            node: self.to_node(node),
+            slot,
+        });
     }
 
     pub fn track_cpu_task_scheduled(&self, task_id: CpuTaskId, task_type: String, subtasks: usize) {
@@ -247,12 +326,14 @@ impl EventTracker {
         task_id: CpuTaskId,
         task_type: String,
         cpu_time: Duration,
+        wall_time: Duration,
         extra: String,
     ) {
         self.send(Event::CpuTaskFinished {
             task: self.to_task(task_id),
             task_type,
             cpu_time_s: cpu_time,
+            wall_time_s: wall_time,
             extra,
         });
     }
@@ -260,31 +341,46 @@ impl EventTracker {
     pub fn track_cpu_subtask_started(
         &self,
         task_id: CpuTaskId,
+        task_type: String,
         subtask_id: u64,
         duration: Duration,
     ) {
-        self.send(Event::CpuSubtaskStarted {
-            task: self.to_task(task_id),
-            subtask_id,
-            duration_s: duration,
+        let task = self.to_task(task_id);
+        let id = format!("{}-{}", task, subtask_id);
+        self.send(Event::Cpu {
+            node: task.node.to_string(),
+            task,
+            task_label: format!("{task_type}: {id}"),
+            id,
+            task_type,
+            cpu_time_s: duration,
         });
     }
 
     pub fn track_praos_block_lottery_won(&self, block: &Block) {
         self.send(Event::RBLotteryWon {
             id: self.to_block(block.id),
+            slot: block.id.slot,
+            producer: self.to_node(block.id.producer),
         });
     }
 
     pub fn track_praos_block_generated(&self, block: &Block) {
         self.send(Event::RBGenerated {
             id: self.to_block(block.id),
+            slot: block.id.slot,
+            producer: self.to_node(block.id.producer),
             vrf: block.vrf,
-            parent: block.parent.map(|id| self.to_block(id)),
+            parent: block.parent.map(|id| BlockRef {
+                id: self.to_block(id),
+            }),
             header_bytes: block.header_bytes,
+            size_bytes: block.bytes(),
             endorsement: block.endorsement.as_ref().map(|e| Endorsement {
-                eb: self.to_endorser_block(e.eb),
-                bytes: e.bytes,
+                eb: BlockRef {
+                    id: self.to_endorser_block(e.eb),
+                },
+                size_bytes: e.size_bytes,
                 votes: e
                     .votes
                     .iter()
@@ -298,37 +394,48 @@ impl EventTracker {
     pub fn track_praos_block_sent(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBSent {
             id: self.to_block(block.id),
+            slot: block.id.slot,
+            producer: self.to_node(block.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes(),
         });
     }
 
     pub fn track_praos_block_received(&self, block: &Block, sender: NodeId, recipient: NodeId) {
         self.send(Event::RBReceived {
             id: self.to_block(block.id),
+            slot: block.id.slot,
+            producer: self.to_node(block.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });
     }
 
     pub fn track_transaction_generated(&self, transaction: &Transaction, publisher: NodeId) {
-        self.send(Event::TransactionGenerated {
+        self.send(Event::TXGenerated {
             id: transaction.id,
             publisher: self.to_node(publisher),
-            bytes: transaction.bytes,
+            size_bytes: transaction.bytes,
         });
     }
 
-    pub fn track_transaction_sent(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
-        self.send(Event::TransactionSent {
-            id,
+    pub fn track_transaction_sent(
+        &self,
+        transaction: &Transaction,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        self.send(Event::TXSent {
+            id: transaction.id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: transaction.bytes,
         });
     }
 
     pub fn track_transaction_received(&self, id: TransactionId, sender: NodeId, recipient: NodeId) {
-        self.send(Event::TransactionReceived {
+        self.send(Event::TXReceived {
             id,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
@@ -338,30 +445,62 @@ impl EventTracker {
     pub fn track_ib_lottery_won(&self, id: InputBlockId) {
         self.send(Event::IBLotteryWon {
             id: self.to_input_block(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
+            index: id.index,
         });
     }
 
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
+        let header_bytes = block.header.bytes;
+        let tx_payload_bytes = block.transactions.iter().map(|tx| tx.bytes).sum();
         self.send(Event::IBGenerated {
             id: self.to_input_block(block.header.id),
-            header_bytes: block.header.bytes,
-            total_bytes: block.header.bytes
-                + block.transactions.iter().map(|tx| tx.bytes).sum::<u64>(),
+            slot: block.header.id.slot,
+            pipeline: block.header.id.pipeline,
+            producer: self.to_node(block.header.id.producer),
+            index: block.header.id.index,
+            header_bytes,
+            tx_payload_bytes,
+            size_bytes: header_bytes + tx_payload_bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
         });
     }
 
-    pub fn track_ib_sent(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
+    pub fn track_no_ib_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoIBGenerated {
+            node: self.to_node(node),
+            slot,
+        });
+    }
+
+    pub fn track_ib_sent(
+        &self,
+        block: &crate::model::InputBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
+        let id = block.header.id;
         self.send(Event::IBSent {
             id: self.to_input_block(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
+            index: id.index,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes(),
         });
     }
 
     pub fn track_ib_received(&self, id: InputBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::IBReceived {
             id: self.to_input_block(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
+            index: id.index,
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });
@@ -370,37 +509,66 @@ impl EventTracker {
     pub fn track_eb_lottery_won(&self, id: EndorserBlockId) {
         self.send(Event::EBLotteryWon {
             id: self.to_endorser_block(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
         });
     }
 
     pub fn track_eb_generated(&self, block: &crate::model::EndorserBlock) {
         self.send(Event::EBGenerated {
             id: self.to_endorser_block(block.id()),
-            bytes: block.bytes,
+            slot: block.slot,
+            pipeline: block.pipeline,
+            producer: self.to_node(block.producer),
+            size_bytes: block.bytes,
             input_blocks: block
                 .ibs
                 .iter()
-                .map(|id| self.to_input_block(*id))
+                .map(|id| BlockRef {
+                    id: self.to_input_block(*id),
+                })
                 .collect(),
             endorser_blocks: block
                 .ebs
                 .iter()
-                .map(|id| self.to_endorser_block(*id))
+                .map(|id| BlockRef {
+                    id: self.to_endorser_block(*id),
+                })
                 .collect(),
         });
     }
 
-    pub fn track_eb_sent(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
+    pub fn track_no_eb_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoEBGenerated {
+            node: self.to_node(node),
+            slot,
+        });
+    }
+
+    pub fn track_eb_sent(
+        &self,
+        block: &crate::model::EndorserBlock,
+        sender: NodeId,
+        recipient: NodeId,
+    ) {
         self.send(Event::EBSent {
-            id: self.to_endorser_block(id),
+            id: self.to_endorser_block(block.id()),
+            slot: block.slot,
+            pipeline: block.pipeline,
+            producer: self.to_node(block.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: block.bytes,
         });
     }
 
     pub fn track_eb_received(&self, id: EndorserBlockId, sender: NodeId, recipient: NodeId) {
         self.send(Event::EBReceived {
             id: self.to_endorser_block(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });
@@ -409,13 +577,19 @@ impl EventTracker {
     pub fn track_vote_lottery_won(&self, id: VoteBundleId) {
         self.send(Event::VTLotteryWon {
             id: self.to_vote_bundle(id),
+            slot: id.slot,
+            pipeline: id.pipeline,
+            producer: self.to_node(id.producer),
         });
     }
 
     pub fn track_votes_generated(&self, votes: &VoteBundle) {
         self.send(Event::VTBundleGenerated {
             id: self.to_vote_bundle(votes.id),
-            bytes: votes.bytes,
+            slot: votes.id.slot,
+            pipeline: votes.id.pipeline,
+            producer: self.to_node(votes.id.producer),
+            size_bytes: votes.bytes,
             votes: Votes(
                 votes
                     .ebs
@@ -423,6 +597,13 @@ impl EventTracker {
                     .map(|(node, count)| (self.to_endorser_block(*node), *count))
                     .collect(),
             ),
+        });
+    }
+
+    pub fn track_no_vote_generated(&self, node: NodeId, slot: u64) {
+        self.send(Event::NoVTBundleGenerated {
+            node: self.to_node(node),
+            slot,
         });
     }
 
@@ -446,14 +627,21 @@ impl EventTracker {
     pub fn track_votes_sent(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VTBundleSent {
             id: self.to_vote_bundle(votes.id),
+            slot: votes.id.slot,
+            pipeline: votes.id.pipeline,
+            producer: self.to_node(votes.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
+            msg_size_bytes: votes.bytes,
         });
     }
 
     pub fn track_votes_received(&self, votes: &VoteBundle, sender: NodeId, recipient: NodeId) {
         self.send(Event::VTBundleReceived {
             id: self.to_vote_bundle(votes.id),
+            slot: votes.id.slot,
+            pipeline: votes.id.pipeline,
+            producer: self.to_node(votes.id.producer),
             sender: self.to_node(sender),
             recipient: self.to_node(recipient),
         });

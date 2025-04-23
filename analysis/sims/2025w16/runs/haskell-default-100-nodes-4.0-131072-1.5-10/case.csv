@@ -1,0 +1,2 @@
+simulator,label,network,ib-generation-probability,ib-body-avg-size-bytes,eb-generation-probability,leios-stage-length-slots
+haskell,default,100-nodes,4.0,131072,1.5,10

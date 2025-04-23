@@ -1,5 +1,221 @@
 # Leios logbook
 
+## 2025-04-22
+
+### Simulation and analysis of Full Leios, including transaction lifecycle
+
+The Haskell and Rust simulators, at tag [leios-2025w17](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w17), were used to simulation 270 scenarios of Full Leios for varied IB production rate, IB size, and EB production rate, stage length, and CPU constraints. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w17/analysis.ipynb](analysis/sims/2025w17/analysis.ipynb). These analyses were performed on the 100-node network.
+
+New measurements of the transaction lifecyle were added to the analyses, and transaction rates of 1 tx/s and 10 tx/s were studied. (Higher rates will be scrutinized after [#305](https://github.com/input-output-hk/ouroboros-leios/issues/305) is fixed.)
+
+Findings:
+
+- All outstanding discrepancies between Rust and Haskell simulation results have either been resolved or explained.
+- In the initial study of transaction lifecycle . . .
+    - Inclusion of a transaction in an IB typically occurs in 2.4 seconds.
+    - Referencing of a transaction via an EB typically occurs in 27.6 seconds.
+    - Referencing of a transaction via an RB typically occurs in 67.2 seconds.
+    - The current version of Full Leios exhibits some undesirable side effects of never referencing some transactions in RBs and duplicating inclusion or referencing of transactions.
+
+![Example measurements of transaction lifecycle](analysis/sims/2025w17/plots/lifecycle-timeseries.png)
+
+## 2025-04-18
+
+### Haskell simulation
+
+- Completed first draft of new mini protocols for leios diffusion
+  - see `simulation/docs/network-spec`
+  - Protocols modeled after BlockFetch and node-to-node Tx-Submission ones from ouroboros-network.
+  - IB-relay, EB-relay, Vote-relay for header diffusion and body (for IB and EB) announcements.
+  - IB-fetch, EB-fetch, for body diffusion.
+  - CatchUp protocol for older blocks.
+- renamed `short-leios` command to `leios` since it covers full variant too.
+  - `short-leios` is kept as alias for compatibility.
+
+### Rust simulation
+
+- Fixed conformance with shared trace format
+- Fixed bug with voting logic which was preventing EBs from receiving enough votes to get on-chain
+- Updated visualization to use smaller trace files, to prepare for hosting on docs site
+
+### Revisions to cost dashboard
+
+The [cost dashboard](https://leios.cardano-scaling.org/cost-estimator/) was updated with lower and more realistic IO estimates.
+
+### Analysis of transaction lifecycle
+
+The Jupyter notebook [Analysis of transaction lifecycle](analysis/tx-to-block.ipynb) estimates the delay imposed by each of the seven stages of Full Leios as a transaction moves from memory pool to being referenced by a Praos block.
+
+![Probability of delay from transaction submission to its being referenced by an RB](analysis/tx-to-block.svg)
+
+The plot hints at the following:
+
+1. There seems little advantage to moving to stage lengths less than 10 slots.
+2. The number of shards should be kept small enough so that the IB rate per shard is high relative to the stage length.
+3. Low EB rates result in many orphaned IBs.
+4. Realistic parameter settings result in an approximately two-minute delay between transaction submission and its referencing by an RB.
+
+Potential next steps:
+
+- Translating this model into Delta QSD, so that network effects can be included.
+- Compare this model's results to output of the Rust simulator.
+- Elaborate the model in order to represent the memory-pool and ledger variants under consideration.
+
+## 2025-04-17
+
+### Simulation and analysis of Full Leios
+
+The Haskell and Rust simulators, at tag [leios-2025w16](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w16), were used to simulation 648 scenarios of Full and Short Leios for varied IB production rate, IB size, and EB production rate, stage length, and CPU contrainsts. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w16/analysis.ipynb](analysis/sims/2025w16/analysis.ipynb). These analyses were performed on the 100-node network and were adapted to the latest changes in the simulation log format.
+
+Two new output files are now computed:
+
+1. Summary of network, disk, and CPU resource usage over the course of the simulation.
+2. Vertices and edges of the "Leios graph", showing linkages between transactions, IBs, EBs, RBs, and votes. This can be visualized as an interactive web page.
+
+Findings:
+
+- Agreement between the Rust and Haskell simulations is generally quite close.
+- The Haskell simulation experiences network congestion at 16 IB/s, but the Rust simulation does not.
+- The Rust simulation uses more CPU at high IB rates than the Haskell simulation does.
+- The Rust simulation sometimes does not produce enough votes to certify an EB.
+
+## 2025-04-16
+
+### Leios IB rate for counteracting depletion of Reserves
+
+The analysis [Motivating Leios: Fees and rewards](analysis/epoch-utiilization.md) estimates the transaction throughput needed to maintain current reward levels on `mainnet` in the future. It assumes that fee-related protocol parameters remain the same in the future.
+
+- If Praos were fully utilized in terms of bytes and Plutus execution, it would generate approximately 446 thousand ADA per epoch.
+- Current rewards are approximately 8 million ADA per epoch.
+- The Reserve is being depleted at the rate of 12.8% per year.
+- In five years, the Reserve's contribution to rewards may drop by half.
+- The following table shows the rate of maximum-fee Praos-like blocks needed to maintain make up for the diminishing contribution of the Reserve. These correspond to the Leios input block (IB) production rate if Leios and Praos blocks were the same size and had the same fee structure.
+
+| Year   | IB rate [block/slot] |
+|-------:|----------------------|
+| `2025` |              `0.008` |
+| `2026` |              `0.112` |
+| `2027` |              `0.203` |
+| `2028` |              `0.284` |
+| `2029` |              `0.355` |
+| `2030` |              `0.418` |
+| `2031` |              `0.472` |
+| `2032` |              `0.521` |
+| `2033` |              `0.563` |
+| `2034` |              `0.601` |
+| `2035` |              `0.634` |
+
+## 2025-04-13
+
+### Haskell simulation
+
+- Started spec of new relay protocol for IB header diffusion without body.
+  - see `simulation/docs/network-spec`
+- Removed redundancies and harmonized naming in --shared-log-format.
+  - see `data/simulation/trace.shared.d.ts` for base schema both sims share.
+- Added support for extra events required by conformance testing.
+  - see `SlotEvent` and `NoBlockEvent` in schema.
+  - use flag `--conformance-events` with `--shared-log-format` to enable them, otherwise too numerous.
+
+## 2025-04-11
+
+### Refactored and optimized simulation-analysis workflow
+
+The [workflow for analyzing the Haskell and Rust simulations](analysis/sims/2025w15/) was thoroughly reworked to improve its speed, flexibility, and automation:
+
+- Replaced use of MongoDB with faster `jq` queries, organized as map-reduce operations.
+- Created library functions for plotting with R.
+- Revised scripts for creating, executing, and analyzing simulations.
+- Genericized the Jupyter notebook for analyses.
+- Tested new workflow on tag `leios-2025w15`.
+
+In the course of this work, new discrepancies between the two simulations were discovered and documented as github issues.
+
+Future simulation experiments will be fast to set up and easier to complete with quick turnaround.
+
+### Rust simulation
+
+- Updated traces to match the noew "standardized" trace format.
+- Fixed bug with CPU scheduling causing nodes to use more cores than they had
+
+## 2025-04-04
+
+### EB ledger state / order of IBs discussion
+
+- Prompted by workshop discussion about EB ledger states, added some concerns about how to define them without "history rewriting" effects to [the relevant github discussion](https://github.com/input-output-hk/ouroboros-leios/discussions/243).
+
+### Haskell simulation
+
+- Added support for dishonest Nodes that diffuse an unbounded amount of old IBs.
+   - see `adversarial` field in network topology schema.
+   - should be useful to observe differences between freshest-first and oldest-first delivery.
+- Traced loss of Vote delivery to bug in config generation for the simulation runs.
+  - also explains why no difference was observed between default and uniform/extended voting: the default was actually extended as well.
+
+## 2025-03-28
+
+### Haskell simulation
+
+- Moved configuration and topology parsers to `leios-trace-hs` package
+  for reuse by formal methods.
+- Investigated differences in IBs referenced with Rust simulation:
+  - IBs that belong to preferred chain get referenced in pipelines
+    where EBs are generated, as expected.
+  - Odd gaps in their distribution seem within variance. Their
+    consistency across different runs is due to performing the same
+    sequence of random samples no matter the frequency of
+    blocks.
+  - Nevertheless streamlined sortition code by relying on external statistics
+    package.
+- Testing of Full Leios
+  - added assertions for limits on referenced EBs
+  - resolved tension between `η`/`praos-chain-quality` and `r_EB`/`eb-max-age-slots`:
+    - an error is thrown if `r_EB` is not large enough to allow for the
+      certified EBs required by `η` to be kept by a node long enough.
+  - traces show expected behaviour.
+- Fix for `cabal run ols -- generate-topology close-and-random`
+  - The `close-and-random` peers chosen for each node are now properly listed as `producers`.
+  - Variance in upstream peers, and hence access to blocks, is now much smaller.
+
+### Rust simulation
+
+- Investigated oddities in simulation results
+ - IB production broke down earlier than expected; this is due to low connectivity of the network.
+ - CPU usage is lower than Haskell sim: this may be related to slow IB propagation.
+ - IBs don't propagate as far when using oldest-first ordering. This may be because nodes can't make separate requests as effectively.
+- Refined Full Leios implementation
+- Added Full Leios support to visualizer
+- Moved visualizer off of Next.js and onto vite, so it is now a proper static site. Next step is to embed it in the public Leios website.
+- Bug fixes and performance improvements
+
+### Analysis of simulations at tag `leios-2025w13`
+
+The Haskell and Rust simulators, at tag [leios-2025w13](https://github.com/input-output-hk/ouroboros-leios/releases/tag/leios-2025w13), were used to simulation 198 scenarios of Short Leios for varied IB production rate, IB size, and network topology, CPU limits, and protocol flags. Comprehensive results are in the Jupyter notebook [analysis/sims/2025w13/analysis.ipynb](analysis/sims/2025w13/analysis.ipynb). New analyses focused on exploring simulator settings related to message delivery and CPU. The simulations resolved most of the prior outstanding issues that arose in comparing simulators, but they unearthed new ones.
+
+1. Studied how limiting available CPU affects the propagation of messages like IBs, where they might potentially be lost if insufficient CPU is available. *CPU can impact diffusion of IBs under some stressful scenarios.*
+2. Compared freshest-first versus oldest-first vote propagation. *Freshest first (arguably) may improve reliability of IB delivery.*
+3. Compared an extended voting period versus a limited one in the Haskell simulation. *Extended voting makes little difference except for rare improvements in reliable delivery of votes.*
+
+The qualitative discrepancies between the Haskell and Rust simulators' results are under investigation to determine whether they are *bona fide* differences due to the resolution of the simulators instead of infidelities in the simulations themselves.
+
+### Tools
+
+### Egress Traffic Calculator
+
+Added a new interactive calculator tool to help node operators estimate egress traffic and costs under Leios. The calculator allows users to model different network scenarios and understand the potential impact on infrastructure costs.
+
+Key features:
+- Interactive parameters for IB rate, block utilization, peer count, and network propagation
+- Detailed traffic breakdown by block type (IB, EB, RB, Votes)
+- Cost estimates across multiple cloud providers with varying pricing models
+- Comparison with Ouroboros Praos traffic levels
+- Responsive design with mobile-friendly controls
+- Calculation breakdown showing the methodology behind the estimates
+- Monthly transaction volume and fee revenue projections
+
+The calculator helps visualize how Leios traffic scales with different input block rates and network configurations, providing SPOs and infrastructure providers with data to plan for the transition.
+
+
 ## 2025-03-21
 
 ### Haskell simulation

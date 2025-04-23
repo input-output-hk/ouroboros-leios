@@ -5,7 +5,7 @@ use coordinator::{EdgeConfig, Message, NetworkCoordinator};
 use tokio::sync::mpsc;
 
 use crate::{
-    clock::{Clock, ClockBarrier, Timestamp},
+    clock::{Clock, ClockBarrier},
     config::NodeId,
 };
 
@@ -95,7 +95,6 @@ impl<TProtocol, TMessage> NetworkSink<TProtocol, TMessage> {
         bytes: u64,
         protocol: TProtocol,
         message: TMessage,
-        sent: Timestamp,
     ) -> Result<()> {
         if self
             .sink
@@ -105,7 +104,6 @@ impl<TProtocol, TMessage> NetworkSink<TProtocol, TMessage> {
                 body: message,
                 bytes,
                 protocol,
-                sent,
             })
             .is_err()
         {

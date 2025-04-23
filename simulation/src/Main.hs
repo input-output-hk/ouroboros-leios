@@ -13,7 +13,7 @@ import Data.Aeson (eitherDecodeFileStrict')
 import Data.Default (Default (..))
 import Data.List (find)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Yaml as Yaml
 import qualified ExamplesRelay
 import qualified ExamplesRelayP2P
@@ -262,10 +262,15 @@ parserVizSubCommand =
     , command "short-leios-1" . info (pure VizShortLeios1) $
         progDesc
           "A simulation of two nodes running Short Leios."
-    , command "short-leios-p2p-1" . info (parserShortLeiosP2P1 <**> helper) $
+    , command "short-leios-p2p-1" . info leiosP2P $
         progDesc
-          "A simulation of 100 nodes running Short Leios."
+          "Alias for leios-p2p-1."
+    , command "leios-p2p-1" . info leiosP2P $
+        progDesc
+          "A simulation of 100 nodes running Leios."
     ]
+ where
+  leiosP2P = parserShortLeiosP2P1 <**> helper
 
 parserPraosP2P1 :: Parser VizSubCommand
 parserPraosP2P1 =
@@ -374,12 +379,18 @@ runSimOptions SimOptions{..} = case simCommand of
     p2pNetwork <- execTopologyOptions rng1 topologyOptions
     let outputCfg =
           DataShortLeiosP2P.SimOutputConfig
-            { logFile = listToMaybe [dropExtension simOutputFile <.> "log" | logVerbosity > 0 || sharedFormat]
-            , logVerbosity
-            , dataFile = guard (takeExtension simOutputFile == ".json") >> pure simOutputFile
+            { logFile = do
+                guard (logVerbosity > 0 || isJust sharedFormat)
+                pure $ dropExtension simOutputFile <.> "log"
+            , dataFile = do
+                guard (takeExtension simOutputFile == ".json")
+                pure simOutputFile
             , analize
             , stop = simOutputSeconds
-            , sharedFormat
+            , logFormat = case sharedFormat of
+                Just x -> DataShortLeiosP2P.Shared (x == CBOR)
+                Nothing -> DataShortLeiosP2P.Legacy logVerbosity
+            , conformanceEvents
             }
     DataShortLeiosP2P.exampleSim rng2 config p2pNetwork outputCfg
 
@@ -415,7 +426,8 @@ data SimCommand
       , topologyOptions :: TopologyOptions
       , logVerbosity :: Int
       , analize :: Bool
-      , sharedFormat :: Bool
+      , sharedFormat :: Maybe OutputFormat
+      , conformanceEvents :: Bool
       }
 
 parserSimCommand :: Parser SimCommand
@@ -423,10 +435,14 @@ parserSimCommand =
   subparser . mconcat $
     [ commandGroup "Available simulations:"
     , command "praos-diffusion" . info (parserSimPraosDiffusion <**> helper) $
-        progDesc ""
-    , command "short-leios" . info (parserShortLeios <**> helper) $
-        progDesc ""
+        progDesc "Praos simulation."
+    , command "short-leios" . info leios $
+        progDesc "Alias for `leios`."
+    , command "leios" . info leios $
+        progDesc "Leios simulation."
     ]
+ where
+  leios = parserShortLeios <**> helper
 
 parserSimPraosDiffusion :: Parser SimCommand
 parserSimPraosDiffusion =
@@ -443,7 +459,8 @@ parserShortLeios =
     <*> parserTopologyOptions
     <*> logVerbosity
     <*> switch (long "analize" <> help "Calculate metrics and statistics.")
-    <*> switch (long "shared-log-format" <> help "Use log format documented in trace.haskell.d.ts. Ignores --log-verbosity.")
+    <*> optional sharedLogFormat
+    <*> switch (long "conformance-events" <> help "Emits `Slot` and `No*Generated` events in the shared log format.")
  where
   logVerbosity =
     option
@@ -453,6 +470,18 @@ parserShortLeios =
           <> help "0: no log; 1: major events; 2: debug; 3: all."
           <> shownDefValue 1
       )
+  sharedLogFormat =
+    option
+      auto
+      ( long "shared-log-format"
+          <> metavar "OUTPUT"
+          <> help "Log format documented in trace.haskell.d.ts. OUTPUT can be `CBOR` or `JSON`."
+      )
+
+data OutputFormat
+  = JSON
+  | CBOR
+  deriving (Eq, Read, Show)
 
 data ConfigOptions
   = LeiosConfigFile FilePath

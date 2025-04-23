@@ -40,6 +40,7 @@ module PraosProtocol.Common (
   BlockGeneratorConfig (..),
   waitNextSlot,
   mkScheduler,
+  mkScheduler',
 ) where
 
 import Chan (ConnectionConfig, mkConnectionConfig)
@@ -229,13 +230,22 @@ mkScheduler ::
   (SlotNo -> m [(a, Maybe (Double -> Word64))]) ->
   m (SlotNo -> m [(a, Word64)])
 mkScheduler rng0 rates = do
+  sched <- mkScheduler rng0 rates
+  pure $ \slot -> filter ((>= 1) . snd) <$> sched slot
+
+mkScheduler' ::
+  MonadSTM m =>
+  StdGen ->
+  (SlotNo -> m [(a, Maybe (Double -> Word64))]) ->
+  m (SlotNo -> m [(a, Word64)])
+mkScheduler' rng0 rates = do
   let
     sampleRates (_role, Nothing) = return []
     sampleRates (role, Just f) = do
       (sample, rng') <- gets $ uniformR (0, 1)
       put $! rng'
       let wins = f sample
-      return [(role, wins) | wins >= 1]
+      return [(role, wins)]
   rngVar <- newTVarIO rng0
   let sched slot = do
         rs <- rates slot

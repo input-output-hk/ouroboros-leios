@@ -14,6 +14,7 @@ export const Scenario: FC = () => {
       const body: { scenarios: IScenario[] } = await response.json();
       const scenarios = body.scenarios.map(scenario => ({
         ...scenario,
+        topology: new URL(scenario.topology, window.location.toString()).toString(),
         trace: new URL(scenario.trace, window.location.toString()).toString(),
       }));
       dispatch({ type: "SET_SCENARIOS", payload: scenarios });

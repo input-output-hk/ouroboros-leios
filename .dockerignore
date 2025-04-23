@@ -1,5 +1,15 @@
-# Ignore everything
-*
+# Ignore specific files and directories
+.git/
+**/.DS_Store
+**/*.rs.bk
+
+# Ignore build artifacts
+sim-rs/target/
+sim-rs/output/
+**/dist/
+**/dist-newstyle/
+
+# Allow specific directories and files
 !sim-rs/
 !simulation/
 !conformance-testing/
@@ -7,9 +17,7 @@
 !leios-trace-hs/
 !cabal.project
 
-# Ignore unnecessary files even in sim-rs
-sim-rs/target/
-sim-rs/.git/
-sim-rs/output/
-**/*.rs.bk
-**/.DS_Store 
+# Allow cabal files
+!simulation/*.cabal
+!conformance-testing/*.cabal
+!leios-trace-hs/*.cabal 

@@ -25,6 +25,7 @@ import SimTCPLinks (labelDirToLabelLink, selectTimedEvents, simTracer)
 import SimTypes
 import System.Random (StdGen, split)
 import Topology (P2PNetwork (..))
+import qualified Topology
 
 traceLeiosP2P ::
   StdGen ->
@@ -88,11 +89,11 @@ traceLeiosP2P
     linkTracer nfrom nto =
       contramap (LeiosEventTcp . labelDirToLabelLink nfrom nto) tracer
 
-exampleTrace2 :: StdGen -> OnDisk.Config -> P2PNetwork -> LeiosTrace
+exampleTrace2 :: StdGen -> OnDisk.Config -> P2PNetwork -> Bool -> LeiosTrace
 exampleTrace2 rng = exampleTrace2' rng . convertConfig
 
-exampleTrace2' :: StdGen -> LeiosConfig -> P2PNetwork -> LeiosTrace
-exampleTrace2' rng0 leios@LeiosConfig{praos = PraosConfig{configureConnection}} p2pTopography@P2PNetwork{..} =
+exampleTrace2' :: StdGen -> LeiosConfig -> P2PNetwork -> Bool -> LeiosTrace
+exampleTrace2' rng0 leios@LeiosConfig{praos = PraosConfig{configureConnection}} p2pTopography@P2PNetwork{..} conformanceEvents =
   traceLeiosP2P
     rng0
     p2pTopography
@@ -109,6 +110,15 @@ exampleTrace2' rng0 leios@LeiosConfig{praos = PraosConfig{configureConnection}} 
       , processingCores
       , nodeId
       , rng
+      , blockGeneration = case Map.lookup nodeId =<< p2pAdversaries of
+          Nothing -> Honest
+          Just Topology.UnboundedIbs{..} ->
+            UnboundedIbs
+              { startingAtSlot = SlotNo $ fromIntegral startingAtSlot
+              , slotOfGeneratedIbs = SlotNo $ fromIntegral slotOfGeneratedIbs
+              , ibsPerSlot = fromIntegral ibsPerSlot
+              }
+      , conformanceEvents
       }
    where
     processingCores = fromMaybe undefined $ Map.lookup nodeId p2pNodeCores

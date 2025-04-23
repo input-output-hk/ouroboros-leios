@@ -79,20 +79,20 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
                     }
                 },
                 Some(message) = self.source.recv() => {
-                    self.schedule_message(message);
+                    self.schedule_message(message, clock.now());
                     clock.finish_task();
                 }
             }
         }
     }
 
-    fn schedule_message(&mut self, message: Message<TProtocol, TMessage>) {
+    fn schedule_message(&mut self, message: Message<TProtocol, TMessage>, now: Timestamp) {
         let link = Link {
             from: message.from,
             to: message.to,
         };
         let connection = self.connections.get_mut(&link).unwrap();
-        connection.send(message.body, message.bytes, message.protocol, message.sent);
+        connection.send(message.body, message.bytes, message.protocol, now);
         if let Some(timestamp) = connection.next_arrival_time() {
             self.events.push(link, Reverse(timestamp));
         }
@@ -105,5 +105,4 @@ pub struct Message<TProtocol, TMessage> {
     pub protocol: TProtocol,
     pub body: TMessage,
     pub bytes: u64,
-    pub sent: Timestamp,
 }

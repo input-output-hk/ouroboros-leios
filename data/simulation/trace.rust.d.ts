@@ -1,121 +1,75 @@
 /** Rust simulation trace format */
 
-// Base types
-interface RustBaseEvent {
+import * as shared from "./trace.shared";
+
+interface RustTraceEvent {
     time_s: number;
-    message: {
-        type: string;
-        [key: string]: any;
-    };
+    message: RustEvent
 }
 
-interface RustTaskInfo {
+type RustEvent =
+    | CpuEvent
+    | BlockEvent
+    | shared.NoBlockEvent
+    | NetworkEvent
+    | SlotEvent;
+
+type CpuEvent =
+    | CpuSubtaskEvent
+    | ScheduledCpuTaskEvent
+    | CpuTaskFinishedEvent;
+
+interface CpuSubtaskEvent {
+    type: "Cpu";
     node: string;
-    index: number;
+    cpu_time_s: number;
+    task_label: string;
+    task_type: CpuTaskType;
+    id: string;
 }
 
-// CPU Events
-type BlockOrTaskType =
-    | "RBBlock"
-    | "EBBlock"
-    | "VTBundle"
-    | "IBBlock"
-    | "IBHeader"
-    | "Transaction";
-type Action = "Validated" | "Generated";
-type RustCpuTaskType = `${BlockOrTaskType}${Action}`;
-
-type CpuTaskPrefix = "CpuTask" | "CpuSubtask";
-type CpuTaskAction = "Scheduled" | "Started" | "Finished";
-type RustCpuMessageType = `${CpuTaskPrefix}${CpuTaskAction}`;
-
-interface RustCpuEvent extends Omit<RustBaseEvent, "message"> {
-    message: {
-        type: RustCpuMessageType;
-        task: RustTaskInfo;
-        task_type?: RustCpuTaskType;
-        subtasks?: number;
-        subtask_id?: number;
-        duration_s?: number;
-        cpu_time_s?: number;
-        extra?: string;
-    };
+interface ScheduledCpuTaskEvent {
+    type: "CpuTaskScheduled";
+    task_type: CpuTaskType;
+    subtasks: number;
 }
 
-// Block Events
-interface RustBaseBlockEvent {
+interface CpuTaskFinishedEvent {
+    type: "CpuTaskFinished";
+    task_type: CpuTaskType;
+    cpu_time_s: number;
+}
+
+type CpuTaskType = shared.CpuTaskType;
+
+type BlockEvent = shared.BlockEvent | LotteryWon | GeneratedTransaction;
+
+interface LotteryWon {
+    type: "IBLotteryWon" | "EBLotteryWon" | "VTLotteryWon";
     id: string;
     slot: number;
-    pipeline?: number;
     producer: string;
-    sender?: string;
-    recipient?: string;
 }
 
-type BlockType = "IB" | "EB" | "RB";
-type BlockAction = "Sent" | "Received" | "LotteryWon" | "Generated";
-type RustBlockMessageType = `${BlockType}${BlockAction}`;
-
-interface RustBlockEvent extends Omit<RustBaseEvent, "message"> {
-    message: RustBaseBlockEvent & {
-        type: RustBlockMessageType;
-        index?: number;
-        header_bytes?: number;
-        total_bytes?: number;
-        transactions?: string[];
-        vrf?: number;
-        endorsement?: any;
-        parent?: {
-            id: string;
-            slot: number;
-            producer: string;
-        };
-    };
+interface GeneratedTransaction {
+    type: "TXGenerated";
+    id: string;
+    publisher: string;
+    size_bytes: number;
 }
 
-// Transaction Events
-type TransactionAction = "Sent" | "Received" | "Generated";
-type RustTransactionMessageType = `Transaction${TransactionAction}`;
-
-interface RustTransactionEvent extends Omit<RustBaseEvent, "message"> {
-    message: {
-        type: RustTransactionMessageType;
-        id: string;
-        sender?: string;
-        recipient?: string;
-        publisher?: string;
-        bytes?: number;
-    };
+interface NetworkEvent extends Omit<shared.NetworkEvent, "type"> {
+    type: NetworkEventType
 }
 
-// Vote Events
-type VoteAction = "Received" | "Sent" | "Generated" | "LotteryWon";
-type RustVoteMessageType = `Votes${VoteAction}`;
+type NetworkEventType = shared.NetworkEventType | "TXSent" | "TXReceived";
 
-interface RustVoteEvent extends Omit<RustBaseEvent, "message"> {
-    message: {
-        type: RustVoteMessageType;
-        id: string;
-        slot: number;
-        producer: string;
-        sender?: string;
-        recipient?: string;
-        votes?: Record<string, number>;
-    };
+type SlotEvent = shared.SlotEvent | {
+    type: "GlobalSlot";
+    slot: number;
 }
 
-// Slot Event
-interface RustSlotEvent extends Omit<RustBaseEvent, "message"> {
-    message: {
-        type: "Slot";
-        number: number;
-    };
-}
+// Type to validate `jq '.' -cs` of a log.
+type TraceEvents = RustTraceEvent[]
 
-// Combined type
-export type RustTraceEvent =
-    | RustCpuEvent
-    | RustBlockEvent
-    | RustTransactionEvent
-    | RustVoteEvent
-    | RustSlotEvent;
+type KnownType = RustEvent["type"];

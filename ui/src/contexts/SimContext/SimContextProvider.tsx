@@ -14,7 +14,7 @@ export const SimContextProvider: FC<PropsWithChildren> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, defaultState);
 
   // load topology
-  const canvasRef = useRef<HTMLCanvasElement>(defaultState.graph.canvasRef.current);
+  const canvasRef = useRef<HTMLCanvasElement | null>(defaultState.graph.canvasRef.current);
   const resolvedState = useMemo(
     () => ({
       ...state,

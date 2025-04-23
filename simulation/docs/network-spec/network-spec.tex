@@ -1,0 +1,193 @@
+\documentclass{report}
+
+\usepackage[dvipsnames,x11names]{xcolor}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[british]{babel}
+\usepackage{etoolbox}
+\newbool{isRelease}
+\IfFileExists{.isRelease}{\booltrue{isRelease}}{\boolfalse{isRelease}}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amssymb, latexsym, mathtools}
+\usepackage{times}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{natbib}
+\usepackage{framed}
+\ifbool{isRelease}
+    {\usepackage[disable]{todonotes}}
+    {\usepackage{todonotes}}
+\setuptodonotes{inline}
+\usepackage{amsmath}
+\usepackage{stmaryrd}
+\usepackage{colonequals}
+
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning, arrows}
+\tikzset{
+    state/.style={
+           rectangle,
+           rounded corners,
+           draw=black, very thick,
+           minimum height=2em,
+           inner sep=2pt,
+           text centered,
+           },
+}
+
+
+\usepackage{microtype}
+\usepackage{graphicx}
+
+\usepackage[colorlinks,citecolor=blue,linkcolor=blue,anchorcolor=blue,urlcolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev,nameinlink]{cleveref}
+
+\usetikzlibrary{arrows}
+
+\newcommand{\coot}[1]{\textcolor{violet}{\emph{#1}}}
+\newcommand{\njd}[1]{\textcolor{purple}{\emph{#1}}}
+\newcommand{\avieth}[1]{\textcolor{blue}{\emph{#1}}}
+\newcommand{\dcoutts}[1]{\textcolor{orange}{\emph{#1}}}
+\addtolength{\marginparwidth}{-0.1\marginparwidth}
+
+\newcommand{\var}[1]{\mathit{#1}}
+\newcommand{\type}[1]{\mathsf{#1}}
+\newcommand{\powerset}[1]{\mathbb{P}(#1)}
+\newcommand{\order}[1]{\mathcal{O}\left(#1\right)}
+\newcommand{\restrictdom}{\lhd}
+\newcommand{\subtractdom}{\mathbin{\slashed{\restrictdom}}}
+\newcommand{\restrictrange}{\rhd}
+
+\ifbool{isRelease}
+       {
+         \newcommand{\wip}[1]{}
+         \newcommand{\hide}[1]{}
+       }
+       {
+         \newcommand{\wip}[1]{\color{magenta}{#1}\color{black}}
+         \newcommand{\hide}[1]{}
+       }
+\newcommand{\haddockref}[2]
+           {\href{https://ouroboros-network.cardano.intersectmbo.org/#2}
+                 {\emph{haddock documentation}: \texttt{#1}}
+           }
+\newcommand{\haddockrefraw}[2]
+           {\href{#2}
+                 {\emph{haddock documentation}: \texttt{#1}}
+           }
+\newcommand{\trans}[1]{\texttt{#1}}
+\newcommand{\state}[1]{\texttt{#1}}
+\newcommand{\msg}[1]{\textbf{\texttt{#1}}}
+\newcommand{\StIdle}{\state{StIdle}}
+\newcommand{\StBusy}{\state{StBusy}}
+\newcommand{\StDone}{\state{StDone}}
+\newcommand{\MsgDone}{\msg{MsgDone}}
+\newcommand{\header}[1]{\textbf{#1}}
+
+% TODO: the document is using `\langle` and `\rangle` to denote lists, maybe
+% it's better to use Haskell notation, will it be more in sync with other docs
+% produced by the formal method team?
+\renewcommand{\langle}{[}
+\renewcommand{\rangle}{]}
+
+\DeclareMathOperator{\dom}{dom}
+\DeclareMathOperator{\range}{range}
+\DeclareMathOperator*{\argmin}{arg\,min} % thin space, limits underneath in displays
+\DeclareMathOperator*{\minimum}{min}
+\DeclareMathOperator*{\maximum}{max}
+
+% ---- Connection Manager things
+\lstset{
+  xleftmargin=2pt,
+  stepnumber=1,
+  belowcaptionskip=\bigskipamount,
+  captionpos=b,
+  escapeinside={*'}{'*},
+  language=haskell,
+  tabsize=2,
+  emphstyle={\bf},
+  commentstyle=\it,
+  stringstyle=\mdseries\rmfamily,
+  showspaces=false,
+  keywordstyle=\bfseries\rmfamily,
+  columns=flexible,
+  basicstyle=\small\sffamily,
+  showstringspaces=false,
+  morecomment=[l]\%,
+}
+\lstdefinelanguage{cddl}{
+  morekeywords={bool,uint,nint,int,float16,float32,float64,float,bstr,bytes,tstr,text},
+  morecomment=[l]{;},
+  morestring=[b]",
+}
+\lstdefinestyle{cddl}{
+  numbers=left,
+  language=cddl,
+  columns=fixed,
+}
+
+\definecolor{mygreen}{rgb}{0.109804,0.698039,0.341176}
+\definecolor{myblue}{rgb}{0.360784,0.423529,255}
+\newenvironment{detail}
+  {
+    \begin{center}
+    \begin{minipage}{0.9\textwidth}
+      \footnotesize
+      \noindent\textit{Implementation detail}
+      \vspace{0.3em}
+      \newline
+  }
+  {
+  \end{minipage}
+  \end{center}
+  \vspace{1em}
+  }
+\usetikzlibrary{arrows,calc,matrix,shapes}
+\tikzset{every scope/.style={>=triangle 60,thick}}
+\exhyphenpenalty 10000
+
+% -------
+
+\raggedbottom
+
+\begin{document}
+
+\title{Ouroboros Leios Network Specification}
+\author{
+  Duncan Coutts\footnote{\small \texttt{duncan@well-typed.com}, {\small \texttt{duncan.coutts@iohk.io}}}
+\and
+  Andrea Vezzosi\footnote{{\small \texttt{andrea@well-typed.com}}}
+}
+\date{\today}
+
+\maketitle
+
+\begin{abstract}
+  Ouroboros Leios introduces new types of blocks with novel diffusion
+  patterns and requirements. In this document we provide a technical
+  specification of mini protocols for the on-the-fly relay of recent
+  blocks and for the availability of older blocks referenced by the
+  blockchain.
+\end{abstract}
+
+\tableofcontents
+
+\section*{Version history}
+
+\begin{description}
+\item[Version 0.0.1 Apr 2025, Draft.]
+\end{description}
+\listoftodos
+\include{miniprotocols}
+
+%% \appendix
+
+%% \chapter{Common CDDL definitions}
+%% \label{cddl-common}
+%% \lstinputlisting[style=cddl]{../../ouroboros-network-protocols/cddl/specs/common.cddl}
+
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}

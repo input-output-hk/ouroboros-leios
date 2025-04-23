@@ -5,8 +5,6 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-## High-level summary
-
 This week in Leios development, [CPS-0018](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) for transaction throughput was approved, along with improved Docker support for simulations and analysis of cross-simulation results. The team also examined input block (IB) production rates and their impact on network performance.
 
 ## Protocol development

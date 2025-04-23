@@ -15,6 +15,7 @@ pub struct ClockCoordinator {
     tx: mpsc::UnboundedSender<ClockEvent>,
     rx: mpsc::UnboundedReceiver<ClockEvent>,
     waiter_count: Arc<AtomicUsize>,
+    tasks: Arc<AtomicUsize>,
 }
 
 impl Default for ClockCoordinator {
@@ -28,11 +29,13 @@ impl ClockCoordinator {
         let time = Arc::new(AtomicTimestamp::new(Timestamp::zero()));
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
+        let tasks = Arc::new(AtomicUsize::new(0));
         Self {
             time,
             tx,
             rx,
             waiter_count,
+            tasks,
         }
     }
 
@@ -40,6 +43,7 @@ impl ClockCoordinator {
         Clock::new(
             self.time.clone(),
             self.waiter_count.clone(),
+            self.tasks.clone(),
             self.tx.clone(),
         )
     }
@@ -52,10 +56,10 @@ impl ClockCoordinator {
 
         let mut queue: BTreeMap<Timestamp, Vec<usize>> = BTreeMap::new();
         let mut running = waiters.len();
-        let mut open_tasks = 0;
         while let Some(event) = self.rx.recv().await {
             match event {
                 ClockEvent::Wait { actor, until, done } => {
+                    assert!(until.is_none_or(|t| t > self.time.load(Ordering::Acquire)));
                     if waiters[actor].replace(Waiter { until, done }).is_some() {
                         panic!("An actor has somehow managed to wait twice");
                     }
@@ -63,7 +67,7 @@ impl ClockCoordinator {
                     if let Some(timestamp) = until {
                         queue.entry(timestamp).or_default().push(actor);
                     }
-                    while running == 0 && open_tasks == 0 {
+                    while running == 0 && self.tasks.load(Ordering::Acquire) == 0 {
                         // advance time
                         let (timestamp, waiter_ids) = queue.pop_first().unwrap();
                         self.time.store(timestamp, Ordering::Release);
@@ -86,11 +90,12 @@ impl ClockCoordinator {
                         running += 1;
                     }
                 }
-                ClockEvent::StartTask => {
-                    open_tasks += 1;
-                }
                 ClockEvent::FinishTask => {
-                    open_tasks -= 1;
+                    self.tasks.fetch_sub(1, Ordering::AcqRel);
+                    assert!(
+                        running != 0,
+                        "All tasks were completed while there were no actors to complete them"
+                    );
                 }
             }
         }
@@ -112,7 +117,6 @@ pub enum ClockEvent {
     CancelWait {
         actor: usize,
     },
-    StartTask,
     FinishTask,
 }
 

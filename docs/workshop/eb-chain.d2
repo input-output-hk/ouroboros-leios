@@ -1,0 +1,175 @@
+...@styles
+
+title: {
+  label: "EB-Chain"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+volatile: {
+  label: "Volatile chain suffix"
+  class: container
+
+  RBs: {
+    class: rb_stacked
+    label: "[RB]\n(tip-k, tip-2)"
+  }
+
+  RB1: {
+    class: rb
+    label: "RB\n(tip-1)"
+  }
+
+  RB: {
+    class: rb
+    label: "RB\n(tip)"
+  }
+}
+
+RB0: {
+  class: rb_unconfirmed
+  label: "RB"
+}
+
+# EB Chain Example 1 - Simple chain with older RB reference
+eb_chain1: {
+  label: "EB Chain Example 1 (Older RB Reference)"
+  class: container
+
+  EB1: {
+    class: eb
+    label: "EB1"
+  }
+
+  EB2: {
+    class: eb
+    label: "EB2"
+  }
+
+  IB1: {
+    class: ib
+    label: "IB1"
+  }
+
+  IB2: {
+    class: ib
+    label: "IB2"
+  }
+}
+
+# EB Chain Example 2 - Multiple EBs from different pipelines with recent RB reference
+eb_chain2: {
+  label: "EB Chain Example 2 (Recent RB Reference)"
+  class: container
+
+  EB3: {
+    class: eb
+    label: "EB3\n(Pipeline A)"
+  }
+
+  EB4: {
+    class: eb
+    label: "EB4\n(Pipeline B)"
+  }
+
+  EB5: {
+    class: eb
+    label: "EB5\n(Pipeline A)"
+  }
+
+  IB3: {
+    class: ib
+    label: "IB3"
+  }
+
+  IB4: {
+    class: ib
+    label: "IB4"
+  }
+}
+
+# Links
+
+# Volatile chain suffix
+volatile.RB -> volatile.RB1: {
+  class: to_rb_arrow
+}
+
+volatile.RB1 -> volatile.RBs: {
+  class: to_rb_arrow
+}
+
+RB0 -> volatile.RB: {
+  class: to_rb_arrow
+  style: {
+    stroke-dash: 7
+  }
+}
+
+# EB Certificates
+RB0 -> eb_chain1.EB1: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+RB0 -> eb_chain2.EB3: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+RB0 -> eb_chain2.EB4: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+# EB Chain 1 - Simple chain with older RB reference
+eb_chain1.EB1 -> eb_chain1.EB2: "EB Ref" {
+  class: to_eb_arrow
+}
+
+eb_chain1.EB2 -> volatile.RBs: "Ledger Ref" {
+  class: ledger_link
+}
+
+# EB to IB references for Example 1
+eb_chain1.EB1 -> eb_chain1.IB2: "Ref" {
+  class: to_ib_arrow
+}
+
+# IB validation references for Example 1
+eb_chain1.IB1 -> eb_chain1.EB1: "Ledger Ref" {
+  class: ledger_link
+}
+
+eb_chain1.IB2 -> eb_chain1.EB2: "Ledger Ref" {
+  class: ledger_link
+}
+
+# EB Chain 2 - Multiple pipelines with recent RB reference
+eb_chain2.EB3 -> eb_chain2.EB5: "EB Ref" {
+  class: to_eb_arrow
+}
+
+eb_chain2.EB4 -> volatile.RB: "Ledger Ref" {
+  class: ledger_link
+}
+
+eb_chain2.EB5 -> volatile.RB1: "Ledger Ref" {
+  class: ledger_link
+}
+
+# EB to IB references for Example 2
+eb_chain2.EB3 -> eb_chain2.IB4: "Ref" {
+  class: to_ib_arrow
+}
+
+# IB validation references for Example 2
+eb_chain2.IB3 -> eb_chain2.EB3: "Ledger Ref" {
+  class: ledger_link
+}
+
+eb_chain2.IB4 -> eb_chain2.EB4: "Ledger Ref" {
+  class: ledger_link
+}
+
+direction: left

@@ -21,6 +21,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module LeiosTopology where
 
@@ -37,7 +38,7 @@ import Data.Text (Text)
 import qualified Data.Vector as V
 import GHC.Generics (Generic)
 import GHC.Records (HasField (..))
-import JSONCompat (Getter, always, get, omitDefault, parseField, parseFieldOrDefault)
+import JSONCompat (Getter, always, camelToKebab, get, omitDefault, parseField, parseFieldOrDefault)
 import LeiosTypes (Point (..))
 import Text.Printf (PrintfArg)
 
@@ -202,6 +203,10 @@ instance HasField "coord2D" (Node 'COORD2D) Point where
   getField :: Node 'COORD2D -> Point
   getField node = node.nodeInfo.location.coord2D
 
+instance HasField "adversarial" (Node lk) (Maybe Behaviour) where
+  getField :: Node lk -> Maybe Behaviour
+  getField node = node.nodeInfo.adversarial
+
 instance Default (Node 'CLUSTER) where
   def :: Node 'CLUSTER
   def = Node{nodeInfo = def, producers = mempty}
@@ -210,8 +215,12 @@ data NodeInfo (lk :: LocationKind) = NodeInfo
   { stake :: {-# UNPACK #-} !Word
   , cpuCoreCount :: {-# UNPACK #-} !CpuCoreCount
   , location :: !(Location lk)
+  , adversarial :: !(Maybe Behaviour)
   }
   deriving stock (Show, Eq, Generic)
+
+data Behaviour = UnboundedIbs {startingAtSlot :: Word, slotOfGeneratedIbs :: Word, ibsPerSlot :: Word}
+  deriving (Show, Eq, Generic)
 
 instance HasField "coord2D" (NodeInfo 'COORD2D) Point where
   getField :: NodeInfo 'COORD2D -> Point
@@ -224,6 +233,7 @@ instance Default (NodeInfo 'CLUSTER) where
       { stake = 0
       , cpuCoreCount = Unbounded
       , location = LocCluster Nothing
+      , adversarial = Nothing
       }
 
 data LinkInfo = LinkInfo
@@ -250,6 +260,7 @@ nodeToKVs getter node =
     , get @"cpuCoreCount" getter node
     , get @"location" getter node
     , get @"producers" getter node
+    , get @"adversarial" getter node
     ]
 
 instance ToJSON (Node 'CLUSTER) where
@@ -273,6 +284,7 @@ instance FromJSON (Node 'CLUSTER) where
     cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
     location <- parseFieldOrDefault @(Node 'CLUSTER) @"location" obj
     producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
+    adversarial <- parseFieldOrDefault @(Node 'CLUSTER) @"adversarial" obj
     pure Node{nodeInfo = NodeInfo{..}, ..}
 
 instance FromJSON (Node 'COORD2D) where
@@ -285,7 +297,24 @@ instance FromJSON (Node 'COORD2D) where
     cpuCoreCount <- parseFieldOrDefault @(Node 'CLUSTER) @"cpuCoreCount" obj
     location <- parseField @(Node 'COORD2D) @"location" obj
     producers <- parseFieldOrDefault @(Node 'CLUSTER) @"producers" obj
+    adversarial <- parseFieldOrDefault @(Node 'CLUSTER) @"adversarial" obj
     pure Node{nodeInfo = NodeInfo{..}, ..}
+
+behaviourJSONOptions :: Options
+behaviourJSONOptions =
+  defaultOptions
+    { sumEncoding = Json.defaultTaggedObject{Json.tagFieldName = "behaviour"}
+    , fieldLabelModifier = camelToKebab
+    , constructorTagModifier = camelToKebab
+    , tagSingleConstructors = True
+    }
+
+instance FromJSON Behaviour where
+  parseJSON = genericParseJSON behaviourJSONOptions
+
+instance ToJSON Behaviour where
+  toJSON = Json.genericToJSON behaviourJSONOptions
+  toEncoding = Json.genericToEncoding behaviourJSONOptions
 
 linkInfoToKVs :: KeyValue e kv => Getter LinkInfo -> LinkInfo -> [kv]
 linkInfoToKVs getter link =

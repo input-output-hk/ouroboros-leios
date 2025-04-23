@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Display, sync::Arc};
 
 use crate::{clock::Timestamp, config::NodeId};
-use serde::{ser::SerializeStruct, Serialize};
+use serde::Serialize;
 
 macro_rules! id_wrapper {
     ($outer:ident, $inner:ty) => {
@@ -53,16 +53,12 @@ impl<Node: Display> Display for BlockId<Node> {
     }
 }
 
-impl<Node: Display + Serialize> Serialize for BlockId<Node> {
+impl<Node: Display> Serialize for BlockId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("BlockId", 3)?;
-        obj.serialize_field("id", &self.to_string())?;
-        obj.serialize_field("slot", &self.slot)?;
-        obj.serialize_field("producer", &self.producer)?;
-        obj.end()
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -82,7 +78,7 @@ impl Block {
             + self
                 .endorsement
                 .as_ref()
-                .map(|e| e.bytes)
+                .map(|e| e.size_bytes)
                 .unwrap_or_default()
             + self.transactions.iter().map(|t| t.bytes).sum::<u64>()
     }
@@ -116,18 +112,12 @@ impl<Node: Display> Display for InputBlockId<Node> {
     }
 }
 
-impl<Node: Display + Serialize> Serialize for InputBlockId<Node> {
+impl<Node: Display> Serialize for InputBlockId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("InputBlockId", 5)?;
-        obj.serialize_field("id", &self.to_string())?;
-        obj.serialize_field("slot", &self.slot)?;
-        obj.serialize_field("pipeline", &self.pipeline)?;
-        obj.serialize_field("producer", &self.producer)?;
-        obj.serialize_field("index", &self.index)?;
-        obj.end()
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -161,17 +151,12 @@ impl<Node: Display> Display for EndorserBlockId<Node> {
         f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
     }
 }
-impl<Node: Display + Serialize> Serialize for EndorserBlockId<Node> {
+impl<Node: Display> Serialize for EndorserBlockId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("EndorserBlockId", 4)?;
-        obj.serialize_field("id", &self.to_string())?;
-        obj.serialize_field("slot", &self.slot)?;
-        obj.serialize_field("pipeline", &self.pipeline)?;
-        obj.serialize_field("producer", &self.producer)?;
-        obj.end()
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -206,17 +191,12 @@ impl<Node: Display> Display for VoteBundleId<Node> {
         f.write_fmt(format_args!("{}-{}", self.slot, self.producer))
     }
 }
-impl<Node: Display + Serialize> Serialize for VoteBundleId<Node> {
+impl<Node: Display> Serialize for VoteBundleId<Node> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut obj = serializer.serialize_struct("VoteBundleId", 4)?;
-        obj.serialize_field("id", &self.to_string())?;
-        obj.serialize_field("slot", &self.slot)?;
-        obj.serialize_field("pipeline", &self.pipeline)?;
-        obj.serialize_field("producer", &self.producer)?;
-        obj.end()
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -233,11 +213,12 @@ pub enum NoVoteReason {
     ExtraIB,
     MissingIB,
     MissingEB,
+    UncertifiedEBReference,
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,
-    pub bytes: u64,
+    pub size_bytes: u64,
     pub votes: BTreeMap<Node, usize>,
 }
