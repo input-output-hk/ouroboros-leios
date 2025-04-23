@@ -52,10 +52,25 @@ OTHER_SCENARIOS := scenario4-higher-IB-rate scenario4-lower-stage-length scenari
 $(foreach s,$(OTHER_SCENARIOS),$(eval $(call main_scenario_template,$(s))))
 
 #### Running simulations.
-SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$@" short-leios --log-verbosity=0
+
+GIT_REV := $(shell git rev-parse HEAD)
+
+ifeq ($(shell git status --porcelain --untracked-files=no),)
+	GIT_DIRTY_TRACKED :=
+else
+	GIT_DIRTY_TRACKED := -dirty
+endif
+
+## In some cases it's useful to keep logs.
+LOG_VERBOSITY ?= 0
+
+TAGGED_SIM_DATA = $(basename $@)-$(GIT_REV)$(GIT_DIRTY_TRACKED).json
+SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$(TAGGED_SIM_DATA)" short-leios --log-verbosity="$(LOG_VERBOSITY)"
 
 %/sim-data.json: %/config.yaml %/topology.yaml
 	$(SHORT_LEIOS) -l "$(word 1, $^)" -t "$(word 2, $^)" +RTS -s
+	ln -srf $(TAGGED_SIM_DATA) $@
+	ln -srf $(basename $(TAGGED_SIM_DATA)).log $(basename $@).log
 
 %/sim-data.json: SIM_SECONDS=300
 
