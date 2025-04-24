@@ -70,6 +70,63 @@ bandwidth.
 > If a proposal defines structure of on-chain data it must include a CDDL schema.
 
 
+### Non-normative overview of Leios
+
+> [!IMPORTANT]
+> 
+> Write this section after the details of the recommended variant of Full Leios have been settled.
+
+### Normative Leios specification in Agda
+
+> [!IMPORTANT]
+> 
+> Work in progress: https://github.com/input-output-hk/ouroboros-leios-formal-spec/tree/main/formal-spec/Leios.
+> 
+> - [ ] Do we plan to embed the Agda in this document?
+> - [ ] If so, will all of the Agda be embedded, instead of just the core subset?
+
+### Constraints on Leios protocol parameters
+
+| Parameter                      | Symbol        | Units   | Description                                                                 | Constraints                | Rationale                                                    |
+| ------------------------------ | ------------- | ------- | --------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------ |
+| Stage length                   | $L$           | slot    |                                                                             | $L \geq \Delta$            |                                                              |
+| Input-block production rate    | $f_\text{IB}$ | 1/slot  |                                                                             | $0 \lt f_\text{IB}$        |                                                              |
+| Endorser-block production rate | $f_\text{EB}$ | 1/stage |                                                                             | $0 < f_\text{EB}$          |                                                              |
+| Mean committee size            | $n$           | parties |                                                                             |                            |                                                              |
+| Quorum size                    | $\tau$        | parties |                                                                             | $\tau > n / 2$             |                                                              |
+|                                |               |         |                                                                             |                            |                                                              |
+| Network diffusion time         | $\Delta$      | slot    | Upper limit on the time needed to diffuse a message to all nodes.           | $\Delta > 0$               | Messages have a finite delay.                                |
+| Praos active slot coefficient  | $f_\text{RB}$ | 1/slot  | The probability that a party will be the slot leader for a particular slot. | $0 \lt f \leq \Delta^{-1}$ | Blocks should not be produced faster than the network delay. |
+
+### Specification for votes and certificates
+
+
+### CDDL schema for the ledger
+
+#### IB schema
+
+> [!IMPORTANT]
+> 
+> Translate the Agda type for input blocks into CDDL.
+
+#### EB schema
+
+> [!IMPORTANT]
+> 
+> Translate the Agda type for endorser blocks into CDDL.
+
+#### Certificate schema
+
+> [!IMPORTANT]
+> 
+> Translate the Agda type for certificates into CDDL.
+
+#### RB schema
+
+> [!IMPORTANT]
+> 
+> Provide the diff for the CDDL for Praos blocks, so that Leios certificates are included.
+
 ## Rationale: how does this CIP achieve its goals?
 
 > [!NOTE]
@@ -78,6 +135,26 @@ bandwidth.
 > 
 > It must also explain how the proposal affects the backward compatibility of existing solutions when applicable. If the proposal responds to a [CPS][], the 'Rationale' section should explain how it addresses the CPS and answer any questions that the CPS poses for potential solutions.
 
+#### How Leios increases throughput
+
+
+#### Evidence that Leios provides high throughput
+
+
+#### Why Leios is practical to implement
+
+
+#### Use cases
+
+
+#### Feasible values for Leios protocol parameters
+
+
+### Attack and mitigation
+
+
+### Resource requirements
+
 
 ## Path to active
 
@@ -85,6 +162,7 @@ bandwidth.
 > 
 > Organised in two sub-sections:
 
+- [ ] Clear evidence of stakeholder use cases that require the high transaction throughput that Leios provides.
 
 ### Acceptance criteria
 
@@ -94,6 +172,10 @@ bandwidth.
 > 
 > This sub-section must define a list of criteria by which the proposal can become active. Criteria must relate to observable metrics or deliverables and be reviewed by editors and project maintainers when applicable. For example: "The changes to the ledger rules are implemented and deployed on Cardano mainnet by a majority of the network", or "The following key projects have implemented support for this standard".
 
+- [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
+- [ ]  Audit.
+- [ ]  Successful operation in testnet environments.
+- [ ]  Community agreement on the settings for the Peras protocol parameters.
 
 ### Implementation plan
 
@@ -103,6 +185,14 @@ bandwidth.
 > This sub-section should define the plan by which a proposal will meet its acceptance criteria, when applicable. More, proposals that require implementation work in a specific project may indicate one or more implementors. Implementors must sign off on the plan and be referenced in the document's preamble.
 > 
 > In particular, an implementation that requires a hard-fork should explicitly mention it in its _'Implementation Plan'_.
+
+- [ ]  Detailed node-level (as opposed to this protocol-level) specification.
+- [ ]  Develop node-level conformance test suite.
+- Consider developing a "quick and dirty" implementation for large scale experiments.
+- Coordinate with related activities on other protocol enhancements.
+    - Compatibility between Peras, Leios, and Genesis.
+    - Common design and implementation for certificates, voting, and related key registration: Mithril, Peras, Leios, and partner chains.
+- Triage by intersect Core Infrastructure and Consensus functions.
 
 ## Versioning
 
@@ -123,6 +213,11 @@ bandwidth.
 > 
 > Optional
 
+- [CPS-18: Greater transaction throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md)
+- [Leios R&D web site](https://leios.cardano-scaling.org/)
+- [Leios channel on IOG Discord](https://discord.com/channels/826816523368005654/1247688618621927505)
+- [Github repository for Leios R&D](https://github.com/input-output-hk/ouroboros-leios)
+- [Github repository for Leios formal specification](https://github.com/input-output-hk/ouroboros-leios-formal-spec)
 
 ## Appendices
 
@@ -300,3 +395,5 @@ The following plots show number of persistent votes and votes, along with certif
 > The CIP must be explicitly licensed under acceptable copyright terms (see below).
 > 
 > CIPs are licensed in the public domain. More so, they must be licensed under one of the following licenses. Each new CIP must identify at least one acceptable license in its preamble. In addition, each license must be referenced by its respective abbreviation below in the _"Copyright"_ section.
+
+This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
