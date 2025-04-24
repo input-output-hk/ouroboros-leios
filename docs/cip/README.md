@@ -324,6 +324,40 @@ Nearly all of these *hypothetical* threats are already mitigated by the protocol
 
 ### Resource requirements
 
+The resource requirements for operating Leios nodes have been estimated from benchmarking and simulation studies. The benchmark values for various Leios operations come either from measurements of the cryptography prototype[^3] or from the IOG benchmarking cluster for the Cardano node. These were input to the Haskell and Rust simulators for Leios to make holistic estimates of resource usage of operating nodes.
+
+> [!CAUTION]
+> 
+> The plots below are placeholders. All of the simulations in this section need to be re-run:
+> 
+> - [ ] Final version of the Leios protocol
+> - [ ] Realistic mainnet topology
+> - [ ] Protocol parameters close to the recommended value
+> - [ ] CPU
+>     - [ ] Unlimited?
+>     - [ ] Six cores?
+> - [ ] Strip the major titles from the diagrams
+> - [ ] Use SVG format
+
+At high throughput, network egress can become a significant cost for nodes hosted on some cloud-computing providers. The violin plots below indicate that at the higher throughput that Leios can support, network egress can reach nearly 2 MB/s.
+
+![Simulation of Leios network egress](images/network.png)
+
+Disk usage is correlated with network usage, as most of the blocks moving over the network also need to be persisted permanently; only the votes do not require disk storage. The plots below demonstrate that disk usage scales directly as the product of the IB rate and the IB size.
+
+![Simulation of Leios disk usage](images/disk.png)
+
+Both the average CPU usage and the peak CPU usage are relevant for deciding how to provision hardware for Leios nodes. The following plots indicate that two CPUs are sufficient for sustained and for peak Leios operation at high throughput. Real deployments should over-provision CPU, of course, in order to handle rare extraordinary peak conditions and to speed syncing from genesis.
+
+![Simulation of average CPU usage for Leios](images/cpu-mean.png)
+
+![Simulation of peak CPU usage for Leios](images/cpu-peak.png)
+
+Overall the most significant Leios hardware requirement changes compared to Praos are the higher levels of network egress and the rapidly growing disk space to store the Leios blocks. CPU requirements are quite similar to existing Praos deployments.
+
+### Operating costs
+
+
 ## Path to active
 
 > [!NOTE]
