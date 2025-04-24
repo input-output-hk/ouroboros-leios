@@ -1,6 +1,6 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useMemo } from "react";
-import { Area, AreaChart, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const TransactionsView: FC = ({ }) => {
   const {
@@ -28,15 +28,17 @@ export const TransactionsView: FC = ({ }) => {
   return (
     <div className="flex flex-col w-full h-4/5 items-center justify-center">
       <h2 className="font-bold text-xl">Transactions</h2>
-      <AreaChart width={640} height={480} data={data}>
-        <XAxis dataKey="Time" />
-        <YAxis />
-        <Tooltip />
-        <Area type="monotone" dataKey="Created" stackId="1" stroke="#26de81" fill="#26de81" />
-        <Area type="monotone" dataKey="In Input Block" stackId="1" stroke="#2bcbba" fill="#2bcbba" />
-        <Area type="monotone" dataKey="In Endorser Block" stackId="1" stroke="#4b7bec" fill="#4b7bec" />
-        <Area type="monotone" dataKey="On Chain" stackId="1" stroke="#2d98da" fill="#2d98da" />
-      </AreaChart>
+      <ResponsiveContainer width="80%" height="80%">
+        <AreaChart data={data}>
+          <XAxis dataKey="Time" />
+          <YAxis />
+          <Tooltip />
+          <Area type="monotone" dataKey="Created" stackId="1" stroke="#9e0142" fill="#9e0142" />
+          <Area type="monotone" dataKey="In Input Block" stackId="1" stroke="#d0394e" fill="#d0394e" />
+          <Area type="monotone" dataKey="In Endorser Block" stackId="1" stroke="#ef6445" fill="#ef6445" />
+          <Area type="monotone" dataKey="On Chain" stackId="1" stroke="#fb9d56" fill="#fb9d56" />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useSimContext } from "@/contexts/SimContext/context";
 import { FC, useCallback, useMemo } from "react";
-import { Bar, BarChart, Legend, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const BlockGraph: FC = ({ }) => {
   const {
@@ -34,14 +34,16 @@ export const BlockGraph: FC = ({ }) => {
   return (
     <div className="flex flex-col w-full h-4/5 items-center justify-center">
       <h2 className="font-bold text-xl">Transactions Per Block</h2>
-      <BarChart width={640} height={480} data={data}>
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="praosTx" stackId="a" name={"TXs in block"} fill="#8884d8" onClick={viewBlock} />
-        <Bar dataKey="leiosTx" stackId="a" name={"TXs from Leios"} fill="#82ca9d" onClick={viewBlock} />
-      </BarChart>
+      <ResponsiveContainer width="80%" height="80%">
+        <BarChart data={data}>
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="praosTx" stackId="a" name={"TXs in block"} fill="#8884d8" onClick={viewBlock} />
+          <Bar dataKey="leiosTx" stackId="a" name={"TXs from Leios"} fill="#82ca9d" onClick={viewBlock} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 

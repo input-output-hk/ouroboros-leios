@@ -78,9 +78,9 @@ export const SimWrapper: FC = ({
   const setActiveTab = useCallback((tab: Tab) => dispatch({ type: 'SET_ACTIVE_TAB', payload: tab }), [dispatch]);
   return (
     <>
-      <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
+      {activeTab === Tab.Graph ? <div className="flex flex-col items-center justify-between gap-4 z-10 absolute left-10 top-10">
         <Stats />
-      </div>
+      </div> : null}
       <div className="flex items-center justify-center gap-4 relative h-screen w-screen">
         {activeTab === Tab.Graph && topologyLoaded ? <GraphWrapper /> : null}
         {activeTab === Tab.Blocks ? <BlocksView /> : null}
