@@ -18,22 +18,21 @@ technical papers, presentations, and videos.
 - Cardano’s mainnet periodically faces congestion, with block utilization
   exceeding 90%, delaying transactions and impacting user experience, especially
   for use cases like airdrops, DEXes, oracles, and DApps. As new applications
-  and bridges (e.g., Cardano-Midnight, Cardano-Bitcoin) increase demand, current
+  and bridges (eg, Cardano-Midnight, Cardano-Bitcoin) increase demand, current
   throughput (~12 TPS max) lags far behind competitors like Solana (7229 TPS).
-  In Ouroboros Praos, security constraints (e.g., 5-second block relay within a
+  In Ouroboros Praos, security constraints (eg, 5-second block relay within a
   20-second slot) limit block size and script execution, underutilizing network
   resources. This CPS calls for research into scaling solutions like Ouroboros
   Leios to boost transaction volume, size, and execution units, while ensuring
   predictable processing times for time-sensitive applications. Goals include
   defining stakeholder needs, safely increasing limits, and leveraging underused
-  resources—all without compromising security or raising node costs. Historical
+  resources — all without compromising security or raising node costs. Historical
   data shows frequent near-full blocks and Plutus execution bottlenecks,
   underscoring the urgency as Cardano aims for nation-state-scale usage by 2030.
 
 ### Leios CIP
 
-- [Leios CIP (CIP-0079)](https://github.com/cardano-foundation/CIPs/pull/379)  
-  — Cardano Improvement Proposal by Duncan Coutts, November 2022.
+- [Leios CIP (CIP-0079)](https://github.com/cardano-foundation/CIPs/pull/379) — Cardano Improvement Proposal by Duncan Coutts, November 2022.
 
 **Summary**
 
@@ -43,10 +42,7 @@ and provides a high-level protocol design.
 
 ### Leios research paper
 
-- *High-Throughput Blockchain Consensus under Realistic Network Assumptions*  
-  (May 31, 2024) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias,
-  Giorgos Panagiotakos, and Alexander Russell.  
-  <https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/>
+- [High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) (May 31, 2024) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell.  
 
 **Summary**
 
@@ -73,7 +69,7 @@ maintaining settlement guarantees and supporting dynamic participation.
 
 - [Understanding Leios](https://www.youtube.com/watch?v=YEcYVygdhzU) – Giorgos
   Panagiotakos, one of the paper's co-authors, provides a detailed explanation
-  of the Leios protocol.
+  of the Leios protocol
 
 - **Monthly Leios meetings**:
 
