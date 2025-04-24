@@ -67,6 +67,10 @@ In order to substantially scale beyond this requires changes to the underlying  
 
 ### Constraints on Leios protocol parameters
 
+> [!WARNING]
+> 
+> This is not a complete list.
+
 | Parameter                      | Symbol        | Units   | Description                                                                 | Constraints                | Rationale                                                    |
 | ------------------------------ | ------------- | ------- | --------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------ |
 | Stage length                   | $L$           | slot    |                                                                             | $L \geq \Delta$            |                                                              |
@@ -270,6 +274,10 @@ Although the version of Leios proposed in this document does not support the par
 
 The table below documents a set of Leios protocol parameters that provided high throughput and reasonably fast settlement in the prototype Haskell and Rust simulations of Leios. The exact choice of parameters that would be adopted on the Cardano mainnet must be subject to discussion and consideration of tradeoffs.
 
+> [!WARNING]
+> 
+> This is not a complete list, and each row should have a paragraph of justification.
+
 | Parameter                      | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
 | ------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
 | Stage length                   | $L$           | slot     |                                                                             |             10 | Short stages increase settlement speed, but the stage length must be generously larger than the propagation time for IBs. |
@@ -283,6 +291,36 @@ The table below documents a set of Leios protocol parameters that provided high 
 The analysis [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement) in the first Leios Technical Report indicates that the Leios committee size should be no smaller than 500 votes and the quorum should be at least 60% of those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger as the number of voters increases, so larger committee sizes might be permitted for broader SPO participation and higher security. The committee size should be large enough that fluctuations in committee membership do not create an appreciable probability of an adversarial quorum when the adversarial stake is just under 50%. The quorum size should be kept large enough above 50% so that those same fluctuations do not prevent an honest quorum, but not so large that a minority adversary can prevent the honest quorum. Larger committees require more network traffic, of course.
 
 ### Attack and mitigation
+
+The Leios protocol may have to mitigate the following categories of threats.
+
+- Grinding the VRF to obtain an advantage in Leios sortition
+- Equivocating IBs, EBs, or RBs
+- Declining to create IBs, EBs, or votes
+- Manipulating the content of IBs or EBs
+- Sending invalid txs, IBs, EBs, or certificates
+- Abusing the sync protocol
+- Delaying diffusion of IBs, EBs, or votes
+- Submitting invalid, conflicting, or duplicate transactions
+
+Nearly all of these *hypothetical* threats are already mitigated by the protocol design, the incentive structure, or the cost of the resources needed to execute the threat. The [Threat model](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#threat-model) section of the first Leios Technical report contains a detailed taxonomy that we summarize here. The general impact of such attacks varies:
+
+- Resource burden on nodes
+- Lowered throughput
+- Increased latency
+- Manipulation of dapps or oracles
+
+*Grinding and other threats to Praos:* Threats to the ranking blocks used by Leios are already mitigated by Ouroboros Praos and Genesis. Nevertheless, the possibility of _grinding attacks_, as discussed in [CPS-0017](https://github.com/cardano-scaling/CIPs/blob/settlement-cps/CPS-0017/README.md), will always exist, albeit at low probability of success. Such an attack, which requires some stake, involves using CPU resources to try to manipulate the epoch nonce to a value which will result in higher probability of being select as an RB, IB, or EB producer or as a voter in a subsequent epoch. This presumes that the Praos VRF will be used for the sortition in Leios. Currently, large and expensive amounts of CPU power would be required to successfully conduct a grind attack on Praos. Nevertheless, additional research and development are underway to further harden Praos.
+
+*Equivocation:* In Leios, an IB producer, EB producers, or voter is only allowed one production for each winning of the sortition lottery. (Note that they may win more than once in the same slot because a lottery takes place for each lovelace staked.) A malicious producer or voter might create two conflicting IBs, EBs, or votes and diffuse them to different downstream peers in an attempt to disrupt the Leios protocol. The [Leios paper](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) mitigates this situation explicitly by identifying nodes that misbehave in this manner and notifying downstream peers in a controlled manner.
+
+*Inaction and nuisance:* Producer nodes might also attempt to disrupt the protocol by failing to play their assigned role or by attempting to diffuse invalid information. Failing to produce a block (RB, IB, or EB) or to vote when entitled will result in the attacker receiving fewer rewards for their Leios work. Similarly for creating invalid blocks or votes. Very little advantage would be gained by such attacks because they really only reduce throughput or create a minor annoyance to their first downstream nodes by burdening them with useless verification work. Presumably, the loss of rewards would not compensate for the small disruption they create. The cryptographic aspects of Leios quickly catch invalid blocks or votes, of course.
+
+*Omission and manipulation:* In Praos, omitting transactions from a block being forged does not directly affect the producer's rewards, but it may reduce the overall size of the rewards pot for the whole epoch. However, a malicious producer has little leverage by such omissions because of the very high probability that the omitted transactions reside elsewhere in the memory pool and will soon be included in subsequent honest blocks. Reordering IBs when an EB is created is not an option for an attacker because the Leios paper specifies a fixed ordering.
+
+*Network interference:* Malicious network activity such as violating the sync protocol or delaying diffusion of block or votes creates a minor annoyance that the node's sync protocol will quickly avoid by preferring efficient and honest nodes. Large numbers of malicious relays would be needed to impinge on efficiency even in a small degree.
+
+*Denial of service:* Transaction-based denial of service attacks on Leios would involve submitting numerous invalid, duplicate, or conflicting transactions to different nodes so that they would all make their way into the memory pool and then to IBs, only to be invalidated when transaction reconciliation occurs after those IBs are indirectly referenced by a certificate on a Praos ranking block. Such a denial of service would result in extra computation by the nodes and wasted permanent storage in the IBs. (Plutus transactions may be especially burdensome in this respect.) Ongoing research will mitigate such denial of service via sharding techniques and Leios's fee structure. Sharding will prevent duplicate transactions from reaching IBs and the fee structure will enforce payment for intentionally conflicted transactions, even though only one of the transactions would make it onto the ledger.
 
 ### Resource requirements
 
@@ -357,6 +395,10 @@ The analysis [Committee size and quorum requirement](https://github.com/input-ou
 ### Cryptographic benchmarks
 
 The following benchmarks for Leios cryptographic operations were computed with Rust code[^3] that uses a reference implementation for BLS operations. A variety of optimizations are possible, so the measurements below should be considered worst-case bounds.
+
+> [!WARNING]
+> 
+> - [ ] Could the following bulleted list be better formatted as a table?
 
 - Sortition
     - *Input blocks:* 230 µs
