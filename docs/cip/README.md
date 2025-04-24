@@ -21,13 +21,7 @@ License: Apache-2.0
 >
 > A short (\~200 word) description of the proposed solution and the technical issue being addressed.
 
-As Cardano evolves, there will be increasing demand for greater network  
-capacity to support new and existing users and applications. The long term  
-solution is to rebase Cardano on the new Ouroboros Leios protocol.  
-Ouroboros Leios is a new member of the Ouroboros family that is designed  
-specifically for high throughput, without compromising security. This will  
-meet expected future demands, providing a basis for continuing Cardano growth  
-and scalability.
+As Cardano evolves, there will be increasing demand for greater network  capacity to support new and existing users and applications. The long term  solution is to rebase Cardano on the new Ouroboros Leios protocol.  Ouroboros Leios is a new member of the Ouroboros family that is designed  specifically for high throughput, without compromising security. This will  meet expected future demands, providing a basis for continuing Cardano growth  and scalability.
 
 ## Motivation: why is this CIP necessary?
 
@@ -35,30 +29,12 @@ and scalability.
 > 
 > A clear explanation that introduces a proposal's purpose, use cases, and stakeholders. If the CIP changes an established design, it must outline design issues that motivate a rework. For complex proposals, authors must write a [Cardano Problem Statement (CPS) as defined in CIP-9999][CPS] and link to it as the `Motivation`.
 
-Cardano's current throughput (measured both in data rate and available script  
-execution time) is adequate for the current demand. There is also some  
-opportunity to increase the block sizes and script execution limits to meet  
-emerging future demands for increased network capacity. There are however  
-fundamental limits to how far the block size and the script execution budget  
-can be pushed, while maintaining system security.
+Cardano's current throughput (measured both in data rate and available script  execution time) is adequate for the current demand. There is also some  opportunity to increase the block sizes and script execution limits to meet  emerging future demands for increased network capacity. There are however  fundamental limits to how far the block size and the script execution budget  can be pushed, while maintaining system security.
 
-Under Ouroboros Praos, in order to ensure the security of the overall system,  
-blocks must be distributed across the network reliably in "" time slots.  
-This is set to be 5 seconds on the Cardano mainnet. The block relaying process  
-is an essentially serial process: blocks must be relayed between consecutive  
-block producer nodes through a series of intermediate relay nodes. The overall  
-time that this takes is proportional to the number of network hops between one  
-block producer and the next, and the network latency of each of those hops  
-(which must in general span the whole globe). Given that this must always  
-happen within 5 seconds, this puts a hard upper limit on how large each block  
-can be and also on how much time can be spent validating transactions and  
-scripts.
+Under Ouroboros Praos, in order to ensure the security of the overall system,  blocks must be distributed across the network reliably in "" time slots.  This is set to be 5 seconds on the Cardano mainnet. The block relaying process  is an essentially serial process: blocks must be relayed between consecutive  block producer nodes through a series of intermediate relay nodes. The overall  time that this takes is proportional to the number of network hops between one  block producer and the next, and the network latency of each of those hops  (which must in general span the whole globe). Given that this must always  happen within 5 seconds, this puts a hard upper limit on how large each block  can be and also on how much time can be spent validating transactions and  scripts.
 
-In order to substantially scale beyond this requires changes to the underlying  
-blockchain algorithm. There are significant opportunities to scale: the  
-network and CPU resources on most nodes are almost idle much of the time. With  
-a different algorithm, these resources can be used to increase the total chain  
-bandwidth.
+In order to substantially scale beyond this requires changes to the underlying  blockchain algorithm. There are significant opportunities to scale: the  network and CPU resources on most nodes are almost idle much of the time. With  a different algorithm, these resources can be used to increase the total chain  bandwidth.
+
 ## Specification
 
 > [!NOTE]
@@ -68,7 +44,6 @@ bandwidth.
 > This section must address the [Versioning](#versioning) requirement unless this is addressed in an optional Versioning section.
 > 
 > If a proposal defines structure of on-chain data it must include a CDDL schema.
-
 
 ### Non-normative overview of Leios
 
@@ -197,7 +172,7 @@ $$
 
 but not including any minor overhead arising from CBOR serialization. As noted previously, only a quorum of votes actually needs to be recorded, but the full set might need to be recorded in order for any voting rewards to be computed.
 
-[^2]: Sandro Coretti-Drayton et al., "High-Throughput Blockchain Consensus under Realistic Network Assumptions" (working paper, April 2024), https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/.
+[^2]: Sandro Coretti-Drayton et al., "High-Throughput Blockchain Consensus under Realistic Network Assumptions" (preprint, April 2024), https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/.
 
 ### CDDL schema for the ledger
 
@@ -235,12 +210,9 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### How Leios increases throughput
 
-
 ### Evidence that Leios provides high throughput
 
-
 ### Why Leios is practical to implement
-
 
 The feasibility and performance of the cryptographic required for Leios is demonstrated by a prototype implementation[^3] and the benchmarks in the Appendix [Cryptographic benchmarks](#cryptographic-benchmarks). The small size (less than 9 kB) of Leios certificates is documented in the Appendix [Certificate size for realistic stake distributions](#certificate-size-for-realistic-stake-distributions).
 
@@ -307,9 +279,7 @@ The analysis [Committee size and quorum requirement](https://github.com/input-ou
 
 ### Attack and mitigation
 
-
 ### Resource requirements
-
 
 ## Path to active
 
@@ -361,7 +331,6 @@ The analysis [Committee size and quorum requirement](https://github.com/input-ou
 > 
 > A single Versioning scheme can be placed either as a subsection of the Specification section or in an optional Versioning top-level section near the end.  If the Specification contains multiple specification subsections, each of these can have a Versioning subsection within it.
 
-
 ## References
 
 > [!NOTE]
@@ -379,7 +348,6 @@ The analysis [Committee size and quorum requirement](https://github.com/input-ou
 > [!NOTE]
 > 
 > Optional
-
 
 ### Cryptographic benchmarks
 
