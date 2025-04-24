@@ -4,17 +4,17 @@ sidebar_position: 3
 
 # How it works
 
-Leios is a high-throughput overlay protocol designed to enhance blockchain scalability—such as for Cardano’s Ouroboros—by managing a structured flow of transactions. Here’s a breakdown of how it operates:
+Leios is a high-throughput overlay protocol designed to enhance blockchain scalability — such as for Cardano’s Ouroboros — by managing a structured flow of transactions. Here’s a breakdown of how it operates:
 
-1. **Creating Input Blocks (IBs)**<br /> Stake pool operators (SPOs), acting as
-   validators, bundle transactions into Input Blocks (IBs) every 0.2–2 seconds
+1. **Creating input blocks (IBs)** <br /> Stake pool operators (SPOs), acting as
+   validators, bundle transactions into IBs every 0.2–2 seconds
    and broadcast them across the network for parallel processing.
 
 2. **Proofs of data availability** <br /> Validators check that IBs’ transaction
-   data is valid and accessible, a process later confirmed through Endorser
-   Blocks (EBs) and voting, ensuring no data is missing or malformed.
+   data is valid and accessible, a process later confirmed through endorser
+   blocks (EBs) and voting, ensuring no data is missing or malformed.
 
-3. **Generating Endorser Blocks (EBs)**<br /> EBs aggregate multiple verified
+3. **Generating EBs** <br /> EBs aggregate multiple verified
    IBs, grouping them for validation and proposing their inclusion in the
    blockchain’s final ledger.
 
@@ -24,10 +24,10 @@ Leios is a high-throughput overlay protocol designed to enhance blockchain scala
 
 5. **Voting and certification**<br /> Validators vote on EBs using
    stake-weighted BLS signatures to certify their correctness and data
-   availability, ensuring only compliant IBs (e.g., valid scripts) proceed.
+   availability, ensuring only compliant IBs (eg, valid scripts) proceed.
 
 6. **Final inclusion in the blockchain**<br /> Certified EBs are referenced by
-   a certificate included in a Ranking Block (RB)—a Praos-style block minted
+   a certificate included in a ranking block (RB) — a Praos-style block minted
    every ~20 seconds—finalizing IB transactions on the blockchain while
    maintaining a verifiable, efficient record.
 
@@ -38,7 +38,7 @@ Leios uses a pipelined architecture to achieve high throughput. Each pipeline in
 1. **Propose**:<br />
 
    - Validators concurrently generate and propose IBs with transaction data,
-     kicking off the pipeline instance and targeting frequent output (For example,
+     kicking off the pipeline instance and targeting frequent output (for example,
      every 0.2–2 seconds)
    - IBs proposed during this stage are the focus of the current pipeline
      instance.
@@ -47,13 +47,13 @@ Leios uses a pipelined architecture to achieve high throughput. Each pipeline in
 
    - Time is allocated for proposed IBs to spread across the network using a
      freshest-first diffusion strategy, ensuring honest nodes receive them
-     within a set delay (e.g., Δ_hdr) despite potential adversarial bursts
+     within a set delay (eg, Δ_hdr) despite potential adversarial bursts
    - Duration is crucial for ensuring all honest nodes receive IBs before the
      next stage.
 
 3. **Link**:<br />
 
-   - Validators create EBs that reference Propose-stage IBs, grouping and
+   - Validators create EBs that reference propose-stage IBs, grouping and
      ordering them for validation and eventual blockchain inclusion
    - EBs serve as containers for grouping and ordering IBs.
 
@@ -78,7 +78,7 @@ Leios uses a pipelined architecture to achieve high throughput. Each pipeline in
    - Strengthens overall confirmation of IBs.
 
 7. **Vote2**:<br />
-   - Validators cast final votes for Endorse-stage EBs, certifying them as
+   - Validators cast final votes for endorse-stage EBs, certifying them as
      Vote2-certified if they reference a majority of Vote1-certified EBs,
      preparing them for RB inclusion and ledger finality
    - Must reference a majority of Vote1-certified EBs.
@@ -87,20 +87,20 @@ Leios uses a pipelined architecture to achieve high throughput. Each pipeline in
 
 Leios counters adversarial tactics with:
 
-- **Freshest-first diffusion**: Nodes prioritize downloading the newest IBs and
+- **Freshest-first diffusion**: nodes prioritize downloading the newest IBs and
   EBs (via VRF-based timestamps), limiting delays from malicious message bursts.
-- **Equivocation proofs**: If a validator double-signs (e.g., sends conflicting
+- **Equivocation proofs**: if a validator double-signs (eg, sends conflicting
   EBs), honest nodes detect and propagate proofs, ensuring only one valid block
   per slot is processed, minimizing bandwidth waste.
 
 ## Integration with Ouroboros
 
-- Leios enhances Ouroboros Praos by overlaying its Ranking Blocks (RBs) with
+- Leios enhances Ouroboros Praos by overlaying its RBs with
   high-throughput IB and EB processing. RBs, minted every ~20 seconds, anchor
   the ledger’s security, while Leios’ pipeline scales transaction capacity
   without altering Praos’ core settlement guarantees.
 
 This pipelined architecture ensures continuous IB generation, parallel
 processing, and robust confirmation, enabling Leios to achieve near-optimal
-transaction throughput (e.g., (1-δ) of network capacity) while resisting
+transaction throughput (eg, (1-δ) of network capacity) while resisting
 adversarial tactics like message bursts and equivocations.
