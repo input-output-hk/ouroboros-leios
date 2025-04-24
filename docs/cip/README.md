@@ -74,7 +74,7 @@ bandwidth.
 
 > [!IMPORTANT]
 > 
-> Write this section after the details of the recommended variant of Full Leios have been settled.
+> - [ ] Write this section after the details of the recommended variant of Full Leios have been settled.
 
 ### Normative Leios specification in Agda
 
@@ -205,25 +205,25 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 > [!IMPORTANT]
 > 
-> Translate the Agda type for input blocks into CDDL.
+> - [ ] Translate the Agda type for input blocks into CDDL.
 
 #### EB schema
 
 > [!IMPORTANT]
 > 
-> Translate the Agda type for endorser blocks into CDDL.
+> - [ ] Translate the Agda type for endorser blocks into CDDL.
 
 #### Certificate schema
 
 > [!IMPORTANT]
 > 
-> Translate the Agda type for certificates into CDDL.
+> - [ ] Translate the Agda type for certificates into CDDL.
 
 #### RB schema
 
 > [!IMPORTANT]
 > 
-> Provide the diff for the CDDL for Praos blocks, so that Leios certificates are included.
+> - [ ] Provide the diff for the CDDL for Praos blocks, so that Leios certificates are included.
 
 ## Rationale: how does this CIP achieve its goals?
 
@@ -246,6 +246,48 @@ The feasibility and performance of the cryptographic required for Leios is demon
 
 ### Use cases
 
+Leios immediately enables use cases for high transaction volume and for more computationally intensive Plutus scripts, but future minor modifications of the protocol can open additional novel and custom transaction workflows.
+
+#### High transaction volume
+
+Prototype simulations of the Leios protocol indicate that it can achieve at least 20 times the maximum throughput of the current Cardano mainnet. This amounts to approximately 2 MB/s or 1500 tx/s, assuming the current mean transaction size of 1400 bytes. The availability of Leios, however, would likely affect the characteristics of the mix of transactions, so the the maximum transaction rate could be higher or lower than this estimate. Whatever the specifics, Leios will enable transaction volumes that are orders of magnitude greater than Praos.
+
+Aside from the general benefit of high capacity, several specific use cases could benefit.
+
+- *Enterprise or national-state adoption:* Enterprises and nation states require sustained and guaranteed scalability for their blockchain transactions, and large entities may become heavy users of Cardano.
+- *Finance:* High volume and high frequency trading may become more practical given the higher throughput supported by Leios.
+- *Airdrops:* The high throughput of Leios could streamline the user experience of claiming tokens for large (or extremely large) airdrops.
+- *Partner chains, bridges, and oracles:* Multiple simultaneous operation of partner chains, bridges, and oracles on Cardano will require high transaction rates and minimal delays from the time a transaction reaches the memory pool to when it is recorded in the ledger.
+- *Games:* High throughput and lower transaction cost may enable cost-effective coupling of games (e.g., markets for in-game items).
+- *Improved user experience:* From the onset of the Alonzo era, the usability of particular dapps has occasionally been constrained by the transaction throughput available on Praos. This is especially important and severe when a popular new dapps launches and experiences high activity. Congestion that sometimes occurs during spikes in transaction activity would be alleviated.
+- *More complex governance actions:* Expansion of Cardano and DAO governance would required high volumes of transactions if large portions of the community participate. This is particularly important if the number of dreps increases and Cardano moves towards a "direct democracy" style of voting.
+
+#### Improved cost structure
+
+Techno-economic analyses indicate that at a sustained transaction volume of 50 tx/s or greater the profitability profile of Cardano will improve in several ways. If the current transaction fee structure remains the same as now, Leios would have three economic effects at 50+ tx/s:
+
+1. The intake of transaction fees would be large enough to lessen or eliminate the need for supplementing rewards from the Reserve pot. In particular, the `monetaryExpansion` protocol parameters to be lowered and/or the `treasuryCut` parameter could be increased.
+2. Stake rewards would increase.
+3. Stake pools would become more profitable. In particular, at 50+ tx/s the costlier Leios hardware would be overcome by higher rewards.
+
+Alternatively or additionally, transaction fees could be somewhat lowered. That could further drive adoption and make smaller transactions more cost effective, perhaps even opening the possibilities for micropayments or IoT applications.
+
+#### Intensive Plutus execution
+
+Because there typically is a time window of several seconds from the time a Leios input block can be created to when it needs to start diffusing to other nodes, there is also an opportunity to do more computation validating an Leios input block than for a Praos ranking block. This opens the possibility of increasing the Plutus execution budget for input blocks so that it is significantly larger than the budget for Praos blocks. At the very least a script could be allowed to use the whole Plutus execution budget for an input block, instead of just one quarter of it as is the case for Praos.
+
+Numerous emerging use cases on Cardano would benefit from larger Plutus execution budgets. Complex dapps currently have to split a single logical operation into a sequence of several transactions, increasing the development effort, the complexity, and the attack surface of the scripts involved.
+
+- *ZK proofs:* It may be possible to increase the Plutus execution budget enough that a complete ZK proof could verified in a single transaction.
+- *Large number of parties:* Scripts managing potential interactions with a large number of parties (e.g., airdrops, lotteries, and local accounts) are intrinsically limited by Plutus execution limits.
+- *On-chain interpreters:* Dapps like Marlowe run interpreters for their DSL in a Plutus script. Execution limits currently restrict the complexity of the DSL expressions that can be evaluated in a single transaction.
+
+#### Novel use cases
+
+Although the version of Leios proposed in this document does not support the particular use cases listed below, a minor variant or future version of Leios could.
+
+- *Priority pipelines:* Different Leios pipelines might have different stage lengths, throughput, fees, and/or Plutus execution limits, enabling applications to select their level of service.
+- *Externally batched input blocks:* Third parties could construction input blocks and provide them directly to the block producers, allowing a dapp or an exchange detailed control over sequencing of interdependent transactions within a block or even between blocks.
 
 ### Feasible values for Leios protocol parameters
 
@@ -262,7 +304,6 @@ The table below documents a set of Leios protocol parameters that provided high 
 | Praos active slot coefficient  | $f_\text{RB}$ | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
 
 The analysis [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement) in the first Leios Technical Report indicates that the Leios committee size should be no smaller than 500 votes and the quorum should be at least 60% of those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger as the number of voters increases, so larger committee sizes might be permitted for broader SPO participation and higher security. The committee size should be large enough that fluctuations in committee membership do not create an appreciable probability of an adversarial quorum when the adversarial stake is just under 50%. The quorum size should be kept large enough above 50% so that those same fluctuations do not prevent an honest quorum, but not so large that a minority adversary can prevent the honest quorum. Larger committees require more network traffic, of course.
-
 
 ### Attack and mitigation
 
