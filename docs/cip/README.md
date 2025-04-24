@@ -2,18 +2,23 @@
 CIP: "?"
 Title: Ouroboros Leios - Greater transaction throughput
 Status: Active
-Category: One of the registered [categories](#categories) covering one area of the ecosystem.
+Category:
+    - Consensus
+    - Ledger
+    - Network
 Authors:
-    - 
-Implementors: N/A
+    - William Wolff <william.wolff@iohk.io>
+    - Brian W Bush <brian.bush@iohk.io>
+    - PLEASE ADD YOUR NAME IF YOU CONTRIBUTE TEXT TO THIS DOCUMENT
+Implementors:
+    - Intersect
 Discussions:
-    - 
+    - https://github.com/input-output-hk/ouroboros-leios/discussions
 Solution-To:
     - CPS-0018
 Created: 2025-03-07
 License: Apache-2.0
 ---
-
 
 ## Abstract
 
