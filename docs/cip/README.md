@@ -357,6 +357,40 @@ Overall the most significant Leios hardware requirement changes compared to Prao
 
 ### Operating costs
 
+A detailed cost analysis of Leios deployment is documented in [Leios node operating costs](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/cost-estimate/README.md) in the github repository for the Leios R&D effort. The major conclusion of that report is the following table that relates IB production rate, assuming IBs are the maximum size of existing Praos blocks, to the cost per node and the total cost of all nodes.
+
+| IB/s Rate | Cost per Node (Avg) | Network Cost (10,000 nodes) |
+| --------: | ------------------: | --------------------------: |
+|      0.05 |       $80 USD/month |          $800,000 USD/month |
+|         1 |      $200 USD/month |        $2,000,000 USD/month |
+|         5 |      $700 USD/month |        $7,000,000 USD/month |
+|        10 |    $1,300 USD/month |       $13,000,000 USD/month |
+|        20 |    $2,500 USD/month |       $25,000,000 USD/month |
+|        30 |    $3,600 USD/month |       $36,000,000 USD/month |
+
+*Required TPS for Infrastructure Cost Coverage:* Using average transaction sizes and fees, we can calculate the required TPS to generate enough fees to cover infrastructure costs.
+
+| Infrastructure Cost (USD/month) | Required ADA (at $0.45/ADA) | TPS (Avg Tx) | TPS (Min Tx) | Equivalent IB/s |
+| ------------------------------: | --------------------------: | -----------: | -----------: | --------------: |
+|                        $800,000 |                   1,777,778 |         0.31 |         0.40 |           0.004 |
+|                      $2,000,000 |                   4,444,444 |         0.78 |         1.00 |           0.011 |
+|                      $7,000,000 |                  15,555,556 |         2.72 |         3.49 |           0.039 |
+|                     $13,000,000 |                  28,888,889 |         5.05 |         6.48 |           0.072 |
+|                     $25,000,000 |                  55,555,556 |         9.71 |        12.47 |           0.139 |
+|                     $36,000,000 |                  80,000,000 |        13.99 |        17.96 |           0.200 |
+
+*Required TPS for Current Reward Maintenance:* To maintain current reward levels (~48 million ADA monthly) through transaction fees as the Reserve depletes.
+
+| Year | Reserve Depletion | Rewards from Fees (ADA) | Required TPS (Avg Tx) | Required IB/s |
+| ---: | ----------------: | ----------------------: | --------------------: | ------------: |
+| 2025 |               ~0% |                       0 |                     0 |             0 |
+| 2026 |              ~13% |               6,240,000 |                  10.9 |          0.16 |
+| 2027 |              ~24% |              11,520,000 |                  20.1 |          0.29 |
+| 2028 |              ~34% |              16,320,000 |                  28.5 |          0.41 |
+| 2029 |              ~43% |              20,640,000 |                  36.1 |          0.52 |
+| 2030 |              ~50% |              24,000,000 |                  41.9 |          0.60 |
+
+Note that by 2029, to compensate for Reserve depletion, the network would need to process approximately 36 TPS with average-sized transactions, requiring an Input Block rate of around 0.52 IB/s, roughly 10 times the current mainnet throughput. Leios's design would comfortably support this increased throughput while maintaining decentralization.
 
 ## Path to active
 
