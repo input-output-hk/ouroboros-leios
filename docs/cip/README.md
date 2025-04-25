@@ -224,10 +224,13 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### Evidence that Leios provides high throughput
 
+The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol.
 
 ### Why Leios is practical to implement
 
-The feasibility and performance of the cryptographic required for Leios is demonstrated by a prototype implementation[^3] and the benchmarks in the Appendix [Cryptographic benchmarks](#cryptographic-benchmarks). The small size (less than 9 kB) of Leios certificates is documented in the Appendix [Certificate size for realistic stake distributions](#certificate-size-for-realistic-stake-distributions).
+A Leios implementation would build upon the well-proven design of the existing Cardano node by adding several new mini-protocols for the diffusion of IBs, EBs, and votes. The additional cryptography used by Leios is also quite similar to that already in production in various parts of the Cardano and blockchain ecosystems. Leios adds complexity to the process of updating the ledger because conflicting or duplicate transactions in IBs need reconciliation when the UTXO set is recomputed. The sharding of transactions in Leios will complicate the management of the memory pool and the structure of UTXOs themselves. Adjustments to the rewards model will also be required.
+
+The performance of the cryptographic operations required for Leios is demonstrated by a prototype implementation[^3] and the benchmarks in the Appendix [Cryptographic benchmarks](#cryptographic-benchmarks). The small size (less than 9 kB) of Leios certificates is documented in the Appendix [Certificate size for realistic stake distributions](#certificate-size-for-realistic-stake-distributions). The [Resource requirements](#resource-requirements), discussed below, modestly increase the requirements for running a Cardano node but not beyond commonly available commodity hardware.
 
 ### Use cases
 
