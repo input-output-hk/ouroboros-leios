@@ -227,7 +227,29 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### Evidence that Leios provides high throughput
 
-The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol.
+The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol. That has been demonstrated by prototype simulations written in Haskell and Rust.
+
+> [!CAUTION]
+> 
+> The plots below are placeholders. All of the simulations in this section need to be re-run:
+> 
+> - [ ] Final version of the Leios protocol
+> - [ ] Realistic mainnet topology
+> - [ ] Protocol parameters close to the recommended value
+> - [ ] CPU
+>     - [ ] Unlimited?
+>     - [ ] Six cores?
+> - [ ] Decide which plots best illustrate throughput
+> - [ ] Strip the major titles from the diagrams
+> - [ ] Use SVG format
+
+The simulations demonstrate that bandwidth is partitioned between IBs, EBs, votes, and RBs so that congestion in one message type does not spill over into congestion for other message types. Because IBs are the largest messages, these are the ones first subject to congestion. The plot below shows the appearance of congestion effects in the Haskell simulation at 8 IB/s for 98 kB IBs. (Note that the Haskell simulation represents TCP more faithfully than the Rust one.) Even at this high throughput, IBs arrive at all nodes in the network with 100% success and mostly within five seconds. This implies that the stage length could be as short a five seconds per stage.
+
+![Simulated time in flight for IBs](images/elapsed-IB.png)
+
+In terms of the transaction lifecycle, transaction typically reach IBs rapidly for high-throughput settings of Leios parameters, but it takes tens of seconds for the to become referenced by an EB. Referencing by an RB takes longer, often close to 100 seconds.
+
+![Simulation of transaction lifecycle](images/lifecycle-histogram.png)
 
 ### Why Leios is practical to implement
 
