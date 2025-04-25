@@ -28,6 +28,15 @@ License: Apache-2.0
 
 As Cardano evolves, there will be increasing demand for greater network  capacity to support new and existing users and applications. The long term  solution is to rebase Cardano on the new Ouroboros Leios protocol.  Ouroboros Leios is a new member of the Ouroboros family that is designed  specifically for high throughput, without compromising security. This will  meet expected future demands, providing a basis for continuing Cardano growth  and scalability.
 
+<details>
+  <summary><h2>Table of contents</h2></summary>
+
+> [!IMPORTANT]
+> 
+> - [ ] Create a table of contents with internal hyperlinks when the organization of the document is stable.
+
+</details>
+
 ## Motivation: why is this CIP necessary?
 
 > [!NOTE]
