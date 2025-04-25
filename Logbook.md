@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-04-25
+
+### Draft CIP
+
+As many sections of the [Leios CIP](docs/cip/README.md) have been drafted as can be done pending resolution of outstanding discussions of changes in the Full Leios protocol. The document uses the standard CIP template and provides evidence-based arguments for the need and viability of Leios.
+
 ## 2025-04-23
 
 ### Benchmarking Plutus
