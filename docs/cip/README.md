@@ -30,11 +30,7 @@ As Cardano evolves, there will be increasing demand for greater network  capacit
 
 <details>
   <summary><h2>Table of contents</h2></summary>
-
-> [!IMPORTANT]
-> 
-> - [ ] Create a table of contents with internal hyperlinks when the organization of the document is stable.
-
+  <strong><font color="red">Create a table of contents with internal hyperlinks when the organization of the document is stable.</font></strong>
 </details>
 
 ## Motivation: why is this CIP necessary?
