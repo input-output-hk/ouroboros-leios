@@ -225,9 +225,13 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### How Leios increases throughput
 
+The throughput of a Nakamoto consensus like Ouroboros Praos is intrinsically limited by the strict requirement for rapid global propagation of each block approximately before the next leader produces a block. Leios escapes that limitation by producing input blocks at a higher rate and then voting on aggregations of them (i.e., voting on endorser blocks) by a dynamically selected representative committee of stake pools, ensuring broad participation in the aggregation process. The voting process on these aggregations occurs in a more relaxed and extended manner over a multi-slot stage, allowing for greater network latency tolerance. When a quorum is reached, that quorum is recorded in a Praos block. The majority voting by this committee ensures consensus on the endorser block while inheriting and maintaining Praos's robust resistance to adversarial activity, as the final commitment is anchored in the secure Praos chain. As a result of this decoupled approach, Leios can utilize nearly the full bandwidth available to the network of nodes without requiring unrealistically fast propagation of blocks: Leios employs a structured, multi-stage process where input blocks are produced rapidly and then aggregated and voted upon in subsequent stages before being referenced by a Praos block. Think of Praos as a single-lane highway where every car (block) needs to travel the entire length before the next can start. Leios, in contrast, is like having many local roads (input blocks) feeding into a larger, slower-moving but higher-capacity highway (endorser block aggregation and Praos anchoring).
+
+In analogy, imagine Praos as a single courier diligently collecting and delivering individual letters one by one, limiting the delivery speed to their individual capacity. Ouroboros Leios, however, operates like a mail sorting office where numerous local branches rapidly collect and bundle letters (input blocks) before a central team efficiently processes and dispatches these aggregated bundles (endorser blocks), achieving a significantly higher delivery volume.
+
 ### Evidence that Leios provides high throughput
 
-The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol. That has been demonstrated by prototype simulations written in Haskell and Rust.
+The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol. That has been reinforced and demonstrated by prototype simulations written in Haskell and Rust.
 
 > [!CAUTION]
 > 
