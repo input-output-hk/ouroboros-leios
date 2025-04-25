@@ -33,10 +33,10 @@ export const TransactionsView: FC = ({ }) => {
           <XAxis dataKey="Time" />
           <YAxis />
           <Tooltip />
-          <Area type="monotone" dataKey="On Chain" stackId="1" stroke="#9e0142" fill="#9e0142" />
-          <Area type="monotone" dataKey="In Endorser Block" stackId="1" stroke="#d0394e" fill="#d0394e" />
-          <Area type="monotone" dataKey="In Input Block" stackId="1" stroke="#ef6445" fill="#ef6445" />
-          <Area type="monotone" dataKey="Created" stackId="1" stroke="#fb9d56" fill="#fb9d56" />
+          <Area type="monotone" dataKey="On Chain" stackId="1" isAnimationActive={false} stroke="#9e0142" fill="#9e0142" />
+          <Area type="monotone" dataKey="In Endorser Block" stackId="1" isAnimationActive={false} stroke="#d0394e" fill="#d0394e" />
+          <Area type="monotone" dataKey="In Input Block" stackId="1" isAnimationActive={false} stroke="#ef6445" fill="#ef6445" />
+          <Area type="monotone" dataKey="Created" stackId="1" isAnimationActive={false} stroke="#fb9d56" fill="#fb9d56" />
         </AreaChart>
       </ResponsiveContainer>
     </div>

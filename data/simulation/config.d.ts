@@ -24,7 +24,6 @@ export interface Config {
   "cleanup-policies": CleanupPolicies;
 
   // Leios Protocol Configuration
-  /** Only supported by Rust simulation. */
   "leios-variant": LeiosVariant;
   "leios-stage-length-slots": bigint;
   "leios-stage-active-voting-slots": bigint;
@@ -35,6 +34,12 @@ export interface Config {
    *
    * Only supported by Haskell simulation. */
   "leios-vote-send-recv-stages": boolean;
+  /**
+   * Extends Leios so that EB producers include IBs directly from previous pipelines
+   * where no certified EB was observed.
+   * 
+   * Only supported by Rust simulation. */
+  "leios-late-ib-inclusion": boolean;
   /**
    * The expected time it takes a header to fully diffuse across the network.
    * This is Δhdr from the Leios paper.
