@@ -69,7 +69,10 @@ In order to substantially scale beyond this requires changes to the underlying  
 
 > [!WARNING]
 > 
-> This is not a complete list.
+> This is an incomplete work in progress.
+> 
+> - [ ] Revise after protocol definition is complete.
+> - [ ] Add paragraphs explain the rationale in more detail.
 
 | Parameter                      | Symbol        | Units   | Description                                                                 | Constraints                | Rationale                                                    |
 | ------------------------------ | ------------- | ------- | --------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------ |
@@ -221,6 +224,7 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### Evidence that Leios provides high throughput
 
+
 ### Why Leios is practical to implement
 
 The feasibility and performance of the cryptographic required for Leios is demonstrated by a prototype implementation[^3] and the benchmarks in the Appendix [Cryptographic benchmarks](#cryptographic-benchmarks). The small size (less than 9 kB) of Leios certificates is documented in the Appendix [Certificate size for realistic stake distributions](#certificate-size-for-realistic-stake-distributions).
@@ -276,7 +280,10 @@ The table below documents a set of Leios protocol parameters that provided high 
 
 > [!WARNING]
 > 
-> This is not a complete list, and each row should have a paragraph of justification.
+> This is an incomplete work in progress.
+> 
+> - [ ] Revise after the protocol definition is complete.
+> - [ ] Each row should have a paragraph of justification.
 
 | Parameter                      | Symbol        | Units    | Description                                                                 | Feasible value | Justification                                                                                                             |
 | ------------------------------ | ------------- | -------- | --------------------------------------------------------------------------- | -------------: | ------------------------------------------------------------------------------------------------------------------------- |
@@ -411,7 +418,7 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 - [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
 - [ ]  Audit.
 - [ ]  Successful operation in testnet environments.
-- [ ]  Community agreement on the settings for the Peras protocol parameters.
+- [ ]  Community agreement on the settings for the Leios protocol parameters.
 
 ### Implementation plan
 
@@ -428,7 +435,7 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 - Coordinate with related activities on other protocol enhancements.
     - Compatibility between Peras, Leios, and Genesis.
     - Common design and implementation for certificates, voting, and related key registration: Mithril, Peras, Leios, and partner chains.
-- Triage by intersect Core Infrastructure and Consensus functions.
+- Triage by intersect Core Infrastructure, Consensus, Ledger, and Network functions.
 
 ## Versioning
 
@@ -441,6 +448,8 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 > Authors are free to describe any approach to versioning that allows versioned alterations to be added without author oversight.  Stipulating that the proposal must be superseded by another is also considered to be valid versioning.
 > 
 > A single Versioning scheme can be placed either as a subsection of the Specification section or in an optional Versioning top-level section near the end.  If the Specification contains multiple specification subsections, each of these can have a Versioning subsection within it.
+
+Leios will be versioned via the major and minor version numbers of the Cardano protocol.
 
 ## References
 
