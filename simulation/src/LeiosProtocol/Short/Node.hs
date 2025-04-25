@@ -139,6 +139,7 @@ data LeiosNodeState m = LeiosNodeState
   -- ^ waiting for ledger state of RB block to be validated.
   , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
   , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
+  , ibsValidationActionsVar :: !(TVar m (Map InputBlockId (STM m ())))
   , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
   }
 
@@ -401,6 +402,7 @@ newLeiosNodeState cfg = do
   waitingForLedgerStateVar <- newTVarIO Map.empty
   taskQueue <- atomically $ newTaskMultiQueue cfg.processingQueueBound
   votesForEBVar <- newTVarIO Map.empty
+  ibsValidationActionsVar <- newTVarIO Map.empty
   return $ LeiosNodeState{..}
 
 leiosNode ::
@@ -495,7 +497,10 @@ leiosNode tracer cfg followers peers = do
 
   let blockGenerationThreads = [generator tracer cfg leiosState]
 
-  let computeLedgerStateThreads = [computeLedgerStateThread tracer cfg leiosState]
+  let computeLedgerStateThreads =
+        [ computeLedgerStateThread tracer cfg leiosState
+        -- , validateIBsOfCertifiedEBs tracer cfg leiosState
+        ]
 
   let pruningThreads =
         concat
@@ -507,6 +512,9 @@ leiosNode tracer cfg followers peers = do
             ]
           , [ pruneExpiredUnadoptedEBs tracer cfg leiosState
             | CleanupExpiredUnadoptedEb `isEnabledIn` cfg.leios.cleanupPolicies
+            , -- With Full a fresh EB might end up referencing all the way to Genesis.
+            -- TODO: could expire EBs not referenced by young enough EBs.
+            cfg.leios.variant /= Full
             ]
           , [ pruneExpiredIBs tracer cfg leiosState
             | CleanupExpiredIb `isEnabledIn` cfg.leios.cleanupPolicies
@@ -543,7 +551,7 @@ pruneExpiredIBs _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
     --   traceWith tracer $! LeiosNodeEvent Pruned (EventIB ib)
     go (succ p)
 
--- rEB slots after the end of vote-receiving,
+-- rEB slots after the end of Endorse,
 -- prune EBs that became certified but were not adopted by an RB.
 pruneExpiredUnadoptedEBs ::
   forall m.
@@ -673,6 +681,32 @@ pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _
     --   traceWith tracer $! LeiosNodeEvent Pruned (EventVote $ snd vt)
     go (succ p)
 
+referencedEBs :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> Set EndorseBlockId -> STM m [EndorseBlockId]
+referencedEBs cfg st ebIds0
+  | null ebIds0 = return []
+  | Short <- cfg.variant = pure $ Set.toList ebIds0
+  | otherwise = do
+      ebBuffer <- readTVar st.relayEBState.relayBufferVar
+      let
+        ebsReferenced :: Set EndorseBlockId -> Set EndorseBlockId -> [EndorseBlockId]
+        ebsReferenced !fetched ebIds
+          | null ebIds = []
+          | otherwise = do
+              let ebs =
+                    [ snd $ fromMaybe (error $ "EB missing:" ++ show ebId) $ RB.lookup ebBuffer ebId
+                    | ebId <- Set.toList ebIds
+                    ]
+              let fetched' = Set.union fetched ebIds
+              let refs =
+                    Set.fromList
+                      [ refId
+                      | eb <- ebs
+                      , refId <- eb.endorseBlocksEarlierPipeline
+                      , Set.notMember refId fetched'
+                      ]
+              map (.id) ebs ++ ebsReferenced fetched' refs
+      return $ ebsReferenced Set.empty ebIds0
+
 computeLedgerStateThread ::
   forall m.
   (MonadMVar m, MonadFork m, MonadAsync m, MonadSTM m, MonadTime m, MonadDelay m) =>
@@ -680,36 +714,73 @@ computeLedgerStateThread ::
   LeiosNodeConfig ->
   LeiosNodeState m ->
   m ()
-computeLedgerStateThread tracer _cfg st = forever $ do
+computeLedgerStateThread tracer cfg st = forever $ do
   readyLedgerState <- atomically $ do
     -- TODO: this will get more costly as the base chain grows,
     -- however it grows much more slowly than anything else.
     chain <- PraosNode.preferredChain st.praosState
     let rbsOnChain = Chain.toNewestFirst $ chain
-    let blocks = Map.fromList [(blockHash block, block) | block <- rbsOnChain]
-    when (Map.null blocks) retry
+    when (null rbsOnChain) retry
+    -- TODO: should we prune the ledger state to only cover RBs on the chain?
     ledgerState <- readTVar st.ledgerStateVar
-    let ledgerMissing = Map.elems $ blocks Map.\\ ledgerState
-    when (null ledgerMissing) retry
-    let ledgerEligible = flip filter ledgerMissing $ \blk ->
-          case blockPrevHash blk of
-            GenesisHash -> True
-            BlockHash prev -> prev `Map.member` ledgerState
-    when (null ledgerEligible) retry
+    let oldestMissingLedgerState = go Nothing rbsOnChain
+         where
+          go acc [] = acc
+          go acc (x : xs)
+            | Map.member (blockHash x) ledgerState = acc
+            | otherwise = go (Just x) xs
+    ledgerEligible <- case oldestMissingLedgerState of
+      Nothing -> retry
+      Just block -> pure block
 
-    ibsNeededForEB <- readTVar st.ibsNeededForEBVar
-    let readyLedgerState =
-          [ (blockHash rb, LedgerState)
-          | rb <- ledgerMissing
-          , flip all rb.blockBody.endorseBlocks $ \(ebId, _) ->
-              Map.lookup ebId ibsNeededForEB == Just Set.empty
-          ]
-    when (null readyLedgerState) retry
-    modifyTVar' st.ledgerStateVar (`Map.union` Map.fromList readyLedgerState)
-    return readyLedgerState
+    todo <- do
+      let doLedgerState = Left (blockHash ledgerEligible, LedgerState)
+      case (map fst $ ledgerEligible.blockBody.endorseBlocks) of
+        [] -> return $ doLedgerState
+        ebIds -> do
+          ibsNeededForEB <- readTVar st.ibsNeededForEBVar
+          ibsNeeded <- do
+            ebs <- referencedEBs cfg.leios st (Set.fromList ebIds)
+            return $ Set.unions <$> mapM (flip Map.lookup ibsNeededForEB) ebs
+          case ibsNeeded of
+            -- Some EB was missing ibsNeeded info
+            Nothing -> undefined
+            Just ibs
+              | Set.null ibs -> pure $ doLedgerState
+              | otherwise -> pure $ Right ibs
+
+    case todo of
+      Left readyLedgerState -> do
+        modifyTVar' st.ledgerStateVar (uncurry Map.insert readyLedgerState)
+        return [readyLedgerState]
+      Right ibsEligibleToValidate -> do
+        ibValActions <- readTVar st.ibsValidationActionsVar
+        let ibsReadyToValidate = Map.elems $ Map.restrictKeys ibValActions ibsEligibleToValidate
+        if null ibsReadyToValidate
+          then retry
+          else do
+            modifyTVar' st.ibsValidationActionsVar $ flip Map.withoutKeys ibsEligibleToValidate
+            sequence_ ibsReadyToValidate
+            return []
   for_ readyLedgerState $ \(rb, _) -> do
     traceWith tracer $! LeiosNodeEventLedgerState rb
   return ()
+
+-- TODO: Use or remove.
+--       Might be sensible to validate IBs as soon as we have a certified EB including them: the network managed to validate the IB, so a suitable ledger state is available.
+validateIBsOfCertifiedEBs :: MonadSTM m => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
+validateIBsOfCertifiedEBs _trace _cfg st = forever . atomically $ do
+  ibsNeeded <- readTVar st.ibsNeededForEBVar
+  ebs <- readTVar st.votesForEBVar
+  let certEBs = Set.fromList [eb | (eb, Certified{}) <- Map.toList ebs]
+  let ibsEligible = Set.unions $ Map.elems $ Map.restrictKeys ibsNeeded certEBs
+  when (null ibsEligible) retry
+  ibsValActions <- readTVar st.ibsValidationActionsVar
+  let ibsToValidate = Map.toList $ Map.restrictKeys ibsValActions ibsEligible
+  when (null ibsToValidate) $ retry
+  forM_ ibsToValidate $ \(ibId, m) -> do
+    modifyTVar' st.ibsValidationActionsVar $ Map.delete ibId
+    m
 
 adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
 adoptIB leiosState ib deliveryTime = do
@@ -787,12 +858,28 @@ dispatchValidation tracer cfg leiosState req =
           return []
     ValidateIBS ibs deliveryTime completion -> do
       -- NOTE: IBs with an RB reference have to wait for ledger state of that RB.
-      let waitingLedgerState =
-            [ (rbHash, [queue [valIB ib deliveryTime completion]])
-            | ib <- ibs
-            , BlockHash rbHash <- [(fst ib).rankingBlock]
-            ]
+      --       However, if they get referenced by the chain they should be validated anyway.
+      --       We use a map to store the validation logic, so we can force it happening in the latter case.
+      let lookupValAction ibId = do
+            ibValActions <- readTVar leiosState.ibsValidationActionsVar
+            case Map.lookup ibId ibValActions of
+              Just m -> do
+                modifyTVar' leiosState.ibsValidationActionsVar $
+                  Map.delete ibId
+                m
+              Nothing -> pure ()
+      let storeAction rbHash ib@(h, _) = do
+            modifyTVar' leiosState.ibsValidationActionsVar $
+              Map.insert h.id (queue [valIB ib deliveryTime completion])
+            return (rbHash, [lookupValAction $ (fst ib).id])
+      waitingLedgerState <-
+        sequence $
+          [ storeAction rbHash ib
+          | ib <- ibs
+          , BlockHash rbHash <- [(fst ib).rankingBlock]
+          ]
 
+      -- TODO: cancel the ones forced by computeLedgerState
       waitFor
         leiosState.waitingForLedgerStateVar
         waitingLedgerState
