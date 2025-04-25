@@ -279,6 +279,7 @@ Although the version of Leios proposed in this document does not support the par
 
 - *Priority pipelines:* Different Leios pipelines might have different stage lengths, throughput, fees, and/or Plutus execution limits, enabling applications to select their level of service.
 - *Externally batched input blocks:* Third parties could construction input blocks and provide them directly to the block producers, allowing a dapp or an exchange detailed control over sequencing of interdependent transactions within a block or even between blocks.
+- *Nuanced roles for SPOs:* Leios opens the possibility of separating the protocol functions into separate processes that could be run independently but in coordination. For example, some SPOs (or parts of an SPO) might only create input blocks while others might only produce ranking blocks. In addition to enabling flexible configuration of Cardano worker services, this could encourage new operational models for SPO consortia.
 
 ### Feasible values for Leios protocol parameters
 
