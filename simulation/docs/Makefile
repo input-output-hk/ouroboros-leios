@@ -58,14 +58,14 @@ GIT_REV := $(shell git rev-parse HEAD)
 ifeq ($(shell git status --porcelain --untracked-files=no),)
 	GIT_DIRTY_TRACKED :=
 else
-	GIT_DIRTY_TRACKED := -dirty
+	GIT_DIRTY_TRACKED := -$(shell git stash create)
 endif
 
-## In some cases it's useful to keep logs.
+## In some cases it's useful to generate logs.
 LOG_VERBOSITY ?= 0
-
+SEED ?= 0
 TAGGED_SIM_DATA = $(basename $@)-$(GIT_REV)$(GIT_DIRTY_TRACKED).json
-SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$(TAGGED_SIM_DATA)" short-leios --log-verbosity="$(LOG_VERBOSITY)"
+SHORT_LEIOS = cabal run ols -- sim --output-seconds="$(SIM_SECONDS)" --output-file="$(TAGGED_SIM_DATA)" short-leios --seed $(SEED) --log-verbosity="$(LOG_VERBOSITY)"
 
 %/sim-data.json: %/config.yaml %/topology.yaml
 	$(SHORT_LEIOS) -l "$(word 1, $^)" -t "$(word 2, $^)" +RTS -s
