@@ -26,7 +26,7 @@ License: Apache-2.0
 >
 > A short (\~200 word) description of the proposed solution and the technical issue being addressed.
 
-As Cardano evolves, there will be increasing demand for greater network  capacity to support new and existing users and applications. The long term  solution is to rebase Cardano on the new Ouroboros Leios protocol.  Ouroboros Leios is a new member of the Ouroboros family that is designed  specifically for high throughput, without compromising security. This will  meet expected future demands, providing a basis for continuing Cardano growth  and scalability.
+The anticipated growth of the Cardano ecosystem necessitates a fundamental enhancement of network throughput to accommodate increasing transaction volumes and support complex decentralized applications. To address this, we propose a transition to Ouroboros Leios, a novel consensus protocol within the Ouroboros family specifically designed for high-throughput operation while preserving Ouroboros Praos's rigorous security properties. Leios achieves this via a decoupled block production and aggregation mechanism, allowing for a higher rate of input-block generation followed by efficient endorsement and anchoring onto the main chain. This document specifies the Leios protocol formally using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
 
 <details>
   <summary><h2>Table of contents</h2></summary>
