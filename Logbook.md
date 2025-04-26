@@ -6,6 +6,12 @@
 
 As many sections of the [Leios CIP](docs/cip/README.md) have been drafted as can be done pending resolution of outstanding discussions of changes in the Full Leios protocol. The document uses the standard CIP template and provides evidence-based arguments for the need and viability of Leios.
 
+### Rust simulation
+ - Publicly hosted visualization as part of the Leios docs
+ - Added a "transactions" view to the visualization, showing a graph of TXs in different states over time
+ - Fixed crash when running long simulations
+ - Added `leios-late-ib-inclusion` Full Leios extension, to allow referencing IBs from older pipelines which didn't have EBs
+
 ## 2025-04-23
 
 ### Benchmarking Plutus
