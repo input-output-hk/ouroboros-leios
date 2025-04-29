@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-04-28
+
+### Delta-QSD analysis of transaction lifecycle
+
+An experimental Delta-QSD expression was created for computing the delay between transaction submission and its referencing by a Praos block: see [analysis/deltaq/tx-lifecycle.ipynb](analysis/deltaq/tx-lifecycle.ipynb).
+
 ## 2025-04-25
 
 ### Draft CIP
