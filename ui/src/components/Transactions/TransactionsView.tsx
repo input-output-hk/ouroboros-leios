@@ -17,7 +17,7 @@ export const TransactionsView: FC = ({ }) => {
       const seconds = Math.floor(data.timestamp % 60);
       return {
         Time: minutes ? `${minutes}m${seconds}s` : `${seconds}s`,
-        "Created": data.created,
+        "In Mempool": data.created,
         "In Input Block": data.inIb,
         "In Endorser Block": data.inEb,
         "On Chain": data.onChain,
@@ -25,7 +25,7 @@ export const TransactionsView: FC = ({ }) => {
     })
   }, [transactions]);
 
-  const tooltipOrderer = ["Created", "In Input Block", "In Endorser Block", "On Chain"];
+  const tooltipOrderer = ["In Mempool", "In Input Block", "In Endorser Block", "On Chain"];
 
   return (
     <div className="flex flex-col w-full h-4/5 items-center justify-center">
@@ -38,7 +38,7 @@ export const TransactionsView: FC = ({ }) => {
           <Area type="monotone" dataKey="On Chain" stackId="1" isAnimationActive={false} stroke="#9e0142" fill="#9e0142" />
           <Area type="monotone" dataKey="In Endorser Block" stackId="1" isAnimationActive={false} stroke="#d0394e" fill="#d0394e" />
           <Area type="monotone" dataKey="In Input Block" stackId="1" isAnimationActive={false} stroke="#ef6445" fill="#ef6445" />
-          <Area type="monotone" dataKey="Created" stackId="1" isAnimationActive={false} stroke="#fb9d56" fill="#fb9d56" />
+          <Area type="monotone" dataKey="In Mempool" stackId="1" isAnimationActive={false} stroke="#fb9d56" fill="#fb9d56" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
