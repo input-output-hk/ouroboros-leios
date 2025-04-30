@@ -25,6 +25,8 @@ export const TransactionsView: FC = ({ }) => {
     })
   }, [transactions]);
 
+  const tooltipOrderer = ["Created", "In Input Block", "In Endorser Block", "On Chain"];
+
   return (
     <div className="flex flex-col w-full h-4/5 items-center justify-center">
       <h2 className="font-bold text-xl">Transactions</h2>
@@ -32,7 +34,7 @@ export const TransactionsView: FC = ({ }) => {
         <AreaChart data={data}>
           <XAxis dataKey="Time" />
           <YAxis />
-          <Tooltip />
+          <Tooltip itemSorter={i => tooltipOrderer.indexOf(i.dataKey as string)} />
           <Area type="monotone" dataKey="On Chain" stackId="1" isAnimationActive={false} stroke="#9e0142" fill="#9e0142" />
           <Area type="monotone" dataKey="In Endorser Block" stackId="1" isAnimationActive={false} stroke="#d0394e" fill="#d0394e" />
           <Area type="monotone" dataKey="In Input Block" stackId="1" isAnimationActive={false} stroke="#ef6445" fill="#ef6445" />
