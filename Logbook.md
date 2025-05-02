@@ -2,15 +2,21 @@
 
 ## 2025-05-02
 
+### Long-term profitablity of Praos
+
+We have estimated that without reward contributions from the Cardano Reserve, Praos nodes would have to operate at approximately 50 TPS, even though Praos would likely not support such a high transaction rate. See [analysis/profitability.ipynb](analysis/profitability.ipynb) for methods and details.
+
+![Profitability of Praos without rewards from the Reserve](analysis/spo-profit.svg)
+
 ### Forecast of mainnet rewards
 
-In support of an upcoming block post motivating Leios, we have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](analysis/reward-forecast.ipynb) for methods and details.
+We have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](analysis/reward-forecast.ipynb) for methods and details.
 
 ![Forecast of future Cardano mainnet rewards](analysis/reward-forecast-bau.svg)
 
 ### Statistics for blog post
 
-In support of an upcoming block post motivating Leios, we have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees. See [analysis/epoch-550.md](analysis/epoch-550.md) for methods and details.
+We have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees. See [analysis/epoch-550.md](analysis/epoch-550.md) for methods and details.
 
 - Findings for Epoch 500
     - The Reserve dropped 12.0 million ADA.
