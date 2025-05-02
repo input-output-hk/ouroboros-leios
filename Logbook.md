@@ -1,5 +1,23 @@
 # Leios logbook
 
+## 2025-05-02
+
+### Statistics for blog post
+
+In support of an upcoming block post motivating Leios, we have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees.
+
+- Findings for Epoch 500
+    - The Reserve dropped 12.0 million ADA.
+    - The Treasury increased 5.02 million ADA.
+    - Non-Treasury ADA in circulation increased by 6.99 million ADA.
+    - SPOs received 1.63 million ADA (21.1%) of the rewards.
+    - Delegators received 6.10 million ADA (78.9%) of the rewards.
+- Findings for Epochs 500 through 550
+    - 272k tx/epoch
+    - 0.63 tx/second
+    - Fee of 0.34 ADA/tx
+    - 19.3% block space utilization
+
 ## 2025-04-28
 
 ### Delta-QSD analysis of transaction lifecycle
