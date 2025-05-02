@@ -368,9 +368,7 @@ impl Node {
                 })
                 .collect(),
             CpuTaskType::VTBundleValidated(_, votes) => {
-                std::iter::repeat(cpu_times.vote_validation)
-                    .take(votes.ebs.len())
-                    .collect()
+                std::iter::repeat_n(cpu_times.vote_validation, votes.ebs.len()).collect()
             }
         }
     }
@@ -578,16 +576,17 @@ impl Node {
                     pipeline,
                     producer: self.id,
                 });
-                let mut eb = EndorserBlock {
+                let ibs = self.select_ibs_for_eb(pipeline);
+                let ebs = self.select_ebs_for_eb(pipeline);
+                let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
+                let eb = EndorserBlock {
                     slot,
                     pipeline,
                     producer: self.id,
-                    bytes: 0,
-                    ibs: vec![],
-                    ebs: vec![],
+                    bytes,
+                    ibs,
+                    ebs,
                 };
-                self.try_filling_eb(&mut eb);
-                eb.bytes = self.sim_config.sizes.eb(eb.ibs.len(), eb.ebs.len());
                 self.schedule_cpu_task(CpuTaskType::EBBlockGenerated(eb));
                 // A node should only generate at most 1 EB per slot
                 return;
@@ -1318,37 +1317,28 @@ impl Node {
         Ok(())
     }
 
-    fn try_filling_eb(&mut self, eb: &mut EndorserBlock) {
-        eb.ibs = self.select_ibs_from_pipeline(eb.pipeline);
-        eb.ebs = self.select_ebs_for_eb(eb.pipeline);
-        if !self.sim_config.late_ib_inclusion {
-            return;
+    fn select_ibs_for_eb(&self, pipeline: u64) -> Vec<InputBlockId> {
+        let mut ibs = vec![];
+        for p in self.pipelines_for_ib_references(pipeline) {
+            let Some(p_ibs) = self.leios.ibs_by_pipeline.get(&p) else {
+                continue;
+            };
+            ibs.extend(p_ibs.iter().cloned());
         }
-        let Some(expected_referenced_pipelines) = self.pipelines_referenced_by_ebs(eb.pipeline)
-        else {
-            return;
-        };
-
-        let pipelines_referenced_by_ebs: HashSet<u64> =
-            eb.ebs.iter().map(|eb| eb.pipeline).collect();
-        for pipeline in expected_referenced_pipelines {
-            if !pipelines_referenced_by_ebs.contains(&pipeline) {
-                let mut pipeline_ibs = self.select_ibs_from_pipeline(pipeline);
-                eb.ibs.append(&mut pipeline_ibs);
-            }
-        }
+        ibs
     }
 
-    fn select_ibs_from_pipeline(&self, pipeline: u64) -> Vec<InputBlockId> {
-        self.leios
-            .ibs_by_pipeline
-            .get(&pipeline)
-            .cloned()
-            .unwrap_or_default()
+    fn pipelines_for_ib_references(&self, pipeline: u64) -> impl Iterator<Item = u64> + use<'_> {
+        let oldest_pipeline = if self.sim_config.late_ib_inclusion {
+            pipeline.saturating_sub(2)
+        } else {
+            pipeline
+        };
+        oldest_pipeline..=pipeline
     }
 
     fn select_ebs_for_eb(&self, pipeline: u64) -> Vec<EndorserBlockId> {
-        let Some(referenced_pipelines) = self.pipelines_referenced_by_ebs(pipeline) else {
+        let Some(referenced_pipelines) = self.pipelines_for_eb_references(pipeline) else {
             return vec![];
         };
 
@@ -1362,7 +1352,7 @@ impl Node {
         ebs
     }
 
-    fn pipelines_referenced_by_ebs(
+    fn pipelines_for_eb_references(
         &self,
         pipeline: u64,
     ) -> Option<impl Iterator<Item = u64> + use<'_>> {
@@ -1409,30 +1399,22 @@ impl Node {
 
     fn should_vote_for(&self, eb: &EndorserBlock) -> Result<(), NoVoteReason> {
         let mut ib_set = HashSet::new();
-        let mut pipelines_referenced_by_ibs = HashSet::new();
+        let expected_ib_pipelines: HashSet<u64> =
+            self.pipelines_for_ib_references(eb.pipeline).collect();
 
         for ib in &eb.ibs {
             if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
                 return Err(NoVoteReason::MissingIB);
             }
-            ib_set.insert(*ib);
-            pipelines_referenced_by_ibs.insert(ib.pipeline);
-        }
-
-        if let Some(ibs) = self.leios.ibs_by_pipeline.get(&eb.pipeline) {
-            for ib in ibs {
-                if !ib_set.contains(ib) {
-                    return Err(NoVoteReason::ExtraIB);
-                }
+            if !expected_ib_pipelines.contains(&ib.pipeline) {
+                return Err(NoVoteReason::InvalidSlot);
             }
+            ib_set.insert(*ib);
         }
 
-        // If this EB is meant to reference other EBs, validate that it references whatever it needs
-        if let Some(expected_referenced_pipelines) = self.pipelines_referenced_by_ebs(eb.pipeline) {
-            let pipelines_referenced_by_ebs: HashSet<u64> =
-                eb.ebs.iter().map(|id| id.pipeline).collect();
-
-            for expected_pipeline in expected_referenced_pipelines {
+        if let Some(expected_eb_pipelines) = self.pipelines_for_eb_references(eb.pipeline) {
+            let actual_eb_pipelines: HashSet<u64> = eb.ebs.iter().map(|id| id.pipeline).collect();
+            for expected_pipeline in expected_eb_pipelines {
                 let saw_certified_eb = self
                     .leios
                     .earliest_eb_cert_times_by_pipeline
@@ -1445,24 +1427,11 @@ impl Node {
                             .unwrap_or_default();
                         certified_at <= &cutoff
                     });
-
-                if saw_certified_eb && !pipelines_referenced_by_ebs.contains(&expected_pipeline) {
+                if saw_certified_eb && !actual_eb_pipelines.contains(&expected_pipeline) {
                     // We saw at least one certified EB for this pipeline, so we should have included one.
                     return Err(NoVoteReason::MissingEB);
                 }
-                if pipelines_referenced_by_ebs.contains(&expected_pipeline)
-                    && pipelines_referenced_by_ibs.contains(&expected_pipeline)
-                {
-                    // No pipeline should be referenced by both an EB and any IBs
-                    return Err(NoVoteReason::ExtraIB);
-                }
             }
-        } else if pipelines_referenced_by_ibs
-            .iter()
-            .any(|pipeline| *pipeline != eb.pipeline)
-        {
-            // This EB should only reference IBs from its own pipeline
-            return Err(NoVoteReason::InvalidSlot);
         }
 
         // If this EB _does_ reference other EBs, make sure we trust them
