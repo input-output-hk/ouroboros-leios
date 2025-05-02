@@ -4,7 +4,7 @@
 
 ### Statistics for blog post
 
-In support of an upcoming block post motivating Leios, we have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees.
+In support of an upcoming block post motivating Leios, we have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees. See [analysis/epoch-550.md](analysis/epoch-550.md) for methods and details.
 
 - Findings for Epoch 500
     - The Reserve dropped 12.0 million ADA.
