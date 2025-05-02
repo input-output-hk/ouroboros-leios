@@ -2,6 +2,12 @@
 
 ## 2025-05-02
 
+### Forecast of mainnet rewards
+
+In support of an upcoming block post motivating Leios, we have forecast the diminishing rewards that would occur if the current TPS persists. See [analysis/reward-forecast.ipynb](analysis/reward-forecast.ipynb) for methods and details.
+
+![Forecast of future Cardano mainnet rewards](analysis/reward-forecast-bau.svg)
+
 ### Statistics for blog post
 
 In support of an upcoming block post motivating Leios, we have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, transactions, utlization, and fees. See [analysis/epoch-550.md](analysis/epoch-550.md) for methods and details.
