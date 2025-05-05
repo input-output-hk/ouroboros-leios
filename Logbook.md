@@ -2,6 +2,12 @@
 
 ## 2025-05-05
 
+### Revised figure of Praos profitability
+
+Annotations were added to the figure of Praos profitablity, so that it highlights potential uses of the economic surplus that is present at high throughput and so that it emphasizes that Praos cannot support high throughput.
+
+![Profitability of Praos without rewards from the Reserve](analysis/spo-profitability.svg)
+
 ### Internet latencies
 
 In support of building a more realistic topology and latency graph for the pseudo-mainnet simulations, we have processed 2.6 billion `ping` measurements from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/). When combined with Cardano mainnet node-location telemetry, this can be used to have realistic network delays in the simulation network topology.
@@ -14,7 +20,7 @@ In support of building a more realistic topology and latency graph for the pseud
 
 We have estimated that without reward contributions from the Cardano Reserve, Praos nodes would have to operate at approximately 50 TPS, even though Praos would likely not support such a high transaction rate. See [analysis/profitability-praos.ipynb](analysis/profitability-praos.ipynb) for methods and details.
 
-![Profitability of Praos without rewards from the Reserve](analysis/spo-profitability.svg)
+![Profitability of Praos without rewards from the Reserve](https://github.com/input-output-hk/ouroboros-leios/blob/73c3b6b49cec325a871617c4242ee7c6b13bae4d/analysis/spo-profitability.svg)
 
 ### Forecast of mainnet rewards
 
