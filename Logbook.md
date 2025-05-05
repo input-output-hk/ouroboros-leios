@@ -6,7 +6,7 @@
 
 In support of building a more realistic topology and latency graph for the pseudo-mainnet simulations, we have processed 2.6 billion `ping` measurements from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/). When combined with Cardano mainnet node-location telemetry, this can be used to have realistic network delays in the simulation network topology.
 
-![ASN to ASN RTT statistics](asn-to-asn.svg)
+![ASN to ASN RTT statistics](data/internet/asn-to-asn.svg)
 
 ## 2025-05-02
 
