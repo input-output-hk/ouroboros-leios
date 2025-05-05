@@ -27,6 +27,26 @@ Latencies are assumed to be symmetical, so the data files only record the "upper
 | `rtt_max`      | ms       | The maximum of the RTT ping measurements in the sample.            |
 
 
+## Summary statistics
+
+
+### ASN to ASN
+
+![ASN to ASN RTT statistics](asn-to-asn.svg)
+
+
+### Country to country
+
+![Country to country RTT statistics](cty-to-cty.svg)
+
+
+### Intra-ASN
+
+| Mean    | Standard deviation | Minimum | Maximum     |
+|--------:|-------------------:|--------:|------------:|
+| 80.4 ms | 103.5 ms           | 0 ms    | 249625.7 ms |
+
+
 ## Data processing
 
 This section provides a reproducible recipe for creating or updating the data files.
