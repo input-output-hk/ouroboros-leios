@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-05-05
+
+### Internet latencies
+
+In support of building a more realistic topology and latency graph for the pseudo-mainnet simulations, we have processed 2.6 billion `ping` measurements from the [RIPE Atlas](https://www.ripe.net/analyse/internet-measurements/ripe-atlas/). When combined with Cardano mainnet node-location telemetry, this can be used to have realistic network delays in the simulation network topology.
+
+![ASN to ASN RTT statistics](data/internet/asn-to-asn.svg)
+
 ## 2025-05-02
 
 ### Long-term profitablity of Praos
@@ -31,6 +39,7 @@ We have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, tr
     - 19.3% block space utilization
 
 ### Rust simulation
+
  - Minor visual improvements to visualizer
  - Updated logic around "late IB inclusion" Leios extension to match Giorgos' revisions
 
@@ -47,6 +56,7 @@ An experimental Delta-QSD expression was created for computing the delay between
 As many sections of the [Leios CIP](docs/cip/README.md) have been drafted as can be done pending resolution of outstanding discussions of changes in the Full Leios protocol. The document uses the standard CIP template and provides evidence-based arguments for the need and viability of Leios.
 
 ### Rust simulation
+
  - Publicly hosted visualization as part of the Leios docs
  - Added a "transactions" view to the visualization, showing a graph of TXs in different states over time
  - Fixed crash when running long simulations
