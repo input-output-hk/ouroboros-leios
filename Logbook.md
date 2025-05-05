@@ -30,6 +30,10 @@ We have analyzed Cardano `mainnet` statistics regarding the Reserve, rewards, tr
     - Fee of 0.34 ADA/tx
     - 19.3% block space utilization
 
+### Rust simulation
+ - Minor visual improvements to visualizer
+ - Updated logic around "late IB inclusion" Leios extension to match Giorgos' revisions
+
 ## 2025-04-28
 
 ### Delta-QSD analysis of transaction lifecycle
