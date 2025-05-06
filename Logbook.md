@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-05-06
+
+### Computation of Leios profitability
+
+Using previously computed infrastructure expenses and "business as usual" assumptions, we have estimated the profitiability of Leios SPOs (hosted either on premium or value cloud providers) as a function of transaction throughput.
+
+![Profitability of Leios without rewards from the Reserve](analysis/leios-forecast-sqrt-fill.svg)
+
 ## 2025-05-05
 
 ### Revised figure of Praos profitability
