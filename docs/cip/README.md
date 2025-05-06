@@ -303,7 +303,7 @@ Techno-economic analyses indicate that at a sustained transaction volume of 50 t
 
 The following plot shows a forecast for SPO profitability under Leios, assuming a "business as usual" scenario where the fee, treasury, and monetary expansion protocol parameter stay the same as presently. The precise profitability of individual SPOs depends strongly upon how they host their nodes, but there is a clear trend towards profitability (without any contributions from the Cardano Reserve) once 30-50 transactions per second are sustained. Note that profitability slows at very high throughput because of the substantial expense of network egress and storage of the ledger.
 
-![SPO profitability under Leios.](leios-forecast-sqrt-fill.svg)
+![SPO profitability under Leios.](images/leios-forecast-sqrt-fill.svg)
 
 #### Intensive Plutus execution
 
