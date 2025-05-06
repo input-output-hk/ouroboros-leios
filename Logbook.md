@@ -2,6 +2,14 @@
 
 ## 2025-05-06
 
+### Revisions to draft CIP
+
+The discussion and figures were added to the draft CIP:
+
+1. Diminishing future rewards due to dwindling of the Reserve.
+2. Unprofitability of Praos SPOs in the absense of reward contributions from the Reserve.
+3. Profitability of Leios SPOs, even without contribution of the Reserve, once 50 transactions per second is sustained.
+
 ### Computation of Leios profitability
 
 Using previously computed infrastructure expenses and "business as usual" assumptions, we have estimated the profitiability of Leios SPOs (hosted either on premium or value cloud providers) as a function of transaction throughput. See [analysis/profitability-leios.ipynb](analysis/profitability-leios.ipynb) for details.
