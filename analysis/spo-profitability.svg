@@ -85,6 +85,6 @@
 <text x='305.38' y='424.23' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='96.23px' lengthAdjust='spacingAndGlyphs'>Throughput [tx/s]</text>
 <text transform='translate(13.50,219.70) rotate(-90)' text-anchor='middle' style='font-size: 11.00px; font-family: "Arial";' textLength='156.31px' lengthAdjust='spacingAndGlyphs'>Revenue / expense ratio [%]</text>
 <text x='40.24' y='31.34' style='font-size: 11.00px; font-family: "Arial";' textLength='444.94px' lengthAdjust='spacingAndGlyphs'>Notional approximate forecast mostly based on "business as usual" assumptions</text>
-<text x='40.24' y='15.10' style='font-size: 13.20px; font-family: "Arial";' textLength='334.83px' lengthAdjust='spacingAndGlyphs'>SPO profitability without rewards from the Reserve</text>
+<text x='40.24' y='15.10' style='font-size: 13.20px; font-family: "Arial";' textLength='422.20px' lengthAdjust='spacingAndGlyphs'>SPO profitability under Praos, without rewards from the Reserve</text>
 </g>
 </svg>
