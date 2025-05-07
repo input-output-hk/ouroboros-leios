@@ -13,6 +13,7 @@
       curl
       data_table
       dplyr
+      ggpattern
       ggplot2
       ggExtra
       lubridate
