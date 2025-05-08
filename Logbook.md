@@ -1,5 +1,17 @@
 # Leios logbook
 
+## 2025-05-07
+
+### Additional figures for blog post
+
+#### Transactions throughput as a function of block size and rate
+
+![Transactions throughput as a function of block size and rate](analysis/block-praos-leios-contour.svg)
+
+#### Transaction lifecycle for Praos vs Leios
+
+![Transaction lifecycle for Praos vs Leios](analysis/tx-to-block-fig.svg)
+
 ## 2025-05-06
 
 ### Revisions to draft CIP
