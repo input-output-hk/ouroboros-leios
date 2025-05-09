@@ -15,7 +15,7 @@ We executed the first high-tps simuations of Leios using the Rust simulator, wit
 
 ![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-bar.svg)
 
-![Temporal efficiency of Leios](plots/temporal-efficiency-timeseries.svg)
+![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-timeseries.svg)
 
 ![Spatial efficiency of Leios](analysis/sims/2025w19/plots/space-efficiency.svg)
 
