@@ -1,0 +1,57 @@
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m 66976 transactions(s) were generated in total.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m 31 naive praos block(s) were published.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m 569 slot(s) had no naive praos blocks.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m 119387 transaction(s) (203.14 MB) finalized in a naive praos block.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m 25764 transaction(s) (44.28 MB) did not reach a naive praos block.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 6 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 7 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 8 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 13 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 16 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 18 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 20 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 23 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 27 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 28 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 31 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 35 published 2 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 38 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 44 published 3 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 45 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 47 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 52 published 2 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 56 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 57 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 58 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 60 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 78 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 79 published 0 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 79 failed to publish 1 naive praos block(s) due to slot battles.
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 83 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 87 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 95 published 1 naive praos block(s)
+[32m INFO[0m [1mpraos[0m: [2msim_cli::events[0m[2m:[0m Pool 99 published 2 naive praos block(s)
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 892 IB(s) were generated, on average 1.487 IB(s) per slot.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 59497 out of 66976 transaction(s) were included in at least one IB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m The average age of the pending transactions is 198.441s (stddev 176.262).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each transaction was included in an average of 1.695 IB(s) (stddev 0.865).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each IB contained an average of 113.028 transaction(s) (stddev 17.990) and an average of 193.52 kB (stddev 16.). 0 IB(s) were empty.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each node received an average of 888.960 IB(s) (stddev 0.647).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 88 EB(s) were generated; on average there were 0.147 EB(s) per slot.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each EB contained an average of 1.767 IB(s) (stddev 1.061). 6 EB(s) were empty.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each IB was included in an average of 14.610 EB(s) (stddev 4.322).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 678 out of 892 IBs were included in at least one EB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 171 out of 892 IBs expired before they reached an EB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 15 out of 88 EBs expired before an EB from their stage reached an RB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 45644 out of 66976 transaction(s) were included in at least one EB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 107271 total votes were generated.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each stake pool produced an average of 1072.710 vote(s) (stddev 111.044).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each EB received an average of 1233.000 vote(s) (stddev 628.770).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m There were 4675 bundle(s) of votes. Each bundle contained 22.946 vote(s) (stddev 31.716).
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 30 L1 block(s) had a Leios endorsement.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 117528 tx(s) were referenced by a Leios endorsement.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 1859 tx(s) were included directly in a Praos block.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m 73025 tx(s) (38.323%) referenced by a Leios endorsement were redundant.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each transaction took an average of 30.690s (stddev 19.885) to be included in an IB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each transaction took an average of 54.822s (stddev 18.858) to be included in an EB.
+[32m INFO[0m [1mleios[0m: [2msim_cli::events[0m[2m:[0m Each transaction took an average of 98.643s (stddev 32.542) to be included in a block.

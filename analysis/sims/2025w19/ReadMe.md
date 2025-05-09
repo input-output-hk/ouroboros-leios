@@ -11,6 +11,19 @@
 6. Run Jupyter notebook [analysis.ipynb](analysis.ipynb).
 
 
+## Summary of results
+
+See the `tps/*/summary.txt` files:
+
+- [1 TPS](tps/1/summary.txt)
+- [3 TPS](tps/3/summary.txt)
+- [10 TPS](tps/10/summary.txt)
+- [30 TPS](tps/30/summary.txt)
+- [100 TPS](tps/100/summary.txt)
+- [300 TPS](tps/300/summary.txt)
+- [1000 TPS](tps/1000/summary.txt)
+
+
 ## Archive of results
 
 | Results             | 100-node network                                                             |
