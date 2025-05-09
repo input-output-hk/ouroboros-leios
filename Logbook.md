@@ -2,6 +2,10 @@
 
 ## 2025-05-07
 
+### Patched security of web apps
+
+Minor and moderate security vulnerabilities were fixed in the Leios web apps: [#321](https://github.com/input-output-hk/ouroboros-leios/pull/321), [#322](https://github.com/input-output-hk/ouroboros-leios/pull/322), [#323](https://github.com/input-output-hk/ouroboros-leios/pull/323), [#325](https://github.com/input-output-hk/ouroboros-leios/pull/325).
+
 ### Additional figures for blog post
 
 #### Transactions throughput as a function of block size and rate
