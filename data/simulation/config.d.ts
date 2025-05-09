@@ -58,6 +58,11 @@ export interface Config {
   "tx-generation-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-size-bytes-distribution": Distribution;
+  /**
+   * What percentage of transactions have at least one sharded input?
+   * 
+   * Only supported by Rust simulation. */
+  "tx-sharded-percentage": number;
   /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
@@ -76,8 +81,24 @@ export interface Config {
   // Input Block Configuration
   "ib-generation-probability": number;
   "ib-generation-cpu-time-ms": number;
-  /** Only supported by Rust simulation. */
+  /**
+   * The total number of shards available for IBs.
+   * Must be divisible by ib_shard_group_count.
+
+   * Only supported by Rust simulation. */
   "ib-shards": number;
+  /**
+   * The "m" IB sharding parameter.
+   * Controls how many slots in a row will use the same list of shards.
+   * 
+   * Only supported by Rust simulation. */
+  "ib-shard-period-length-slots": number;
+  /**
+   * The "k" IB sharding parameter.
+   * Controls how many groups of shards are assigned at a time.
+
+   * Only supported by Rust simulation. */
+  "ib-shard-group-count": number;
   "ib-head-size-bytes": bigint;
   "ib-head-validation-cpu-time-ms": number;
   "ib-body-validation-cpu-time-ms-constant": number;

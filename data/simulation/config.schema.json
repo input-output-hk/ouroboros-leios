@@ -243,8 +243,16 @@
     "ib-head-validation-cpu-time-ms": {
       "type": "number"
     },
+    "ib-shard-group-count": {
+      "description": "The \"k\" IB sharding parameter.\nControls how many groups of shards are assigned at a time.\n\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
+    "ib-shard-period-length-slots": {
+      "description": "The \"m\" IB sharding parameter.\nControls how many slots in a row will use the same list of shards.\n\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
     "ib-shards": {
-      "description": "Only supported by Rust simulation.",
+      "description": "The total number of shards available for IBs.\nMust be divisible by ib_shard_group_count.\n\nOnly supported by Rust simulation.",
       "type": "number"
     },
     "leios-header-diffusion-time-ms": {
@@ -333,6 +341,10 @@
       "additionalProperties": false,
       "description": "Only supported by Rust simulation.",
       "properties": {},
+      "type": "number"
+    },
+    "tx-sharded-percentage": {
+      "description": "What percentage of transactions have at least one sharded input?\n\nOnly supported by Rust simulation.",
       "type": "number"
     },
     "tx-size-bytes-distribution": {

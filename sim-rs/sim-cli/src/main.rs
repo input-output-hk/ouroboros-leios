@@ -90,7 +90,7 @@ fn read_config(args: &Args) -> Result<SimConfiguration> {
     }
 
     let params: RawParameters = raw_params.extract()?;
-    let mut config = SimConfiguration::build(params, topology);
+    let mut config = SimConfiguration::build(params, topology)?;
     if let Some(slots) = args.slots {
         config.slots = Some(slots);
     }

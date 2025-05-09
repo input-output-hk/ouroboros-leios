@@ -548,6 +548,8 @@ impl Node {
             }
         }
         for (slot, vrfs) in slot_vrfs {
+            let shards = self.find_available_ib_shards(slot);
+            assert!(!shards.is_empty());
             let headers = vrfs
                 .into_iter()
                 .enumerate()
@@ -559,12 +561,20 @@ impl Node {
                         index: index as u64,
                     },
                     vrf,
+                    shard: shards[vrf as usize % shards.len()],
                     timestamp: self.clock.now(),
                     bytes: self.sim_config.sizes.ib_header,
                 })
                 .collect();
             self.leios.ibs_to_generate.insert(slot, headers);
         }
+    }
+
+    fn find_available_ib_shards(&self, slot: u64) -> Vec<u64> {
+        let period = slot / self.sim_config.ib_shard_period_slots;
+        let group = period % self.sim_config.ib_shard_groups;
+        let shards_per_group = self.sim_config.ib_shards / self.sim_config.ib_shard_groups;
+        (group * shards_per_group..(group + 1) * shards_per_group).collect()
     }
 
     fn generate_endorser_blocks(&mut self, slot: u64) {
@@ -719,7 +729,7 @@ impl Node {
             // Add one transaction, the right size for the extra RB payload
             let tx = Transaction {
                 id: config.next_id(),
-                shard: 0,
+                shard: None,
                 bytes: config.rb_size,
             };
             self.tracker.track_transaction_generated(&tx, self.id);
@@ -1267,7 +1277,7 @@ impl Node {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
             let tx = Transaction {
                 id: config.next_id(),
-                shard: 0,
+                shard: None,
                 bytes: config.ib_size,
             };
             self.tracker.track_transaction_generated(&tx, self.id);
@@ -1275,13 +1285,12 @@ impl Node {
             return;
         }
 
-        let shard = ib.header.vrf % self.sim_config.ib_shards;
         let candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
             .filter_map(|tx| {
-                if tx.shard == shard {
+                if tx.shard.is_none_or(|shard| shard == ib.header.shard) {
                     Some((tx.id, tx.bytes))
                 } else {
                     None

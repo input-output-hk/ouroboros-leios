@@ -67,6 +67,7 @@ pub struct RawParameters {
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
+    pub tx_sharded_percentage: f64,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
 
@@ -85,6 +86,8 @@ pub struct RawParameters {
     pub ib_generation_probability: f64,
     pub ib_generation_cpu_time_ms: f64,
     pub ib_shards: u64,
+    pub ib_shard_period_length_slots: u64,
+    pub ib_shard_group_count: u64,
     pub ib_head_size_bytes: u64,
     pub ib_head_validation_cpu_time_ms: f64,
     pub ib_body_validation_cpu_time_ms_constant: f64,
@@ -371,6 +374,7 @@ impl TransactionConfig {
         if params.simulate_transactions {
             Self::Real(RealTransactionConfig {
                 max_size: params.tx_max_size_bytes,
+                sharded_percentage: params.tx_sharded_percentage,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
             })
@@ -387,6 +391,7 @@ impl TransactionConfig {
 #[derive(Debug, Clone)]
 pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
+    pub sharded_percentage: f64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
 }
@@ -434,14 +439,23 @@ pub struct SimConfiguration {
     pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
+    pub(crate) ib_shard_period_slots: u64,
+    pub(crate) ib_shard_groups: u64,
     pub(crate) cpu_times: CpuTimeConfig,
     pub(crate) sizes: BlockSizeConfig,
     pub(crate) transactions: TransactionConfig,
 }
 
 impl SimConfiguration {
-    pub fn build(params: RawParameters, topology: Topology) -> Self {
-        Self {
+    pub fn build(params: RawParameters, topology: Topology) -> Result<Self> {
+        if params.ib_shards % params.ib_shard_group_count != 0 {
+            bail!(
+                "ib-shards ({}) is not divisible by ib-shard-group-count ({})",
+                params.ib_shards,
+                params.ib_shard_group_count
+            );
+        }
+        Ok(Self {
             seed: 0,
             slots: None,
             emit_conformance_events: false,
@@ -467,10 +481,12 @@ impl SimConfiguration {
             ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: params.ib_diffusion_max_bodies_to_request as usize,
             ib_shards: params.ib_shards,
+            ib_shard_period_slots: params.ib_shard_period_length_slots,
+            ib_shard_groups: params.ib_shard_group_count,
             cpu_times: CpuTimeConfig::new(&params),
             sizes: BlockSizeConfig::new(&params),
             transactions: TransactionConfig::new(&params),
-        }
+        })
     }
 }
 

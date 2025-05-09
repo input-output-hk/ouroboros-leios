@@ -43,6 +43,7 @@ tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
   sigma: 1.127
+tx-sharded-percentage: 0.5
 tx-validation-cpu-time-ms: 1.5
 tx-max-size-bytes: 16384
 
@@ -74,7 +75,9 @@ rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0005
 ################################################################################
 
 ib-generation-probability: 5.0
-ib-shards: 1
+ib-shards: 50
+ib-shard-period-length-slots: 5
+ib-shard-group-count: 25
 
 # ProducerId  32
 # SlotNo      64

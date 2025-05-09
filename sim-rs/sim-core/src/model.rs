@@ -89,7 +89,7 @@ id_wrapper!(TransactionId, u64);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub id: TransactionId,
-    pub shard: u64,
+    pub shard: Option<u64>,
     pub bytes: u64,
 }
 
@@ -125,6 +125,7 @@ impl<Node: Display> Serialize for InputBlockId<Node> {
 pub struct InputBlockHeader {
     pub id: InputBlockId,
     pub vrf: u64,
+    pub shard: u64,
     pub timestamp: Timestamp,
     pub bytes: u64,
 }

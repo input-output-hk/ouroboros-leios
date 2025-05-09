@@ -102,6 +102,7 @@ pub enum Event {
         id: TransactionId,
         publisher: Node,
         size_bytes: u64,
+        shard: Option<u64>,
     },
     TXSent {
         id: TransactionId,
@@ -158,6 +159,7 @@ pub enum Event {
         pipeline: u64,
         producer: Node,
         index: u64,
+        shard: u64,
         header_bytes: u64,
         tx_payload_bytes: u64,
         size_bytes: u64,
@@ -417,6 +419,7 @@ impl EventTracker {
             id: transaction.id,
             publisher: self.to_node(publisher),
             size_bytes: transaction.bytes,
+            shard: transaction.shard,
         });
     }
 
@@ -461,6 +464,7 @@ impl EventTracker {
             pipeline: block.header.id.pipeline,
             producer: self.to_node(block.header.id.producer),
             index: block.header.id.index,
+            shard: block.header.shard,
             header_bytes,
             tx_payload_bytes,
             size_bytes: header_bytes + tx_payload_bytes,

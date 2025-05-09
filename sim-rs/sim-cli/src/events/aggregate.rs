@@ -59,6 +59,7 @@ impl TraceAggregator {
                 id,
                 publisher,
                 size_bytes,
+                ..
             } => {
                 self.transactions.insert(
                     id,
