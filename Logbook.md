@@ -16,6 +16,11 @@ Minor and moderate security vulnerabilities were fixed in the Leios web apps: [#
 
 ![Transaction lifecycle for Praos vs Leios](analysis/tx-to-block-fig.svg)
 
+### Rust simulation
+
+ - Simulate the latest design of the sharding strategy
+ - Report on spatial efficiency in logs
+
 ## 2025-05-06
 
 ### Revisions to draft CIP
