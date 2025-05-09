@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#!nix-shell -i bash -p jq dasel gnused gzip
+#!nix-shell -i bash -p jq dasel gnused gawk gzip
 
 jq -c '
   select(.message.type | match("Generated$"))
@@ -130,7 +130,7 @@ jq -c '
 | gawk '
 BEGIN {
   FS=","
-  OFS="\t"
+  OFS=","
 }
 $2 == "TX" {
   time = $1
