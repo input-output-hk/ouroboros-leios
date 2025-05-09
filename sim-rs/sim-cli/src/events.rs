@@ -102,6 +102,7 @@ impl EventMonitor {
         let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
         let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
         let mut eb_ebs: BTreeMap<EndorserBlockId, Vec<EndorserBlockId>> = BTreeMap::new();
+        let mut leios_tx_bytes: BTreeMap<TransactionId, u64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp::zero();
         let mut total_slots = 0u64;
@@ -115,7 +116,7 @@ impl EventMonitor {
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
         let mut leios_txs = 0u64;
-        let mut unique_leios_txs = 0u64;
+        let mut total_leios_bytes = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
         let mut eb_messages = MessageStats::default();
@@ -236,6 +237,7 @@ impl EventMonitor {
                     );
                     praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
+                        total_leios_bytes += endorsement.size_bytes;
                         leios_blocks_with_endorsements += 1;
                         pending_ebs.retain(|eb| eb.slot != endorsement.eb.id.slot);
 
@@ -257,8 +259,11 @@ impl EventMonitor {
                             block_leios_txs.len(),
                             unique_block_leios_txs.len()
                         );
+                        for tx_id in &unique_block_leios_txs {
+                            let bytes = txs.get(tx_id).unwrap().bytes;
+                            leios_tx_bytes.insert(*tx_id, bytes);
+                        }
                         leios_txs += block_leios_txs.len() as u64;
-                        unique_leios_txs += unique_block_leios_txs.len() as u64;
                         all_txs.append(&mut unique_block_leios_txs);
                     }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
@@ -293,6 +298,7 @@ impl EventMonitor {
                     transactions,
                     ..
                 } => {
+                    total_leios_bytes += size_bytes;
                     generated_ibs += 1;
                     if transactions.is_empty() {
                         empty_ibs += 1;
@@ -332,8 +338,10 @@ impl EventMonitor {
                     id,
                     input_blocks,
                     endorser_blocks,
+                    size_bytes,
                     ..
                 } => {
+                    total_leios_bytes += size_bytes;
                     generated_ebs += 1;
                     pending_ebs.insert(id.clone());
                     eb_ibs.insert(
@@ -390,6 +398,8 @@ impl EventMonitor {
         }
 
         output.flush().await?;
+
+        let unique_leios_txs = leios_tx_bytes.len() as u64;
 
         info_span!("praos").in_scope(|| {
             info!("{} transactions(s) were generated in total.", txs.len());
@@ -463,6 +473,8 @@ impl EventMonitor {
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
+            let total_leios_tx_bytes: u64 = leios_tx_bytes.values().copied().sum();
+            let space_efficiency = total_leios_tx_bytes as f64 / total_leios_bytes as f64;
 
             info!(
                 "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -489,7 +501,7 @@ impl EventMonitor {
             info!(
                 "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
                 txs_per_ib.mean, txs_per_ib.std_dev,
-                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo),
+                pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo.clone()),
                 empty_ibs,
             );
             info!(
@@ -534,6 +546,7 @@ impl EventMonitor {
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) were referenced by a Leios endorsement.", unique_leios_txs);
             info!("{} tx(s) were included directly in a Praos block.", praos_txs);
+            info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were transactions.", pretty_bytes(total_leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
             info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", leios_txs - unique_leios_txs, (leios_txs - unique_leios_txs) as f64 / leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
