@@ -13,13 +13,12 @@ We executed the first high-tps simuations of Leios using the Rust simulator, wit
     - Efficiency near 100% indicates that very little extra disk space is consumed by the Leios protocol when storing transactions.
     - Praos has an efficiency near 100%.
 
-![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-bar.svg)
+Recently proposed revisions to Full Short Leios will increase both efficiencies, as will tuning the protocol parameters involved. In the simulations it took approximately 100 seconds for a transaction to reach the ledger, measured from the time the transaction was submitted.
 
-![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-timeseries.svg)
-
-![Spatial efficiency of Leios](analysis/sims/2025w19/plots/space-efficiency.svg)
-
-Recently proposed revisions to Full Short Leios will increase both efficiencies, as will tuning the protocol parameters involved.
+|   |   |
+|---|---|
+| ![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-timeseries.svg) |
+| ![Spatial efficiency of Leios](analysis/sims/2025w19/plots/spatial-efficiency.svg) | ![Transaction lifecycle](analysis/sims/2025w19/plots/reach-rb-tx.svg) |
 
 ## 2025-05-08
 
