@@ -3,21 +3,21 @@
 
 set -e
 
-for f in lifecycle resources
-do
-  for d in tps/*
-  do
-    pushd $d 2>/dev/null
-    zcat sim.log.gz > sim.tmp
-    ../../queries/$f.sh sim.tmp $f.csv.gz
-    rm sim.tmp
-    popd
-  done
-done
+####for f in lifecycle resources
+####do
+####  for d in tps/*
+####  do
+####    pushd $d 2>/dev/null
+####    zcat sim.log.gz > sim.tmp
+####    ../../queries/$f.sh sim.tmp $f.csv.gz
+####    rm sim.tmp
+####    popd
+####  done
+####done
 
 mkdir -p results
 
-for f in lifecycle resources
+for f in lifecycle
 do
   echo "----- $f -----"
   DIR=$(find tps -type f -name $f.csv.gz -printf %h\\n -quit)
