@@ -1,0 +1,57 @@
+praos: 66976 transactions(s) were generated in total.
+praos: 31 naive praos block(s) were published.
+praos: 569 slot(s) had no naive praos blocks.
+praos: 119387 transaction(s) (203.14 MB) finalized in a naive praos block.
+praos: 25764 transaction(s) (44.28 MB) did not reach a naive praos block.
+praos: Pool 6 published 1 naive praos block(s)
+praos: Pool 7 published 1 naive praos block(s)
+praos: Pool 8 published 1 naive praos block(s)
+praos: Pool 13 published 1 naive praos block(s)
+praos: Pool 16 published 1 naive praos block(s)
+praos: Pool 18 published 1 naive praos block(s)
+praos: Pool 20 published 1 naive praos block(s)
+praos: Pool 23 published 1 naive praos block(s)
+praos: Pool 27 published 1 naive praos block(s)
+praos: Pool 28 published 1 naive praos block(s)
+praos: Pool 31 published 1 naive praos block(s)
+praos: Pool 35 published 2 naive praos block(s)
+praos: Pool 38 published 1 naive praos block(s)
+praos: Pool 44 published 3 naive praos block(s)
+praos: Pool 45 published 1 naive praos block(s)
+praos: Pool 47 published 1 naive praos block(s)
+praos: Pool 52 published 2 naive praos block(s)
+praos: Pool 56 published 1 naive praos block(s)
+praos: Pool 57 published 1 naive praos block(s)
+praos: Pool 58 published 1 naive praos block(s)
+praos: Pool 60 published 1 naive praos block(s)
+praos: Pool 78 published 1 naive praos block(s)
+praos: Pool 79 published 0 naive praos block(s)
+praos: Pool 79 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 83 published 1 naive praos block(s)
+praos: Pool 87 published 1 naive praos block(s)
+praos: Pool 95 published 1 naive praos block(s)
+praos: Pool 99 published 2 naive praos block(s)
+leios: 892 IB(s) were generated, on average 1.487 IB(s) per slot.
+leios: 59497 out of 66976 transaction(s) were included in at least one IB.
+leios: The average age of the pending transactions is 198.441s (stddev 176.262).
+leios: Each transaction was included in an average of 1.695 IB(s) (stddev 0.865).
+leios: Each IB contained an average of 113.028 transaction(s) (stddev 17.990) and an average of 193.52 kB (stddev 16.). 0 IB(s) were empty.
+leios: Each node received an average of 888.960 IB(s) (stddev 0.647).
+leios: 88 EB(s) were generated; on average there were 0.147 EB(s) per slot.
+leios: Each EB contained an average of 1.767 IB(s) (stddev 1.061). 6 EB(s) were empty.
+leios: Each IB was included in an average of 14.610 EB(s) (stddev 4.322).
+leios: 678 out of 892 IBs were included in at least one EB.
+leios: 171 out of 892 IBs expired before they reached an EB.
+leios: 15 out of 88 EBs expired before an EB from their stage reached an RB.
+leios: 45644 out of 66976 transaction(s) were included in at least one EB.
+leios: 107271 total votes were generated.
+leios: Each stake pool produced an average of 1072.710 vote(s) (stddev 111.044).
+leios: Each EB received an average of 1233.000 vote(s) (stddev 628.770).
+leios: There were 4675 bundle(s) of votes. Each bundle contained 22.946 vote(s) (stddev 31.716).
+leios: 30 L1 block(s) had a Leios endorsement.
+leios: 117528 tx(s) were referenced by a Leios endorsement.
+leios: 1859 tx(s) were included directly in a Praos block.
+leios: 73025 tx(s) (38.323%) referenced by a Leios endorsement were redundant.
+leios: Each transaction took an average of 30.690s (stddev 19.885) to be included in an IB.
+leios: Each transaction took an average of 54.822s (stddev 18.858) to be included in an EB.
+leios: Each transaction took an average of 98.643s (stddev 32.542) to be included in a block.

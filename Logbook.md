@@ -1,10 +1,32 @@
 # Leios logbook
 
-## 2025-05-07
+## 2025-05-09
+
+### Lifecycle and resource analysis of Rust simulations
+
+We executed the first high-tps simuations of Leios using the Rust simulator, with TPS ranging as high as 1000 tx/s. Two efficiency measures are used to quantify the inclusion of transactions in the ledger and the amount of data that must be persisted as the ledger.
+
+- *Temporal efficiency* is simply the fraction of submitted transactions that make it into the ledger.
+    - Efficiency near 100% indicates that almost all submitted transactions reach the ledger.
+    - Because of fast diffusion of transactions in the memory pool, Praos has an efficiency of near 100%.
+- *Spatial efficiency* is the ratio of the size of transactions included in the ledger divided by the total size of IBs, EBs, and RBs consituting the ledger.
+    - Efficiency near 100% indicates that very little extra disk space is consumed by the Leios protocol when storing transactions.
+    - Praos has an efficiency near 100%.
+
+Recently proposed revisions to Full Short Leios will increase both efficiencies, as will tuning the protocol parameters involved. In the simulations it took approximately 100 seconds for a transaction to reach the ledger, measured from the time the transaction was submitted.
+
+|   |   |
+|---|---|
+| ![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w19/plots/temporal-efficiency-timeseries.svg) |
+| ![Spatial efficiency of Leios](analysis/sims/2025w19/plots/spatial-efficiency.svg) | ![Transaction lifecycle](analysis/sims/2025w19/plots/reach-rb-tx.svg) |
+
+## 2025-05-08
 
 ### Patched security of web apps
 
 Minor and moderate security vulnerabilities were fixed in the Leios web apps: [#321](https://github.com/input-output-hk/ouroboros-leios/pull/321), [#322](https://github.com/input-output-hk/ouroboros-leios/pull/322), [#323](https://github.com/input-output-hk/ouroboros-leios/pull/323), [#325](https://github.com/input-output-hk/ouroboros-leios/pull/325).
+
+## 2025-05-07
 
 ### Additional figures for blog post
 
