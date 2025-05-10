@@ -17,27 +17,27 @@ and endorser blocks (EBs) that validate them, enhancing the network’s capacity
 
 Leios offers several significant advantages:
 
-- **Higher throughput and lower latency.** By splitting transaction processing
+- **Higher throughput and lower latency:** by splitting transaction processing
   into IB and EB stages, Leios handles more transactions in parallel, enabling
-  faster and more responsive applications.
-- **Better user experience.** Faster transaction processing means quicker
-  confirmations for wallet users and dApp interactions.
-- **Flexible diffusion strategies.** Nodes can choose how to share blocks (e.g.,
-  prioritizing newest or oldest data), optimizing network performance based on
-  conditions.
-- **Enhanced cryptography.** Leios uses Boneh–Lynn–Shacham (BLS) signatures for
+  faster and more responsive applications
+- **Better user experience:** faster transaction processing means quicker
+  confirmations for wallet users and DApp interactions
+- **Flexible diffusion strategies:** nodes can choose how to share blocks (eg,
+  prioritizing the newest or the oldest data), optimizing network performance based on
+  conditions
+- **Enhanced cryptography:** Leios uses Boneh–Lynn–Shacham (BLS) signatures for
   aggregated verification and verifiable random functions (VRFs) for fair leader
-  selection.
-- **Robust simulations and formal methods.** Rust and Haskell simulations
+  selection
+- **Robust simulations and formal methods:** Rust and Haskell simulations
   measure real-world performance, and executable specifications ensure
-  correctness.
-- **Scalable cost model.** A cost calculator helps node operators estimate
-  expenses (e.g., storage, CPU usage).
+  correctness
+- **Scalable cost model:** a cost calculator helps node operators estimate
+  expenses (for example, storage and CPU usage).
 
-## What does Leios mean for Cardano users (e.g., wallet users, dApp developers)?
+## What does Leios mean for Cardano users (eg, wallet users, DApp developers)?
 
 For everyday users, Leios means faster transaction confirmations and a smoother
-experience in wallets and dApps—think near-instant payments or interactions
+experience in wallets and DApps—think near-instant payments or interactions
 instead of waiting 20 seconds or more. For developers, it offers higher
 throughput (more transactions per second), enabling complex, high-volume
 applications like decentralized exchanges or gaming platforms. However, wallets,
@@ -47,9 +47,9 @@ EBs, RBs), so expect some transition as it rolls out.
 ## What are the risks or trade-offs of Leios?
 
 Leios prioritizes scalability, but it’s not without trade-offs. Parallel
-processing increases demands on node operators (e.g., more CPU, bandwidth,
+processing increases demands on node operators (eg, more CPU, bandwidth,
 storage), potentially raising costs or requiring better hardware. The complexity
-of three block types (IBs, EBs, RBs) could also introduce new bugs or delays
+of the three block types (IBs, EBs, RBs) could also introduce new bugs or delays
 during implementation. However, extensive simulations and formal methods aim to
 minimize these risks, ensuring Leios remains secure and reliable as it matures.
 
@@ -57,11 +57,11 @@ minimize these risks, ensuring Leios remains secure and reliable as it matures.
 
 Leios uses three distinct block types:
 
-- **IB (input block):** a block that contains transactions. Produced by nodes
+- **IB (input block)**. A block that contains transactions. Produced by nodes
   that win the IB sortition lottery.
-- **EB (endorser block):** a block that references one or more IBs, providing
+- **EB (endorser block)**. A block that references one or more IBs, providing
   endorsements. Produced by nodes that win the EB sortition lottery.
-- **RB (ranking block):** a block that ranks or orders other blocks as part of
+- **RB (ranking block)**. A block that ranks or orders other blocks as part of
   the consensus mechanism.
 
 Each block type plays a distinct role in moving transactions from submission to
@@ -70,42 +70,46 @@ occur every ~20 seconds.
 
 ## What is the relationship between Ouroboros, Peras, and Leios?
 
-### Ouroboros: The Foundation
+### Ouroboros: the foundation
 
 - What it is: Ouroboros is the overarching family of proof-of-stake (PoS)
   consensus protocols that powers Cardano. It’s designed to be secure,
   energy-efficient, and provably fair, replacing proof-of-work (PoW) systems
   like Bitcoin’s.
-- Key Features:
+- Key features:
   - Slot-based time division (epochs and slots, with slots typically 1 second
-    long in earlier versions, now 20 seconds in Praos for block production).
-  - Stake pool leaders elected based on stake to mint blocks.
-  - Formal mathematical proofs of security (e.g., resistance to attacks like
-    double-spending or chain forks).
+    long in earlier versions, now 20 seconds in Praos for block production)
+  - Stake pool leaders elected based on stake to mint blocks
+  - Formal mathematical proofs of security (for example, resistance to attacks like
+    double-spending or chain forks)
 - Role: Ouroboros is the bedrock consensus mechanism that Peras and Leios build
   upon or refine.
 
-### Peras: A Modular Upgrade
+### Peras: a modular upgrade
 
 - What it is: Peras is a proposed evolution of Ouroboros aimed at improving
   efficiency and modularity.
-- Key Features:
-  - Separation of Concerns: Peras splits consensus into modular components, such
+- Key features:
+  - Separation of concerns. Peras splits consensus into modular components, such
     as transaction ordering, validation, and ledger state updates, to allow
     parallel processing and flexibility.
-  - Improved Finality: It introduces mechanisms for faster confirmation times,
+  - Improved finality. It introduces mechanisms for faster confirmation times.
+  - Separation of concerns. Peras splits consensus into modular components, such
+    as transaction ordering, validation, and ledger state updates to allow
+    parallel processing and flexibility.
+  - Improved finality. It introduces mechanisms for faster confirmation times,
     potentially reducing the time to finality compared to Praos’ 20-second block
     intervals.
-  - Adaptability: Designed to integrate with future scaling solutions (like
+  - Adaptability. Designed to integrate with future scaling solutions (like
     Leios) and sidechains or layer-2 systems.
 - Relationship to Ouroboros:
   - Peras is a direct descendant of Ouroboros Praos, refining its mechanics
-    while staying within the PoS framework. It’s like an “Ouroboros 2.0,”
+    while staying within the PoS framework. It’s like an 'Ouroboros 2.0,'
     optimizing the core protocol without fundamentally changing its PoS nature.
   - It serves as a bridge between the foundational Ouroboros Praos and more
     radical scalability-focused variants like Leios.
 
-### Leios: A Scalability Leap
+### Leios: a scalability leap
 
 - What it is: Ouroboros Leios is a specific variant of the Ouroboros family,
   designed to dramatically increase Cardano’s throughput (transactions per
@@ -114,43 +118,43 @@ occur every ~20 seconds.
   research community.
 - Relationship to Ouroboros:
   - Leios is a specialized extension of Ouroboros, taking the core PoS mechanics
-    and rearchitecting block production for scalability.
+    and re-architecting block production for scalability.
   - It retains Ouroboros’ security model but reimagines how transactions are
     ingested and validated, making it a next-generation Ouroboros variant.
 
-### The Relationship
+### The relationship
 
-- Ouroboros as the Core:
+- Ouroboros as the core:
   - Ouroboros (especially Praos) is the foundational consensus protocol that
     defines Cardano’s PoS system. Both Peras and Leios are built on this
     foundation, inheriting its security properties and stake-based governance.
-- Peras as an Intermediate Step:
+- Peras as an intermediate step:
   - Peras enhances Ouroboros by introducing modularity and efficiency
     improvements, potentially laying the groundwork for integrating advanced
     features like those in Leios. It’s a stepping stone that refines Praos’
     mechanics, making it more adaptable to future needs.
-- Leios as a Scalability Solution:
+- Leios as a scalability solution:
   - Leios takes Ouroboros further by addressing throughput limitations head-on.
     It uses the same PoS principles but introduces a parallel processing model
     that Peras’ modularity could theoretically support or complement.
-  - Leios can be seen as a “plugin” or evolution that fits into the Ouroboros
+  - Leios can be seen as a 'plugin' or evolution that fits into the Ouroboros
     ecosystem, possibly relying on Peras’ groundwork for smoother integration.
-- Timeline and Evolution:
-  - Ouroboros Praos → Current live protocol
-  - Peras → A near-future refinement for flexibility and efficiency
-  - Leios → A long-term scalability solution, still in research/development,
+- Timeline and evolution:
+  - Ouroboros Praos → current live protocol.
+  - Peras → a near-future refinement for flexibility and efficiency.
+  - Leios → a long-term scalability solution, still in research/development,
     aimed at making Cardano competitive with high-TPS blockchains like Solana or
-    Ethereum layer-2s
+    Ethereum layer-2s.
 
 ## What's the state of an IB before an EB or RB gets created for it? Is it visible, is it usable?
 
-Before an Endorsement Block (EB) or Ranking Block (RB) is created, an Input
-Block (IB) is a proposed set of transactions in a preliminary state. Here’s what
+Before an endorsement block (EB) or ranking block (RB) is created, an input
+block (IB) is a proposed set of transactions in a preliminary state. Here’s what
 that means:
 
-### State of an Input Block
+### State of an IB
 
-An IB is minted by a node (e.g., a stake pool operator) and contains unconfirmed
+An IB is minted by a node (eg, a stake pool operator) and contains unconfirmed
 transactions from the mempool. It’s cryptographically signed for authenticity
 but hasn’t been validated or finalized by the network, leaving it in a pending
 state.
@@ -159,12 +163,12 @@ state.
 
 Once minted, the IB is broadcast and visible to all nodes. This allows them to
 inspect its transactions and start validation, a key part of Leios’ parallel
-processing design. However, visibility doesn’t mean it’s accepted—it’s just a
+processing design. However, visibility doesn’t mean it’s accepted — it’s just a
 proposal.
 
 ### Usability
 
-The IB isn’t usable yet—its transactions can’t be spent or relied upon because
+The IB isn’t usable yet — its transactions can’t be spent or relied upon because
 they lack consensus and finality. Only after EBs endorse it and an RB finalizes
 it does it become part of the blockchain’s official state. Until then, it could
 still be discarded if it fails validation.
@@ -174,36 +178,34 @@ still be discarded if it fails validation.
 Leios boosts performance by processing transactions in parallel, even though
 final confirmation still takes 20 seconds. Here’s how:
 
-### Parallel Processing Boost
+### Parallel processing boost
 
-Think of Leios like a factory: In Ouroboros Praos, one worker (a slot leader)
+Think of Leios like a factory: in Ouroboros Praos, one worker (a slot leader)
 builds a block every 20 seconds. In Leios, dozens of workers (nodes) create
-Input Blocks (IBs) continuously, others check them with Endorsement Blocks
-(EBs), and a supervisor (Ranking Block, RB) approves the batch every 20 seconds.
+IBs continuously, others check them with EBs, and a supervisor (RB) approves the batch every 20 seconds.
 This parallelism lets the network handle far more transactions in that
-time—potentially 10x to 100x more than Praos.
+time — potentially 10x to 100x more than Praos.
 
-### Splitting the Work
+### Splitting the work
 
-- **IBs**: Propose transactions frequently and in parallel.
-- **EBs**: Validate IBs concurrently across nodes.
-- **RBs**: Finalize everything every 20 seconds, ensuring security. Unlike
+- **IBs**. Propose transactions frequently and in parallel.
+- **EBs**. Validate IBs concurrently across nodes.
+- **RBs**. Finalize everything every 20 seconds, ensuring security. Unlike
   Praos, where one block does it all, Leios splits these roles so transaction
   processing isn’t bottlenecked by the 20-second RB interval.
 
-### Practical Gains
+### Practical gains
 
 While IBs aren’t spendable until an RB confirms them, EBs provide early
 confidence, letting apps (like wallets) act on them sooner for low-risk tasks
-(e.g., showing balances). The 20-second RB is a security anchor, not a
+(for example, showing balances). The 20-second RB is a security anchor, not a
 limit—hundreds of IBs can queue up in that window, massively increasing
 throughput.
 
 ## How does Leios maintain security with parallel processing?
 
 Leios preserves Cardano’s strong security by combining parallel transaction
-processing with a sequential finality layer. Input Blocks (IBs) and Endorsement
-Blocks (EBs) are produced in parallel, but Ranking Blocks (RBs) finalize the
+processing with a sequential finality layer. IBs and EBs are produced in parallel, but RBs finalize the
 ledger every 20 seconds, ensuring a single, consistent chain. This prevents
 double-spending or forks by resolving conflicts at the RB stage. Additionally,
 cryptographic tools like BLS signatures and VRFs ensure that only valid blocks
@@ -214,9 +216,9 @@ guarantees.
 
 Leios finalizes blocks through a structured voting mechanism. Nodes may adopt:
 
-- **Single-stage voting:** all votes are broadcast in one phase, possibly
-  resulting in a longer CPU usage 'tail' during high throughput.
-- **Send-recv (two-stage) voting:** votes are first sent, then a follow-up
+- **Single-stage voting**: all votes are broadcast in one phase, possibly
+  resulting in a longer CPU usage 'tail' during high throughput
+- **Send-recv (two-stage) voting**: votes are first sent, then a follow-up
   receive phase ensures broader propagation before final tallies.
 
 You can configure voting through parameters such as leios-vote-send-recv-stages
@@ -233,9 +235,9 @@ sortition' because once a node proves it was selected to produce a block or vote
 
 Leios supports multiple strategies for propagating blocks and votes:
 
-- **Oldest-first:** prioritizes older blocks or transactions
-- **Freshest-first:** focuses on the newest blocks or transactions first
-- **Peer-order:** requests blocks in the order peers announce them.
+- **Oldest-first**: prioritizes older blocks or transactions
+- **Freshest-first**: focuses on the newest blocks or transactions first
+- **Peer-order**: requests blocks in the order peers announce them.
 
 Your choice of strategy can affect latency, network load, and overall
 throughput.
@@ -253,11 +255,11 @@ sharding, but it is not yet part of Leios.
 Leios incorporates multiple cryptographic techniques to ensure security and
 efficiency:
 
-- BLS signatures: allows efficient aggregation of many signatures into one,
+- BLS signatures: allow efficient aggregation of many signatures into one,
   reducing verification overhead
 - Mithril or Musen protocols: used for voting and proof aggregation, depending
   on the context
-- VRFs: ensures fair selection of nodes for block production
+- VRFs: ensure fair selection of nodes for block production.
 
 Recent benchmarking shows that aggregated BLS verification significantly speeds
 up certificate validation.
@@ -290,11 +292,11 @@ Developers continually refine these simulations based on real-world data.
 
 Based on preliminary internal testing and simulations:
 
-- **Block size:** commonly set to about one-third of the available link capacity
+- **Block size**: commonly set to about one-third of the available link capacity
   for IBs
-- **Voting stages:** choose single-stage or send-recv, depending on reliability
+- **Voting stages**: choose single-stage or send-recv, depending on reliability
   and speed requirements
-- **Diffusion strategy:** many operators use 'freshest-first,' though
+- **Diffusion strategy**: many operators use 'freshest-first,' though
   'peer-order' may help maintain compatibility with older setups.
 
 Operators can adjust these parameters, which evolve through community votes.
@@ -306,7 +308,7 @@ You can follow:
 - Weekly updates on the Ouroboros Leios site
 - Technical reports for deeper insights
 - Leios glossary for definitions of commonly used terms
-- Public GitHub repositories that host source code and simulations
+- Public GitHub repositories that host source code and simulations.
 
 These resources provide transparency and regular updates on ongoing development.
 
@@ -315,9 +317,9 @@ These resources provide transparency and regular updates on ongoing development.
 Leios changes how transactions are validated and how blocks and memory pools
 operate, potentially affecting:
 
-- **Wallets and SDKs,** which need to accommodate new block types (IBs and EBs)
-- **Explorers,** which must handle higher throughput and multi-block referencing
-- **Indexers and APIs,** which will see more granular block and vote data.
+- **Wallets and SDKs**, which need to accommodate new block types (IBs and EBs)
+- **Explorers**, which must handle higher throughput and multi-block referencing
+- **Indexers and APIs**, which will see more granular block and vote data.
 
 Weekly updates provide a deeper analysis of these topics, including how advanced
 indexing and potential sharding solutions might eventually mitigate challenges.

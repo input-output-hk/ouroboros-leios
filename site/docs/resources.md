@@ -18,56 +18,48 @@ technical papers, presentations, and videos.
 - Cardano’s mainnet periodically faces congestion, with block utilization
   exceeding 90%, delaying transactions and impacting user experience, especially
   for use cases like airdrops, DEXes, oracles, and DApps. As new applications
-  and bridges (e.g., Cardano-Midnight, Cardano-Bitcoin) increase demand, current
+  and bridges (eg, Cardano-Midnight, Cardano-Bitcoin) increase demand, current
   throughput (~12 TPS max) lags far behind competitors like Solana (7229 TPS).
-  In Ouroboros Praos, security constraints (e.g., 5-second block relay within a
+  In Ouroboros Praos, security constraints (eg, 5-second block relay within a
   20-second slot) limit block size and script execution, underutilizing network
   resources. This CPS calls for research into scaling solutions like Ouroboros
   Leios to boost transaction volume, size, and execution units, while ensuring
   predictable processing times for time-sensitive applications. Goals include
   defining stakeholder needs, safely increasing limits, and leveraging underused
-  resources—all without compromising security or raising node costs. Historical
+  resources — all without compromising security or raising node costs. Historical
   data shows frequent near-full blocks and Plutus execution bottlenecks,
   underscoring the urgency as Cardano aims for nation-state-scale usage by 2030.
 
 ### Leios CIP
 
-- [Leios CIP](https://github.com/cardano-foundation/CIPs/pull/379)
+- [Leios CIP (CIP-0079)](https://github.com/cardano-foundation/CIPs/pull/379) — Cardano Improvement Proposal by Duncan Coutts, November 2022.
 
-#### Summary
+**Summary**
 
-- – the Cardano Improvement Proposal by Duncan Coutts,
-- CIP-0079, proposed by Duncan Coutts in November 2022, introduces Ouroboros
-  Leios as a long-term solution to boost Cardano’s transaction throughput beyond
-  the limitations of Ouroboros Praos. This CIP provides the rationale and a
-  high-level design of the protocol.
+CIP-0079 introduces Ouroboros Leios as a long-term solution to raise Cardano
+throughput beyond the limits of Ouroboros Praos. The CIP explains the rationale
+and provides a high-level protocol design.
 
-### Leios Research Paper
+### Leios research paper
 
-- [High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/)
+- [High-Throughput Blockchain Consensus under Realistic Network Assumptions](https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/) (May 31, 2024) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell.  
 
-#### Summary
+**Summary**
 
-- The original research defining the core protocol and its theoretical
-  properties. Published on May 31, 2024, by Sandro Coretti, Matthias Fitzi,
-  Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell, this research
-  paper introduces Leios, a blockchain protocol overlay that transforms
-  low-throughput permissionless protocols (PoW or PoS) into high-throughput
-  systems, achieving near-optimal throughput of (1-δ)σ_H (where σ_H is the
-  honest stake fraction and δ>0) under realistic network conditions. Unlike
-  prior models assuming unbounded message capacity, Leios addresses adversarial
-  tactics like protocol bursts (mass message releases) and equivocations
-  (double-signing in PoS) using a freshest-first diffusion network model
-  (F_FFD). It employs five key techniques: (i) concurrent Input Block (IB)
-  generation for transactions, (ii) Endorser Blocks (EBs) with data availability
-  proofs, (iii) a pipelined architecture for uninterrupted processing, (iv)
-  freshest-first message prioritization with VRF-based timestamps, and (v)
-  equivocation proofs to limit malicious spam. Full Leios ensures throughput
-  scales with network capacity, retains base protocol settlement times (adjusted
-  by a δ-related constant), and supports dynamic participation, proven secure
-  with a stake-based voting scheme using BLS signatures. Applied to Ouroboros,
-  Leios offers a scalable, secure layer-1 solution for Cardano, balancing
-  throughput, latency, and resilience.
+The paper presents Leios, a protocol overlay that transforms low-throughput PoW
+or PoS systems into high-throughput chains, achieving near-optimal throughput of
+(1 − δ) σ_H (where σ_H is the honest-stake fraction and δ > 0). Leios addresses
+adversarial tactics such as message bursts and equivocations via:
+
+1. Concurrent input-block (IB) generation
+2. Endorser blocks (EBs) with data-availability proofs
+3. A seven-stage pipeline for uninterrupted processing
+4. Freshest-first diffusion with VRF-based timestamps
+5. Equivocation proofs to cap malicious spam.
+
+Applied to Ouroboros, Leios yields a scalable, secure layer-1 for Cardano while
+maintaining settlement guarantees and supporting dynamic participation.
+
 
 ## Videos
 
@@ -87,7 +79,7 @@ technical papers, presentations, and videos.
 
   - [December 2024](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing)
 
-  - [January 2025](https://www.youtube.com/live/6ovcWDCdqFU?si=-dgnvO7353tUyiDZ&t=120)
+  - [January 2025](https://www.youtube.com/live/6ovcWDCdqFU?si=-dgnvO7353tUyiDZ&t=120).
 
 ## Presentations
 
