@@ -27,7 +27,7 @@ let
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "trace-parser";
     name = "trace-parser";  # FIXME: Why is this entry needed?
-    src = ../trace-parser;
+    src = ../leios-trace-verifier;
     meta = { };
     libraryFile = "trace-parser.agda-lib";
     everythingFile = "trace-parser.agda";
