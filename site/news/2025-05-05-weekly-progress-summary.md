@@ -9,14 +9,14 @@ This week, the team focused on simulation analysis, security improvements, and p
 
 ### Simulation analysis and performance
 
-The team executed the first high-throughput simulations of Leios using the Rust simulator, with transaction rates reaching up to 1000 TPS. We introduced two key efficiency metrics to quantify system performance:
+The team executed the first high-throughput simulations of Leios using the Rust simulator, with transaction rates reaching up to 1,000 TPS. They introduced two key efficiency metrics to quantify system performance:
 
-- *Temporal efficiency* measures the fraction of submitted transactions that make it into the ledger, with near 100% indicating optimal transaction inclusion.
-- *Spatial efficiency* represents the ratio of transaction size to total ledger size (including IBs, EBs, and RBs), with higher values indicating better storage optimization.
+- *Temporal efficiency*, which measures the fraction of submitted transactions that make it into the ledger, with nearly 100% indicating optimal transaction inclusion
+- *Spatial efficiency*, which represents the ratio of transaction size to total ledger size (including IBs, EBs, and RBs), with higher values indicating better storage optimization.
 
 Recent revisions to Full Short Leios have shown promising improvements in both efficiency metrics. The simulations revealed an average transaction lifecycle of approximately 100 seconds from submission to ledger inclusion.
 
-Our analysis produced several key visualizations that demonstrate the system's performance:
+The analysis produced several key visualizations that demonstrate the system's performance:
 
 <div align="center">
 
@@ -40,7 +40,7 @@ Our analysis produced several key visualizations that demonstrate the system's p
 
 ### Protocol documentation and analysis
 
-We conducted extensive analysis of transaction throughput and block characteristics, producing several key visualizations:
+The team conducted an extensive analysis of transaction throughput and block characteristics, producing several key visualizations:
 
 <div align="center">
 
@@ -56,29 +56,29 @@ We conducted extensive analysis of transaction throughput and block characterist
 
 The team also completed a comprehensive profitability analysis for Leios SPOs, considering various deployment scenarios:
 - Evaluated infrastructure costs across premium and value cloud providers
-- Demonstrated profitability without Reserve contributions at 50+ TPS
-- Documented the impact of diminishing future rewards due to Reserve depletion
-- Analyzed comparative economics between Praos and Leios SPOs
+- Demonstrated profitability without reserve contributions at 50+ TPS
+- Documented the impact of diminishing future rewards due to reserve depletion
+- Analyzed comparative economics between Praos and Leios SPOs.
 
 <div align="center">
 
 ![Profitability forecast visualization](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/leios-forecast-sqrt-fill.svg)
 
-*Figure 7: Profitability forecast for Leios SPOs without Reserve contributions*
+*Figure 7: Profitability forecast for Leios SPOs without reserve contributions*
 
 </div>
 
 ### Security and infrastructure improvements
 
-The team addressed several security vulnerabilities in the web applications through a series of patches:
-- Fixed minor and moderate security issues in PRs [#321](https://github.com/input-output-hk/ouroboros-leios/pull/321), [#322](https://github.com/input-output-hk/ouroboros-leios/pull/322), [#323](https://github.com/input-output-hk/ouroboros-leios/pull/323), and [#325](https://github.com/input-output-hk/ouroboros-leios/pull/325)
+The team addressed several security vulnerabilities in web applications through a series of patches:
+- Fixed minor and moderate security issues in [#321](https://github.com/input-output-hk/ouroboros-leios/pull/321), [#322](https://github.com/input-output-hk/ouroboros-leios/pull/322), [#323](https://github.com/input-output-hk/ouroboros-leios/pull/323), and [#325](https://github.com/input-output-hk/ouroboros-leios/pull/325) pull requests.
 
 ### Protocol enhancements
 
 Recent protocol improvements include:
 - Implementation of revisions to Full Short Leios design to enhance both temporal and spatial efficiency
 - Optimization of protocol parameters for improved transaction processing
-- Development of new sharding strategy in Rust simulation
-- Enhanced logging system for tracking spatial efficiency metrics
+- Development of a new sharding strategy in Rust simulation
+- Enhanced logging system for tracking spatial efficiency metrics.
 
 For more detailed information about the simulations and analysis, please refer to the [analysis documentation](https://github.com/input-output-hk/ouroboros-leios/tree/main/analysis) and the [profitability analysis notebook](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/profitability-leios.ipynb).
