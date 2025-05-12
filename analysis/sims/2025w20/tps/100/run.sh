@@ -4,7 +4,7 @@ set -e
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-../../sim-cli --parameters config.yaml network.yaml --slots 2400 sim.log > stdout 2> stderr
+../../sim-cli --parameters config.yaml network.yaml --slots 3600 sim.log > stdout 2> stderr
 
 for f in ../../queries/*.sh
 do
