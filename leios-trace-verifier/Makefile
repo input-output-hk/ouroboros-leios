@@ -20,5 +20,9 @@ define agdaToHs
       >> $(HS_DIR)/$(CABAL_FILE)
 endef
 HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/trace-parser.hs
+
+all: $(HS_LEIOS)
+	cabal build parser
+
 $(HS_LEIOS): trace-parser.agda
 	$(call agdaToHs,trace-parser)
