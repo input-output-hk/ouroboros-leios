@@ -9,7 +9,7 @@
 
 
 <script src="https://plausible.io/js/script.js" defer="defer" data-domain="leios.cardano-scaling.org"></script><link rel="stylesheet" href="/assets/css/styles.0ecca660.css">
-<script src="/assets/js/runtime~main.3b12c55d.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.99399a1e.js" defer="defer"></script>
 <script src="/assets/js/main.941c763d.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -26,57 +26,44 @@ technical papers, presentations, and videos.</p>
 <li>Cardano’s mainnet periodically faces congestion, with block utilization
 exceeding 90%, delaying transactions and impacting user experience, especially
 for use cases like airdrops, DEXes, oracles, and DApps. As new applications
-and bridges (e.g., Cardano-Midnight, Cardano-Bitcoin) increase demand, current
+and bridges (eg, Cardano-Midnight, Cardano-Bitcoin) increase demand, current
 throughput (~12 TPS max) lags far behind competitors like Solana (7229 TPS).
-In Ouroboros Praos, security constraints (e.g., 5-second block relay within a
+In Ouroboros Praos, security constraints (eg, 5-second block relay within a
 20-second slot) limit block size and script execution, underutilizing network
 resources. This CPS calls for research into scaling solutions like Ouroboros
 Leios to boost transaction volume, size, and execution units, while ensuring
 predictable processing times for time-sensitive applications. Goals include
 defining stakeholder needs, safely increasing limits, and leveraging underused
-resources—all without compromising security or raising node costs. Historical
+resources — all without compromising security or raising node costs. Historical
 data shows frequent near-full blocks and Plutus execution bottlenecks,
 underscoring the urgency as Cardano aims for nation-state-scale usage by 2030.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="leios-cip">Leios CIP<a class="hash-link" aria-label="Direct link to Leios CIP" title="Direct link to Leios CIP" href="/docs/resources#leios-cip">​</a></h3>
 <ul>
-<li><a href="https://github.com/cardano-foundation/CIPs/pull/379" target="_blank" rel="noopener noreferrer">Leios CIP</a></li>
+<li><a href="https://github.com/cardano-foundation/CIPs/pull/379" target="_blank" rel="noopener noreferrer">Leios CIP (CIP-0079)</a> — Cardano Improvement Proposal by Duncan Coutts, November 2022.</li>
 </ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="summary-1">Summary<a class="hash-link" aria-label="Direct link to Summary" title="Direct link to Summary" href="/docs/resources#summary-1">​</a></h4>
+<p><strong>Summary</strong></p>
+<p>CIP-0079 introduces Ouroboros Leios as a long-term solution to raise Cardano
+throughput beyond the limits of Ouroboros Praos. The CIP explains the rationale
+and provides a high-level protocol design.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="leios-research-paper">Leios research paper<a class="hash-link" aria-label="Direct link to Leios research paper" title="Direct link to Leios research paper" href="/docs/resources#leios-research-paper">​</a></h3>
 <ul>
-<li>– the Cardano Improvement Proposal by Duncan Coutts,</li>
-<li>CIP-0079, proposed by Duncan Coutts in November 2022, introduces Ouroboros
-Leios as a long-term solution to boost Cardano’s transaction throughput beyond
-the limitations of Ouroboros Praos. This CIP provides the rationale and a
-high-level design of the protocol.</li>
+<li><a href="https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/" target="_blank" rel="noopener noreferrer">High-Throughput Blockchain Consensus under Realistic Network Assumptions</a> (May 31, 2024) — Sandro Coretti, Matthias Fitzi, Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell.</li>
 </ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="leios-research-paper">Leios Research Paper<a class="hash-link" aria-label="Direct link to Leios Research Paper" title="Direct link to Leios Research Paper" href="/docs/resources#leios-research-paper">​</a></h3>
-<ul>
-<li><a href="https://iohk.io/en/research/library/papers/high-throughput-blockchain-consensus-under-realistic-network-assumptions/" target="_blank" rel="noopener noreferrer">High-Throughput Blockchain Consensus under Realistic Network Assumptions</a></li>
-</ul>
-<h4 class="anchor anchorWithStickyNavbar_LWe7" id="summary-2">Summary<a class="hash-link" aria-label="Direct link to Summary" title="Direct link to Summary" href="/docs/resources#summary-2">​</a></h4>
-<ul>
-<li>The original research defining the core protocol and its theoretical
-properties. Published on May 31, 2024, by Sandro Coretti, Matthias Fitzi,
-Aggelos Kiayias, Giorgos Panagiotakos, and Alexander Russell, this research
-paper introduces Leios, a blockchain protocol overlay that transforms
-low-throughput permissionless protocols (PoW or PoS) into high-throughput
-systems, achieving near-optimal throughput of (1-δ)σ_H (where σ_H is the
-honest stake fraction and δ&gt;0) under realistic network conditions. Unlike
-prior models assuming unbounded message capacity, Leios addresses adversarial
-tactics like protocol bursts (mass message releases) and equivocations
-(double-signing in PoS) using a freshest-first diffusion network model
-(F_FFD). It employs five key techniques: (i) concurrent Input Block (IB)
-generation for transactions, (ii) Endorser Blocks (EBs) with data availability
-proofs, (iii) a pipelined architecture for uninterrupted processing, (iv)
-freshest-first message prioritization with VRF-based timestamps, and (v)
-equivocation proofs to limit malicious spam. Full Leios ensures throughput
-scales with network capacity, retains base protocol settlement times (adjusted
-by a δ-related constant), and supports dynamic participation, proven secure
-with a stake-based voting scheme using BLS signatures. Applied to Ouroboros,
-Leios offers a scalable, secure layer-1 solution for Cardano, balancing
-throughput, latency, and resilience.</li>
-</ul>
+<p><strong>Summary</strong></p>
+<p>The paper presents Leios, a protocol overlay that transforms low-throughput PoW
+or PoS systems into high-throughput chains, achieving near-optimal throughput of
+(1 − δ) σ_H (where σ_H is the honest-stake fraction and δ &gt; 0). Leios addresses
+adversarial tactics such as message bursts and equivocations via:</p>
+<ol>
+<li>Concurrent input-block (IB) generation</li>
+<li>Endorser blocks (EBs) with data-availability proofs</li>
+<li>A seven-stage pipeline for uninterrupted processing</li>
+<li>Freshest-first diffusion with VRF-based timestamps</li>
+<li>Equivocation proofs to cap malicious spam.</li>
+</ol>
+<p>Applied to Ouroboros, Leios yields a scalable, secure layer-1 for Cardano while
+maintaining settlement guarantees and supporting dynamic participation.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="videos">Videos<a class="hash-link" aria-label="Direct link to Videos" title="Direct link to Videos" href="/docs/resources#videos">​</a></h2>
 <ul>
 <li>
@@ -102,7 +89,7 @@ of the Leios protocol</p>
 <p><a href="https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing" target="_blank" rel="noopener noreferrer">December 2024</a></p>
 </li>
 <li>
-<p><a href="https://www.youtube.com/live/6ovcWDCdqFU?si=-dgnvO7353tUyiDZ&amp;t=120" target="_blank" rel="noopener noreferrer">January 2025</a></p>
+<p><a href="https://www.youtube.com/live/6ovcWDCdqFU?si=-dgnvO7353tUyiDZ&amp;t=120" target="_blank" rel="noopener noreferrer">January 2025</a>.</p>
 </li>
 </ul>
 </li>
@@ -146,6 +133,6 @@ official Leios implementation repository</p>
 <p><a href="https://leios.cardano-scaling.org/cost-estimator/" target="_blank" rel="noopener noreferrer">Cost estimator</a> – the tool
 for estimating resource costs in Leios.</p>
 </li>
-</ul></div></article><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/glossary"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Glossary</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#technical-documentation">Technical documentation</a><ul><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-cps">Leios CPS</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-cip">Leios CIP</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-research-paper">Leios Research Paper</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#videos">Videos</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#presentations">Presentations</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#tools-and-simulations">Tools and simulations</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#development-resources">Development resources</a></li></ul></div></div></div></div></main></div></div></div><div><div class="preFooter_SOPz"></div><footer class="footer"><div class="container container-fluid"><div class="row footer__links"><div class="col footer__col"><div class="footer__title">Docs</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/docs/overview">What is Ouroboros Leios?</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/protocol-overview">Protocol overview</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/how-it-works">How it works</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/faq">FAQs</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/glossary">Glossary</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/resources">Resources</a></li><li class="footer__item"><a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer" class="footer__link-item">CPS<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Community</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://discord.gg/83aXYxy9" target="_blank" rel="noopener noreferrer" class="footer__link-item">Discord<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/discussions" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub Discussions<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Legal</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Terms &amp; Conditions</a></li><li class="footer__item"><a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Privacy Policy</a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/graphs/contributors" target="_blank" rel="noopener noreferrer" class="footer__link-item">Contributors</a></li></ul></div><div class="col footer__col"><div class="footer__title">More resources</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://iohk.io/en/research/library/" target="_blank" rel="noopener noreferrer" class="footer__link-item">IOHK research library</a></li><li class="footer__item"><a href="https://www.essentialcardano.io/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Essential Cardano</a></li><li class="footer__item"><a href="https://docs.cardano.org/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Cardano Docs</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 <strong>Input Output Global</strong> <br> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br> <small>Built with Docusaurus</small></div></div></div></footer></div></div>
+</ul></div></article><nav class="pagination-nav docusaurus-mt-lg" aria-label="Docs pages"><a class="pagination-nav__link pagination-nav__link--prev" href="/docs/glossary"><div class="pagination-nav__sublabel">Previous</div><div class="pagination-nav__label">Glossary</div></a></nav></div></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop"><ul class="table-of-contents table-of-contents__left-border"><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#technical-documentation">Technical documentation</a><ul><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-cps">Leios CPS</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-cip">Leios CIP</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#leios-research-paper">Leios research paper</a></li></ul></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#videos">Videos</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#presentations">Presentations</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#tools-and-simulations">Tools and simulations</a></li><li><a class="table-of-contents__link toc-highlight" href="/docs/resources#development-resources">Development resources</a></li></ul></div></div></div></div></main></div></div></div><div><div class="preFooter_SOPz"></div><footer class="footer"><div class="container container-fluid"><div class="row footer__links"><div class="col footer__col"><div class="footer__title">Docs</div><ul class="footer__items clean-list"><li class="footer__item"><a class="footer__link-item" href="/docs/overview">What is Ouroboros Leios?</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/protocol-overview">Protocol overview</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/how-it-works">How it works</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/faq">FAQs</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/glossary">Glossary</a></li><li class="footer__item"><a class="footer__link-item" href="/docs/resources">Resources</a></li><li class="footer__item"><a href="https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md" target="_blank" rel="noopener noreferrer" class="footer__link-item">CPS<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Community</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://discord.gg/83aXYxy9" target="_blank" rel="noopener noreferrer" class="footer__link-item">Discord<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/discussions" target="_blank" rel="noopener noreferrer" class="footer__link-item">GitHub Discussions<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a></li></ul></div><div class="col footer__col"><div class="footer__title">Legal</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Terms &amp; Conditions</a></li><li class="footer__item"><a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" rel="noopener noreferrer" class="footer__link-item">Privacy Policy</a></li><li class="footer__item"><a href="https://github.com/input-output-hk/ouroboros-leios/graphs/contributors" target="_blank" rel="noopener noreferrer" class="footer__link-item">Contributors</a></li></ul></div><div class="col footer__col"><div class="footer__title">More resources</div><ul class="footer__items clean-list"><li class="footer__item"><a href="https://iohk.io/en/research/library/" target="_blank" rel="noopener noreferrer" class="footer__link-item">IOHK research library</a></li><li class="footer__item"><a href="https://www.essentialcardano.io/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Essential Cardano</a></li><li class="footer__item"><a href="https://docs.cardano.org/" target="_blank" rel="noopener noreferrer" class="footer__link-item">Cardano Docs</a></li></ul></div></div><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2025 <strong>Input Output Global</strong> <br> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br> <small>Built with Docusaurus</small></div></div></div></footer></div></div>
 </body>
 </html>
