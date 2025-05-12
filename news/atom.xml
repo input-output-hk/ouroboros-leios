@@ -15,37 +15,37 @@
         <summary type="html"><![CDATA[This week, the team focused on simulation analysis, security improvements, and protocol documentation, making significant progress across multiple areas.]]></summary>
         <content type="html"><![CDATA[<p>This week, the team focused on simulation analysis, security improvements, and protocol documentation, making significant progress across multiple areas.</p>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-analysis-and-performance">Simulation analysis and performance<a class="hash-link" aria-label="Direct link to Simulation analysis and performance" title="Direct link to Simulation analysis and performance" href="https://leios.cardano-scaling.org/news/2025/05/05/weekly-progress-summary#simulation-analysis-and-performance">​</a></h3>
-<p>The team executed the first high-throughput simulations of Leios using the Rust simulator, with transaction rates reaching up to 1000 TPS. We introduced two key efficiency metrics to quantify system performance:</p>
+<p>The team executed the first high-throughput simulations of Leios using the Rust simulator, with transaction rates reaching up to 1,000 TPS. They introduced two key efficiency metrics to quantify system performance:</p>
 <ul>
-<li><em>Temporal efficiency</em> measures the fraction of submitted transactions that make it into the ledger, with near 100% indicating optimal transaction inclusion.</li>
-<li><em>Spatial efficiency</em> represents the ratio of transaction size to total ledger size (including IBs, EBs, and RBs), with higher values indicating better storage optimization.</li>
+<li><em>Temporal efficiency</em>, which measures the fraction of submitted transactions that make it into the ledger, with nearly 100% indicating optimal transaction inclusion</li>
+<li><em>Spatial efficiency</em>, which represents the ratio of transaction size to total ledger size (including IBs, EBs, and RBs), with higher values indicating better storage optimization.</li>
 </ul>
 <p>Recent revisions to Full Short Leios have shown promising improvements in both efficiency metrics. The simulations revealed an average transaction lifecycle of approximately 100 seconds from submission to ledger inclusion.</p>
-<p>Our analysis produced several key visualizations that demonstrate the system's performance:</p>
+<p>The analysis produced several key visualizations that demonstrate the system's performance:</p>
 <div align="center"><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/sims/2025w19/plots/temporal-efficiency-bar.svg" alt="Temporal efficiency bar chart" class="img_ev3q"></p><p><em>Figure 1: Temporal efficiency comparison across different transaction rates</em></p><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/1a7ccb588bf87284858c05a0670b938b5d35c417/analysis/sims/2025w19/plots/temporal-efficiency-timeseries.svg" alt="Temporal efficiency time series" class="img_ev3q"></p><p><em>Figure 2: Temporal efficiency trends over time</em></p><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/sims/2025w19/plots/spatial-efficiency.svg" alt="Spatial efficiency analysis" class="img_ev3q"></p><p><em>Figure 3: Spatial efficiency analysis showing ledger optimization</em></p><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/sims/2025w19/plots/reach-rb-tx.svg" alt="Transaction lifecycle visualization" class="img_ev3q"></p><p><em>Figure 4: Transaction lifecycle from submission to ledger inclusion</em></p></div>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-documentation-and-analysis">Protocol documentation and analysis<a class="hash-link" aria-label="Direct link to Protocol documentation and analysis" title="Direct link to Protocol documentation and analysis" href="https://leios.cardano-scaling.org/news/2025/05/05/weekly-progress-summary#protocol-documentation-and-analysis">​</a></h3>
-<p>We conducted extensive analysis of transaction throughput and block characteristics, producing several key visualizations:</p>
+<p>The team conducted an extensive analysis of transaction throughput and block characteristics, producing several key visualizations:</p>
 <div align="center"><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/block-praos-leios-contour.svg" alt="Transaction throughput analysis" class="img_ev3q"></p><p><em>Figure 5: Transaction throughput as a function of block size and rate</em></p><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/tx-to-block-fig.svg" alt="Comparative transaction lifecycle" class="img_ev3q"></p><p><em>Figure 6: Comparative transaction lifecycle between Praos and Leios</em></p></div>
 <p>The team also completed a comprehensive profitability analysis for Leios SPOs, considering various deployment scenarios:</p>
 <ul>
 <li>Evaluated infrastructure costs across premium and value cloud providers</li>
-<li>Demonstrated profitability without Reserve contributions at 50+ TPS</li>
-<li>Documented the impact of diminishing future rewards due to Reserve depletion</li>
-<li>Analyzed comparative economics between Praos and Leios SPOs</li>
+<li>Demonstrated profitability without reserve contributions at 50+ TPS</li>
+<li>Documented the impact of diminishing future rewards due to reserve depletion</li>
+<li>Analyzed comparative economics between Praos and Leios SPOs.</li>
 </ul>
-<div align="center"><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/leios-forecast-sqrt-fill.svg" alt="Profitability forecast visualization" class="img_ev3q"></p><p><em>Figure 7: Profitability forecast for Leios SPOs without Reserve contributions</em></p></div>
+<div align="center"><p><img decoding="async" loading="lazy" src="https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/leios-forecast-sqrt-fill.svg" alt="Profitability forecast visualization" class="img_ev3q"></p><p><em>Figure 7: Profitability forecast for Leios SPOs without reserve contributions</em></p></div>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="security-and-infrastructure-improvements">Security and infrastructure improvements<a class="hash-link" aria-label="Direct link to Security and infrastructure improvements" title="Direct link to Security and infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/05/05/weekly-progress-summary#security-and-infrastructure-improvements">​</a></h3>
-<p>The team addressed several security vulnerabilities in the web applications through a series of patches:</p>
+<p>The team addressed several security vulnerabilities in web applications through a series of patches:</p>
 <ul>
-<li>Fixed minor and moderate security issues in PRs <a href="https://github.com/input-output-hk/ouroboros-leios/pull/321" target="_blank" rel="noopener noreferrer">#321</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/pull/322" target="_blank" rel="noopener noreferrer">#322</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/pull/323" target="_blank" rel="noopener noreferrer">#323</a>, and <a href="https://github.com/input-output-hk/ouroboros-leios/pull/325" target="_blank" rel="noopener noreferrer">#325</a></li>
+<li>Fixed minor and moderate security issues in <a href="https://github.com/input-output-hk/ouroboros-leios/pull/321" target="_blank" rel="noopener noreferrer">#321</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/pull/322" target="_blank" rel="noopener noreferrer">#322</a>, <a href="https://github.com/input-output-hk/ouroboros-leios/pull/323" target="_blank" rel="noopener noreferrer">#323</a>, and <a href="https://github.com/input-output-hk/ouroboros-leios/pull/325" target="_blank" rel="noopener noreferrer">#325</a> pull requests.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="protocol-enhancements">Protocol enhancements<a class="hash-link" aria-label="Direct link to Protocol enhancements" title="Direct link to Protocol enhancements" href="https://leios.cardano-scaling.org/news/2025/05/05/weekly-progress-summary#protocol-enhancements">​</a></h3>
 <p>Recent protocol improvements include:</p>
 <ul>
 <li>Implementation of revisions to Full Short Leios design to enhance both temporal and spatial efficiency</li>
 <li>Optimization of protocol parameters for improved transaction processing</li>
-<li>Development of new sharding strategy in Rust simulation</li>
-<li>Enhanced logging system for tracking spatial efficiency metrics</li>
+<li>Development of a new sharding strategy in Rust simulation</li>
+<li>Enhanced logging system for tracking spatial efficiency metrics.</li>
 </ul>
 <p>For more detailed information about the simulations and analysis, please refer to the <a href="https://github.com/input-output-hk/ouroboros-leios/tree/main/analysis" target="_blank" rel="noopener noreferrer">analysis documentation</a> and the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/profitability-leios.ipynb" target="_blank" rel="noopener noreferrer">profitability analysis notebook</a>.</p>]]></content>
         <author>
