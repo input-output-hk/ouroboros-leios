@@ -2,8 +2,8 @@ name: "simulation-docs"
 
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
-  TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= thelio:KyHAYh2EtAT5skKWlArHRcLhiq3d13u0Pt9BwDJp7UY="
-  SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io http://thelio.functionally.dev:5000"
+  TRUSTED_PUBLIC_KEYS: "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+  SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
