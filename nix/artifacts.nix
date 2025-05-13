@@ -3,8 +3,6 @@
 with pkgs;
 let
 
-  project = repoRoot.nix.project;
-
   simRealism = pkgs.stdenv.mkDerivation {
     name = "sim-realism";
     src = ../simulation;
