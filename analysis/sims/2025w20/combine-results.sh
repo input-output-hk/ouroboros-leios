@@ -5,7 +5,7 @@ set -e
 
 mkdir -p results
 
-for f in lifecycle resources
+for f in lifecycle
 do
   echo "----- $f -----"
   DIR=$(find tps -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
