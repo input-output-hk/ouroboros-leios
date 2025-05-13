@@ -181,7 +181,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
         ; winning-slots     = fromList (L.catMaybes $ L.map winningSlot l)
         }
 
-    open import Leios.Short.Trace.Verifier params
+    open import Leios.Short.Trace.Verifier params renaming (verifyTrace to checkTrace)
 
     data Blk : Type where
       IB-Blk : InputBlock → Blk
@@ -284,14 +284,60 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
           (s'' , ys) = mapAccuml f s' xs
       in s'' , y ∷ ys
 
+    result : ∀ {E A : Type} → (f : A → String) → (g : E → String) → Result E A → String
+    result f g (Ok x) = f x
+    result f g (Err x) = g x
+
+    instance
+      Show-EndorserBlock : Show EndorserBlock
+      Show-EndorserBlock .show _ = "EndorserBlock"
+
+      Show-Action : Show Action
+      Show-Action .show (IB-Role-Action x)    = "IB-Role-Action"
+      Show-Action .show (EB-Role-Action x x₁) = "EB-Role-Action"
+      Show-Action .show (VT-Role-Action x)    = "VT-Role-Action"
+      Show-Action .show No-IB-Role-Action     = "No-IB-Role-Action"
+      Show-Action .show No-EB-Role-Action     = "No-EB-Role-Action"
+      Show-Action .show No-VT-Role-Action     = "No-VT-Role-Action"
+      Show-Action .show Ftch-Action           = "Ftch-Action"
+      Show-Action .show (Slot-Action x)       = "Slot-Action " S.++ show x
+      Show-Action .show Base₁-Action          = "Base₁-Action"
+      Show-Action .show (Base₂a-Action x)     = "Base₂a-Action " S.++ show x
+      Show-Action .show Base₂b-Action         = "Base₂b-Action"
+
+      Show-Update : Show FFDUpdate
+      Show-Update .show (IB-Recv-Update x) = "IB-Recv-Update"
+      Show-Update .show (EB-Recv-Update x) = "EB-Recv-Update"
+      Show-Update .show (VT-Recv-Update x) = "VT-Recv-Update"
+
     opaque
       unfolding List-Model
 
-      verifyTrace : ℕ
+      s₀ : LeiosState
+      s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
+
+      format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → String
+      format-Err-verifyAction {α} (E-Err _) = "Invalid Action: " S.++ show α
+
+      format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → String
+      format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update: " S.++ show μ
+
+      format-error : ∀ {αs s} → Err-verifyTrace αs s → String
+      format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "error step: " S.++ show α
+      format-error {inj₁ (α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
+      format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "error update: " S.++ show μ
+      format-error {inj₂ μ ∷ αs} {s} (Err-UpdateOk x)     = format-error x
+      format-error {inj₁ (α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
+      format-error {inj₁ (α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
+      format-error {inj₂ μ ∷ []} {s} (Err-Update x)       = format-Err-verifyUpdate x
+      format-error {inj₂ μ ∷ αs} {s} (Err-Update x)       = format-Err-verifyUpdate x
+
+      verifyTrace : String
       verifyTrace =
-        let s₀ = record { refs = [] ; ib-lottery = [] ; eb-lottery = []  ; vt-lottery = [] }
-            l' = proj₂ $ mapAccuml traceEvent→action s₀ l
+        let n₀ = record { refs = [] ; ib-lottery = [] ; eb-lottery = []  ; vt-lottery = [] }
+            l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
-        in if ¿ ValidTrace αs ¿ᵇ then L.length l else 0
+            tr = checkTrace αs s₀
+        in result (λ x → "ok") format-error tr
 
       {-# COMPILE GHC verifyTrace as verifyTrace #-}
