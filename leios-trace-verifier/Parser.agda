@@ -310,27 +310,27 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-Update .show (EB-Recv-Update x) = "EB-Recv-Update"
       Show-Update .show (VT-Recv-Update x) = "VT-Recv-Update"
 
+    s₀ : LeiosState
+    s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
+
+    format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → String
+    format-Err-verifyAction {α} (E-Err _) = "Invalid Action: " S.++ show α
+
+    format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → String
+    format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update: " S.++ show μ
+
+    format-error : ∀ {αs s} → Err-verifyTrace αs s → String
+    format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "error step: " S.++ show α
+    format-error {inj₁ (α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
+    format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "error update: " S.++ show μ
+    format-error {inj₂ μ ∷ αs} {s} (Err-UpdateOk x)     = format-error x
+    format-error {inj₁ (α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
+    format-error {inj₁ (α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
+    format-error {inj₂ μ ∷ []} {s} (Err-Update x)       = format-Err-verifyUpdate x
+    format-error {inj₂ μ ∷ αs} {s} (Err-Update x)       = format-Err-verifyUpdate x
+
     opaque
       unfolding List-Model
-
-      s₀ : LeiosState
-      s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
-
-      format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → String
-      format-Err-verifyAction {α} (E-Err _) = "Invalid Action: " S.++ show α
-
-      format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → String
-      format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update: " S.++ show μ
-
-      format-error : ∀ {αs s} → Err-verifyTrace αs s → String
-      format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "error step: " S.++ show α
-      format-error {inj₁ (α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
-      format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "error update: " S.++ show μ
-      format-error {inj₂ μ ∷ αs} {s} (Err-UpdateOk x)     = format-error x
-      format-error {inj₁ (α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
-      format-error {inj₁ (α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
-      format-error {inj₂ μ ∷ []} {s} (Err-Update x)       = format-Err-verifyUpdate x
-      format-error {inj₂ μ ∷ αs} {s} (Err-Update x)       = format-Err-verifyUpdate x
 
       verifyTrace : String
       verifyTrace =
@@ -338,6 +338,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s₀
-        in result (λ x → "ok") format-error tr
+        in result (λ x → "ok, checked " S.++ show (L.length αs) S.++ " actions") format-error tr
 
       {-# COMPILE GHC verifyTrace as verifyTrace #-}
