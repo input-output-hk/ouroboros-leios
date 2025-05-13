@@ -24,7 +24,7 @@ in
     pkgs.nodePackages_latest.prettier
     pkgs.gnuplot
     pkgs.texliveFull
-    pkgs.python3Packages.pygments
+    pkgs.python312Packages.pygments
   ];
 
   # Agda environment variables.
