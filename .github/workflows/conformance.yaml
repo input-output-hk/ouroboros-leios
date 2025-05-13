@@ -34,3 +34,18 @@ jobs:
     - name: 🏗️ Build trace verifier
       run: |
         nix build --show-trace .#leios-trace-verifier
+    - name: 🏗️ Check example trace
+      run: |
+        nix run .#ols -- \
+          sim leios \
+          --leios-config-file data/simulation/config.default.yaml \
+          --topology-file data/simulation/topo-default-100.yaml \
+          --conformance-events \
+          --shared-log-format JSON \
+          --output-seconds 30 \
+          --output-file sim.log
+        nix run .#leios-trace-verifier -- \
+          --config-file data/simulation/config.default.yaml \
+          --topology-file data/simulation/topo-default-100.yaml \
+          --trace-file sim.log \
+          --idSut 0
