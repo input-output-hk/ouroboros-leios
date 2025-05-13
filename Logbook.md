@@ -2,6 +2,10 @@
 
 ## 2025-05-13
 
+### Nix derivations and CI for trace verifier
+
+The [Leios trace verifier](leios-trace-verifier/) has been added to the Nix infrastructure and the CI builds. Currently, the CI runs a short simulation and then checks its trace.
+
 ### Partial documentation of Haskell simulations
 
 Two partially-drafted technical reports related to the Haskell simulations have been added to the Nix and CI builds:
