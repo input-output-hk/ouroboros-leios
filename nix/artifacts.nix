@@ -27,7 +27,7 @@ let
     name = "network-spec";
     src = ../simulation/docs/network-spec;
     buildInputs = [
-      pkgs.texliveFull
+      pkgs.texliveBasic
     ];
     installPhase = ''
       mkdir $out
