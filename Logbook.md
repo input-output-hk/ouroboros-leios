@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2025-05-13
+
+### Partial documentation of Haskell simulations
+
+Two partially-drafted technical reports related to the Haskell simulations have been added to the Nix and CI builds:
+
+- [Ouroboros Leios Network Specification](simulation/docs/network-spec/ReadMe.md)
+- [Ouroboros Leios simulation: building confidence in the performance results](simulation/docs/ReadMe.md)
+
 ## 2025-05-09
 
 ### Lifecycle and resource analysis of Rust simulations
