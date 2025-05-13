@@ -3,22 +3,39 @@
 with pkgs;
 let
 
+  project = repoRoot.nix.project;
+
   simRealism = pkgs.stdenv.mkDerivation {
     name = "sim-realism";
-    src = ../simulation/docs;
+    src = ../simulation;
     buildInputs = [
       pkgs.texliveFull
       pkgs.gnuplot
       pkgs.python3Packages.pygments
-      pkgs.cabal-install
     ];
+    buildPhase = ''
+      cd docs
+      make
+    '';
     installPhase = ''
       mkdir $out
       cp sim-realism.pdf $out/
     '';
   };
 
+  networkSpec = pkgs.stdenv.mkDerivation {
+    name = "network-spec";
+    src = ../simulation/docs/network-spec;
+    buildInputs = [
+      pkgs.texliveFull
+    ];
+    installPhase = ''
+      mkdir $out
+      cp network-spec.pdf $out/
+    '';
+  };
+
 in
 {
-  inherit networkSpec;
+  inherit simRealism networkSpec;
 }
