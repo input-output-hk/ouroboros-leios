@@ -8,11 +8,11 @@ mkdir -p results
 for f in lifecycle resources
 do
   echo "----- $f -----"
-  DIR=$(find tps -type f -name $f.csv.gz -printf %h\\n -quit)
+  DIR=$(find tps -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n -quit)
   HL=$(sed -n -e '1p' "$DIR/case.csv")
   HR=$(zcat "$DIR/$f.csv.gz" | sed -n -e '1p')
   echo "$HL,$HR" > results/$f.csv
-  for g in $(find tps -type f -name $f.csv.gz -printf %h\\n)
+  for g in $(find tps -type f -name $f.csv.gz \( -not -empty \) -printf %h\\n)
   do
     if [ ! -e "$g/stderr" ]
     then
