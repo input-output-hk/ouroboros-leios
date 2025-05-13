@@ -28,7 +28,7 @@ common globalOptions
     ghc-options:
         -Wno-overlapping-patterns
 
-executable parser
+executable leios-trace-verifier
     import: globalOptions
     main-is: app/Main.hs
     build-depends:

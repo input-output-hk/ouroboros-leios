@@ -22,7 +22,7 @@ endef
 HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/trace-parser.hs
 
 all: $(HS_LEIOS)
-	cabal build parser
+	cabal build leios-trace-verifier
 
 $(HS_LEIOS): trace-parser.agda
 	$(call agdaToHs,trace-parser)
