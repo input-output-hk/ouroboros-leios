@@ -120,6 +120,23 @@ jobs:
     steps:
     - name: 📥 Checkout repository
       uses: actions/checkout@v4
+    - name: 🛠️ Install system dependencies (Linux)
+      run: sudo apt-get install -y texlive-full gnuplot python3-pygments
+    - name: 🏗️ network-spec.pdf
+      run: |
+        cd simulation/docs/network-spec/
+        make
+    - name: 🏗️ sim-realism.pdf
+      run: |
+        cd simulation/docs/
+        make
+  sim-docs-via-nix:
+    if: false
+    name: Build documents
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
     - name: 🛠️ Install Nix
       uses: cachix/install-nix-action@v21
       with:
