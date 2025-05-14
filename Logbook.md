@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-05-14
+
+### Removed deterministic conformance testing
+
+The non-deterministic, trace-based conformance testing in [leios-trace-verifier/](leios-trace-verifier/) has replaced the deterministic approach based on an executable specification. The folder [conformance-testing/](https://github.com/input-output-hk/ouroboros-leios/tree/47d9128219af214cec8dae17ee4fb461a8a52a87/conformance-testing) has been deleted after being archived via permalink.
+
 ## 2025-05-13
 
 ### Nix derivations and CI for trace verifier
