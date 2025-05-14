@@ -8,7 +8,7 @@
   --sidebar-width: 280px;
   --content-width: calc(100vw - var(--sidebar-width) - 4rem);
   --search-width: 300px;
-  --hover-color: #f6f8fa;
+  --hover-color: rgba(0, 0, 0, 0.05);
   --highlight-color: #ffeb3b;
   --muted-color: #6a737d;
   --header-height: 60px;
@@ -23,7 +23,7 @@
   --code-bg: #161b22;
   --link-color: #58a6ff;
   --header-bg: transparent;
-  --hover-color: #161b22;
+  --hover-color: rgba(255, 255, 255, 0.05);
   --highlight-color: #ffeb3b;
   --muted-color: #8b949e;
 }
@@ -64,8 +64,13 @@ body {
 
 .agda-container {
   display: flex;
-  margin-top: var(--header-height);
-  min-height: calc(100vh - var(--header-height));
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-color);
+  overflow: hidden;
 }
 
 .agda-sidebar {
@@ -78,6 +83,7 @@ body {
   overflow-y: auto;
   padding: 1.5rem;
   border-right: none;
+  z-index: 10;
 }
 
 .agda-sidebar h3 {
@@ -133,7 +139,11 @@ body {
   margin-left: var(--sidebar-width);
   padding: 2rem;
   width: var(--content-width);
+  height: 100%;
+  overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
+  box-sizing: border-box;
 }
 
 /* Add padding to Agda content to prevent overlap */
@@ -142,6 +152,18 @@ body {
   width: 100%;
   overflow-x: visible;
   max-width: none;
+  padding-bottom: 4rem; /* Add some padding at the bottom */
+}
+
+/* Add styles for highlighted line */
+.highlight-line {
+  background-color: var(--highlight-color);
+  transition: background-color 0.3s ease;
+}
+
+/* Add styles for line anchors */
+[id^="L"] {
+  scroll-margin-top: calc(var(--header-height) + 2rem);
 }
 
 /* Agda Syntax Highlighting */

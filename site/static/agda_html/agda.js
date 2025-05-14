@@ -60,17 +60,7 @@ if (searchInput && searchResults) {
       const lineNumber = result.dataset.line;
       const targetElement = document.querySelector('#L' + lineNumber);
       if (targetElement) {
-        // Calculate the offset to account for the header height and add some padding
-        const headerHeight = 60; // matches --header-height in CSS
-        const offset = headerHeight + 40; // add 20px padding
-        const elementPosition = targetElement.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - offset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-
+        targetElement.scrollIntoView({ behavior: 'smooth' });
         targetElement.classList.add('highlight-line');
         setTimeout(() => targetElement.classList.remove('highlight-line'), 2000);
       }
