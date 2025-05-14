@@ -134,7 +134,7 @@ body {
   width: var(--content-width);
   min-width: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   position: relative;
   box-sizing: border-box;
 }
@@ -146,6 +146,7 @@ body {
   overflow-x: visible;
   max-width: none;
   padding-bottom: 4rem; /* Add some padding at the bottom */
+  white-space: pre; /* Preserve whitespace and line breaks */
 }
 
 /* Add styles for highlighted line */
@@ -174,6 +175,9 @@ body {
   background-color: var(--code-bg);
   padding: 0.2em 0.4em;
   border-radius: 3px;
+  white-space: pre; /* Preserve whitespace and line breaks */
+  overflow-x: auto; /* Allow horizontal scrolling */
+  display: inline-block; /* Ensure proper overflow behavior */
 }
 
 .Agda a {

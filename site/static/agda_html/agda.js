@@ -25,7 +25,7 @@ if (searchInput && searchResults) {
       // Ensure the path is properly encoded
       const encodedPath = encodeURIComponent(result.path);
       
-      return '<a href="/agda_html/' + encodedPath + '#L' + result.lineNumber + '" class="search-result" data-line="' + result.lineNumber + '">' +
+      return '<a href="/agda_html/' + encodedPath + '#L' + result.lineNumber + '" class="search-result" data-line="' + result.lineNumber + '" data-term="' + result.term + '">' +
              '<span class="result-match">' + highlightedContent + '</span>' +
              '<span class="result-file">' + result.moduleName + '</span>' +
              '</a>';
@@ -57,17 +57,89 @@ if (searchInput && searchResults) {
   document.addEventListener('click', (e) => {
     const result = e.target.closest('.search-result');
     if (result) {
+      e.preventDefault(); // Prevent default link behavior
       const lineNumber = result.dataset.line;
-      const targetElement = document.querySelector('#L' + lineNumber);
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth' });
-        targetElement.classList.add('highlight-line');
-        setTimeout(() => targetElement.classList.remove('highlight-line'), 2000);
+      const searchTerm = result.dataset.term;
+      const href = result.getAttribute('href');
+      
+      // If we're already on the target page
+      if (window.location.pathname.endsWith(href.split('#')[0])) {
+        scrollToLine(lineNumber, searchTerm);
+      } else {
+        // If we're not on the target page, navigate to it
+        // Store the line number and search term in sessionStorage
+        sessionStorage.setItem('scrollToLine', lineNumber);
+        sessionStorage.setItem('searchTerm', searchTerm);
+        window.location.href = href;
       }
+      
       searchOverlay.classList.remove('active');
       searchInput.value = ''; // Clear the search input
       searchResults.innerHTML = ''; // Clear the results
     }
+  });
+
+  // Function to scroll to a specific line and highlight terms
+  function scrollToLine(lineNumber, searchTerm) {
+    // Wait for the next frame to ensure content is rendered
+    requestAnimationFrame(() => {
+      const targetElement = document.querySelector('#L' + lineNumber);
+      if (targetElement) {
+        // Add a small delay to ensure content is fully rendered
+        setTimeout(() => {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetElement.classList.add('highlight-line');
+          setTimeout(() => targetElement.classList.remove('highlight-line'), 2000);
+          
+          // Highlight all matching terms on the page
+          const content = document.querySelector('.agda-content');
+          if (content && searchTerm) {
+            const regex = new RegExp(searchTerm, 'gi');
+            const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null, false);
+            const nodesToHighlight = [];
+            
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              if (node.textContent.match(regex)) {
+                nodesToHighlight.push(node);
+              }
+            }
+            
+            nodesToHighlight.forEach(node => {
+              const span = document.createElement('span');
+              span.className = 'search-term-highlight';
+              span.innerHTML = node.textContent.replace(regex, match => '<mark>' + match + '</mark>');
+              node.parentNode.replaceChild(span, node);
+            });
+            
+            // Remove highlights after 5 seconds
+            setTimeout(() => {
+              const highlights = document.querySelectorAll('.search-term-highlight');
+              highlights.forEach(highlight => {
+                const text = highlight.textContent;
+                const textNode = document.createTextNode(text);
+                highlight.parentNode.replaceChild(textNode, highlight);
+              });
+            }, 5000);
+          }
+        }, 100); // Small delay to ensure content is rendered
+      }
+    });
+  }
+
+  // Check for stored line number and search term on page load
+  window.addEventListener('load', () => {
+    // Wait for a short time to ensure all content is loaded and rendered
+    setTimeout(() => {
+      const storedLine = sessionStorage.getItem('scrollToLine');
+      const storedTerm = sessionStorage.getItem('searchTerm');
+      if (storedLine) {
+        scrollToLine(storedLine, storedTerm);
+        // Clear the stored values
+        sessionStorage.removeItem('scrollToLine');
+        sessionStorage.removeItem('searchTerm');
+      }
+    }, 100);
   });
 
   // Close search when clicking outside or pressing Escape
