@@ -4,6 +4,7 @@
 
 module Main where
 
+import Control.Monad (when)
 import Data.ByteString.Lazy as BSL
 import Data.Map
 import Data.Yaml
@@ -12,6 +13,7 @@ import LeiosEvents
 import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..), Topology (..))
 import Lib
 import Options.Applicative
+import System.Exit (exitFailure)
 
 main :: IO ()
 main =
@@ -24,14 +26,13 @@ main =
     let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
     let stakeDistribution = Prelude.zip nodeNames stakes
     let stageLength = toInteger (leiosStageLengthSlots config)
-    BSL.readFile logFile
-      >>= print
-        . verifyTrace
-          nrNodes
-          idSut
-          stakeDistribution
-          stageLength
+    result <-
+      verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
+        <$> BSL.readFile logFile
+    print result
+    when (result == 0)
+      exitFailure
 
 data Command = Command
   { logFile :: FilePath
