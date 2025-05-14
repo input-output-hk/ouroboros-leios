@@ -21,7 +21,19 @@ nix build .#leiosDocs --impure
 
 echo "Copying Agda HTML files..."
 mkdir -p "$SITE_DIR/static/agda_html"
+
+# Backup our custom CSS if it exists
+if [ -f "$SITE_DIR/static/agda_html/agda.css" ]; then
+    cp "$SITE_DIR/static/agda_html/agda.css" "$SITE_DIR/static/agda_html/agda.css.bak"
+fi
+
+# Copy all files except Agda.css
 cp -r result/html/* "$SITE_DIR/static/agda_html/"
+
+# Restore our custom CSS
+if [ -f "$SITE_DIR/static/agda_html/agda.css.bak" ]; then
+    mv "$SITE_DIR/static/agda_html/agda.css.bak" "$SITE_DIR/static/agda_html/agda.css"
+fi
 
 echo "Processing Agda HTML files..."
 cd "$SITE_DIR"
