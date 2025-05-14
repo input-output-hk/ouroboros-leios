@@ -1,0 +1,47 @@
+nodes:
+  node-0:
+    cpu-core-count: null
+    location:
+    - 0.12000040231003672
+    - 0.1631004621065356
+    producers:
+      node-1:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 141.01364015418432
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 254.62497828351891
+    stake: 500
+  node-1:
+    cpu-core-count: null
+    location:
+    - 0.34276660615051174
+    - 0.2636899791034371
+    producers:
+      node-2:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 175.32530255486684
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 379.1167948193313
+    stake: 200
+  node-2:
+    cpu-core-count: null
+    location:
+    - 0.5150493264153491
+    - 0.27873594531347595
+    producers:
+      node-3:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 248.31457793649423
+    stake: 100
+  node-3:
+    cpu-core-count: null
+    location:
+    - 0.3503537969220088
+    - 0.13879558055660354
+    producers:
+      node-0:
+        bandwidth-bytes-per-second: 1024000
+        latency-ms: 140.19739576271447
+    stake: 0
