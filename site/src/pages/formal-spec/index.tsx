@@ -46,7 +46,7 @@ export default function FormalSpecPage(): React.ReactElement {
             protocol's properties and guarantees.
           </p>
           
-          <h2>Available Modules</h2>
+          <h2>Modules</h2>
           <div className={styles.fileGrid}>
             {AGDA_MODULES.map(module => (
               <a
@@ -61,22 +61,6 @@ export default function FormalSpecPage(): React.ReactElement {
               </a>
             ))}
           </div>
-
-          <h2>Getting Started</h2>
-          <p>
-            The formal specification is organized into modules, each focusing on different
-            aspects of the protocol. Start with these key modules:
-          </p>
-          <ul>
-            {AGDA_MODULES.slice(0, 3).map(module => (
-              <li key={module.name}>
-                <a href={`/agda_html/${module.path}`} target="_blank" rel="noopener noreferrer">
-                  <strong>{module.name}</strong>
-                </a>
-                {' - '}{module.description}
-              </li>
-            ))}
-          </ul>
         </div>
       </main>
     </Layout>
