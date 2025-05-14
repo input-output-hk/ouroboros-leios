@@ -39,6 +39,7 @@ body {
   color: var(--text-color);
   font-family: var(--font-sans);
   line-height: 1.6;
+  padding-top: var(--header-height); /* Added to offset fixed header */
 }
 
 .agda-header {
@@ -64,26 +65,19 @@ body {
 
 .agda-container {
   display: flex;
-  position: fixed;
-  top: var(--header-height);
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex-direction: row;
   background-color: var(--bg-color);
-  overflow: hidden;
+  min-height: calc(100vh - var(--header-height));
+  position: relative;
+  top: 0;
 }
 
 .agda-sidebar {
-  position: fixed;
-  top: var(--header-height);
-  left: 0;
-  bottom: 0;
   width: var(--sidebar-width);
   background-color: var(--bg-color);
   overflow-y: auto;
   padding: 1.5rem;
   border-right: none;
-  z-index: 10;
 }
 
 .agda-sidebar h3 {
@@ -136,10 +130,9 @@ body {
 
 .agda-content {
   flex: 1;
-  margin-left: var(--sidebar-width);
   padding: 2rem;
   width: var(--content-width);
-  height: 100%;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
@@ -614,4 +607,31 @@ body {
 /* Remove the search-type class as we're simplifying the results */
 .search-type {
   display: none;
+}
+
+/* Search term highlighting */
+.search-term-highlight mark {
+  background-color: var(--highlight-color);
+  color: var(--text-color);
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+  font-weight: 500;
+  animation: fadeHighlight 5s ease-out;
+}
+
+@keyframes fadeHighlight {
+  0% {
+    background-color: var(--highlight-color);
+  }
+  80% {
+    background-color: var(--highlight-color);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+[data-theme="dark"] .search-term-highlight mark {
+  background-color: var(--highlight-color);
+  color: var(--text-color);
 }
