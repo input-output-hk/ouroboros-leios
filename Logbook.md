@@ -1,5 +1,16 @@
 # Leios logbook
 
+## 2025-05-15
+
+### Manually curated test cases for Leios trace verifier
+
+We manually created test cases for checking the Leios trace verifier. These are indented to scrutinize the correct operation of `leios-trace-verifier`. Over time, this database of scenarios will be expanded.
+
+- [Valid traces](/leios-trace-verifier/examples/valid/)
+- [Invalid traces](leios-trace-verifier/examples/invalid/)
+
+These have been integrated into a new test suite, `test-trace-verifier`, and the CI.
+
 ## 2025-05-14
 
 ### Removed deterministic conformance testing
