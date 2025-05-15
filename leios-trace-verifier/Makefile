@@ -24,5 +24,8 @@ HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/trace-parser.hs
 all: $(HS_LEIOS)
 	cabal build leios-trace-verifier
 
+clean:
+	rm -rf _build dist dist-newstyle
+
 $(HS_LEIOS): trace-parser.agda
 	$(call agdaToHs,trace-parser)
