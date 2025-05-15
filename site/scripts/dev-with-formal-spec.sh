@@ -28,7 +28,7 @@ if [ -f "$SITE_DIR/static/agda_html/agda.css" ]; then
 fi
 
 # Copy all files except Agda.css
-cp -r result/html/* "$SITE_DIR/static/agda_html/"
+cp -r result/share/doc/agda/html/* "$SITE_DIR/static/agda_html/"
 
 # Restore our custom CSS
 if [ -f "$SITE_DIR/static/agda_html/agda.css.bak" ]; then
