@@ -1,6 +1,7 @@
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
 import { themes as prismThemes } from "prism-react-renderer";
+import path from 'path';
 
 const config: Config = {
     title: "Ouroboros Leios",
@@ -35,6 +36,13 @@ const config: Config = {
             defer: true,
             "data-domain": "leios.cardano-scaling.org",
         },
+    ],
+
+    // Configure static file serving
+    staticDirectories: ['static', 'public'],
+
+    // Configure plugins
+    plugins: [
     ],
 
     presets: [
@@ -86,6 +94,11 @@ const config: Config = {
                     sidebarId: "developmentSidebar",
                     position: "left",
                     label: "Development",
+                },
+                {
+                    to: "/formal-spec/",
+                    label: "Formal Specification",
+                    position: "left",
                 },
                 { to: "/news", label: "Weekly updates", position: "right" },
                 {
@@ -141,6 +154,10 @@ const config: Config = {
                         {
                             label: "How it works",
                             to: "/docs/how-it-works",
+                        },
+                        {
+                            label: "Formal Specification",
+                            to: "/formal-spec/",
                         },
                         {
                             label: "FAQs",
