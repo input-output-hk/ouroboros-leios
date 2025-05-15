@@ -33,7 +33,7 @@ main =
       verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
         <$> BSL.readFile logFile
-    hPutStrLn stderr $ "Succeeded for " <> show (fst result) <> " messages"
+    hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
     unless (snd result == "ok")
       $ do
         putStrLn . T.unpack $ snd result
