@@ -14,6 +14,7 @@ import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..)
 import Lib
 import Options.Applicative
 import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
 
 import qualified Data.Text as T (unpack)
 
@@ -32,7 +33,7 @@ main =
       verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
         <$> BSL.readFile logFile
-    putStrLn $ "Succeeded for " <> show (fst result) <> " messages"
+    hPutStrLn stderr $ "Succeeded for " <> show (fst result) <> " messages"
     unless (snd result == "ok")
       $ do
         putStrLn . T.unpack $ snd result
