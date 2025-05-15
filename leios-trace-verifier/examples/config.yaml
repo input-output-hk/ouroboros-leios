@@ -23,7 +23,7 @@ cleanup-policies: ["cleanup-expired-vote"]
 ################################################################################
 
 leios-variant: short
-leios-stage-length-slots: 10
+leios-stage-length-slots: 2
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
 leios-late-ib-inclusion: false
