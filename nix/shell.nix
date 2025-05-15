@@ -22,6 +22,9 @@ in
     agda.agdaWithDeps
     emacsWithPackages
     pkgs.nodePackages_latest.prettier
+    pkgs.gnuplot
+    pkgs.texliveFull
+    pkgs.python3Packages.pygments
   ];
 
   # Agda environment variables.

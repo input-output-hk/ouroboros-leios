@@ -1,5 +1,24 @@
 # Leios logbook
 
+## 2025-05-14
+
+### Removed deterministic conformance testing
+
+The non-deterministic, trace-based conformance testing in [leios-trace-verifier/](leios-trace-verifier/) has replaced the deterministic approach based on an executable specification. The folder [conformance-testing/](https://github.com/input-output-hk/ouroboros-leios/tree/47d9128219af214cec8dae17ee4fb461a8a52a87/conformance-testing) has been deleted after being archived via permalink.
+
+## 2025-05-13
+
+### Nix derivations and CI for trace verifier
+
+The [Leios trace verifier](leios-trace-verifier/) has been added to the Nix infrastructure and the CI builds. Currently, the CI runs a short simulation and then checks its trace.
+
+### Partial documentation of Haskell simulations
+
+Two partially-drafted technical reports related to the Haskell simulations have been added to the Nix and CI builds:
+
+- [Ouroboros Leios Network Specification](simulation/docs/network-spec/ReadMe.md)
+- [Ouroboros Leios simulation: building confidence in the performance results](simulation/docs/ReadMe.md)
+
 ## 2025-05-09
 
 ### Lifecycle and resource analysis of Rust simulations

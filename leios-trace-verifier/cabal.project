@@ -1,0 +1,3 @@
+packages:
+  dist/haskell
+  ../leios-trace-hs
