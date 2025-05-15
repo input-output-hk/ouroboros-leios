@@ -17,6 +17,15 @@ maintainer:         yves.hauser@iohk.io
 -- copyright:
 -- category:
 
+data-dir:
+  data
+
+data-files:
+  data/config.yaml
+  data/topology.yaml
+  data/valid/*.jsonl
+  data/invalid/*.jsonl
+
 common globalOptions
     default-language: Haskell2010
     build-depends:
@@ -43,6 +52,24 @@ executable leios-trace-verifier
 
     default-language: Haskell2010
     ghc-options:      -Wall
+
+test-suite test-trace-verifier
+  type:                exitcode-stdio-1.0
+  main-is:          Spec.hs
+  other-modules:    Paths_trace_parser
+  hs-source-dirs:     test
+  build-depends:
+      base
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , hspec
+    , leios-trace-hs
+    , text
+    , trace-parser
+    , yaml
+  default-language:    Haskell2010
 
 library
     import: globalOptions

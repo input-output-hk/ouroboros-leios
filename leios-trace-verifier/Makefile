@@ -14,6 +14,8 @@ define agdaToHs
     mkdir -p $(HS_DIST)
     cp -r hs-src/* $(HS_DIR)/
     cp hs-src/$(CABAL_FILE) $(HS_DIR)/
+    mkdir -p $(HS_DIR)/data
+    cp -r examples/{config.yaml,topology.yaml,valid,invalid} $(HS_DIR)/data/
     $(AGDA_RUN) -c --ghc-dont-call-ghc --compile-dir $(HS_DIST) $<
     find $(HS_DIST)/MAlonzo -name "*.hs" -print\
       | sed "s#^$(HS_DIST)/#        #;s#\.hs##;s#/#.#g"\
@@ -22,7 +24,7 @@ endef
 HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/trace-parser.hs
 
 all: $(HS_LEIOS)
-	cabal build leios-trace-verifier
+	cabal build all
 
 clean:
 	rm -rf _build dist dist-newstyle
