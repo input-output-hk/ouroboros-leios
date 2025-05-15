@@ -41,7 +41,10 @@ jobs:
     - name: 🏗️ Build trace verifier
       run: |
         nix build --show-trace .#leios-trace-verifier
-    - name: 🏗️ Check example trace
+    - name: 🧪 Test trace verifier
+      run: |
+        nix run --show-trace .#test-trace-verifier
+    - name: 🔬 Check example trace
       run: |
         nix run .#ols -- \
           sim leios \

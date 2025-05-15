@@ -4,7 +4,7 @@
 
 module Main where
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.ByteString.Lazy as BSL
 import Data.Map
 import Data.Yaml
@@ -14,12 +14,15 @@ import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..)
 import Lib
 import Options.Applicative
 import System.Exit (exitFailure)
+import System.IO (hPutStrLn, stderr)
+
+import qualified Data.Text as T (unpack)
 
 main :: IO ()
 main =
   do
     Command{..} <- execParser commandParser
-    (top :: Topology CLUSTER) <- decodeFileThrow topologyFile
+    (top :: Topology COORD2D) <- decodeFileThrow topologyFile
     (config :: Config) <- decodeFileThrow configFile
     let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
     let nodeNames = Prelude.map unNodeName (keys $ nodes top)
@@ -30,9 +33,11 @@ main =
       verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
         <$> BSL.readFile logFile
-    print (snd result)
-    when (fst result == 0)
-      exitFailure
+    hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
+    unless (snd result == "ok")
+      $ do
+        putStrLn . T.unpack $ snd result
+        exitFailure
 
 data Command = Command
   { logFile :: FilePath
