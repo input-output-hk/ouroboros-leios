@@ -36,8 +36,9 @@ executable leios-trace-verifier
       , bytestring
       , containers
       , leios-trace-hs
-      , trace-parser
       , optparse-applicative
+      , text
+      , trace-parser
       , yaml
 
     default-language: Haskell2010
@@ -52,8 +53,8 @@ library
       , base
       , bytestring
       , containers
-      , text
       , ieee
       , leios-trace-hs
+      , text
 -- This will be generated automatically when building with nix
     other-modules:

@@ -4,7 +4,7 @@
 
 module Main where
 
-import Control.Monad (when)
+import Control.Monad (unless)
 import Data.ByteString.Lazy as BSL
 import Data.Map
 import Data.Yaml
@@ -14,6 +14,8 @@ import LeiosTopology (LocationKind (..), Node (..), NodeInfo (..), NodeName (..)
 import Lib
 import Options.Applicative
 import System.Exit (exitFailure)
+
+import qualified Data.Text as T (unpack)
 
 main :: IO ()
 main =
@@ -30,9 +32,11 @@ main =
       verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
         <$> BSL.readFile logFile
-    print (snd result)
-    when (fst result == 0)
-      exitFailure
+    putStrLn $ "Succeeded for " <> show (fst result) <> " messages"
+    unless (snd result == "ok")
+      $ do
+        putStrLn . T.unpack $ snd result
+        exitFailure
 
 data Command = Command
   { logFile :: FilePath
