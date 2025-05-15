@@ -19,12 +19,11 @@ maintainer:         yves.hauser@iohk.io
 
 data-dir:
   data
-
 data-files:
-  data/config.yaml
-  data/topology.yaml
-  data/valid/*.jsonl
-  data/invalid/*.jsonl
+  config.yaml
+  topology.yaml
+  valid/*.jsonl
+  invalid/*.jsonl
 
 common globalOptions
     default-language: Haskell2010
