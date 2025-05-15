@@ -30,8 +30,8 @@ main =
       verifyTrace nrNodes idSut stakeDistribution stageLength
         . decodeJSONL
         <$> BSL.readFile logFile
-    print result
-    when (result == 0)
+    print (snd result)
+    when (fst result == 0)
       exitFailure
 
 data Command = Command
