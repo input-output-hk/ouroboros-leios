@@ -140,7 +140,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
   winningSlot record { message = Cpu _ _ _ _ }                  = nothing
   winningSlot record { message = NoIBGenerated _ _ }            = nothing
   winningSlot record { message = NoEBGenerated _ _ }            = nothing
-  winningSlot record { message = NoVTBundleGenerated p _ }      = nothing
+  winningSlot record { message = NoVTBundleGenerated _ _ }      = nothing
   winningSlot record { message = IBSent _ _ _ _ _ _ }           = nothing
   winningSlot record { message = EBSent _ _ _ _ _ _ }           = nothing
   winningSlot record { message = VTBundleSent _ _ _ _ _ _ }     = nothing
@@ -157,11 +157,11 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     with p ≟ SUT
   ... | yes _ = just (IB , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = EBGenerated p _ s _ _ ibs }
+  winningSlot record { message = EBGenerated p _ s _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (EB , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = VTBundleGenerated p i s _ _ vts }
+  winningSlot record { message = VTBundleGenerated p _ s _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (VT , primWord64ToNat s)
   ... | no _  = nothing
@@ -210,20 +210,20 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     traceEvent→action : State → TraceEvent → State × List ((Action × LeiosInput) ⊎ FFDUpdate)
     traceEvent→action l record { message = Slot p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (Base₂b-Action , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
+    ... | yes _ = l , (inj₁ (Base₂b-Action (primWord64ToNat s) , SLOT)) ∷ (inj₁ (Slot-Action (primWord64ToNat s) , SLOT)) ∷ []
     ... | no _  = l , []
     traceEvent→action l record { message = Cpu _ _ _ _ } = l , []
-    traceEvent→action l record { message = NoIBGenerated p _ }
+    traceEvent→action l record { message = NoIBGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-IB-Role-Action , SLOT) ∷ [])
+    ... | yes _ = l , (inj₁ (No-IB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
     ... | no _  = l , []
-    traceEvent→action l record { message = NoEBGenerated p _ }
+    traceEvent→action l record { message = NoEBGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-EB-Role-Action , SLOT) ∷ [])
+    ... | yes _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
     ... | no _  = l , []
-    traceEvent→action l record { message = NoVTBundleGenerated p _ }
+    traceEvent→action l record { message = NoVTBundleGenerated p s }
       with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-VT-Role-Action , SLOT) ∷ [])
+    ... | yes _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
     ... | no _  = l , []
     traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
@@ -293,28 +293,28 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-EndorserBlock .show _ = "EndorserBlock"
 
       Show-Action : Show Action
-      Show-Action .show (IB-Role-Action x)    = "IB-Role-Action"
-      Show-Action .show (EB-Role-Action x x₁) = "EB-Role-Action"
-      Show-Action .show (VT-Role-Action x)    = "VT-Role-Action"
-      Show-Action .show No-IB-Role-Action     = "No-IB-Role-Action"
-      Show-Action .show No-EB-Role-Action     = "No-EB-Role-Action"
-      Show-Action .show No-VT-Role-Action     = "No-VT-Role-Action"
-      Show-Action .show Ftch-Action           = "Ftch-Action"
+      Show-Action .show (IB-Role-Action x)    = "IB-Role-Action " S.++ show x
+      Show-Action .show (EB-Role-Action x _)  = "EB-Role-Action " S.++ show x
+      Show-Action .show (VT-Role-Action x)    = "VT-Role-Action " S.++ show x
+      Show-Action .show (No-IB-Role-Action x) = "No-IB-Role-Action " S.++ show x
+      Show-Action .show (No-EB-Role-Action x) = "No-EB-Role-Action " S.++ show x
+      Show-Action .show (No-VT-Role-Action x) = "No-VT-Role-Action " S.++ show x
+      Show-Action .show (Ftch-Action x)       = "Ftch-Action " S.++ show x
       Show-Action .show (Slot-Action x)       = "Slot-Action " S.++ show x
-      Show-Action .show Base₁-Action          = "Base₁-Action"
-      Show-Action .show (Base₂a-Action x)     = "Base₂a-Action " S.++ show x
-      Show-Action .show Base₂b-Action         = "Base₂b-Action"
+      Show-Action .show (Base₁-Action x)      = "Base₁-Action " S.++ show x
+      Show-Action .show (Base₂a-Action x _)   = "Base₂a-Action " S.++ show x
+      Show-Action .show (Base₂b-Action x)     = "Base₂b-Action " S.++ show x
 
       Show-Update : Show FFDUpdate
-      Show-Update .show (IB-Recv-Update x) = "IB-Recv-Update"
-      Show-Update .show (EB-Recv-Update x) = "EB-Recv-Update"
-      Show-Update .show (VT-Recv-Update x) = "VT-Recv-Update"
+      Show-Update .show (IB-Recv-Update _) = "IB-Recv-Update"
+      Show-Update .show (EB-Recv-Update _) = "EB-Recv-Update"
+      Show-Update .show (VT-Recv-Update _) = "VT-Recv-Update"
 
     s₀ : LeiosState
     s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
 
     format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → String
-    format-Err-verifyAction {α} (E-Err _) = "Invalid Action: " S.++ show α
+    format-Err-verifyAction {α} (E-Err e) = "Invalid Action: Slot " S.++ show α
 
     format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → String
     format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update: " S.++ show μ
