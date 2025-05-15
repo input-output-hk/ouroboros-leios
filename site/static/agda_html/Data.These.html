@@ -1,0 +1,131 @@
+<!DOCTYPE HTML>
+<html><head><meta charset="utf-8"><title>Data.These</title><link rel="stylesheet" href="Agda.css">
+             <link rel="stylesheet" href="agda.css">
+             <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet"></head><body>
+             <div class="agda-header">
+               <div class="agda-header-left">
+                 <a href="/formal-spec/">Back</a>
+                 <button class="search-button" onclick="toggleSearch()">
+                   <svg viewBox="0 0 24 24" width="24" height="24">
+                     <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                   </svg>
+                   Search...
+                 </button>
+               </div>
+               <div class="agda-header-right">
+                 <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" class="github-link" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+                   <svg viewBox="0 0 24 24" width="24" height="24">
+                     <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                   </svg>
+                 </a>
+                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                   <span class="light-icon">
+                     <svg viewBox="0 0 24 24" width="24" height="24">
+                       <path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+                     </svg>
+                   </span>
+                   <span class="dark-icon">
+                     <svg viewBox="0 0 24 24" width="24" height="24">
+                       <path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+                     </svg>
+                   </span>
+                 </button>
+               </div>
+             </div>
+             <div class="search-overlay">
+               <div class="search-modal">
+                 <div class="search-container">
+                   <input type="text" class="search-input" placeholder="Search modules..." />
+                   <div class="search-results"></div>
+                 </div>
+               </div>
+             </div>
+             <div class="agda-container">
+               <nav class="agda-sidebar">
+                 <h3>Modules</h3>
+                 
+                     <h4>Leios</h4>
+                     <ul>
+                       <li><a href="/agda_html/Leios.Abstract.html" >Abstract</a></li>
+<li><a href="/agda_html/Leios.Base.html" >Base</a></li>
+<li><a href="/agda_html/Leios.Blocks.html" >Blocks</a></li>
+<li><a href="/agda_html/Leios.Config.html" >Config</a></li>
+<li><a href="/agda_html/Leios.Defaults.html" >Defaults</a></li>
+<li><a href="/agda_html/Leios.FFD.html" >FFD</a></li>
+<li><a href="/agda_html/Leios.Foreign.BaseTypes.html" >Foreign.BaseTypes</a></li>
+<li><a href="/agda_html/Leios.Foreign.HsTypes.html" >Foreign.HsTypes</a></li>
+<li><a href="/agda_html/Leios.Foreign.Types.html" >Foreign.Types</a></li>
+<li><a href="/agda_html/Leios.Foreign.Util.html" >Foreign.Util</a></li>
+<li><a href="/agda_html/Leios.KeyRegistration.html" >KeyRegistration</a></li>
+<li><a href="/agda_html/Leios.Network.html" >Network</a></li>
+<li><a href="/agda_html/Leios.Prelude.html" >Prelude</a></li>
+<li><a href="/agda_html/Leios.Protocol.html" >Protocol</a></li>
+<li><a href="/agda_html/Leios.Short.html" >Short</a></li>
+<li><a href="/agda_html/Leios.Short.Decidable.html" >Short.Decidable</a></li>
+<li><a href="/agda_html/Leios.Short.Trace.Verifier.html" >Short.Trace.Verifier</a></li>
+<li><a href="/agda_html/Leios.Short.Trace.Verifier.Test.html" >Short.Trace.Verifier.Test</a></li>
+<li><a href="/agda_html/Leios.Simplified.html" >Simplified</a></li>
+<li><a href="/agda_html/Leios.Simplified.Deterministic.html" >Simplified.Deterministic</a></li>
+<li><a href="/agda_html/Leios.SpecStructure.html" >SpecStructure</a></li>
+<li><a href="/agda_html/Leios.Traces.html" >Traces</a></li>
+<li><a href="/agda_html/Leios.Voting.html" >Voting</a></li>
+<li><a href="/agda_html/Leios.VRF.html" >VRF</a></li>
+                     </ul>
+                   
+               </nav>
+               <main class="agda-content">
+             <script src="agda.js"></script><pre class="Agda"><div class="line"><a id="1" class="Comment">------------------------------------------------------------------------</a></div>
+<div class="line"><a id="74" class="Comment">-- The Agda standard library</a></div>
+<div class="line"><a id="103" class="Comment">--</a></div>
+<div class="line"><a id="106" class="Comment">-- An either-or-both data type</a></div>
+<div class="line"><a id="137" class="Comment">------------------------------------------------------------------------</a></div>
+<div class="line"></div>
+<div class="line"><a id="211" class="Symbol">{-#</a> <a id="215" class="Keyword">OPTIONS</a> <a id="223" class="Pragma">--cubical-compatible</a> <a id="244" class="Pragma">--safe</a> <a id="251" class="Symbol">#-}</a></div>
+<div class="line"></div>
+<div class="line"><a id="256" class="Keyword">module</a> <a id="263" href="/agda_html/Data.These.html" class="Module">Data.These</a> <a id="274" class="Keyword">where</a></div>
+<div class="line"></div>
+<div class="line"><a id="281" class="Keyword">open</a> <a id="286" class="Keyword">import</a> <a id="293" href="/agda_html/Level.html" class="Module">Level</a></div>
+<div class="line"><a id="299" class="Keyword">open</a> <a id="304" class="Keyword">import</a> <a id="311" href="/agda_html/Data.Maybe.Base.html" class="Module">Data.Maybe.Base</a> <a id="327" class="Keyword">using</a> <a id="333" class="Symbol">(</a><a id="334" href="/agda_html/Agda.Builtin.Maybe.html#135" class="Datatype">Maybe</a><a id="339" class="Symbol">;</a> <a id="341" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a><a id="345" class="Symbol">;</a> <a id="347" href="/agda_html/Agda.Builtin.Maybe.html#194" class="InductiveConstructor">nothing</a><a id="354" class="Symbol">;</a> <a id="356" href="/agda_html/Data.Maybe.Base.html#1468" class="Function">maybe′</a><a id="362" class="Symbol">)</a></div>
+<div class="line"><a id="364" class="Keyword">open</a> <a id="369" class="Keyword">import</a> <a id="376" href="/agda_html/Data.Sum.Base.html" class="Module">Data.Sum.Base</a> <a id="390" class="Keyword">using</a> <a id="396" class="Symbol">(</a><a id="397" href="/agda_html/Data.Sum.Base.html#625" class="Datatype Operator">_⊎_</a><a id="400" class="Symbol">;</a> <a id="402" href="/agda_html/Data.Sum.Base.html#980" class="Function Operator">[_,_]′</a><a id="408" class="Symbol">)</a></div>
+<div class="line"><a id="410" class="Keyword">open</a> <a id="415" class="Keyword">import</a> <a id="422" href="/agda_html/Function.Base.html" class="Module">Function.Base</a> <a id="436" class="Keyword">using</a> <a id="442" class="Symbol">(</a><a id="443" href="/agda_html/Function.Base.html#725" class="Function">const</a><a id="448" class="Symbol">;</a> <a id="450" href="/agda_html/Function.Base.html#3626" class="Function Operator">_∘′_</a><a id="454" class="Symbol">;</a> <a id="456" href="/agda_html/Function.Base.html#704" class="Function">id</a><a id="458" class="Symbol">;</a> <a id="460" href="/agda_html/Function.Base.html#762" class="Function">constᵣ</a><a id="466" class="Symbol">)</a></div>
+<div class="line"></div>
+<div class="line"></div>
+<div class="line"><a id="470" class="Comment">------------------------------------------------------------------------</a></div>
+<div class="line"><a id="543" class="Comment">-- Re-exporting the datatype and its operations</a></div>
+<div class="line"></div>
+<div class="line"><a id="592" class="Keyword">open</a> <a id="597" class="Keyword">import</a> <a id="604" href="/agda_html/Data.These.Base.html" class="Module">Data.These.Base</a> <a id="620" class="Keyword">public</a></div>
+<div class="line"></div>
+<div class="line"><a id="628" class="Keyword">private</a></div>
+<div class="line">  <a id="638" class="Keyword">variable</a></div>
+<div class="line">    <a id="651" href="/agda_html/Data.These.html#651" class="Generalizable">a</a> <a id="653" href="/agda_html/Data.These.html#653" class="Generalizable">b</a> <a id="655" class="Symbol">:</a> <a id="657" href="/agda_html/Agda.Primitive.html#742" class="Postulate">Level</a></div>
+<div class="line">    <a id="667" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="669" class="Symbol">:</a> <a id="671" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Set</a> <a id="675" href="/agda_html/Data.These.html#651" class="Generalizable">a</a></div>
+<div class="line">    <a id="681" href="/agda_html/Data.These.html#681" class="Generalizable">B</a> <a id="683" class="Symbol">:</a> <a id="685" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Set</a> <a id="689" href="/agda_html/Data.These.html#653" class="Generalizable">b</a></div>
+<div class="line"></div>
+<div class="line"><a id="692" class="Comment">------------------------------------------------------------------------</a></div>
+<div class="line"><a id="765" class="Comment">-- Additional operations</a></div>
+<div class="line"></div>
+<div class="line"><a id="791" class="Comment">-- projections</a></div>
+<div class="line"></div>
+<div class="line"><a id="fromThis"></a><a id="807" href="/agda_html/Data.These.html#807" class="Function">fromThis</a> <a id="816" class="Symbol">:</a> <a id="818" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="824" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="826" href="/agda_html/Data.These.html#681" class="Generalizable">B</a> <a id="828" class="Symbol">→</a> <a id="830" href="/agda_html/Agda.Builtin.Maybe.html#135" class="Datatype">Maybe</a> <a id="836" href="/agda_html/Data.These.html#667" class="Generalizable">A</a></div>
+<div class="line"><a id="838" href="/agda_html/Data.These.html#807" class="Function">fromThis</a> <a id="847" class="Symbol">=</a> <a id="849" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="854" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="859" class="Symbol">(</a><a id="860" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="866" href="/agda_html/Agda.Builtin.Maybe.html#194" class="InductiveConstructor">nothing</a><a id="873" class="Symbol">)</a> <a id="875" class="Symbol">(</a><a id="876" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="882" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="885" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a><a id="889" class="Symbol">)</a></div>
+<div class="line"></div>
+<div class="line"><a id="fromThat"></a><a id="892" href="/agda_html/Data.These.html#892" class="Function">fromThat</a> <a id="901" class="Symbol">:</a> <a id="903" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="909" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="911" href="/agda_html/Data.These.html#681" class="Generalizable">B</a> <a id="913" class="Symbol">→</a> <a id="915" href="/agda_html/Agda.Builtin.Maybe.html#135" class="Datatype">Maybe</a> <a id="921" href="/agda_html/Data.These.html#681" class="Generalizable">B</a></div>
+<div class="line"><a id="923" href="/agda_html/Data.These.html#892" class="Function">fromThat</a> <a id="932" class="Symbol">=</a> <a id="934" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="939" class="Symbol">(</a><a id="940" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="946" href="/agda_html/Agda.Builtin.Maybe.html#194" class="InductiveConstructor">nothing</a><a id="953" class="Symbol">)</a> <a id="955" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="960" class="Symbol">(</a><a id="961" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="967" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a><a id="971" class="Symbol">)</a></div>
+<div class="line"></div>
+<div class="line"><a id="leftMost"></a><a id="974" href="/agda_html/Data.These.html#974" class="Function">leftMost</a> <a id="983" class="Symbol">:</a> <a id="985" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="991" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="993" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="995" class="Symbol">→</a> <a id="997" href="/agda_html/Data.These.html#667" class="Generalizable">A</a></div>
+<div class="line"><a id="999" href="/agda_html/Data.These.html#974" class="Function">leftMost</a> <a id="1008" class="Symbol">=</a> <a id="1010" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="1015" href="/agda_html/Function.Base.html#704" class="Function">id</a> <a id="1018" href="/agda_html/Function.Base.html#704" class="Function">id</a> <a id="1021" href="/agda_html/Function.Base.html#725" class="Function">const</a></div>
+<div class="line"></div>
+<div class="line"><a id="rightMost"></a><a id="1028" href="/agda_html/Data.These.html#1028" class="Function">rightMost</a> <a id="1038" class="Symbol">:</a> <a id="1040" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1046" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1048" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1050" class="Symbol">→</a> <a id="1052" href="/agda_html/Data.These.html#667" class="Generalizable">A</a></div>
+<div class="line"><a id="1054" href="/agda_html/Data.These.html#1028" class="Function">rightMost</a> <a id="1064" class="Symbol">=</a> <a id="1066" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="1071" href="/agda_html/Function.Base.html#704" class="Function">id</a> <a id="1074" href="/agda_html/Function.Base.html#704" class="Function">id</a> <a id="1077" href="/agda_html/Function.Base.html#762" class="Function">constᵣ</a></div>
+<div class="line"></div>
+<div class="line"><a id="mergeThese"></a><a id="1085" href="/agda_html/Data.These.html#1085" class="Function">mergeThese</a> <a id="1096" class="Symbol">:</a> <a id="1098" class="Symbol">(</a><a id="1099" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1101" class="Symbol">→</a> <a id="1103" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1105" class="Symbol">→</a> <a id="1107" href="/agda_html/Data.These.html#667" class="Generalizable">A</a><a id="1108" class="Symbol">)</a> <a id="1110" class="Symbol">→</a> <a id="1112" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1118" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1120" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1122" class="Symbol">→</a> <a id="1124" href="/agda_html/Data.These.html#667" class="Generalizable">A</a></div>
+<div class="line"><a id="1126" href="/agda_html/Data.These.html#1085" class="Function">mergeThese</a> <a id="1137" class="Symbol">=</a> <a id="1139" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="1144" href="/agda_html/Function.Base.html#704" class="Function">id</a> <a id="1147" href="/agda_html/Function.Base.html#704" class="Function">id</a></div>
+<div class="line"></div>
+<div class="line"><a id="1151" class="Comment">-- deletions</a></div>
+<div class="line"></div>
+<div class="line"><a id="deleteThis"></a><a id="1165" href="/agda_html/Data.These.html#1165" class="Function">deleteThis</a> <a id="1176" class="Symbol">:</a> <a id="1178" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1184" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1186" href="/agda_html/Data.These.html#681" class="Generalizable">B</a> <a id="1188" class="Symbol">→</a> <a id="1190" href="/agda_html/Agda.Builtin.Maybe.html#135" class="Datatype">Maybe</a> <a id="1196" class="Symbol">(</a><a id="1197" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1203" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1205" href="/agda_html/Data.These.html#681" class="Generalizable">B</a><a id="1206" class="Symbol">)</a></div>
+<div class="line"><a id="1208" href="/agda_html/Data.These.html#1165" class="Function">deleteThis</a> <a id="1219" class="Symbol">=</a> <a id="1221" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="1226" class="Symbol">(</a><a id="1227" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="1233" href="/agda_html/Agda.Builtin.Maybe.html#194" class="InductiveConstructor">nothing</a><a id="1240" class="Symbol">)</a> <a id="1242" class="Symbol">(</a><a id="1243" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="1248" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="1251" href="/agda_html/Data.These.Base.html#623" class="InductiveConstructor">that</a><a id="1255" class="Symbol">)</a> <a id="1257" class="Symbol">(</a><a id="1258" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="1264" class="Symbol">(</a><a id="1265" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="1270" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="1273" href="/agda_html/Data.These.Base.html#623" class="InductiveConstructor">that</a><a id="1277" class="Symbol">))</a></div>
+<div class="line"></div>
+<div class="line"><a id="deleteThat"></a><a id="1281" href="/agda_html/Data.These.html#1281" class="Function">deleteThat</a> <a id="1292" class="Symbol">:</a> <a id="1294" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1300" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1302" href="/agda_html/Data.These.html#681" class="Generalizable">B</a> <a id="1304" class="Symbol">→</a> <a id="1306" href="/agda_html/Agda.Builtin.Maybe.html#135" class="Datatype">Maybe</a> <a id="1312" class="Symbol">(</a><a id="1313" href="/agda_html/Data.These.Base.html#537" class="Datatype">These</a> <a id="1319" href="/agda_html/Data.These.html#667" class="Generalizable">A</a> <a id="1321" href="/agda_html/Data.These.html#681" class="Generalizable">B</a><a id="1322" class="Symbol">)</a></div>
+<div class="line"><a id="1324" href="/agda_html/Data.These.html#1281" class="Function">deleteThat</a> <a id="1335" class="Symbol">=</a> <a id="1337" href="/agda_html/Data.These.Base.html#1134" class="Function">fold</a> <a id="1342" class="Symbol">(</a><a id="1343" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="1348" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="1351" href="/agda_html/Data.These.Base.html#595" class="InductiveConstructor">this</a><a id="1355" class="Symbol">)</a> <a id="1357" class="Symbol">(</a><a id="1358" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="1364" href="/agda_html/Agda.Builtin.Maybe.html#194" class="InductiveConstructor">nothing</a><a id="1371" class="Symbol">)</a> <a id="1373" class="Symbol">(</a><a id="1374" href="/agda_html/Function.Base.html#725" class="Function">const</a> <a id="1380" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="1383" href="/agda_html/Agda.Builtin.Maybe.html#173" class="InductiveConstructor">just</a> <a id="1388" href="/agda_html/Function.Base.html#3626" class="Function Operator">∘′</a> <a id="1391" href="/agda_html/Data.These.Base.html#595" class="InductiveConstructor">this</a><a id="1395" class="Symbol">)</a></div>
+<div class="line"></div></pre></main></div></body></html>

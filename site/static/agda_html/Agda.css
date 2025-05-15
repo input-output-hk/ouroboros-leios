@@ -9,7 +9,7 @@
   --content-width: calc(100vw - var(--sidebar-width) - 4rem);
   --search-width: 300px;
   --hover-color: rgba(0, 0, 0, 0.05);
-  --highlight-color: #ffeb3b;
+  --highlight-color: rgba(255, 235, 59, 0.2);
   --muted-color: #6a737d;
   --header-height: 60px;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -24,7 +24,7 @@
   --link-color: #58a6ff;
   --header-bg: transparent;
   --hover-color: rgba(255, 255, 255, 0.05);
-  --highlight-color: #ffeb3b;
+  --highlight-color: rgba(255, 235, 59, 0.15);
   --muted-color: #8b949e;
 }
 
@@ -39,14 +39,11 @@ body {
   color: var(--text-color);
   font-family: var(--font-sans);
   line-height: 1.6;
-  padding-top: var(--header-height); /* Added to offset fixed header */
 }
 
 .agda-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex: 1;
   height: var(--header-height);
   background-color: var(--bg-color);
   display: flex;
@@ -65,11 +62,10 @@ body {
 
 .agda-container {
   display: flex;
-  flex-direction: row;
+  flex: 1;
   background-color: var(--bg-color);
-  min-height: calc(100vh - var(--header-height));
+  min-height: 0; /* Important for proper flex behavior */
   position: relative;
-  top: 0;
 }
 
 .agda-sidebar {
@@ -78,6 +74,7 @@ body {
   overflow-y: auto;
   padding: 1.5rem;
   border-right: none;
+  flex-shrink: 0;
 }
 
 .agda-sidebar h3 {
@@ -131,7 +128,6 @@ body {
 .agda-content {
   flex: 1;
   padding: 2rem;
-  width: var(--content-width);
   min-width: 0;
   overflow-y: auto;
   overflow-x: auto;
@@ -145,8 +141,9 @@ body {
   width: 100%;
   overflow-x: visible;
   max-width: none;
-  padding-bottom: 4rem; /* Add some padding at the bottom */
-  white-space: pre; /* Preserve whitespace and line breaks */
+  padding-bottom: 4rem;
+  white-space: pre;
+  margin: 0;
 }
 
 /* Add styles for highlighted line */
@@ -164,9 +161,39 @@ body {
 .Agda {
   font-family: var(--font-mono);
   font-size: 0.95rem;
-  line-height: 1.6;
+  line-height: 1;
   background-color: var(--bg-color);
   color: var(--text-color);
+  counter-reset: line;
+  position: relative;
+}
+
+.Agda .line {
+  position: relative;
+  display: block;
+  padding-left: 5em;
+  min-height: 1em;
+}
+
+.Agda .line::before {
+  counter-increment: line;
+  content: counter(line);
+  position: absolute;
+  left: 0;
+  width: 3em;
+  text-align: right;
+  color: var(--muted-color);
+  padding-right: 1em;
+  user-select: none;
+}
+
+.Agda .line.highlight-line {
+  background-color: var(--highlight-color);
+}
+
+.Agda .line.highlight-line::before {
+  color: var(--text-color);
+  font-weight: bold;
 }
 
 .Agda code {

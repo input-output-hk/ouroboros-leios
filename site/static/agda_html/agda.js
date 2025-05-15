@@ -81,50 +81,54 @@ if (searchInput && searchResults) {
 
   // Function to scroll to a specific line and highlight terms
   function scrollToLine(lineNumber, searchTerm) {
-    // Wait for the next frame to ensure content is rendered
-    requestAnimationFrame(() => {
-      const targetElement = document.querySelector('#L' + lineNumber);
-      if (targetElement) {
-        // Add a small delay to ensure content is fully rendered
-        setTimeout(() => {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          targetElement.classList.add('highlight-line');
-          setTimeout(() => targetElement.classList.remove('highlight-line'), 2000);
-          
-          // Highlight all matching terms on the page
-          const content = document.querySelector('.agda-content');
-          if (content && searchTerm) {
-            const regex = new RegExp(searchTerm, 'gi');
-            const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null, false);
-            const nodesToHighlight = [];
-            
-            while (walker.nextNode()) {
-              const node = walker.currentNode;
-              if (node.textContent.match(regex)) {
-                nodesToHighlight.push(node);
-              }
+    const targetElement = document.querySelector('.Agda .line:nth-child(' + (lineNumber - 1) + ')');
+    if (targetElement) {
+        // Remove any existing highlights
+        document.querySelectorAll('.line.highlight-line').forEach(line => {
+            line.classList.remove('highlight-line');
+        });
+
+        // Add highlight to target line
+        targetElement.classList.add('highlight-line');
+        
+        // Scroll to the line
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Highlight matching terms
+        if (searchTerm) {
+            const content = document.querySelector('.agda-content');
+            if (content) {
+                const regex = new RegExp(searchTerm, 'gi');
+                const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null, false);
+                const nodesToHighlight = [];
+                
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    if (node.textContent.match(regex)) {
+                        nodesToHighlight.push(node);
+                    }
+                }
+                
+                nodesToHighlight.forEach(node => {
+                    const span = document.createElement('span');
+                    span.className = 'search-term-highlight';
+                    span.innerHTML = node.textContent.replace(regex, match => '<mark>' + match + '</mark>');
+                    node.parentNode.replaceChild(span, node);
+                });
+                
+                // Remove highlights after 5 seconds
+                setTimeout(() => {
+                    const highlights = document.querySelectorAll('.search-term-highlight');
+                    highlights.forEach(highlight => {
+                        const text = highlight.textContent;
+                        const textNode = document.createTextNode(text);
+                        highlight.parentNode.replaceChild(textNode, highlight);
+                    });
+                    targetElement.classList.remove('highlight-line');
+                }, 5000);
             }
-            
-            nodesToHighlight.forEach(node => {
-              const span = document.createElement('span');
-              span.className = 'search-term-highlight';
-              span.innerHTML = node.textContent.replace(regex, match => '<mark>' + match + '</mark>');
-              node.parentNode.replaceChild(span, node);
-            });
-            
-            // Remove highlights after 5 seconds
-            setTimeout(() => {
-              const highlights = document.querySelectorAll('.search-term-highlight');
-              highlights.forEach(highlight => {
-                const text = highlight.textContent;
-                const textNode = document.createTextNode(text);
-                highlight.parentNode.replaceChild(textNode, highlight);
-              });
-            }, 5000);
-          }
-        }, 100); // Small delay to ensure content is rendered
-      }
-    });
+        }
+    }
   }
 
   // Check for stored line number and search term on page load
@@ -140,6 +144,17 @@ if (searchInput && searchResults) {
         sessionStorage.removeItem('searchTerm');
       }
     }, 100);
+  });
+
+  // Check for line number in URL hash on page load
+  window.addEventListener('load', () => {
+    const hash = window.location.hash;
+    if (hash.startsWith('#L')) {
+        const lineNumber = parseInt(hash.substring(2));
+        if (!isNaN(lineNumber)) {
+            scrollToLine(lineNumber);
+        }
+    }
   });
 
   // Close search when clicking outside or pressing Escape

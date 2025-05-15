@@ -1,0 +1,130 @@
+<!DOCTYPE HTML>
+<html><head><meta charset="utf-8"><title>Class.IsSet</title><link rel="stylesheet" href="Agda.css">
+             <link rel="stylesheet" href="agda.css">
+             <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet"></head><body>
+             <div class="agda-header">
+               <div class="agda-header-left">
+                 <a href="/formal-spec/">Back</a>
+                 <button class="search-button" onclick="toggleSearch()">
+                   <svg viewBox="0 0 24 24" width="24" height="24">
+                     <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                   </svg>
+                   Search...
+                 </button>
+               </div>
+               <div class="agda-header-right">
+                 <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" class="github-link" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+                   <svg viewBox="0 0 24 24" width="24" height="24">
+                     <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                   </svg>
+                 </a>
+                 <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                   <span class="light-icon">
+                     <svg viewBox="0 0 24 24" width="24" height="24">
+                       <path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+                     </svg>
+                   </span>
+                   <span class="dark-icon">
+                     <svg viewBox="0 0 24 24" width="24" height="24">
+                       <path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+                     </svg>
+                   </span>
+                 </button>
+               </div>
+             </div>
+             <div class="search-overlay">
+               <div class="search-modal">
+                 <div class="search-container">
+                   <input type="text" class="search-input" placeholder="Search modules..." />
+                   <div class="search-results"></div>
+                 </div>
+               </div>
+             </div>
+             <div class="agda-container">
+               <nav class="agda-sidebar">
+                 <h3>Modules</h3>
+                 
+                     <h4>Leios</h4>
+                     <ul>
+                       <li><a href="/agda_html/Leios.Abstract.html" >Abstract</a></li>
+<li><a href="/agda_html/Leios.Base.html" >Base</a></li>
+<li><a href="/agda_html/Leios.Blocks.html" >Blocks</a></li>
+<li><a href="/agda_html/Leios.Config.html" >Config</a></li>
+<li><a href="/agda_html/Leios.Defaults.html" >Defaults</a></li>
+<li><a href="/agda_html/Leios.FFD.html" >FFD</a></li>
+<li><a href="/agda_html/Leios.Foreign.BaseTypes.html" >Foreign.BaseTypes</a></li>
+<li><a href="/agda_html/Leios.Foreign.HsTypes.html" >Foreign.HsTypes</a></li>
+<li><a href="/agda_html/Leios.Foreign.Types.html" >Foreign.Types</a></li>
+<li><a href="/agda_html/Leios.Foreign.Util.html" >Foreign.Util</a></li>
+<li><a href="/agda_html/Leios.KeyRegistration.html" >KeyRegistration</a></li>
+<li><a href="/agda_html/Leios.Network.html" >Network</a></li>
+<li><a href="/agda_html/Leios.Prelude.html" >Prelude</a></li>
+<li><a href="/agda_html/Leios.Protocol.html" >Protocol</a></li>
+<li><a href="/agda_html/Leios.Short.html" >Short</a></li>
+<li><a href="/agda_html/Leios.Short.Decidable.html" >Short.Decidable</a></li>
+<li><a href="/agda_html/Leios.Short.Trace.Verifier.html" >Short.Trace.Verifier</a></li>
+<li><a href="/agda_html/Leios.Short.Trace.Verifier.Test.html" >Short.Trace.Verifier.Test</a></li>
+<li><a href="/agda_html/Leios.Simplified.html" >Simplified</a></li>
+<li><a href="/agda_html/Leios.Simplified.Deterministic.html" >Simplified.Deterministic</a></li>
+<li><a href="/agda_html/Leios.SpecStructure.html" >SpecStructure</a></li>
+<li><a href="/agda_html/Leios.Traces.html" >Traces</a></li>
+<li><a href="/agda_html/Leios.Voting.html" >Voting</a></li>
+<li><a href="/agda_html/Leios.VRF.html" >VRF</a></li>
+                     </ul>
+                   
+               </nav>
+               <main class="agda-content">
+             <script src="agda.js"></script><pre class="Agda"><div class="line"><a id="1" class="Symbol">{-#</a> <a id="5" class="Keyword">OPTIONS</a> <a id="13" class="Pragma">--safe</a> <a id="20" class="Pragma">--no-import-sorts</a> <a id="38" class="Symbol">#-}</a></div>
+<div class="line"></div>
+<div class="line"><a id="43" class="Keyword">open</a> <a id="48" class="Keyword">import</a> <a id="55" href="/agda_html/Axiom.Set.html" class="Module">Axiom.Set</a></div>
+<div class="line"></div>
+<div class="line"><a id="66" class="Keyword">module</a> <a id="73" href="/agda_html/Class.IsSet.html" class="Module">Class.IsSet</a> <a id="85" class="Symbol">(</a><a id="86" href="/agda_html/Class.IsSet.html#86" class="Bound">th</a> <a id="89" class="Symbol">:</a> <a id="91" href="/agda_html/Axiom.Set.html#1616" class="Record">Theory</a><a id="97" class="Symbol">)</a> <a id="99" class="Keyword">where</a></div>
+<div class="line"></div>
+<div class="line"><a id="106" class="Keyword">open</a> <a id="111" href="/agda_html/Axiom.Set.html#1616" class="Module">Theory</a> <a id="118" href="/agda_html/Class.IsSet.html#86" class="Bound">th</a> <a id="121" class="Keyword">renaming</a> <a id="130" class="Symbol">(</a><a id="131" href="/agda_html/Axiom.Set.html#1730" class="Field Operator">_∈_</a> <a id="135" class="Symbol">to</a> <a id="138" class="Field Operator">_∈ᵗ_</a><a id="142" class="Symbol">;</a> <a id="144" href="/agda_html/Axiom.Set.html#2711" class="Function Operator">_∉_</a> <a id="148" class="Symbol">to</a> <a id="151" class="Function Operator">_∉ᵗ_</a><a id="155" class="Symbol">)</a></div>
+<div class="line"></div>
+<div class="line"><a id="158" class="Keyword">import</a> <a id="165" href="/agda_html/Axiom.Set.Rel.html" class="Module">Axiom.Set.Rel</a> <a id="179" href="/agda_html/Class.IsSet.html#86" class="Bound">th</a> <a id="182" class="Symbol">as</a> <a id="Rel"></a><a id="185" href="/agda_html/Class.IsSet.html#185" class="Module">Rel</a></div>
+<div class="line"><a id="189" class="Keyword">open</a> <a id="194" class="Keyword">import</a> <a id="201" href="/agda_html/Axiom.Set.Map.html" class="Module">Axiom.Set.Map</a> <a id="215" href="/agda_html/Class.IsSet.html#86" class="Bound">th</a> <a id="218" class="Symbol">as</a> <a id="Map"></a><a id="221" href="/agda_html/Class.IsSet.html#221" class="Module">Map</a></div>
+<div class="line"><a id="225" class="Keyword">open</a> <a id="230" class="Keyword">import</a> <a id="237" href="/agda_html/Axiom.Set.TotalMap.html" class="Module">Axiom.Set.TotalMap</a> <a id="256" href="/agda_html/Class.IsSet.html#86" class="Bound">th</a> <a id="259" class="Symbol">as</a> <a id="TotalMap"></a><a id="262" href="/agda_html/Class.IsSet.html#262" class="Module">TotalMap</a></div>
+<div class="line"><a id="271" class="Keyword">open</a> <a id="276" class="Keyword">import</a> <a id="283" href="/agda_html/Data.Product.html" class="Module">Data.Product</a></div>
+<div class="line"><a id="296" class="Keyword">open</a> <a id="301" class="Keyword">import</a> <a id="308" href="/agda_html/abstract-set-theory.Prelude.html" class="Module">abstract-set-theory.Prelude</a></div>
+<div class="line"></div>
+<div class="line"><a id="337" class="Keyword">private</a> <a id="345" class="Keyword">variable</a> <a id="354" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="356" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a> <a id="358" href="/agda_html/Class.IsSet.html#358" class="Generalizable">X</a> <a id="360" class="Symbol">:</a> <a id="362" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a></div>
+<div class="line"></div>
+<div class="line"><a id="368" class="Keyword">record</a> <a id="IsSet"></a><a id="375" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="381" class="Symbol">(</a><a id="382" href="/agda_html/Class.IsSet.html#382" class="Bound">A</a> <a id="384" href="/agda_html/Class.IsSet.html#384" class="Bound">B</a> <a id="386" class="Symbol">:</a> <a id="388" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a><a id="392" class="Symbol">)</a> <a id="394" class="Symbol">:</a> <a id="396" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a> <a id="401" class="Keyword">where</a></div>
+<div class="line">  <a id="409" class="Keyword">field</a></div>
+<div class="line">    <a id="IsSet.toSet"></a><a id="419" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="425" class="Symbol">:</a> <a id="427" href="/agda_html/Class.IsSet.html#382" class="Bound">A</a> <a id="429" class="Symbol">→</a> <a id="431" href="/agda_html/Axiom.Set.html#1700" class="Field">Set</a> <a id="435" href="/agda_html/Class.IsSet.html#384" class="Bound">B</a></div>
+<div class="line"></div>
+<div class="line">  <a id="440" class="Keyword">infix</a> <a id="446" class="Number">4</a> <a id="448" href="/agda_html/Class.IsSet.html#458" class="Function Operator">_∈_</a> <a id="452" href="/agda_html/Class.IsSet.html#462" class="Function Operator">_∉_</a></div>
+<div class="line">  <a id="IsSet._∈_"></a><a id="458" href="/agda_html/Class.IsSet.html#458" class="Function Operator">_∈_</a> <a id="IsSet._∉_"></a><a id="462" href="/agda_html/Class.IsSet.html#462" class="Function Operator">_∉_</a> <a id="466" class="Symbol">:</a> <a id="468" href="/agda_html/Class.IsSet.html#384" class="Bound">B</a> <a id="470" class="Symbol">→</a> <a id="472" href="/agda_html/Class.IsSet.html#382" class="Bound">A</a> <a id="474" class="Symbol">→</a> <a id="476" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a></div>
+<div class="line">  <a id="483" href="/agda_html/Class.IsSet.html#483" class="Bound">a</a> <a id="485" href="/agda_html/Class.IsSet.html#458" class="Function Operator">∈</a> <a id="487" href="/agda_html/Class.IsSet.html#487" class="Bound">X</a> <a id="489" class="Symbol">=</a> <a id="491" href="/agda_html/Class.IsSet.html#483" class="Bound">a</a> <a id="493" href="/agda_html/Class.IsSet.html#138" class="Field Operator">∈ᵗ</a> <a id="496" class="Symbol">(</a><a id="497" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="503" href="/agda_html/Class.IsSet.html#487" class="Bound">X</a><a id="504" class="Symbol">)</a></div>
+<div class="line">  <a id="508" href="/agda_html/Class.IsSet.html#508" class="Bound">a</a> <a id="510" href="/agda_html/Class.IsSet.html#462" class="Function Operator">∉</a> <a id="512" href="/agda_html/Class.IsSet.html#512" class="Bound">X</a> <a id="514" class="Symbol">=</a> <a id="516" href="/agda_html/Class.IsSet.html#508" class="Bound">a</a> <a id="518" href="/agda_html/Class.IsSet.html#151" class="Function Operator">∉ᵗ</a> <a id="521" class="Symbol">(</a><a id="522" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="528" href="/agda_html/Class.IsSet.html#512" class="Bound">X</a><a id="529" class="Symbol">)</a></div>
+<div class="line"></div>
+<div class="line"><a id="532" class="Keyword">open</a> <a id="537" href="/agda_html/Class.IsSet.html#375" class="Module">IsSet</a> <a id="543" class="Symbol">⦃...⦄</a> <a id="549" class="Keyword">public</a></div>
+<div class="line"></div>
+<div class="line"><a id="557" class="Keyword">infix</a> <a id="563" class="Number">2</a> <a id="565" href="/agda_html/Class.IsSet.html#576" class="Function">All-syntax</a></div>
+<div class="line"><a id="All-syntax"></a><a id="576" href="/agda_html/Class.IsSet.html#576" class="Function">All-syntax</a> <a id="587" class="Symbol">:</a> <a id="589" class="Symbol">∀</a> <a id="591" class="Symbol">{</a><a id="592" href="/agda_html/Class.IsSet.html#592" class="Bound">A</a> <a id="594" href="/agda_html/Class.IsSet.html#594" class="Bound">X</a><a id="595" class="Symbol">}</a> <a id="597" class="Symbol">⦃</a> <a id="599" href="/agda_html/Class.IsSet.html#599" class="Bound">_</a> <a id="601" class="Symbol">:</a> <a id="603" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="609" href="/agda_html/Class.IsSet.html#594" class="Bound">X</a> <a id="611" href="/agda_html/Class.IsSet.html#592" class="Bound">A</a> <a id="613" class="Symbol">⦄</a> <a id="615" class="Symbol">→</a> <a id="617" class="Symbol">(</a><a id="618" href="/agda_html/Class.IsSet.html#592" class="Bound">A</a> <a id="620" class="Symbol">→</a> <a id="622" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a><a id="626" class="Symbol">)</a> <a id="628" class="Symbol">→</a> <a id="630" href="/agda_html/Class.IsSet.html#594" class="Bound">X</a> <a id="632" class="Symbol">→</a> <a id="634" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a></div>
+<div class="line"><a id="639" href="/agda_html/Class.IsSet.html#576" class="Function">All-syntax</a> <a id="650" href="/agda_html/Class.IsSet.html#650" class="Bound">P</a> <a id="652" href="/agda_html/Class.IsSet.html#652" class="Bound">X</a> <a id="654" class="Symbol">=</a> <a id="656" href="/agda_html/Axiom.Set.html#9724" class="Function">All</a> <a id="660" href="/agda_html/Class.IsSet.html#650" class="Bound">P</a> <a id="662" class="Symbol">(</a><a id="663" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="669" href="/agda_html/Class.IsSet.html#652" class="Bound">X</a><a id="670" class="Symbol">)</a></div>
+<div class="line"><a id="672" class="Keyword">syntax</a> <a id="679" href="/agda_html/Class.IsSet.html#576" class="Function">All-syntax</a> <a id="690" class="Symbol">(λ</a> <a id="693" class="Bound">x</a> <a id="695" class="Symbol">→</a> <a id="697" class="Bound">P</a><a id="698" class="Symbol">)</a> <a id="700" class="Bound">l</a> <a id="702" class="Symbol">=</a> <a id="704" class="Function">∀[</a> <a id="707" class="Bound">x</a> <a id="709" class="Function">∈</a> <a id="711" class="Bound">l</a> <a id="713" class="Function">]</a> <a id="715" class="Bound">P</a></div>
+<div class="line"></div>
+<div class="line"><a id="718" class="Keyword">infix</a> <a id="724" class="Number">2</a> <a id="726" href="/agda_html/Class.IsSet.html#736" class="Function">Ex-syntax</a></div>
+<div class="line"><a id="Ex-syntax"></a><a id="736" href="/agda_html/Class.IsSet.html#736" class="Function">Ex-syntax</a> <a id="746" class="Symbol">:</a> <a id="748" class="Symbol">∀</a> <a id="750" class="Symbol">{</a><a id="751" href="/agda_html/Class.IsSet.html#751" class="Bound">A</a> <a id="753" href="/agda_html/Class.IsSet.html#753" class="Bound">X</a><a id="754" class="Symbol">}</a> <a id="756" class="Symbol">⦃</a> <a id="758" href="/agda_html/Class.IsSet.html#758" class="Bound">_</a> <a id="760" class="Symbol">:</a> <a id="762" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="768" href="/agda_html/Class.IsSet.html#753" class="Bound">X</a> <a id="770" href="/agda_html/Class.IsSet.html#751" class="Bound">A</a> <a id="772" class="Symbol">⦄</a> <a id="774" class="Symbol">→</a> <a id="776" class="Symbol">(</a><a id="777" href="/agda_html/Class.IsSet.html#751" class="Bound">A</a> <a id="779" class="Symbol">→</a> <a id="781" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a><a id="785" class="Symbol">)</a> <a id="787" class="Symbol">→</a> <a id="789" href="/agda_html/Class.IsSet.html#753" class="Bound">X</a> <a id="791" class="Symbol">→</a> <a id="793" href="/agda_html/Agda.Primitive.html#388" class="Primitive">Type</a></div>
+<div class="line"><a id="798" href="/agda_html/Class.IsSet.html#736" class="Function">Ex-syntax</a> <a id="808" href="/agda_html/Class.IsSet.html#808" class="Bound">P</a> <a id="810" href="/agda_html/Class.IsSet.html#810" class="Bound">X</a> <a id="812" class="Symbol">=</a> <a id="814" href="/agda_html/Axiom.Set.html#9793" class="Function">Any</a> <a id="818" href="/agda_html/Class.IsSet.html#808" class="Bound">P</a> <a id="820" class="Symbol">(</a><a id="821" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="827" href="/agda_html/Class.IsSet.html#810" class="Bound">X</a><a id="828" class="Symbol">)</a></div>
+<div class="line"><a id="830" class="Keyword">syntax</a> <a id="837" href="/agda_html/Class.IsSet.html#736" class="Function">Ex-syntax</a> <a id="847" class="Symbol">(λ</a> <a id="850" class="Bound">x</a> <a id="852" class="Symbol">→</a> <a id="854" class="Bound">P</a><a id="855" class="Symbol">)</a> <a id="857" class="Bound">l</a> <a id="859" class="Symbol">=</a> <a id="861" class="Function">∃[</a> <a id="864" class="Bound">x</a> <a id="866" class="Function">∈</a> <a id="868" class="Bound">l</a> <a id="870" class="Function">]</a> <a id="872" class="Bound">P</a></div>
+<div class="line"></div>
+<div class="line"><a id="875" class="Keyword">module</a> <a id="882" href="/agda_html/Class.IsSet.html#882" class="Module">_</a> <a id="884" class="Symbol">⦃</a> <a id="886" href="/agda_html/Class.IsSet.html#886" class="Bound">_</a> <a id="888" class="Symbol">:</a> <a id="890" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="896" href="/agda_html/Class.IsSet.html#358" class="Generalizable">X</a> <a id="898" class="Symbol">(</a><a id="899" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="901" href="/agda_html/Data.Product.Base.html#1618" class="Function Operator">×</a> <a id="903" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a><a id="904" class="Symbol">)</a> <a id="906" class="Symbol">⦄</a> <a id="908" class="Keyword">where</a></div>
+<div class="line">  <a id="916" href="/agda_html/Class.IsSet.html#916" class="Function">dom</a> <a id="920" class="Symbol">:</a> <a id="922" href="/agda_html/Class.IsSet.html#896" class="Bound">X</a> <a id="924" class="Symbol">→</a> <a id="926" href="/agda_html/Axiom.Set.html#1700" class="Field">Set</a> <a id="930" href="/agda_html/Class.IsSet.html#899" class="Bound">A</a></div>
+<div class="line">  <a id="934" href="/agda_html/Class.IsSet.html#916" class="Function">dom</a> <a id="938" class="Symbol">=</a> <a id="940" href="/agda_html/Axiom.Set.Rel.html#1511" class="Function">Rel.dom</a> <a id="948" href="/agda_html/Function.Base.html#1115" class="Function Operator">∘</a> <a id="950" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a></div>
+<div class="line"></div>
+<div class="line">  <a id="959" href="/agda_html/Class.IsSet.html#959" class="Function">range</a> <a id="965" class="Symbol">:</a> <a id="967" href="/agda_html/Class.IsSet.html#896" class="Bound">X</a> <a id="969" class="Symbol">→</a> <a id="971" href="/agda_html/Axiom.Set.html#1700" class="Field">Set</a> <a id="975" href="/agda_html/Class.IsSet.html#903" class="Bound">B</a></div>
+<div class="line">  <a id="979" href="/agda_html/Class.IsSet.html#959" class="Function">range</a> <a id="985" class="Symbol">=</a> <a id="987" href="/agda_html/Axiom.Set.Rel.html#1550" class="Function">Rel.range</a> <a id="997" href="/agda_html/Function.Base.html#1115" class="Function Operator">∘</a> <a id="999" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a></div>
+<div class="line"></div>
+<div class="line"><a id="1006" class="Keyword">instance</a></div>
+<div class="line">  <a id="IsSet-Set"></a><a id="1017" href="/agda_html/Class.IsSet.html#1017" class="Function">IsSet-Set</a> <a id="1027" class="Symbol">:</a> <a id="1029" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="1035" class="Symbol">(</a><a id="1036" href="/agda_html/Axiom.Set.html#1700" class="Field">Set</a> <a id="1040" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a><a id="1041" class="Symbol">)</a> <a id="1043" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a></div>
+<div class="line">  <a id="1047" href="/agda_html/Class.IsSet.html#1017" class="Function">IsSet-Set</a> <a id="1057" class="Symbol">.</a><a id="1058" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="1064" href="/agda_html/Class.IsSet.html#1064" class="Bound">A</a> <a id="1066" class="Symbol">=</a> <a id="1068" href="/agda_html/Class.IsSet.html#1064" class="Bound">A</a></div>
+<div class="line"></div>
+<div class="line">  <a id="IsSet-Map"></a><a id="1073" href="/agda_html/Class.IsSet.html#1073" class="Function">IsSet-Map</a> <a id="1083" class="Symbol">:</a> <a id="1085" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="1091" class="Symbol">(</a><a id="1092" href="/agda_html/Axiom.Set.Map.html#2125" class="Function">Map</a> <a id="1096" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="1098" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a><a id="1099" class="Symbol">)</a> <a id="1101" class="Symbol">(</a><a id="1102" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="1104" href="/agda_html/Data.Product.Base.html#1618" class="Function Operator">×</a> <a id="1106" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a><a id="1107" class="Symbol">)</a></div>
+<div class="line">  <a id="1111" href="/agda_html/Class.IsSet.html#1073" class="Function">IsSet-Map</a> <a id="1121" class="Symbol">.</a><a id="1122" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="1128" class="Symbol">=</a> <a id="1130" href="/agda_html/Axiom.Set.Map.html#2293" class="Function Operator">_ˢ</a></div>
+<div class="line"></div>
+<div class="line">  <a id="IsSet-TotalMap"></a><a id="1136" href="/agda_html/Class.IsSet.html#1136" class="Function">IsSet-TotalMap</a> <a id="1151" class="Symbol">:</a> <a id="1153" href="/agda_html/Class.IsSet.html#375" class="Record">IsSet</a> <a id="1159" class="Symbol">(</a><a id="1160" href="/agda_html/Axiom.Set.TotalMap.html#574" class="Record">TotalMap</a> <a id="1169" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="1171" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a><a id="1172" class="Symbol">)</a> <a id="1174" class="Symbol">(</a><a id="1175" href="/agda_html/Class.IsSet.html#354" class="Generalizable">A</a> <a id="1177" href="/agda_html/Data.Product.Base.html#1618" class="Function Operator">×</a> <a id="1179" href="/agda_html/Class.IsSet.html#356" class="Generalizable">B</a><a id="1180" class="Symbol">)</a></div>
+<div class="line">  <a id="1184" href="/agda_html/Class.IsSet.html#1136" class="Function">IsSet-TotalMap</a> <a id="1199" class="Symbol">.</a><a id="1200" href="/agda_html/Class.IsSet.html#419" class="Field">toSet</a> <a id="1206" class="Symbol">=</a> <a id="1208" href="/agda_html/Axiom.Set.TotalMap.html#617" class="Field">TotalMap.rel</a></div>
+<div class="line"></div></pre></main></div></body></html>
