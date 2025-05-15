@@ -332,12 +332,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     opaque
       unfolding List-Model
 
-      verifyTrace : String
+      verifyTrace : Pair ℕ String
       verifyTrace =
         let n₀ = record { refs = [] ; ib-lottery = [] ; eb-lottery = []  ; vt-lottery = [] }
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s₀
-        in result (λ x → "ok, checked " S.++ show (L.length αs) S.++ " actions") format-error tr
+        in L.length αs , result (λ _ → "ok") format-error tr
 
       {-# COMPILE GHC verifyTrace as verifyTrace #-}
