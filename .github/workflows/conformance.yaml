@@ -44,7 +44,7 @@ jobs:
     - name: 🧪 Test trace verifier
       run: |
         nix run --show-trace .#test-trace-verifier
-    - name: 🔎 Check example trace
+    - name: 🔬 Check example trace
       run: |
         nix run .#ols -- \
           sim leios \

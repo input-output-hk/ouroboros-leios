@@ -22,7 +22,7 @@ main :: IO ()
 main =
   do
     Command{..} <- execParser commandParser
-    (top :: Topology CLUSTER) <- decodeFileThrow topologyFile
+    (top :: Topology COORD2D) <- decodeFileThrow topologyFile
     (config :: Config) <- decodeFileThrow configFile
     let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
     let nodeNames = Prelude.map unNodeName (keys $ nodes top)
