@@ -13,6 +13,7 @@
 
 module Diffusion
 where
+-- @bwbush: Note that this is only used for bookkeeping, not for modeling.
 
 import Control.Monad
 import Data.Aeson

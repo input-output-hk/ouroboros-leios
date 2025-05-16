@@ -13,6 +13,7 @@
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short.Node where
+-- @bwbush: The functions here actually are common to all Leios variants: block management, expiration, computation, etc.
 
 import Chan
 import Control.Category ((>>>))
@@ -100,6 +101,7 @@ data BlockGeneration
       , slotOfGeneratedIbs :: SlotNo
       , ibsPerSlot :: Word64
       }
+-- @bwbush: `UnboundedIbs` seems to be the only adversarial behavior accounted for.
 
 data LeiosNodeConfig = LeiosNodeConfig
   { leios :: !LeiosConfig
@@ -174,6 +176,7 @@ data LeiosNodeTask
   | GenVote
   | GenRB
   deriving (Eq, Ord, Ix, Bounded, Show)
+-- @bwbush: We need to account for the potentially very significant time used for ledger updates.
 
 data NodeRelayState id header body m = NodeRelayState
   { relayBufferVar :: !(TVar m (RB.RelayBuffer id (header, body)))
