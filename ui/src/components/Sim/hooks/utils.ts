@@ -147,14 +147,14 @@ export const processMessage = (
     trackDataReceived(aggregatedData, intermediate, message.recipient, "pb", message.id);
   } else if (message.type === EMessageType.EBGenerated) {
     trackDataGenerated(aggregatedData, intermediate, message.producer, "eb", message.id, message.size_bytes);
-    for (const { id: ibId } of message.input_blocks ?? []) {
+    for (const { id: ibId } of message.input_blocks) {
       for (const tx of intermediate.ibs.get(ibId)?.txs ?? []) {
         if (intermediate.txStatuses[tx] === 'created' || intermediate.txStatuses[tx] === 'inIb') {
           intermediate.txStatuses[tx] = 'inEb';
         }
       }
     }
-    for (const { id: txId } of message.transactions ?? []) {
+    for (const { id: txId } of message.transactions) {
       const tx = Number(txId);
       if (intermediate.txStatuses[tx] === 'created' || intermediate.txStatuses[tx] === 'inIb') {
         intermediate.txStatuses[tx] = 'inEb';
@@ -164,8 +164,8 @@ export const processMessage = (
       slot: message.slot,
       pipeline: message.pipeline,
       bytes: message.size_bytes,
-      txs: message.transactions?.map(tx => tx.id) ?? [],
-      ibs: message.input_blocks?.map(ib => ib.id) ?? [],
+      txs: message.transactions.map(tx => tx.id),
+      ibs: message.input_blocks.map(ib => ib.id),
       ebs: message.endorser_blocks.map(eb => eb.id),
     });
   } else if (message.type === EMessageType.EBSent) {

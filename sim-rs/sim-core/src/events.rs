@@ -200,9 +200,7 @@ pub enum Event {
         pipeline: u64,
         producer: Node,
         size_bytes: u64,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
         transactions: Vec<BlockRef<TransactionId>>,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
         input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
         endorser_blocks: Vec<BlockRef<EndorserBlockId<Node>>>,
     },
