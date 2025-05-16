@@ -351,6 +351,14 @@
       "$ref": "#/definitions/Distribution",
       "description": "Only supported by Rust simulation."
     },
+    "tx-start-time": {
+      "description": "When the first transaction should appear.\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
+    "tx-stop-time": {
+      "description": "The cutoff time after which transactions should not appear.\nOnly supported by Rust simulation.",
+      "type": "number"
+    },
     "tx-validation-cpu-time-ms": {
       "description": "Only supported by Rust simulation.",
       "type": "number"

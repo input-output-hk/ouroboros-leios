@@ -67,6 +67,14 @@ export interface Config {
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
+  /**
+   * When the first transaction should appear.
+   * Only supported by Rust simulation.  */
+  "tx-start-time"?: number | null;
+  /**
+   * The cutoff time after which transactions should not appear.
+   * Only supported by Rust simulation.  */
+  "tx-stop-time"?: number | null;
 
   // Ranking Block Configuration
   "rb-generation-probability": number;

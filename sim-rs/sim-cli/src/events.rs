@@ -620,6 +620,7 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum OutputTarget {
     AggregatedEventStream {
         aggregation: TraceAggregator,

@@ -8,7 +8,7 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{model::TransactionId, probability::FloatDistribution};
+use crate::{clock::Timestamp, model::TransactionId, probability::FloatDistribution};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
@@ -70,6 +70,8 @@ pub struct RawParameters {
     pub tx_sharded_percentage: f64,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
+    pub tx_start_time: Option<f64>,
+    pub tx_stop_time: Option<f64>,
 
     // Ranking block configuration
     pub rb_generation_probability: f64,
@@ -377,6 +379,12 @@ impl TransactionConfig {
                 sharded_percentage: params.tx_sharded_percentage,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
+                start_time: params
+                    .tx_start_time
+                    .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
+                stop_time: params
+                    .tx_stop_time
+                    .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
             })
         } else {
             Self::Mock(MockTransactionConfig {
@@ -394,6 +402,8 @@ pub(crate) struct RealTransactionConfig {
     pub sharded_percentage: f64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
+    pub start_time: Option<Timestamp>,
+    pub stop_time: Option<Timestamp>,
 }
 
 #[derive(Debug, Clone)]
