@@ -87,6 +87,11 @@ To evaluate this hypothesis, we re-ran the experiment with IBs being produced at
 | ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-timeseries.svg) |
 
 
+### Rust simulation
+
+ - Added `tx-start-time` and `tx-stop-time` parameters, to avoid effect of Leios's slow start or sudden termination on TX analysis
+ - Added a new leios variant `full-without-ibs`. In this variant, there are no IBs; instead, EBs contain references to TXs directly.
+
 ## 2025-05-15
 
 ### Manually curated test cases for Leios trace verifier
