@@ -34,8 +34,8 @@ main =
         . decodeJSONL
         <$> BSL.readFile logFile
     hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
-    unless (snd result == "ok")
-      $ do
+    unless (snd result == "ok") $
+      do
         putStrLn . T.unpack $ snd result
         exitFailure
 
