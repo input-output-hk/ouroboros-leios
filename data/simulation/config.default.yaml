@@ -153,6 +153,10 @@ eb-max-age-slots: 100
 # up to slot `s+eb-max-age-for-relay-slots`.
 eb-max-age-for-relay-slots: 40
 
+# The maximum size of transactions (in bytes) which an EB can reference.
+# Only relevant when running with the "full-without-ibs" variant.
+eb-referenced-txs-max-size-bytes: 16384000
+
 ################################################################################
 # Vote Configuration
 ################################################################################

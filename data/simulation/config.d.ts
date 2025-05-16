@@ -158,6 +158,14 @@ export interface Config {
    */
   "eb-max-age-for-relay-slots": bigint;
 
+  /**
+   * The maximum size of transactions (in bytes) which an EB can reference.
+   * Only relevant when running with the "full-without-ibs" variant.
+   * 
+   * Only supported by Rust simulation.
+   */
+  "eb-referenced-txs-max-size-bytes": bigint;
+
   // Vote Configuration
   "vote-generation-probability": number;
   "vote-generation-cpu-time-ms-constant": number;
@@ -234,6 +242,10 @@ export enum RelayStrategy {
 }
 
 export enum LeiosVariant {
+  /** Short Leios: EBs only reference IBs */
   Short = "short",
+  /** Full Leios: EBs reference IBs and other EBs */
   Full = "full",
+  /** Full Leios Without IBs: EBs reference TXs directly, as well as other EBs */
+  FullWithoutIbs = "full-without-ibs",
 }

@@ -73,7 +73,7 @@
       "type": "object"
     },
     "LeiosVariant": {
-      "enum": ["short", "full"],
+      "enum": ["short", "full", "full-without-ibs"],
       "type": "string"
     },
     "LogNormalDistribution": {
@@ -176,6 +176,12 @@
     "eb-max-age-slots": {
       "additionalProperties": false,
       "description": "The maximum age of EBs included in RBs.\n\nAn EB from slot `s` can only be included in RBs\nup to slot `s+eb-max-age-slots`.\n\nIn short leios we expect votes to diffuse within 3 stages lengths of\nEB generation, we allow for 2 more stage lengths to account for\nvariance in the interval within RBs.",
+      "properties": {},
+      "type": "number"
+    },
+    "eb-referenced-txs-max-size-bytes": {
+      "additionalProperties": false,
+      "description": "The maximum size of transactions (in bytes) which an EB can reference.\nOnly relevant when running with the \"full-without-ibs\" variant.\n\nOnly supported by Rust simulation.",
       "properties": {},
       "type": "number"
     },

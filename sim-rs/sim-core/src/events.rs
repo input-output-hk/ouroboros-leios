@@ -200,6 +200,9 @@ pub enum Event {
         pipeline: u64,
         producer: Node,
         size_bytes: u64,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        transactions: Vec<BlockRef<TransactionId>>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
         input_blocks: Vec<BlockRef<InputBlockId<Node>>>,
         endorser_blocks: Vec<BlockRef<EndorserBlockId<Node>>>,
     },
@@ -526,6 +529,7 @@ impl EventTracker {
             pipeline: block.pipeline,
             producer: self.to_node(block.producer),
             size_bytes: block.bytes,
+            transactions: block.txs.iter().map(|id| BlockRef { id: *id }).collect(),
             input_blocks: block
                 .ibs
                 .iter()

@@ -106,6 +106,7 @@ pub struct RawParameters {
     pub eb_size_bytes_constant: u64,
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
+    pub eb_referenced_txs_max_size_bytes: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -138,6 +139,7 @@ pub enum DiffusionStrategy {
 pub enum LeiosVariant {
     Short,
     Full,
+    FullWithoutIbs,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -434,7 +436,7 @@ pub struct SimConfiguration {
     pub stage_length: u64,
     pub max_eb_age: u64,
     pub late_ib_inclusion: bool,
-    pub(crate) variant: LeiosVariant,
+    pub variant: LeiosVariant,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) praos_chain_quality: u64,
@@ -446,6 +448,7 @@ pub struct SimConfiguration {
     pub(crate) vote_slot_length: u64,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
+    pub(crate) max_eb_size: u64,
     pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
@@ -488,6 +491,7 @@ impl SimConfiguration {
             vote_slot_length: params.leios_stage_active_voting_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
+            max_eb_size: params.eb_referenced_txs_max_size_bytes,
             ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: params.ib_diffusion_max_bodies_to_request as usize,
             ib_shards: params.ib_shards,
