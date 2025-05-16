@@ -8,9 +8,12 @@ The transaction lifecycle simulations earlier this week and last week raised the
 
 To evaluate this hypothesis, we re-ran the experiment with IBs being produced at three times a higher rate, which leaves plenty of space in IBs for transaction duplication. The loss of transactions persists, indicating that the hypothesis was incorrect and that some other factor is preventing transactions from making it to the ledger.
 
-|   |   |
+- [Read-me file](analysis/sims/2025w20/)
+- [Results at 1x IB capacity](analysis/sims/2025w20/analysis1x.ipynb)
+- [Results at 3x IB capacity](analysis/sims/2025w20/analysis1x.ipynb)
+
 |---|---|
-| ![Temporal efficiency of Leios](analysis/sims/2025w19/plots3x/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w19/plots3x/temporal-efficiency-timeseries.svg) |
+| ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-timeseries.svg) |
 
 
 ## 2025-05-15
