@@ -1,0 +1,113 @@
+praos: 58175 transactions(s) were generated in total.
+praos: 114 naive praos block(s) were published.
+praos: 1686 slot(s) had no naive praos blocks.
+praos: 47680 transaction(s) (277.49 MB) finalized in a naive praos block.
+praos: 16752 transaction(s) (28.19 MB) did not reach a naive praos block.
+praos: Pool 2 published 2 naive praos block(s)
+praos: Pool 3 published 3 naive praos block(s)
+praos: Pool 4 published 3 naive praos block(s)
+praos: Pool 6 published 2 naive praos block(s)
+praos: Pool 7 published 2 naive praos block(s)
+praos: Pool 8 published 2 naive praos block(s)
+praos: Pool 10 published 1 naive praos block(s)
+praos: Pool 11 published 1 naive praos block(s)
+praos: Pool 13 published 1 naive praos block(s)
+praos: Pool 14 published 1 naive praos block(s)
+praos: Pool 16 published 2 naive praos block(s)
+praos: Pool 17 published 1 naive praos block(s)
+praos: Pool 18 published 1 naive praos block(s)
+praos: Pool 19 published 2 naive praos block(s)
+praos: Pool 20 published 1 naive praos block(s)
+praos: Pool 21 published 1 naive praos block(s)
+praos: Pool 22 published 1 naive praos block(s)
+praos: Pool 22 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 23 published 2 naive praos block(s)
+praos: Pool 24 published 2 naive praos block(s)
+praos: Pool 25 published 2 naive praos block(s)
+praos: Pool 26 published 0 naive praos block(s)
+praos: Pool 26 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 27 published 2 naive praos block(s)
+praos: Pool 28 published 1 naive praos block(s)
+praos: Pool 29 published 1 naive praos block(s)
+praos: Pool 30 published 1 naive praos block(s)
+praos: Pool 31 published 2 naive praos block(s)
+praos: Pool 33 published 2 naive praos block(s)
+praos: Pool 34 published 2 naive praos block(s)
+praos: Pool 35 published 4 naive praos block(s)
+praos: Pool 38 published 2 naive praos block(s)
+praos: Pool 40 published 2 naive praos block(s)
+praos: Pool 41 published 1 naive praos block(s)
+praos: Pool 43 published 1 naive praos block(s)
+praos: Pool 44 published 3 naive praos block(s)
+praos: Pool 45 published 1 naive praos block(s)
+praos: Pool 46 published 1 naive praos block(s)
+praos: Pool 47 published 2 naive praos block(s)
+praos: Pool 48 published 1 naive praos block(s)
+praos: Pool 49 published 2 naive praos block(s)
+praos: Pool 50 published 1 naive praos block(s)
+praos: Pool 52 published 3 naive praos block(s)
+praos: Pool 54 published 1 naive praos block(s)
+praos: Pool 56 published 1 naive praos block(s)
+praos: Pool 57 published 2 naive praos block(s)
+praos: Pool 58 published 1 naive praos block(s)
+praos: Pool 60 published 4 naive praos block(s)
+praos: Pool 61 published 1 naive praos block(s)
+praos: Pool 62 published 1 naive praos block(s)
+praos: Pool 63 published 1 naive praos block(s)
+praos: Pool 66 published 2 naive praos block(s)
+praos: Pool 67 published 2 naive praos block(s)
+praos: Pool 68 published 1 naive praos block(s)
+praos: Pool 69 published 1 naive praos block(s)
+praos: Pool 70 published 2 naive praos block(s)
+praos: Pool 70 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 71 published 1 naive praos block(s)
+praos: Pool 71 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 72 published 1 naive praos block(s)
+praos: Pool 73 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 75 published 1 naive praos block(s)
+praos: Pool 77 published 1 naive praos block(s)
+praos: Pool 77 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 78 published 2 naive praos block(s)
+praos: Pool 79 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 80 published 2 naive praos block(s)
+praos: Pool 83 published 2 naive praos block(s)
+praos: Pool 84 published 1 naive praos block(s)
+praos: Pool 85 published 1 naive praos block(s)
+praos: Pool 87 published 1 naive praos block(s)
+praos: Pool 88 published 1 naive praos block(s)
+praos: Pool 89 published 0 naive praos block(s)
+praos: Pool 89 failed to publish 1 naive praos block(s) due to slot battles.
+praos: Pool 90 published 1 naive praos block(s)
+praos: Pool 91 published 2 naive praos block(s)
+praos: Pool 95 published 4 naive praos block(s)
+praos: Pool 98 published 1 naive praos block(s)
+praos: Pool 99 published 4 naive praos block(s)
+leios: 2435 IB(s) were generated, on average 1.353 IB(s) per slot.
+leios: 54777 out of 58175 transaction(s) were included in at least one IB.
+leios: The average age of the pending transactions is 709.397s (stddev 539.232).
+leios: Each transaction was included in an average of 2.128 IB(s) (stddev 1.345).
+leios: Each IB contained an average of 47.903 transaction(s) (stddev 20.123) and an average of 82.84 kB (stddev 38.). 2 IB(s) were empty.
+leios: Each node received an average of 2433.970 IB(s) (stddev 0.842).
+leios: 280 EB(s) were generated; on average there were 0.156 EB(s) per slot.
+leios: Each EB contained an average of 1.922 IB(s) (stddev 1.084). 6 EB(s) were empty.
+leios: Each IB was included in an average of 13.372 EB(s) (stddev 3.797).
+leios: 1906 out of 2435 IBs were included in at least one EB.
+leios: 489 out of 2435 IBs expired before they reached an EB.
+leios: 68 out of 280 EBs expired before an EB from their stage reached an RB.
+leios: 43142 out of 58175 transaction(s) were included in at least one EB.
+leios: 346699 total votes were generated.
+leios: Each stake pool produced an average of 3466.990 vote(s) (stddev 195.947).
+leios: Each EB received an average of 1265.325 vote(s) (stddev 608.989).
+leios: There were 14008 bundle(s) of votes. Each bundle contained 24.750 vote(s) (stddev 32.089).
+leios: 118 L1 block(s) had a Leios endorsement.
+leios: 41348 tx(s) were referenced by a Leios endorsement.
+leios: 6332 tx(s) were included directly in a Praos block.
+leios: Spatial efficiency: 71.80 MB/202.78 MB (35.408%) of Leios bytes were transactions.
+leios: 276225 tx(s) (86.980%) referenced by a Leios endorsement were redundant.
+leios: Each transaction took an average of 81.885s (stddev 138.427) to be included in an IB.
+leios: Each transaction took an average of 107.854s (stddev 139.605) to be included in an EB.
+leios: Each transaction took an average of 151.133s (stddev 142.541) to be included in a block.
+network: 5756185 TX message(s) were sent. 5755468 of them were received (99.988%).
+network: 241000 IB message(s) were sent. 240962 of them were received (99.984%).
+network: 27720 EB message(s) were sent. 27720 of them were received (100.000%).
+network: 1386792 Vote message(s) were sent. 1386792 of them were received (100.000%).
