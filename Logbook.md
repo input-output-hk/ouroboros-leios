@@ -2,6 +2,11 @@
 
 ## 2025-05-16
 
+### Trace verifier improvements
+
+- Error handling, initial error reporting
+- Trace verification starting from other than initial state
+
 ### Documentation housekeeping
 
 We relocated the ancient report on Leios from `report/` to [docs/obsolete-report/](docs/obsolete-report/) in order to avoid confusing that the report still represents the Leios design. It does contain useful background information and design principles, however.
