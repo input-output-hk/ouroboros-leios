@@ -2,6 +2,10 @@
 
 ## 2025-05-16
 
+### Documentation housekeeping
+
+We relocated the ancient report on Leios from `report/` to [docs/obsolete-report/](docs/obsolete-report/) in order to avoid confusing that the report still represents the Leios design. It does contain useful background information and design principles, however.
+
 ### Higher excess-capacity simulations
 
 The transaction lifecycle simulations earlier this week and last week raised the question of whether the duplication of transactions in IBs was starving other transactions from ever being included in an IB, and hence never making it to the ledger. Those earlier simulations had at total IB capacity that was only modestly larger than the size of all of the transactions submitted during the course of the simulation.

@@ -20,7 +20,8 @@ on:
 jobs:
 
   sim-docs:
-    name: Build documents
+    name: Build documents via Ubuntu
+    if: true
     runs-on: ubuntu-latest
     steps:
     - name: 📥 Checkout repository
