@@ -7,6 +7,67 @@
 - Error handling, initial error reporting
 - Trace verification starting from other than initial state
 
+### Informal review of Haskell simulator for Leios
+
+We reviewed existing code and documents related to the Haskell simulator, and assessed its state of completeness. See also the discussion in [PR#353](https://github.com/input-output-hk/ouroboros-leios/pull/353).
+
+- Statistics
+    - ELOC: 17,035 lines
+    - TODO: 51 lines
+    - Comments 1437 lines
+- Organization
+    - Some intertwining of concerns
+        - Simulation
+        - Data analysis
+        - Visualization
+        - Examples
+    - Praos cleanly separated from Leios.
+    - Leios specifics are concentrated in just three modules.
+- Code quality
+    - Generally readable and well organized code.
+    - Especially understandable by those already familiar with the Cardano codebase.
+    - Most types and functions are not documented.
+    - The best documentation is for the typed protocols.
+    - Networking code is most mature, with few changes for many months.
+    - Block management is also mature.
+    - Only three tests in the test suite, and these do not relate to the protocol
+        - `test_benchTopologyIsConnected`
+        - `test_defaultConfigOnDiskMatchesDef`
+        - `test_canParseConstantDistribution`
+- Design
+    - Leios variants handled via pattern matching on sum types.
+    - Moderately high fidelity treatment of TCP.
+    - Faithful to Leios specification regarding input blocks, endorser blocks, votes, Praos blocks, CPU resources, and networking behavior.
+    - Uses typed mini-protocols for blocks and votes in a unified manner
+    - Some node operations are modeled as parallel threads.
+    - The network is static, so the input topology needs to reflect a snapshot of a typical p2p network.
+    - The fidelity of the network representation is greater than needed for SRL4 analyses.
+    - No representation or modeling of transactions.
+    - Essentially no representation of adversarial behavior, though there is one placeholder.
+    - There is no provision for modeling network dynamism such as coming/going of nodes or communication disruptions.
+    - "Full Short" Leios implementation is slightly out of sync with the recent v0.2 changes.
+- Implementation
+    - Single threaded execution because of its reliance of `IOSim`.
+    - Runs 40x slower than Rust simulator.
+    - Simulations of 3000 nodes for one hour takes ~24 hours for high TPS.
+    - Dependencies our the production Ouroboros packages and a few Cardano packages.
+    - Does not account for CPU resources needed for ledger updates.
+- Documentation
+    - The readme files (`README.md` and `simulation/README.md`) are slightly out of date.
+    - The "Network Specification" document is terse but complete enough to be useful in comparing against the implementation. It is unclear how closely the implementation matches or if there are major gaps (aside from the to-do list in its header) in the documentation.
+    - The "Simulation Realism" document mostly consists of figures, with some brief text introducing them and pointing out interesting features. The document is not complete enough to make a sound case for the realism of the simulation.
+    - Evidently, the simulations were compared to graph-theory models of idealized behavior, but there does not seem to be documentation of this.
+    - There is no high-level design documentation for the simulation itself.
+- Assessment
+    - The trace logs currently fail the conformance tests in the Leios trace verifier.
+    - Changes to the networking model would require great care and understanding.
+    - Most prospective changes to the Leios protocol would only involve a small fraction of the codebase and would likely be straightforward.
+    - Addition of memory pool and transactions is feasible but would likely take ~100-200 hours of labor.
+        - Many aspects of transactions could leverage the existing network code and protocol patterns.
+        - Understanding the details of the existing Praos memory pool and transaction diffusion would be critical to implementing Leios transactions in the simulation.
+    - Major speedup or parallelization of execution might require a lot of effort, but the code should be profiled to identify easily mitigated hotspots.
+    - QA on the network implementation would require detailed understanding of TCP and reverse-engineering requirements documents.
+
 ### Documentation housekeeping
 
 We relocated the ancient report on Leios from `report/` to [docs/obsolete-report/](docs/obsolete-report/) in order to avoid confusing that the report still represents the Leios design. It does contain useful background information and design principles, however.
