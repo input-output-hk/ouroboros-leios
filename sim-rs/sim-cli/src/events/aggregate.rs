@@ -123,6 +123,7 @@ impl TraceAggregator {
                 pipeline,
                 producer,
                 size_bytes,
+                transactions,
                 input_blocks,
                 endorser_blocks,
                 ..
@@ -134,6 +135,7 @@ impl TraceAggregator {
                         slot,
                         pipeline,
                         bytes: size_bytes,
+                        txs: transactions.iter().map(|tx| tx.id).collect(),
                         ibs: input_blocks
                             .iter()
                             .map(|ib| self.ibs.get(&ib.id).unwrap().clone())
@@ -144,14 +146,16 @@ impl TraceAggregator {
                             .collect(),
                     },
                 );
-                for tx in input_blocks
+                for tx_id in input_blocks
                     .iter()
                     .map(|ib| self.ibs.get(&ib.id).unwrap())
                     .flat_map(|ib| ib.txs.iter())
+                    .map(|tx| tx.id)
+                    .chain(transactions.iter().map(|tx| tx.id))
                 {
                     let status = self
                         .tx_statuses
-                        .entry(tx.id)
+                        .entry(tx_id)
                         .or_insert(TransactionStatus::InEb);
                     if matches!(status, TransactionStatus::Created | TransactionStatus::InIb) {
                         *status = TransactionStatus::InEb;
@@ -404,6 +408,7 @@ struct EndorsementBlock {
     slot: u64,
     pipeline: u64,
     bytes: u64,
+    txs: Vec<TransactionId>,
     ibs: Vec<InputBlock>,
     ebs: Vec<EndorsementBlock>,
 }

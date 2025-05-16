@@ -159,8 +159,13 @@ export interface IEndorserBlockGenerated {
   pipeline: number;
   producer: string;
   size_bytes: number;
-  input_blocks: IInputBlock[]
-  endorser_blocks: IEndorserBlock[]
+  transactions?: ITransaction[];
+  input_blocks?: IInputBlock[];
+  endorser_blocks: IEndorserBlock[];
+}
+
+export interface ITransaction {
+  id: string;
 }
 
 export interface IInputBlock {

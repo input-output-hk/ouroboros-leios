@@ -63,6 +63,7 @@ export interface ISimulationEndorsementBlock {
   slot: number;
   pipeline: number;
   bytes: number;
+  txs: ISimulationTransaction[];
   ibs: ISimulationInputBlock[];
   ebs: ISimulationEndorsementBlock[];
 }
@@ -99,6 +100,7 @@ export interface ISimulationIntermediateEndorsementBlock {
   slot: number;
   pipeline: number;
   bytes: number;
+  txs: string[];
   ibs: string[];
   ebs: string[];
 }
