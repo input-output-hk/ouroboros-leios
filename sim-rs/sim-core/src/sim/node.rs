@@ -1462,6 +1462,12 @@ impl Node {
         let expected_ib_pipelines: HashSet<u64> =
             self.pipelines_for_ib_references(eb.pipeline).collect();
 
+        for tx in &eb.txs {
+            if !matches!(self.txs.get(tx), Some(TransactionView::Received(_))) {
+                return Err(NoVoteReason::ExtraTX);
+            }
+        }
+
         for ib in &eb.ibs {
             if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
                 return Err(NoVoteReason::MissingIB);

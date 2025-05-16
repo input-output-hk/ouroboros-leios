@@ -214,6 +214,7 @@ pub enum NoVoteReason {
     ExtraIB,
     MissingIB,
     MissingEB,
+    ExtraTX,
     UncertifiedEBReference,
 }
 
