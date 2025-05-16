@@ -10,7 +10,7 @@ To evaluate this hypothesis, we re-ran the experiment with IBs being produced at
 
 - [Read-me file](analysis/sims/2025w20/)
 - [Results at 1x IB capacity](analysis/sims/2025w20/analysis1x.ipynb)
-- [Results at 3x IB capacity](analysis/sims/2025w20/analysis1x.ipynb)
+- [Results at 3x IB capacity](analysis/sims/2025w20/analysis3x.ipynb)
 
 |---|---|
 | ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w20/plots3x/temporal-efficiency-timeseries.svg) |
