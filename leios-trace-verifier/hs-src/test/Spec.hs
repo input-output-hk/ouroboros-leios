@@ -5,7 +5,6 @@
 
 module Main where
 
-import qualified Paths_trace_parser as Paths
 import Control.Monad (forM_)
 import Data.ByteString.Lazy as BSL (readFile)
 import Data.List (sort)
@@ -16,6 +15,7 @@ import LeiosConfig (Config (..))
 import LeiosEvents (decodeJSONL)
 import LeiosTopology (LocationKind (COORD2D), Node (..), NodeInfo (..), NodeName (..), Topology (..))
 import Lib (verifyTrace)
+import qualified Paths_trace_parser as Paths
 import System.Directory (listDirectory)
 import System.FilePath ((</>))
 import Test.Hspec (Expectation, SpecWith, describe, hspec, it, shouldBe, shouldNotBe)
