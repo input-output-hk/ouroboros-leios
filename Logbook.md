@@ -1,5 +1,18 @@
 # Leios logbook
 
+## 2025-05-16
+
+### Higher excess-capacity simulations
+
+The transaction lifecycle simulations earlier this week and last week raised the question of whether the duplication of transactions in IBs was starving other transactions from ever being included in an IB, and hence never making it to the ledger. Those earlier simulations had at total IB capacity that was only modestly larger than the size of all of the transactions submitted during the course of the simulation.
+
+To evaluate this hypothesis, we re-ran the experiment with IBs being produced at three times a higher rate, which leaves plenty of space in IBs for transaction duplication. The loss of transactions persists, indicating that the hypothesis was incorrect and that some other factor is preventing transactions from making it to the ledger.
+
+|   |   |
+|---|---|
+| ![Temporal efficiency of Leios](analysis/sims/2025w19/plots3x/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w19/plots3x/temporal-efficiency-timeseries.svg) |
+
+
 ## 2025-05-15
 
 ### Manually curated test cases for Leios trace verifier
