@@ -72,6 +72,7 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
       , slotConfig
       }
  where
+  -- @bwbush: Block-generation logic.
   execute slot (SomeRole r, wins) = assert (wins >= 1) $ (map . second) (SomeAction r) <$> execute' slot r wins
   execute' :: SlotNo -> Role a -> Word64 -> StateT Int m [(DiffTime, a)]
   execute' slot Base _wins = do
@@ -106,6 +107,7 @@ leiosBlockGenerator LeiosGeneratorConfig{..} =
         pure $
           mapMaybe (chooseEB . snd) $
             endorseBlocksToReference leios p ebs (\_ _ -> True)
+      -- @bwbush: "Full Short" Leios variant is likely the `Full` case or close to it.
     let endorsedIBs = inputBlocksToEndorse leios slot ibs
     let !eb = mkEndorseBlock leios i slot nodeId referencedEBs endorsedIBs
     let !task = leios.delays.endorseBlockGeneration eb

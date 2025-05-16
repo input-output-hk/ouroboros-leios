@@ -169,6 +169,7 @@ data EndorseBlock = EndorseBlock
   , size :: !Bytes
   }
   deriving stock (Eq, Show)
+-- @bwbush: Check to see whether "Full Short" Leios is modeled correctly.
 
 data VoteId = VoteId
   { node :: !NodeId
@@ -186,6 +187,7 @@ data VoteMsg = VoteMsg
   , size :: !Bytes
   }
   deriving stock (Eq, Show)
+-- @bwbush: The weight of a vote is a `Rational` in the proposed wFA^LS scheme.
 
 newtype Certificate = Certificate
   { votes :: Map VoteId Word64

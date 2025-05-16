@@ -21,6 +21,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module LeiosProtocol.Short.DataSimP2P where
+-- @bwbush: Only used for data analysis.
 
 import Control.Exception
 import Control.Monad

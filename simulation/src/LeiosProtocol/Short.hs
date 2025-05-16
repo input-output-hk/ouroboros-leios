@@ -15,6 +15,7 @@
 {-# LANGUAGE NoFieldSelectors #-}
 
 module LeiosProtocol.Short (module LeiosProtocol.Short, DiffusionStrategy (..)) where
+-- @bwbush: Despite the name, this module encodes logic for "Short" and (mostly) "Full Short" Leios.
 
 import Chan (mkConnectionConfig)
 import Control.DeepSeq
@@ -79,6 +80,7 @@ prioritize ::
 prioritize PeerOrder _ = \_ hs -> hs
 prioritize FreshestFirst sl = \m _ -> sortOn (Down . sl) . Map.elems $ m
 prioritize OldestFirst sl = \m _ -> sortOn sl . Map.elems $ m
+-- @bwbush: Note that these variations made little difference in the simulation studies, even under congested conditions.
 
 data SingPipeline (p :: Pipeline) where
   SingSingleVote :: SingPipeline SingleVote
@@ -148,6 +150,7 @@ convertConfig disk =
           , variant = disk.leiosVariant
           , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
           , pipelinesToReferenceFromEB =
+              -- @bwbush: Does the Rust simulation model this, too?
               if disk.leiosVariant == Full
                 then
                   ceiling ((3 * disk.praosChainQuality) / fromIntegral sliceLength) - 2
@@ -801,6 +804,7 @@ endorseBlocksToVoteFor cfg@LeiosConfig{voteSendStage} slotConfig slot ibs ebs =
 -----------------------------------------------------------------
 ---- Expected generation rates in each slot.
 -----------------------------------------------------------------
+-- @bwbush: We may not need subslots because the sortition proposal limits producers to one IB or EB per slot. Even if stake where extremely concentrated, this would still be a good approximation.
 
 splitIntoSubSlots :: NetworkRate -> [NetworkRate]
 splitIntoSubSlots (NetworkRate r)
@@ -858,6 +862,7 @@ votingRatePerPipeline cfg stake = f
 nodeRate :: StakeFraction -> NetworkRate -> NodeRate
 nodeRate (StakeFraction s) (NetworkRate r) = NodeRate (s * r)
 
+-- @bwbush: The proposed sortition limits to one win.
 numWins ::
   StakeFraction ->
   NetworkRate ->
