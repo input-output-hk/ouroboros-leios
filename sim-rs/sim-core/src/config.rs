@@ -358,8 +358,8 @@ impl BlockSizeConfig {
         self.cert_constant + self.cert_per_node * nodes as u64
     }
 
-    pub fn eb(&self, ibs: usize, ebs: usize) -> u64 {
-        self.eb_constant + self.eb_per_ib * (ibs + ebs) as u64
+    pub fn eb(&self, txs: usize, ibs: usize, ebs: usize) -> u64 {
+        self.eb_constant + self.eb_per_ib * (txs + ibs + ebs) as u64
     }
 
     pub fn vote_bundle(&self, ebs: usize) -> u64 {

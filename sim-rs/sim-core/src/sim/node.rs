@@ -598,7 +598,7 @@ impl Node {
                 let txs = self.select_txs_for_eb(pipeline);
                 let ibs = self.select_ibs_for_eb(pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
-                let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
+                let bytes = self.sim_config.sizes.eb(txs.len(), ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
                     pipeline,
