@@ -1,0 +1,58 @@
+Existing and proposed flavors of Leios.
+
+> ![Note]
+> This is currently just a brain dump on understanding the status quo and the Leios flavors encounterd by @ch1bo. Maybe some of these names and summarirs are helpful to others.
+
+## Status quo / Praos
+
+Lets look at the status quo consensus protocol of Cardano - Ouroboros Praos - and how it is currently deployed. This section can be also seen as my assumptions on how the current system works. See also [Pi's blog post](https://314pool-v2-git-pi-leios-pi-lanninghams-projects.vercel.app/post/leios#review-of-ouroboros-praos):
+
+- Every network participant can submit transactions, which diffused across the whole network
+  - Each node validates all received transactions against its latest ledger state built from the current longest Praos chain of blocks
+  - Nodes pull transactions from their peers, potentially sampling across them
+  - However, no punishment for "invalid" transactions
+
+- Block production: A stake based VRF lottery decides which (stake pool) node will mint the next block
+  - Tuned to one active slot every ~20 seconds
+  - Probabilistic, so multiple blocks per slot or in short sequence possible
+  - Honest nodes: put as many txs from their already ordered mempool into a block 
+  - Adversary nodes: may fill a block with txs unknown to the network
+  
+- Blocks need to reach the next block producer as fast as possible
+  - Currently takes about 3 seconds; Target is < 5 seconds
+  - The lower, the less block height battles / chain re-orgs there are
+  - To get 3 seconds end-to-end network diffusion we only have fractions of a second to forward (= download, validate and upload) blocks
+
+## Vanilla: Full Leios
+- As published in paper TODO link
+- 7 stage pipeline with two EB rounds (?)
+- Optimal use of available bandwidth
+- TODO ...
+
+## Chocolate: Short Leios
+- 5 stages with only one round of EB (?)
+- TODO ... + link short leios in docs/
+
+## Proposal 1 - Pistachio: IBs not contain txs
+- Only reference txs in IBs
+    - Tx diffusion happening already for praos
+    - Should reuse already transmitted data
+    - Same tunable IB rate as in other flavors
+- Still 5 stage pipeline which starts with IB propose
+
+## Proposal 2 - Stracciatella: No IBs
+- Replace IB propose stage with regular Praos-like tx diffusion
+    - Effectively removes a stage?
+        - Lower individual tx latency possible?
+    - Restrict age of txs (as with IBs)?
+- EBs reference txs directly
+    - Honest EB producers just pick a "likely" set of transactions everyone saw as if they would do for IBs
+    - Schedule multiple EBs per round like in other flavors
+    - Maybe also sample EB sizes to increase chance of at least one EB certified?
+- Like Pi's 0.2, but with EBs onto transactions directly: https://314pool-v2-git-pi-leios-pi-lanninghams-projects.vercel.app/post/leios#leios-02---design
+
+#### Open points
+- Why are we often jumping onto the need for IBs?
+    - Am I missing something?
+- Does this avoid the conflicting tx problem as only one would end up in a certified EB?
+- Chain EBs like in vanilla Leios or just vote on longer prefixes?
