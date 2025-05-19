@@ -1,0 +1,1185 @@
+<!DOCTYPE html><html><head><script>
+      (function() {
+        // Check for theme preference in localStorage
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+        }
+      })();
+    </script><meta charset="utf-8"><title>Data.List.Relation.Unary.First</title><link rel="stylesheet" href="Agda.css"><style>/* Base styles */
+:root {
+  --header-height: 64px;
+  --sidebar-width: 280px;
+  --sidebar-padding: 24px;
+  --content-max-width: 900px;
+  --primary-color: #1a1a1a;
+  --border-color: #e0e0e0;
+  --hover-bg: rgba(0, 119, 204, 0.1);
+  --hover-transform: translateY(-1px);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --content-padding: 40px;
+  --background-color: #ffffff;
+  --code-bg: #f6f8fa;
+  --code-color: #24292e;
+  --link-color: #0077cc;
+  --link-hover-color: #0055aa;
+  --syntax-keyword: #d73a49;
+  --syntax-string: #032f62;
+  --syntax-comment: #6a737d;
+  --syntax-function: #6f42c1;
+  --syntax-variable: #e36209;
+  --syntax-operator: #005cc5;
+  --syntax-class: #6f42c1;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --code-border: rgba(0, 0, 0, 0.05);
+  --sidebar-border-color: var(--border-color);
+  --header-border-color: var(--border-color);
+  --header-button-padding: 8px;
+  --header-button-border-radius: 6px;
+}
+
+:root.dark-theme {
+  --primary-color: #e4e4e4;
+  --border-color: #555555;
+  --hover-bg: rgba(88, 166, 255, 0.2);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --background-color: #121212;
+  --code-bg: rgba(255, 255, 255, 0.07);
+  --code-color: #e4e4e4;
+  --link-color: #78aeff;
+  --link-hover-color: #94c2ff;
+  --syntax-keyword: #c75d65;
+  --syntax-string: #7fb0d8;
+  --syntax-comment: #6e7781;
+  --syntax-function: #b387d8;
+  --syntax-variable: #e0a17a;
+  --syntax-operator: #8ab4ff;
+  --syntax-class: #b387d8;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --code-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border-color: #333333;
+  --header-border-color: #333333;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-family);
+  color: var(--primary-color);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background-color);
+}
+
+/* Header styles */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: var(--background-color);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1000;
+  box-shadow: var(--box-shadow);
+  border-bottom: 1px solid var(--header-border-color);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Header button/link shared styles */
+.back-button,
+.github-link,
+.theme-toggle,
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  border-radius: var(--header-button-border-radius);
+  transition: all 0.2s ease;
+  padding: var(--header-button-padding);
+  position: relative;
+}
+
+.back-button:hover,
+.github-link:hover,
+.theme-toggle:hover,
+.search-button:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.back-button:active,
+.github-link:active,
+.theme-toggle:active,
+.search-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Individual button styles - keeping only specific differences */
+.back-button {
+  text-decoration: none;
+  font-size: 15px;
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  margin: 0 4px;
+}
+
+.github-link {
+  text-decoration: none;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Theme toggler styles */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+:root:not(.dark-theme) .dark-icon {
+  display: none;
+}
+
+:root.dark-theme .light-icon {
+  display: none;
+}
+
+/* Main layout */
+.main-wrapper {
+  display: flex;
+  margin-top: var(--header-height);
+  min-height: calc(100vh - var(--header-height));
+}
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--background-color);
+  border-right: 1px solid var(--sidebar-border-color);
+  overflow-y: auto;
+  padding: var(--sidebar-padding);
+  flex-shrink: 0;
+}
+
+.modules-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sidebar-border-color);
+}
+
+.module-group-header {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary-color);
+  opacity: 0.7;
+  margin: 20px 0 8px 0;
+  padding-left: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+}
+
+.module-item {
+  margin-bottom: 2px;
+  padding-left: 24px;
+}
+
+.module-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 14px;
+  display: block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.module-link:hover {
+  background-color: var(--hover-bg);
+}
+
+.module-link.active {
+  background-color: var(--hover-bg);
+  font-weight: 500;
+  border-left: 3px solid var(--link-color);
+  padding-left: 9px;
+}
+
+/* Main content styles */
+.main-content {
+  flex: 1;
+  margin-left: calc(var(--sidebar-width) + var(--sidebar-padding) * 2);
+  padding: var(--content-padding);
+  overflow-y: auto;
+  max-width: var(--content-max-width);
+  scroll-padding-top: calc(var(--header-height) + var(--content-padding));
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Ensure anchors have proper scroll margin */
+.main-content :target {
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Add padding to all direct children of main-content */
+.main-content > * {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* Common elements styling */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+/* Code blocks */
+pre, code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  background-color: var(--code-bg);
+  color: var(--code-color);
+  border-radius: 6px;
+}
+
+pre {
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--code-border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+pre.Agda {
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+
+code {
+  padding: 2px 4px;
+}
+
+pre code {
+  padding: 0;
+  background-color: transparent;
+  border: none;
+}
+
+/* Syntax highlighting for Agda */
+.Keyword { color: var(--syntax-keyword); }
+.String { color: var(--syntax-string); }
+.Comment { color: var(--syntax-comment); }
+.Function { color: var(--syntax-function); }
+.InductiveConstructor { color: var(--syntax-class); }
+.CoinductiveConstructor { color: var(--syntax-class); }
+.Datatype { color: var(--syntax-class); }
+.Field { color: var(--syntax-variable); }
+.Bound { color: var(--code-color); }
+.Generalizable { color: var(--syntax-variable); }
+.Module { color: var(--syntax-keyword); }
+.Number { color: var(--syntax-variable); }
+.Postulate { color: var(--syntax-function); }
+.Primitive { color: var(--syntax-keyword); }
+.Record { color: var(--syntax-class); }
+.Hole { color: var(--syntax-operator); background-color: rgba(255, 255, 0, 0.1); }
+.Symbol { color: var(--syntax-operator); }
+.PrimitiveType { color: var(--syntax-keyword); }
+.Macro { color: var(--syntax-function); }
+
+/* Override Agda.css hover styles */
+.Agda a[href]:hover {
+  background-color: var(--hover-bg) !important;
+  color: var(--link-hover-color) !important;
+  text-decoration: underline !important;
+}
+
+.Agda [href].hover-highlight {
+  background-color: var(--hover-bg) !important;
+}
+
+/* Specific Agda syntax improvements for dark theme */
+:root.dark-theme .Agda .Keyword, 
+:root.dark-theme .Agda .Module,
+:root.dark-theme .Agda .Pragma { 
+  color: var(--syntax-keyword) !important; 
+}
+
+:root.dark-theme .Agda .Symbol,
+:root.dark-theme .Agda .Operator { 
+  color: var(--syntax-operator) !important; 
+}
+
+:root.dark-theme .Agda .InductiveConstructor,
+:root.dark-theme .Agda .CoinductiveConstructor { 
+  color: var(--syntax-variable) !important; 
+}
+
+:root.dark-theme .Agda .Datatype,
+:root.dark-theme .Agda .Record,
+:root.dark-theme .Agda .Primitive,
+:root.dark-theme .Agda .PrimitiveType { 
+  color: var(--syntax-class) !important; 
+}
+
+:root.dark-theme .Agda .String { 
+  color: var(--syntax-string) !important; 
+}
+
+:root.dark-theme .Agda .Comment { 
+  color: var(--syntax-comment) !important; 
+}
+
+:root.dark-theme .Agda .Function,
+:root.dark-theme .Agda .Macro,
+:root.dark-theme .Agda .Postulate { 
+  color: var(--syntax-function) !important; 
+}
+
+:root.dark-theme .Agda .Bound,
+:root.dark-theme .Agda .Generalizable { 
+  color: var(--code-color) !important; 
+}
+
+/* Code line numbers styling */
+.code-container {
+  display: flex;
+  width: 100%;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.code-container * {
+  box-sizing: border-box;
+}
+
+.line-numbers {
+  flex: 0 0 auto;
+  padding-right: 8px;
+  user-select: none;
+  text-align: right;
+  width: 32px;
+  position: sticky;
+  left: 0;
+  background-color: transparent;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.line-number {
+  display: block;
+  color: rgba(27, 31, 35, 0.4);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 1.5em;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  outline: none;
+}
+
+.line-number:hover {
+  color: var(--primary-color);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.line-number:focus,
+.line-number:focus-visible,
+.line-number:focus-within,
+.line-number:active {
+  outline: none;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+:root.dark-theme .line-number {
+  color: rgba(230, 237, 243, 0.4);
+}
+
+.code-content {
+  overflow-x: auto;
+  padding-left: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.code-line {
+  line-height: 1.5;
+  height: 1.5em;
+  white-space: pre;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+/* Ensure that the Agda syntax elements don't affect line height */
+.code-line * {
+  line-height: inherit;
+}
+
+/* Highlighted line styles */
+.code-line.highlighted {
+  background-color: var(--hover-bg);
+  border-radius: 3px;
+  display: block;
+  width: 100%;
+}
+
+/* Improve highlighted line visibility */
+pre.Agda .code-content .highlighted {
+  animation: highlight-glow 1s ease-in-out 1;
+}
+
+@keyframes highlight-glow {
+  0% {
+    background-color: rgba(255, 213, 0, 0.1);
+  }
+  50% {
+    background-color: rgba(255, 213, 0, 0.2);
+  }
+  100% {
+    background-color: var(--hover-bg);
+  }
+}
+
+/* Target the line when the hash in the URL matches */
+.code-content .code-line:target {
+  background-color: var(--hover-bg);
+}
+
+/* Code copy button styles */
+pre.Agda {
+  position: relative;
+}
+
+pre.Agda.has-copy-button {
+  padding-right: 42px; /* Space for copy button */
+}
+
+.copy-code-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.2s, background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-code-button:hover {
+  opacity: 1;
+  background-color: var(--hover-bg);
+}
+
+.copy-code-button:active {
+  background-color: var(--hover-bg);
+  opacity: 1;
+}
+
+.copy-code-button.copy-success {
+  background-color: var(--hover-bg);
+  opacity: 1;
+  border-color: rgba(0, 119, 204, 0.5);
+}
+
+:root.dark-theme .copy-code-button.copy-success {
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+.copy-code-button.copy-success svg {
+  color: var(--primary-color);
+}
+
+.copy-code-button svg {
+  display: block;
+  color: var(--primary-color);
+}
+
+/* Line number highlight styles */
+.line-number[data-line-number].highlighted,
+.line-number[href].active {
+  color: var(--primary-color) !important;
+  font-weight: 500;
+}
+
+.line-number[data-line-number].highlighted::before,
+.line-number[href].active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background-color: rgba(0, 119, 204, 0.5);
+  border-radius: 2px;
+}
+
+:root.dark-theme .line-number[data-line-number].highlighted::before,
+:root.dark-theme .line-number[href].active::before {
+  background-color: rgba(88, 166, 255, 0.5);
+}
+
+/* When copy-pasting, only select the code, not the line numbers */
+.code-content {
+  user-select: text;
+}
+
+/* Target just the current line when linking to it */
+:target + .code-content > [id^="LC"] {
+  background-color: var(--hover-bg);
+}
+
+.code-content [id^="LC"]:target {
+  background-color: var(--hover-bg);
+}
+
+/* Responsive styles for narrow screens */
+@media (max-width: 768px) {
+  .line-numbers {
+    width: 40px;
+    padding-right: 8px;
+  }
+  
+  .code-content {
+    padding-left: 8px;
+  }
+} </style><style>/* Search UI Styles */
+
+/* Search button in the header */
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--primary-color);
+  border-radius: var(--header-button-border-radius);
+  transition: all 0.2s ease;
+  padding: var(--header-button-padding);
+  position: relative;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+}
+
+.search-button:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.search-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.search-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Fix header buttons to use consistent styling */
+.header-right button, 
+.header-right a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+/* All header buttons should have the same hover effects */
+.header-right button:hover, 
+.header-right a:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.header-right button:active,
+.header-right a:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Make sure SVG icons are consistent */
+.header-right button svg, 
+.header-right a svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Fix header alignment while preserving gap */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Search overlay (background) */
+.search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding-top: 80px;
+  backdrop-filter: blur(2px);
+}
+
+/* Main search container */
+.search-container {
+  width: 600px;
+  max-width: calc(100% - 32px);
+  background-color: var(--background-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  max-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Search input field */
+.search-input {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 18px;
+  outline: none;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: var(--link-color);
+  box-shadow: 0 0 0 1px var(--link-color, #0077cc);
+}
+
+.search-input:placeholder-shown {
+  box-shadow: inset 0 0 6px rgba(0, 119, 204, 0.1);
+}
+
+:root.dark-theme .search-input:placeholder-shown {
+  box-shadow: inset 0 0 6px rgba(88, 166, 255, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--text-light);
+  opacity: 0.7;
+}
+
+/* Search results container */
+.search-results {
+  overflow-y: auto;
+  max-height: 450px;
+  padding: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Empty search state */
+.search-message {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+/* Individual search result */
+.search-result {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: relative;
+  display: block;
+  text-decoration: none;
+  color: var(--primary-color);
+}
+
+.search-result:hover, 
+.search-result.selected {
+  background-color: var(--hover-bg);
+  text-decoration: none;
+}
+
+.search-result.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--primary-color, #4a6da7);
+}
+
+/* Result title */
+.result-title {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* Result footer with path and type */
+.result-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+/* Result source path */
+.result-path {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* Result preview content */
+.result-preview {
+  padding: 8px;
+  background-color: var(--code-bg);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  position: relative;
+  max-height: none;
+  overflow-x: visible;
+  line-height: 1.3;
+}
+
+/* Code-specific styling */
+.code-preview {
+  background-color: var(--code-bg, #f5f5f5);
+}
+
+.code-highlight {
+  display: block;
+  background-color: var(--highlight-color, #f0f0f0);
+  font-weight: bold;
+}
+
+.code-context {
+  display: block;
+  opacity: 0.7;
+}
+
+/* Highlight matched text in previews */
+.result-match {
+  background-color: rgba(255, 255, 0, 0.4);
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+  font-weight: bold;
+  display: inline;
+}
+
+/* Fix for consecutive highlighted characters */
+.result-match + .result-match {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* Different result types styling */
+.result-type {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.result-type-code {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.result-type-header {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.result-type-module {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+/* Dark theme overrides */
+.dark-theme .result-match {
+  background-color: rgba(255, 255, 0, 0.25);
+  color: var(--text-color);
+}
+
+.dark-theme .result-type-code {
+  background-color: rgba(25, 118, 210, 0.2);
+  color: #90caf9;
+}
+
+.dark-theme .result-type-header {
+  background-color: rgba(46, 125, 50, 0.2);
+  color: #a5d6a7;
+}
+
+.dark-theme .result-type-module {
+  background-color: rgba(230, 81, 0, 0.2);
+  color: #ffcc80;
+}
+
+.dark-theme .code-highlight {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Apply blur to main content when search is active */
+body.search-active .main-wrapper {
+  filter: blur(2px);
+}
+
+/* Keyboard shortcut hint in results */
+.keyboard-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 11px;
+  color: var(--text-light);
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* Add extra room at bottom of results */
+.search-results::after {
+  content: '';
+  display: block;
+  height: 16px;
+}
+
+/* Empty results state */
+.no-results {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+/* Loading indicator */
+.search-loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.search-loading-spinner {
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .search-container {
+    width: 100%;
+    max-width: calc(100% - 16px);
+    border-radius: 8px 8px 0 0;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    max-height: 80vh;
+  }
+  
+  .search-overlay {
+    padding-top: 0;
+    align-items: flex-end;
+  }
+} </style></head><body><header><div class="header-left"><a href="/formal-spec/" class="back-button">← Back</a></div><div class="header-right"><a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" class="github-link" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+        <svg viewBox="0 0 24 24" width="24" height="24" class="github-icon">
+          <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path>
+        </svg>
+      </a><button class="theme-toggle" title="Toggle theme">
+      <span class="light-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+        </svg>
+      </span>
+      <span class="dark-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+        </svg>
+      </span>
+    </button></div></header><div class="main-wrapper"><aside class="sidebar"><h3 class="modules-header">Modules</h3><h4 class="module-group-header">Leios</h4><ul class="module-list"><li class="module-item"><a href="Leios.Abstract.html" class="module-link">Abstract</a></li><li class="module-item"><a href="Leios.Base.html" class="module-link">Base</a></li><li class="module-item"><a href="Leios.Blocks.html" class="module-link">Blocks</a></li><li class="module-item"><a href="Leios.Config.html" class="module-link">Config</a></li><li class="module-item"><a href="Leios.Defaults.html" class="module-link">Defaults</a></li><li class="module-item"><a href="Leios.FFD.html" class="module-link">FFD</a></li><li class="module-item"><a href="Leios.Foreign.BaseTypes.html" class="module-link">Foreign.BaseTypes</a></li><li class="module-item"><a href="Leios.Foreign.HsTypes.html" class="module-link">Foreign.HsTypes</a></li><li class="module-item"><a href="Leios.Foreign.Types.html" class="module-link">Foreign.Types</a></li><li class="module-item"><a href="Leios.Foreign.Util.html" class="module-link">Foreign.Util</a></li><li class="module-item"><a href="Leios.KeyRegistration.html" class="module-link">KeyRegistration</a></li><li class="module-item"><a href="Leios.Network.html" class="module-link">Network</a></li><li class="module-item"><a href="Leios.Prelude.html" class="module-link">Prelude</a></li><li class="module-item"><a href="Leios.Protocol.html" class="module-link">Protocol</a></li><li class="module-item"><a href="Leios.Short.html" class="module-link">Short</a></li><li class="module-item"><a href="Leios.Short.Decidable.html" class="module-link">Short.Decidable</a></li><li class="module-item"><a href="Leios.Short.Trace.Verifier.html" class="module-link">Short.Trace.Verifier</a></li><li class="module-item"><a href="Leios.Short.Trace.Verifier.Test.html" class="module-link">Short.Trace.Verifier.Test</a></li><li class="module-item"><a href="Leios.Simplified.html" class="module-link">Simplified</a></li><li class="module-item"><a href="Leios.Simplified.Deterministic.html" class="module-link">Simplified.Deterministic</a></li><li class="module-item"><a href="Leios.SpecStructure.html" class="module-link">SpecStructure</a></li><li class="module-item"><a href="Leios.Traces.html" class="module-link">Traces</a></li><li class="module-item"><a href="Leios.Voting.html" class="module-link">Voting</a></li><li class="module-item"><a href="Leios.VRF.html" class="module-link">VRF</a></li></ul></aside><div class="main-content"><pre class="Agda has-copy-button"><div class="code-container"><div class="line-numbers"><a href="#L1" id="L1" class="line-number" data-line-number="1">1</a><a href="#L2" id="L2" class="line-number" data-line-number="2">2</a><a href="#L3" id="L3" class="line-number" data-line-number="3">3</a><a href="#L4" id="L4" class="line-number" data-line-number="4">4</a><a href="#L5" id="L5" class="line-number" data-line-number="5">5</a><a href="#L6" id="L6" class="line-number" data-line-number="6">6</a><a href="#L7" id="L7" class="line-number" data-line-number="7">7</a><a href="#L8" id="L8" class="line-number" data-line-number="8">8</a><a href="#L9" id="L9" class="line-number" data-line-number="9">9</a><a href="#L10" id="L10" class="line-number" data-line-number="10">10</a><a href="#L11" id="L11" class="line-number" data-line-number="11">11</a><a href="#L12" id="L12" class="line-number" data-line-number="12">12</a><a href="#L13" id="L13" class="line-number" data-line-number="13">13</a><a href="#L14" id="L14" class="line-number" data-line-number="14">14</a><a href="#L15" id="L15" class="line-number" data-line-number="15">15</a><a href="#L16" id="L16" class="line-number" data-line-number="16">16</a><a href="#L17" id="L17" class="line-number" data-line-number="17">17</a><a href="#L18" id="L18" class="line-number" data-line-number="18">18</a><a href="#L19" id="L19" class="line-number" data-line-number="19">19</a><a href="#L20" id="L20" class="line-number" data-line-number="20">20</a><a href="#L21" id="L21" class="line-number" data-line-number="21">21</a><a href="#L22" id="L22" class="line-number" data-line-number="22">22</a><a href="#L23" id="L23" class="line-number" data-line-number="23">23</a><a href="#L24" id="L24" class="line-number" data-line-number="24">24</a><a href="#L25" id="L25" class="line-number" data-line-number="25">25</a><a href="#L26" id="L26" class="line-number" data-line-number="26">26</a><a href="#L27" id="L27" class="line-number" data-line-number="27">27</a><a href="#L28" id="L28" class="line-number" data-line-number="28">28</a><a href="#L29" id="L29" class="line-number" data-line-number="29">29</a><a href="#L30" id="L30" class="line-number" data-line-number="30">30</a><a href="#L31" id="L31" class="line-number" data-line-number="31">31</a><a href="#L32" id="L32" class="line-number" data-line-number="32">32</a><a href="#L33" id="L33" class="line-number" data-line-number="33">33</a><a href="#L34" id="L34" class="line-number" data-line-number="34">34</a><a href="#L35" id="L35" class="line-number" data-line-number="35">35</a><a href="#L36" id="L36" class="line-number" data-line-number="36">36</a><a href="#L37" id="L37" class="line-number" data-line-number="37">37</a><a href="#L38" id="L38" class="line-number" data-line-number="38">38</a><a href="#L39" id="L39" class="line-number" data-line-number="39">39</a><a href="#L40" id="L40" class="line-number" data-line-number="40">40</a><a href="#L41" id="L41" class="line-number" data-line-number="41">41</a><a href="#L42" id="L42" class="line-number" data-line-number="42">42</a><a href="#L43" id="L43" class="line-number" data-line-number="43">43</a><a href="#L44" id="L44" class="line-number" data-line-number="44">44</a><a href="#L45" id="L45" class="line-number" data-line-number="45">45</a><a href="#L46" id="L46" class="line-number" data-line-number="46">46</a><a href="#L47" id="L47" class="line-number" data-line-number="47">47</a><a href="#L48" id="L48" class="line-number" data-line-number="48">48</a><a href="#L49" id="L49" class="line-number" data-line-number="49">49</a><a href="#L50" id="L50" class="line-number" data-line-number="50">50</a><a href="#L51" id="L51" class="line-number" data-line-number="51">51</a><a href="#L52" id="L52" class="line-number" data-line-number="52">52</a><a href="#L53" id="L53" class="line-number" data-line-number="53">53</a><a href="#L54" id="L54" class="line-number" data-line-number="54">54</a><a href="#L55" id="L55" class="line-number" data-line-number="55">55</a><a href="#L56" id="L56" class="line-number" data-line-number="56">56</a><a href="#L57" id="L57" class="line-number" data-line-number="57">57</a><a href="#L58" id="L58" class="line-number" data-line-number="58">58</a><a href="#L59" id="L59" class="line-number" data-line-number="59">59</a><a href="#L60" id="L60" class="line-number" data-line-number="60">60</a><a href="#L61" id="L61" class="line-number" data-line-number="61">61</a><a href="#L62" id="L62" class="line-number" data-line-number="62">62</a><a href="#L63" id="L63" class="line-number" data-line-number="63">63</a><a href="#L64" id="L64" class="line-number" data-line-number="64">64</a><a href="#L65" id="L65" class="line-number" data-line-number="65">65</a><a href="#L66" id="L66" class="line-number" data-line-number="66">66</a><a href="#L67" id="L67" class="line-number" data-line-number="67">67</a><a href="#L68" id="L68" class="line-number" data-line-number="68">68</a><a href="#L69" id="L69" class="line-number" data-line-number="69">69</a><a href="#L70" id="L70" class="line-number" data-line-number="70">70</a><a href="#L71" id="L71" class="line-number" data-line-number="71">71</a><a href="#L72" id="L72" class="line-number" data-line-number="72">72</a><a href="#L73" id="L73" class="line-number" data-line-number="73">73</a><a href="#L74" id="L74" class="line-number" data-line-number="74">74</a><a href="#L75" id="L75" class="line-number" data-line-number="75">75</a><a href="#L76" id="L76" class="line-number" data-line-number="76">76</a><a href="#L77" id="L77" class="line-number" data-line-number="77">77</a><a href="#L78" id="L78" class="line-number" data-line-number="78">78</a><a href="#L79" id="L79" class="line-number" data-line-number="79">79</a><a href="#L80" id="L80" class="line-number" data-line-number="80">80</a><a href="#L81" id="L81" class="line-number" data-line-number="81">81</a><a href="#L82" id="L82" class="line-number" data-line-number="82">82</a><a href="#L83" id="L83" class="line-number" data-line-number="83">83</a><a href="#L84" id="L84" class="line-number" data-line-number="84">84</a><a href="#L85" id="L85" class="line-number" data-line-number="85">85</a><a href="#L86" id="L86" class="line-number" data-line-number="86">86</a><a href="#L87" id="L87" class="line-number" data-line-number="87">87</a><a href="#L88" id="L88" class="line-number" data-line-number="88">88</a><a href="#L89" id="L89" class="line-number" data-line-number="89">89</a><a href="#L90" id="L90" class="line-number" data-line-number="90">90</a><a href="#L91" id="L91" class="line-number" data-line-number="91">91</a><a href="#L92" id="L92" class="line-number" data-line-number="92">92</a><a href="#L93" id="L93" class="line-number" data-line-number="93">93</a><a href="#L94" id="L94" class="line-number" data-line-number="94">94</a><a href="#L95" id="L95" class="line-number" data-line-number="95">95</a><a href="#L96" id="L96" class="line-number" data-line-number="96">96</a><a href="#L97" id="L97" class="line-number" data-line-number="97">97</a><a href="#L98" id="L98" class="line-number" data-line-number="98">98</a><a href="#L99" id="L99" class="line-number" data-line-number="99">99</a><a href="#L100" id="L100" class="line-number" data-line-number="100">100</a><a href="#L101" id="L101" class="line-number" data-line-number="101">101</a><a href="#L102" id="L102" class="line-number" data-line-number="102">102</a><a href="#L103" id="L103" class="line-number" data-line-number="103">103</a><a href="#L104" id="L104" class="line-number" data-line-number="104">104</a><a href="#L105" id="L105" class="line-number" data-line-number="105">105</a><a href="#L106" id="L106" class="line-number" data-line-number="106">106</a><a href="#L107" id="L107" class="line-number" data-line-number="107">107</a><a href="#L108" id="L108" class="line-number" data-line-number="108">108</a></div><div class="code-content"><div id="LC1" class="code-line"><a id="1" class="Comment">------------------------------------------------------------------------</a></div><div id="LC2" class="code-line"><a id="74" class="Comment">-- The Agda standard library</a></div><div id="LC3" class="code-line"><a id="103" class="Comment">--</a></div><div id="LC4" class="code-line"><a id="106" class="Comment">-- First generalizes the idea that an element is the first in a list to</a></div><div id="LC5" class="code-line"><a id="178" class="Comment">-- satisfy a predicate.</a></div><div id="LC6" class="code-line"><a id="202" class="Comment">------------------------------------------------------------------------</a></div><div id="LC7" class="code-line">&nbsp;</div><div id="LC8" class="code-line"><a id="276" class="Symbol">{-#</a> <a id="280" class="Keyword">OPTIONS</a> <a id="288" class="Pragma">--cubical-compatible</a> <a id="309" class="Pragma">--safe</a> <a id="316" class="Symbol">#-}</a></div><div id="LC9" class="code-line">&nbsp;</div><div id="LC10" class="code-line"><a id="321" class="Keyword">module</a> <a id="328" href="Data.List.Relation.Unary.First.html" class="Module">Data.List.Relation.Unary.First</a> <a id="359" class="Symbol">{</a><a id="360" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#360" title="Line 10 (position 360)">a</a><a id="361" class="Symbol">}</a> <a id="363" class="Symbol">{</a><a id="364" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="366" class="Symbol">:</a> <a id="368" href="Agda.Primitive.html#L14" class="Primitive" data-original-href="Agda.Primitive.html#388" title="Line 14 (position 388)">Set</a> <a id="372" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#360" title="Line 10 (position 360)">a</a><a id="373" class="Symbol">}</a> <a id="375" class="Keyword">where</a></div><div id="LC11" class="code-line">&nbsp;</div><div id="LC12" class="code-line"><a id="382" class="Keyword">open</a> <a id="387" class="Keyword">import</a> <a id="394" href="Level.html" class="Module">Level</a> <a id="400" class="Keyword">using</a> <a id="406" class="Symbol">(</a><a id="407" href="Agda.Primitive.html#L37" class="Primitive Operator" data-original-href="Agda.Primitive.html#961" title="Line 37 (position 961)">_⊔_</a><a id="410" class="Symbol">)</a></div><div id="LC13" class="code-line"><a id="412" class="Keyword">open</a> <a id="417" class="Keyword">import</a> <a id="424" href="Data.Empty.html" class="Module">Data.Empty</a></div><div id="LC14" class="code-line"><a id="435" class="Keyword">open</a> <a id="440" class="Keyword">import</a> <a id="447" href="Data.Fin.Base.html" class="Module">Data.Fin.Base</a> <a id="461" class="Symbol">as</a> <a id="464" class="Module">Fin</a> <a id="468" class="Keyword">using</a> <a id="474" class="Symbol">(</a><a id="475" href="Data.Fin.Base.html#L34" class="Datatype" data-original-href="Data.Fin.Base.html#1159" title="Line 34 (position 1159)">Fin</a><a id="478" class="Symbol">;</a> <a id="480" href="Data.Fin.Base.html#L35" class="InductiveConstructor" data-original-href="Data.Fin.Base.html#1181" title="Line 35 (position 1181)">zero</a><a id="484" class="Symbol">;</a> <a id="486" href="Data.Fin.Base.html#L36" class="InductiveConstructor" data-original-href="Data.Fin.Base.html#1202" title="Line 36 (position 1202)">suc</a><a id="489" class="Symbol">)</a></div><div id="LC15" class="code-line"><a id="491" class="Keyword">open</a> <a id="496" class="Keyword">import</a> <a id="503" href="Data.List.Base.html" class="Module">Data.List.Base</a> <a id="518" class="Symbol">as</a> <a id="521" class="Module">List</a> <a id="526" class="Keyword">using</a> <a id="532" class="Symbol">(</a><a id="533" href="Agda.Builtin.List.html#L6" class="Datatype" data-original-href="Agda.Builtin.List.html#147" title="Line 6 (position 147)">List</a><a id="537" class="Symbol">;</a> <a id="539" href="Data.List.Base.html#L279" class="InductiveConstructor" data-original-href="Data.List.Base.html#7599" title="Line 279 (position 7599)">[]</a><a id="541" class="Symbol">;</a> <a id="543" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">_∷_</a><a id="546" class="Symbol">)</a></div><div id="LC16" class="code-line"><a id="548" class="Keyword">open</a> <a id="553" class="Keyword">import</a> <a id="560" href="Data.List.Relation.Unary.All.html" class="Module">Data.List.Relation.Unary.All</a> <a id="589" class="Symbol">as</a> <a id="592" class="Module">All</a> <a id="596" class="Keyword">using</a> <a id="602" class="Symbol">(</a><a id="603" href="Data.List.Relation.Unary.All.html#L48" class="Datatype" data-original-href="Data.List.Relation.Unary.All.html#1639" title="Line 48 (position 1639)">All</a><a id="606" class="Symbol">;</a> <a id="608" href="Data.List.Relation.Unary.All.html#L49" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.All.html#1702" title="Line 49 (position 1702)">[]</a><a id="610" class="Symbol">;</a> <a id="612" href="Data.List.Relation.Unary.All.html#L50" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.All.html#1719" title="Line 50 (position 1719)">_∷_</a><a id="615" class="Symbol">)</a></div><div id="LC17" class="code-line"><a id="617" class="Keyword">open</a> <a id="622" class="Keyword">import</a> <a id="629" href="Data.List.Relation.Unary.Any.html" class="Module">Data.List.Relation.Unary.Any</a> <a id="658" class="Symbol">as</a> <a id="661" class="Module">Any</a> <a id="665" class="Keyword">using</a> <a id="671" class="Symbol">(</a><a id="672" href="Data.List.Relation.Unary.Any.html#L35" class="Datatype" data-original-href="Data.List.Relation.Unary.Any.html#1148" title="Line 35 (position 1148)">Any</a><a id="675" class="Symbol">;</a> <a id="677" href="Data.List.Relation.Unary.Any.html#L36" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1211" title="Line 36 (position 1211)">here</a><a id="681" class="Symbol">;</a> <a id="683" href="Data.List.Relation.Unary.Any.html#L37" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1264" title="Line 37 (position 1264)">there</a><a id="688" class="Symbol">)</a></div><div id="LC18" class="code-line"><a id="690" class="Keyword">open</a> <a id="695" class="Keyword">import</a> <a id="702" href="Data.Product.Base.html" class="Module">Data.Product.Base</a> <a id="720" class="Keyword">using</a> <a id="726" class="Symbol">(</a><a id="727" href="Data.Product.Base.html#L37" class="Function" data-original-href="Data.Product.Base.html#852" title="Line 37 (position 852)">∃</a><a id="728" class="Symbol">;</a> <a id="730" href="Data.Product.Base.html#L85" class="Function Operator" data-original-href="Data.Product.Base.html#1932" title="Line 85 (position 1932)">-,_</a><a id="733" class="Symbol">;</a> <a id="735" href="Agda.Builtin.Sigma.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.Sigma.html#235" title="Line 8 (position 235)">_,_</a><a id="738" class="Symbol">)</a></div><div id="LC19" class="code-line"><a id="740" class="Keyword">open</a> <a id="745" class="Keyword">import</a> <a id="752" href="Data.Sum.Base.html" class="Module">Data.Sum.Base</a> <a id="766" class="Symbol">as</a> <a id="769" class="Module">Sum</a> <a id="773" class="Keyword">using</a> <a id="779" class="Symbol">(</a><a id="780" href="Data.Sum.Base.html#L28" class="Datatype Operator" data-original-href="Data.Sum.Base.html#625" title="Line 28 (position 625)">_⊎_</a><a id="783" class="Symbol">;</a> <a id="785" href="Data.Sum.Base.html#L29" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#675" title="Line 29 (position 675)">inj₁</a><a id="789" class="Symbol">;</a> <a id="791" href="Data.Sum.Base.html#L30" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#700" title="Line 30 (position 700)">inj₂</a><a id="795" class="Symbol">)</a></div><div id="LC20" class="code-line"><a id="797" class="Keyword">open</a> <a id="802" class="Keyword">import</a> <a id="809" href="Function.Base.html" class="Module">Function.Base</a> <a id="823" class="Keyword">using</a> <a id="829" class="Symbol">(</a><a id="830" href="Function.Base.html#L29" class="Function" data-original-href="Function.Base.html#704" title="Line 29 (position 704)">id</a><a id="832" class="Symbol">;</a> <a id="834" href="Function.Base.html#L134" class="Function Operator" data-original-href="Function.Base.html#3626" title="Line 134 (position 3626)">_∘′_</a><a id="838" class="Symbol">)</a></div><div id="LC21" class="code-line"><a id="840" class="Keyword">open</a> <a id="845" class="Keyword">import</a> <a id="852" href="Relation.Unary.html" class="Module">Relation.Unary</a></div><div id="LC22" class="code-line"><a id="867" class="Keyword">open</a> <a id="872" class="Keyword">import</a> <a id="879" href="Relation.Nullary.html" class="Module">Relation.Nullary</a></div><div id="LC23" class="code-line">&nbsp;</div><div id="LC24" class="code-line"><a id="897" class="Comment">------------------------------------------------------------------------</a></div><div id="LC25" class="code-line"><a id="970" class="Comment">-- Basic type.</a></div><div id="LC26" class="code-line">&nbsp;</div><div id="LC27" class="code-line"><a id="986" class="Keyword">module</a> <a id="993" href="Data.List.Relation.Unary.First.html#L27" class="Module" data-original-href="Data.List.Relation.Unary.First.html#993" title="Line 27 (position 993)">_</a> <a id="995" class="Symbol">{</a><a id="996" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#996" title="Line 27 (position 996)">p</a> <a id="998" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#998" title="Line 27 (position 998)">q</a><a id="999" class="Symbol">}</a> <a id="1001" class="Symbol">(</a><a id="1002" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1002" title="Line 27 (position 1002)">P</a> <a id="1004" class="Symbol">:</a> <a id="1006" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1011" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1013" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#996" title="Line 27 (position 996)">p</a><a id="1014" class="Symbol">)</a> <a id="1016" class="Symbol">(</a><a id="1017" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1017" title="Line 27 (position 1017)">Q</a> <a id="1019" class="Symbol">:</a> <a id="1021" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1026" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1028" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#998" title="Line 27 (position 998)">q</a><a id="1029" class="Symbol">)</a> <a id="1031" class="Keyword">where</a></div><div id="LC28" class="code-line">&nbsp;</div><div id="LC29" class="code-line">  <a id="1040" class="Keyword">infix</a> <a id="1046" class="Number">1</a> <a id="1048" href="Data.List.Relation.Unary.First.html#L37" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1280" title="Line 37 (position 1280)">_++_∷_</a></div><div id="LC30" class="code-line">  <a id="1057" class="Keyword">infixr</a> <a id="1064" class="Number">5</a> <a id="1066" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">_∷_</a></div><div id="LC31" class="code-line">&nbsp;</div><div id="LC32" class="code-line">  <a id="1073" class="Keyword">data</a> <a id="1078" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1084" class="Symbol">:</a> <a id="1086" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1091" class="Symbol">(</a><a id="1092" href="Agda.Builtin.List.html#L6" class="Datatype" data-original-href="Agda.Builtin.List.html#147" title="Line 6 (position 147)">List</a> <a id="1097" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a><a id="1098" class="Symbol">)</a> <a id="1100" class="Symbol">(</a><a id="1101" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#360" title="Line 10 (position 360)">a</a> <a id="1103" href="Agda.Primitive.html#L37" class="Primitive Operator" data-original-href="Agda.Primitive.html#961" title="Line 37 (position 961)">⊔</a> <a id="1105" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#996" title="Line 27 (position 996)">p</a> <a id="1107" href="Agda.Primitive.html#L37" class="Primitive Operator" data-original-href="Agda.Primitive.html#961" title="Line 37 (position 961)">⊔</a> <a id="1109" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#998" title="Line 27 (position 998)">q</a><a id="1110" class="Symbol">)</a> <a id="1112" class="Keyword">where</a></div><div id="LC33" class="code-line">    <a id="1122" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[_]</a> <a id="1126" class="Symbol">:</a> <a id="1128" class="Symbol">∀</a> <a id="1130" class="Symbol">{</a><a id="1131" href="Data.List.Relation.Unary.First.html#L33" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1131" title="Line 33 (position 1131)">x</a> <a id="1133" href="Data.List.Relation.Unary.First.html#L33" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1133" title="Line 33 (position 1133)">xs</a><a id="1135" class="Symbol">}</a> <a id="1137" class="Symbol">→</a> <a id="1139" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1017" title="Line 27 (position 1017)">Q</a> <a id="1141" href="Data.List.Relation.Unary.First.html#L33" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1131" title="Line 33 (position 1131)">x</a>            <a id="1154" class="Symbol">→</a> <a id="1156" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1162" class="Symbol">(</a><a id="1163" href="Data.List.Relation.Unary.First.html#L33" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1131" title="Line 33 (position 1131)">x</a> <a id="1165" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">∷</a> <a id="1167" href="Data.List.Relation.Unary.First.html#L33" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1133" title="Line 33 (position 1133)">xs</a><a id="1169" class="Symbol">)</a></div><div id="LC34" class="code-line">    <a id="1175" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">_∷_</a> <a id="1179" class="Symbol">:</a> <a id="1181" class="Symbol">∀</a> <a id="1183" class="Symbol">{</a><a id="1184" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1184" title="Line 34 (position 1184)">x</a> <a id="1186" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1186" title="Line 34 (position 1186)">xs</a><a id="1188" class="Symbol">}</a> <a id="1190" class="Symbol">→</a> <a id="1192" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1002" title="Line 27 (position 1002)">P</a> <a id="1194" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1184" title="Line 34 (position 1184)">x</a> <a id="1196" class="Symbol">→</a> <a id="1198" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1204" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1186" title="Line 34 (position 1186)">xs</a> <a id="1207" class="Symbol">→</a> <a id="1209" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1215" class="Symbol">(</a><a id="1216" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1184" title="Line 34 (position 1184)">x</a> <a id="1218" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">∷</a> <a id="1220" href="Data.List.Relation.Unary.First.html#L34" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1186" title="Line 34 (position 1186)">xs</a><a id="1222" class="Symbol">)</a></div><div id="LC35" class="code-line">&nbsp;</div><div id="LC36" class="code-line">  <a id="1227" class="Keyword">data</a> <a id="1232" href="Data.List.Relation.Unary.First.html#L36" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1232" title="Line 36 (position 1232)">FirstView</a> <a id="1242" class="Symbol">:</a> <a id="1244" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1249" class="Symbol">(</a><a id="1250" href="Agda.Builtin.List.html#L6" class="Datatype" data-original-href="Agda.Builtin.List.html#147" title="Line 6 (position 147)">List</a> <a id="1255" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a><a id="1256" class="Symbol">)</a> <a id="1258" class="Symbol">(</a><a id="1259" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#360" title="Line 10 (position 360)">a</a> <a id="1261" href="Agda.Primitive.html#L37" class="Primitive Operator" data-original-href="Agda.Primitive.html#961" title="Line 37 (position 961)">⊔</a> <a id="1263" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#996" title="Line 27 (position 996)">p</a> <a id="1265" href="Agda.Primitive.html#L37" class="Primitive Operator" data-original-href="Agda.Primitive.html#961" title="Line 37 (position 961)">⊔</a> <a id="1267" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#998" title="Line 27 (position 998)">q</a><a id="1268" class="Symbol">)</a> <a id="1270" class="Keyword">where</a></div><div id="LC37" class="code-line">    <a id="1280" href="Data.List.Relation.Unary.First.html#L37" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1280" title="Line 37 (position 1280)">_++_∷_</a> <a id="1287" class="Symbol">:</a> <a id="1289" class="Symbol">∀</a> <a id="1291" class="Symbol">{</a><a id="1292" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1292" title="Line 37 (position 1292)">xs</a> <a id="1295" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1295" title="Line 37 (position 1295)">y</a><a id="1296" class="Symbol">}</a> <a id="1298" class="Symbol">→</a> <a id="1300" href="Data.List.Relation.Unary.All.html#L48" class="Datatype" data-original-href="Data.List.Relation.Unary.All.html#1639" title="Line 48 (position 1639)">All</a> <a id="1304" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1002" title="Line 27 (position 1002)">P</a> <a id="1306" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1292" title="Line 37 (position 1292)">xs</a> <a id="1309" class="Symbol">→</a> <a id="1311" href="Data.List.Relation.Unary.First.html#L27" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1017" title="Line 27 (position 1017)">Q</a> <a id="1313" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1295" title="Line 37 (position 1295)">y</a> <a id="1315" class="Symbol">→</a> <a id="1317" class="Symbol">∀</a> <a id="1319" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1319" title="Line 37 (position 1319)">ys</a> <a id="1322" class="Symbol">→</a> <a id="1324" href="Data.List.Relation.Unary.First.html#L36" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1232" title="Line 36 (position 1232)">FirstView</a> <a id="1334" class="Symbol">(</a><a id="1335" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1292" title="Line 37 (position 1292)">xs</a> <a id="1338" href="Data.List.Base.html#L54" class="Function Operator" data-original-href="Data.List.Base.html#1734" title="Line 54 (position 1734)">List.++</a> <a id="1346" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1295" title="Line 37 (position 1295)">y</a> <a id="1348" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">∷</a> <a id="1350" href="Data.List.Relation.Unary.First.html#L37" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1319" title="Line 37 (position 1319)">ys</a><a id="1352" class="Symbol">)</a></div><div id="LC38" class="code-line">&nbsp;</div><div id="LC39" class="code-line"><a id="1355" class="Comment">------------------------------------------------------------------------</a></div><div id="LC40" class="code-line"><a id="1428" class="Comment">-- map</a></div><div id="LC41" class="code-line">&nbsp;</div><div id="LC42" class="code-line"><a id="1436" class="Keyword">module</a> <a id="1443" href="Data.List.Relation.Unary.First.html#L42" class="Module" data-original-href="Data.List.Relation.Unary.First.html#1443" title="Line 42 (position 1443)">_</a> <a id="1445" class="Symbol">{</a><a id="1446" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1446" title="Line 42 (position 1446)">p</a> <a id="1448" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1448" title="Line 42 (position 1448)">q</a> <a id="1450" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1450" title="Line 42 (position 1450)">r</a> <a id="1452" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1452" title="Line 42 (position 1452)">s</a><a id="1453" class="Symbol">}</a> <a id="1455" class="Symbol">{</a><a id="1456" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1456" title="Line 42 (position 1456)">P</a> <a id="1458" class="Symbol">:</a> <a id="1460" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1465" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1467" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1446" title="Line 42 (position 1446)">p</a><a id="1468" class="Symbol">}</a> <a id="1470" class="Symbol">{</a><a id="1471" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1471" title="Line 42 (position 1471)">Q</a> <a id="1473" class="Symbol">:</a> <a id="1475" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1480" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1482" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1448" title="Line 42 (position 1448)">q</a><a id="1483" class="Symbol">}</a> <a id="1485" class="Symbol">{</a><a id="1486" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1486" title="Line 42 (position 1486)">R</a> <a id="1488" class="Symbol">:</a> <a id="1490" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1495" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1497" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1450" title="Line 42 (position 1450)">r</a><a id="1498" class="Symbol">}</a> <a id="1500" class="Symbol">{</a><a id="1501" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1501" title="Line 42 (position 1501)">S</a> <a id="1503" class="Symbol">:</a> <a id="1505" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1510" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1512" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1452" title="Line 42 (position 1452)">s</a><a id="1513" class="Symbol">}</a> <a id="1515" class="Keyword">where</a></div><div id="LC43" class="code-line">&nbsp;</div><div id="LC44" class="code-line">  <a id="1524" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1528" class="Symbol">:</a> <a id="1530" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1456" title="Line 42 (position 1456)">P</a> <a id="1532" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1534" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1486" title="Line 42 (position 1486)">R</a> <a id="1536" class="Symbol">→</a> <a id="1538" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1471" title="Line 42 (position 1471)">Q</a> <a id="1540" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1542" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1501" title="Line 42 (position 1501)">S</a> <a id="1544" class="Symbol">→</a> <a id="1546" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1552" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1456" title="Line 42 (position 1456)">P</a> <a id="1554" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1471" title="Line 42 (position 1471)">Q</a> <a id="1556" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1558" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1564" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1486" title="Line 42 (position 1486)">R</a> <a id="1566" href="Data.List.Relation.Unary.First.html#L42" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1501" title="Line 42 (position 1501)">S</a></div><div id="LC45" class="code-line">  <a id="1570" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1574" href="Data.List.Relation.Unary.First.html#L45" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1574" title="Line 45 (position 1574)">p⇒r</a> <a id="1578" href="Data.List.Relation.Unary.First.html#L45" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1578" title="Line 45 (position 1578)">q⇒r</a> <a id="1582" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="1584" href="Data.List.Relation.Unary.First.html#L45" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1584" title="Line 45 (position 1584)">qx</a> <a id="1587" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>      <a id="1594" class="Symbol">=</a> <a id="1596" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="1598" href="Data.List.Relation.Unary.First.html#L45" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1578" title="Line 45 (position 1578)">q⇒r</a> <a id="1602" href="Data.List.Relation.Unary.First.html#L45" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1584" title="Line 45 (position 1584)">qx</a> <a id="1605" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC46" class="code-line">  <a id="1609" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1613" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1613" title="Line 46 (position 1613)">p⇒r</a> <a id="1617" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1617" title="Line 46 (position 1617)">q⇒r</a> <a id="1621" class="Symbol">(</a><a id="1622" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1622" title="Line 46 (position 1622)">px</a> <a id="1625" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="1627" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1627" title="Line 46 (position 1627)">pqxs</a><a id="1631" class="Symbol">)</a> <a id="1633" class="Symbol">=</a> <a id="1635" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1613" title="Line 46 (position 1613)">p⇒r</a> <a id="1639" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1622" title="Line 46 (position 1622)">px</a> <a id="1642" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="1644" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1648" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1613" title="Line 46 (position 1613)">p⇒r</a> <a id="1652" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1617" title="Line 46 (position 1617)">q⇒r</a> <a id="1656" href="Data.List.Relation.Unary.First.html#L46" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1627" title="Line 46 (position 1627)">pqxs</a></div><div id="LC47" class="code-line">&nbsp;</div><div id="LC48" class="code-line"><a id="1662" class="Keyword">module</a> <a id="1669" href="Data.List.Relation.Unary.First.html#L48" class="Module" data-original-href="Data.List.Relation.Unary.First.html#1669" title="Line 48 (position 1669)">_</a> <a id="1671" class="Symbol">{</a><a id="1672" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1672" title="Line 48 (position 1672)">p</a> <a id="1674" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1674" title="Line 48 (position 1674)">q</a> <a id="1676" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1676" title="Line 48 (position 1676)">r</a><a id="1677" class="Symbol">}</a> <a id="1679" class="Symbol">{</a><a id="1680" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1682" class="Symbol">:</a> <a id="1684" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1689" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1691" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1672" title="Line 48 (position 1672)">p</a><a id="1692" class="Symbol">}</a> <a id="1694" class="Symbol">{</a><a id="1695" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1697" class="Symbol">:</a> <a id="1699" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1704" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1706" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1674" title="Line 48 (position 1674)">q</a><a id="1707" class="Symbol">}</a> <a id="1709" class="Symbol">{</a><a id="1710" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1712" class="Symbol">:</a> <a id="1714" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="1719" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="1721" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1676" title="Line 48 (position 1676)">r</a><a id="1722" class="Symbol">}</a> <a id="1724" class="Keyword">where</a></div><div id="LC49" class="code-line">&nbsp;</div><div id="LC50" class="code-line">  <a id="1733" href="Data.List.Relation.Unary.First.html#L50" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1733" title="Line 50 (position 1733)">map₁</a> <a id="1738" class="Symbol">:</a> <a id="1740" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1742" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1744" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1746" class="Symbol">→</a> <a id="1748" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1754" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1756" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1758" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1760" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1766" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1768" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a></div><div id="LC51" class="code-line">  <a id="1772" href="Data.List.Relation.Unary.First.html#L50" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1733" title="Line 50 (position 1733)">map₁</a> <a id="1777" href="Data.List.Relation.Unary.First.html#L51" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1777" title="Line 51 (position 1777)">p⇒r</a> <a id="1781" class="Symbol">=</a> <a id="1783" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1787" href="Data.List.Relation.Unary.First.html#L51" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1777" title="Line 51 (position 1777)">p⇒r</a> <a id="1791" href="Function.Base.html#L29" class="Function" data-original-href="Function.Base.html#704" title="Line 29 (position 704)">id</a></div><div id="LC52" class="code-line">&nbsp;</div><div id="LC53" class="code-line">  <a id="1797" href="Data.List.Relation.Unary.First.html#L53" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1797" title="Line 53 (position 1797)">map₂</a> <a id="1802" class="Symbol">:</a> <a id="1804" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1806" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1808" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1810" class="Symbol">→</a> <a id="1812" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1818" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1820" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1822" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1824" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1830" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1832" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a></div><div id="LC54" class="code-line">  <a id="1836" href="Data.List.Relation.Unary.First.html#L53" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1797" title="Line 53 (position 1797)">map₂</a> <a id="1841" class="Symbol">=</a> <a id="1843" href="Data.List.Relation.Unary.First.html#L44" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1524" title="Line 44 (position 1524)">map</a> <a id="1847" href="Function.Base.html#L29" class="Function" data-original-href="Function.Base.html#704" title="Line 29 (position 704)">id</a></div><div id="LC55" class="code-line">&nbsp;</div><div id="LC56" class="code-line">  <a id="1853" href="Data.List.Relation.Unary.First.html#L56" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1853" title="Line 56 (position 1853)">refine</a> <a id="1860" class="Symbol">:</a> <a id="1862" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1864" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1866" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1868" href="Relation.Unary.html#L224" class="Function Operator" data-original-href="Relation.Unary.html#5118" title="Line 224 (position 5118)">∪</a> <a id="1870" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1872" class="Symbol">→</a> <a id="1874" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1880" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1680" title="Line 48 (position 1680)">P</a> <a id="1882" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a> <a id="1884" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="1886" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="1892" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1710" title="Line 48 (position 1710)">R</a> <a id="1894" href="Data.List.Relation.Unary.First.html#L48" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1695" title="Line 48 (position 1695)">Q</a></div><div id="LC57" class="code-line">  <a id="1898" href="Data.List.Relation.Unary.First.html#L56" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1853" title="Line 56 (position 1853)">refine</a> <a id="1905" href="Data.List.Relation.Unary.First.html#L57" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1905" title="Line 57 (position 1905)">f</a> <a id="1907" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="1909" href="Data.List.Relation.Unary.First.html#L57" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1909" title="Line 57 (position 1909)">qx</a> <a id="1912" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>      <a id="1919" class="Symbol">=</a> <a id="1921" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="1923" href="Data.List.Relation.Unary.First.html#L57" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1909" title="Line 57 (position 1909)">qx</a> <a id="1926" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC58" class="code-line">  <a id="1930" href="Data.List.Relation.Unary.First.html#L56" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1853" title="Line 56 (position 1853)">refine</a> <a id="1937" href="Data.List.Relation.Unary.First.html#L58" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1937" title="Line 58 (position 1937)">f</a> <a id="1939" class="Symbol">(</a><a id="1940" href="Data.List.Relation.Unary.First.html#L58" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1940" title="Line 58 (position 1940)">px</a> <a id="1943" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="1945" href="Data.List.Relation.Unary.First.html#L58" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1945" title="Line 58 (position 1945)">pqxs</a><a id="1949" class="Symbol">)</a> <a id="1951" class="Keyword">with</a> <a id="1956" href="Data.List.Relation.Unary.First.html#L58" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1937" title="Line 58 (position 1937)">f</a> <a id="1958" href="Data.List.Relation.Unary.First.html#L58" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1940" title="Line 58 (position 1940)">px</a></div><div id="LC59" class="code-line">  <a id="1963" class="Symbol">...</a> <a id="1967" class="Symbol">|</a> <a id="1969" href="Data.Sum.Base.html#L29" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#675" title="Line 29 (position 675)">inj₁</a> <a id="1974" href="Data.List.Relation.Unary.First.html#L59" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1974" title="Line 59 (position 1974)">qx</a> <a id="1977" class="Symbol">=</a> <a id="1979" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="1981" href="Data.List.Relation.Unary.First.html#L59" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1974" title="Line 59 (position 1974)">qx</a> <a id="1984" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC60" class="code-line">  <a id="1988" class="Symbol">...</a> <a id="1992" class="Symbol">|</a> <a id="1994" href="Data.Sum.Base.html#L30" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#700" title="Line 30 (position 700)">inj₂</a> <a id="1999" href="Data.List.Relation.Unary.First.html#L60" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1999" title="Line 60 (position 1999)">rx</a> <a id="2002" class="Symbol">=</a> <a id="2004" href="Data.List.Relation.Unary.First.html#L60" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#1999" title="Line 60 (position 1999)">rx</a> <a id="2007" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="2009" href="Data.List.Relation.Unary.First.html#L56" class="Function" data-original-href="Data.List.Relation.Unary.First.html#1853" title="Line 56 (position 1853)">refine</a> <a id="2016" class="Bound">f</a> <a id="2018" class="Bound">pqxs</a></div><div id="LC61" class="code-line">&nbsp;</div><div id="LC62" class="code-line"><a id="2024" class="Keyword">module</a> <a id="2031" href="Data.List.Relation.Unary.First.html#L62" class="Module" data-original-href="Data.List.Relation.Unary.First.html#2031" title="Line 62 (position 2031)">_</a> <a id="2033" class="Symbol">{</a><a id="2034" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2034" title="Line 62 (position 2034)">p</a> <a id="2036" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2036" title="Line 62 (position 2036)">q</a><a id="2037" class="Symbol">}</a> <a id="2039" class="Symbol">{</a><a id="2040" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2042" class="Symbol">:</a> <a id="2044" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="2049" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="2051" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2034" title="Line 62 (position 2034)">p</a><a id="2052" class="Symbol">}</a> <a id="2054" class="Symbol">{</a><a id="2055" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2057" class="Symbol">:</a> <a id="2059" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="2064" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="2066" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2036" title="Line 62 (position 2036)">q</a><a id="2067" class="Symbol">}</a> <a id="2069" class="Keyword">where</a></div><div id="LC63" class="code-line">&nbsp;</div><div id="LC64" class="code-line"><a id="2076" class="Comment">------------------------------------------------------------------------</a></div><div id="LC65" class="code-line"><a id="2149" class="Comment">-- Operations</a></div><div id="LC66" class="code-line">&nbsp;</div><div id="LC67" class="code-line">  <a id="2166" href="Data.List.Relation.Unary.First.html#L67" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2166" title="Line 67 (position 2166)">empty</a> <a id="2172" class="Symbol">:</a> <a id="2174" href="Relation.Nullary.Negation.Core.html#L26" class="Function Operator" data-original-href="Relation.Nullary.Negation.Core.html#658" title="Line 26 (position 658)">¬</a> <a id="2176" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2182" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2184" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2186" href="Agda.Builtin.List.html#L7" class="InductiveConstructor" data-original-href="Agda.Builtin.List.html#184" title="Line 7 (position 184)">[]</a></div><div id="LC68" class="code-line">  <a id="2191" href="Data.List.Relation.Unary.First.html#L67" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2166" title="Line 67 (position 2166)">empty</a> <a id="2197" class="Symbol">()</a></div><div id="LC69" class="code-line">&nbsp;</div><div id="LC70" class="code-line">  <a id="2203" href="Data.List.Relation.Unary.First.html#L70" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2203" title="Line 70 (position 2203)">tail</a> <a id="2208" class="Symbol">:</a> <a id="2210" class="Symbol">∀</a> <a id="2212" class="Symbol">{</a><a id="2213" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2213" title="Line 70 (position 2213)">x</a> <a id="2215" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2215" title="Line 70 (position 2215)">xs</a><a id="2217" class="Symbol">}</a> <a id="2219" class="Symbol">→</a> <a id="2221" href="Relation.Nullary.Negation.Core.html#L26" class="Function Operator" data-original-href="Relation.Nullary.Negation.Core.html#658" title="Line 26 (position 658)">¬</a> <a id="2223" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2225" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2213" title="Line 70 (position 2213)">x</a> <a id="2227" class="Symbol">→</a> <a id="2229" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2235" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2237" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2239" class="Symbol">(</a><a id="2240" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2213" title="Line 70 (position 2213)">x</a> <a id="2242" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">∷</a> <a id="2244" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2215" title="Line 70 (position 2215)">xs</a><a id="2246" class="Symbol">)</a> <a id="2248" class="Symbol">→</a> <a id="2250" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2256" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2258" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2260" href="Data.List.Relation.Unary.First.html#L70" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2215" title="Line 70 (position 2215)">xs</a></div><div id="LC71" class="code-line">  <a id="2265" href="Data.List.Relation.Unary.First.html#L70" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2203" title="Line 70 (position 2203)">tail</a> <a id="2270" href="Data.List.Relation.Unary.First.html#L71" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2270" title="Line 71 (position 2270)">¬qx</a> <a id="2274" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="2276" href="Data.List.Relation.Unary.First.html#L71" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2276" title="Line 71 (position 2276)">qx</a> <a id="2279" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>      <a id="2286" class="Symbol">=</a> <a id="2288" href="Data.Empty.html#L36" class="Function" data-original-href="Data.Empty.html#1069" title="Line 36 (position 1069)">⊥-elim</a> <a id="2295" class="Symbol">(</a><a id="2296" href="Data.List.Relation.Unary.First.html#L71" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2270" title="Line 71 (position 2270)">¬qx</a> <a id="2300" href="Data.List.Relation.Unary.First.html#L71" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2276" title="Line 71 (position 2276)">qx</a><a id="2302" class="Symbol">)</a></div><div id="LC72" class="code-line">  <a id="2306" href="Data.List.Relation.Unary.First.html#L70" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2203" title="Line 70 (position 2203)">tail</a> <a id="2311" href="Data.List.Relation.Unary.First.html#L72" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2311" title="Line 72 (position 2311)">¬qx</a> <a id="2315" class="Symbol">(</a><a id="2316" href="Data.List.Relation.Unary.First.html#L72" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2316" title="Line 72 (position 2316)">px</a> <a id="2319" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="2321" href="Data.List.Relation.Unary.First.html#L72" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2321" title="Line 72 (position 2321)">pqxs</a><a id="2325" class="Symbol">)</a> <a id="2327" class="Symbol">=</a> <a id="2329" href="Data.List.Relation.Unary.First.html#L72" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2321" title="Line 72 (position 2321)">pqxs</a></div><div id="LC73" class="code-line">&nbsp;</div><div id="LC74" class="code-line">  <a id="2337" href="Data.List.Relation.Unary.First.html#L74" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2337" title="Line 74 (position 2337)">index</a> <a id="2343" class="Symbol">:</a> <a id="2345" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2351" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2353" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2355" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="2357" class="Symbol">(</a><a id="2358" href="Data.Fin.Base.html#L34" class="Datatype" data-original-href="Data.Fin.Base.html#1159" title="Line 34 (position 1159)">Fin</a> <a id="2362" href="Function.Base.html#L134" class="Function Operator" data-original-href="Function.Base.html#3626" title="Line 134 (position 3626)">∘′</a> <a id="2365" href="Data.List.Base.html#L171" class="Function" data-original-href="Data.List.Base.html#5044" title="Line 171 (position 5044)">List.length</a><a id="2376" class="Symbol">)</a></div><div id="LC75" class="code-line">  <a id="2380" href="Data.List.Relation.Unary.First.html#L74" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2337" title="Line 74 (position 2337)">index</a> <a id="2386" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="2388" href="Data.List.Relation.Unary.First.html#L75" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2388" title="Line 75 (position 2388)">qx</a> <a id="2391" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>     <a id="2397" class="Symbol">=</a> <a id="2399" href="Data.Fin.Base.html#L35" class="InductiveConstructor" data-original-href="Data.Fin.Base.html#1181" title="Line 35 (position 1181)">zero</a></div><div id="LC76" class="code-line">  <a id="2406" href="Data.List.Relation.Unary.First.html#L74" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2337" title="Line 74 (position 2337)">index</a> <a id="2412" class="Symbol">(_</a> <a id="2415" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="2417" href="Data.List.Relation.Unary.First.html#L76" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2417" title="Line 76 (position 2417)">pqxs</a><a id="2421" class="Symbol">)</a> <a id="2423" class="Symbol">=</a> <a id="2425" href="Data.Fin.Base.html#L36" class="InductiveConstructor" data-original-href="Data.Fin.Base.html#1202" title="Line 36 (position 1202)">suc</a> <a id="2429" class="Symbol">(</a><a id="2430" href="Data.List.Relation.Unary.First.html#L74" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2337" title="Line 74 (position 2337)">index</a> <a id="2436" href="Data.List.Relation.Unary.First.html#L76" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2417" title="Line 76 (position 2417)">pqxs</a><a id="2440" class="Symbol">)</a></div><div id="LC77" class="code-line">&nbsp;</div><div id="LC78" class="code-line">  <a id="2445" href="Data.List.Relation.Unary.First.html#L78" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2445" title="Line 78 (position 2445)">index-satisfied</a> <a id="2461" class="Symbol">:</a> <a id="2463" class="Symbol">∀</a> <a id="2465" class="Symbol">{</a><a id="2466" href="Data.List.Relation.Unary.First.html#L78" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2466" title="Line 78 (position 2466)">xs</a><a id="2468" class="Symbol">}</a> <a id="2470" class="Symbol">(</a><a id="2471" href="Data.List.Relation.Unary.First.html#L78" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2471" title="Line 78 (position 2471)">pqxs</a> <a id="2476" class="Symbol">:</a> <a id="2478" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2484" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2486" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2488" href="Data.List.Relation.Unary.First.html#L78" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2466" title="Line 78 (position 2466)">xs</a><a id="2490" class="Symbol">)</a> <a id="2492" class="Symbol">→</a> <a id="2494" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2496" class="Symbol">(</a><a id="2497" href="Data.List.Base.html#L228" class="Function" data-original-href="Data.List.Base.html#6561" title="Line 228 (position 6561)">List.lookup</a> <a id="2509" href="Data.List.Relation.Unary.First.html#L78" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2466" title="Line 78 (position 2466)">xs</a> <a id="2512" class="Symbol">(</a><a id="2513" href="Data.List.Relation.Unary.First.html#L74" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2337" title="Line 74 (position 2337)">index</a> <a id="2519" href="Data.List.Relation.Unary.First.html#L78" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2471" title="Line 78 (position 2471)">pqxs</a><a id="2523" class="Symbol">))</a></div><div id="LC79" class="code-line">  <a id="2528" href="Data.List.Relation.Unary.First.html#L78" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2445" title="Line 78 (position 2445)">index-satisfied</a> <a id="2544" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="2546" href="Data.List.Relation.Unary.First.html#L79" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2546" title="Line 79 (position 2546)">qx</a> <a id="2549" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>     <a id="2555" class="Symbol">=</a> <a id="2557" href="Data.List.Relation.Unary.First.html#L79" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2546" title="Line 79 (position 2546)">qx</a></div><div id="LC80" class="code-line">  <a id="2562" href="Data.List.Relation.Unary.First.html#L78" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2445" title="Line 78 (position 2445)">index-satisfied</a> <a id="2578" class="Symbol">(_</a> <a id="2581" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="2583" href="Data.List.Relation.Unary.First.html#L80" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2583" title="Line 80 (position 2583)">pqxs</a><a id="2587" class="Symbol">)</a> <a id="2589" class="Symbol">=</a> <a id="2591" href="Data.List.Relation.Unary.First.html#L78" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2445" title="Line 78 (position 2445)">index-satisfied</a> <a id="2607" href="Data.List.Relation.Unary.First.html#L80" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2583" title="Line 80 (position 2583)">pqxs</a></div><div id="LC81" class="code-line">&nbsp;</div><div id="LC82" class="code-line">  <a id="2615" href="Data.List.Relation.Unary.First.html#L82" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2615" title="Line 82 (position 2615)">satisfied</a> <a id="2625" class="Symbol">:</a> <a id="2627" class="Symbol">∀</a> <a id="2629" class="Symbol">{</a><a id="2630" href="Data.List.Relation.Unary.First.html#L82" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2630" title="Line 82 (position 2630)">xs</a><a id="2632" class="Symbol">}</a> <a id="2634" class="Symbol">→</a> <a id="2636" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2642" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2644" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2646" href="Data.List.Relation.Unary.First.html#L82" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2630" title="Line 82 (position 2630)">xs</a> <a id="2649" class="Symbol">→</a> <a id="2651" href="Data.Product.Base.html#L37" class="Function" data-original-href="Data.Product.Base.html#852" title="Line 37 (position 852)">∃</a> <a id="2653" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a></div><div id="LC83" class="code-line">  <a id="2657" href="Data.List.Relation.Unary.First.html#L82" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2615" title="Line 82 (position 2615)">satisfied</a> <a id="2667" href="Data.List.Relation.Unary.First.html#L83" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2667" title="Line 83 (position 2667)">pqxs</a> <a id="2672" class="Symbol">=</a> <a id="2674" href="Data.Product.Base.html#L85" class="Function Operator" data-original-href="Data.Product.Base.html#1932" title="Line 85 (position 1932)">-,</a> <a id="2677" href="Data.List.Relation.Unary.First.html#L78" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2445" title="Line 78 (position 2445)">index-satisfied</a> <a id="2693" href="Data.List.Relation.Unary.First.html#L83" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2667" title="Line 83 (position 2667)">pqxs</a></div><div id="LC84" class="code-line">&nbsp;</div><div id="LC85" class="code-line">  <a id="2701" href="Data.List.Relation.Unary.First.html#L85" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2701" title="Line 85 (position 2701)">satisfiable</a> <a id="2713" class="Symbol">:</a> <a id="2715" href="Relation.Unary.html#L148" class="Function" data-original-href="Relation.Unary.html#3519" title="Line 148 (position 3519)">Satisfiable</a> <a id="2727" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2729" class="Symbol">→</a> <a id="2731" href="Relation.Unary.html#L148" class="Function" data-original-href="Relation.Unary.html#3519" title="Line 148 (position 3519)">Satisfiable</a> <a id="2743" class="Symbol">(</a><a id="2744" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2750" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2752" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a><a id="2753" class="Symbol">)</a></div><div id="LC86" class="code-line">  <a id="2757" href="Data.List.Relation.Unary.First.html#L85" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2701" title="Line 85 (position 2701)">satisfiable</a> <a id="2769" class="Symbol">(</a><a id="2770" href="Data.List.Relation.Unary.First.html#L86" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2770" title="Line 86 (position 2770)">x</a> <a id="2772" href="Agda.Builtin.Sigma.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.Sigma.html#235" title="Line 8 (position 235)">,</a> <a id="2774" href="Data.List.Relation.Unary.First.html#L86" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2774" title="Line 86 (position 2774)">qx</a><a id="2776" class="Symbol">)</a> <a id="2778" class="Symbol">=</a> <a id="2780" href="Data.List.Base.html#L177" class="Function Operator" data-original-href="Data.List.Base.html#5205" title="Line 177 (position 5205)">List.[</a> <a id="2787" href="Data.List.Relation.Unary.First.html#L86" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2770" title="Line 86 (position 2770)">x</a> <a id="2789" href="Data.List.Base.html#L177" class="Function Operator" data-original-href="Data.List.Base.html#5205" title="Line 177 (position 5205)">]</a> <a id="2791" href="Agda.Builtin.Sigma.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.Sigma.html#235" title="Line 8 (position 235)">,</a> <a id="2793" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="2795" href="Data.List.Relation.Unary.First.html#L86" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2774" title="Line 86 (position 2774)">qx</a> <a id="2798" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC87" class="code-line">&nbsp;</div><div id="LC88" class="code-line"><a id="2801" class="Comment">------------------------------------------------------------------------</a></div><div id="LC89" class="code-line"><a id="2874" class="Comment">-- Decidability results</a></div><div id="LC90" class="code-line">&nbsp;</div><div id="LC91" class="code-line">  <a id="2901" href="Data.List.Relation.Unary.First.html#L91" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2901" title="Line 91 (position 2901)">first</a> <a id="2907" class="Symbol">:</a> <a id="2909" href="Relation.Unary.html#L155" class="Function" data-original-href="Relation.Unary.html#3655" title="Line 155 (position 3655)">Π[</a> <a id="2912" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2914" href="Relation.Unary.html#L224" class="Function Operator" data-original-href="Relation.Unary.html#5118" title="Line 224 (position 5118)">∪</a> <a id="2916" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2918" href="Relation.Unary.html#L155" class="Function" data-original-href="Relation.Unary.html#3655" title="Line 155 (position 3655)">]</a> <a id="2920" class="Symbol">→</a> <a id="2922" href="Relation.Unary.html#L155" class="Function" data-original-href="Relation.Unary.html#3655" title="Line 155 (position 3655)">Π[</a> <a id="2925" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="2931" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2933" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2055" title="Line 62 (position 2055)">Q</a> <a id="2935" href="Relation.Unary.html#L224" class="Function Operator" data-original-href="Relation.Unary.html#5118" title="Line 224 (position 5118)">∪</a> <a id="2937" href="Data.List.Relation.Unary.All.html#L48" class="Datatype" data-original-href="Data.List.Relation.Unary.All.html#1639" title="Line 48 (position 1639)">All</a> <a id="2941" href="Data.List.Relation.Unary.First.html#L62" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2040" title="Line 62 (position 2040)">P</a> <a id="2943" href="Relation.Unary.html#L155" class="Function" data-original-href="Relation.Unary.html#3655" title="Line 155 (position 3655)">]</a></div><div id="LC92" class="code-line">  <a id="2947" href="Data.List.Relation.Unary.First.html#L91" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2901" title="Line 91 (position 2901)">first</a> <a id="2953" href="Data.List.Relation.Unary.First.html#L92" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2953" title="Line 92 (position 2953)">p⊎q</a> <a id="2957" href="Agda.Builtin.List.html#L7" class="InductiveConstructor" data-original-href="Agda.Builtin.List.html#184" title="Line 7 (position 184)">[]</a>       <a id="2966" class="Symbol">=</a> <a id="2968" href="Data.Sum.Base.html#L30" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#700" title="Line 30 (position 700)">inj₂</a> <a id="2973" href="Data.List.Relation.Unary.All.html#L49" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.All.html#1702" title="Line 49 (position 1702)">[]</a></div><div id="LC93" class="code-line">  <a id="2978" href="Data.List.Relation.Unary.First.html#L91" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2901" title="Line 91 (position 2901)">first</a> <a id="2984" href="Data.List.Relation.Unary.First.html#L93" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2984" title="Line 93 (position 2984)">p⊎q</a> <a id="2988" class="Symbol">(</a><a id="2989" href="Data.List.Relation.Unary.First.html#L93" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2989" title="Line 93 (position 2989)">x</a> <a id="2991" href="Agda.Builtin.List.html#L8" class="InductiveConstructor Operator" data-original-href="Agda.Builtin.List.html#199" title="Line 8 (position 199)">∷</a> <a id="2993" href="Data.List.Relation.Unary.First.html#L93" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2993" title="Line 93 (position 2993)">xs</a><a id="2995" class="Symbol">)</a> <a id="2997" class="Keyword">with</a> <a id="3002" href="Data.List.Relation.Unary.First.html#L93" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2984" title="Line 93 (position 2984)">p⊎q</a> <a id="3006" href="Data.List.Relation.Unary.First.html#L93" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#2989" title="Line 93 (position 2989)">x</a></div><div id="LC94" class="code-line">  <a id="3010" class="Symbol">...</a> <a id="3014" class="Symbol">|</a> <a id="3016" href="Data.Sum.Base.html#L29" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#675" title="Line 29 (position 675)">inj₁</a> <a id="3021" href="Data.List.Relation.Unary.First.html#L94" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3021" title="Line 94 (position 3021)">px</a> <a id="3024" class="Symbol">=</a> <a id="3026" href="Data.Sum.Base.html#L57" class="Function" data-original-href="Data.Sum.Base.html#1253" title="Line 57 (position 1253)">Sum.map</a> <a id="3034" class="Symbol">(</a><a id="3035" href="Data.List.Relation.Unary.First.html#L94" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3021" title="Line 94 (position 3021)">px</a> <a id="3038" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷_</a><a id="3040" class="Symbol">)</a> <a id="3042" class="Symbol">(</a><a id="3043" href="Data.List.Relation.Unary.First.html#L94" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3021" title="Line 94 (position 3021)">px</a> <a id="3046" href="Data.List.Relation.Unary.All.html#L50" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.All.html#1719" title="Line 50 (position 1719)">∷_</a><a id="3048" class="Symbol">)</a> <a id="3050" class="Symbol">(</a><a id="3051" href="Data.List.Relation.Unary.First.html#L91" class="Function" data-original-href="Data.List.Relation.Unary.First.html#2901" title="Line 91 (position 2901)">first</a> <a id="3057" class="Bound">p⊎q</a> <a id="3061" class="Bound">xs</a><a id="3063" class="Symbol">)</a></div><div id="LC95" class="code-line">  <a id="3067" class="Symbol">...</a> <a id="3071" class="Symbol">|</a> <a id="3073" href="Data.Sum.Base.html#L30" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#700" title="Line 30 (position 700)">inj₂</a> <a id="3078" href="Data.List.Relation.Unary.First.html#L95" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3078" title="Line 95 (position 3078)">qx</a> <a id="3081" class="Symbol">=</a> <a id="3083" href="Data.Sum.Base.html#L29" class="InductiveConstructor" data-original-href="Data.Sum.Base.html#675" title="Line 29 (position 675)">inj₁</a> <a id="3088" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="3090" href="Data.List.Relation.Unary.First.html#L95" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3078" title="Line 95 (position 3078)">qx</a> <a id="3093" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC96" class="code-line">&nbsp;</div><div id="LC97" class="code-line"><a id="3096" class="Comment">------------------------------------------------------------------------</a></div><div id="LC98" class="code-line"><a id="3169" class="Comment">-- Relationship with Any</a></div><div id="LC99" class="code-line">&nbsp;</div><div id="LC100" class="code-line"><a id="3195" class="Keyword">module</a> <a id="3202" href="Data.List.Relation.Unary.First.html#L100" class="Module" data-original-href="Data.List.Relation.Unary.First.html#3202" title="Line 100 (position 3202)">_</a> <a id="3204" class="Symbol">{</a><a id="3205" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3205" title="Line 100 (position 3205)">q</a><a id="3206" class="Symbol">}</a> <a id="3208" class="Symbol">{</a><a id="3209" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3209" title="Line 100 (position 3209)">Q</a> <a id="3211" class="Symbol">:</a> <a id="3213" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="3218" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="3220" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3205" title="Line 100 (position 3205)">q</a><a id="3221" class="Symbol">}</a> <a id="3223" class="Keyword">where</a></div><div id="LC101" class="code-line">&nbsp;</div><div id="LC102" class="code-line">  <a id="3232" href="Data.List.Relation.Unary.First.html#L102" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3232" title="Line 102 (position 3232)">fromAny</a> <a id="3240" class="Symbol">:</a> <a id="3242" href="Data.List.Relation.Unary.Any.html#L35" class="Datatype" data-original-href="Data.List.Relation.Unary.Any.html#1148" title="Line 35 (position 1148)">Any</a> <a id="3246" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3209" title="Line 100 (position 3209)">Q</a> <a id="3248" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="3250" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="3256" href="Relation.Unary.html#L58" class="Function" data-original-href="Relation.Unary.html#1686" title="Line 58 (position 1686)">U</a> <a id="3258" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3209" title="Line 100 (position 3209)">Q</a></div><div id="LC103" class="code-line">  <a id="3262" href="Data.List.Relation.Unary.First.html#L102" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3232" title="Line 102 (position 3232)">fromAny</a> <a id="3270" class="Symbol">(</a><a id="3271" href="Data.List.Relation.Unary.Any.html#L36" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1211" title="Line 36 (position 1211)">here</a> <a id="3276" href="Data.List.Relation.Unary.First.html#L103" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3276" title="Line 103 (position 3276)">qx</a><a id="3278" class="Symbol">)</a>   <a id="3282" class="Symbol">=</a> <a id="3284" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="3286" href="Data.List.Relation.Unary.First.html#L103" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3276" title="Line 103 (position 3276)">qx</a> <a id="3289" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a></div><div id="LC104" class="code-line">  <a id="3293" href="Data.List.Relation.Unary.First.html#L102" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3232" title="Line 102 (position 3232)">fromAny</a> <a id="3301" class="Symbol">(</a><a id="3302" href="Data.List.Relation.Unary.Any.html#L37" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1264" title="Line 37 (position 1264)">there</a> <a id="3308" href="Data.List.Relation.Unary.First.html#L104" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3308" title="Line 104 (position 3308)">any</a><a id="3311" class="Symbol">)</a> <a id="3313" class="Symbol">=</a> <a id="3315" class="Symbol">_</a> <a id="3317" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="3319" href="Data.List.Relation.Unary.First.html#L102" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3232" title="Line 102 (position 3232)">fromAny</a> <a id="3327" href="Data.List.Relation.Unary.First.html#L104" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3308" title="Line 104 (position 3308)">any</a></div><div id="LC105" class="code-line">&nbsp;</div><div id="LC106" class="code-line">  <a id="3334" href="Data.List.Relation.Unary.First.html#L106" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3334" title="Line 106 (position 3334)">toAny</a> <a id="3340" class="Symbol">:</a> <a id="3342" class="Symbol">∀</a> <a id="3344" class="Symbol">{</a><a id="3345" href="Data.List.Relation.Unary.First.html#L106" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3345" title="Line 106 (position 3345)">p</a><a id="3346" class="Symbol">}</a> <a id="3348" class="Symbol">{</a><a id="3349" href="Data.List.Relation.Unary.First.html#L106" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3349" title="Line 106 (position 3349)">P</a> <a id="3351" class="Symbol">:</a> <a id="3353" href="Relation.Unary.html#L37" class="Function" data-original-href="Relation.Unary.html#1178" title="Line 37 (position 1178)">Pred</a> <a id="3358" href="Data.List.Relation.Unary.First.html#L10" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#364" title="Line 10 (position 364)">A</a> <a id="3360" href="Data.List.Relation.Unary.First.html#L106" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3345" title="Line 106 (position 3345)">p</a><a id="3361" class="Symbol">}</a> <a id="3363" class="Symbol">→</a> <a id="3365" href="Data.List.Relation.Unary.First.html#L32" class="Datatype" data-original-href="Data.List.Relation.Unary.First.html#1078" title="Line 32 (position 1078)">First</a> <a id="3371" href="Data.List.Relation.Unary.First.html#L106" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3349" title="Line 106 (position 3349)">P</a> <a id="3373" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3209" title="Line 100 (position 3209)">Q</a> <a id="3375" href="Relation.Unary.html#L77" class="Function Operator" data-original-href="Relation.Unary.html#2046" title="Line 77 (position 2046)">⊆</a> <a id="3377" href="Data.List.Relation.Unary.Any.html#L35" class="Datatype" data-original-href="Data.List.Relation.Unary.Any.html#1148" title="Line 35 (position 1148)">Any</a> <a id="3381" href="Data.List.Relation.Unary.First.html#L100" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3209" title="Line 100 (position 3209)">Q</a></div><div id="LC107" class="code-line">  <a id="3385" href="Data.List.Relation.Unary.First.html#L106" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3334" title="Line 106 (position 3334)">toAny</a> <a id="3391" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">[</a> <a id="3393" href="Data.List.Relation.Unary.First.html#L107" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3393" title="Line 107 (position 3393)">qx</a> <a id="3396" href="Data.List.Relation.Unary.First.html#L33" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1122" title="Line 33 (position 1122)">]</a>     <a id="3402" class="Symbol">=</a> <a id="3404" href="Data.List.Relation.Unary.Any.html#L36" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1211" title="Line 36 (position 1211)">here</a> <a id="3409" href="Data.List.Relation.Unary.First.html#L107" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3393" title="Line 107 (position 3393)">qx</a></div><div id="LC108" class="code-line">  <a id="3414" href="Data.List.Relation.Unary.First.html#L106" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3334" title="Line 106 (position 3334)">toAny</a> <a id="3420" class="Symbol">(_</a> <a id="3423" href="Data.List.Relation.Unary.First.html#L34" class="InductiveConstructor Operator" data-original-href="Data.List.Relation.Unary.First.html#1175" title="Line 34 (position 1175)">∷</a> <a id="3425" href="Data.List.Relation.Unary.First.html#L108" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3425" title="Line 108 (position 3425)">pqxs</a><a id="3429" class="Symbol">)</a> <a id="3431" class="Symbol">=</a> <a id="3433" href="Data.List.Relation.Unary.Any.html#L37" class="InductiveConstructor" data-original-href="Data.List.Relation.Unary.Any.html#1264" title="Line 37 (position 1264)">there</a> <a id="3439" class="Symbol">(</a><a id="3440" href="Data.List.Relation.Unary.First.html#L106" class="Function" data-original-href="Data.List.Relation.Unary.First.html#3334" title="Line 106 (position 3334)">toAny</a> <a id="3446" href="Data.List.Relation.Unary.First.html#L108" class="Bound" data-original-href="Data.List.Relation.Unary.First.html#3425" title="Line 108 (position 3425)">pqxs</a><a id="3450" class="Symbol">)</a></div></div></div><button class="copy-code-button" title="Copy code">
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path fill="currentColor" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path fill="currentColor" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+        </svg>
+      </button></pre><script>
+      (function() {
+        // Check if theme preference exists in localStorage
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+        }
+
+        // Add toggle functionality
+        document.querySelector('.theme-toggle').addEventListener('click', function() {
+          const html = document.documentElement;
+          const isDark = html.classList.contains('dark-theme');
+          
+          if (isDark) {
+            html.classList.remove('dark-theme');
+            localStorage.setItem('theme', 'light');
+          } else {
+            html.classList.add('dark-theme');
+            localStorage.setItem('theme', 'dark');
+          }
+        });
+      })();
+    </script></div></div><script>
+      (function() {
+        // Function to copy code without line numbers
+        function copyCode(event) {
+          const button = event.currentTarget;
+          const pre = button.closest('pre.Agda');
+          if (!pre) return;
+          
+          const codeContent = pre.querySelector('.code-content');
+          if (!codeContent) return;
+          
+          // Extract text content from code lines, preserving structure
+          const codeLines = Array.from(codeContent.querySelectorAll('.code-line'));
+          const codeText = codeLines.map(line => line.textContent).join('\n');
+          
+          // Create temporary textarea to copy from
+          const textarea = document.createElement('textarea');
+          textarea.value = codeText;
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          
+          try {
+            document.execCommand('copy');
+            // Show success state
+            button.classList.add('copy-success');
+            setTimeout(() => {
+              button.classList.remove('copy-success');
+            }, 2000);
+          } catch (err) {
+            console.error('Failed to copy code: ', err);
+          }
+          
+          document.body.removeChild(textarea);
+        }
+        
+        // Add click event listeners to all copy buttons
+        const copyButtons = document.querySelectorAll('.copy-code-button');
+        copyButtons.forEach(button => {
+          button.addEventListener('click', copyCode);
+        });
+        
+        // Handle highlighting of lines when line numbers are clicked
+        function setupLineHighlighting() {
+          const lineNumbers = document.querySelectorAll('.line-number');
+          
+          lineNumbers.forEach(lineNum => {
+            lineNum.addEventListener('click', function(e) {
+              e.preventDefault(); // Prevent default hash navigation
+              
+              // Remove highlight from all lines and line numbers first
+              document.querySelectorAll('.code-line.highlighted').forEach(line => {
+                line.classList.remove('highlighted');
+              });
+              document.querySelectorAll('.line-number.highlighted').forEach(num => {
+                num.classList.remove('highlighted');
+              });
+              
+              // Get the line number
+              const num = this.getAttribute('data-line-number');
+              if (!num) return;
+              
+              // Add highlight class to clicked line number
+              this.classList.add('highlighted');
+              
+              // Find the corresponding code line and highlight it
+              const lineId = 'LC' + num;
+              const codeLine = document.getElementById(lineId);
+              if (codeLine) {
+                codeLine.classList.add('highlighted');
+                
+                // Update URL hash without causing a jump
+                const newUrl = window.location.pathname + window.location.search + '#L' + num;
+                history.pushState(null, '', newUrl);
+                
+                // Scroll the element into view
+                codeLine.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'center'
+                });
+              }
+            });
+          });
+        }
+        
+        // Handle highlighting of lines when URL has fragment
+        function highlightTargetLine() {
+          // Clear any existing highlights first
+          document.querySelectorAll('.code-line.highlighted').forEach(line => {
+            line.classList.remove('highlighted');
+          });
+          document.querySelectorAll('.line-number.highlighted').forEach(num => {
+            num.classList.remove('highlighted');
+          });
+          
+          const hash = window.location.hash;
+          if (hash && hash.startsWith('#L')) {
+            // Extract the line number from the hash
+            const lineNum = hash.substring(2);
+            const lineId = 'LC' + lineNum;
+            const codeLine = document.getElementById(lineId);
+            const lineNumEl = document.getElementById('L' + lineNum);
+            
+            if (codeLine) {
+              // Highlight the target line
+              codeLine.classList.add('highlighted');
+              
+              // Highlight the corresponding line number
+              if (lineNumEl) {
+                lineNumEl.classList.add('highlighted');
+              }
+              
+              // Scroll the line into view
+              setTimeout(() => {
+                codeLine.scrollIntoView({
+                  behavior: 'smooth', 
+                  block: 'center'
+                });
+              }, 100); // Small delay to ensure DOM is ready
+            }
+          }
+        }
+        
+        // Run on page load and when hash changes
+        setupLineHighlighting();
+        highlightTargetLine();
+        window.addEventListener('hashchange', highlightTargetLine);
+      })();
+    </script><script src="search.js" defer=""></script><script>
+      (function() {
+        // Support for toggling between position and line references
+        document.addEventListener('keydown', function(event) {
+          // Alt+P toggles position mode
+          if (event.altKey && event.key === 'p') {
+            const links = document.querySelectorAll('a[data-original-href]');
+            links.forEach(link => {
+              const currentHref = link.getAttribute('href');
+              const originalHref = link.getAttribute('data-original-href');
+              
+              // Toggle between original position references and line numbers
+              link.setAttribute('data-original-href', currentHref);
+              link.setAttribute('href', originalHref);
+            });
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.style.position = 'fixed';
+            notification.style.bottom = '20px';
+            notification.style.right = '20px';
+            notification.style.padding = '10px 20px';
+            notification.style.background = 'rgba(0,0,0,0.8)';
+            notification.style.color = 'white';
+            notification.style.borderRadius = '4px';
+            notification.style.zIndex = '9999';
+            notification.style.transition = 'opacity 0.5s';
+            notification.textContent = 'Reference mode toggled';
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+              notification.style.opacity = '0';
+              setTimeout(() => {
+                document.body.removeChild(notification);
+              }, 500);
+            }, 2000);
+          }
+        });
+      })();
+    </script></body></html>
