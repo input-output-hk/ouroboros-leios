@@ -167,7 +167,7 @@ pub struct EndorserBlock {
     pub pipeline: u64,
     pub producer: NodeId,
     pub bytes: u64,
-    // The real impl will store hashes
+    pub txs: Vec<TransactionId>,
     pub ibs: Vec<InputBlockId>,
     pub ebs: Vec<EndorserBlockId>,
 }
@@ -214,6 +214,7 @@ pub enum NoVoteReason {
     ExtraIB,
     MissingIB,
     MissingEB,
+    ExtraTX,
     UncertifiedEBReference,
 }
 

@@ -13,7 +13,7 @@ use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
     clock::Timestamp,
-    config::{NodeId, SimConfiguration},
+    config::{LeiosVariant, NodeId, SimConfiguration},
     events::{BlockRef, Event, Node},
     model::{BlockId, TransactionId},
 };
@@ -45,6 +45,7 @@ enum OutputFormat {
 }
 
 pub struct EventMonitor {
+    variant: LeiosVariant,
     node_ids: Vec<NodeId>,
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
@@ -69,6 +70,7 @@ impl EventMonitor {
         let stage_length = config.stage_length;
         let maximum_ib_age = stage_length * 3;
         Self {
+            variant: config.variant,
             node_ids,
             pool_ids,
             maximum_ib_age,
@@ -100,6 +102,7 @@ impl EventMonitor {
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
         let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
+        let mut eb_txs: BTreeMap<EndorserBlockId, Vec<TransactionId>> = BTreeMap::new();
         let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
         let mut eb_ebs: BTreeMap<EndorserBlockId, Vec<EndorserBlockId>> = BTreeMap::new();
         let mut leios_tx_bytes: BTreeMap<TransactionId, u64> = BTreeMap::new();
@@ -241,16 +244,23 @@ impl EventMonitor {
                         leios_blocks_with_endorsements += 1;
                         pending_ebs.retain(|eb| eb.slot != endorsement.eb.id.slot);
 
-                        let all_eb_ids = eb_ebs
+                        let all_eb_ids: Vec<_> = eb_ebs
                             .get(&endorsement.eb.id)
                             .unwrap()
                             .iter()
-                            .chain(std::iter::once(&endorsement.eb.id));
-                        let block_leios_txs: Vec<_> = all_eb_ids
+                            .chain(std::iter::once(&endorsement.eb.id))
+                            .collect();
+                        let block_ib_leios_txs = all_eb_ids
+                            .iter()
                             .flat_map(|eb| eb_ibs.get(eb).unwrap())
                             .flat_map(|ib| ib_txs.get(ib).unwrap())
-                            .copied()
-                            .collect();
+                            .copied();
+                        let block_eb_leios_txs = all_eb_ids
+                            .iter()
+                            .flat_map(|eb| eb_txs.get(eb).unwrap())
+                            .copied();
+                        let block_leios_txs: Vec<_> =
+                            block_ib_leios_txs.chain(block_eb_leios_txs).collect();
 
                         let mut unique_block_leios_txs: Vec<_> =
                             block_leios_txs.iter().copied().sorted().dedup().collect();
@@ -336,6 +346,7 @@ impl EventMonitor {
                 Event::EBLotteryWon { .. } => {}
                 Event::EBGenerated {
                     id,
+                    transactions,
                     input_blocks,
                     endorser_blocks,
                     size_bytes,
@@ -344,6 +355,7 @@ impl EventMonitor {
                     total_leios_bytes += size_bytes;
                     generated_ebs += 1;
                     pending_ebs.insert(id.clone());
+                    eb_txs.insert(id.clone(), transactions.iter().map(|r| r.id).collect());
                     eb_ibs.insert(
                         id.clone(),
                         input_blocks.iter().map(|r| r.id.clone()).collect(),
@@ -352,6 +364,12 @@ impl EventMonitor {
                         id.clone(),
                         endorser_blocks.into_iter().map(|r| r.id.clone()).collect(),
                     );
+                    for BlockRef { id: tx_id } in &transactions {
+                        let tx = txs.get_mut(tx_id).unwrap();
+                        if tx.included_in_eb.is_none() {
+                            tx.included_in_eb = Some(time);
+                        }
+                    }
                     for BlockRef { id: ib_id } in &input_blocks {
                         *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
                         *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;
@@ -364,9 +382,10 @@ impl EventMonitor {
                         }
                     }
                     info!(
-                        "Pool {} generated an EB with {} IBs(s) in slot {}.",
+                        "Pool {} generated an EB with {} IB(s) and {} TX(s) in slot {}.",
                         id.producer,
                         input_blocks.len(),
+                        transactions.len(),
                         id.slot,
                     )
                 }
@@ -546,7 +565,9 @@ impl EventMonitor {
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
             info!("{} tx(s) were referenced by a Leios endorsement.", unique_leios_txs);
             info!("{} tx(s) were included directly in a Praos block.", praos_txs);
-            info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were transactions.", pretty_bytes(total_leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
+            if self.variant != LeiosVariant::FullWithoutIbs {
+                info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were transactions.", pretty_bytes(total_leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
+            }
             info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", leios_txs - unique_leios_txs, (leios_txs - unique_leios_txs) as f64 / leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
@@ -620,6 +641,7 @@ fn compute_stats<Iter: IntoIterator<Item = f64>>(data: Iter) -> Stats {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum OutputTarget {
     AggregatedEventStream {
         aggregation: TraceAggregator,

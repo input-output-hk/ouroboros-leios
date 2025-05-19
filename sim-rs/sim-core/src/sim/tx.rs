@@ -47,6 +47,12 @@ impl TransactionProducer {
         let mut next_tx_id = 0;
         let mut next_tx_at = Timestamp::zero();
         let mut rng = &mut self.rng;
+
+        if let Some(start) = config.start_time {
+            self.clock.wait_until(start).await;
+            next_tx_at = start;
+        };
+
         loop {
             let id = TransactionId::new(next_tx_id);
             let shard = rng
@@ -67,7 +73,12 @@ impl TransactionProducer {
             let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
             next_tx_at += Duration::from_millis(millis_until_tx);
 
-            self.clock.wait_until(next_tx_at).await;
+            if config.stop_time.is_some_and(|t| next_tx_at > t) {
+                self.clock.wait_forever().await;
+                return Ok(());
+            } else {
+                self.clock.wait_until(next_tx_at).await;
+            }
         }
     }
 }

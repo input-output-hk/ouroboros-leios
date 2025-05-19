@@ -54,6 +54,7 @@ const getNodeData = (aggregationNodeDataRef: ISimulationAggregatedDataState, nod
 
 const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string): ISimulationEndorsementBlock => {
   const eb = intermediate.ebs.get(ebId)!;
+  const txs = eb.txs.map(id => intermediate.txs[Number(id)]);
   const ibs = eb.ibs.map(id => {
     const ib = intermediate.ibs.get(id)!;
     for (const tx of ib.txs) {
@@ -77,6 +78,7 @@ const extractEb = (intermediate: ISimulationIntermediateDataState, ebId: string)
     slot: eb.slot,
     pipeline: eb.pipeline,
     bytes: eb.bytes,
+    txs,
     ibs,
     ebs,
   }
@@ -152,10 +154,17 @@ export const processMessage = (
         }
       }
     }
+    for (const { id: txId } of message.transactions) {
+      const tx = Number(txId);
+      if (intermediate.txStatuses[tx] === 'created' || intermediate.txStatuses[tx] === 'inIb') {
+        intermediate.txStatuses[tx] = 'inEb';
+      }
+    }
     intermediate.ebs.set(message.id, {
       slot: message.slot,
       pipeline: message.pipeline,
       bytes: message.size_bytes,
+      txs: message.transactions.map(tx => tx.id),
       ibs: message.input_blocks.map(ib => ib.id),
       ebs: message.endorser_blocks.map(eb => eb.id),
     });

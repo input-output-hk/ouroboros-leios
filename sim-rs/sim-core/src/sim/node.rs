@@ -138,9 +138,14 @@ struct NodePraosState {
     blocks: BTreeMap<u64, Arc<Block>>,
 }
 
+struct SeenTransaction {
+    tx: Arc<Transaction>,
+    seen_at: Timestamp,
+}
+
 #[derive(Default)]
 struct NodeLeiosState {
-    mempool: BTreeMap<TransactionId, Arc<Transaction>>,
+    mempool: BTreeMap<TransactionId, SeenTransaction>,
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
@@ -537,6 +542,10 @@ impl Node {
     }
 
     fn schedule_input_block_generation(&mut self, slot: u64) {
+        if self.sim_config.variant == LeiosVariant::FullWithoutIbs {
+            // In this variant, IB generation is completely disabled
+            return;
+        }
         let mut slot_vrfs: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         // IBs are generated at the start of any slot within this stage
         for stage_slot in slot..slot + self.sim_config.stage_length {
@@ -586,14 +595,16 @@ impl Node {
                     pipeline,
                     producer: self.id,
                 });
+                let txs = self.select_txs_for_eb(pipeline);
                 let ibs = self.select_ibs_for_eb(pipeline);
                 let ebs = self.select_ebs_for_eb(pipeline);
-                let bytes = self.sim_config.sizes.eb(ibs.len(), ebs.len());
+                let bytes = self.sim_config.sizes.eb(txs.len(), ibs.len(), ebs.len());
                 let eb = EndorserBlock {
                     slot,
                     pipeline,
                     producer: self.id,
                     bytes,
+                    txs,
                     ibs,
                     ebs,
                 };
@@ -689,11 +700,11 @@ impl Node {
         };
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
-            let mut ib = InputBlock {
+            let transactions = self.select_txs_for_ib(header.shard);
+            let ib = InputBlock {
                 header,
-                transactions: vec![],
+                transactions,
             };
-            self.try_filling_ib(&mut ib);
             self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
         }
     }
@@ -807,7 +818,7 @@ impl Node {
         let (&block, _, _) = match self.sim_config.variant {
             LeiosVariant::Short => candidates
                 .max_by_key(|(eb, age, votes)| (*age, self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Full => candidates
+            LeiosVariant::Full | LeiosVariant::FullWithoutIbs => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
         };
 
@@ -952,7 +963,13 @@ impl Node {
             }
             self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
         }
-        self.leios.mempool.insert(tx.id, tx);
+        self.leios.mempool.insert(
+            tx.id,
+            SeenTransaction {
+                seen_at: self.clock.now(),
+                tx,
+            },
+        );
         Ok(())
     }
 
@@ -1273,7 +1290,7 @@ impl Node {
         Ok(())
     }
 
-    fn try_filling_ib(&mut self, ib: &mut InputBlock) {
+    fn select_txs_for_ib(&mut self, shard: u64) -> Vec<Arc<Transaction>> {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
             let tx = Transaction {
                 id: config.next_id(),
@@ -1281,30 +1298,64 @@ impl Node {
                 bytes: config.ib_size,
             };
             self.tracker.track_transaction_generated(&tx, self.id);
-            ib.transactions.push(Arc::new(tx));
-            return;
+            vec![Arc::new(tx)]
+        } else {
+            self.select_txs(
+                |seen| seen.tx.shard.is_none_or(|s| s == shard),
+                self.sim_config.max_ib_size,
+            )
+        }
+    }
+
+    fn select_txs_for_eb(&mut self, pipeline: u64) -> Vec<TransactionId> {
+        if self.sim_config.variant != LeiosVariant::FullWithoutIbs {
+            return vec![];
         }
 
+        let Some(last_legal_slot) =
+            (pipeline * self.sim_config.stage_length).checked_sub(self.sim_config.stage_length)
+        else {
+            return vec![];
+        };
+        let max_seen_at = Timestamp::zero() + Duration::from_secs(last_legal_slot);
+
+        self.select_txs(
+            |seen| seen.seen_at <= max_seen_at,
+            self.sim_config.max_eb_size,
+        )
+        .into_iter()
+        .map(|tx| tx.id)
+        .collect()
+    }
+
+    fn select_txs<C>(&mut self, condition: C, max_size: u64) -> Vec<Arc<Transaction>>
+    where
+        C: Fn(&SeenTransaction) -> bool,
+    {
         let candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
-            .filter_map(|tx| {
-                if tx.shard.is_none_or(|shard| shard == ib.header.shard) {
-                    Some((tx.id, tx.bytes))
+            .filter_map(|seen| {
+                if condition(seen) {
+                    Some((seen.tx.id, seen.tx.bytes))
                 } else {
                     None
                 }
             })
             .collect();
+        let mut txs = vec![];
+        let mut size = 0;
         for (id, bytes) in candidate_txs {
-            let remaining_capacity = self.sim_config.max_ib_size - ib.bytes();
+            let remaining_capacity = max_size - size;
             if remaining_capacity < bytes {
                 continue;
             }
-            ib.transactions
-                .push(self.leios.mempool.remove(&id).unwrap());
+            let tx = self.leios.mempool.remove(&id).unwrap().tx;
+            size += tx.bytes;
+            txs.push(tx);
         }
+        txs
     }
 
     fn finish_generating_ib(&mut self, mut ib: InputBlock) -> Result<()> {
@@ -1365,7 +1416,7 @@ impl Node {
         &self,
         pipeline: u64,
     ) -> Option<impl Iterator<Item = u64> + use<'_>> {
-        if self.sim_config.variant != LeiosVariant::Full {
+        if self.sim_config.variant == LeiosVariant::Short {
             // EBs don't reference other EBs unless we're running Full Leios
             return None;
         }
@@ -1410,6 +1461,12 @@ impl Node {
         let mut ib_set = HashSet::new();
         let expected_ib_pipelines: HashSet<u64> =
             self.pipelines_for_ib_references(eb.pipeline).collect();
+
+        for tx in &eb.txs {
+            if !matches!(self.txs.get(tx), Some(TransactionView::Received(_))) {
+                return Err(NoVoteReason::ExtraTX);
+            }
+        }
 
         for ib in &eb.ibs {
             if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {

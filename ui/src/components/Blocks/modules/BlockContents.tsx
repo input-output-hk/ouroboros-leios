@@ -138,6 +138,7 @@ const EndorserBlock: FC<IEndorserBlockProps> = ({ eb, hovered, onHover, onClick 
     <Box hovered={hovered} onHover={onHover} onClick={onClick}>
       Endorser Block
       <span className='text-sm'>Pipeline {eb.pipeline}, Slot {eb.slot}</span>
+      {eb.txs.length ? <span className='text-sm'>References {eb.txs.length} TX(s)</span> : null}
       {eb.ibs.length ? <span className='text-sm'>References {eb.ibs.length} IB(s)</span> : null}
       {eb.ebs.length ? <span className='text-sm'>References {eb.ebs.length} EB(s)</span> : null}
     </Box>

@@ -1,0 +1,140 @@
+# Test 2 from Agda: https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/9741f8a27a55d562b33d0b4ac4f9334fc9fba9e0/formal-spec/Leios/Short/Trace/Verifier/Test.agda#L57-L123
+#
+# -- slot 0
+#   inj₁ (Base₂b-Action  0    , SLOT)
+# ∷ inj₁ (Slot-Action    0    , SLOT)
+{"message":{"slot":0,"type":"Slot","node":"node-0"},"time_s":0.01}
+#
+# -- slot 1
+# ∷ inj₁ (IB-Role-Action 1    , SLOT)
+{"message":{"slot":1,"type":"IBGenerated","producer":"node-0","id":"0-1","rb_ref":"genesis","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":1.01}
+#
+# ∷ inj₁ (VT-Role-Action 1    , SLOT)
+{"message":{"slot":1,"type":"VTBundleGenerated","producer":"node-0","id":"0-1","votes":{},"pipeline":0,"size_bytes":105},"time_s":1.02}
+#
+# Create an RB for later referencing by the SUT.
+{"message":{"slot":1,"type":"RBGenerated","producer":"node-1","id":"-7674734470404649268","endorsement":null,"parent":null,"size_bytes":1025,"tx_payload_bytes":0},"time_s":1.03}
+#
+# Create an IB for later referencing by the SUT.
+{"message":{"slot":1,"type":"IBGenerated","producer":"node-1","id":"1-1","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":1.04}
+#
+# ∷ inj₁ (Base₂b-Action  1    , SLOT)
+# ∷ inj₁ (Slot-Action    1    , SLOT)
+{"message":{"slot":1,"type":"Slot","node":"node-0"},"time_s":1.05}
+#
+# -- slot 2
+# ∷ inj₂ (IB-Recv-Update
+#     (record { header =
+#       record { slotNumber = 1
+#              ; producerID = fsuc fzero
+#              ; lotteryPf = tt
+#              ; bodyHash = 0 ∷ 1 ∷ 2 ∷ []
+#              ; signature = tt
+#              }
+#             ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))
+{"message":{"type":"IBReceived","recipient":"node-0","id":"1-1"},"time_s":2.01}
+#
+# ∷ inj₁ (IB-Role-Action 2    , SLOT)
+{"message":{"slot":2,"type":"IBGenerated","producer":"node-0","id":"0-2","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":2.02}
+#
+# Receive an RB for later referencing by the SUT.
+{"message":{"type":"RBReceived","recipient":"node-0","id":"-7674734470404649268"},"time_s":2.03}
+#
+# ∷ inj₁ (EB-Role-Action 2 [] , SLOT)
+{"message":{"slot":2,"type":"EBGenerated","producer":"node-0","id":"0-2","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":2.04}
+#
+# ∷ inj₁ (VT-Role-Action 2    , SLOT)
+{"message":{"slot":2,"type":"VTBundleGenerated","producer":"node-0","id":"0-2","votes":{},"pipeline":0,"size_bytes":105},"time_s":2.05}
+#
+# ∷ inj₁ (Base₂b-Action  2    , SLOT)
+# ∷ inj₁ (Slot-Action    2    , SLOT)
+{"message":{"type":"Slot","slot":2,"node":"node-0"},"time_s":2.06}
+#
+# Create an IB for later referencing by the SUT.
+{"message":{"slot":2,"type":"IBGenerated","producer":"node-1","id":"1-2","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":2.07}
+#
+# -- slot 3
+# ∷ inj₂ (IB-Recv-Update
+#     (record { header =
+#       record { slotNumber = 2
+#              ; producerID = fsuc fzero
+#              ; lotteryPf = tt
+#              ; bodyHash = 3 ∷ 4 ∷ 5 ∷ []
+#              ; signature = tt
+#              }
+#             ; body = record { txs = 3 ∷ 4 ∷ 5 ∷ [] }}))
+{"message":{"type":"IBReceived","recipient":"node-0","id":"1-2"},"time_s":3.01}
+#
+# ∷ inj₁ (IB-Role-Action 3    , SLOT)
+{"message":{"slot":3,"type":"IBGenerated","producer":"node-0","id":"0-3","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":3.02}
+#
+# ∷ inj₁ (VT-Role-Action 3    , SLOT)
+{"message":{"slot":3,"type":"VTBundleGenerated","producer":"node-0","id":"0-3","votes":{},"pipeline":0,"size_bytes":105},"time_s":3.03}
+#
+# ∷ inj₁ (Base₂b-Action  3    , SLOT)
+# ∷ inj₁ (Slot-Action    3    , SLOT)
+{"message":{"type":"Slot","slot":3,"node":"node-0"},"time_s":3.04}
+#
+# -- slot 4
+# ∷ inj₁ (IB-Role-Action 4    , SLOT)
+{"message":{"slot":4,"type":"IBGenerated","producer":"node-0","id":"0-4","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":4.01}
+#
+# ∷ inj₁ (EB-Role-Action 4 [] , SLOT)
+{"message":{"slot":4,"type":"EBGenerated","producer":"node-0","id":"0-4","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":4.02}
+#
+# ∷ inj₁ (VT-Role-Action 4    , SLOT)
+{"message":{"slot":4,"type":"VTBundleGenerated","producer":"node-0","id":"0-4","votes":{},"pipeline":0,"size_bytes":105},"time_s":4.03}
+#
+# ∷ inj₁ (Base₂b-Action  4    , SLOT)
+# ∷ inj₁ (Slot-Action    4    , SLOT)
+{"message":{"type":"Slot","slot":4,"node":"node-0"}, "time_s":4.04}
+#
+# -- slot 5
+# ∷ inj₁ (IB-Role-Action 5    , SLOT)
+{"message":{"slot":5,"type":"IBGenerated","producer":"node-0","id":"0-5","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":5.01}
+#
+# ∷ inj₁ (VT-Role-Action 5    , SLOT)
+{"message":{"slot":5,"type":"VTBundleGenerated","producer":"node-0","id":"0-5","votes":{},"pipeline":0,"size_bytes":105},"time_s":5.02}
+#
+# ∷ inj₁ (Base₂b-Action  5    , SLOT)
+# ∷ inj₁ (Slot-Action    5    , SLOT)
+{"message":{"type":"Slot","slot":5,"node":"node-0"},"time_s":5.03}
+#
+# -- slot 6
+# ∷ inj₁ (No-IB-Role-Action 6 , SLOT)
+{"message":{"slot":6,"type":"NoIBGenerated","node":"node-0"},"time_s":6.01}
+#
+# ∷ inj₁ (No-EB-Role-Action 6 , SLOT)
+{"message":{"slot":6,"type":"NoEBGenerated","node":"node-0"},"time_s":6.02}
+#
+# ∷ inj₁ (VT-Role-Action    6 , SLOT)
+{"message":{"slot":6,"type":"VTBundleGenerated","producer":"node-0","id":"0-6","votes":{},"pipeline":0,"size_bytes":105},"time_s":6.03}
+#
+# ∷ inj₁ (Base₂b-Action     6 , SLOT)
+# ∷ inj₁ (Slot-Action       6 , SLOT)
+{"message":{"type":"Slot","slot":6,"node":"node-0"}, "time_s":6.04}
+#
+# -- slot 7
+# ∷ inj₁ (IB-Role-Action 7    , SLOT)
+{"message":{"slot":7,"type":"IBGenerated","producer":"node-0","id":"0-7","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":7.01}
+#
+# ∷ inj₁ (VT-Role-Action 7    , SLOT)
+{"message":{"slot":7,"type":"VTBundleGenerated","producer":"node-0","id":"0-7","votes":{},"pipeline":0,"size_bytes":105},"time_s":7.02}
+#
+# ∷ inj₁ (Base₂b-Action  7    , SLOT)
+# ∷ inj₁ (Slot-Action    7    , SLOT)
+{"message":{"type":"Slot","slot":7,"node":"node-0"}, "time_s":7.03}
+#
+# -- slot 8
+# ∷ inj₁ (IB-Role-Action 8    , SLOT)
+{"message":{"slot":8,"type":"IBGenerated","producer":"node-0","id":"0-8","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":8.01}
+#
+# ∷ inj₁ (EB-Role-Action 8 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
+{"message":{"slot":8,"type":"EBGenerated","producer":"node-0","id":"0-8","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":8.02}
+#
+# ∷ inj₁ (VT-Role-Action 8    , SLOT)
+{"message":{"slot":8,"type":"VTBundleGenerated","producer":"node-0","id":"0-8","votes":{},"pipeline":0,"size_bytes":105},"time_s":8.03}
+#
+# ∷ inj₁ (Base₂b-Action  8    , SLOT)
+# ∷ inj₁ (Slot-Action    8    , SLOT)
+{"message":{"type":"Slot","slot":8,"node":"node-0"}, "time_s":8.04}

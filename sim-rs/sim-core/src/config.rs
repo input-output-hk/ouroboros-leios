@@ -8,7 +8,7 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{model::TransactionId, probability::FloatDistribution};
+use crate::{clock::Timestamp, model::TransactionId, probability::FloatDistribution};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
@@ -70,6 +70,8 @@ pub struct RawParameters {
     pub tx_sharded_percentage: f64,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
+    pub tx_start_time: Option<f64>,
+    pub tx_stop_time: Option<f64>,
 
     // Ranking block configuration
     pub rb_generation_probability: f64,
@@ -104,6 +106,7 @@ pub struct RawParameters {
     pub eb_size_bytes_constant: u64,
     pub eb_size_bytes_per_ib: u64,
     pub eb_max_age_slots: u64,
+    pub eb_referenced_txs_max_size_bytes: u64,
 
     // Vote configuration
     pub vote_generation_probability: f64,
@@ -136,6 +139,7 @@ pub enum DiffusionStrategy {
 pub enum LeiosVariant {
     Short,
     Full,
+    FullWithoutIbs,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -354,8 +358,8 @@ impl BlockSizeConfig {
         self.cert_constant + self.cert_per_node * nodes as u64
     }
 
-    pub fn eb(&self, ibs: usize, ebs: usize) -> u64 {
-        self.eb_constant + self.eb_per_ib * (ibs + ebs) as u64
+    pub fn eb(&self, txs: usize, ibs: usize, ebs: usize) -> u64 {
+        self.eb_constant + self.eb_per_ib * (txs + ibs + ebs) as u64
     }
 
     pub fn vote_bundle(&self, ebs: usize) -> u64 {
@@ -377,6 +381,12 @@ impl TransactionConfig {
                 sharded_percentage: params.tx_sharded_percentage,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
+                start_time: params
+                    .tx_start_time
+                    .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
+                stop_time: params
+                    .tx_stop_time
+                    .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
             })
         } else {
             Self::Mock(MockTransactionConfig {
@@ -394,6 +404,8 @@ pub(crate) struct RealTransactionConfig {
     pub sharded_percentage: f64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
+    pub start_time: Option<Timestamp>,
+    pub stop_time: Option<Timestamp>,
 }
 
 #[derive(Debug, Clone)]
@@ -424,7 +436,7 @@ pub struct SimConfiguration {
     pub stage_length: u64,
     pub max_eb_age: u64,
     pub late_ib_inclusion: bool,
-    pub(crate) variant: LeiosVariant,
+    pub variant: LeiosVariant,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) praos_chain_quality: u64,
@@ -436,6 +448,7 @@ pub struct SimConfiguration {
     pub(crate) vote_slot_length: u64,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
+    pub(crate) max_eb_size: u64,
     pub(crate) ib_diffusion_strategy: DiffusionStrategy,
     pub(crate) max_ib_requests_per_peer: usize,
     pub(crate) ib_shards: u64,
@@ -478,6 +491,7 @@ impl SimConfiguration {
             vote_slot_length: params.leios_stage_active_voting_slots,
             max_block_size: params.rb_body_max_size_bytes,
             max_ib_size: params.ib_body_max_size_bytes,
+            max_eb_size: params.eb_referenced_txs_max_size_bytes,
             ib_diffusion_strategy: params.ib_diffusion_strategy,
             max_ib_requests_per_peer: params.ib_diffusion_max_bodies_to_request as usize,
             ib_shards: params.ib_shards,

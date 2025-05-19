@@ -197,7 +197,7 @@ instance Default Config where
       , ibDiffusionMaxWindowSize = 100
       , ibDiffusionMaxHeadersToRequest = 100
       , ibDiffusionMaxBodiesToRequest = 1
-      , ibShards = 1
+      , ibShards = 50
       , ebGenerationProbability = 1.5
       , ebGenerationCpuTimeMs = 75.0
       , ebValidationCpuTimeMs = 1.0
