@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-05-17
+
+### Web-based enhanced formal specification documentation
+
+Added a comprehensive web-based documentation for the Ouroboros Leios formal specification, available at [https://leios.cardano-scaling.org/formal-spec/](https://leios.cardano-scaling.org/formal-spec/). This enhanced documentation offers a simple way to explore the different Leios modules as types are linked together, and includes full text search capabilities.
+
 ## 2025-05-16
 
 ### Trace verifier improvements
@@ -800,15 +806,15 @@ The resulting completion outcome is plotted to the terminal together with the ex
 
 Learnings from this exercise:
 
-- latencies within the topologies examined (from the topology generator as well as the “realistic” set from the Rust simulation) very clearly consist of differing near/far components (there’s a “knee” in the graphs)
-- latency-weighted Dijkstra shortest paths are _extremely long_ in terms of hop count, much longer than I expected (mean 4–5, max 8 for the topology-100; min 8, max 20 for the “realistic” topology)
+- latencies within the topologies examined (from the topology generator as well as the "realistic" set from the Rust simulation) very clearly consist of differing near/far components (there's a "knee" in the graphs)
+- latency-weighted Dijkstra shortest paths are _extremely long_ in terms of hop count, much longer than I expected (mean 4–5, max 8 for the topology-100; min 8, max 20 for the "realistic" topology)
 - composing a ΔQ model as a sequence of some number of near hops (with early exit probabilities) and some number of far hops (also with early exit) yields models that roughly fit the overall shape, which is dominated by the `far` component of latencies, but there always is a significant deviation at low latencies
-- the deviation is that observed completion starts out much slower than the model would predict, so the model goes faster first, then “pauses” for 100ms or so, crossing the observed CDF again, then catching up — thereafter the high latency behaviour works out quite well
+- the deviation is that observed completion starts out much slower than the model would predict, so the model goes faster first, then "pauses" for 100ms or so, crossing the observed CDF again, then catching up — thereafter the high latency behaviour works out quite well
 
 My hope had been to use a model that can be understood behaviourally, not just statistically, so that the resource usage tracking features of the `delta_q` library could be brought to bear.
 **This has not yet been achieved.**
 While the timeliness graph can be made to match to some degree, doing this results in a ΔQ expression for which at least I no longer understand the load multiplication factors that should be applied — in other words, how many peer connections are supposedly used at each step of the process.
-The remaining part of this week’s plan was to be able to use the fitted model to obtain a formula for creating such models algebraically;
+The remaining part of this week's plan was to be able to use the fitted model to obtain a formula for creating such models algebraically;
 this has been put on hold because it seems easier to just generate a topology with the desired properties and then use the `topology-checker` to get the corresponding ΔQSD model.
 
 In any case, the `topology-checker` now outputs the fitted ΔQSD model in the syntax needed for the `delta_q` web app, so that you can directly play with the results.
@@ -1055,7 +1061,7 @@ stake to determine how connected each relay is.
 
 ### DeltaQ update
 
-Wrote a report on the work since Sep’24:
+Wrote a report on the work since Sep'24:
 [Report 2025-01.md](./delta_q/docs/Report%202025-01.md)
 
 ## 2025-01-30
@@ -1800,15 +1806,15 @@ correct even when there are too many messages to simulate in real time.
   - general structure of completion matches the timings, but the completion rate
     is overall quite different
   - spreading to neighbor clusters (3×68ms) followed by another such hop should
-    hit all clusters, but that also doesn’t happen in the simulation, it waits
+    hit all clusters, but that also doesn't happen in the simulation, it waits
     until 3×268ms before it can break through 74% completion
-  - **conclusion:** I don’t really understand what the simulation is doing, even
+  - **conclusion:** I don't really understand what the simulation is doing, even
     though the Rust code looks obvious enough, and obviously correct on the node
     level; will dive into the machine room later
 - created a ΔQ model (`comparison_hs.txt`) of Praos block diffusion in the
   Haskell simulation:
   - hs simulates TCP window collapse, which adds a very latency-dependent
-    additional delay to block transfer times — I wasn’t able to adequately model
+    additional delay to block transfer times — I wasn't able to adequately model
     that, plausible ΔQ expressions lead to too slow completion
   - when TCP window collapse is hacked out (thanks Andrea!) I get close matching
     of the result with a ΔQ expression, however, that expression does not match
@@ -2008,13 +2014,13 @@ Unforutnately, this is a bug.
 - gossip is a large part of the Leios problem space, which makes resource
   tracking like CPU/mem/disk hard: there are >2500 CPU metrics to consider in
   principle!
-- currently trying the approach of making “which node am I?” the main random
+- currently trying the approach of making "which node am I?" the main random
   variable during gossip, allowing probabilistic handling of per-node resource
   usage
 - results are getting more reasonable, but still not fully correct (test case is
   diffusion of 1MB blob with 100ms CPU validation time: should never use CPU
   with intensity two, and should yield integral of 1 CPU for 100ms when adding
-  up probability densities; instead, I’m seeing CPU intensity 2 during some time
+  up probability densities; instead, I'm seeing CPU intensity 2 during some time
   periods)
 
 ## 2024-11-27
@@ -2044,8 +2050,8 @@ settling on the details of Leios voting and certificates.
 ### Curve fit to empirically observed distribution of stake pools
 
 The cumulative distribution function for the beta distribution
-(the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function))
-with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of
+(the [regularized incomplete beta function](https://en.wikipedia.org/wiki/Regularized_incomplete_beta_function))
+with parameters `α = 11` and `β = 1` nicely fits the empirical distribution of
 stake pools at epoch 500. To use this for 2000 stake pools, just divide the x
 axis into 2000 points and take the difference in consecutive y values as the
 amount of stake the corresponding pool has.
@@ -2610,9 +2616,9 @@ latency of requests
   - this reproduces the values taken from the Tech Report when using roughly
     size=2500, branching=15, cluster_coeff=0.08 (but this understanding should
     definitely be deepened)
-  - when playing with gossip parameters, one quickly enters “stack overflow”
+  - when playing with gossip parameters, one quickly enters "stack overflow"
     territory because `DeltaQ::eval()` is just a recursive function; therefore,
-    I’ll move iteration state to the heap (it turns out that WASM stack is
+    I'll move iteration state to the heap (it turns out that WASM stack is
     smaller than I thought, so it already affects quite reasonable ΔQ
     expressions)
 
@@ -2778,7 +2784,7 @@ Agenda:
 
 ### Rust simulation
 
-Rewrote the simulation to use separate tokio tasks for each node, multithreading
+Rewritten the simulation to use separate tokio tasks for each node, multithreading
 as much as possible. It can simulate 85tps in almost realtime, but the slowdown
 makes its results inaccurate (a smaller percentage of IBs propagated across the
 network compared to the non-netsim branch).
@@ -3522,7 +3528,7 @@ product/usage
 Report on ΔQ work in Rust so far (Roland):
 
 - implemented MVP in the sense of being able to create ΔQ expressions as per the
-  “Mind your outcomes” paper and evaluate them
+  "Mind your outcomes" paper and evaluate them
 - added a recursion operator that is purely syntactical: recursive unfolding of
   a named expression with a given depth limit
 - project uses yew/trunk to render the HTML/CSS frontend, which uses WASM (tools
@@ -3544,7 +3550,7 @@ Implementation notes:
      one of the same distance; this yields more even pruning along the x axis
 - the EvaluationContext holds all named expressions and allows resolving names,
   but also tracks the current recursion allowance for each name (recursion with
-  allowance isn’t allowed while already recursing on that name; allowing this
+  allowance isn't allowed while already recursing on that name; allowing this
   results in infinite loop)
 
 Comments raised while presenting this to the team today:
@@ -3558,21 +3564,21 @@ Comments raised while presenting this to the team today:
   which operation that would be)
 - recursion as template unfolding was understood as some fix point
   representation by Duncan, but currently that is not how it is implemented
-- treating the propagation of messages across a network graph isn’t faithfully
+- treating the propagation of messages across a network graph isn't faithfully
   modelled, but it could be if recursion was actually some kind of fix point
   operation
-  - it would be great to have an operator that expresses “only broadcast the
-    first copy of the message I receive”, which would allow pruning the infinite
+  - it would be great to have an operator that expresses "only broadcast the
+    first copy of the message I receive", which would allow pruning the infinite
     evaluation tree
-  - this is unclear to me because ΔQ speaks in CDFs which aren’t concrete in
-    this way, so pruning wouldn’t apply to CDFs but to some execution of the
+  - this is unclear to me because ΔQ speaks in CDFs which aren't concrete in
+    this way, so pruning wouldn't apply to CDFs but to some execution of the
     modelled process
 - Pi asked how this work relates to the Rust-based network graph simulator,
   which has at least two answers:
   - compute CDFs that are used by the simulator using ΔQ
   - use simulation results (CDFs) as inputs for further ΔQ modelling, e.g. on a
     higher level
-- on the website we’ll need something that can quickly answer high-level
+- on the website we'll need something that can quickly answer high-level
   questions, running a simulation would probably not be feasible but ΔQ should
   be
 - it occurred to me that if we can get a load profile from a ΔQ model, we can
@@ -3766,7 +3772,7 @@ on Agda-based conformance testing:
     [#18](https://github.com/input-output-hk/ouroboros-leios/issues/18)
   - Nominal objectives, tasks, and deliverables for next 12 months
 - Work agreement
-  - Write down “everything” in a “research journal”
+  - Write down "everything" in a "research journal"
     - what we do
     - why we do it
     - what are the expected results vs. actual results.
@@ -3778,7 +3784,7 @@ on Agda-based conformance testing:
   - Processes and workflows can emerge from our needs, and do not have to match
     typical production enviroments
     - However, QA and checking each others' work is important
-  - Ensure all results are “easily” reproducible by the community
+  - Ensure all results are "easily" reproducible by the community
   - Arnaud will pair with engineering staff each week in October
   - Technical report each quarter -- the next will be in December
   - CIP at conclusion of innovation workstream
