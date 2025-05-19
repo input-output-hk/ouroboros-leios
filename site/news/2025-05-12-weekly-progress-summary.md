@@ -5,54 +5,43 @@ authors:
 tags: [progress, update, weekly]
 ---
 
-Here is a weekly summary for the period from 2025-05-12 to 2025-05-19.
+This week, the team made significant progress on simulation improvements, trace verification, and comprehensive analysis of Leios transaction processing capacity.
 
-### Weekly Summary - 2025-05-12 to 2025-05-19
+### Trace verification
 
-This week, the team made significant progress on various fronts, including protocol documentation, security improvements, and simulation analysis.
+- Improved the trace verifier with better error handling and reporting
+- Added support for starting verification from non-initial states
+- Created manually curated test cases for the Leios trace verifier
+  - [Valid traces](https://github.com/input-output-hk/ouroboros-leios/blob/main/leios-trace-verifier/examples/valid/)
+  - [Invalid traces](https://github.com/input-output-hk/ouroboros-leios/blob/main/leios-trace-verifier/examples/invalid/)
+- Integrated the trace verifier into Nix infrastructure and CI builds
+- Removed deterministic conformance testing in favor of trace-based approach.
 
-### Protocol Documentation and Analysis
+### Simulation improvements
 
-The team continued working on the Leios protocol documentation, producing several key visualizations to demonstrate transaction throughput and block characteristics.
+#### Haskell simulation
+- Conducted an informal review assessing code quality, design, and implementation
+- Analyzed the simulation organization and identified areas for future improvement
+- Found that most prospective changes to the Leios protocol would only involve a small fraction of the codebase
+- Determined that addition of memory pool and transactions would take approximately 100-200 hours of labor.
 
-<div align="center">
+The review of the Haskell simulator was documented in detail in [PR#353](https://github.com/input-output-hk/ouroboros-leios/pull/353), covering statistics, organization, code quality, design, implementation, and documentation aspects of the simulator.
 
-![Transaction throughput analysis](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/block-praos-leios-contour.svg)
+#### Rust simulation
+- Added `tx-start-time` and `tx-stop-time` parameters to avoid effects of slow starts or sudden terminations on transaction analysis
+- Created a new Leios variant `full-without-ibs` where endorser blocks directly reference transactions.
 
-*Figure 1: Transaction throughput as a function of block size and rate*
+### Documentation and analysis
 
-![Comparative transaction lifecycle](https://raw.githubusercontent.com/input-output-hk/ouroboros-leios/refs/heads/main/analysis/tx-to-block-fig.svg)
+- Relocated the original Leios report to avoid confusion, while preserving valuable background information
+- Added partially-drafted technical reports on Haskell simulations to Nix and CI builds:
+  - [Ouroboros Leios Network Specification](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/network-spec/ReadMe.md)
+  - [Ouroboros Leios simulation: building confidence in the performance results](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/ReadMe.md)
 
-*Figure 2: Comparative transaction lifecycle between Praos and Leios*
+The team conducted higher excess-capacity simulations to evaluate transaction inclusion hypotheses. The transaction lifecycle simulations raised the question of whether duplication of transactions in IBs was starving other transactions from ever being included in an IB. To test this, simulations were run with IBs being produced at three times the normal rate, providing ample space for transaction duplication.
 
-</div>
+Detailed analysis showed that transaction loss persisted despite increased capacity, indicating that other factors are preventing transactions from reaching the ledger. The results are documented in:
+- [Analysis overview](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/)
+- [Results at 1x IB capacity](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis1x.ipynb)
+- [Results at 3x IB capacity](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis3x.ipynb)
 
-The team also conducted an extensive profitability analysis for Leios SPOs, considering various deployment scenarios. The analysis included evaluating infrastructure costs across premium and value cloud providers, demonstrating profitability without reserve contributions at 50+ TPS, and documenting the impact of diminishing future rewards due to reserve depletion.
-
-### Simulation Analysis and Performance
-
-The team conducted high-throughput simulations of Leios using the Rust simulator, with transaction rates reaching up to 1,000 TPS. They introduced two key efficiency metrics to quantify system performance: temporal efficiency, which measures the fraction of submitted transactions that make it into the ledger, and spatial efficiency, which represents the ratio of transaction size to total ledger size.
-
-Recent revisions to Full Short Leios have shown promising improvements in both efficiency metrics. The simulations revealed an average transaction lifecycle of approximately 100 seconds from submission to ledger inclusion.
-
-### Security and Infrastructure Improvements
-
-The team addressed several security vulnerabilities in web applications through a series of patches.
-
-### Protocol Enhancements
-
-Recent protocol improvements include:
-
-- Implementation of revisions to Full Short Leios design to enhance both temporal and spatial efficiency
-- Optimization of protocol parameters for improved transaction processing
-- Development of a new sharding strategy in Rust simulation
-- Enhanced logging system for tracking spatial efficiency metrics.
-
-### Notable Updates
-
-- Two manually curated test cases for the Leios trace verifier were created and integrated into a new test suite.
-- Deterministic conformance testing was removed and replaced with non-deterministic, trace-based conformance testing.
-- The Leios trace verifier was added to the Nix infrastructure and the CI builds.
-- Two partially-drafted technical reports related to the Haskell simulations were added to the Nix and CI builds.
-
-For more detailed information about the simulations and analysis, please refer to the [analysis documentation](https://github.com/input-output-hk/ouroboros-leios/tree/main/analysis) and the [profitability analysis notebook](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/profitability-leios.ipynb).
