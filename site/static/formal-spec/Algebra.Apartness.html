@@ -1,0 +1,1185 @@
+<!DOCTYPE html><html><head><script>
+      (function() {
+        // Check for theme preference in localStorage
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+        }
+      })();
+    </script><meta charset="utf-8"><title>Algebra.Apartness</title><link rel="stylesheet" href="Agda.css"><style>/* Base styles */
+:root {
+  --header-height: 64px;
+  --sidebar-width: 280px;
+  --sidebar-padding: 24px;
+  --content-max-width: 900px;
+  --primary-color: #1a1a1a;
+  --border-color: #e0e0e0;
+  --hover-bg: rgba(0, 119, 204, 0.1);
+  --hover-transform: translateY(-1px);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --content-padding: 40px;
+  --background-color: #ffffff;
+  --code-bg: #f6f8fa;
+  --code-color: #24292e;
+  --link-color: #0077cc;
+  --link-hover-color: #0055aa;
+  --syntax-keyword: #d73a49;
+  --syntax-string: #032f62;
+  --syntax-comment: #6a737d;
+  --syntax-function: #6f42c1;
+  --syntax-variable: #e36209;
+  --syntax-operator: #005cc5;
+  --syntax-class: #6f42c1;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --code-border: rgba(0, 0, 0, 0.05);
+  --sidebar-border-color: var(--border-color);
+  --header-border-color: var(--border-color);
+  --header-button-padding: 8px;
+  --header-button-border-radius: 6px;
+}
+
+:root.dark-theme {
+  --primary-color: #e4e4e4;
+  --border-color: #555555;
+  --hover-bg: rgba(88, 166, 255, 0.2);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --background-color: #121212;
+  --code-bg: rgba(255, 255, 255, 0.07);
+  --code-color: #e4e4e4;
+  --link-color: #78aeff;
+  --link-hover-color: #94c2ff;
+  --syntax-keyword: #c75d65;
+  --syntax-string: #7fb0d8;
+  --syntax-comment: #6e7781;
+  --syntax-function: #b387d8;
+  --syntax-variable: #e0a17a;
+  --syntax-operator: #8ab4ff;
+  --syntax-class: #b387d8;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --code-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border-color: #333333;
+  --header-border-color: #333333;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-family);
+  color: var(--primary-color);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background-color);
+}
+
+/* Header styles */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: var(--background-color);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1000;
+  box-shadow: var(--box-shadow);
+  border-bottom: 1px solid var(--header-border-color);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Header button/link shared styles */
+.back-button,
+.github-link,
+.theme-toggle,
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  border-radius: var(--header-button-border-radius);
+  transition: all 0.2s ease;
+  padding: var(--header-button-padding);
+  position: relative;
+}
+
+.back-button:hover,
+.github-link:hover,
+.theme-toggle:hover,
+.search-button:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.back-button:active,
+.github-link:active,
+.theme-toggle:active,
+.search-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Individual button styles - keeping only specific differences */
+.back-button {
+  text-decoration: none;
+  font-size: 15px;
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  margin: 0 4px;
+}
+
+.github-link {
+  text-decoration: none;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Theme toggler styles */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+:root:not(.dark-theme) .dark-icon {
+  display: none;
+}
+
+:root.dark-theme .light-icon {
+  display: none;
+}
+
+/* Main layout */
+.main-wrapper {
+  display: flex;
+  margin-top: var(--header-height);
+  min-height: calc(100vh - var(--header-height));
+}
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--background-color);
+  border-right: 1px solid var(--sidebar-border-color);
+  overflow-y: auto;
+  padding: var(--sidebar-padding);
+  flex-shrink: 0;
+}
+
+.modules-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sidebar-border-color);
+}
+
+.module-group-header {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary-color);
+  opacity: 0.7;
+  margin: 20px 0 8px 0;
+  padding-left: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+}
+
+.module-item {
+  margin-bottom: 2px;
+  padding-left: 24px;
+}
+
+.module-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 14px;
+  display: block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.module-link:hover {
+  background-color: var(--hover-bg);
+}
+
+.module-link.active {
+  background-color: var(--hover-bg);
+  font-weight: 500;
+  border-left: 3px solid var(--link-color);
+  padding-left: 9px;
+}
+
+/* Main content styles */
+.main-content {
+  flex: 1;
+  margin-left: calc(var(--sidebar-width) + var(--sidebar-padding) * 2);
+  padding: var(--content-padding);
+  overflow-y: auto;
+  max-width: var(--content-max-width);
+  scroll-padding-top: calc(var(--header-height) + var(--content-padding));
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Ensure anchors have proper scroll margin */
+.main-content :target {
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Add padding to all direct children of main-content */
+.main-content > * {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* Common elements styling */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+/* Code blocks */
+pre, code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  background-color: var(--code-bg);
+  color: var(--code-color);
+  border-radius: 6px;
+}
+
+pre {
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--code-border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+pre.Agda {
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+
+code {
+  padding: 2px 4px;
+}
+
+pre code {
+  padding: 0;
+  background-color: transparent;
+  border: none;
+}
+
+/* Syntax highlighting for Agda */
+.Keyword { color: var(--syntax-keyword); }
+.String { color: var(--syntax-string); }
+.Comment { color: var(--syntax-comment); }
+.Function { color: var(--syntax-function); }
+.InductiveConstructor { color: var(--syntax-class); }
+.CoinductiveConstructor { color: var(--syntax-class); }
+.Datatype { color: var(--syntax-class); }
+.Field { color: var(--syntax-variable); }
+.Bound { color: var(--code-color); }
+.Generalizable { color: var(--syntax-variable); }
+.Module { color: var(--syntax-keyword); }
+.Number { color: var(--syntax-variable); }
+.Postulate { color: var(--syntax-function); }
+.Primitive { color: var(--syntax-keyword); }
+.Record { color: var(--syntax-class); }
+.Hole { color: var(--syntax-operator); background-color: rgba(255, 255, 0, 0.1); }
+.Symbol { color: var(--syntax-operator); }
+.PrimitiveType { color: var(--syntax-keyword); }
+.Macro { color: var(--syntax-function); }
+
+/* Override Agda.css hover styles */
+.Agda a[href]:hover {
+  background-color: var(--hover-bg) !important;
+  color: var(--link-hover-color) !important;
+  text-decoration: underline !important;
+}
+
+.Agda [href].hover-highlight {
+  background-color: var(--hover-bg) !important;
+}
+
+/* Specific Agda syntax improvements for dark theme */
+:root.dark-theme .Agda .Keyword, 
+:root.dark-theme .Agda .Module,
+:root.dark-theme .Agda .Pragma { 
+  color: var(--syntax-keyword) !important; 
+}
+
+:root.dark-theme .Agda .Symbol,
+:root.dark-theme .Agda .Operator { 
+  color: var(--syntax-operator) !important; 
+}
+
+:root.dark-theme .Agda .InductiveConstructor,
+:root.dark-theme .Agda .CoinductiveConstructor { 
+  color: var(--syntax-variable) !important; 
+}
+
+:root.dark-theme .Agda .Datatype,
+:root.dark-theme .Agda .Record,
+:root.dark-theme .Agda .Primitive,
+:root.dark-theme .Agda .PrimitiveType { 
+  color: var(--syntax-class) !important; 
+}
+
+:root.dark-theme .Agda .String { 
+  color: var(--syntax-string) !important; 
+}
+
+:root.dark-theme .Agda .Comment { 
+  color: var(--syntax-comment) !important; 
+}
+
+:root.dark-theme .Agda .Function,
+:root.dark-theme .Agda .Macro,
+:root.dark-theme .Agda .Postulate { 
+  color: var(--syntax-function) !important; 
+}
+
+:root.dark-theme .Agda .Bound,
+:root.dark-theme .Agda .Generalizable { 
+  color: var(--code-color) !important; 
+}
+
+/* Code line numbers styling */
+.code-container {
+  display: flex;
+  width: 100%;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.code-container * {
+  box-sizing: border-box;
+}
+
+.line-numbers {
+  flex: 0 0 auto;
+  padding-right: 8px;
+  user-select: none;
+  text-align: right;
+  width: 32px;
+  position: sticky;
+  left: 0;
+  background-color: transparent;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.line-number {
+  display: block;
+  color: rgba(27, 31, 35, 0.4);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 1.5em;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  outline: none;
+}
+
+.line-number:hover {
+  color: var(--primary-color);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.line-number:focus,
+.line-number:focus-visible,
+.line-number:focus-within,
+.line-number:active {
+  outline: none;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+:root.dark-theme .line-number {
+  color: rgba(230, 237, 243, 0.4);
+}
+
+.code-content {
+  overflow-x: auto;
+  padding-left: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.code-line {
+  line-height: 1.5;
+  height: 1.5em;
+  white-space: pre;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+/* Ensure that the Agda syntax elements don't affect line height */
+.code-line * {
+  line-height: inherit;
+}
+
+/* Highlighted line styles */
+.code-line.highlighted {
+  background-color: var(--hover-bg);
+  border-radius: 3px;
+  display: block;
+  width: 100%;
+}
+
+/* Improve highlighted line visibility */
+pre.Agda .code-content .highlighted {
+  animation: highlight-glow 1s ease-in-out 1;
+}
+
+@keyframes highlight-glow {
+  0% {
+    background-color: rgba(255, 213, 0, 0.1);
+  }
+  50% {
+    background-color: rgba(255, 213, 0, 0.2);
+  }
+  100% {
+    background-color: var(--hover-bg);
+  }
+}
+
+/* Target the line when the hash in the URL matches */
+.code-content .code-line:target {
+  background-color: var(--hover-bg);
+}
+
+/* Code copy button styles */
+pre.Agda {
+  position: relative;
+}
+
+pre.Agda.has-copy-button {
+  padding-right: 42px; /* Space for copy button */
+}
+
+.copy-code-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.2s, background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-code-button:hover {
+  opacity: 1;
+  background-color: var(--hover-bg);
+}
+
+.copy-code-button:active {
+  background-color: var(--hover-bg);
+  opacity: 1;
+}
+
+.copy-code-button.copy-success {
+  background-color: var(--hover-bg);
+  opacity: 1;
+  border-color: rgba(0, 119, 204, 0.5);
+}
+
+:root.dark-theme .copy-code-button.copy-success {
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+.copy-code-button.copy-success svg {
+  color: var(--primary-color);
+}
+
+.copy-code-button svg {
+  display: block;
+  color: var(--primary-color);
+}
+
+/* Line number highlight styles */
+.line-number[data-line-number].highlighted,
+.line-number[href].active {
+  color: var(--primary-color) !important;
+  font-weight: 500;
+}
+
+.line-number[data-line-number].highlighted::before,
+.line-number[href].active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background-color: rgba(0, 119, 204, 0.5);
+  border-radius: 2px;
+}
+
+:root.dark-theme .line-number[data-line-number].highlighted::before,
+:root.dark-theme .line-number[href].active::before {
+  background-color: rgba(88, 166, 255, 0.5);
+}
+
+/* When copy-pasting, only select the code, not the line numbers */
+.code-content {
+  user-select: text;
+}
+
+/* Target just the current line when linking to it */
+:target + .code-content > [id^="LC"] {
+  background-color: var(--hover-bg);
+}
+
+.code-content [id^="LC"]:target {
+  background-color: var(--hover-bg);
+}
+
+/* Responsive styles for narrow screens */
+@media (max-width: 768px) {
+  .line-numbers {
+    width: 40px;
+    padding-right: 8px;
+  }
+  
+  .code-content {
+    padding-left: 8px;
+  }
+} </style><style>/* Search UI Styles */
+
+/* Search button in the header */
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--primary-color);
+  border-radius: var(--header-button-border-radius);
+  transition: all 0.2s ease;
+  padding: var(--header-button-padding);
+  position: relative;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+}
+
+.search-button:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.search-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.search-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Fix header buttons to use consistent styling */
+.header-right button, 
+.header-right a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+/* All header buttons should have the same hover effects */
+.header-right button:hover, 
+.header-right a:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.header-right button:active,
+.header-right a:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Make sure SVG icons are consistent */
+.header-right button svg, 
+.header-right a svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Fix header alignment while preserving gap */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Search overlay (background) */
+.search-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding-top: 80px;
+  backdrop-filter: blur(2px);
+}
+
+/* Main search container */
+.search-container {
+  width: 600px;
+  max-width: calc(100% - 32px);
+  background-color: var(--background-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  max-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Search input field */
+.search-input {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 18px;
+  outline: none;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.search-input:focus {
+  border-color: var(--link-color);
+  box-shadow: 0 0 0 1px var(--link-color, #0077cc);
+}
+
+.search-input:placeholder-shown {
+  box-shadow: inset 0 0 6px rgba(0, 119, 204, 0.1);
+}
+
+:root.dark-theme .search-input:placeholder-shown {
+  box-shadow: inset 0 0 6px rgba(88, 166, 255, 0.1);
+}
+
+.search-input::placeholder {
+  color: var(--text-light);
+  opacity: 0.7;
+}
+
+/* Search results container */
+.search-results {
+  overflow-y: auto;
+  max-height: 450px;
+  padding: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Empty search state */
+.search-message {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+/* Individual search result */
+.search-result {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: relative;
+  display: block;
+  text-decoration: none;
+  color: var(--primary-color);
+}
+
+.search-result:hover, 
+.search-result.selected {
+  background-color: var(--hover-bg);
+  text-decoration: none;
+}
+
+.search-result.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--primary-color, #4a6da7);
+}
+
+/* Result title */
+.result-title {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+/* Result footer with path and type */
+.result-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+/* Result source path */
+.result-path {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+/* Result preview content */
+.result-preview {
+  padding: 8px;
+  background-color: var(--code-bg);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 13px;
+  white-space: pre-wrap;
+  position: relative;
+  max-height: none;
+  overflow-x: visible;
+  line-height: 1.3;
+}
+
+/* Code-specific styling */
+.code-preview {
+  background-color: var(--code-bg, #f5f5f5);
+}
+
+.code-highlight {
+  display: block;
+  background-color: var(--highlight-color, #f0f0f0);
+  font-weight: bold;
+}
+
+.code-context {
+  display: block;
+  opacity: 0.7;
+}
+
+/* Highlight matched text in previews */
+.result-match {
+  background-color: rgba(255, 255, 0, 0.4);
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+  font-weight: bold;
+  display: inline;
+}
+
+/* Fix for consecutive highlighted characters */
+.result-match + .result-match {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* Different result types styling */
+.result-type {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.result-type-code {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.result-type-header {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.result-type-module {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+/* Dark theme overrides */
+.dark-theme .result-match {
+  background-color: rgba(255, 255, 0, 0.25);
+  color: var(--text-color);
+}
+
+.dark-theme .result-type-code {
+  background-color: rgba(25, 118, 210, 0.2);
+  color: #90caf9;
+}
+
+.dark-theme .result-type-header {
+  background-color: rgba(46, 125, 50, 0.2);
+  color: #a5d6a7;
+}
+
+.dark-theme .result-type-module {
+  background-color: rgba(230, 81, 0, 0.2);
+  color: #ffcc80;
+}
+
+.dark-theme .code-highlight {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Apply blur to main content when search is active */
+body.search-active .main-wrapper {
+  filter: blur(2px);
+}
+
+/* Keyboard shortcut hint in results */
+.keyboard-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 11px;
+  color: var(--text-light);
+  opacity: 0.7;
+  user-select: none;
+}
+
+/* Add extra room at bottom of results */
+.search-results::after {
+  content: '';
+  display: block;
+  height: 16px;
+}
+
+/* Empty results state */
+.no-results {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-light);
+}
+
+/* Loading indicator */
+.search-loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.search-loading-spinner {
+  border: 3px solid var(--border-color);
+  border-top: 3px solid var(--primary-color);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .search-container {
+    width: 100%;
+    max-width: calc(100% - 16px);
+    border-radius: 8px 8px 0 0;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    max-height: 80vh;
+  }
+  
+  .search-overlay {
+    padding-top: 0;
+    align-items: flex-end;
+  }
+} </style></head><body><header><div class="header-left"><a href="/formal-spec/" class="back-button">← Back</a></div><div class="header-right"><a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec" class="github-link" target="_blank" rel="noopener noreferrer" title="View on GitHub">
+        <svg viewBox="0 0 24 24" width="24" height="24" class="github-icon">
+          <path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path>
+        </svg>
+      </a><button class="theme-toggle" title="Toggle theme">
+      <span class="light-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+        </svg>
+      </span>
+      <span class="dark-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+        </svg>
+      </span>
+    </button></div></header><div class="main-wrapper"><aside class="sidebar"><h3 class="modules-header">Modules</h3><h4 class="module-group-header">Leios</h4><ul class="module-list"><li class="module-item"><a href="Leios.Abstract.html" class="module-link">Abstract</a></li><li class="module-item"><a href="Leios.Base.html" class="module-link">Base</a></li><li class="module-item"><a href="Leios.Blocks.html" class="module-link">Blocks</a></li><li class="module-item"><a href="Leios.Config.html" class="module-link">Config</a></li><li class="module-item"><a href="Leios.Defaults.html" class="module-link">Defaults</a></li><li class="module-item"><a href="Leios.FFD.html" class="module-link">FFD</a></li><li class="module-item"><a href="Leios.Foreign.BaseTypes.html" class="module-link">Foreign.BaseTypes</a></li><li class="module-item"><a href="Leios.Foreign.HsTypes.html" class="module-link">Foreign.HsTypes</a></li><li class="module-item"><a href="Leios.Foreign.Types.html" class="module-link">Foreign.Types</a></li><li class="module-item"><a href="Leios.Foreign.Util.html" class="module-link">Foreign.Util</a></li><li class="module-item"><a href="Leios.KeyRegistration.html" class="module-link">KeyRegistration</a></li><li class="module-item"><a href="Leios.Network.html" class="module-link">Network</a></li><li class="module-item"><a href="Leios.Prelude.html" class="module-link">Prelude</a></li><li class="module-item"><a href="Leios.Protocol.html" class="module-link">Protocol</a></li><li class="module-item"><a href="Leios.Short.html" class="module-link">Short</a></li><li class="module-item"><a href="Leios.Short.Decidable.html" class="module-link">Short.Decidable</a></li><li class="module-item"><a href="Leios.Short.Trace.Verifier.html" class="module-link">Short.Trace.Verifier</a></li><li class="module-item"><a href="Leios.Short.Trace.Verifier.Test.html" class="module-link">Short.Trace.Verifier.Test</a></li><li class="module-item"><a href="Leios.Simplified.html" class="module-link">Simplified</a></li><li class="module-item"><a href="Leios.Simplified.Deterministic.html" class="module-link">Simplified.Deterministic</a></li><li class="module-item"><a href="Leios.SpecStructure.html" class="module-link">SpecStructure</a></li><li class="module-item"><a href="Leios.Traces.html" class="module-link">Traces</a></li><li class="module-item"><a href="Leios.Voting.html" class="module-link">Voting</a></li><li class="module-item"><a href="Leios.VRF.html" class="module-link">VRF</a></li></ul></aside><div class="main-content"><pre class="Agda has-copy-button"><div class="code-container"><div class="line-numbers"><a href="#L1" id="L1" class="line-number" data-line-number="1">1</a><a href="#L2" id="L2" class="line-number" data-line-number="2">2</a><a href="#L3" id="L3" class="line-number" data-line-number="3">3</a><a href="#L4" id="L4" class="line-number" data-line-number="4">4</a><a href="#L5" id="L5" class="line-number" data-line-number="5">5</a><a href="#L6" id="L6" class="line-number" data-line-number="6">6</a><a href="#L7" id="L7" class="line-number" data-line-number="7">7</a><a href="#L8" id="L8" class="line-number" data-line-number="8">8</a><a href="#L9" id="L9" class="line-number" data-line-number="9">9</a><a href="#L10" id="L10" class="line-number" data-line-number="10">10</a><a href="#L11" id="L11" class="line-number" data-line-number="11">11</a><a href="#L12" id="L12" class="line-number" data-line-number="12">12</a></div><div class="code-content"><div id="LC1" class="code-line"><a id="1" class="Comment">------------------------------------------------------------------------</a></div><div id="LC2" class="code-line"><a id="74" class="Comment">-- The Agda standard library</a></div><div id="LC3" class="code-line"><a id="103" class="Comment">--</a></div><div id="LC4" class="code-line"><a id="106" class="Comment">-- Algebraic objects with an apartness relation</a></div><div id="LC5" class="code-line"><a id="154" class="Comment">------------------------------------------------------------------------</a></div><div id="LC6" class="code-line">&nbsp;</div><div id="LC7" class="code-line"><a id="228" class="Symbol">{-#</a> <a id="232" class="Keyword">OPTIONS</a> <a id="240" class="Pragma">--cubical-compatible</a> <a id="261" class="Pragma">--safe</a> <a id="268" class="Symbol">#-}</a></div><div id="LC8" class="code-line">&nbsp;</div><div id="LC9" class="code-line"><a id="273" class="Keyword">module</a> <a id="280" href="Algebra.Apartness.html" class="Module">Algebra.Apartness</a> <a id="298" class="Keyword">where</a></div><div id="LC10" class="code-line">&nbsp;</div><div id="LC11" class="code-line"><a id="305" class="Keyword">open</a> <a id="310" class="Keyword">import</a> <a id="317" href="Algebra.Apartness.Structures.html" class="Module">Algebra.Apartness.Structures</a> <a id="346" class="Keyword">public</a></div><div id="LC12" class="code-line"><a id="353" class="Keyword">open</a> <a id="358" class="Keyword">import</a> <a id="365" href="Algebra.Apartness.Bundles.html" class="Module">Algebra.Apartness.Bundles</a> <a id="391" class="Keyword">public</a></div></div></div><button class="copy-code-button" title="Copy code">
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path fill="currentColor" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path fill="currentColor" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+        </svg>
+      </button></pre><script>
+      (function() {
+        // Check if theme preference exists in localStorage
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+        }
+
+        // Add toggle functionality
+        document.querySelector('.theme-toggle').addEventListener('click', function() {
+          const html = document.documentElement;
+          const isDark = html.classList.contains('dark-theme');
+          
+          if (isDark) {
+            html.classList.remove('dark-theme');
+            localStorage.setItem('theme', 'light');
+          } else {
+            html.classList.add('dark-theme');
+            localStorage.setItem('theme', 'dark');
+          }
+        });
+      })();
+    </script></div></div><script>
+      (function() {
+        // Function to copy code without line numbers
+        function copyCode(event) {
+          const button = event.currentTarget;
+          const pre = button.closest('pre.Agda');
+          if (!pre) return;
+          
+          const codeContent = pre.querySelector('.code-content');
+          if (!codeContent) return;
+          
+          // Extract text content from code lines, preserving structure
+          const codeLines = Array.from(codeContent.querySelectorAll('.code-line'));
+          const codeText = codeLines.map(line => line.textContent).join('\n');
+          
+          // Create temporary textarea to copy from
+          const textarea = document.createElement('textarea');
+          textarea.value = codeText;
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          
+          try {
+            document.execCommand('copy');
+            // Show success state
+            button.classList.add('copy-success');
+            setTimeout(() => {
+              button.classList.remove('copy-success');
+            }, 2000);
+          } catch (err) {
+            console.error('Failed to copy code: ', err);
+          }
+          
+          document.body.removeChild(textarea);
+        }
+        
+        // Add click event listeners to all copy buttons
+        const copyButtons = document.querySelectorAll('.copy-code-button');
+        copyButtons.forEach(button => {
+          button.addEventListener('click', copyCode);
+        });
+        
+        // Handle highlighting of lines when line numbers are clicked
+        function setupLineHighlighting() {
+          const lineNumbers = document.querySelectorAll('.line-number');
+          
+          lineNumbers.forEach(lineNum => {
+            lineNum.addEventListener('click', function(e) {
+              e.preventDefault(); // Prevent default hash navigation
+              
+              // Remove highlight from all lines and line numbers first
+              document.querySelectorAll('.code-line.highlighted').forEach(line => {
+                line.classList.remove('highlighted');
+              });
+              document.querySelectorAll('.line-number.highlighted').forEach(num => {
+                num.classList.remove('highlighted');
+              });
+              
+              // Get the line number
+              const num = this.getAttribute('data-line-number');
+              if (!num) return;
+              
+              // Add highlight class to clicked line number
+              this.classList.add('highlighted');
+              
+              // Find the corresponding code line and highlight it
+              const lineId = 'LC' + num;
+              const codeLine = document.getElementById(lineId);
+              if (codeLine) {
+                codeLine.classList.add('highlighted');
+                
+                // Update URL hash without causing a jump
+                const newUrl = window.location.pathname + window.location.search + '#L' + num;
+                history.pushState(null, '', newUrl);
+                
+                // Scroll the element into view
+                codeLine.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'center'
+                });
+              }
+            });
+          });
+        }
+        
+        // Handle highlighting of lines when URL has fragment
+        function highlightTargetLine() {
+          // Clear any existing highlights first
+          document.querySelectorAll('.code-line.highlighted').forEach(line => {
+            line.classList.remove('highlighted');
+          });
+          document.querySelectorAll('.line-number.highlighted').forEach(num => {
+            num.classList.remove('highlighted');
+          });
+          
+          const hash = window.location.hash;
+          if (hash && hash.startsWith('#L')) {
+            // Extract the line number from the hash
+            const lineNum = hash.substring(2);
+            const lineId = 'LC' + lineNum;
+            const codeLine = document.getElementById(lineId);
+            const lineNumEl = document.getElementById('L' + lineNum);
+            
+            if (codeLine) {
+              // Highlight the target line
+              codeLine.classList.add('highlighted');
+              
+              // Highlight the corresponding line number
+              if (lineNumEl) {
+                lineNumEl.classList.add('highlighted');
+              }
+              
+              // Scroll the line into view
+              setTimeout(() => {
+                codeLine.scrollIntoView({
+                  behavior: 'smooth', 
+                  block: 'center'
+                });
+              }, 100); // Small delay to ensure DOM is ready
+            }
+          }
+        }
+        
+        // Run on page load and when hash changes
+        setupLineHighlighting();
+        highlightTargetLine();
+        window.addEventListener('hashchange', highlightTargetLine);
+      })();
+    </script><script src="search.js" defer=""></script><script>
+      (function() {
+        // Support for toggling between position and line references
+        document.addEventListener('keydown', function(event) {
+          // Alt+P toggles position mode
+          if (event.altKey && event.key === 'p') {
+            const links = document.querySelectorAll('a[data-original-href]');
+            links.forEach(link => {
+              const currentHref = link.getAttribute('href');
+              const originalHref = link.getAttribute('data-original-href');
+              
+              // Toggle between original position references and line numbers
+              link.setAttribute('data-original-href', currentHref);
+              link.setAttribute('href', originalHref);
+            });
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.style.position = 'fixed';
+            notification.style.bottom = '20px';
+            notification.style.right = '20px';
+            notification.style.padding = '10px 20px';
+            notification.style.background = 'rgba(0,0,0,0.8)';
+            notification.style.color = 'white';
+            notification.style.borderRadius = '4px';
+            notification.style.zIndex = '9999';
+            notification.style.transition = 'opacity 0.5s';
+            notification.textContent = 'Reference mode toggled';
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+              notification.style.opacity = '0';
+              setTimeout(() => {
+                document.body.removeChild(notification);
+              }, 500);
+            }, 2000);
+          }
+        });
+      })();
+    </script></body></html>

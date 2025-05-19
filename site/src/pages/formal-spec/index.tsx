@@ -51,7 +51,7 @@ export default function FormalSpecPage(): React.ReactElement {
             {AGDA_MODULES.map(module => (
               <a
                 key={module.name}
-                href={`/agda_html/${module.path}`}
+                href={`/formal-spec/${module.path}`}
                 className={styles.fileLink}
                 target="_blank"
                 rel="noopener noreferrer"
