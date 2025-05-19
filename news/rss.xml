@@ -4,10 +4,65 @@
         <title>Ouroboros Leios Blog</title>
         <link>https://leios.cardano-scaling.org/news</link>
         <description>Ouroboros Leios Blog</description>
-        <lastBuildDate>Mon, 05 May 2025 00:00:00 GMT</lastBuildDate>
+        <lastBuildDate>Mon, 12 May 2025 00:00:00 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
+        <item>
+            <title><![CDATA[Weekly Summary - 2025-05-12]]></title>
+            <link>https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary</link>
+            <guid>https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary</guid>
+            <pubDate>Mon, 12 May 2025 00:00:00 GMT</pubDate>
+            <description><![CDATA[This week, the team made significant progress on simulation improvements, trace verification, and comprehensive analysis of Leios transaction processing capacity.]]></description>
+            <content:encoded><![CDATA[<p>This week, the team made significant progress on simulation improvements, trace verification, and comprehensive analysis of Leios transaction processing capacity.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="trace-verification">Trace verification<a class="hash-link" aria-label="Direct link to Trace verification" title="Direct link to Trace verification" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#trace-verification">​</a></h3>
+<ul>
+<li>Improved the trace verifier with better error handling and reporting</li>
+<li>Added support for starting verification from non-initial states</li>
+<li>Created manually curated test cases for the Leios trace verifier<!-- -->
+<ul>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/leios-trace-verifier/examples/valid/" target="_blank" rel="noopener noreferrer">Valid traces</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/leios-trace-verifier/examples/invalid/" target="_blank" rel="noopener noreferrer">Invalid traces</a></li>
+</ul>
+</li>
+<li>Integrated the trace verifier into Nix infrastructure and CI builds</li>
+<li>Removed deterministic conformance testing in favor of trace-based approach.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#simulation-improvements">​</a></h3>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#haskell-simulation">​</a></h4>
+<ul>
+<li>Conducted an informal review assessing code quality, design, and implementation</li>
+<li>Analyzed the simulation organization and identified areas for future improvement</li>
+<li>Found that most prospective changes to the Leios protocol would only involve a small fraction of the codebase</li>
+<li>Determined that addition of memory pool and transactions would take approximately 100-200 hours of labor.</li>
+</ul>
+<p>The review of the Haskell simulator was documented in detail in <a href="https://github.com/input-output-hk/ouroboros-leios/pull/353" target="_blank" rel="noopener noreferrer">PR#353</a>, covering statistics, organization, code quality, design, implementation, and documentation aspects of the simulator.</p>
+<h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#rust-simulation">​</a></h4>
+<ul>
+<li>Added <code>tx-start-time</code> and <code>tx-stop-time</code> parameters to avoid effects of slow starts or sudden terminations on transaction analysis</li>
+<li>Created a new Leios variant <code>full-without-ibs</code> where endorser blocks directly reference transactions.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="documentation-and-analysis">Documentation and analysis<a class="hash-link" aria-label="Direct link to Documentation and analysis" title="Direct link to Documentation and analysis" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#documentation-and-analysis">​</a></h3>
+<ul>
+<li>Relocated the original Leios report to avoid confusion, while preserving valuable background information</li>
+<li>Added partially-drafted technical reports on Haskell simulations to Nix and CI builds:<!-- -->
+<ul>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/network-spec/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios Network Specification</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios simulation: building confidence in the performance results</a></li>
+</ul>
+</li>
+</ul>
+<p>The team conducted higher excess-capacity simulations to evaluate transaction inclusion hypotheses. The transaction lifecycle simulations raised the question of whether duplication of transactions in IBs was starving other transactions from ever being included in an IB. To test this, simulations were run with IBs being produced at three times the normal rate, providing ample space for transaction duplication.</p>
+<p>Detailed analysis showed that transaction loss persisted despite increased capacity, indicating that other factors are preventing transactions from reaching the ledger. The results are documented in:</p>
+<ul>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/" target="_blank" rel="noopener noreferrer">Analysis overview</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis1x.ipynb" target="_blank" rel="noopener noreferrer">Results at 1x IB capacity</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis3x.ipynb" target="_blank" rel="noopener noreferrer">Results at 3x IB capacity</a></li>
+</ul>]]></content:encoded>
+            <category>progress</category>
+            <category>update</category>
+            <category>weekly</category>
+        </item>
         <item>
             <title><![CDATA[Weekly Summary – May 5, 2025]]></title>
             <link>https://leios.cardano-scaling.org/news/2025/05/05/weekly-progress-summary</link>
@@ -1235,35 +1290,6 @@ endorser block (EB) inclusion rates.</li>
 <ul>
 <li>Introduced new high-performance Haskell packages for DeltaQ with comprehensive
 test suites.</li>
-</ul>]]></content:encoded>
-            <category>progress</category>
-            <category>update</category>
-            <category>weekly</category>
-        </item>
-        <item>
-            <title><![CDATA[Weekly Summary – December 23, 2024]]></title>
-            <link>https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary</link>
-            <guid>https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary</guid>
-            <pubDate>Mon, 23 Dec 2024 00:00:00 GMT</pubDate>
-            <description><![CDATA[GitHub actions]]></description>
-            <content:encoded><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="github-actions">GitHub actions<a class="hash-link" aria-label="Direct link to GitHub actions" title="Direct link to GitHub actions" href="https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary#github-actions">​</a></h2>
-<ul>
-<li>Organized continuous integration (CI) configuration with namespace prefixes for better project sorting.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Began visualizing transaction throughput</li>
-<li>Tweaked configuration settings to maximize throughput.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary#haskell-simulation">​</a></h2>
-<ul>
-<li>Merged code for running Praos and Leios visualizations</li>
-<li>Added HLint integration for consistent module imports.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="public-meeting-on-december-28-2024">Public meeting on December 28, 2024<a class="hash-link" aria-label="Direct link to Public meeting on December 28, 2024" title="Direct link to Public meeting on December 28, 2024" href="https://leios.cardano-scaling.org/news/2024/12/23/weekly-progress-summary#public-meeting-on-december-28-2024">​</a></h2>
-<ul>
-<li><a href="https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing" target="_blank" rel="noopener noreferrer">Meeting recording</a></li>
-<li><a href="https://docs.google.com/presentation/d/1LwpcXnXLgrYTSDalJY1SfpeyU_4lIkYhyMy5Kv0Huzw/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Meeting slides</a>.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
