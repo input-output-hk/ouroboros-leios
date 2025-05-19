@@ -46,6 +46,12 @@ jobs:
           # Copy the HTML files
           cp -r formal-spec-html/* site/static/formal-spec/
 
+      - name: 🔄 Enhance Agda documentation
+        working-directory: site
+        run: |
+          # Process HTML files using the agda-web-docs-lib
+          NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+
       - name: 🏗️ Build Docusaurus site
         working-directory: site
         run: |
