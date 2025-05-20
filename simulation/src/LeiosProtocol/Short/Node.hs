@@ -1050,7 +1050,7 @@ mkSchedule tracer cfg = do
     , (SomeRole Generate.Base, const $ calcWins (NetworkRate cfg.leios.praos.blockFrequencyPerSlot))
     ]
   rates votingSlots slot = do
-    when cfg.conformanceEvents $ traceWith tracer $ LeiosNodeEventConformance Slot{..}
+    when (cfg.conformanceEvents && (slot > 0)) $ traceWith tracer $ LeiosNodeEventConformance Slot{ slot = slot - 1}
     vote <- atomically $ do
       vs <- readTVar votingSlots
       case vs of
