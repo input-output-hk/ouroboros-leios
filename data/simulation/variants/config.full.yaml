@@ -1,0 +1,7 @@
+leios-variant: full
+
+# Allow EBs to include IBs from previous slots
+leios-late-ib-inclusion: true
+
+# Chain quality controls how far back EB recursion can reach.
+praos-chain-quality: 40
