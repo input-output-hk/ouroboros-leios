@@ -20,7 +20,7 @@
     const searchInput = document.createElement('input');
     searchInput.type = 'text';
     searchInput.className = 'search-input';
-    searchInput.placeholder = 'Search documentation...';
+    searchInput.placeholder = 'Search documentation... (Ctrl+K / Cmd+K)';
     searchInput.setAttribute('autocomplete', 'off');
     searchInput.setAttribute('autocorrect', 'off');
     searchInput.setAttribute('autocapitalize', 'off');

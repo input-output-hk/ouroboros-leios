@@ -2,6 +2,5 @@
   "backButtonUrl": "/formal-spec/",
   "inputDir": "./static/formal-spec",
   "modules": ["Leios", "Cardano", "Ouroboros", "Ledger", "Ledger-Spec"],
-  "githubUrl": "https://github.com/input-output-hk/ouroboros-leios-formal-spec",
-  "searchGranularity": "comprehensive"
+  "githubUrl": "https://github.com/input-output-hk/ouroboros-leios-formal-spec"
 } 

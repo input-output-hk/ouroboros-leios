@@ -1,0 +1,605 @@
+/* Base styles */
+:root {
+  --header-height: 64px;
+  --sidebar-width: 280px;
+  --sidebar-padding: 24px;
+  --content-max-width: 900px;
+  --primary-color: #1a1a1a;
+  --border-color: #e0e0e0;
+  --hover-bg: rgba(0, 119, 204, 0.1);
+  --hover-transform: translateY(-1px);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --content-padding: 40px;
+  --background-color: #ffffff;
+  --code-bg: #f6f8fa;
+  --code-color: #24292e;
+  --link-color: #0077cc;
+  --link-hover-color: #0055aa;
+  --syntax-keyword: #d73a49;
+  --syntax-string: #032f62;
+  --syntax-comment: #6a737d;
+  --syntax-function: #6f42c1;
+  --syntax-variable: #e36209;
+  --syntax-operator: #005cc5;
+  --syntax-class: #6f42c1;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --code-border: rgba(0, 0, 0, 0.05);
+  --sidebar-border-color: var(--border-color);
+  --header-border-color: var(--border-color);
+  --header-button-padding: 8px;
+  --header-button-border-radius: 6px;
+}
+
+:root.dark-theme {
+  --primary-color: #e4e4e4;
+  --border-color: #555555;
+  --hover-bg: rgba(88, 166, 255, 0.2);
+  --hover-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  --background-color: #121212;
+  --code-bg: rgba(255, 255, 255, 0.07);
+  --code-color: #e4e4e4;
+  --link-color: #78aeff;
+  --link-hover-color: #94c2ff;
+  --syntax-keyword: #c75d65;
+  --syntax-string: #7fb0d8;
+  --syntax-comment: #6e7781;
+  --syntax-function: #b387d8;
+  --syntax-variable: #e0a17a;
+  --syntax-operator: #8ab4ff;
+  --syntax-class: #b387d8;
+  --box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --code-border: rgba(255, 255, 255, 0.08);
+  --sidebar-border-color: #333333;
+  --header-border-color: #333333;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-family);
+  color: var(--primary-color);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background-color);
+}
+
+/* Header styles */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background: var(--background-color);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1000;
+  box-shadow: var(--box-shadow);
+  border-bottom: 1px solid var(--header-border-color);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Header button/link shared styles */
+.back-button,
+.github-link,
+.theme-toggle,
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  border-radius: var(--header-button-border-radius);
+  transition: all 0.2s ease;
+  padding: var(--header-button-padding);
+  position: relative;
+}
+
+.back-button:hover,
+.github-link:hover,
+.theme-toggle:hover,
+.search-button:hover {
+  background-color: var(--hover-bg);
+  color: var(--link-hover-color);
+  transform: var(--hover-transform);
+  box-shadow: var(--hover-shadow);
+}
+
+.back-button:active,
+.github-link:active,
+.theme-toggle:active,
+.search-button:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Individual button styles - keeping only specific differences */
+.back-button {
+  text-decoration: none;
+  font-size: 15px;
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  margin: 0 4px;
+}
+
+.github-link {
+  text-decoration: none;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+}
+
+.github-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Theme toggler styles */
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+:root:not(.dark-theme) .dark-icon {
+  display: none;
+}
+
+:root.dark-theme .light-icon {
+  display: none;
+}
+
+/* Main layout */
+.main-wrapper {
+  display: flex;
+  margin-top: var(--header-height);
+  min-height: calc(100vh - var(--header-height));
+}
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--background-color);
+  border-right: 1px solid var(--sidebar-border-color);
+  overflow-y: auto;
+  padding: var(--sidebar-padding);
+  flex-shrink: 0;
+}
+
+.modules-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sidebar-border-color);
+}
+
+.module-group-header {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary-color);
+  opacity: 0.7;
+  margin: 20px 0 8px 0;
+  padding-left: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px 0;
+}
+
+.module-item {
+  margin-bottom: 2px;
+  padding-left: 24px;
+}
+
+.module-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 14px;
+  display: block;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.module-link:hover {
+  background-color: var(--hover-bg);
+}
+
+.module-link.active {
+  background-color: var(--hover-bg);
+  font-weight: 500;
+  border-left: 3px solid var(--link-color);
+  padding-left: 9px;
+}
+
+/* Main content styles */
+.main-content {
+  flex: 1;
+  margin-left: calc(var(--sidebar-width) + var(--sidebar-padding) * 2);
+  padding: var(--content-padding);
+  overflow-y: auto;
+  max-width: var(--content-max-width);
+  scroll-padding-top: calc(var(--header-height) + var(--content-padding));
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Ensure anchors have proper scroll margin */
+.main-content :target {
+  scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+}
+
+/* Add padding to all direct children of main-content */
+.main-content > * {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+/* Common elements styling */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+
+/* Code blocks */
+pre, code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  background-color: var(--code-bg);
+  color: var(--code-color);
+  border-radius: 6px;
+}
+
+pre {
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--code-border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+pre.Agda {
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+
+code {
+  padding: 2px 4px;
+}
+
+pre code {
+  padding: 0;
+  background-color: transparent;
+  border: none;
+}
+
+/* Syntax highlighting for Agda */
+.Keyword { color: var(--syntax-keyword); }
+.String { color: var(--syntax-string); }
+.Comment { color: var(--syntax-comment); }
+.Function { color: var(--syntax-function); }
+.InductiveConstructor { color: var(--syntax-class); }
+.CoinductiveConstructor { color: var(--syntax-class); }
+.Datatype { color: var(--syntax-class); }
+.Field { color: var(--syntax-variable); }
+.Bound { color: var(--code-color); }
+.Generalizable { color: var(--syntax-variable); }
+.Module { color: var(--syntax-keyword); }
+.Number { color: var(--syntax-variable); }
+.Postulate { color: var(--syntax-function); }
+.Primitive { color: var(--syntax-keyword); }
+.Record { color: var(--syntax-class); }
+.Hole { color: var(--syntax-operator); background-color: rgba(255, 255, 0, 0.1); }
+.Symbol { color: var(--syntax-operator); }
+.PrimitiveType { color: var(--syntax-keyword); }
+.Macro { color: var(--syntax-function); }
+
+/* Override Agda.css hover styles */
+.Agda a[href]:hover {
+  background-color: var(--hover-bg) !important;
+  color: var(--link-hover-color) !important;
+  text-decoration: underline !important;
+}
+
+.Agda [href].hover-highlight {
+  background-color: var(--hover-bg) !important;
+}
+
+/* Specific Agda syntax improvements for dark theme */
+:root.dark-theme .Agda .Keyword, 
+:root.dark-theme .Agda .Module,
+:root.dark-theme .Agda .Pragma { 
+  color: var(--syntax-keyword) !important; 
+}
+
+:root.dark-theme .Agda .Symbol,
+:root.dark-theme .Agda .Operator { 
+  color: var(--syntax-operator) !important; 
+}
+
+:root.dark-theme .Agda .InductiveConstructor,
+:root.dark-theme .Agda .CoinductiveConstructor { 
+  color: var(--syntax-variable) !important; 
+}
+
+:root.dark-theme .Agda .Datatype,
+:root.dark-theme .Agda .Record,
+:root.dark-theme .Agda .Primitive,
+:root.dark-theme .Agda .PrimitiveType { 
+  color: var(--syntax-class) !important; 
+}
+
+:root.dark-theme .Agda .String { 
+  color: var(--syntax-string) !important; 
+}
+
+:root.dark-theme .Agda .Comment { 
+  color: var(--syntax-comment) !important; 
+}
+
+:root.dark-theme .Agda .Function,
+:root.dark-theme .Agda .Macro,
+:root.dark-theme .Agda .Postulate { 
+  color: var(--syntax-function) !important; 
+}
+
+:root.dark-theme .Agda .Bound,
+:root.dark-theme .Agda .Generalizable { 
+  color: var(--code-color) !important; 
+}
+
+/* Code line numbers styling */
+.code-container {
+  display: flex;
+  width: 100%;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.code-container * {
+  box-sizing: border-box;
+}
+
+.line-numbers {
+  flex: 0 0 auto;
+  padding-right: 8px;
+  user-select: none;
+  text-align: right;
+  width: 32px;
+  position: sticky;
+  left: 0;
+  background-color: transparent;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.line-number {
+  display: block;
+  color: rgba(27, 31, 35, 0.4);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 1.5em;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  outline: none;
+}
+
+.line-number:hover {
+  color: var(--primary-color);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.line-number:focus,
+.line-number:focus-visible,
+.line-number:focus-within,
+.line-number:active {
+  outline: none;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+:root.dark-theme .line-number {
+  color: rgba(230, 237, 243, 0.4);
+}
+
+.code-content {
+  overflow-x: auto;
+  padding-left: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+.code-line {
+  line-height: 1.5;
+  height: 1.5em;
+  white-space: pre;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+/* Ensure that the Agda syntax elements don't affect line height */
+.code-line * {
+  line-height: inherit;
+}
+
+/* Highlighted line styles */
+.code-line.highlighted {
+  background-color: var(--hover-bg);
+  border-radius: 3px;
+  display: block;
+  width: 100%;
+}
+
+/* Improve highlighted line visibility */
+pre.Agda .code-content .highlighted {
+  animation: highlight-glow 1s ease-in-out 1;
+}
+
+@keyframes highlight-glow {
+  0% {
+    background-color: rgba(255, 213, 0, 0.1);
+  }
+  50% {
+    background-color: rgba(255, 213, 0, 0.2);
+  }
+  100% {
+    background-color: var(--hover-bg);
+  }
+}
+
+/* Target the line when the hash in the URL matches */
+.code-content .code-line:target {
+  background-color: var(--hover-bg);
+}
+
+/* Code copy button styles */
+pre.Agda {
+  position: relative;
+}
+
+pre.Agda.has-copy-button {
+  padding-right: 42px; /* Space for copy button */
+}
+
+.copy-code-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.2s, background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-code-button:hover {
+  opacity: 1;
+  background-color: var(--hover-bg);
+}
+
+.copy-code-button:active {
+  background-color: var(--hover-bg);
+  opacity: 1;
+}
+
+.copy-code-button.copy-success {
+  background-color: var(--hover-bg);
+  opacity: 1;
+  border-color: rgba(0, 119, 204, 0.5);
+}
+
+:root.dark-theme .copy-code-button.copy-success {
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+.copy-code-button.copy-success svg {
+  color: var(--primary-color);
+}
+
+.copy-code-button svg {
+  display: block;
+  color: var(--primary-color);
+}
+
+/* Line number highlight styles */
+.line-number[data-line-number].highlighted,
+.line-number[href].active {
+  color: var(--primary-color) !important;
+  font-weight: 500;
+}
+
+.line-number[data-line-number].highlighted::before,
+.line-number[href].active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background-color: rgba(0, 119, 204, 0.5);
+  border-radius: 2px;
+}
+
+:root.dark-theme .line-number[data-line-number].highlighted::before,
+:root.dark-theme .line-number[href].active::before {
+  background-color: rgba(88, 166, 255, 0.5);
+}
+
+/* When copy-pasting, only select the code, not the line numbers */
+.code-content {
+  user-select: text;
+}
+
+/* Target just the current line when linking to it */
+:target + .code-content > [id^="LC"] {
+  background-color: var(--hover-bg);
+}
+
+.code-content [id^="LC"]:target {
+  background-color: var(--hover-bg);
+}
+
+/* Responsive styles for narrow screens */
+@media (max-width: 768px) {
+  .line-numbers {
+    width: 40px;
+    padding-right: 8px;
+  }
+  
+  .code-content {
+    padding-left: 8px;
+  }
+} 
