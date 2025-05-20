@@ -201,8 +201,8 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       hhx : Hashable InputBlock (List ℕ)
       hhx .hash record { header = h } = hash h
 
-      Show-Txs : Show (List Tx)
-      Show-Txs = Show-List
+      _ = Show-List
+      _ = Show-×
 
     unquoteDecl Show-IBHeaderOSig Show-IBBody Show-InputBlock = derive-Show $
         (quote IBHeaderOSig , Show-IBHeaderOSig)
@@ -210,28 +210,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       ∷ (quote InputBlock , Show-InputBlock)
       ∷ []
 
-    instance
-      Show-EBRefs : Show (List EBRef)
-      Show-EBRefs = Show-List
-
     unquoteDecl Show-EndorserBlockOSig = derive-Show [ (quote EndorserBlockOSig , Show-EndorserBlockOSig) ]
-
-    instance
-      Show-VoteBundle : Show (List Vote)
-      Show-VoteBundle = Show-List
-
     unquoteDecl Show-Blk = derive-Show [ (quote Blk , Show-Blk) ]
-
-    instance
-      Show-Pair : Show (String × Blk)
-      Show-Pair = Show-×
-
-      Show-Assoc : Show (AssocList String Blk)
-      Show-Assoc = Show-List
 
     del : String
     del = ", "
-    
+
     nl : String
     nl = "\n"
 
@@ -333,28 +317,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     result f g (Ok x) = f x
     result f g (Err x) = g x
 
-    instance
-      Show-PubKey : Show PubKey
-      Show-PubKey .show _ = "pubkey" 
-
-      Show-PubKeys : Show (List PubKey)
-      Show-PubKeys = Show-List
-
-      Show-IBHeaders : Show (List IBHeader)
-      Show-IBHeaders = Show-List
-
-      Show-IBBodies : Show (List IBBody)
-      Show-IBBodies = Show-List
-
-      Show-Votes : Show (List (List Vote))
-      Show-Votes = Show-List
-
-      Show-EBs : Show (List EndorserBlock)
-      Show-EBs = Show-List
-
-      Show-IBs : Show (List InputBlock)
-      Show-IBs = Show-List
-
 {-
     unquoteDecl Show-FFDBuffers = derive-Show [ (quote FFDBuffers , Show-FFDBuffers) ]
     unquoteDecl Show-Action = derive-Show [ (quote Action , Show-Action) ]
@@ -362,7 +324,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
     instance
       Show-FFDBuffers : Show FFDBuffers
-      Show-FFDBuffers .show _ = "ffd buffers" 
+      Show-FFDBuffers .show _ = "ffd buffers"
 
       Show-Action : Show Action
       Show-Action .show (IB-Role-Action x)    = "IB-Role-Action " ◇ show x
@@ -377,7 +339,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-Action .show (Base₂a-Action x _)   = "Base₂a-Action " ◇ show x
       Show-Action .show (Base₂b-Action x)     = "Base₂b-Action " ◇ show x
 
-    instance    
+    instance
       Show-NonZero : ∀ {n : ℕ} → Show (NonZero n)
       Show-NonZero .show record { nonZero = _ } = "NonZero"
 
@@ -386,14 +348,11 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
     unquoteDecl Show-BlockType = derive-Show [ (quote BlockType , Show-BlockType) ]
 
-    instance    
-      Show-prod : Show (BlockType × ℕ)
-      Show-prod = Show-×
-
+    instance
       Show-sum : Show (EndorserBlock ⊎ List Tx)
       Show-sum .show (inj₁ x) = show x
       Show-sum .show (inj₂ y) = show y
-      
+
     unquoteDecl Show-FFDUpdate  = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
     unquoteDecl Show-Params     = derive-Show [ (quote Params , Show-Params) ]
     unquoteDecl Show-Upkeep     = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
