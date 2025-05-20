@@ -1,5 +1,5 @@
 ---
-title: Weekly Summary - 2025-05-12
+title: Weekly Summary - May 12, 2025
 authors:
 - will
 tags: [progress, update, weekly]
