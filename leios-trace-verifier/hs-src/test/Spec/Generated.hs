@@ -18,6 +18,7 @@ import LeiosTypes (Point(..))
 import Lib (verifyTrace)
 import Test.Hspec
 import Test.QuickCheck hiding (scale)
+import Test.Hspec.QuickCheck
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -35,13 +36,8 @@ idSut = 0
 sut :: Text
 sut = "node-" <> T.pack (show idSut)
 
-check
-  :: String
-  -> Maybe Integer
-  -> Maybe Text
-  -> [Event]
-  -> Spec
-check label expectedActions expectedMessage events =
+verify :: [Event] -> (Integer, Text)
+verify events =
   let
     nrNodes = toInteger . M.size $ nodes topology
     nodeNames = unNodeName <$> (M.keys $ nodes topology)
@@ -50,13 +46,23 @@ check label expectedActions expectedMessage events =
     stageLength = toInteger $ leiosStageLengthSlots config
     -- FIXME: For cosmetic purposes, add a consistent set of times.
     events' = TraceEvent 0 <$> events
-    result = verifyTrace nrNodes idSut stakeDistribution stageLength events'
+  in
+    verifyTrace nrNodes idSut stakeDistribution stageLength events'
+
+check
+  :: Maybe Integer
+  -> Maybe Text
+  -> [Event]
+  -> Property
+check expectedActions expectedMessage events =
+  let
+    events' = TraceEvent 0 <$> events
+    result = verify events
     expectedMessage' = fromMaybe "ok" expectedMessage
   in
-    it label
-      $ case expectedActions of
-          Nothing -> snd result `shouldBe` expectedMessage'
-          Just expectedActions' -> result `shouldBe` (expectedActions', expectedMessage')
+    case expectedActions of
+      Nothing -> snd result === expectedMessage'
+      Just expectedActions' -> result === (expectedActions', expectedMessage')
 
 data TracingContext =
   TracingContext
@@ -102,20 +108,29 @@ data Transition =
   | ReceiveIB
   deriving Show
 
-transition :: Transition -> State TracingContext [Event]
+transition :: Transition -> StateT TracingContext Gen [Event]
 transition NextSlot =
   do
     event <- Slot sut <$> use slot
     slot %= (+ 1)
     pure [event]
+transition SkipSlot =
+  do
+    slot %= (+ 1)
+    pure mempty
 
-transitions :: [Transition] -> [Event]
-transitions = (`evalState` def) . fmap concat . mapM transition
+transitions :: [Transition] -> Gen [Event]
+transitions = (`evalStateT` def) . fmap concat . mapM transition
 
 generated :: Spec
 generated =
   do
+    let single = (modifyMaxSuccess (const 1) .) . prop
     describe "Positive cases" $ do
-      check "Genesis slot" mzero mzero $ transitions [NextSlot]
+      single "Genesis slot" $
+        check mzero mzero
+          <$> transitions [NextSlot]
     describe "Negative cases" $ do
-      check "No actions" mzero (pure "Invalid Action: Slot Slot-Action 1") $ transitions [NextSlot, NextSlot]
+      single "No actions" $
+        check mzero (pure "Invalid Action: Slot Slot-Action 1")
+          <$> transitions [NextSlot, NextSlot]
