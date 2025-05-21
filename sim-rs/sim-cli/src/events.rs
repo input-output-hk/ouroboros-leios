@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::PathBuf,
-    pin::Pin,
-};
+use std::{collections::BTreeMap, path::PathBuf, pin::Pin, time::Duration};
 
 use aggregate::TraceAggregator;
 use anyhow::Result;
@@ -88,34 +84,21 @@ impl EventMonitor {
         let mut blocks_rejected: BTreeMap<NodeId, u64> = BTreeMap::new();
         let mut blocks: BTreeMap<u64, (NodeId, u64)> = BTreeMap::new();
         let mut txs: BTreeMap<TransactionId, Transaction> = BTreeMap::new();
-        let mut pending_txs: BTreeSet<TransactionId> = BTreeSet::new();
+        let mut ibs: BTreeMap<InputBlockId, InputBlock> = BTreeMap::new();
+        let mut ebs: BTreeMap<EndorserBlockId, EndorserBlock> = BTreeMap::new();
         let mut seen_ibs: BTreeMap<NodeId, f64> = BTreeMap::new();
-        let mut txs_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
-        let mut bytes_in_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
-        let mut ibs_in_eb: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
         let mut ibs_containing_tx: BTreeMap<TransactionId, f64> = BTreeMap::new();
         let mut ebs_containing_ib: BTreeMap<InputBlockId, f64> = BTreeMap::new();
-        let mut pending_ibs: BTreeSet<InputBlockId> = BTreeSet::new();
-        let mut pending_ebs: BTreeSet<EndorserBlockId> = BTreeSet::new();
         let mut votes_per_bundle: BTreeMap<VoteBundleId, f64> = BTreeMap::new();
         let mut votes_per_pool: BTreeMap<NodeId, f64> =
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
-        let mut ib_txs: BTreeMap<InputBlockId, Vec<TransactionId>> = BTreeMap::new();
-        let mut eb_txs: BTreeMap<EndorserBlockId, Vec<TransactionId>> = BTreeMap::new();
-        let mut eb_ibs: BTreeMap<EndorserBlockId, Vec<InputBlockId>> = BTreeMap::new();
-        let mut eb_ebs: BTreeMap<EndorserBlockId, Vec<EndorserBlockId>> = BTreeMap::new();
         let mut leios_tx_bytes: BTreeMap<TransactionId, u64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp::zero();
         let mut total_slots = 0u64;
         let mut praos_txs = 0u64;
         let mut published_bytes = 0u64;
-        let mut generated_ibs = 0u64;
-        let mut empty_ibs = 0u64;
-        let mut expired_ibs = 0u64;
-        let mut expired_ebs = 0u64;
-        let mut generated_ebs = 0u64;
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
         let mut leios_txs = 0u64;
@@ -191,24 +174,6 @@ impl EventMonitor {
                 Event::GlobalSlot { slot: number } => {
                     info!("Slot {number} has begun.");
                     total_slots = number + 1;
-                    if let Some(oldest_live_ib_slot) = number.checked_sub(self.maximum_ib_age) {
-                        pending_ibs.retain(|ib| {
-                            if ib.slot < oldest_live_ib_slot {
-                                expired_ibs += 1;
-                                return false;
-                            }
-                            true
-                        });
-                    }
-                    if let Some(oldest_live_eb_slot) = number.checked_sub(self.maximum_eb_age) {
-                        pending_ebs.retain(|eb| {
-                            if eb.slot < oldest_live_eb_slot {
-                                expired_ebs += 1;
-                                return false;
-                            }
-                            true
-                        });
-                    }
                 }
                 Event::Slot { .. } => {}
                 Event::CpuTaskScheduled { .. } => {}
@@ -216,7 +181,6 @@ impl EventMonitor {
                 Event::Cpu { .. } => {}
                 Event::TXGenerated { id, size_bytes, .. } => {
                     txs.insert(id, Transaction::new(size_bytes, time));
-                    pending_txs.insert(id);
                 }
                 Event::TXSent { .. } => {
                     tx_messages.sent += 1;
@@ -242,25 +206,39 @@ impl EventMonitor {
                     if let Some(endorsement) = endorsement {
                         total_leios_bytes += endorsement.size_bytes;
                         leios_blocks_with_endorsements += 1;
-                        pending_ebs.retain(|eb| eb.slot != endorsement.eb.id.slot);
 
-                        let all_eb_ids: Vec<_> = eb_ebs
-                            .get(&endorsement.eb.id)
-                            .unwrap()
-                            .iter()
-                            .chain(std::iter::once(&endorsement.eb.id))
-                            .collect();
-                        let block_ib_leios_txs = all_eb_ids
-                            .iter()
-                            .flat_map(|eb| eb_ibs.get(eb).unwrap())
-                            .flat_map(|ib| ib_txs.get(ib).unwrap())
-                            .copied();
-                        let block_eb_leios_txs = all_eb_ids
-                            .iter()
-                            .flat_map(|eb| eb_txs.get(eb).unwrap())
-                            .copied();
-                        let block_leios_txs: Vec<_> =
-                            block_ib_leios_txs.chain(block_eb_leios_txs).collect();
+                        let mut block_leios_txs = vec![];
+                        let mut eb_queue = vec![endorsement.eb.id.clone()];
+                        while let Some(eb_id) = eb_queue.pop() {
+                            let eb = ebs.get_mut(&eb_id).unwrap();
+                            if eb.included_in_block.is_some() {
+                                continue;
+                            }
+                            eb.included_in_block = Some(time);
+
+                            eb_queue.extend(eb.ebs.iter().cloned());
+
+                            for ib_id in &eb.ibs {
+                                let ib = ibs.get_mut(ib_id).unwrap();
+                                if ib.included_in_block.is_none() {
+                                    ib.included_in_block = Some(time);
+                                }
+                                for tx_id in &ib.txs {
+                                    block_leios_txs.push(*tx_id);
+                                    let tx = txs.get_mut(tx_id).unwrap();
+                                    if tx.included_in_block.is_none() {
+                                        tx.included_in_block = Some(time);
+                                    }
+                                }
+                            }
+                            for tx_id in &eb.txs {
+                                block_leios_txs.push(*tx_id);
+                                let tx = txs.get_mut(tx_id).unwrap();
+                                if tx.included_in_block.is_none() {
+                                    tx.included_in_block = Some(time);
+                                }
+                            }
+                        }
 
                         let mut unique_block_leios_txs: Vec<_> =
                             block_leios_txs.iter().copied().sorted().dedup().collect();
@@ -295,7 +273,6 @@ impl EventMonitor {
                             tx.included_in_block = Some(time);
                         }
                         published_bytes += tx.bytes;
-                        pending_txs.remove(&published_tx);
                     }
                 }
                 Event::RBSent { .. } => {}
@@ -306,19 +283,16 @@ impl EventMonitor {
                     header_bytes,
                     size_bytes,
                     transactions,
+                    shard,
                     ..
                 } => {
+                    ibs.insert(
+                        id.clone(),
+                        InputBlock::new(size_bytes, time, transactions.clone()),
+                    );
                     total_leios_bytes += size_bytes;
-                    generated_ibs += 1;
-                    if transactions.is_empty() {
-                        empty_ibs += 1;
-                    }
-                    pending_ibs.insert(id.clone());
-                    ib_txs.insert(id.clone(), transactions.clone());
-                    bytes_in_ib.insert(id.clone(), size_bytes as f64);
                     let mut tx_bytes = header_bytes;
                     for tx_id in &transactions {
-                        *txs_in_ib.entry(id.clone()).or_default() += 1.;
                         *ibs_containing_tx.entry(*tx_id).or_default() += 1.;
                         let tx = txs.get_mut(tx_id).unwrap();
                         tx_bytes += tx.bytes;
@@ -328,8 +302,9 @@ impl EventMonitor {
                     }
                     *seen_ibs.entry(id.producer.id).or_default() += 1.;
                     info!(
-                        "Pool {} generated an IB with {} transaction(s) in slot {} ({}).",
+                        "Pool {} generated an IB in shard {} with {} transaction(s) in slot {} ({}).",
                         id.producer,
+                        shard,
                         transactions.len(),
                         id.slot,
                         pretty_bytes(tx_bytes, pbo.clone()),
@@ -352,18 +327,16 @@ impl EventMonitor {
                     size_bytes,
                     ..
                 } => {
+                    ebs.insert(
+                        id.clone(),
+                        EndorserBlock::new(
+                            time,
+                            transactions.iter().map(|tx| tx.id).collect(),
+                            input_blocks.iter().map(|ib| ib.id.clone()).collect(),
+                            endorser_blocks.iter().map(|eb| eb.id.clone()).collect(),
+                        ),
+                    );
                     total_leios_bytes += size_bytes;
-                    generated_ebs += 1;
-                    pending_ebs.insert(id.clone());
-                    eb_txs.insert(id.clone(), transactions.iter().map(|r| r.id).collect());
-                    eb_ibs.insert(
-                        id.clone(),
-                        input_blocks.iter().map(|r| r.id.clone()).collect(),
-                    );
-                    eb_ebs.insert(
-                        id.clone(),
-                        endorser_blocks.into_iter().map(|r| r.id.clone()).collect(),
-                    );
                     for BlockRef { id: tx_id } in &transactions {
                         let tx = txs.get_mut(tx_id).unwrap();
                         if tx.included_in_eb.is_none() {
@@ -371,10 +344,12 @@ impl EventMonitor {
                         }
                     }
                     for BlockRef { id: ib_id } in &input_blocks {
-                        *ibs_in_eb.entry(id.clone()).or_default() += 1.0;
+                        let ib = ibs.get_mut(ib_id).unwrap();
+                        if ib.included_in_eb.is_none() {
+                            ib.included_in_eb = Some(time);
+                        }
                         *ebs_containing_ib.entry(ib_id.clone()).or_default() += 1.0;
-                        pending_ibs.remove(ib_id);
-                        for tx_id in ib_txs.get(ib_id).unwrap() {
+                        for tx_id in &ib.txs {
                             let tx = txs.get_mut(tx_id).unwrap();
                             if tx.included_in_eb.is_none() {
                                 tx.included_in_eb = Some(time);
@@ -418,6 +393,11 @@ impl EventMonitor {
 
         output.flush().await?;
 
+        let pending_txs: Vec<Transaction> = txs
+            .values()
+            .filter(|tx| tx.included_in_block.is_some())
+            .cloned()
+            .collect();
         let unique_leios_txs = leios_tx_bytes.len() as u64;
 
         info_span!("praos").in_scope(|| {
@@ -434,7 +414,6 @@ impl EventMonitor {
                 pretty_bytes(
                     pending_txs
                         .iter()
-                        .filter_map(|id| txs.get(id))
                         .map(|tx| tx.bytes)
                         .sum::<u64>(),
                     pbo.clone(),
@@ -473,14 +452,17 @@ impl EventMonitor {
                     Some(block_time - tx.generated)
                 })
                 .collect();
-            let empty_ebs = generated_ebs - ibs_in_eb.len() as u64;
-            let ibs_which_reached_eb = ebs_containing_ib.len();
+            let ib_expiration_cutoff = last_timestamp - Duration::from_secs(self.maximum_ib_age);
+            let expired_ibs = ibs.values().filter(|ib| ib.included_in_eb.is_none() && ib.generated < ib_expiration_cutoff).count();
+            let eb_expiration_cutoff = last_timestamp - Duration::from_secs(self.maximum_eb_age);
+            let expired_ebs = ebs.values().filter(|eb| eb.included_in_eb.is_none() && eb.included_in_block.is_none() && eb.generated < eb_expiration_cutoff).count();
+            let empty_ebs = ebs.values().filter(|eb| eb.is_empty()).count();
             let bundle_count = votes_per_bundle.len();
-            let txs_per_ib = compute_stats(txs_in_ib.into_values());
-            let bytes_per_ib = compute_stats(bytes_in_ib.into_values());
+            let txs_per_ib = compute_stats(ibs.values().map(|ib| ib.txs.len() as f64));
+            let bytes_per_ib = compute_stats(ibs.values().map(|ib| ib.bytes as f64));
             let ibs_per_tx = compute_stats(ibs_containing_tx.into_values());
-            let ibs_per_eb = compute_stats(ebs_containing_ib.into_values());
-            let ebs_per_ib = compute_stats(ibs_in_eb.into_values());
+            let ibs_per_eb = compute_stats(ebs.values().map(|eb| eb.ibs.len() as f64));
+            let ebs_per_ib = compute_stats(ebs_containing_ib.into_values());
             let ib_time_stats = compute_stats(times_to_reach_ib.iter().map(|t| t.as_secs_f64()));
             let eb_time_stats = compute_stats(times_to_reach_eb.iter().map(|t| t.as_secs_f64()));
             let block_time_stats = compute_stats(times_to_reach_block.iter().map(|t| t.as_secs_f64()));
@@ -496,16 +478,16 @@ impl EventMonitor {
             let space_efficiency = total_leios_tx_bytes as f64 / total_leios_bytes as f64;
 
             info!(
-                "{generated_ibs} IB(s) were generated, on average {:.3} IB(s) per slot.",
-                generated_ibs as f64 / total_slots as f64
+                "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
+                ibs.len(),
+                ibs.len() as f64 / total_slots as f64
             );
             info!(
                 "{} out of {} transaction(s) were included in at least one IB.",
                 times_to_reach_ib.len(),
                 txs.len(),
             );
-            let avg_age = pending_txs.iter().map(|id| {
-                let tx = txs.get(id).unwrap();
+            let avg_age = pending_txs.iter().map(|tx| {
                 (last_timestamp - tx.generated).as_secs_f64()
             });
             let avg_age_stats = compute_stats(avg_age);
@@ -521,15 +503,16 @@ impl EventMonitor {
                 "Each IB contained an average of {:.3} transaction(s) (stddev {:.3}) and an average of {} (stddev {:.3}). {} IB(s) were empty.",
                 txs_per_ib.mean, txs_per_ib.std_dev,
                 pretty_bytes(bytes_per_ib.mean.trunc() as u64, pbo.clone()), pretty_bytes(bytes_per_ib.std_dev.trunc() as u64, pbo.clone()),
-                empty_ibs,
+                ibs.values().filter(|ib| ib.is_empty()).count(),
             );
             info!(
                 "Each node received an average of {:.3} IB(s) (stddev {:.3}).",
                 ibs_received.mean, ibs_received.std_dev,
             );
             info!(
-                "{generated_ebs} EB(s) were generated; on average there were {:.3} EB(s) per slot.",
-                generated_ebs as f64 / total_slots as f64
+                "{} EB(s) were generated; on average there were {:.3} EB(s) per slot.",
+                ebs.len(),
+                ebs.len() as f64 / total_slots as f64
             );
             info!(
                 "Each EB contained an average of {:.3} IB(s) (stddev {:.3}). {} EB(s) were empty.",
@@ -541,15 +524,15 @@ impl EventMonitor {
             );
             info!(
                 "{} out of {} IBs were included in at least one EB.",
-                ibs_which_reached_eb, generated_ibs,
+                ibs.values().filter(|ib| ib.included_in_eb.is_some()).count(), ibs.len(),
             );
             info!(
                 "{} out of {} IBs expired before they reached an EB.",
-                expired_ibs, generated_ibs,
+                expired_ibs, ibs.len(),
             );
             info!(
                 "{} out of {} EBs expired before an EB from their stage reached an RB.",
-                expired_ebs, generated_ebs,
+                expired_ebs, ebs.len(),
             );
             info!(
                 "{} out of {} transaction(s) were included in at least one EB.",
@@ -594,6 +577,7 @@ impl EventMonitor {
     }
 }
 
+#[derive(Clone)]
 struct Transaction {
     bytes: u64,
     generated: Timestamp,
@@ -610,6 +594,55 @@ impl Transaction {
             included_in_eb: None,
             included_in_block: None,
         }
+    }
+}
+struct InputBlock {
+    bytes: u64,
+    generated: Timestamp,
+    txs: Vec<TransactionId>,
+    included_in_eb: Option<Timestamp>,
+    included_in_block: Option<Timestamp>,
+}
+impl InputBlock {
+    fn new(bytes: u64, generated: Timestamp, txs: Vec<TransactionId>) -> Self {
+        Self {
+            bytes,
+            generated,
+            txs,
+            included_in_eb: None,
+            included_in_block: None,
+        }
+    }
+    fn is_empty(&self) -> bool {
+        self.txs.is_empty()
+    }
+}
+struct EndorserBlock {
+    generated: Timestamp,
+    txs: Vec<TransactionId>,
+    ibs: Vec<InputBlockId>,
+    ebs: Vec<EndorserBlockId>,
+    included_in_eb: Option<Timestamp>,
+    included_in_block: Option<Timestamp>,
+}
+impl EndorserBlock {
+    fn new(
+        generated: Timestamp,
+        txs: Vec<TransactionId>,
+        ibs: Vec<InputBlockId>,
+        ebs: Vec<EndorserBlockId>,
+    ) -> Self {
+        Self {
+            generated,
+            txs,
+            ibs,
+            ebs,
+            included_in_eb: None,
+            included_in_block: None,
+        }
+    }
+    fn is_empty(&self) -> bool {
+        self.txs.is_empty() && self.ibs.is_empty() && self.ebs.is_empty()
     }
 }
 
