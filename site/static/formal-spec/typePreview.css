@@ -11,6 +11,12 @@
   border-radius: 3px;
 }
 
+/* Reset cursor for types within the preview itself */
+.type-preview-container .type-hoverable,
+.type-preview-container .type-hoverable:hover {
+  cursor: pointer;
+}
+
 /* Preview container */
 .type-preview-container {
   position: absolute;
@@ -52,69 +58,71 @@
   align-items: center;
 }
 
-/* Preview code */
-.preview-code {
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
+/* Override and adjust styles for preview context */
+.type-preview-container .Agda {
+  margin: 0;
+  padding: 8px;
 }
 
-/* Line numbers in preview */
-.preview-line-numbers {
-  background-color: var(--subtle-background);
-  border-right: 1px solid var(--preview-border-color);
-  padding: 8px 6px;
-  text-align: right;
-  color: var(--text-muted);
+.type-preview-container .code-container {
+  display: flex;
+  width: 100%;
+}
+
+/* Line numbers in preview (adapting from original to match main style) */
+.type-preview-container .preview-line-numbers {
+  flex: 0 0 auto;
   user-select: none;
+  text-align: right;
+  background-color: transparent;
+  border-right: 1px solid var(--preview-border-color);
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
-.preview-line-number {
+.type-preview-container .preview-line-number {
   display: block;
+  color: rgba(27, 31, 35, 0.4);
+  padding: 0 6px 0 0;
+  font-size: 14px;
   line-height: 1.5;
-  font-size: 0.85em;
-  padding: 0 6px;
-  min-height: 1.5em;
+  height: 1.5em;
 }
 
-.preview-line-number.highlight {
-  background-color: var(--preview-highlight-bg);
-  color: var(--text-color);
-  font-weight: bold;
-  border-radius: 3px;
+.type-preview-container .preview-line-number.highlight {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+:root.dark-theme .type-preview-container .preview-line-number {
+  color: rgba(230, 237, 243, 0.4);
 }
 
 /* Code content */
-.preview-code-content {
-  padding: 8px;
+.type-preview-container .preview-code-content {
   flex: 1;
   overflow-x: auto;
+  padding-left: 8px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
-.preview-code-line {
+.type-preview-container .preview-code-line {
   line-height: 1.5;
+  height: 1.5em;
   white-space: pre;
-  min-height: 1.5em;
-  letter-spacing: normal;
-  display: flex;
-  align-items: center;
+  position: relative;
+  margin: 0;
 }
 
-.preview-code-line > * {
+.type-preview-container .preview-code-line > * {
   white-space: pre;
 }
 
-.preview-code-line.highlight {
-  background-color: var(--preview-highlight-bg);
-  border-radius: 3px;
-  font-weight: bold;
-  border-left: 2px solid var(--link-color, #0066cc);
+.type-preview-container .preview-code-line.highlight {
+  background-color: var(--hover-bg);
 }
 
 /* Animation */

@@ -57,21 +57,23 @@
           num.classList.remove('highlighted');
         });
         
-        // Get the line number
+        // Get the line number and block ID
         const num = this.getAttribute('data-line-number');
+        const blockId = this.getAttribute('data-block-id') || 'block-1';
         if (!num) return;
         
         // Add highlight class to clicked line number
         this.classList.add('highlighted');
         
         // Find the corresponding code line and highlight it
-        const lineId = 'LC' + num;
-        const codeLine = document.getElementById(lineId);
+        const lineContentId = `${blockId}-LC${num}`;
+        const codeLine = document.getElementById(lineContentId);
         if (codeLine) {
           codeLine.classList.add('highlighted');
           
           // Update URL hash without causing a jump
-          const newUrl = window.location.pathname + window.location.search + '#L' + num;
+          const lineId = `${blockId}-L${num}`;
+          const newUrl = window.location.pathname + window.location.search + '#' + lineId;
           history.pushState(null, '', newUrl);
           
           // Scroll the element into view
@@ -95,29 +97,63 @@
     });
     
     const hash = window.location.hash;
-    if (hash && hash.startsWith('#L')) {
-      // Extract the line number from the hash
-      const lineNum = hash.substring(2);
-      const lineId = 'LC' + lineNum;
-      const codeLine = document.getElementById(lineId);
-      const lineNumEl = document.getElementById('L' + lineNum);
-      
-      if (codeLine) {
-        // Highlight the target line
-        codeLine.classList.add('highlighted');
+    if (hash) {
+      // Check for block-specific line format: #block-X-LY
+      const blockLineMatch = hash.match(/#(B\d+)-L(\d+)$/);
+      if (blockLineMatch) {
+        const blockId = blockLineMatch[1];
+        const lineNum = blockLineMatch[2];
+        const lineId = `${blockId}-L${lineNum}`;
+        const lineContentId = `${blockId}-LC${lineNum}`;
         
-        // Highlight the corresponding line number
-        if (lineNumEl) {
-          lineNumEl.classList.add('highlighted');
+        const codeLine = document.getElementById(lineContentId);
+        const lineNumEl = document.getElementById(lineId);
+        
+        if (codeLine) {
+          // Highlight the target line
+          codeLine.classList.add('highlighted');
+          
+          // Highlight the corresponding line number
+          if (lineNumEl) {
+            lineNumEl.classList.add('highlighted');
+          }
+          
+          // Scroll the line into view
+          setTimeout(() => {
+            codeLine.scrollIntoView({
+              behavior: 'smooth', 
+              block: 'center'
+            });
+          }, 100); // Small delay to ensure DOM is ready
         }
+      } else if (hash.startsWith('#L')) {
+        // Legacy format support: #L123 (for backward compatibility)
+        // Try to find it in the first block
+        const lineNum = hash.substring(2);
+        const blockId = 'B1';
+        const lineContentId = `${blockId}-LC${lineNum}`;
+        const lineId = `${blockId}-L${lineNum}`;
         
-        // Scroll the line into view
-        setTimeout(() => {
-          codeLine.scrollIntoView({
-            behavior: 'smooth', 
-            block: 'center'
-          });
-        }, 100); // Small delay to ensure DOM is ready
+        const codeLine = document.getElementById(lineContentId);
+        const lineNumEl = document.getElementById(lineId);
+        
+        if (codeLine) {
+          // Highlight the target line
+          codeLine.classList.add('highlighted');
+          
+          // Highlight the corresponding line number
+          if (lineNumEl) {
+            lineNumEl.classList.add('highlighted');
+          }
+          
+          // Scroll the line into view
+          setTimeout(() => {
+            codeLine.scrollIntoView({
+              behavior: 'smooth', 
+              block: 'center'
+            });
+          }, 100); // Small delay to ensure DOM is ready
+        }
       }
     }
   }
