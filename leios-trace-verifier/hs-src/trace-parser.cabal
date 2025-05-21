@@ -63,10 +63,13 @@ test-suite test-trace-verifier
       base
     , bytestring
     , containers
+    , data-default
     , directory
     , filepath
     , hspec
     , leios-trace-hs
+    , lens
+    , mtl
     , QuickCheck
     , text
     , trace-parser

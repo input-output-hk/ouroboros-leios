@@ -1,10 +1,15 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Spec.Generated where
 
+import Control.Lens hiding (_1, _2)
 import Control.Monad (mzero)
+import Control.Monad.State
+import Data.Default (Default(..))
 import Data.Maybe (fromMaybe)
+import Data.Set (Set)
 import Data.Text (Text)
 import LeiosConfig (CleanupPolicy(..), CleanupPolicies(..), Config(..), DiffusionStrategy(..), Distribution(..), LeiosVariant(..), RelayStrategy(..))
 import LeiosEvents
@@ -53,16 +58,64 @@ check label expectedActions expectedMessage events =
           Nothing -> snd result `shouldBe` expectedMessage'
           Just expectedActions' -> result `shouldBe` (expectedActions', expectedMessage')
 
-data TracingState =
-  TracingState
+data TracingContext =
+  TracingContext
   {
+    _clock :: Double
+  , _slot :: SlotNo
+  , _rbs :: Set Text
+  , _ibs :: Set Text
+  , _ebs :: Set Text
+  , _votes :: Set Text
   }
     deriving Show
 
-genesisSlot :: Event
-genesisSlot = Slot sut 0
+instance Default TracingContext where
+  def = TracingContext 0 0 mempty mempty mempty mempty
+
+clock :: Lens' TracingContext Double
+clock = lens _clock $ \ctx x -> ctx {_clock = x}
+
+slot :: Lens' TracingContext SlotNo
+slot = lens _slot $ \ctx x -> ctx {_slot = x}
+
+rbs :: Lens' TracingContext (Set Text)
+rbs = lens _rbs $ \ctx x -> ctx {_rbs = x}
+
+ibs :: Lens' TracingContext (Set Text)
+ibs = lens _ibs $ \ctx x -> ctx {_ibs = x}
+
+ebs :: Lens' TracingContext (Set Text)
+ebs = lens _ebs $ \ctx x -> ctx {_ebs = x}
+
+votes :: Lens' TracingContext (Set Text)
+votes = lens _votes $ \ctx x -> ctx {_votes = x}
+
+data Transition =
+    NextSlot
+  | SkipSlot
+  | GenerateRB
+  | ReceiveRB
+  | GenerateIB
+  | SkipIB
+  | MissIB
+  | ReceiveIB
+  deriving Show
+
+transition :: Transition -> State TracingContext [Event]
+transition NextSlot =
+  do
+    event <- Slot sut <$> use slot
+    slot %= (+ 1)
+    pure [event]
+
+transitions :: [Transition] -> [Event]
+transitions = (`evalState` def) . fmap concat . mapM transition
 
 generated :: Spec
 generated =
-  describe "Generated traces" $ do
-    check "Genesis slot" mzero mzero [genesisSlot]
+  do
+    describe "Positive cases" $ do
+      check "Genesis slot" mzero mzero $ transitions [NextSlot]
+    describe "Negative cases" $ do
+      check "No actions" mzero (pure "Invalid Action: Slot Slot-Action 1") $ transitions [NextSlot, NextSlot]
