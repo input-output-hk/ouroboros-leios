@@ -8,12 +8,12 @@
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
     <entry>
-        <title type="html"><![CDATA[Weekly Summary - May 12, 2025]]></title>
+        <title type="html"><![CDATA[Weekly Summary – May 12, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary"/>
         <updated>2025-05-12T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the team made significant progress on simulation improvements, trace verification, and comprehensive analysis of Leios transaction processing capacity.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the team made significant progress on simulation improvements, trace verification, and comprehensive analysis of Leios transaction processing capacity.</p>
+        <summary type="html"><![CDATA[This week, the team made significant progress on simulation improvements, trace verification, and a comprehensive analysis of Leios' transaction processing capacity.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the team made significant progress on simulation improvements, trace verification, and a comprehensive analysis of Leios' transaction processing capacity.</p>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="trace-verification">Trace verification<a class="hash-link" aria-label="Direct link to Trace verification" title="Direct link to Trace verification" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#trace-verification">​</a></h3>
 <ul>
 <li>Improved the trace verifier with better error handling and reporting</li>
@@ -25,7 +25,7 @@
 </ul>
 </li>
 <li>Integrated the trace verifier into Nix infrastructure and CI builds</li>
-<li>Removed deterministic conformance testing in favor of trace-based approach.</li>
+<li>Removed deterministic conformance testing in favor of a trace-based approach.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-improvements">Simulation improvements<a class="hash-link" aria-label="Direct link to Simulation improvements" title="Direct link to Simulation improvements" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#simulation-improvements">​</a></h3>
 <h4 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#haskell-simulation">​</a></h4>
@@ -33,9 +33,9 @@
 <li>Conducted an informal review assessing code quality, design, and implementation</li>
 <li>Analyzed the simulation organization and identified areas for future improvement</li>
 <li>Found that most prospective changes to the Leios protocol would only involve a small fraction of the codebase</li>
-<li>Determined that addition of memory pool and transactions would take approximately 100-200 hours of labor.</li>
+<li>Determined that adding memory pool and transactions would take approximately 100-200 hours of labor.</li>
 </ul>
-<p>The review of the Haskell simulator was documented in detail in <a href="https://github.com/input-output-hk/ouroboros-leios/pull/353" target="_blank" rel="noopener noreferrer">PR#353</a>, covering statistics, organization, code quality, design, implementation, and documentation aspects of the simulator.</p>
+<p>The review of the Haskell simulator was documented in detail in <a href="https://github.com/input-output-hk/ouroboros-leios/pull/353" target="_blank" rel="noopener noreferrer">PR#353</a>, covering its statistics, organization, code quality, design, implementation, and documentation aspects.</p>
 <h4 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/05/12/weekly-progress-summary#rust-simulation">​</a></h4>
 <ul>
 <li>Added <code>tx-start-time</code> and <code>tx-stop-time</code> parameters to avoid effects of slow starts or sudden terminations on transaction analysis</li>
@@ -46,17 +46,17 @@
 <li>Relocated the original Leios report to avoid confusion, while preserving valuable background information</li>
 <li>Added partially-drafted technical reports on Haskell simulations to Nix and CI builds:<!-- -->
 <ul>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/network-spec/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios Network Specification</a></li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios simulation: building confidence in the performance results</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/network-spec/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios network specification</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/docs/ReadMe.md" target="_blank" rel="noopener noreferrer">Ouroboros Leios simulation: building confidence in the performance results</a>.</li>
 </ul>
 </li>
 </ul>
-<p>The team conducted higher excess-capacity simulations to evaluate transaction inclusion hypotheses. The transaction lifecycle simulations raised the question of whether duplication of transactions in IBs was starving other transactions from ever being included in an IB. To test this, simulations were run with IBs being produced at three times the normal rate, providing ample space for transaction duplication.</p>
+<p>The team ran higher excess-capacity simulations to test hypotheses about transaction inclusion. The transaction lifecycle simulations raised the question of whether duplicated transactions in IBs were preventing other transactions from ever being included. The team ran simulations with IBs produced at three times the normal rate to test this, providing ample space for transaction duplication.</p>
 <p>Detailed analysis showed that transaction loss persisted despite increased capacity, indicating that other factors are preventing transactions from reaching the ledger. The results are documented in:</p>
 <ul>
 <li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/" target="_blank" rel="noopener noreferrer">Analysis overview</a></li>
 <li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis1x.ipynb" target="_blank" rel="noopener noreferrer">Results at 1x IB capacity</a></li>
-<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis3x.ipynb" target="_blank" rel="noopener noreferrer">Results at 3x IB capacity</a></li>
+<li><a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w20/analysis3x.ipynb" target="_blank" rel="noopener noreferrer">Results at 3x IB capacity</a>.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
