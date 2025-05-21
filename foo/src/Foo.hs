@@ -385,12 +385,12 @@ proposal params@Params{..} =
                     (Map.toList ibMempool)
                     selection
 
-            -- add the subsequence (not /substring/!) of 'txMempool' that
+            -- keep the subsequence (not /substring/!) of 'txMempool' that
             -- matches the picked colors and is cumulatively valid starting
             -- from the tip of 'ibMempool'
             goInner !accSz accTxs !acc !accColors remainingColors = \case
                 []       ->
-                    goOuter accSz accTxs acc accColors remainingColors
+                    goOuter accTxs accColors remainingColors
                 tx : txs ->
                     let recur f = f accColors remainingColors txs
 
@@ -417,13 +417,19 @@ proposal params@Params{..} =
 
             -- add colors randomly until the IB is full or the 'txMempool' is
             -- empty
-            goOuter accSz accTxs acc accColors = \case
+            --
+            -- If some red tx depends on a blue tx and red is added before
+            -- blue, then 'goInner' will skip that red tx on the red pass but
+            -- won't skip it on the red&blue pass. That's why each iteration of
+            -- 'goOuter' resets the tx-ish accumulators and works through the
+            -- whole 'txMempool' in its actual order.
+            goOuter accTxs accColors = \case
                 []             -> reverse accTxs
                 color : colors ->
                     goInner
-                        accSz
-                        accTxs
-                        acc
+                        (TxSize 0)
+                        []
+                        l
                         (Set.insert color accColors)
                         colors
                         txMempool
@@ -434,7 +440,7 @@ proposal params@Params{..} =
                     (Set.size mempoolColors)
                     prng1
         in
-        (MkIbBody $ goOuter (TxSize 0) [] l Set.empty shuffledColors, prng2)
+        (MkIbBody $ goOuter [] Set.empty shuffledColors, prng2)
 
 {-
     receiveCert1 (EB sl u) st@MkLeiosState{..} =
