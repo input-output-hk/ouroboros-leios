@@ -1392,7 +1392,7 @@ impl Node {
 
     fn pipelines_for_ib_references(&self, pipeline: u64) -> impl Iterator<Item = u64> + use<'_> {
         let oldest_pipeline = if self.sim_config.late_ib_inclusion {
-            pipeline.saturating_sub(2)
+            pipeline.saturating_sub(3)
         } else {
             pipeline
         };
