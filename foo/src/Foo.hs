@@ -25,9 +25,17 @@ newtype SlotNo = Sl Int                                                         
 plus :: SlotNo -> Int -> SlotNo
 plus (Sl x) y = Sl $ x + y
 
--- | This is a unique identifier for tx (eg a hash of the /entire/ transaction,
--- including witnesses etc), which surprisingly is not what @TxId@ means in the
--- Cardano codebase.
+-- | This is a unique identifier for the part of the tx that is signed.
+--
+-- If it was influence by anything else (eg it it was the hash of the /entire/
+-- transaction, including witnesses etc), then the adversary could alter the
+-- contents (eg the order of witnesses) in order to change the 'TxId' when
+-- relaying the tx.
+--
+-- Key invariant: two transactions with the same 'TxId' have the same inputs
+-- and outputs. But two transactions with the same 'TxId' do not necessarily
+-- have the same validity (that's what the hash of the whole tx including
+-- witnesses might be used to record).
 newtype TxId u = TX u                                                            deriving (Eq, Ord, Read, Show)
 
 data IbId u = IB SlotNo u                                                        deriving (Eq, Ord, Read, Show)
