@@ -56,6 +56,7 @@ test-suite test-trace-verifier
   type:                exitcode-stdio-1.0
   main-is:          Spec.hs
   other-modules:    Paths_trace_parser
+                    Spec.Generated
                     Spec.Golden
   hs-source-dirs:     test
   build-depends:

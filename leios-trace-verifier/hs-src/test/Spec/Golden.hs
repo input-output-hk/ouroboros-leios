@@ -29,6 +29,7 @@ golden = do
   invalidFiles <- runIO $ sort <$> listDirectory (dir </> "invalid")
   (top :: Topology COORD2D) <- runIO $ decodeFileThrow (dir </> "topology.yaml")
   (config :: Config) <- runIO $ decodeFileThrow (dir </> "config.yaml")
+  runIO $ print top
   let nrNodes = toInteger $ Prelude.length (elems $ nodes top)
   let nodeNames = Prelude.map unNodeName (keys $ nodes top)
   let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
