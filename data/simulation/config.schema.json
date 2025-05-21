@@ -294,6 +294,10 @@
       "description": "Praos blockchain quality parameter.\nThis is η from the Leios paper.\nControls the pipelines EBs should reference in Full leios:\n  i - ⌈3η/L⌉, …, i-3\nwhere i is the index of the current pipeline.",
       "type": "number"
     },
+    "praos-fallback-enabled": {
+      "description": "If true, RBs will contain transactions directly as well as through a certificate.\nIf false, RBs will only contain a cert.",
+      "type": "boolean"
+    },
     "rb-body-legacy-praos-payload-avg-size-bytes": {
       "additionalProperties": false,
       "properties": {},

@@ -30,6 +30,7 @@ leios-late-ib-inclusion: true
 leios-header-diffusion-time-ms: 1000.0
 # TODO: revise default
 praos-chain-quality: 40
+praos-fallback-enabled: true
 
 ################################################################################
 # Transaction Configuration

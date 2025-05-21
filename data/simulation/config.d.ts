@@ -53,6 +53,11 @@ export interface Config {
    * where i is the index of the current pipeline.
    * */
   "praos-chain-quality": number;
+  /**
+   * If true, RBs will contain transactions directly as well as through a certificate.
+   * If false, RBs will only contain a cert.
+   */
+  "praos-fallback-enabled": boolean;
   // Transaction Configuration
   /** Only supported by Rust simulation. */
   "tx-generation-distribution": Distribution;
