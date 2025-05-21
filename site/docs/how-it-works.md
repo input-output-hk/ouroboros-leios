@@ -33,6 +33,8 @@ Leios is a high-throughput overlay protocol designed to enhance blockchain scala
 
 ## Leios architecture
 
+![https://ucarecdn.com/8a6ca7f4-42b4-4bb2-a036-01f5c5dadc46/](https://ucarecdn.com/8a6ca7f4-42b4-4bb2-a036-01f5c5dadc46/)
+
 Leios uses a pipelined architecture to achieve high throughput. Each pipeline instance includes the following seven stages:
 
 1. **Propose**:<br />
