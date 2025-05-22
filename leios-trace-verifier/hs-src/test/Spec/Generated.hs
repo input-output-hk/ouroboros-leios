@@ -176,11 +176,20 @@ generated =
       single "Generate equivocated IBs" $
         check mzero (MustBe "Invalid Action: Slot IB-Role-Action 1")
           <$> transitions [NextSlot, GenerateIB, GenerateIB]
+      single "Failure to generate IB" $
+        check mzero (MustBe "Invalid Action: Slot Slot-Action 1")
+          <$> transitions [NextSlot, GenerateVT, NextSlot]
       single "Generate equivocated EBs" $
         check mzero (MustBe "Invalid Action: Slot EB-Role-Action 2")
           <$> transitions [NextSlot, SkipIB, SkipVT, NextSlot, GenerateEB, GenerateEB]
+      single "Failure to generate EB" $
+        check mzero (MustBe "Invalid Action: Slot Slot-Action 2")
+          <$> transitions [NextSlot, SkipIB, SkipVT, NextSlot, SkipIB, SkipVT, NextSlot]
       single "Generate equivocated VTs" $
         check mzero (MustBe "Invalid Action: Slot VT-Role-Action 1")
           <$> transitions [NextSlot, GenerateVT, GenerateVT]
+      single "Failure to generate VT" $
+        check mzero (MustBe "Invalid Action: Slot Slot-Action 1")
+          <$> transitions [NextSlot, SkipIB, NextSlot]
       prop "Sporadic gaps in production" $ \(SporadicMisses actions) ->
         check mzero MustNotBeOkay <$> transitions actions
