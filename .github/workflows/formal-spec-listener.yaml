@@ -49,6 +49,7 @@ jobs:
         with:
           name: formal-spec-html
           repository: input-output-hk/ouroboros-leios-formal-spec
+          run-id: ${{ github.event.client_payload.run_id }}
           path: new-formal-spec-html
           github-token: ${{ secrets.LEIOS_TRIGGER_PAT }}
 
