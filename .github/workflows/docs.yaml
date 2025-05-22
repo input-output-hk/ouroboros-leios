@@ -164,8 +164,8 @@ jobs:
       - name: Check for site or visualizer changes
         id: check_changes
         run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "Changes detected from formal-spec workflow"
+          if [ "${{ github.event_name }}" == "workflow_run" ] || [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Changes detected from formal-spec workflow or manual trigger"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             # For PR or push events, check for actual changes
