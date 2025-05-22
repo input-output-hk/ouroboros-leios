@@ -10,11 +10,11 @@ jobs:
     name: "Process Formal Spec Update"
     runs-on: ubuntu-latest
     outputs:
-      spec_updated: 'true'
+      spec_updated: "true"
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
-        
+
       # First try to download previous artifacts to have as fallback
       - name: 📥 Download previous formal spec HTML for fallback
         id: download_previous
@@ -24,7 +24,7 @@ jobs:
           name: formal-spec-html
           path: previous-formal-spec-html
           if_no_artifact_found: ignore
-          
+
       - name: Check previous artifacts
         id: check_previous
         run: |
@@ -36,22 +36,27 @@ jobs:
             echo "has_previous=false" >> $GITHUB_OUTPUT
           fi
 
+      # Try to download directly from GitHub API to see artifacts in the formal-spec repo
+      - name: List available artifacts in formal-spec repo
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.FORMAL_SPEC_PAT || github.token }}" \
+          "https://api.github.com/repos/input-output-hk/ouroboros-leios-formal-spec/actions/artifacts" | \
+          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}' || true
+
       - name: 📥 Download formal spec HTML
         id: download_new
-        uses: actions/download-artifact@v4
+        uses: dawidd6/action-download-artifact@v2
         continue-on-error: true
         with:
-          workflow: formal-spec.yaml
-          workflow_conclusion: success
           name: formal-spec-html
           repo: input-output-hk/ouroboros-leios-formal-spec
-          token: ${{ github.token }}
           path: new-formal-spec-html
-          
+          token: ${{ secrets.FORMAL_SPEC_PAT || github.token }}
+
       - name: Prepare final formal spec HTML
         run: |
           mkdir -p formal-spec-html
-          
+
           # Check if we successfully downloaded new files
           if [ -d "new-formal-spec-html" ] && [ -n "$(ls -A new-formal-spec-html 2>/dev/null)" ]; then
             echo "Using newly downloaded formal spec HTML"
@@ -65,7 +70,7 @@ jobs:
             echo "No formal spec HTML available, creating placeholder"
             echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > formal-spec-html/index.html
           fi
-          
+
           # Show what we're using
           echo "Final formal spec HTML contents:"
           ls -la formal-spec-html/
@@ -76,10 +81,10 @@ jobs:
           name: formal-spec-html
           path: formal-spec-html
           retention-days: 1
-          
+
       # Trigger the docs workflow to build and publish
       - name: Trigger docs workflow
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: docs.yaml
-          token: ${{ github.token }} 
+          token: ${{ github.token }}
