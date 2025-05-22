@@ -26,10 +26,11 @@ leios-variant: short
 leios-stage-length-slots: 20
 leios-stage-active-voting-slots: 1
 leios-vote-send-recv-stages: false
-leios-late-ib-inclusion: false
+leios-late-ib-inclusion: true
 leios-header-diffusion-time-ms: 1000.0
 # TODO: revise default
-praos-chain-quality: 20
+praos-chain-quality: 40
+praos-fallback-enabled: true
 
 ################################################################################
 # Transaction Configuration

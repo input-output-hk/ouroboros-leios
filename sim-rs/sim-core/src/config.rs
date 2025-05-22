@@ -63,6 +63,7 @@ pub struct RawParameters {
     pub leios_late_ib_inclusion: bool,
     pub leios_header_diffusion_time_ms: f64,
     pub praos_chain_quality: u64,
+    pub praos_fallback_enabled: bool,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
@@ -437,6 +438,7 @@ pub struct SimConfiguration {
     pub max_eb_age: u64,
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
+    pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) praos_chain_quality: u64,
@@ -480,6 +482,7 @@ impl SimConfiguration {
             max_eb_age: params.eb_max_age_slots,
             late_ib_inclusion: params.leios_late_ib_inclusion,
             variant: params.leios_variant,
+            praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
             praos_chain_quality: params.praos_chain_quality,

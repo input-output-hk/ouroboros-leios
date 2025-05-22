@@ -1,5 +1,13 @@
 # Leios logbook
 
+## 2025-05-20
+
+### Expected transaction lifecycle
+
+For the draft blog post we computed the cumulative probability of a transaction reaching the ledger as a function of IB production rate and stage length.
+
+![Cumulative probability of transaction reaching ledger](analysis/tx-to-block-cum-slots-fig.svg)
+
 ## 2025-05-17
 
 ### Web-based enhanced formal specification documentation

@@ -736,25 +736,27 @@ impl Node {
         }
 
         let mut transactions = vec![];
-        if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
-            // Add one transaction, the right size for the extra RB payload
-            let tx = Transaction {
-                id: config.next_id(),
-                shard: None,
-                bytes: config.rb_size,
-            };
-            self.tracker.track_transaction_generated(&tx, self.id);
-            transactions.push(Arc::new(tx));
-        } else {
-            let mut size = 0;
-            // Fill a block with as many pending transactions as can fit
-            while let Some((id, tx)) = self.praos.mempool.first_key_value() {
-                if size + tx.bytes > self.sim_config.max_block_size {
-                    break;
+        if self.sim_config.praos_fallback {
+            if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
+                // Add one transaction, the right size for the extra RB payload
+                let tx = Transaction {
+                    id: config.next_id(),
+                    shard: None,
+                    bytes: config.rb_size,
+                };
+                self.tracker.track_transaction_generated(&tx, self.id);
+                transactions.push(Arc::new(tx));
+            } else {
+                let mut size = 0;
+                // Fill a block with as many pending transactions as can fit
+                while let Some((id, tx)) = self.praos.mempool.first_key_value() {
+                    if size + tx.bytes > self.sim_config.max_block_size {
+                        break;
+                    }
+                    size += tx.bytes;
+                    let id = *id;
+                    transactions.push(self.praos.mempool.remove(&id).unwrap());
                 }
-                size += tx.bytes;
-                let id = *id;
-                transactions.push(self.praos.mempool.remove(&id).unwrap());
             }
         }
 
@@ -1390,7 +1392,7 @@ impl Node {
 
     fn pipelines_for_ib_references(&self, pipeline: u64) -> impl Iterator<Item = u64> + use<'_> {
         let oldest_pipeline = if self.sim_config.late_ib_inclusion {
-            pipeline.saturating_sub(2)
+            pipeline.saturating_sub(3)
         } else {
             pipeline
         };
