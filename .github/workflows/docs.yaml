@@ -13,13 +13,20 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
-  
+
   workflow_run:
     workflows: ["Formal Spec Listener"]
     types:
       - completed
     branches:
       - main
+
+  workflow_dispatch: # Allow manual triggering or via API
+    inputs:
+      source:
+        description: "Source of the workflow dispatch"
+        required: false
+        default: "manual"
 
 # Global permissions
 permissions:
@@ -117,18 +124,18 @@ jobs:
         with:
           lfs: true
           fetch-depth: 2
-      
+
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "yarn"
-          cache-dependency-path: ./ui/yarn.lock 
+          cache-dependency-path: ./ui/yarn.lock
 
       - name: 📦 Install dependencies
         working-directory: ui
         run: yarn install
-  
+
       - name: 🏗️ Build visualizer
         working-directory: ui
         run: |
@@ -141,28 +148,30 @@ jobs:
           name: visualizer
           path: ui/dist
 
-  docs-build:
-    name: "Build Docusaurus Site"
+  # This job handles PR and push events, and depends on viz-build
+  docs-build-pr-push:
+    name: "Build Docusaurus Site (PR/Push)"
     runs-on: ubuntu-latest
     needs: [viz-build]
-    # For workflow_run events, we don't need viz-build
-    if: |
-      github.event_name == 'pull_request' || 
-      github.event_name == 'push' || 
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes || github.event_name == 'workflow_run' }}
+      has_changes: ${{ steps.check_changes.outputs.has_changes || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
+      - name: Debug workflow trigger info
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+
       - name: Check for site or visualizer changes
         id: check_changes
         run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "Changes detected from formal-spec workflow"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Changes from manual trigger"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             # For PR or push events, check for actual changes
@@ -195,20 +204,19 @@ jobs:
 
       # Handle visualizer integration
       - name: 👁️ Unpack visualizer
-        if: steps.check_changes.outputs.has_changes == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/download-artifact@v4
         with:
           name: visualizer
           path: site/static/visualizer
 
-      # Download formal spec HTML - unified approach for all event types
+      # Download formal spec HTML
       - name: 📥 Download formal spec HTML
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/download-artifact@v4
-        continue-on-error: true
+        continue-on-error: false
         with:
           name: formal-spec-html
-          workflow_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
           path: formal-spec-html
 
       - name: 📝 Update formal spec
@@ -216,22 +224,28 @@ jobs:
         run: |
           # Create formal spec directory if it doesn't exist
           mkdir -p site/static/formal-spec
-          
-          # Check if we have files to copy
-          if [ -z "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            echo "No formal spec HTML files found - using placeholder"
-            echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > site/static/formal-spec/index.html
-          else
-            # Copy the HTML files
+
+          # Copy any files we found (even if none were found, this is a no-op)
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "Formal spec HTML files found - copying to site"
             cp -r formal-spec-html/* site/static/formal-spec/
+          else
+            echo "No formal spec HTML files found - continuing without them"
           fi
 
       - name: 🔄 Enhance Agda documentation
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
+        timeout-minutes: 20
         run: |
           # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
-          if [ -d "./static/formal-spec" ] && [ "$(find ./static/formal-spec -name '*.html' | grep -v index.html | wc -l)" -gt "0" ]; then
+          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
+          echo "Found $HTML_COUNT HTML files"
+
+          if [ "$HTML_COUNT" -gt "0" ]; then
+            echo "Processing HTML files with agda-web-docs-lib"
+            echo "Available memory before processing:"
+            free -h
+
             NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
@@ -263,13 +277,114 @@ jobs:
           path: |
             site/build/*
 
+  # This job handles workflow_run events from formal-spec-listener
+  docs-build-workflow-run:
+    name: "Build Docusaurus Site (Workflow Run)"
+    runs-on: ubuntu-latest
+    # No dependency on viz-build for workflow_run events
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    outputs:
+      has_changes: "true"
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Debug workflow trigger info
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+          echo "Workflow run name: ${{ github.event.workflow_run.name }}"
+          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
+          echo "Ref: ${{ github.ref }}"
+
+      - name: List available artifacts
+        run: |
+          echo "Listing artifacts in the formal-spec-listener workflow run"
+          curl -s -H "Authorization: token ${{ github.token }}" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts" | \
+          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}'
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "yarn"
+          cache-dependency-path: ./site/yarn.lock
+
+      - name: 📦 Install dependencies
+        working-directory: site
+        run: yarn install
+
+      # Download formal spec HTML specifically from the workflow run
+      - name: 📥 Download formal spec HTML
+        uses: actions/download-artifact@v4
+        continue-on-error: false
+        with:
+          name: formal-spec-html
+          run-id: ${{ github.event.workflow_run.id }}
+          path: formal-spec-html
+
+      - name: 📝 Update formal spec
+        run: |
+          # Create formal spec directory if it doesn't exist
+          mkdir -p site/static/formal-spec
+
+          # Copy any files we found (even if none were found, this is a no-op)
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "Formal spec HTML files found - copying to site"
+            cp -r formal-spec-html/* site/static/formal-spec/
+          else
+            echo "No formal spec HTML files found - continuing without them"
+          fi
+
+      - name: 🔄 Enhance Agda documentation
+        working-directory: site
+        timeout-minutes: 20
+        run: |
+          # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
+          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
+          echo "Found $HTML_COUNT HTML files"
+
+          if [ "$HTML_COUNT" -gt "0" ]; then
+            echo "Processing HTML files with agda-web-docs-lib"
+            echo "Available memory before processing:"
+            free -h
+
+            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+          else
+            echo "No HTML files found in formal-spec directory, skipping enhancement"
+          fi
+
+      - name: 🏗️ Build Docusaurus site
+        working-directory: site
+        run: |
+          yarn build
+
+      - name: Verify Docusaurus build
+        working-directory: site
+        run: |
+          if [ -z "$(ls -A build/)" ]; then
+            echo "Error: Docusaurus build directory is empty"
+            exit 1
+          fi
+          echo "Docusaurus build verified"
+          ls -la build/
+
+      - name: 🚀 Upload Docusaurus build
+        uses: actions/upload-artifact@v4
+        with:
+          name: docusaurus-build
+          if-no-files-found: error
+          path: |
+            site/build/*
+
   docs-publish:
     name: "Publish"
     if: |
-      github.ref == 'refs/heads/main' && 
-      needs.docs-build.outputs.has_changes == 'true'
+      github.ref == 'refs/heads/main' &&
+      (needs.docs-build-pr-push.outputs.has_changes == 'true' || needs.docs-build-workflow-run.outputs.has_changes == 'true')
     runs-on: ubuntu-latest
-    needs: docs-build
+    needs: [docs-build-pr-push, docs-build-workflow-run]
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4

@@ -523,10 +523,10 @@ impl Node {
 
             // Decide how many IBs to generate in each slot.
             self.schedule_input_block_generation(slot);
-        }
 
-        // Vote for any EBs which satisfy all requirements.
-        self.vote_for_endorser_blocks(slot);
+            // Vote for any EBs which satisfy all requirements.
+            self.vote_for_endorser_blocks(slot);
+        }
 
         // Generate any IBs scheduled for this slot.
         self.generate_input_blocks(slot);
