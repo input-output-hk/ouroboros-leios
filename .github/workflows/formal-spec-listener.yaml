@@ -18,12 +18,13 @@ jobs:
       # First try to download previous artifacts to have as fallback
       - name: 📥 Download previous formal spec HTML for fallback
         id: download_previous
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           name: formal-spec-html
           path: previous-formal-spec-html
           if_no_artifact_found: ignore
+          allow_forks: false
 
       - name: Check previous artifacts
         id: check_previous
@@ -45,13 +46,14 @@ jobs:
 
       - name: 📥 Download formal spec HTML
         id: download_new
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           name: formal-spec-html
           repo: input-output-hk/ouroboros-leios-formal-spec
           path: new-formal-spec-html
           token: ${{ secrets.FORMAL_SPEC_PAT || github.token }}
+          allow_forks: false
 
       - name: Prepare final formal spec HTML
         run: |
