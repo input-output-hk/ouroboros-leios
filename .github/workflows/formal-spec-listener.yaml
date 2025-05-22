@@ -38,7 +38,7 @@ jobs:
       # Try to download directly from GitHub API to see artifacts in the formal-spec repo
       - name: List available artifacts in formal-spec repo
         run: |
-          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN || github.token }}" \
+          curl -s -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
           "https://api.github.com/repos/input-output-hk/ouroboros-leios-formal-spec/actions/artifacts" | \
           jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}' || true
 
@@ -50,7 +50,7 @@ jobs:
           name: formal-spec-html
           repository: input-output-hk/ouroboros-leios-formal-spec
           path: new-formal-spec-html
-          github-token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          github-token: ${{ secrets.LEIOS_TRIGGER_PAT }}
 
       - name: Prepare final formal spec HTML
         run: |
@@ -80,11 +80,3 @@ jobs:
           name: formal-spec-html
           path: formal-spec-html
           retention-days: 1
-
-      # Trigger the docs workflow to build and publish
-      - name: Trigger docs workflow
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: docs.yaml
-          token: ${{ github.token }}
-          inputs: '{"source": "formal-spec-listener"}'
