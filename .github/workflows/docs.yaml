@@ -214,7 +214,7 @@ jobs:
       - name: 📥 Download formal spec HTML
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/download-artifact@v4
-        continue-on-error: true
+        continue-on-error: false
         with:
           name: formal-spec-html
           path: formal-spec-html
@@ -246,8 +246,7 @@ jobs:
             echo "Available memory before processing:"
             free -h
 
-            # Use more memory but only 1 worker to reduce overall memory usage
-            NODE_OPTIONS="--max-old-space-size=24576" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json --workers 1
+            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
@@ -319,7 +318,7 @@ jobs:
       # Download formal spec HTML specifically from the workflow run
       - name: 📥 Download formal spec HTML
         uses: actions/download-artifact@v4
-        continue-on-error: true
+        continue-on-error: false
         with:
           name: formal-spec-html
           run-id: ${{ github.event.workflow_run.id }}
@@ -351,8 +350,7 @@ jobs:
             echo "Available memory before processing:"
             free -h
 
-            # Use more memory but only 1 worker to reduce overall memory usage
-            NODE_OPTIONS="--max-old-space-size=24576" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json --workers 1
+            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
