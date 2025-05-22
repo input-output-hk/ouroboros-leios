@@ -8,25 +8,24 @@ module Spec.Transition where
 import Control.Lens hiding (elements)
 import Control.Monad (mzero, replicateM)
 import Control.Monad.State
-import Data.Default (Default(..))
+import Data.Default (Default (..))
 import Data.Map (Map)
-import Data.Word (Word16, Word64)
 import Data.Set (Set)
 import Data.Text (Text)
+import Data.Word (Word16, Word64)
 import LeiosConfig (leiosStageLengthSlots)
 import LeiosEvents
-import Prelude hiding (id)
 import Test.QuickCheck hiding (scale)
+import Prelude hiding (id)
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Spec.Scenario as Scenario (config, idOther, idSut)
 
-data TracingContext =
-  TracingContext
-  {
-    _clock :: Time
+data TracingContext
+  = TracingContext
+  { _clock :: Time
   , _slotNo :: SlotNo
   , _rbs :: Map Text Text
   , _ibs :: Set Text
@@ -36,32 +35,38 @@ data TracingContext =
   , _idOther :: Integer
   , _stageLength :: Word
   }
-    deriving Show
+  deriving (Show)
 
 instance Default TracingContext where
   def =
     TracingContext
-      0 0 mempty mempty mempty mempty
-      Scenario.idSut Scenario.idOther
+      0
+      0
+      mempty
+      mempty
+      mempty
+      mempty
+      Scenario.idSut
+      Scenario.idOther
       (leiosStageLengthSlots Scenario.config)
 
 clock :: Lens' TracingContext Time
-clock = lens _clock $ \ctx x -> ctx {_clock = x}
+clock = lens _clock $ \ctx x -> ctx{_clock = x}
 
-slotNo:: Lens' TracingContext SlotNo
-slotNo= lens _slotNo $ \ctx x -> ctx {_slotNo = x}
+slotNo :: Lens' TracingContext SlotNo
+slotNo = lens _slotNo $ \ctx x -> ctx{_slotNo = x}
 
 rbs :: Lens' TracingContext (Map Text Text)
-rbs = lens _rbs $ \ctx x -> ctx {_rbs = x}
+rbs = lens _rbs $ \ctx x -> ctx{_rbs = x}
 
 ibs :: Lens' TracingContext (Set Text)
-ibs = lens _ibs $ \ctx x -> ctx {_ibs = x}
+ibs = lens _ibs $ \ctx x -> ctx{_ibs = x}
 
 ebs :: Lens' TracingContext (Set Text)
-ebs = lens _ebs $ \ctx x -> ctx {_ebs = x}
+ebs = lens _ebs $ \ctx x -> ctx{_ebs = x}
 
 vts :: Lens' TracingContext (Set Text)
-vts = lens _vts $ \ctx x -> ctx {_vts = x}
+vts = lens _vts $ \ctx x -> ctx{_vts = x}
 
 idSut :: Getter TracingContext Integer
 idSut = to _idSut
@@ -78,8 +83,8 @@ other = to $ T.pack . ("node-" <>) . show . _idOther
 stageLength :: Getter TracingContext Word
 stageLength = to _stageLength
 
-data Transition =
-    NextSlot
+data Transition
+  = NextSlot
   | SkipSlot
   | GenerateRB
   | ReceiveRB
@@ -92,13 +97,13 @@ data Transition =
   | GenerateVT
   | SkipVT
   | ReceiveVT
-  deriving Show
+  deriving (Show)
 
 genId :: Integer -> Word64 -> Set Text -> Gen Text
 genId system slot forbidden =
   let
     g = T.pack . ((show system <> "-" <> show slot <> "-") <>) . show <$> (arbitrary :: Gen Word16)
-  in
+   in
     g `suchThat` (not . (`S.member` forbidden))
 
 genRB :: Integer -> StateT TracingContext Gen (Text, Nullable BlockRef)

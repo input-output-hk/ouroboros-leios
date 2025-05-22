@@ -4,7 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Spec.Golden (
-  golden
+  golden,
 ) where
 
 import Control.Monad (forM_)

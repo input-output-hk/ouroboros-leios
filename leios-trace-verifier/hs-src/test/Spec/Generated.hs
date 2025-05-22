@@ -14,8 +14,8 @@ import LeiosTopology (nodeInfo, nodes, stake, unNodeName)
 import Lib (verifyTrace)
 import Spec.Transition
 import Test.Hspec
-import Test.QuickCheck hiding (scale)
 import Test.Hspec.QuickCheck
+import Test.QuickCheck hiding (scale)
 
 import qualified Data.Map.Strict as M
 import qualified Spec.Scenario as Scenario (config, idSut, topology)
@@ -28,20 +28,20 @@ verify =
     stakes = toInteger . stake . nodeInfo <$> (M.elems $ nodes Scenario.topology)
     stakeDistribution = zip nodeNames stakes
     stageLength' = toInteger $ leiosStageLengthSlots Scenario.config
-  in
+   in
     verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength'
 
-data Check =
-    MustBeOkay
+data Check
+  = MustBeOkay
   | MustNotBeOkay
   | MustBe Text
-  deriving Show
+  deriving (Show)
 
-check
-  :: Maybe Integer
-  -> Check
-  -> [TraceEvent]
-  -> Property
+check ::
+  Maybe Integer ->
+  Check ->
+  [TraceEvent] ->
+  Property
 check expectedActions expectedMessage events =
   let
     result = verify events
@@ -50,13 +50,13 @@ check expectedActions expectedMessage events =
         MustBeOkay -> (=== "ok")
         MustNotBeOkay -> (=/= "ok")
         MustBe expectedMessage' -> (=== expectedMessage')
-  in
+   in
     case expectedActions of
       Nothing -> checkMessage $ snd result
       Just expectedActions' -> fst result === expectedActions' .&&. checkMessage (snd result)
 
 newtype SkipProduction = SkipProduction {unSkipProduction :: [Transition]}
-  deriving Show
+  deriving (Show)
 
 instance Arbitrary SkipProduction where
   arbitrary =
@@ -69,10 +69,10 @@ instance Arbitrary SkipProduction where
   shrink = fmap SkipProduction . init . inits . unSkipProduction
 
 newtype SporadicProduction = SporadicProduction {unSporadicProduction :: [Transition]}
-  deriving Show
+  deriving (Show)
 
 instance Arbitrary SporadicProduction where
-  arbitrary = 
+  arbitrary =
     do
       let gIB = elements [GenerateIB, SkipIB]
           gEB = elements [GenerateEB, SkipEB]
@@ -88,16 +88,16 @@ instance Arbitrary SporadicProduction where
               eb <- gEB
               vt <- gVT
               (NextSlot :) <$> shuffle [ib, eb, vt]
-          g= liftM2 (<>) gOdd gEven
+          g = liftM2 (<>) gOdd gEven
       n <- choose (1, 25)
       SporadicProduction . concat <$> replicateM n g
   shrink = fmap SporadicProduction . init . inits . unSporadicProduction
 
 newtype NoisyProduction = NoisyProduction {unNoisyProduction :: [Transition]}
-  deriving Show
+  deriving (Show)
 
 instance Arbitrary NoisyProduction where
-  arbitrary = 
+  arbitrary =
     do
       let gNoise = sublistOf [GenerateRB, ReceiveRB, ReceiveIB, ReceiveEB, ReceiveVT]
           gIB = elements [GenerateIB, SkipIB]
@@ -116,13 +116,13 @@ instance Arbitrary NoisyProduction where
               eb <- gEB
               vt <- gVT
               (NextSlot :) <$> shuffle ([ib, eb, vt] <> noise)
-          g= liftM2 (<>) gOdd gEven
+          g = liftM2 (<>) gOdd gEven
       n <- choose (1, 25)
       NoisyProduction . concat <$> replicateM n g
   shrink = fmap NoisyProduction . init . inits . unNoisyProduction
 
 newtype SporadicMisses = SporadicMisses {unSporadicMisses :: [Transition]}
-  deriving Show
+  deriving (Show)
 
 instance Arbitrary SporadicMisses where
   arbitrary =
