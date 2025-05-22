@@ -5,8 +5,8 @@
 
 module Spec.Transition where
 
-import Control.Lens hiding (_1, _2, elements)
-import Control.Monad (mzero)
+import Control.Lens hiding (elements)
+import Control.Monad (mzero, replicateM)
 import Control.Monad.State
 import Data.Default (Default(..))
 import Data.Map (Map)
@@ -31,7 +31,7 @@ data TracingContext =
   , _rbs :: Map Text Text
   , _ibs :: Set Text
   , _ebs :: Set Text
-  , _votes :: Set Text
+  , _vts :: Set Text
   , _idSut :: Integer
   , _idOther :: Integer
   , _stageLength :: Word
@@ -60,8 +60,8 @@ ibs = lens _ibs $ \ctx x -> ctx {_ibs = x}
 ebs :: Lens' TracingContext (Set Text)
 ebs = lens _ebs $ \ctx x -> ctx {_ebs = x}
 
-votes :: Lens' TracingContext (Set Text)
-votes = lens _votes $ \ctx x -> ctx {_votes = x}
+vts :: Lens' TracingContext (Set Text)
+vts = lens _vts $ \ctx x -> ctx {_vts = x}
 
 idSut :: Getter TracingContext Integer
 idSut = to _idSut
@@ -105,7 +105,7 @@ genRB :: Integer -> StateT TracingContext Gen (Text, Nullable BlockRef)
 genRB i =
   do
     slot <- use slotNo
-    rbs' <- M.keysSet <$> use rbs
+    rbs' <- rbs `uses` M.keysSet
     block_id <- lift $ genId i slot rbs'
     parent <-
       if S.null rbs'
@@ -123,19 +123,37 @@ genIB i =
     ibs %= S.insert ib
     pure ib
 
+genEB :: Integer -> StateT TracingContext Gen Text
+genEB i =
+  do
+    slot <- use slotNo
+    ebs' <- use ebs
+    eb <- lift $ genId i slot ebs'
+    ebs %= S.insert eb
+    pure eb
+
+genVT :: Integer -> StateT TracingContext Gen Text
+genVT i =
+  do
+    slot <- use slotNo
+    vts' <- use vts
+    vt <- lift $ genId i slot vts'
+    vts %= S.insert vt
+    pure vt
+
 tick :: StateT TracingContext Gen ()
 tick = clock %= (+ 0.000001)
 
 transition :: Transition -> StateT TracingContext Gen [Event]
+transition SkipSlot =
+  do
+    slotNo %= (+ 1)
+    pure mempty
 transition NextSlot =
   do
     event <- Slot <$> use sut <*> use slotNo
     slotNo %= (+ 1)
     pure [event]
-transition SkipSlot =
-  do
-    slotNo %= (+ 1)
-    pure mempty
 transition GenerateRB =
   do
     tick
@@ -150,38 +168,82 @@ transition GenerateRB =
 transition ReceiveRB =
   do
     tick
-    sender <- pure <$> use other
+    sender <- other `uses` pure
     recipient <- use sut
     let block_ids = mzero
     msg_size_bytes <- lift arbitrary
-    sending_s <- pure <$> use clock
+    sending_s <- clock `uses` pure
     (block_id, _) <- genRB =<< use idOther
     pure [RBReceived{..}]
+transition SkipIB =
+  fmap pure . NoIBGenerated <$> use sut <*> use slotNo
 transition GenerateIB =
   do
     tick
     slot <- use slotNo
     producer <- use sut
-    pipeline <- (slot `div`) . fromIntegral <$> use stageLength
+    pipeline <- uses stageLength $ (slot `div`) . fromIntegral
     id <- genIB =<< use idSut
     size_bytes <- lift arbitrary
     payload_bytes <- lift arbitrary
     rb_ref <- lift . fmap pure . elements . M.keys =<< use rbs
     pure [IBGenerated{..}]
-transition SkipIB = fmap pure . NoIBGenerated <$> use sut <*> use slotNo
 transition ReceiveIB =
   do
     tick
-    sender <- pure <$> use other
+    sender <- other `uses` pure
     recipient <- use sut
     let block_ids = mzero
     msg_size_bytes <- lift arbitrary
-    sending_s <- pure <$> use clock
+    sending_s <- clock `uses` pure
     block_id <- genIB =<< use idOther
     pure [IBReceived{..}]
-transition SkipEB = fmap pure . NoEBGenerated <$> use sut <*> use slotNo
-transition SkipVT = fmap pure . NoVTBundleGenerated <$> use sut <*> use slotNo
-transition _ = undefined
+transition SkipEB =
+  fmap pure . NoEBGenerated <$> use sut <*> use slotNo
+transition GenerateEB =
+  do
+    tick
+    slot <- use slotNo
+    producer <- use sut
+    id <- genEB =<< use idSut
+    pipeline <- uses stageLength $ (slot `div`) . fromIntegral
+    bytes <- lift arbitrary
+    input_blocks <- lift . sublistOf =<< uses ibs (fmap BlockRef . S.toList)
+    pure [EBGenerated{..}]
+transition ReceiveEB =
+  do
+    tick
+    sender <- other `uses` pure
+    recipient <- use sut
+    let block_ids = mzero
+    msg_size_bytes <- lift arbitrary
+    sending_s <- clock `uses` pure
+    block_id <- genEB =<< use idOther
+    pure [EBReceived{..}]
+transition SkipVT =
+  fmap pure . NoVTBundleGenerated <$> use sut <*> use slotNo
+transition GenerateVT =
+  do
+    tick
+    slot <- use slotNo
+    producer <- use sut
+    id <- genVT =<< use idSut
+    pipeline <- uses stageLength $ (slot `div`) . fromIntegral
+    bytes <- lift arbitrary
+    voted <- lift . sublistOf =<< uses ebs S.toList
+    cast <- lift $ replicateM (length voted) arbitrary
+    let votes = M.fromList $ zip voted cast
+    pure [VTBundleGenerated{..}]
+transition ReceiveVT =
+  do
+    tick
+    sender <- other `uses` pure
+    recipient <- use sut
+    let block_ids = mzero
+    msg_size_bytes <- lift arbitrary
+    sending_s <- clock `uses` pure
+    block_id <- genVT =<< use idOther
+    pure [VTBundleReceived{..}]
 
 transitions :: [Transition] -> Gen [TraceEvent]
 transitions =
@@ -191,4 +253,4 @@ transitions =
     . mapM transition
 
 timestamp :: Monad m => Event -> StateT TracingContext m TraceEvent
-timestamp = (<$> use clock) . flip TraceEvent
+timestamp = uses clock . flip TraceEvent

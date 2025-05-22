@@ -52,22 +52,49 @@ newtype SkipProduction = SkipProduction {unSkipProduction :: [Transition]}
 instance Arbitrary SkipProduction where
   arbitrary =
     do
-      let genOdd = (NextSlot :) <$> shuffle [SkipIB, SkipVT]
-          genEven = (NextSlot :) <$> shuffle [SkipIB, SkipEB, SkipVT]
-          gen = liftM2 (<>) genOdd genEven
+      let gOdd = (NextSlot :) <$> shuffle [SkipIB, SkipVT]
+          gEven = (NextSlot :) <$> shuffle [SkipIB, SkipEB, SkipVT]
+          g = liftM2 (<>) gOdd gEven
       n <- choose (0, 25)
-      SkipProduction . concat <$> replicateM n gen
+      SkipProduction . concat <$> replicateM n g
   shrink = fmap SkipProduction . init . inits . unSkipProduction
+
+newtype SporadicProduction = SporadicProduction {unSporadicProduction :: [Transition]}
+  deriving Show
+
+instance Arbitrary SporadicProduction where
+  arbitrary = 
+    do
+      let gIB = elements [GenerateIB, SkipIB]
+          gEB = elements [GenerateEB, SkipEB]
+          gVT = elements [GenerateVT, SkipVT]
+          gOdd =
+            do
+              ib <- gIB
+              vt <- gVT
+              (NextSlot :) <$> shuffle [ib, vt]
+          gEven =
+            do
+              ib <- gIB
+              eb <- gEB
+              vt <- gVT
+              (NextSlot :) <$> shuffle [ib, eb, vt]
+          g= liftM2 (<>) gOdd gEven
+      n <- choose (0, 25)
+      SporadicProduction . concat <$> replicateM n g
 
 generated :: Spec
 generated =
   do
     let single = (modifyMaxSuccess (const 1) .) . prop
+
     describe "Positive cases" $ do
       single "Genesis slot" $
         check mzero mzero
           <$> transitions [NextSlot]
       prop "Skip block production" $ \(SkipProduction actions) ->
+        check mzero mzero <$> transitions actions
+      prop "Sporadic block production" $ \(SporadicProduction actions) ->
         check mzero mzero <$> transitions actions
       single "Generate RB" $
         check mzero mzero
@@ -78,6 +105,7 @@ generated =
       single "Generate no IB" $
         check mzero mzero
           <$> transitions [NextSlot, SkipIB]
+
     describe "Negative cases" $ do
       single "No actions" $
         check mzero (pure "Invalid Action: Slot Slot-Action 1")
