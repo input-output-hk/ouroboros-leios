@@ -6,9 +6,10 @@
 module Spec.Generated where
 
 import Control.Lens hiding (_1, _2, elements)
-import Control.Monad ((<=<), mzero)
+import Control.Monad ((<=<), liftM2, mzero, replicateM)
 import Control.Monad.State
 import Data.Default (Default(..))
+import Data.List (inits)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word16, Word64)
@@ -111,6 +112,12 @@ data Transition =
   | GenerateIB
   | SkipIB
   | ReceiveIB
+  | GenerateEB
+  | SkipEB
+  | ReceiveEB
+  | GenerateVT
+  | SkipVT
+  | ReceiveVT
   deriving Show
 
 genId :: Integer -> Word64 -> Set Text -> Gen Text
@@ -198,6 +205,8 @@ transition ReceiveIB =
     sending_s <- pure <$> use clock
     block_id <- genIB idOther
     pure [IBReceived{..}]
+transition SkipEB = pure . pure . NoEBGenerated sut =<< use slotNo
+transition SkipVT = pure . pure . NoVTBundleGenerated sut =<< use slotNo
 
 transitions :: [Transition] -> Gen [TraceEvent]
 transitions =
@@ -209,6 +218,19 @@ transitions =
 timestamp :: Monad m => Event -> StateT TracingContext m TraceEvent
 timestamp = (<$> use clock) . flip TraceEvent
 
+newtype SkipProduction = SkipProduction {unSkipProduction :: [Transition]}
+  deriving Show
+
+instance Arbitrary SkipProduction where
+  arbitrary =
+    do
+      let genOdd = (NextSlot :) <$> shuffle [SkipIB, SkipVT]
+          genEven = (NextSlot :) <$> shuffle [SkipIB, SkipEB, SkipVT]
+          gen = liftM2 (<>) genOdd genEven
+      n <- choose (0, 25)
+      SkipProduction . concat <$> replicateM n gen
+  shrink = fmap SkipProduction . init . inits . unSkipProduction
+
 generated :: Spec
 generated =
   do
@@ -217,6 +239,8 @@ generated =
       single "Genesis slot" $
         check mzero mzero
           <$> transitions [NextSlot]
+      prop "Skip block production" $ \(SkipProduction actions) ->
+        check mzero mzero <$> transitions actions
       single "Generate RB" $
         check mzero mzero
           <$> transitions [NextSlot, GenerateRB]
