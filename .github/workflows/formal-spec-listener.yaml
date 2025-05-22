@@ -23,7 +23,6 @@ jobs:
         with:
           name: formal-spec-html
           path: previous-formal-spec-html
-          if-no-files-found: ignore
 
       - name: Check previous artifacts
         id: check_previous
