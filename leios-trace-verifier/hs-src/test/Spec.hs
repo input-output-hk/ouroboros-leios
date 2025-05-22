@@ -7,5 +7,5 @@ import Test.Hspec (describe, hspec)
 main :: IO ()
 main =
   hspec $ do
-    describe "Generated trace" generated
+    describe "Generated traces" generated
     describe "Golden traces" golden
