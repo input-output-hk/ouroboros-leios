@@ -22,6 +22,11 @@ on:
       - main
 
   workflow_dispatch: # Allow manual triggering or via API
+    inputs:
+      source:
+        description: "Source of the workflow dispatch"
+        required: false
+        default: "manual"
 
 # Global permissions
 permissions:

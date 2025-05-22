@@ -87,3 +87,4 @@ jobs:
         with:
           workflow: docs.yaml
           token: ${{ github.token }}
+          inputs: '{"source": "formal-spec-listener"}'
