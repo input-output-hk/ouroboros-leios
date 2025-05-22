@@ -225,22 +225,29 @@ jobs:
           # Create formal spec directory if it doesn't exist
           mkdir -p site/static/formal-spec
 
-          # Check if we have files to copy
-          if [ -z "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            echo "No formal spec HTML files found - using placeholder"
-            echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > site/static/formal-spec/index.html
-          else
-            # Copy the HTML files
+          # Copy any files we found (even if none were found, this is a no-op)
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "Formal spec HTML files found - copying to site"
             cp -r formal-spec-html/* site/static/formal-spec/
+          else
+            echo "No formal spec HTML files found - continuing without them"
           fi
 
       - name: 🔄 Enhance Agda documentation
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
+        timeout-minutes: 20
         run: |
           # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
-          if [ -d "./static/formal-spec" ] && [ "$(find ./static/formal-spec -name '*.html' | grep -v index.html | wc -l)" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
+          echo "Found $HTML_COUNT HTML files"
+
+          if [ "$HTML_COUNT" -gt "0" ]; then
+            echo "Processing HTML files with agda-web-docs-lib"
+            echo "Available memory before processing:"
+            free -h
+
+            # Use more memory but only 1 worker to reduce overall memory usage
+            NODE_OPTIONS="--max-old-space-size=24576" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json --workers 1
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
@@ -291,6 +298,13 @@ jobs:
           echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
           echo "Ref: ${{ github.ref }}"
 
+      - name: List available artifacts
+        run: |
+          echo "Listing artifacts in the formal-spec-listener workflow run"
+          curl -s -H "Authorization: token ${{ github.token }}" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts" | \
+          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}'
+
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -316,21 +330,29 @@ jobs:
           # Create formal spec directory if it doesn't exist
           mkdir -p site/static/formal-spec
 
-          # Check if we have files to copy
-          if [ -z "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            echo "No formal spec HTML files found - using placeholder"
-            echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > site/static/formal-spec/index.html
-          else
-            # Copy the HTML files
+          # Copy any files we found (even if none were found, this is a no-op)
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "Formal spec HTML files found - copying to site"
             cp -r formal-spec-html/* site/static/formal-spec/
+          else
+            echo "No formal spec HTML files found - continuing without them"
           fi
 
       - name: 🔄 Enhance Agda documentation
         working-directory: site
+        timeout-minutes: 20
         run: |
           # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
-          if [ -d "./static/formal-spec" ] && [ "$(find ./static/formal-spec -name '*.html' | grep -v index.html | wc -l)" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
+          echo "Found $HTML_COUNT HTML files"
+
+          if [ "$HTML_COUNT" -gt "0" ]; then
+            echo "Processing HTML files with agda-web-docs-lib"
+            echo "Available memory before processing:"
+            free -h
+
+            # Use more memory but only 1 worker to reduce overall memory usage
+            NODE_OPTIONS="--max-old-space-size=24576" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json --workers 1
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
