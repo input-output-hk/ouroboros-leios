@@ -13,11 +13,31 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
+  
+  workflow_run:
+    workflows: ["Formal Spec Listener"]
+    types:
+      - completed
+    branches:
+      - main
+
+# Global permissions
+permissions:
+  contents: read
+  pages: write
+  actions: read
+
+# Prevent redundant workflow runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   docs-generate-d2-diagrams:
     name: "Generate D2 Diagrams"
-    runs-on: ubuntu-22.04
+    # Only run this job on pull_request or push triggers, not on workflow_run
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
@@ -27,9 +47,19 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 2 # Needed to get previous commit for comparison
 
+      - name: Cache D2
+        uses: actions/cache@v4
+        with:
+          path: ~/.d2
+          key: ${{ runner.os }}-d2-${{ hashFiles('**/install.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-d2-
+
       - name: Install D2
         run: |
-          curl -fsSL https://d2lang.com/install.sh | sh -s --
+          if ! command -v d2 &> /dev/null; then
+            curl -fsSL https://d2lang.com/install.sh | sh -s --
+          fi
           d2 --version
 
       - name: Generate PNG files for changed D2 files
@@ -51,6 +81,8 @@ jobs:
               output_file="${file%.d2}.png"
               echo "Converting $file to $output_file"
               d2 "$file" "$output_file"
+            else
+              echo "File $file does not exist, skipping"
             fi
           done
 
@@ -76,7 +108,9 @@ jobs:
 
   viz-build:
     name: "Build Visualizer"
-    runs-on: ubuntu-22.04
+    # Only run this job on pull_request or push triggers, not on workflow_run
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -108,11 +142,16 @@ jobs:
           path: ui/dist
 
   docs-build:
-    name: "Build"
-    runs-on: ubuntu-22.04
-    needs: viz-build
+    name: "Build Docusaurus Site"
+    runs-on: ubuntu-latest
+    needs: [viz-build]
+    # For workflow_run events, we don't need viz-build
+    if: |
+      github.event_name == 'pull_request' || 
+      github.event_name == 'push' || 
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes }}
+      has_changes: ${{ steps.check_changes.outputs.has_changes || github.event_name == 'workflow_run' }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -122,15 +161,22 @@ jobs:
       - name: Check for site or visualizer changes
         id: check_changes
         run: |
-          SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
-          VIZ_CHANGES=$(git diff --name-only HEAD^ HEAD -- ui/ || true)
-          if [ -z "$SITE_CHANGES" ] && [ -z "$VIZ_CHANGES" ]; then
-            echo "No changes in site directory"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changes detected in site directory:"
-            echo "$SITE_CHANGES"
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "Changes detected from formal-spec workflow"
             echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            # For PR or push events, check for actual changes
+            SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
+            VIZ_CHANGES=$(git diff --name-only HEAD^ HEAD -- ui/ || true)
+            if [ -z "$SITE_CHANGES" ] && [ -z "$VIZ_CHANGES" ]; then
+              echo "No changes in site or UI directory"
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected in site or UI directory:"
+              echo "$SITE_CHANGES"
+              echo "$VIZ_CHANGES"
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
           fi
         shell: "bash"
 
@@ -140,19 +186,56 @@ jobs:
         with:
           node-version: 22
           cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock  # Changed from site/yarn.lock to ./site/yarn.lock
+          cache-dependency-path: ./site/yarn.lock
 
       - name: 📦 Install dependencies
         if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: yarn install
 
+      # Handle visualizer integration
       - name: 👁️ Unpack visualizer
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: steps.check_changes.outputs.has_changes == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
         uses: actions/download-artifact@v4
         with:
           name: visualizer
           path: site/static/visualizer
+
+      # Download formal spec HTML - unified approach for all event types
+      - name: 📥 Download formal spec HTML
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: formal-spec-html
+          workflow_run_id: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '' }}
+          path: formal-spec-html
+
+      - name: 📝 Update formal spec
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          # Create formal spec directory if it doesn't exist
+          mkdir -p site/static/formal-spec
+          
+          # Check if we have files to copy
+          if [ -z "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "No formal spec HTML files found - using placeholder"
+            echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > site/static/formal-spec/index.html
+          else
+            # Copy the HTML files
+            cp -r formal-spec-html/* site/static/formal-spec/
+          fi
+
+      - name: 🔄 Enhance Agda documentation
+        if: steps.check_changes.outputs.has_changes == 'true'
+        working-directory: site
+        run: |
+          # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
+          if [ -d "./static/formal-spec" ] && [ "$(find ./static/formal-spec -name '*.html' | grep -v index.html | wc -l)" -gt "0" ]; then
+            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+          else
+            echo "No HTML files found in formal-spec directory, skipping enhancement"
+          fi
 
       - name: 🏗️ Build Docusaurus site
         if: steps.check_changes.outputs.has_changes == 'true'
@@ -160,7 +243,18 @@ jobs:
         run: |
           yarn build
 
-      - name: 🚀 Publish Docusaurus build
+      - name: Verify Docusaurus build
+        if: steps.check_changes.outputs.has_changes == 'true'
+        working-directory: site
+        run: |
+          if [ -z "$(ls -A build/)" ]; then
+            echo "Error: Docusaurus build directory is empty"
+            exit 1
+          fi
+          echo "Docusaurus build verified"
+          ls -la build/
+
+      - name: 🚀 Upload Docusaurus build
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -171,10 +265,10 @@ jobs:
 
   docs-publish:
     name: "Publish"
-    if:
-      ${{ github.ref == 'refs/heads/main' &&
-      needs.docs-build.outputs.has_changes == 'true' }}
-    runs-on: ubuntu-22.04
+    if: |
+      github.ref == 'refs/heads/main' && 
+      needs.docs-build.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
     needs: docs-build
     steps:
       - name: 📥 Download Docusaurus build
@@ -186,6 +280,6 @@ jobs:
       - name: 🚀 Publish GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          github_token: ${{ github.token }}
           publish_dir: ./github-pages
           cname: leios.cardano-scaling.org
