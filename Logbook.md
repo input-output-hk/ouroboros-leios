@@ -1,5 +1,65 @@
 # Leios logbook
 
+## 2025-05-22
+
+### Catalog of conformance tests
+
+The [Potential Conformance Tests](leios-trace-verifier/conformance-coverage.md) have been cataloged in order to assess how much positive and negative test coverage is possible for traces from the Leios simulator and (eventually) from the Leios node. This table provides guidance on property-based and other tests that will be added to the test suite.
+
+### Test cases for trace verify and conformance tests
+
+The test suite for the trace verify now contains property-based tests that check whether the conformance testing matches expectations. The suite has both manually curated golden tests and automatically generated property-based tests. Both positive and negative cases are tested. The list will be expanded as the Agda specification for Leios becomes more sophisticated.
+
+```console
+Generated trace
+  Positive cases
+    Genesis slot [✔]
+      +++ OK, passed 1 test.
+    Generate RB [✔]
+      +++ OK, passed 1 test.
+    Generate IB [✔]
+      +++ OK, passed 1 test.
+    Generate no IB [✔]
+      +++ OK, passed 1 test.
+    Generate EB [✔]
+      +++ OK, passed 1 test.
+    Generate no EB [✔]
+      +++ OK, passed 1 test.
+    Generate VT [✔]
+      +++ OK, passed 1 test.
+    Generate no VT [✔]
+      +++ OK, passed 1 test.
+    Skip block production [✔]     
+      +++ OK, passed 100 tests.
+    Sporadic block production [✔]     
+      +++ OK, passed 100 tests.
+    Noisy block production [✔]     
+      +++ OK, passed 100 tests.
+  Negative cases
+    No actions [✔]
+      +++ OK, passed 1 test.
+    Start after genesis [✔]
+      +++ OK, passed 1 test.
+    Generate equivocated IBs [✔]
+      +++ OK, passed 1 test.
+    Generate equivocated EBs [✔]
+      +++ OK, passed 1 test.
+    Generate equivocated VTs [✔]
+      +++ OK, passed 1 test.
+    Sporadic gaps in production [✔]     
+      +++ OK, passed 100 tests.
+Golden traces
+  Verify valid traces
+    agda-1.jsonl [✔]
+    agda-2.jsonl [✔]
+  Reject invalid traces
+    case-1.jsonl [✔]
+
+Finished in 0.3541 seconds
+20 examples, 0 failures
+Test suite test-trace-verifier: PASS
+```
+
 ## 2025-05-20
 
 ### Expected transaction lifecycle
