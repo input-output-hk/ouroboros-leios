@@ -741,6 +741,7 @@ impl Node {
                 };
                 for tx in &ib.transactions {
                     self.praos.mempool.remove(&tx.id);
+                    self.leios.mempool.remove(&tx.id);
                 }
             }
         }
@@ -766,6 +767,7 @@ impl Node {
                     size += tx.bytes;
                     let id = *id;
                     transactions.push(self.praos.mempool.remove(&id).unwrap());
+                    self.leios.mempool.remove(&id);
                 }
             }
         }
