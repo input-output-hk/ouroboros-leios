@@ -44,6 +44,7 @@ tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
   sigma: 1.127
+tx-sharded-percentage: 1.0
 tx-validation-cpu-time-ms: 1.5
 tx-max-size-bytes: 16384
 tx-start-time: 120
