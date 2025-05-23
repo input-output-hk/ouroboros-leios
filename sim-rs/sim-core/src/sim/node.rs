@@ -508,10 +508,9 @@ impl Node {
     }
 
     fn handle_new_slot(&mut self, slot: u64) -> Result<()> {
-        if self.sim_config.emit_conformance_events {
-            self.tracker.track_slot(self.id, slot);
+        if self.sim_config.emit_conformance_events && slot > 0 {
+            self.tracker.track_slot(self.id, slot - 1);
         }
-
         if slot % self.sim_config.stage_length == 0 {
             // A new stage has begun.
 
