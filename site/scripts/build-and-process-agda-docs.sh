@@ -33,5 +33,5 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# Process HTML files using the agda-web-docs-lib
-cd "$SITE_DIR" && NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process "$FORMAL_SPEC_DIR" "$CONFIG_PATH"
+# Process HTML files using the agda-web-docs-lib with memory-efficient settings
+cd "$SITE_DIR" && NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process "$FORMAL_SPEC_DIR" "$CONFIG_PATH"
