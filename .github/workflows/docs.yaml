@@ -246,7 +246,7 @@ jobs:
             echo "Available memory before processing:"
             free -h
 
-            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
@@ -350,7 +350,7 @@ jobs:
             echo "Available memory before processing:"
             free -h
 
-            NODE_OPTIONS="--max-old-space-size=16384" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           else
             echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
