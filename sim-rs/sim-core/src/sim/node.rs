@@ -587,9 +587,13 @@ impl Node {
     }
 
     fn generate_endorser_blocks(&mut self, slot: u64) {
+        let pipeline = self.slot_to_pipeline(slot) + 1;
+        if pipeline < 4 {
+            // The first pipeline with IBs in it is pipeline 4.
+            // Don't generate EBs before that pipeline, because they would just be empty.
+        }
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
-                let pipeline = self.slot_to_pipeline(slot) + 1;
                 self.tracker.track_eb_lottery_won(EndorserBlockId {
                     slot,
                     pipeline,
@@ -619,6 +623,12 @@ impl Node {
     }
 
     fn schedule_endorser_block_votes(&mut self, slot: u64) {
+        let pipeline = self.slot_to_pipeline(slot);
+        if pipeline < 4 {
+            // The first pipeline with IBs in it is pipeline 4.
+            // Don't run the VT lottery before that pipeline, because there's nothing to vote on.
+            return;
+        }
         let vrf_wins = vrf_probabilities(self.sim_config.vote_probability)
             .filter_map(|f| self.run_vrf(f))
             .count();

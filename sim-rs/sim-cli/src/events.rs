@@ -452,9 +452,9 @@ impl EventMonitor {
                     Some(block_time - tx.generated)
                 })
                 .collect();
-            let ib_expiration_cutoff = last_timestamp - Duration::from_secs(self.maximum_ib_age);
+            let ib_expiration_cutoff = last_timestamp.checked_sub_duration(Duration::from_secs(self.maximum_ib_age)).unwrap_or_default();
             let expired_ibs = ibs.values().filter(|ib| ib.included_in_eb.is_none() && ib.generated < ib_expiration_cutoff).count();
-            let eb_expiration_cutoff = last_timestamp - Duration::from_secs(self.maximum_eb_age);
+            let eb_expiration_cutoff = last_timestamp.checked_sub_duration(Duration::from_secs(self.maximum_eb_age)).unwrap_or_default();
             let expired_ebs = ebs.values().filter(|eb| eb.included_in_eb.is_none() && eb.included_in_block.is_none() && eb.generated < eb_expiration_cutoff).count();
             let empty_ebs = ebs.values().filter(|eb| eb.is_empty()).count();
             let bundle_count = votes_per_bundle.len();
