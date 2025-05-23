@@ -20,9 +20,9 @@ module Parser where
 #-}
 
 postulate
-  Int : Set
+  Int   : Set
   Micro : Set
-  Map : Set → Set → Set
+  Map   : Set → Set → Set
   elems : ∀ {k v} → Map k v → List v
   trunc : Micro → ℕ
 
@@ -46,10 +46,10 @@ postulate
 {-# COMPILE GHC elems = elems' #-}
 {-# COMPILE GHC trunc = trunc' #-}
 
-Bytes = Word64
-SlotNo = Word64
+Bytes      = Word64
+SlotNo     = Word64
 PipelineNo = Word64
-Time = Micro
+Time       = Micro
 
 data NetworkAction : Type where
   Sent Received : NetworkAction
@@ -193,9 +193,6 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
     record State : Type where
       field refs : AssocList String Blk
-            ib-lottery : List ℕ
-            eb-lottery : List ℕ
-            vt-lottery : List ℕ
 
     instance
       hhx : Hashable InputBlock (List ℕ)
@@ -239,13 +236,13 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     ... | yes _ = l , (inj₁ (No-IB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
     ... | no _  = l , []
     traceEvent→action l record { message = NoEBGenerated p s }
-      with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
-    ... | no _  = l , []
+      with p ≟ SUT | stage (primWord64ToNat s) ≤? 2 -- ignore bootstrapping events from Rust simulation
+    ... | yes _ | no _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | _     | _    = l , []
     traceEvent→action l record { message = NoVTBundleGenerated p s }
-      with p ≟ SUT
-    ... | yes _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
-    ... | no _  = l , []
+      with p ≟ SUT | stage (primWord64ToNat s) ≤? 3 -- ignore bootstrapping events from Rust simulation
+    ... | yes _ | no _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | _     | _    = l , []
     traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
@@ -267,43 +264,44 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     traceEvent→action l record { message = EBEnteredState _ _ _ } = l , []
     traceEvent→action l record { message = VTBundleEnteredState _ _ _ } = l , []
     traceEvent→action l record { message = RBEnteredState _ _ _ } = l , []
-    traceEvent→action l record { message = IBGenerated p i s _ _ _ _}
-      with p ≟ SUT
-    ... | yes _ = let ib = record { header =
-                             record { slotNumber = primWord64ToNat s
-                                    ; producerID = nodeId p
-                                    ; lotteryPf  = tt
-                                    ; bodyHash   = [] -- TODO: txs
-                                    ; signature  = tt
-                                    }
-                                  ; body = record { txs = [] } } -- TODO: add transactions
-                  in record l { refs = (i , IB-Blk ib) ∷ refs l ; ib-lottery = (primWord64ToNat s) ∷ ib-lottery l } , (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-    ... | no _  = let ib = record { header =
-                             record { slotNumber = primWord64ToNat s
-                                    ; producerID = nodeId p
-                                    ; lotteryPf  = tt
-                                    ; bodyHash   = [] -- TODO: txs
-                                    ; signature  = tt
-                                    }
-                                  ; body = record { txs = [] } } -- TODO: add transactions
-                  in record l { refs = (i , IB-Blk ib) ∷ refs l } , []
-    traceEvent→action l record { message = EBGenerated p i s _ _ ibs }
-      with p ≟ SUT
-    ... | yes _ = l , (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
-    ... | no _  = let eb = record
-                             { slotNumber = primWord64ToNat s
-                             ; producerID = nodeId p
-                             ; lotteryPf  = tt
-                             ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
-                             ; ebRefs     = []
-                             ; signature  = tt
-                             }
-                  in record l { refs = (i , EB-Blk eb) ∷ refs l } , []
-    traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts }
-      with p ≟ SUT
-    ... | yes _ = l , (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-    ... | no _  = let vt = map (const tt) (elems vts)
-                  in record l { refs = (i , VT-Blk vt) ∷ refs l } , []
+    traceEvent→action l record { message = IBGenerated p i s _ _ _ _} =
+      let ib = record { header =
+                 record { slotNumber = primWord64ToNat s
+                        ; producerID = nodeId p
+                        ; lotteryPf  = tt
+                        ; bodyHash   = [] -- TODO: txs
+                        ; signature  = tt
+                        }
+                      ; body = record { txs = [] } } -- TODO: add transactions
+      in record l { refs = (i , IB-Blk ib) ∷ refs l } , actions
+      where
+        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions with p ≟ SUT
+        ... | yes _ = (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+        ... | no _ = []
+    traceEvent→action l record { message = EBGenerated p i s _ _ ibs } =
+      let eb = record
+                 { slotNumber = primWord64ToNat s
+                 ; producerID = nodeId p
+                 ; lotteryPf  = tt
+                 ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
+                 ; ebRefs     = []
+                 ; signature  = tt
+                 }
+      in record l { refs = (i , EB-Blk eb) ∷ refs l } , actions
+      where
+        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions with p ≟ SUT | stage (primWord64ToNat s) ≤? 2 -- ignore bootstrapping events from Rust simulation
+        ... | yes _ | no _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
+        ... | _     | _    = []
+    traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
+      let vt = map (const tt) (elems vts)
+      in record l { refs = (i , VT-Blk vt) ∷ refs l } , actions
+      where
+        actions : List (Action × LeiosInput ⊎ FFDUpdate)
+        actions with p ≟ SUT | stage (primWord64ToNat s) ≤? 3 -- ignore bootstrapping events from Rust simulation
+        ... | yes _ | no _ = (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+        ... | _     | _    = []
     traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
 
     mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
@@ -353,11 +351,12 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       Show-sum .show (inj₁ x) = show x
       Show-sum .show (inj₂ y) = show y
 
-    unquoteDecl Show-FFDUpdate  = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
-    unquoteDecl Show-Params     = derive-Show [ (quote Params , Show-Params) ]
-    unquoteDecl Show-Upkeep     = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
-    unquoteDecl Show-LeiosState = derive-Show [ (quote LeiosState , Show-LeiosState) ]
-    unquoteDecl Show-LeiosInput = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
+    unquoteDecl Show-FFDUpdate    = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
+    unquoteDecl Show-Params       = derive-Show [ (quote Params , Show-Params) ]
+    unquoteDecl Show-Upkeep       = derive-Show [ (quote SlotUpkeep , Show-Upkeep) ]
+    unquoteDecl Show-Upkeep-Stage = derive-Show [ (quote StageUpkeep , Show-Upkeep-Stage) ]
+    unquoteDecl Show-LeiosState   = derive-Show [ (quote LeiosState , Show-LeiosState) ]
+    unquoteDecl Show-LeiosInput   = derive-Show [ (quote LeiosInput , Show-LeiosInput) ]
 
     s₀ : LeiosState
     s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
@@ -387,7 +386,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
 
       verifyTrace : Pair ℕ String
       verifyTrace =
-        let n₀ = record { refs = [] ; ib-lottery = [] ; eb-lottery = []  ; vt-lottery = [] }
+        let n₀ = record { refs = [] }
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
             tr = checkTrace αs s₀
