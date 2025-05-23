@@ -56,7 +56,7 @@ impl TransactionProducer {
         loop {
             let id = TransactionId::new(next_tx_id);
             let shard = rng
-                .random_bool(config.sharded_percentage)
+                .random_bool(config.sharded_fraction)
                 .then(|| rng.random_range(0..self.ib_shards));
             let bytes = (config.size_bytes.sample(&mut rng) as u64).min(config.max_size);
             let tx = Transaction { id, shard, bytes };
