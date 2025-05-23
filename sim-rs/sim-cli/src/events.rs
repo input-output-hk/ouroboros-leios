@@ -93,15 +93,12 @@ impl EventMonitor {
         let mut votes_per_pool: BTreeMap<NodeId, f64> =
             self.pool_ids.into_iter().map(|id| (id, 0.0)).collect();
         let mut eb_votes: BTreeMap<EndorserBlockId, f64> = BTreeMap::new();
-        let mut leios_tx_bytes: BTreeMap<TransactionId, u64> = BTreeMap::new();
 
         let mut last_timestamp = Timestamp::zero();
         let mut total_slots = 0u64;
-        let mut praos_txs = 0u64;
-        let mut published_bytes = 0u64;
         let mut total_votes = 0u64;
         let mut leios_blocks_with_endorsements = 0u64;
-        let mut leios_txs = 0u64;
+        let mut total_leios_txs = 0u64;
         let mut total_leios_bytes = 0u64;
         let mut tx_messages = MessageStats::default();
         let mut ib_messages = MessageStats::default();
@@ -196,13 +193,11 @@ impl EventMonitor {
                     transactions,
                     ..
                 } => {
-                    let mut all_txs = transactions;
                     info!(
                         "Pool {} produced a praos block in slot {slot} with {} tx(s).",
                         producer,
-                        all_txs.len()
+                        transactions.len()
                     );
-                    praos_txs += all_txs.len() as u64;
                     if let Some(endorsement) = endorsement {
                         total_leios_bytes += endorsement.size_bytes;
                         leios_blocks_with_endorsements += 1;
@@ -228,6 +223,7 @@ impl EventMonitor {
                                     let tx = txs.get_mut(tx_id).unwrap();
                                     if tx.included_in_block.is_none() {
                                         tx.included_in_block = Some(time);
+                                        tx.tx_type = Some(TransactionType::Leios);
                                     }
                                 }
                             }
@@ -236,23 +232,26 @@ impl EventMonitor {
                                 let tx = txs.get_mut(tx_id).unwrap();
                                 if tx.included_in_block.is_none() {
                                     tx.included_in_block = Some(time);
+                                    tx.tx_type = Some(TransactionType::Leios);
                                 }
                             }
                         }
 
-                        let mut unique_block_leios_txs: Vec<_> =
-                            block_leios_txs.iter().copied().sorted().dedup().collect();
+                        total_leios_txs += block_leios_txs.len() as u64;
+                        let unique_block_leios_txs =
+                            block_leios_txs.iter().copied().sorted().dedup().count();
                         info!(
                             "This block had an additional {} leios tx(s) ({} unique).",
                             block_leios_txs.len(),
-                            unique_block_leios_txs.len()
+                            unique_block_leios_txs,
                         );
-                        for tx_id in &unique_block_leios_txs {
-                            let bytes = txs.get(tx_id).unwrap().bytes;
-                            leios_tx_bytes.insert(*tx_id, bytes);
+                    }
+                    for tx_id in &transactions {
+                        let tx = txs.get_mut(tx_id).unwrap();
+                        if tx.included_in_block.is_none() {
+                            tx.included_in_block = Some(time);
+                            tx.tx_type = Some(TransactionType::Praos);
                         }
-                        leios_txs += block_leios_txs.len() as u64;
-                        all_txs.append(&mut unique_block_leios_txs);
                     }
                     if let Some((old_producer, old_vrf)) = blocks.get(&slot) {
                         if *old_vrf > vrf {
@@ -266,13 +265,6 @@ impl EventMonitor {
                     } else {
                         *blocks_published.entry(producer.id).or_default() += 1;
                         blocks.insert(slot, (producer.id, vrf));
-                    }
-                    for published_tx in all_txs {
-                        let tx = txs.get_mut(&published_tx).unwrap();
-                        if tx.included_in_block.is_none() {
-                            tx.included_in_block = Some(time);
-                        }
-                        published_bytes += tx.bytes;
                     }
                 }
                 Event::RBSent { .. } => {}
@@ -393,12 +385,33 @@ impl EventMonitor {
 
         output.flush().await?;
 
-        let pending_txs: Vec<Transaction> = txs
-            .values()
-            .filter(|tx| tx.included_in_block.is_some())
-            .cloned()
-            .collect();
-        let unique_leios_txs = leios_tx_bytes.len() as u64;
+        let mut finalized_txs = 0;
+        let mut finalized_tx_bytes = 0;
+        let mut pending_txs = 0;
+        let mut pending_tx_bytes = 0;
+        let mut praos_txs = 0;
+        let mut praos_tx_bytes = 0;
+        let mut leios_txs = 0;
+        let mut leios_tx_bytes = 0;
+        for tx in txs.values() {
+            if let Some(tx_type) = tx.tx_type {
+                finalized_txs += 1;
+                finalized_tx_bytes += tx.bytes;
+                match tx_type {
+                    TransactionType::Praos => {
+                        praos_txs += 1;
+                        praos_tx_bytes += tx.bytes;
+                    }
+                    TransactionType::Leios => {
+                        leios_txs += 1;
+                        leios_tx_bytes += tx.bytes;
+                    }
+                }
+            } else {
+                pending_txs += 1;
+                pending_tx_bytes += tx.bytes;
+            }
+        }
 
         info_span!("praos").in_scope(|| {
             info!("{} transactions(s) were generated in total.", txs.len());
@@ -407,15 +420,12 @@ impl EventMonitor {
                 "{} slot(s) had no naive praos blocks.",
                 total_slots - blocks.len() as u64
             );
-            info!("{} transaction(s) ({}) finalized in a naive praos block.", praos_txs + unique_leios_txs, pretty_bytes(published_bytes, pbo.clone()));
+            info!("{} transaction(s) ({}) finalized in a naive praos block.", finalized_txs, pretty_bytes(finalized_tx_bytes, pbo.clone()));
             info!(
                 "{} transaction(s) ({}) did not reach a naive praos block.",
-                pending_txs.len(),
+                pending_txs,
                 pretty_bytes(
-                    pending_txs
-                        .iter()
-                        .map(|tx| tx.bytes)
-                        .sum::<u64>(),
+                    pending_tx_bytes,
                     pbo.clone(),
                 ),
             );
@@ -474,8 +484,7 @@ impl EventMonitor {
             let votes_per_pool = compute_stats(votes_per_pool.into_values());
             let votes_per_eb = compute_stats(eb_votes.into_values());
             let votes_per_bundle = compute_stats(votes_per_bundle.into_values());
-            let total_leios_tx_bytes: u64 = leios_tx_bytes.values().copied().sum();
-            let space_efficiency = total_leios_tx_bytes as f64 / total_leios_bytes as f64;
+            let space_efficiency = leios_tx_bytes as f64 / total_leios_bytes as f64;
 
             info!(
                 "{} IB(s) were generated, on average {:.3} IB(s) per slot.",
@@ -487,8 +496,12 @@ impl EventMonitor {
                 times_to_reach_ib.len(),
                 txs.len(),
             );
-            let avg_age = pending_txs.iter().map(|tx| {
-                (last_timestamp - tx.generated).as_secs_f64()
+            let avg_age = txs.values().filter_map(|tx| {
+                if tx.tx_type.is_none() {
+                    Some((last_timestamp - tx.generated).as_secs_f64())
+                } else {
+                    None
+                }
             });
             let avg_age_stats = compute_stats(avg_age);
             info!(
@@ -546,12 +559,12 @@ impl EventMonitor {
             info!("There were {bundle_count} bundle(s) of votes. Each bundle contained {:.3} vote(s) (stddev {:.3}).",
                 votes_per_bundle.mean, votes_per_bundle.std_dev);
             info!("{} L1 block(s) had a Leios endorsement.", leios_blocks_with_endorsements);
-            info!("{} tx(s) were referenced by a Leios endorsement.", unique_leios_txs);
-            info!("{} tx(s) were included directly in a Praos block.", praos_txs);
+            info!("{} tx(s) ({}) were referenced by a Leios endorsement.", leios_txs, pretty_bytes(leios_tx_bytes, pbo.clone()));
+            info!("{} tx(s) ({}) were included directly in a Praos block.", praos_txs, pretty_bytes(praos_tx_bytes, pbo.clone()));
             if self.variant != LeiosVariant::FullWithoutIbs {
-                info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were transactions.", pretty_bytes(total_leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
+                info!("Spatial efficiency: {}/{} ({:.3}%) of Leios bytes were unique transactions.", pretty_bytes(leios_tx_bytes, pbo.clone()), pretty_bytes(total_leios_bytes, pbo.clone()), space_efficiency * 100.);
             }
-            info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", leios_txs - unique_leios_txs, (leios_txs - unique_leios_txs) as f64 / leios_txs as f64 * 100.);
+            info!("{} tx(s) ({:.3}%) referenced by a Leios endorsement were redundant.", total_leios_txs - leios_txs, (total_leios_txs - leios_txs) as f64 / total_leios_txs as f64 * 100.);
             info!(
                 "Each transaction took an average of {:.3}s (stddev {:.3}) to be included in an IB.",
                 ib_time_stats.mean, ib_time_stats.std_dev,
@@ -584,6 +597,7 @@ struct Transaction {
     included_in_ib: Option<Timestamp>,
     included_in_eb: Option<Timestamp>,
     included_in_block: Option<Timestamp>,
+    tx_type: Option<TransactionType>,
 }
 impl Transaction {
     fn new(bytes: u64, generated: Timestamp) -> Self {
@@ -593,9 +607,17 @@ impl Transaction {
             included_in_ib: None,
             included_in_eb: None,
             included_in_block: None,
+            tx_type: None,
         }
     }
 }
+
+#[derive(Clone, Copy)]
+enum TransactionType {
+    Leios,
+    Praos,
+}
+
 struct InputBlock {
     bytes: u64,
     generated: Timestamp,

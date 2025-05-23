@@ -1,12 +1,12 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
     hash::Hash,
     sync::Arc,
     time::Duration,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
 use rand::Rng as _;
@@ -177,7 +177,10 @@ impl InputBlockState {
 
 enum EndorserBlockState {
     Pending,
-    Received(Arc<EndorserBlock>),
+    Received {
+        eb: Arc<EndorserBlock>,
+        finalized: bool,
+    },
 }
 
 enum VoteBundleState {
@@ -365,7 +368,8 @@ impl Node {
                 .ebs
                 .keys()
                 .map(|eb_id| {
-                    let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+                    let Some(EndorserBlockState::Received { eb, .. }) = self.leios.ebs.get(eb_id)
+                    else {
                         panic!("node tried voting for an unknown EB");
                     };
                     cpu_times.vote_generation_constant
@@ -666,7 +670,7 @@ impl Node {
         };
         let mut ebs = ebs.clone();
         ebs.retain(|eb_id| {
-            let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+            let Some(EndorserBlockState::Received { eb, .. }) = self.leios.ebs.get(eb_id) else {
                 panic!("Tried voting for EB which we haven't received");
             };
             match self.should_vote_for(eb) {
@@ -729,21 +733,7 @@ impl Node {
         let endorsement = self.choose_endorsed_block_for_rb(slot);
         if let Some(endorsement) = &endorsement {
             // If we are, get all referenced TXs out of the mempool
-            let Some(eb) = self.leios.ebs.get(&endorsement.eb) else {
-                bail!("Missing endorsement block {}", endorsement.eb);
-            };
-            let EndorserBlockState::Received(eb) = eb else {
-                bail!("Haven't yet received endorsement block {}", endorsement.eb);
-            };
-            for ib_id in &eb.ibs {
-                let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
-                    bail!("Missing input block {}", ib_id);
-                };
-                for tx in &ib.transactions {
-                    self.praos.mempool.remove(&tx.id);
-                    self.leios.mempool.remove(&tx.id);
-                }
-            }
+            self.remove_endorsed_txs_from_mempools(endorsement);
         }
 
         let mut transactions = vec![];
@@ -876,8 +866,48 @@ impl Node {
         Some(block)
     }
 
+    fn remove_endorsed_txs_from_mempools(&mut self, endorsement: &Endorsement) {
+        let mut eb_queue = vec![endorsement.eb];
+        while let Some(eb_id) = eb_queue.pop() {
+            let Some(eb) = self.leios.ebs.get(&eb_id) else {
+                continue;
+            };
+            let EndorserBlockState::Received {
+                eb,
+                finalized: false,
+            } = eb
+            else {
+                // TXs from finalized EBs have already been removed from the mempool
+                continue;
+            };
+            for tx_id in &eb.txs {
+                self.praos.mempool.remove(tx_id);
+                self.leios.mempool.remove(tx_id);
+            }
+            for ib_id in &eb.ibs {
+                let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                    continue;
+                };
+                for tx in &ib.transactions {
+                    self.praos.mempool.remove(&tx.id);
+                    self.leios.mempool.remove(&tx.id);
+                }
+            }
+            for eb_id in &eb.ebs {
+                eb_queue.push(*eb_id);
+            }
+            self.leios.ebs.insert(
+                eb_id,
+                EndorserBlockState::Received {
+                    eb: eb.clone(),
+                    finalized: true,
+                },
+            );
+        }
+    }
+
     fn all_ibs_seen(&self, eb: &EndorserBlockId) -> bool {
-        let Some(EndorserBlockState::Received(eb_body)) = self.leios.ebs.get(eb) else {
+        let Some(EndorserBlockState::Received { eb: eb_body, .. }) = self.leios.ebs.get(eb) else {
             return false;
         };
         eb_body
@@ -887,7 +917,7 @@ impl Node {
     }
 
     fn count_txs_in_eb(&self, eb_id: &EndorserBlockId) -> Option<usize> {
-        let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(eb_id) else {
+        let Some(EndorserBlockState::Received { eb, .. }) = self.leios.ebs.get(eb_id) else {
             return None;
         };
         let mut tx_set = HashSet::new();
@@ -909,9 +939,13 @@ impl Node {
     }
 
     fn publish_block(&mut self, block: Arc<Block>) -> Result<()> {
-        // Remove TXs in these blocks from the leios mempool.
+        // Remove TXs in these blocks from the mempools.
         for tx in &block.transactions {
+            self.praos.mempool.remove(&tx.id);
             self.leios.mempool.remove(&tx.id);
+        }
+        if let Some(endorsement) = &block.endorsement {
+            self.remove_endorsed_txs_from_mempools(endorsement);
         }
         for peer in &self.consumers {
             if self
@@ -1203,7 +1237,7 @@ impl Node {
     }
 
     fn receive_request_eb(&mut self, from: NodeId, id: EndorserBlockId) -> Result<()> {
-        if let Some(EndorserBlockState::Received(eb)) = self.leios.ebs.get(&id) {
+        if let Some(EndorserBlockState::Received { eb, .. }) = self.leios.ebs.get(&id) {
             self.tracker.track_eb_sent(eb, self.id, from);
             self.send_to(from, SimulationMessage::EB(eb.clone()))?;
         }
@@ -1217,13 +1251,22 @@ impl Node {
 
     fn finish_validating_eb(&mut self, from: NodeId, eb: Arc<EndorserBlock>) -> Result<()> {
         let id = eb.id();
-        if self
-            .leios
-            .ebs
-            .insert(id, EndorserBlockState::Received(eb))
-            .is_some_and(|eb| matches!(eb, EndorserBlockState::Received(_)))
-        {
-            return Ok(());
+        match self.leios.ebs.entry(id) {
+            Entry::Vacant(e) => {
+                e.insert(EndorserBlockState::Received {
+                    eb,
+                    finalized: false,
+                });
+            }
+            Entry::Occupied(mut e) => {
+                if matches!(e.get(), EndorserBlockState::Received { .. }) {
+                    return Ok(());
+                }
+                e.insert(EndorserBlockState::Received {
+                    eb,
+                    finalized: false,
+                });
+            }
         }
         self.leios
             .ebs_by_pipeline
@@ -1457,9 +1500,13 @@ impl Node {
         self.tracker.track_eb_generated(&eb);
 
         let id = eb.id();
-        self.leios
-            .ebs
-            .insert(id, EndorserBlockState::Received(eb.clone()));
+        self.leios.ebs.insert(
+            id,
+            EndorserBlockState::Received {
+                eb: eb.clone(),
+                finalized: false,
+            },
+        );
         self.leios
             .ebs_by_pipeline
             .entry(id.pipeline)
