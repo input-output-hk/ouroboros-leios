@@ -47,24 +47,75 @@
   
   // Load search index asynchronously
   function loadSearchIndex() {
-    // Fetch the search index from the server
-    const indexPath = window.location.pathname.includes('/formal-spec/') 
-      ? '/formal-spec/search-index.json' 
-      : '/search-index.json';
-      
-    fetch(indexPath)
+    // Check for chunked index first
+    const basePath = window.location.pathname.includes('/formal-spec/') 
+      ? '/formal-spec/' 
+      : '/';
+    
+    const metadataPath = basePath + 'search-index-metadata.json';
+    
+    fetch(metadataPath)
       .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to load search index');
+        if (response.ok) {
+          return response.json();
+        } else {
+          // Metadata not found, try regular index
+          throw new Error('Metadata not found');
         }
-        return response.json();
       })
-      .then(data => {
-        searchIndex = data;
-        console.log('Search index loaded successfully');
+      .then(metadata => {
+        if (metadata.chunked) {
+          console.log(`Loading chunked search index with ${metadata.chunks.length} chunks...`);
+          return loadChunkedSearchIndex(basePath, metadata);
+        } else {
+          throw new Error('Non-chunked metadata found');
+        }
+      })
+      .catch(() => {
+        // Fall back to regular search index
+        const indexPath = basePath + 'search-index.json';
+        
+        fetch(indexPath)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to load search index');
+            }
+            return response.json();
+          })
+          .then(data => {
+            searchIndex = data;
+            console.log('Search index loaded successfully');
+          })
+          .catch(error => {
+            console.error('Error loading search index:', error);
+          });
+      });
+  }
+  
+  // Load chunked search index
+  function loadChunkedSearchIndex(basePath, metadata) {
+    const chunkPromises = metadata.chunks.map(chunkName => {
+      const chunkPath = basePath + `search-index-${chunkName}.json`;
+      return fetch(chunkPath)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to load chunk: ${chunkName}`);
+          }
+          return response.json();
+        });
+    });
+    
+    return Promise.all(chunkPromises)
+      .then(chunks => {
+        // Merge all chunks into a single index
+        searchIndex = {};
+        chunks.forEach(chunk => {
+          Object.assign(searchIndex, chunk);
+        });
+        console.log(`Chunked search index loaded successfully with ${metadata.totalEntries} entries from ${metadata.totalFiles} files`);
       })
       .catch(error => {
-        console.error('Error loading search index:', error);
+        console.error('Error loading chunked search index:', error);
       });
   }
   
