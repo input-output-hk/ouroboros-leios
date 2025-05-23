@@ -234,6 +234,7 @@ jobs:
           fi
 
       - name: 🔄 Enhance Agda documentation
+        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         timeout-minutes: 20
         run: |
