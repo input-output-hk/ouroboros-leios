@@ -1,5 +1,19 @@
 # Leios logbook
 
+## 2025-05-23
+
+### Rust simulation
+
+Spent time this week investigating poor TX inclusion rates. Findings:
+ - The "late IB inclusion" extension to Full Leios dramatically improves the odds of a TX reaching the ledger.
+ - Transactions without sharded inputs cause extreme duplication across IBs, and will need special care
+
+Enhancements:
+ - Turned on late IB inclusion by default
+ - Fixed an off-by-one error with late IB inclusion logic
+ - Added a `praos-fallback-enabled` setting, to disable Praos when investigating throughput
+ - Fixed TX deduplication in Praos blocks
+
 ## 2025-05-22
 
 ### Catalog of conformance tests
