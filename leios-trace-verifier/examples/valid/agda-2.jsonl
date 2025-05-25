@@ -3,6 +3,7 @@
 # -- slot 0
 #   inj₁ (Base₂b-Action  0    , SLOT)
 # ∷ inj₁ (Slot-Action    0    , SLOT)
+{"message":{"slot":0,"type":"NoIBGenerated","node":"node-0"},"time_s":0.01}
 {"message":{"slot":0,"type":"Slot","node":"node-0"},"time_s":0.01}
 #
 # -- slot 1
@@ -10,7 +11,7 @@
 {"message":{"slot":1,"type":"IBGenerated","producer":"node-0","id":"0-1","rb_ref":"genesis","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":1.01}
 #
 # ∷ inj₁ (VT-Role-Action 1    , SLOT)
-{"message":{"slot":1,"type":"VTBundleGenerated","producer":"node-0","id":"0-1","votes":{},"pipeline":0,"size_bytes":105},"time_s":1.02}
+#{"message":{"slot":1,"type":"VTBundleGenerated","producer":"node-0","id":"0-1","votes":{},"pipeline":0,"size_bytes":105},"time_s":1.02}
 #
 # Create an RB for later referencing by the SUT.
 {"message":{"slot":1,"type":"RBGenerated","producer":"node-1","id":"-7674734470404649268","endorsement":null,"parent":null,"size_bytes":1025,"tx_payload_bytes":0},"time_s":1.03}
@@ -41,10 +42,10 @@
 {"message":{"type":"RBReceived","recipient":"node-0","id":"-7674734470404649268"},"time_s":2.03}
 #
 # ∷ inj₁ (EB-Role-Action 2 [] , SLOT)
-{"message":{"slot":2,"type":"EBGenerated","producer":"node-0","id":"0-2","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":2.04}
+#{"message":{"slot":2,"type":"EBGenerated","producer":"node-0","id":"0-2","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":2.04}
 #
 # ∷ inj₁ (VT-Role-Action 2    , SLOT)
-{"message":{"slot":2,"type":"VTBundleGenerated","producer":"node-0","id":"0-2","votes":{},"pipeline":0,"size_bytes":105},"time_s":2.05}
+#{"message":{"slot":2,"type":"VTBundleGenerated","producer":"node-0","id":"0-2","votes":{},"pipeline":0,"size_bytes":105},"time_s":2.05}
 #
 # ∷ inj₁ (Base₂b-Action  2    , SLOT)
 # ∷ inj₁ (Slot-Action    2    , SLOT)
@@ -80,10 +81,10 @@
 {"message":{"slot":4,"type":"IBGenerated","producer":"node-0","id":"0-4","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":4.01}
 #
 # ∷ inj₁ (EB-Role-Action 4 [] , SLOT)
-{"message":{"slot":4,"type":"EBGenerated","producer":"node-0","id":"0-4","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":4.02}
+#{"message":{"slot":4,"type":"EBGenerated","producer":"node-0","id":"0-4","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":4.02}
 #
 # ∷ inj₁ (VT-Role-Action 4    , SLOT)
-{"message":{"slot":4,"type":"VTBundleGenerated","producer":"node-0","id":"0-4","votes":{},"pipeline":0,"size_bytes":105},"time_s":4.03}
+#{"message":{"slot":4,"type":"VTBundleGenerated","producer":"node-0","id":"0-4","votes":{},"pipeline":0,"size_bytes":105},"time_s":4.03}
 #
 # ∷ inj₁ (Base₂b-Action  4    , SLOT)
 # ∷ inj₁ (Slot-Action    4    , SLOT)

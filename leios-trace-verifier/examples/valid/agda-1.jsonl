@@ -1,4 +1,5 @@
 # Test 1 from Agda: https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/9741f8a27a55d562b33d0b4ac4f9334fc9fba9e0/formal-spec/Leios/Short/Trace/Verifier/Test.agda#L37
 #
 # inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ []
+{"message":{"node":"node-0","slot":0,"type":"NoIBGenerated"},"time_s":0}
 {"message":{"node":"node-0","slot":0,"type":"Slot"},"time_s":0.04}
