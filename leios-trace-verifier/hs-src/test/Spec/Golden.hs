@@ -44,6 +44,6 @@ golden = do
                 verifyTrace nrNodes idSut stakeDistribution stageLength
                   . decodeJSONL
                   <$> BSL.readFile (dir </> folder </> file)
-              snd result `predicate` "ok"
+              fst (snd result) `predicate` "ok"
   check "Verify valid traces" "valid" validFiles shouldBe
   check "Reject invalid traces" "invalid" invalidFiles shouldNotBe

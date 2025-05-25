@@ -236,13 +236,13 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     ... | yes _ = l , (inj₁ (No-IB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
     ... | no _  = l , []
     traceEvent→action l record { message = NoEBGenerated p s }
-      with p ≟ SUT | stage (primWord64ToNat s) ≤? 2 -- ignore bootstrapping events from Rust simulation
-    ... | yes _ | no _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
-    ... | _     | _    = l , []
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (No-EB-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | no _  = l , []
     traceEvent→action l record { message = NoVTBundleGenerated p s }
-      with p ≟ SUT | stage (primWord64ToNat s) ≤? 3 -- ignore bootstrapping events from Rust simulation
-    ... | yes _ | no _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
-    ... | _     | _    = l , []
+      with p ≟ SUT
+    ... | yes _ = l , (inj₁ (No-VT-Role-Action (primWord64ToNat s), SLOT) ∷ [])
+    ... | no _  = l , []
     traceEvent→action l record { message = IBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = EBSent _ _ _ _ _ _ } = l , []
     traceEvent→action l record { message = VTBundleSent _ _ _ _ _ _ } = l , []
@@ -291,17 +291,17 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
       in record l { refs = (i , EB-Blk eb) ∷ refs l } , actions
       where
         actions : List (Action × LeiosInput ⊎ FFDUpdate)
-        actions with p ≟ SUT | stage (primWord64ToNat s) ≤? 2 -- ignore bootstrapping events from Rust simulation
-        ... | yes _ | no _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
-        ... | _     | _    = []
+        actions with p ≟ SUT
+        ... | yes _ = (inj₁ (EB-Role-Action (primWord64ToNat s) [] , SLOT)) ∷ []
+        ... | no _  = []
     traceEvent→action l record { message = VTBundleGenerated p i s _ _ vts } =
       let vt = map (const tt) (elems vts)
       in record l { refs = (i , VT-Blk vt) ∷ refs l } , actions
       where
         actions : List (Action × LeiosInput ⊎ FFDUpdate)
-        actions with p ≟ SUT | stage (primWord64ToNat s) ≤? 3 -- ignore bootstrapping events from Rust simulation
-        ... | yes _ | no _ = (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
-        ... | _     | _    = []
+        actions with p ≟ SUT
+        ... | yes _ = (inj₁ (VT-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
+        ... | no _  = []
     traceEvent→action l record { message = RBGenerated _ _ _ _ _ _ _ _ } = l , []
 
     mapAccuml : {A B S : Set} → (S → A → S × B) → S → List A → S × List B
@@ -311,7 +311,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
           (s'' , ys) = mapAccuml f s' xs
       in s'' , y ∷ ys
 
-    result : ∀ {E A : Type} → (f : A → String) → (g : E → String) → Result E A → String
+    result : ∀ {E A S : Type} → (f : A → S) → (g : E → S) → Result E A → S
     result f g (Ok x) = f x
     result f g (Err x) = g x
 
@@ -361,20 +361,20 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     s₀ : LeiosState
     s₀ = initLeiosState tt sd tt ((SUT-id , tt) ∷ [])
 
-    format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → String
+    format-Err-verifyAction :  ∀ {α i s} → Err-verifyAction α i s → Pair String String
     format-Err-verifyAction {α} {i} {s} (E-Err e) =
-        "Invalid Action: Slot " ◇ show α ◇ nl
-      ◇ "Parameters: " ◇ show params ◇ nl
-      ◇ "Input: " ◇ show i ◇ nl
-      ◇ "LeiosState: " ◇ show s
+        "Invalid Action: Slot " ◇ show α ,
+        "Parameters: " ◇ show params ◇ nl ◇
+        "Input: " ◇ show i ◇ nl ◇
+        "LeiosState: " ◇ show s
 
-    format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → String
-    format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update: " ◇ show μ
+    format-Err-verifyUpdate : ∀ {μ s} → Err-verifyUpdate μ s → Pair String String
+    format-Err-verifyUpdate {μ} (E-Err _) = "Invalid Update" , show μ
 
-    format-error : ∀ {αs s} → Err-verifyTrace αs s → String
-    format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "error step: " ◇ show α
+    format-error : ∀ {αs s} → Err-verifyTrace αs s → Pair String String
+    format-error {inj₁ (α , i) ∷ []} {s} (Err-StepOk x) = "Error step" , show α
     format-error {inj₁ (α , i) ∷ αs} {s} (Err-StepOk x) = format-error x
-    format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "error update: " ◇ show μ
+    format-error {inj₂ μ ∷ []} {s} (Err-UpdateOk x)     = "Error update" , show μ
     format-error {inj₂ μ ∷ αs} {s} (Err-UpdateOk x)     = format-error x
     format-error {inj₁ (α , i) ∷ []} {s} (Err-Action x) = format-Err-verifyAction x
     format-error {inj₁ (α , i) ∷ αs} {s} (Err-Action x) = format-Err-verifyAction x
@@ -384,12 +384,18 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     opaque
       unfolding List-Model
 
-      verifyTrace : Pair ℕ String
-      verifyTrace =
+      verifyTrace' : LeiosState → Pair ℕ (Pair String String)
+      verifyTrace' s =
         let n₀ = record { refs = [] }
             l' = proj₂ $ mapAccuml traceEvent→action n₀ l
             αs = L.reverse (L.concat l')
-            tr = checkTrace αs s₀
-        in L.length αs , result (λ _ → "ok") format-error tr
+            tr = checkTrace αs s
+        in L.length αs , result (λ _ → ("ok" , "")) format-error tr
 
+      verifyTrace : Pair ℕ (Pair String String)
+      verifyTrace = verifyTrace' s₀
       {-# COMPILE GHC verifyTrace as verifyTrace #-}
+
+      verifyTraceFromSlot : ℕ → Pair ℕ (Pair String String)
+      verifyTraceFromSlot n = verifyTrace' (record s₀ { slot = n })
+      {-# COMPILE GHC verifyTraceFromSlot as verifyTraceFromSlot #-}
