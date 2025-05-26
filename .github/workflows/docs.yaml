@@ -214,7 +214,7 @@ jobs:
       - name: 📥 Download formal spec HTML
         if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/download-artifact@v4
-        continue-on-error: false
+        continue-on-error: true
         with:
           name: formal-spec-html
           path: formal-spec-html
@@ -297,6 +297,7 @@ jobs:
           echo "Workflow run name: ${{ github.event.workflow_run.name }}"
           echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
           echo "Ref: ${{ github.ref }}"
+          echo "Event payload: ${{ toJSON(github.event) }}"
 
       - name: List available artifacts
         run: |
@@ -324,6 +325,18 @@ jobs:
           name: formal-spec-html
           run-id: ${{ github.event.workflow_run.id }}
           path: formal-spec-html
+          github-token: ${{ github.token }}
+
+      - name: Check downloaded files
+        run: |
+          echo "Checking downloaded formal spec files..."
+          if [ -d "formal-spec-html" ]; then
+            echo "formal-spec-html directory exists"
+            ls -la formal-spec-html/
+          else
+            echo "formal-spec-html directory does not exist"
+            exit 1
+          fi
 
       - name: 📝 Update formal spec
         run: |
