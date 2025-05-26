@@ -594,6 +594,7 @@ impl Node {
         if pipeline < 4 {
             // The first pipeline with IBs in it is pipeline 4.
             // Don't generate EBs before that pipeline, because they would just be empty.
+            return;
         }
         for next_p in vrf_probabilities(self.sim_config.eb_generation_probability) {
             if self.run_vrf(next_p).is_some() {
@@ -651,6 +652,12 @@ impl Node {
     }
 
     fn vote_for_endorser_blocks(&mut self, slot: u64) {
+        let pipeline = self.slot_to_pipeline(slot);
+        if pipeline < 4 {
+            // The first pipeline with IBs in it is pipeline 4.
+            // Don't try voting before that pipeline, because there's nothing to vote for.
+            return;
+        }
         if !self.try_vote_for_endorser_blocks(slot) && self.sim_config.emit_conformance_events {
             self.tracker.track_no_vote_generated(self.id, slot);
         }
