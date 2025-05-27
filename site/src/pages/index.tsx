@@ -141,54 +141,65 @@ function MonthlyReviewsSection() {
                             className="text--center"
                             style={{
                                 display: "flex",
+                                flexDirection: "column",
                                 justifyContent: "center",
                                 alignItems: "center",
-                                gap: 16,
+                                gap: 24,
                             }}
                         >
-                            <Link
-                                className="button button--primary button--lg"
-                                to="https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <div
+                                className="text--center"
                                 style={{
                                     display: "flex",
                                     flexDirection: "column",
+                                    justifyContent: "center",
                                     alignItems: "center",
-                                    minWidth: 180,
                                 }}
                             >
-                                <span>Watch Live</span>
-                                <span
+                                <Link
+                                    className="button button--primary button--lg"
+                                    to="https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     style={{
-                                        fontSize: "0.68em",
-                                        fontWeight: 600,
-                                        color:
-                                            "var(--ifm-color-primary-contrast-background, #222)",
-                                        marginTop: 2,
-                                        lineHeight: 1.2,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        minWidth: 180,
                                     }}
                                 >
-                                    {countdown}
-                                </span>
-                            </Link>
+                                    <span>Watch Live</span>
+                                    <span
+                                        style={{
+                                            fontSize: "0.68em",
+                                            fontWeight: 600,
+                                            color:
+                                                "var(--ifm-color-primary-contrast-background, #222)",
+                                            marginTop: 2,
+                                            lineHeight: 1.2,
+                                        }}
+                                    >
+                                        {countdown}
+                                    </span>
+                                </Link>
+                                <div
+                                    style={{
+                                        fontSize: "1rem",
+                                        marginTop: 10,
+                                        color: "var(--ifm-color-emphasis-800)",
+                                        textAlign: "center",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    Next update: {nextDate}
+                                </div>
+                            </div>
                             <Link
                                 className={clsx(styles.underlineLink)}
                                 to="/docs/development/monthly-reviews"
                             >
-                                Catch Up Now
+                                Catch Up on Past Reviews
                             </Link>
-                        </div>
-                        <div
-                            style={{
-                                fontSize: "1rem",
-                                marginTop: 10,
-                                color: "var(--ifm-color-emphasis-800)",
-                                textAlign: "center",
-                                fontWeight: 500,
-                            }}
-                        >
-                            Next update: {nextDate}
                         </div>
                     </div>
                 </div>
