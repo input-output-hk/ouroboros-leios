@@ -1,5 +1,4 @@
 import Link from "@docusaurus/Link";
-import { useColorMode } from "@docusaurus/theme-common";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Heading from "@theme/Heading";
@@ -11,7 +10,6 @@ import styles from "./index.module.css";
 
 function HomepageHeader() {
     const { siteConfig } = useDocusaurusContext();
-    const { isDarkTheme } = useColorMode();
 
     return (
         <>
