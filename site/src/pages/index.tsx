@@ -5,6 +5,7 @@ import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Heading from "@theme/Heading";
 import Layout from "@theme/Layout";
 import clsx from "clsx";
+import React, { useEffect, useState } from "react";
 
 import styles from "./index.module.css";
 
@@ -68,6 +69,134 @@ function VideoSection() {
     );
 }
 
+function getLastWednesdayOfMonth(date = new Date()) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    // Start from the last day of the month
+    const lastDay = new Date(Date.UTC(year, month + 1, 0));
+    // 3 = Wednesday
+    const lastWednesday = new Date(lastDay);
+    while (lastWednesday.getUTCDay() !== 3) {
+        lastWednesday.setUTCDate(lastWednesday.getUTCDate() - 1);
+    }
+    // Set to 14:00 UTC (2pm UTC)
+    lastWednesday.setUTCHours(14, 0, 0, 0);
+    return lastWednesday;
+}
+
+function formatCountdown(ms) {
+    if (ms <= 0) return "Starting soon";
+    const totalSeconds = Math.floor(ms / 1000);
+    const weeks = Math.floor(totalSeconds / (7 * 24 * 3600));
+    const days = Math.floor((totalSeconds % (7 * 24 * 3600)) / (24 * 3600));
+    const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [];
+    if (weeks) parts.push(`${weeks} week${weeks > 1 ? "s" : ""}`);
+    if (days) parts.push(`${days} day${days > 1 ? "s" : ""}`);
+    if (hours) parts.push(`${hours} hour${hours > 1 ? "s" : ""}`);
+    if (minutes) parts.push(`${minutes} min${minutes > 1 ? "s" : ""}`);
+    if (seconds && parts.length < 2) {
+        parts.push(`${seconds} sec${seconds > 1 ? "s" : ""}`);
+    }
+    return `Starting in ${parts.slice(0, 2).join(", ")}`;
+}
+
+function MonthlyReviewsSection() {
+    const [countdown, setCountdown] = useState("");
+    const [nextDate, setNextDate] = useState("");
+    useEffect(() => {
+        function updateCountdown() {
+            const now = new Date();
+            const target = getLastWednesdayOfMonth(now);
+            setCountdown(formatCountdown(target.getTime() - now.getTime()));
+            setNextDate(target.toLocaleString(undefined, {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+            }));
+        }
+        updateCountdown();
+        const interval = setInterval(updateCountdown, 1000);
+        return () => clearInterval(interval);
+    }, []);
+    return (
+        <section className={clsx(styles.videoSection, styles.borderTop)}>
+            <div className="container">
+                <div className="row">
+                    <div className="col col--8 col--offset-2">
+                        <h2 className="text--center">
+                            Stay Up to Date
+                        </h2>
+                        <p className={clsx("text--center", styles.subtitle)}>
+                            Catch up on the latest Leios progress, key
+                            decisions, and Q&A in our monthly review videos.
+                        </p>
+                        <div
+                            className="text--center"
+                            style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                gap: 16,
+                            }}
+                        >
+                            <Link
+                                className="button button--primary button--lg"
+                                to="https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    minWidth: 180,
+                                }}
+                            >
+                                <span>Watch Live</span>
+                                <span
+                                    style={{
+                                        fontSize: "0.68em",
+                                        fontWeight: 600,
+                                        color:
+                                            "var(--ifm-color-primary-contrast-background, #222)",
+                                        marginTop: 2,
+                                        lineHeight: 1.2,
+                                    }}
+                                >
+                                    {countdown}
+                                </span>
+                            </Link>
+                            <Link
+                                className={clsx(styles.underlineLink)}
+                                to="/docs/development/monthly-reviews"
+                            >
+                                Catch Up Now
+                            </Link>
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "1rem",
+                                marginTop: 10,
+                                color: "var(--ifm-color-emphasis-800)",
+                                textAlign: "center",
+                                fontWeight: 500,
+                            }}
+                        >
+                            Next update: {nextDate}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
 export default function Home(): React.ReactElement {
     const { siteConfig } = useDocusaurusContext();
     return (
@@ -78,6 +207,7 @@ export default function Home(): React.ReactElement {
             <HomepageHeader />
             <main>
                 <HomepageFeatures />
+                <MonthlyReviewsSection />
                 <VideoSection />
             </main>
         </Layout>
