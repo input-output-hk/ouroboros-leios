@@ -106,6 +106,7 @@ function formatCountdown(ms) {
 function MonthlyReviewsSection() {
     const [countdown, setCountdown] = useState("");
     const [nextDate, setNextDate] = useState("");
+
     useEffect(() => {
         function updateCountdown() {
             const now = new Date();
