@@ -28,9 +28,8 @@ on:
         required: false
         default: "manual"
 
-# Global permissions
 permissions:
-  contents: read
+  contents: write
   pages: write
   actions: read
 
