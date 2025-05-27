@@ -126,6 +126,7 @@ function MonthlyReviewsSection() {
         const interval = setInterval(updateCountdown, 1000);
         return () => clearInterval(interval);
     }, []);
+
     return (
         <section className={clsx(styles.videoSection, styles.borderTop)}>
             <div className="container">
