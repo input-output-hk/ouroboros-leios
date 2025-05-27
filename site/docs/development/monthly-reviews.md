@@ -29,7 +29,7 @@ Until the end of 2024, our monthly review meetings were recorded via Google Meet
 - **February 2025:** [YouTube](https://www.youtube.com/watch?v=7Ze9iVs-bI4&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=4) | [Google Meet](https://drive.google.com/file/d/17f5OtHEsKuUPRdbwQn9wJtdffBiPbJK7/view?usp=sharing)
 - **January 2025:** [YouTube](https://www.youtube.com/watch?v=6ovcWDCdqFU&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=5) | [Google Meet](https://drive.google.com/file/d/1e7YVDUWw945zQL3j0LrUwr42lXpJf4cK/view?usp=sharing)
 
-## 2023 (Google Meet Recordings)
+## 2024 (Google Meet Recordings)
 
 - **December 2024**: [Google Meet](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing)
 - **November 2024**: [Google Meet](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing)
