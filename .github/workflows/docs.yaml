@@ -239,6 +239,6 @@ jobs:
       - name: 🚀 Publish GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ github.token }}
+          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
           publish_dir: ./github-pages
           cname: leios.cardano-scaling.org
