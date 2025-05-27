@@ -479,24 +479,10 @@ pre code {
 .line-number.highlighted {
   background-color: var(--hover-bg);
   border-radius: 3px 0 0 3px;
-  animation: highlight-glow 1s ease-in-out 1;
 }
 
 /* Improve highlighted line visibility */
 pre.Agda .code-content .highlighted {
-  animation: highlight-glow 1s ease-in-out 1;
-}
-
-@keyframes highlight-glow {
-  0% {
-    background-color: rgba(255, 213, 0, 0.1);
-  }
-  50% {
-    background-color: rgba(255, 213, 0, 0.2);
-  }
-  100% {
-    background-color: var(--hover-bg);
-  }
 }
 
 /* Target the line when the hash in the URL matches */
