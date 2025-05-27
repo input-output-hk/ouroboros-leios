@@ -42,7 +42,6 @@ concurrency:
 jobs:
   docs-generate-d2-diagrams:
     name: "Generate D2 Diagrams"
-    # Only run this job on pull_request or push triggers, not on workflow_run
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -115,7 +114,6 @@ jobs:
 
   viz-build:
     name: "Build Visualizer"
-    # Only run this job on pull_request or push triggers, not on workflow_run
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -148,49 +146,17 @@ jobs:
           name: visualizer
           path: ui/dist
 
-  # This job handles PR and push events, and depends on viz-build
-  docs-build-pr-push:
-    name: "Build Docusaurus Site (PR/Push)"
+  build-docusaurus-site:
+    name: "Build Docusaurus Site"
     runs-on: ubuntu-latest
     needs: [viz-build]
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Debug workflow trigger info
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-
-      - name: Check for site or visualizer changes
-        id: check_changes
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "Changes from manual trigger"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            # For PR or push events, check for actual changes
-            SITE_CHANGES=$(git diff --name-only HEAD^ HEAD -- site/ || true)
-            VIZ_CHANGES=$(git diff --name-only HEAD^ HEAD -- ui/ || true)
-            if [ -z "$SITE_CHANGES" ] && [ -z "$VIZ_CHANGES" ]; then
-              echo "No changes in site or UI directory"
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            else
-              echo "Changes detected in site or UI directory:"
-              echo "$SITE_CHANGES"
-              echo "$VIZ_CHANGES"
-              echo "has_changes=true" >> $GITHUB_OUTPUT
-            fi
-          fi
-        shell: "bash"
-
       - name: 🛠️ Setup Node.js
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -198,175 +164,42 @@ jobs:
           cache-dependency-path: ./site/yarn.lock
 
       - name: 📦 Install dependencies
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: site
         run: yarn install
 
-      # Handle visualizer integration
       - name: 👁️ Unpack visualizer
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: actions/download-artifact@v4
         with:
           name: visualizer
           path: site/static/visualizer
 
-      # Download formal spec HTML
+      # Only for workflow_run: Download formal spec HTML
       - name: 📥 Download formal spec HTML
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         continue-on-error: true
         with:
           name: formal-spec-html
           path: formal-spec-html
 
+      # Only for workflow_run: Update formal spec
       - name: 📝 Update formal spec
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: github.event_name == 'workflow_run'
         run: |
-          # Create formal spec directory if it doesn't exist
           mkdir -p site/static/formal-spec
-
-          # Copy any files we found (even if none were found, this is a no-op)
           if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            echo "Formal spec HTML files found - copying to site"
             cp -r formal-spec-html/* site/static/formal-spec/
-          else
-            echo "No formal spec HTML files found - continuing without them"
           fi
 
+      # Only for workflow_run: Enhance Agda documentation
       - name: 🔄 Enhance Agda documentation
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: github.event_name == 'workflow_run'
         working-directory: site
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
-          # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
           HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
-          echo "Found $HTML_COUNT HTML files"
-
           if [ "$HTML_COUNT" -gt "0" ]; then
-            echo "Processing HTML files with agda-web-docs-lib"
-            echo "Available memory before processing:"
-            free -h
-
             NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
-          else
-            echo "No HTML files found in formal-spec directory, skipping enhancement"
-          fi
-
-      - name: 🏗️ Build Docusaurus site
-        if: steps.check_changes.outputs.has_changes == 'true'
-        working-directory: site
-        run: |
-          yarn build
-
-      - name: Verify Docusaurus build
-        if: steps.check_changes.outputs.has_changes == 'true'
-        working-directory: site
-        run: |
-          if [ -z "$(ls -A build/)" ]; then
-            echo "Error: Docusaurus build directory is empty"
-            exit 1
-          fi
-          echo "Docusaurus build verified"
-          ls -la build/
-
-      - name: 🚀 Upload Docusaurus build
-        if: steps.check_changes.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: docusaurus-build
-          if-no-files-found: error
-          path: |
-            site/build/*
-
-  # This job handles workflow_run events from formal-spec-listener
-  docs-build-workflow-run:
-    name: "Build Docusaurus Site (Workflow Run)"
-    runs-on: ubuntu-latest
-    # No dependency on viz-build for workflow_run events
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
-    outputs:
-      has_changes: "true"
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Debug workflow trigger info
-        run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
-          echo "Workflow run name: ${{ github.event.workflow_run.name }}"
-          echo "Workflow run ID: ${{ github.event.workflow_run.id }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Event payload: ${{ toJSON(github.event) }}"
-
-      - name: List available artifacts
-        run: |
-          echo "Listing artifacts in the formal-spec-listener workflow run"
-          curl -s -H "Authorization: token ${{ github.token }}" \
-          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts" | \
-          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}'
-
-      - name: 🛠️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock
-
-      - name: 📦 Install dependencies
-        working-directory: site
-        run: yarn install
-
-      # Download formal spec HTML specifically from the workflow run
-      - name: 📥 Download formal spec HTML
-        uses: actions/download-artifact@v4
-        continue-on-error: false
-        with:
-          name: formal-spec-html
-          run-id: ${{ github.event.workflow_run.id }}
-          path: formal-spec-html
-          github-token: ${{ github.token }}
-
-      - name: Check downloaded files
-        run: |
-          echo "Checking downloaded formal spec files..."
-          if [ -d "formal-spec-html" ]; then
-            echo "formal-spec-html directory exists"
-            ls -la formal-spec-html/
-          else
-            echo "formal-spec-html directory does not exist"
-            exit 1
-          fi
-
-      - name: 📝 Update formal spec
-        run: |
-          # Create formal spec directory if it doesn't exist
-          mkdir -p site/static/formal-spec
-
-          # Copy any files we found (even if none were found, this is a no-op)
-          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            echo "Formal spec HTML files found - copying to site"
-            cp -r formal-spec-html/* site/static/formal-spec/
-          else
-            echo "No formal spec HTML files found - continuing without them"
-          fi
-
-      - name: 🔄 Enhance Agda documentation
-        working-directory: site
-        timeout-minutes: 20
-        run: |
-          # Process HTML files using the agda-web-docs-lib only if there are actual HTML files
-          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
-          echo "Found $HTML_COUNT HTML files"
-
-          if [ "$HTML_COUNT" -gt "0" ]; then
-            echo "Processing HTML files with agda-web-docs-lib"
-            echo "Available memory before processing:"
-            free -h
-
-            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
-          else
-            echo "No HTML files found in formal-spec directory, skipping enhancement"
           fi
 
       - name: 🏗️ Build Docusaurus site
@@ -381,7 +214,6 @@ jobs:
             echo "Error: Docusaurus build directory is empty"
             exit 1
           fi
-          echo "Docusaurus build verified"
           ls -la build/
 
       - name: 🚀 Upload Docusaurus build
@@ -394,14 +226,9 @@ jobs:
 
   docs-publish:
     name: "Publish"
-    if: |
-      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_run') &&
-      (
-        (needs.docs-build-pr-push.result == 'success' && needs.docs-build-pr-push.outputs.has_changes == 'true') ||
-        (needs.docs-build-workflow-run.result == 'success' && needs.docs-build-workflow-run.outputs.has_changes == 'true')
-      )
     runs-on: ubuntu-latest
-    needs: [docs-build-pr-push, docs-build-workflow-run]
+    needs: [build-docusaurus-site]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_run'
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4
