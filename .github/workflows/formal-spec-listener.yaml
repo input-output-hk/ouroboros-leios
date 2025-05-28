@@ -6,17 +6,17 @@ on:
   workflow_dispatch: # Allow manual triggering for testing
 
 jobs:
-  process-formal-spec:
-    name: "Process Formal Spec Update"
+  download-artifacts:
+    name: "Download Formal Spec Artifacts"
     runs-on: ubuntu-latest
     outputs:
-      spec_updated: "true"
+      artifacts-available: ${{ steps.check-artifacts.outputs.available }}
+      download-successful: ${{ steps.validate-download.outputs.successful }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # Try to download directly from GitHub API to see artifacts in the formal-spec repo
-      - name: List available artifacts in formal-spec repo
+      - name: 🔍 List available artifacts in formal-spec repo
         id: list_artifacts
         run: |
           echo "Checking for artifacts in formal-spec repo..."
@@ -64,7 +64,8 @@ jobs:
           search_artifacts: true
           if_no_artifact_found: warn
 
-      - name: Check download and create placeholder if needed
+      - name: ✅ Validate download and create placeholder if needed
+        id: validate-download
         run: |
           mkdir -p formal-spec-html
 
@@ -73,10 +74,43 @@ jobs:
             echo "Using downloaded formal spec HTML"
             echo "Files in formal-spec-html directory:"
             ls -la formal-spec-html/
+            echo "successful=true" >> $GITHUB_OUTPUT
           else
             echo "No formal spec HTML available, creating placeholder"
             echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > formal-spec-html/index.html
+            echo "successful=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: 🔍 Check artifacts availability
+        id: check-artifacts
+        run: |
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📤 Upload artifacts for next job
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-spec-html-processed
+          path: formal-spec-html/
+          retention-days: 1
+
+  process-documentation:
+    name: "Process and Enhance Documentation"
+    runs-on: ubuntu-latest
+    needs: download-artifacts
+    if: needs.download-artifacts.outputs.artifacts-available == 'true'
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download artifacts from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: formal-spec-html-processed
+          path: formal-spec-html
 
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
@@ -108,6 +142,38 @@ jobs:
             NODE_OPTIONS="--max-old-space-size=4096" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           fi
 
+      - name: 📤 Upload processed documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: enhanced-formal-spec
+          path: site/static/formal-spec/
+          retention-days: 1
+
+  deploy:
+    name: "Deploy to GitHub Pages"
+    runs-on: ubuntu-latest
+    needs: [download-artifacts, process-documentation]
+    if: always() && (needs.download-artifacts.outputs.artifacts-available == 'true' || needs.download-artifacts.outputs.artifacts-available == 'false')
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download enhanced documentation (if available)
+        if: needs.process-documentation.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: enhanced-formal-spec
+          path: deploy-content
+        continue-on-error: true
+
+      - name: 📥 Download basic artifacts (fallback)
+        if: needs.process-documentation.result != 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: formal-spec-html-processed
+          path: deploy-content
+        continue-on-error: true
+
       - name: 🔧 Configure Git for deployment
         run: |
           git config --global user.name "github-actions[bot]"
@@ -115,11 +181,11 @@ jobs:
           git config --global http.postBuffer 52428800
           git config --global core.compression 1
 
-      - name: 🚀 Deploy only formal-spec changes
+      - name: 🚀 Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          publish_dir: site/static/formal-spec
+          publish_dir: deploy-content
           destination_dir: formal-spec
           cname: leios.cardano-scaling.org
           keep_files: true
