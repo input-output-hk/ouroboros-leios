@@ -34,12 +34,12 @@ const AGDA_MODULES = [
 export default function FormalSpecPage(): React.ReactElement {
   return (
     <Layout
-      title="Formal Specification"
-      description="Ouroboros Leios Formal Specification"
+      title="Formal specification"
+      description="Ouroboros Leios formal specification"
     >
       <main className={styles.main}>
         <div className={styles.container}>
-          <h1>Ouroboros Leios Formal Specification</h1>
+          <h1>Ouroboros Leios formal specification</h1>
           <p>
             This section contains the formal specification of the Ouroboros Leios protocol,
             written in Agda. The specification provides a mathematical foundation for the
