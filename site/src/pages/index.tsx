@@ -82,7 +82,32 @@ function getLastWednesdayOfMonth(date = new Date()) {
     return lastWednesday;
 }
 
-function formatCountdown(ms) {
+function getNextMeeting(now = new Date()) {
+    const currentMonthMeeting = getLastWednesdayOfMonth(now);
+    const meetingEndTime = new Date(
+        currentMonthMeeting.getTime() + 60 * 60 * 1000,
+    ); // 1 hour after start
+
+    // If we're past the current month's meeting end time, get next month's meeting
+    if (now >= meetingEndTime) {
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        return getLastWednesdayOfMonth(nextMonth);
+    }
+
+    return currentMonthMeeting;
+}
+
+function isLiveTime(now = new Date()) {
+    const currentMonthMeeting = getLastWednesdayOfMonth(now);
+    const meetingStartTime = currentMonthMeeting.getTime();
+    const meetingEndTime = meetingStartTime + 60 * 60 * 1000; // 1 hour after start
+    const currentTime = now.getTime();
+
+    return currentTime >= meetingStartTime && currentTime < meetingEndTime;
+}
+
+function formatCountdown(ms, isLive = false) {
+    if (isLive) return "Live Now!";
     if (ms <= 0) return "Starting soon";
     const totalSeconds = Math.floor(ms / 1000);
     const weeks = Math.floor(totalSeconds / (7 * 24 * 3600));
@@ -104,12 +129,18 @@ function formatCountdown(ms) {
 function MonthlyReviewsSection() {
     const [countdown, setCountdown] = useState("");
     const [nextDate, setNextDate] = useState("");
+    const [isLive, setIsLive] = useState(false);
 
     useEffect(() => {
         function updateCountdown() {
             const now = new Date();
-            const target = getLastWednesdayOfMonth(now);
-            setCountdown(formatCountdown(target.getTime() - now.getTime()));
+            const live = isLiveTime(now);
+            const target = getNextMeeting(now);
+
+            setIsLive(live);
+            setCountdown(
+                formatCountdown(target.getTime() - now.getTime(), live),
+            );
             setNextDate(target.toLocaleString(undefined, {
                 weekday: "short",
                 year: "numeric",
@@ -168,31 +199,38 @@ function MonthlyReviewsSection() {
                                         minWidth: 180,
                                     }}
                                 >
-                                    <span>Watch Live</span>
-                                    <span
+                                    <span>
+                                        {isLive ? "Join Live" : "Watch Live"}
+                                    </span>
+                                    {!isLive && (
+                                        <span
+                                            style={{
+                                                fontSize: "0.68em",
+                                                fontWeight: 600,
+                                                color:
+                                                    "var(--ifm-color-primary-contrast-background, #222)",
+                                                marginTop: 2,
+                                                lineHeight: 1.2,
+                                            }}
+                                        >
+                                            {countdown}
+                                        </span>
+                                    )}
+                                </Link>
+                                {!isLive && (
+                                    <div
                                         style={{
-                                            fontSize: "0.68em",
-                                            fontWeight: 600,
+                                            fontSize: "1rem",
+                                            marginTop: 10,
                                             color:
-                                                "var(--ifm-color-primary-contrast-background, #222)",
-                                            marginTop: 2,
-                                            lineHeight: 1.2,
+                                                "var(--ifm-color-emphasis-800)",
+                                            textAlign: "center",
+                                            fontWeight: 500,
                                         }}
                                     >
-                                        {countdown}
-                                    </span>
-                                </Link>
-                                <div
-                                    style={{
-                                        fontSize: "1rem",
-                                        marginTop: 10,
-                                        color: "var(--ifm-color-emphasis-800)",
-                                        textAlign: "center",
-                                        fontWeight: 500,
-                                    }}
-                                >
-                                    Next update: {nextDate}
-                                </div>
+                                        Next update: {nextDate}
+                                    </div>
+                                )}
                             </div>
                             <Link
                                 className={clsx(styles.underlineLink)}
