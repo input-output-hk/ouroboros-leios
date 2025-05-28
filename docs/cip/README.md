@@ -530,35 +530,56 @@ Leios will be versioned via the major and minor version numbers of the Cardano p
 
 The following benchmarks for Leios cryptographic operations were computed with Rust code[^3] that uses a reference implementation for BLS operations. A variety of optimizations are possible, so the measurements below should be considered worst-case bounds.
 
-> [!WARNING]
-> 
-> - [ ] Could the following bulleted list be better formatted as a table?
+**Sortition Benchmarks**
 
-- Sortition
-    - *Input blocks:* 230 µs
-    - *Endorser blocks:* 230 µs
-    - *Persistent voters:* 5.5 ms (once per epoch)
-    - *Non-persistent voters:* 230 µs (once per pipeline)
-- Vote
-    - *Verify the proof of key possession:* 1.5 ms/key
-    - *Generate vote:*
-	    - *Persistent:* 135 µs/vote
-	    - *Non-persistent:* 280 µs/vote
-    - *Verify vote:*
-	    - *Persistent:* 670 µs/vote
-	    - *Non-persistent:* 1.4 ms/vote
-- Certificate (for a realistic number of pools, stake distribution, and committee size)
-    - *Generate certificate:* 90 ms/cert
-    - *Verify certificate:* 130 ms/cert
-    - *Determine weight (i.e., total stake voted for) in certificate:* 5.9 ms/cert
-- Serialization
-	- *Key registration:* 1.1 µs
-	- *Vote:* 630 ns
-	- *Certificate:* 65 µs 
-- Deserialization
-	- *Key registration:* 52 µs
-	- *Vote:* 19 µs
-	- *Certificate:* 2.7 ms
+| Operation                | Timing        |
+|--------------------------|---------------|
+| Input blocks             | 230 µs        |
+| Endorser blocks          | 230 µs        |
+| Persistent voters        | 5.5 ms        |
+| Non-persistent voters    | 230 µs        |
+
+> [!NOTE]
+> 
+> Persistent voters are computed once per epoch, non-persistent voters once per pipeline.
+
+**Vote Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Verify proof of key possession          | 1.5 ms/key    |
+| Generate vote (persistent)              | 135 µs/vote   |
+| Generate vote (non-persistent)          | 280 µs/vote   |
+| Verify vote (persistent)                | 670 µs/vote   |
+| Verify vote (non-persistent)            | 1.4 ms/vote   |
+
+**Certificate Benchmarks**
+
+> [!NOTE]
+> 
+> For realistic number of pools, stake distribution, and committee size
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Generate certificate                    | 90 ms/cert    |
+| Verify certificate                      | 130 ms/cert   |
+| Determine weight in certificate         | 5.9 ms/cert   |
+
+**Serialization Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Key registration                        | 1.1 µs        |
+| Vote                                    | 630 ns        |
+| Certificate                             | 65 µs         |
+
+**Deserialization Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Key registration                        | 52 µs         |
+| Vote                                    | 19 µs         |
+| Certificate                             | 2.7 ms        |
 
 As a general rule of thumb, assume that 80% of votes are persistent and 20% are non-persistent. Here are details for how certificate operations vary with committee size, given a realistic stake distribution similar to that on Cardano mainnet.
 
