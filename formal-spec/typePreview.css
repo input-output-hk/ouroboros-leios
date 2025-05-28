@@ -1,1 +1,138 @@
-.type-hoverable{cursor:help;transition:background-color .2s ease-in-out}.type-hoverable:hover{background-color:var(--preview-highlight-bg);border-radius:3px}.type-preview-container .type-hoverable,.type-preview-container .type-hoverable:hover{cursor:pointer}.type-preview-container{animation:.2s ease-in-out a;background-color:var(--background-color);border:1px solid var(--border-color);border-radius:6px;box-shadow:0 6px 16px #0000001f;font-family:var(--mono-font);font-size:.9em;max-height:300px;max-width:600px;min-width:300px;overflow:auto;padding:0;position:absolute;z-index:1000;--preview-highlight-bg:#569cd633;--preview-border-color:var(--border-color)}.theme-dark .type-preview-container{--preview-highlight-bg:#569cd626;box-shadow:0 6px 16px #0000004d}.preview-heading{align-items:center;background-color:var(--subtle-background);border-bottom:1px solid var(--preview-border-color);display:flex;font-size:.9em;font-weight:700;justify-content:space-between;padding:8px 12px}.type-preview-container .Agda{margin:0;padding:8px}.type-preview-container .code-container{display:flex;width:100%}.type-preview-container .preview-line-numbers{background-color:initial;border-right:1px solid var(--preview-border-color);display:flex;flex:0 0 auto;flex-direction:column;margin:0;padding:0;text-align:right;user-select:none}.type-preview-container .preview-line-number{color:#1b1f2366;display:block;font-size:14px;height:1.5em;line-height:1.5;padding:0 6px 0 0}.type-preview-container .preview-line-number.highlight{color:var(--primary-color);font-weight:500}:root.dark-theme .type-preview-container .preview-line-number{color:#e6edf366}.type-preview-container .preview-code-content{display:flex;flex:1;flex-direction:column;overflow-x:auto;padding-left:8px}.type-preview-container .preview-code-line{height:1.5em;line-height:1.5;margin:0;position:relative;white-space:pre}.type-preview-container .preview-code-line>*{white-space:pre}.type-preview-container .preview-code-line.highlight{background-color:var(--hover-bg)}@keyframes a{0%{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+/* Type Preview Styles */
+
+/* Hoverable type links */
+.type-hoverable {
+  cursor: help;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.type-hoverable:hover {
+  background-color: var(--preview-highlight-bg);
+  border-radius: 3px;
+}
+
+/* Reset cursor for types within the preview itself */
+.type-preview-container .type-hoverable,
+.type-preview-container .type-hoverable:hover {
+  cursor: pointer;
+}
+
+/* Preview container */
+.type-preview-container {
+  position: absolute;
+  z-index: 1000;
+  max-width: 600px;
+  min-width: 300px;
+  max-height: 300px;
+  overflow: auto;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  padding: 0;
+  font-family: var(--mono-font);
+  font-size: 0.9em;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Dark/Light theme variables are inherited from main CSS */
+.type-preview-container {
+  --preview-highlight-bg: rgba(86, 156, 214, 0.2);
+  --preview-border-color: var(--border-color);
+}
+
+.theme-dark .type-preview-container {
+  --preview-highlight-bg: rgba(86, 156, 214, 0.15);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Preview header */
+.preview-heading {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--preview-border-color);
+  font-weight: bold;
+  font-size: 0.9em;
+  background-color: var(--subtle-background);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Override and adjust styles for preview context */
+.type-preview-container .Agda {
+  margin: 0;
+  padding: 8px;
+}
+
+.type-preview-container .code-container {
+  display: flex;
+  width: 100%;
+}
+
+/* Line numbers in preview (adapting from original to match main style) */
+.type-preview-container .preview-line-numbers {
+  flex: 0 0 auto;
+  user-select: none;
+  text-align: right;
+  background-color: transparent;
+  border-right: 1px solid var(--preview-border-color);
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.type-preview-container .preview-line-number {
+  display: block;
+  color: rgba(27, 31, 35, 0.4);
+  padding: 0 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  height: 1.5em;
+}
+
+.type-preview-container .preview-line-number.highlight {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+:root.dark-theme .type-preview-container .preview-line-number {
+  color: rgba(230, 237, 243, 0.4);
+}
+
+/* Code content */
+.type-preview-container .preview-code-content {
+  flex: 1;
+  overflow-x: auto;
+  padding-left: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.type-preview-container .preview-code-line {
+  line-height: 1.5;
+  height: 1.5em;
+  white-space: pre;
+  position: relative;
+  margin: 0;
+}
+
+.type-preview-container .preview-code-line > * {
+  white-space: pre;
+}
+
+.type-preview-container .preview-code-line.highlight {
+  background-color: var(--hover-bg);
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

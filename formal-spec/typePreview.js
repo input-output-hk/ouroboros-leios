@@ -1,1 +1,509 @@
-!function(){let e,t,n=null;const i=new Map;function o(o){t&&clearTimeout(t),n=o.target;n.getAttribute("data-original-href");const l=n.getAttribute("href");l&&(t=setTimeout((()=>{!async function(t,n){const[o,l]=n.split("#");if(!l)return;let s,a;const d=l.match(/^(B\d+)-L(\d+)$/);if(d)a=d[1],s=parseInt(d[2],10);else{if(!l.startsWith("L"))return;a="B1",s=parseInt(l.substring(1),10)}if(isNaN(s))return;const m=`${o||window.location.pathname}#${a}-${s}`;let u;if(i.has(m))u=i.get(m);else if(o&&o!==window.location.pathname.split("/").pop())try{const e=o.replace(".html","");u=await async function(e,t,n="",i="B1"){try{const o=await fetch(e);if(!o.ok)throw new Error(`Failed to fetch ${e}: ${o.status}`);const l=await o.text(),s=(new DOMParser).parseFromString(l,"text/html"),a=`${i}-LC${t}`,d=s.getElementById(a);if(!d){const e=s.getElementById(`LC${t}`);if(e){const i=e.closest(".code-content");if(i){const o=Array.from(i.querySelectorAll(".code-line")),l=o.indexOf(e);if(-1!==l){const{startIndex:e,endIndex:i}=c(o,l);return r(o.slice(e,i+1),t,e,n)}}}return null}const m=d.closest(".code-content");if(!m)return null;const u=Array.from(m.querySelectorAll(".code-line")),p=u.indexOf(d);if(-1===p)return null;const{startIndex:f,endIndex:h}=c(u,p);return r(u.slice(f,h+1),t,f,n,i)}catch(o){return console.error("Error fetching preview:",o),null}}(o,s,e,a),u&&i.set(m,u)}catch(p){return void console.error("Error fetching code preview:",p)}else{const e=`${a}-LC${s}`,t=document.getElementById(e);if(!t)return;const n=t.closest(".code-content");if(!n)return;const o=Array.from(n.querySelectorAll(".code-line")),l=o.indexOf(t);if(-1===l)return;const{startIndex:d,endIndex:p}=c(o,l);u=r(o.slice(d,p+1),s,d,document.title||window.location.pathname.split("/").pop().replace(".html",""),a),i.set(m,u)}if(!u)return;e.innerHTML="",e.appendChild(u),function(t){if(!t||!e)return;const n=t.getBoundingClientRect(),i=window.innerWidth,o=window.innerHeight;e.style.maxHeight="",e.style.maxWidth="",e.style.visibility="hidden",e.style.display="block";const l=e.offsetWidth,c=e.offsetHeight;let r=n.bottom+window.scrollY+5,s=n.left+window.scrollX;if(n.bottom+c>o&&(r=n.top+window.scrollY-c-5,r<window.scrollY)){r=window.scrollY+5;const t=o-10;e.style.maxHeight=`${t}px`}s+l>i&&(s=i-l+window.scrollX-5,s<window.scrollX&&(s=window.scrollX+5,e.style.maxWidth=i-10+"px"));e.style.top=`${r}px`,e.style.left=`${s}px`,e.style.visibility="visible"}(t),e.style.display="block"}(n,l)}),300))}function l(){t&&(clearTimeout(t),t=null)}function c(e,t){const n=e=>""===(e.textContent||"").trim(),i=e=>(e.innerHTML||"").includes("Comment");let o=Math.max(0,t-3),l=Math.min(e.length-1,t+3),c=t;for(;c>0;){if(c--,n(e[c])){c===t-1&&(o=c+1);break}if(i(e[c]))break;o=c}c=t;let r=0,s=!1;for(;c<e.length-1&&!s;){const t=e[c].textContent||"";for(const e of t)"("!==e&&"{"!==e&&"["!==e||r++,")"!==e&&"}"!==e&&"]"!==e||r--;if(c++,c<e.length&&r<=0&&(n(e[c])||i(e[c]))){s=!0,l=c-1;break}l=c}return o=Math.max(0,o),l=Math.min(e.length-1,l),{startIndex:o,endIndex:l}}function r(e,t,n,i="",o="B1"){const l=document.createElement("div");l.className="code-preview-container";const c=document.createElement("div");c.className="preview-heading";const r=document.createElement("span");r.className="module-name",r.textContent=i?`Definition in ${i}`:"Definition";const s=document.createElement("a");s.className="link-to-definition",s.textContent=`Line ${t}`,i&&i!==(document.title||"")?s.href=`${i}.html#${o}-L${t}`:s.href=`#${o}-L${t}`,c.appendChild(r),c.appendChild(s),l.appendChild(c);const a=document.createElement("div");a.className="preview-line-numbers";const d=document.createElement("div");d.className="preview-code-content",e.forEach(((e,i)=>{const o=n+i+1,l=document.createElement("span");l.className="preview-line-number",l.textContent=o,o===t&&l.classList.add("highlight"),a.appendChild(l);const c=document.createElement("div");c.className="preview-code-line",o===t&&c.classList.add("highlight");const r=document.createElement("div");r.style.whiteSpace="pre",r.innerHTML=e.innerHTML,c.appendChild(r),d.appendChild(c)}));const m=document.createElement("div");m.className="Agda";const u=document.createElement("div");return u.className="code-container",u.appendChild(a),u.appendChild(d),m.appendChild(u),l.appendChild(m),l}document.addEventListener("DOMContentLoaded",(function(){!function(){e=document.getElementById("type-preview-container"),e||(e=document.createElement("div"),e.id="type-preview-container",e.className="type-preview-container",e.style.display="none",document.body.appendChild(e));function i(){document.querySelectorAll(".type-hoverable").forEach((e=>{e.addEventListener("mouseenter",o),e.addEventListener("mouseleave",l),e.addEventListener("focus",o),e.addEventListener("blur",l)}))}i(),document.addEventListener("click",(function(i){"block"!==e.style.display||e.contains(i.target)||n?.contains(i.target)||function(){e&&(e.style.display="none");t&&(clearTimeout(t),t=null);n=null}()}))}()}))}();
+/**
+ * Type Preview on Hover
+ * Shows a preview of Agda type/function definitions when hovering over links
+ */
+
+(function() {
+  let previewContainer;
+  let activeTimeout;
+  let activeLink = null;
+  const codeCache = new Map();
+  const previewDelay = 300; // ms delay before showing preview
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    init();
+  });
+  
+  /**
+   * Initialize the preview functionality
+   */
+  function init() {
+    // Get or create the preview container
+    previewContainer = document.getElementById('type-preview-container');
+    if (!previewContainer) {
+      previewContainer = document.createElement('div');
+      previewContainer.id = 'type-preview-container';
+      previewContainer.className = 'type-preview-container';
+      previewContainer.style.display = 'none';
+      document.body.appendChild(previewContainer);
+    }
+    
+    // Add event listeners to hoverable links
+    function setupHoverableLinks() {
+      const hoverableLinks = document.querySelectorAll('.type-hoverable');
+      hoverableLinks.forEach(link => {
+        link.addEventListener('mouseenter', handleMouseEnter);
+        link.addEventListener('mouseleave', handleMouseLeave);
+        link.addEventListener('focus', handleMouseEnter);
+        link.addEventListener('blur', handleMouseLeave);
+      });
+    }
+    
+    // Initial setup
+    setupHoverableLinks();
+    
+    // Hide preview when clicking outside
+    document.addEventListener('click', function(event) {
+      if (previewContainer.style.display === 'block' && 
+          !previewContainer.contains(event.target) && 
+          !activeLink?.contains(event.target)) {
+        hidePreview();
+      }
+    });
+  }
+  
+  /**
+   * Handle mouse enter event on hoverable links
+   */
+  function handleMouseEnter(event) {
+    // Clear any existing timeout
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+    }
+    
+    // Set the active link
+    activeLink = event.target;
+    
+    // Get the href attribute or data-original-href if available
+    const originalHref = activeLink.getAttribute('data-original-href');
+    const href = activeLink.getAttribute('href');
+    
+    if (!href) return;
+    
+    // Use timeout to avoid showing preview for quick mouse movements
+    activeTimeout = setTimeout(() => {
+      showPreview(activeLink, href);
+    }, previewDelay);
+  }
+  
+  /**
+   * Handle mouse leave event
+   */
+  function handleMouseLeave() {
+    // Clear timeout if mouse leaves quickly
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+      activeTimeout = null;
+    }
+  }
+  
+  /**
+   * Determine which context lines to include in the preview
+   */
+  function determineContextLines(allLines, targetIndex) {
+    // Default to showing a few lines before and after the target line
+    const defaultContextLines = 3;
+    
+    // Helper function to check if a line is empty or just whitespace
+    const isEmptyLine = (line) => {
+      const content = line.textContent || '';
+      return content.trim() === '';
+    };
+    
+    // Helper function to check if a line contains a comment
+    const isComment = (line) => {
+      const content = line.innerHTML || '';
+      return content.includes('Comment');
+    };
+    
+    // Start with basic context
+    let startIndex = Math.max(0, targetIndex - defaultContextLines);
+    let endIndex = Math.min(allLines.length - 1, targetIndex + defaultContextLines);
+    
+    // Expand context to capture more meaningful content
+    
+    // Look backward for the start of a declaration/definition
+    let idx = targetIndex;
+    while (idx > 0) {
+      idx--;
+      
+      // If we find an empty line, check if we should stop including previous context
+      if (isEmptyLine(allLines[idx])) {
+        // If the empty line is directly before the definition, don't include any more previous lines
+        if (idx === targetIndex - 1) {
+          startIndex = idx + 1; // Start at the definition itself
+        }
+        break;
+      }
+      
+      // If we find a comment line, stop
+      if (isComment(allLines[idx])) {
+        break;
+      }
+      
+      startIndex = idx;
+    }
+    
+    // Look forward to capture the entire declaration
+    idx = targetIndex;
+    let bracketCount = 0;
+    let foundEndOfDeclaration = false;
+    
+    // Count open and close brackets/parens to find the complete expression
+    while (idx < allLines.length - 1 && !foundEndOfDeclaration) {
+      const content = allLines[idx].textContent || '';
+      
+      // Count brackets crudely (this is a simple heuristic)
+      for (const char of content) {
+        if (char === '(' || char === '{' || char === '[') bracketCount++;
+        if (char === ')' || char === '}' || char === ']') bracketCount--;
+      }
+      
+      idx++;
+      
+      // Check if the next line is empty and brackets are balanced
+      if (idx < allLines.length && bracketCount <= 0) {
+        if (isEmptyLine(allLines[idx]) || isComment(allLines[idx])) {
+          // Found the end, but don't include this empty line
+          foundEndOfDeclaration = true;
+          // Keep endIndex at the last non-empty line
+          endIndex = idx - 1;
+          break;
+        }
+      }
+      
+      // If we reached here, include this line
+      endIndex = idx;
+    }
+    
+    // Ensure we don't exceed array bounds
+    startIndex = Math.max(0, startIndex);
+    endIndex = Math.min(allLines.length - 1, endIndex);
+    
+    return { startIndex, endIndex };
+  }
+  
+  /**
+   * Show the preview for the given link and target
+   */
+  async function showPreview(link, href) {
+    // Parse the href to get the file and line number
+    const [file, lineFragment] = href.split('#');
+    
+    if (!lineFragment) return;
+    
+    // Extract the line number and block ID from the fragment
+    let lineNumber, blockId;
+    
+    // Check if using the new block-specific format (BX-LY)
+    const blockLineMatch = lineFragment.match(/^(B\d+)-L(\d+)$/);
+    if (blockLineMatch) {
+      blockId = blockLineMatch[1];
+      lineNumber = parseInt(blockLineMatch[2], 10);
+    } else if (lineFragment.startsWith('L')) {
+      // Legacy format (LY)
+      blockId = 'B1'; // Assume first block for legacy format
+      lineNumber = parseInt(lineFragment.substring(1), 10);
+    } else {
+      return; // Unknown format
+    }
+    
+    if (isNaN(lineNumber)) return;
+    
+    // Construct cache key
+    const cacheKey = `${file || window.location.pathname}#${blockId}-${lineNumber}`;
+    
+    // Check if we already have this code block in cache
+    let codeBlock;
+    if (codeCache.has(cacheKey)) {
+      codeBlock = codeCache.get(cacheKey);
+    } else {
+      // Find the code block content - either in the current page or fetch from another page
+      if (!file || file === window.location.pathname.split('/').pop()) {
+        // Same page - look for the target line
+        const lineContentId = `${blockId}-LC${lineNumber}`;
+        const targetLine = document.getElementById(lineContentId);
+        if (!targetLine) return;
+        
+        // Get the containing code block
+        const codeContainer = targetLine.closest('.code-content');
+        if (!codeContainer) return;
+        
+        // Get all lines from the code container
+        const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+        const targetIndex = allLines.indexOf(targetLine);
+        
+        if (targetIndex === -1) return;
+        
+        // Determine context-aware start and end indexes
+        const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+        
+        // Create a new container with the context lines
+        const contextLines = allLines.slice(startIndex, endIndex + 1);
+        
+        // Get current module name from document title or path
+        const moduleName = document.title || window.location.pathname.split('/').pop().replace('.html', '');
+        
+        // Build HTML for the code preview
+        codeBlock = buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId);
+        
+        // Cache the result
+        codeCache.set(cacheKey, codeBlock);
+      } else {
+        // Different page - we'll need to fetch it
+        try {
+          // Extract module name from file path
+          const moduleName = file.replace('.html', '');
+          codeBlock = await fetchCodeFromFile(file, lineNumber, moduleName, blockId);
+          if (codeBlock) {
+            codeCache.set(cacheKey, codeBlock);
+          }
+        } catch (error) {
+          console.error('Error fetching code preview:', error);
+          return;
+        }
+      }
+    }
+    
+    if (!codeBlock) return;
+    
+    // Add content to preview container
+    previewContainer.innerHTML = '';
+    previewContainer.appendChild(codeBlock);
+    
+    // Position the preview near the link
+    positionPreview(link);
+    
+    // Show the preview
+    previewContainer.style.display = 'block';
+  }
+  
+  /**
+   * Build a code preview element with the given context lines
+   */
+  function buildCodePreview(contextLines, highlightLineNumber, startLineIndex, moduleName = '', blockId = 'B1') {
+    const container = document.createElement('div');
+    container.className = 'code-preview-container';
+    
+    // Add heading with link to full definition
+    const heading = document.createElement('div');
+    heading.className = 'preview-heading';
+    
+    // Create module name text
+    const moduleText = document.createElement('span');
+    moduleText.className = 'module-name';
+    
+    // If module name is provided, include it
+    if (moduleName) {
+      moduleText.textContent = `Definition in ${moduleName}`;
+    } else {
+      moduleText.textContent = 'Definition';
+    }
+    
+    // Create link to full definition
+    const linkToDefinition = document.createElement('a');
+    linkToDefinition.className = 'link-to-definition';
+    linkToDefinition.textContent = `Line ${highlightLineNumber}`;
+    
+    // Determine the link href using block-specific format
+    // If this is from another file, include the file name
+    if (moduleName && moduleName !== (document.title || '')) {
+      linkToDefinition.href = `${moduleName}.html#${blockId}-L${highlightLineNumber}`;
+    } else {
+      linkToDefinition.href = `#${blockId}-L${highlightLineNumber}`;
+    }
+    
+    // Add both elements to heading
+    heading.appendChild(moduleText);
+    heading.appendChild(linkToDefinition);
+    
+    container.appendChild(heading);
+    
+    // Create line numbers container
+    const lineNumbers = document.createElement('div');
+    lineNumbers.className = 'preview-line-numbers';
+    
+    // Create code content container
+    const codeContent = document.createElement('div');
+    codeContent.className = 'preview-code-content';
+    
+    // Add each line with its number
+    contextLines.forEach((line, index) => {
+      // The actual line number in the document (startLineIndex is 0-based, but lines are 1-based)
+      const actualLineNumber = startLineIndex + index + 1;
+      
+      // Add line number
+      const lineNumberSpan = document.createElement('span');
+      lineNumberSpan.className = 'preview-line-number';
+      lineNumberSpan.textContent = actualLineNumber;
+      if (actualLineNumber === highlightLineNumber) {
+        lineNumberSpan.classList.add('highlight');
+      }
+      lineNumbers.appendChild(lineNumberSpan);
+      
+      // Add code line
+      const codeLine = document.createElement('div');
+      codeLine.className = 'preview-code-line';
+      if (actualLineNumber === highlightLineNumber) {
+        codeLine.classList.add('highlight');
+      }
+      
+      // Clone the line content more carefully to preserve whitespace and syntax highlighting
+      const lineContentWrapper = document.createElement('div');
+      lineContentWrapper.style.whiteSpace = 'pre';
+      lineContentWrapper.innerHTML = line.innerHTML;
+      
+      codeLine.appendChild(lineContentWrapper);
+      codeContent.appendChild(codeLine);
+    });
+    
+    // Create preview code structure - use the same exact class structure as in the main content
+    const previewCode = document.createElement('div');
+    // Use the same class structure as the main Agda code blocks to inherit styles
+    previewCode.className = 'Agda'; 
+    
+    // Create a code container to match the main content structure
+    const codeContainer = document.createElement('div');
+    codeContainer.className = 'code-container';
+    codeContainer.appendChild(lineNumbers);
+    codeContainer.appendChild(codeContent);
+    
+    previewCode.appendChild(codeContainer);
+    container.appendChild(previewCode);
+    
+    return container;
+  }
+  
+  /**
+   * Fetch code from another file
+   */
+  async function fetchCodeFromFile(file, lineNumber, moduleName = '', blockId = 'B1') {
+    try {
+      const response = await fetch(file);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${file}: ${response.status}`);
+      }
+      
+      const html = await response.text();
+      
+      // Create a temporary document to parse the HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Find the target line using the block-specific ID
+      const lineContentId = `${blockId}-LC${lineNumber}`;
+      const targetLine = doc.getElementById(lineContentId);
+      
+      // If the specific block isn't found, try to find any line with that number
+      // (fallback for files that might not have the updated format)
+      if (!targetLine) {
+        // Look for a line with the legacy format or in any block
+        const legacyTarget = doc.getElementById(`LC${lineNumber}`);
+        if (legacyTarget) {
+          // Use the legacy target's code block
+          const codeContainer = legacyTarget.closest('.code-content');
+          if (codeContainer) {
+            const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+            const targetIndex = allLines.indexOf(legacyTarget);
+            
+            if (targetIndex !== -1) {
+              const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+              const contextLines = allLines.slice(startIndex, endIndex + 1);
+              return buildCodePreview(contextLines, lineNumber, startIndex, moduleName);
+            }
+          }
+        }
+        return null;
+      }
+      
+      // Get the containing code block
+      const codeContainer = targetLine.closest('.code-content');
+      if (!codeContainer) return null;
+      
+      // Get all lines from the code container
+      const allLines = Array.from(codeContainer.querySelectorAll('.code-line'));
+      const targetIndex = allLines.indexOf(targetLine);
+      
+      if (targetIndex === -1) return null;
+      
+      // Determine context-aware start and end indexes
+      const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+      
+      // Create a new container with the context lines
+      const contextLines = allLines.slice(startIndex, endIndex + 1);
+      
+      // Build HTML for the code preview
+      return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId);
+    } catch (error) {
+      console.error('Error fetching preview:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Position the preview container near the link
+   */
+  function positionPreview(link) {
+    if (!link || !previewContainer) return;
+    
+    const linkRect = link.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Reset any previous positioning
+    previewContainer.style.maxHeight = '';
+    previewContainer.style.maxWidth = '';
+    
+    // Allow the container to take its natural size first
+    previewContainer.style.visibility = 'hidden';
+    previewContainer.style.display = 'block';
+    
+    // Get container dimensions
+    const containerWidth = previewContainer.offsetWidth;
+    const containerHeight = previewContainer.offsetHeight;
+    
+    // Default position is below the link
+    let top = linkRect.bottom + window.scrollY + 5;
+    let left = linkRect.left + window.scrollX;
+    
+    // Check if the preview would go off the bottom of the viewport
+    if (linkRect.bottom + containerHeight > viewportHeight) {
+      // Position above the link instead
+      top = linkRect.top + window.scrollY - containerHeight - 5;
+      
+      // If it would go off the top too, position it at the top of the viewport
+      if (top < window.scrollY) {
+        top = window.scrollY + 5;
+        
+        // Constrain height to fit in viewport
+        const maxHeight = viewportHeight - 10;
+        previewContainer.style.maxHeight = `${maxHeight}px`;
+      }
+    }
+    
+    // Check if the preview would go off the right of the viewport
+    if (left + containerWidth > viewportWidth) {
+      // Align right edge with viewport edge
+      left = viewportWidth - containerWidth + window.scrollX - 5;
+      
+      // Don't let it go off the left either
+      if (left < window.scrollX) {
+        left = window.scrollX + 5;
+        previewContainer.style.maxWidth = `${viewportWidth - 10}px`;
+      }
+    }
+    
+    // Apply the calculated position
+    previewContainer.style.top = `${top}px`;
+    previewContainer.style.left = `${left}px`;
+    
+    // Show the preview
+    previewContainer.style.visibility = 'visible';
+  }
+  
+  /**
+   * Hide the preview
+   */
+  function hidePreview() {
+    if (previewContainer) {
+      previewContainer.style.display = 'none';
+    }
+    
+    if (activeTimeout) {
+      clearTimeout(activeTimeout);
+      activeTimeout = null;
+    }
+    
+    activeLink = null;
+  }
+})();
