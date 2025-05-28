@@ -23,14 +23,14 @@ Until the end of 2024, our monthly review meetings were recorded via Google Meet
 
 ## 2025 (YouTube & Google Meet Recordings)
 
-- **May 2025:** [YouTube](https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=1) | [Google Meet](https://meet.google.com/qhx-joxe-rmz)
-- **April 2025:** [YouTube](https://www.youtube.com/watch?v=-jddya2E2NA&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2) | [Google Meet](https://drive.google.com/file/d/1OufvQSHLhC2VHmVr-RLplb6hkdEyfPLi/view?usp=sharing)
-- **March 2025:** [YouTube](https://www.youtube.com/watch?v=7K6qXiVsMXg&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=3) | [Google Meet](https://drive.google.com/file/d/1aCM-RJql7nX1MpMOG3pO9A-qTkpivzIT/view?usp=sharing)
-- **February 2025:** [YouTube](https://www.youtube.com/watch?v=7Ze9iVs-bI4&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=4) | [Google Meet](https://drive.google.com/file/d/17f5OtHEsKuUPRdbwQn9wJtdffBiPbJK7/view?usp=sharing)
-- **January 2025:** [YouTube](https://www.youtube.com/watch?v=6ovcWDCdqFU&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=5) | [Google Meet](https://drive.google.com/file/d/1e7YVDUWw945zQL3j0LrUwr42lXpJf4cK/view?usp=sharing)
+- **May 2025:** [YouTube](https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=1) | [Google Meet](https://meet.google.com/qhx-joxe-rmz) | [Slides](https://docs.google.com/presentation/d/1QNlCG33G6uC86sv4pWWMvxsqwNwXxx9-yjCPqEabpbo/edit?usp=sharing)
+- **April 2025:** [YouTube](https://www.youtube.com/watch?v=-jddya2E2NA&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2) | [Google Meet](https://drive.google.com/file/d/1OufvQSHLhC2VHmVr-RLplb6hkdEyfPLi/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1pWNLCtYtNVHvKPttUXgXuSXSXmrBp5YqvexPVcTXfQk/edit?usp=sharing)
+- **March 2025:** [YouTube](https://www.youtube.com/watch?v=7K6qXiVsMXg&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=3) | [Google Meet](https://drive.google.com/file/d/1aCM-RJql7nX1MpMOG3pO9A-qTkpivzIT/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1C99KT5wOR-Gq7lKXgD8MHDms4tmQH5nZIhOZbc4_5wg/edit?usp=sharing)
+- **February 2025:** [YouTube](https://www.youtube.com/watch?v=7Ze9iVs-bI4&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=4) | [Google Meet](https://drive.google.com/file/d/17f5OtHEsKuUPRdbwQn9wJtdffBiPbJK7/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1yrgOv3OnDEHxoxtpc5OV043-T3RPZ66ZtHKWVGMz25c/edit?usp=sharing)
+- **January 2025:** [YouTube](https://www.youtube.com/watch?v=6ovcWDCdqFU&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=5) | [Google Meet](https://drive.google.com/file/d/1e7YVDUWw945zQL3j0LrUwr42lXpJf4cK/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1qKXe3CvAvJGVWAssjrKpRrRABMT6I39E1FxUWQ_PZzo/edit?usp=sharing)
 
 ## 2024 (Google Meet Recordings)
 
-- **December 2024**: [Google Meet](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing)
-- **November 2024**: [Google Meet](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing)
-- **October 2024**: [Google Meet](https://drive.google.com/file/d/12VE0__S0knHqXXpIVdXGWvDipK0g89p_/view?usp=sharing)
+- **December 2024**: [Google Meet](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1LwpcXnXLgrYTSDalJY1SfpeyU_4lIkYhyMy5Kv0Huzw/edit?usp=sharing)
+- **November 2024**: [Google Meet](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/11LHQeUuv-TQfiy9GwXkrffSimFjSq8tdTB8qIB-Pk3U/edit?usp=sharing)
+- **October 2024**: [Google Meet](https://drive.google.com/file/d/12VE0__S0knHqXXpIVdXGWvDipK0g89p_/view?usp=sharing) | [Slides](https://docs.google.com/presentation/d/1KgjJyP6yZyZKCGum3deoIyooYUOretA9W6dTtXv1fso/edit?usp=sharing)
