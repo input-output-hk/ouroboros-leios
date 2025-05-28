@@ -97,14 +97,16 @@ jobs:
           path: formal-spec-html/
           retention-days: 1
 
-  process-documentation:
-    name: "Process and Enhance Documentation"
+  update-formal-spec:
+    name: "Update Formal Spec in Repository"
     runs-on: ubuntu-latest
     needs: download-artifacts
     if: needs.download-artifacts.outputs.artifacts-available == 'true'
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN || github.token }}
 
       - name: 📥 Download artifacts from previous job
         uses: actions/download-artifact@v4
@@ -123,9 +125,8 @@ jobs:
         working-directory: site
         run: yarn install
 
-      - name: 📝 Prepare formal spec directory
+      - name: 📝 Update formal spec directory
         run: |
-          mkdir -p site/static/formal-spec
           # Clear existing formal spec files
           rm -rf site/static/formal-spec/*
 
@@ -142,50 +143,26 @@ jobs:
             NODE_OPTIONS="--max-old-space-size=4096" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           fi
 
-      - name: 📤 Upload processed documentation
-        uses: actions/upload-artifact@v4
-        with:
-          name: enhanced-formal-spec
-          path: site/static/formal-spec/
-          retention-days: 1
-
-  deploy:
-    name: "Deploy to GitHub Pages"
-    runs-on: ubuntu-latest
-    needs: [download-artifacts, process-documentation]
-    if: always() && (needs.download-artifacts.outputs.artifacts-available == 'true' || needs.download-artifacts.outputs.artifacts-available == 'false')
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 📥 Download enhanced documentation (if available)
-        if: needs.process-documentation.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: enhanced-formal-spec
-          path: deploy-content
-        continue-on-error: true
-
-      - name: 📥 Download basic artifacts (fallback)
-        if: needs.process-documentation.result != 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: formal-spec-html-processed
-          path: deploy-content
-        continue-on-error: true
-
-      - name: 🔧 Configure Git for deployment
+      - name: 🔍 Check for changes
+        id: check-changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global http.postBuffer 52428800
-          git config --global core.compression 1
+          git add site/static/formal-spec/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in formal spec"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: 🚀 Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          publish_dir: deploy-content
-          destination_dir: formal-spec
-          cname: leios.cardano-scaling.org
-          keep_files: true
+      - name: 💾 Commit and push changes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit -m "Update formal specification documentation
+
+          - Updated from ouroboros-leios-formal-spec repository
+          - Run ID: ${{ github.event.client_payload.run_id || 'manual' }}
+          - Triggered by: ${{ github.event_name }}"
+          git push

@@ -13,6 +13,7 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
+  workflow_dispatch: # Allow manual triggering for formal spec updates
 
 permissions:
   contents: write
@@ -99,7 +100,7 @@ jobs:
 
   viz-build:
     name: "Build Visualizer"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
@@ -133,7 +134,7 @@ jobs:
 
   build-docusaurus-site:
     name: "Build Docusaurus Site"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [viz-build]
     runs-on: ubuntu-latest
     steps:
@@ -183,7 +184,7 @@ jobs:
 
   docs-publish:
     name: "Publish Docs"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: [build-docusaurus-site]
     runs-on: ubuntu-latest
     steps:
