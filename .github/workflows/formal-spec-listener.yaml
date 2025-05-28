@@ -78,18 +78,56 @@ jobs:
             echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > formal-spec-html/index.html
           fi
 
-      - name: 🚢 Upload formal spec files
-        uses: actions/upload-artifact@v4
+      # Prepare Docusaurus site with formal spec
+      - name: 📥 Checkout repository (again for site)
+        uses: actions/checkout@v4
         with:
-          name: formal-spec-html
-          path: formal-spec-html
-          retention-days: 1
-          compression-level: 9
-          if-no-files-found: error
+          fetch-depth: 2
 
-      - name: Verify artifact upload
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "yarn"
+          cache-dependency-path: ./site/yarn.lock
+
+      - name: 📦 Install dependencies
+        working-directory: site
+        run: yarn install
+
+      - name: 📝 Update formal spec
         run: |
-          echo "Verifying artifact upload..."
-          curl -s -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
-          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | \
-          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}'
+          mkdir -p site/static/formal-spec
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            cp -r formal-spec-html/* site/static/formal-spec/
+          fi
+
+      - name: 🔄 Enhance Agda documentation
+        working-directory: site
+        timeout-minutes: 25
+        run: |
+          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
+          if [ "$HTML_COUNT" -gt "0" ]; then
+            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+          fi
+
+      - name: 🏗️ Build Docusaurus site
+        working-directory: site
+        run: |
+          yarn build
+
+      - name: Verify Docusaurus build
+        working-directory: site
+        run: |
+          if [ -z "$(ls -A build/)" ]; then
+            echo "Error: Docusaurus build directory is empty"
+            exit 1
+          fi
+          ls -la build/
+
+      - name: 🚀 Publish GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          publish_dir: site/build
+          cname: leios.cardano-scaling.org

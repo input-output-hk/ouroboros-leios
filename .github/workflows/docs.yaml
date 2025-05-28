@@ -14,20 +14,6 @@ on:
       - "site/**"
       - "ui/**"
 
-  workflow_run:
-    workflows: ["Formal Spec Listener"]
-    types:
-      - completed
-    branches:
-      - main
-
-  workflow_dispatch: # Allow manual triggering or via API
-    inputs:
-      source:
-        description: "Source of the workflow dispatch"
-        required: false
-        default: "manual"
-
 permissions:
   contents: write
   pages: write
@@ -195,80 +181,11 @@ jobs:
           path: |
             site/build/*
 
-  build-docusaurus-site-formal-spec:
-    name: "Build Docusaurus Site (Formal Spec)"
-    if: github.event_name == 'workflow_run'
-    runs-on: ubuntu-latest
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: 🛠️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock
-
-      - name: 📦 Install dependencies
-        working-directory: site
-        run: yarn install
-
-      # Only for workflow_run: Download formal spec HTML
-      - name: 📥 Download formal spec HTML
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: formal-spec-html
-          path: formal-spec-html
-
-      # Only for workflow_run: Update formal spec
-      - name: 📝 Update formal spec
-        run: |
-          mkdir -p site/static/formal-spec
-          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            cp -r formal-spec-html/* site/static/formal-spec/
-          fi
-
-      # Only for workflow_run: Enhance Agda documentation
-      - name: 🔄 Enhance Agda documentation
-        working-directory: site
-        timeout-minutes: 25
-        run: |
-          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
-          if [ "$HTML_COUNT" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
-          fi
-
-      - name: 🏗️ Build Docusaurus site
-        working-directory: site
-        run: |
-          yarn build
-
-      - name: Verify Docusaurus build
-        working-directory: site
-        run: |
-          if [ -z "$(ls -A build/)" ]; then
-            echo "Error: Docusaurus build directory is empty"
-            exit 1
-          fi
-          ls -la build/
-
-      - name: 🚀 Upload Docusaurus build
-        uses: actions/upload-artifact@v4
-        with:
-          name: docusaurus-build
-          if-no-files-found: error
-          path: |
-            site/build/*
-
   docs-publish:
-    name: "Publish"
+    name: "Publish Docs"
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-docusaurus-site]
     runs-on: ubuntu-latest
-    needs: [build-docusaurus-site, build-docusaurus-site-formal-spec]
-    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_run')
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4
@@ -277,7 +194,6 @@ jobs:
           path: ./github-pages
 
       - name: 🚀 Publish GitHub Pages
-        if: success()
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
