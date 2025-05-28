@@ -21,9 +21,13 @@ License: Apache-2.0
 
 > [!NOTE]
 >
-> A short (\~200 word) description of the proposed solution and the technical issue being addressed.
+> A short (~200 word) description of the proposed solution and the technical issue being addressed.
 
-The anticipated growth of the Cardano ecosystem necessitates a fundamental enhancement of network throughput to accommodate increasing transaction volumes and support complex decentralized applications. To address this, we propose a transition to Ouroboros Leios, a novel consensus protocol within the Ouroboros family specifically designed for high-throughput operation while preserving Ouroboros Praos's rigorous security properties. Leios achieves this via a decoupled block production and aggregation mechanism, allowing for a higher rate of input-block generation followed by efficient endorsement and anchoring onto the main chain. This document specifies the Leios protocol formally using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
+The anticipated growth of the Cardano ecosystem necessitates a fundamental enhancement of network throughput to accommodate increasing transaction volumes and support complex decentralized applications.
+
+To address this challenge, we propose a transition to Ouroboros Leios — a novel consensus protocol within the Ouroboros family. Leios is specifically designed for high-throughput operation while preserving the rigorous security properties established by Ouroboros Praos.
+
+Leios achieves its scalability through a decoupled block production and aggregation mechanism. This allows for a higher rate of input-block generation, followed by efficient endorsement and anchoring onto the main chain. This document formally specifies the Leios protocol using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
 
 <details>
   <summary><h2>Table of contents</h2></summary>
@@ -464,10 +468,10 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 > 
 > This sub-section must define a list of criteria by which the proposal can become active. Criteria must relate to observable metrics or deliverables and be reviewed by editors and project maintainers when applicable. For example: "The changes to the ledger rules are implemented and deployed on Cardano mainnet by a majority of the network", or "The following key projects have implemented support for this standard".
 
-- [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
-- [ ]  Audit.
-- [ ]  Successful operation in testnet environments.
-- [ ]  Community agreement on the settings for the Leios protocol parameters.
+- [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
+- [ ]  Audit.
+- [ ]  Successful operation in testnet environments.
+- [ ]  Community agreement on the settings for the Leios protocol parameters.
 
 ### Implementation plan
 
@@ -478,8 +482,8 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 > 
 > In particular, an implementation that requires a hard-fork should explicitly mention it in its _'Implementation Plan'_.
 
-- [ ]  Detailed node-level (as opposed to this protocol-level) specification.
-- [ ]  Develop node-level conformance test suite.
+- [ ]  Detailed node-level (as opposed to this protocol-level) specification.
+- [ ]  Develop node-level conformance test suite.
 - Consider developing a "quick and dirty" implementation for large scale experiments.
 - Coordinate with related activities on other protocol enhancements.
     - Compatibility between Peras, Leios, and Genesis.
@@ -581,4 +585,4 @@ The following plots show number of persistent votes and votes, along with certif
 > 
 > CIPs are licensed in the public domain. More so, they must be licensed under one of the following licenses. Each new CIP must identify at least one acceptable license in its preamble. In addition, each license must be referenced by its respective abbreviation below in the _"Copyright"_ section.
 
-This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
+This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
