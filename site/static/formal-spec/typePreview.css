@@ -41,7 +41,7 @@
   --preview-border-color: var(--border-color);
 }
 
-.theme-dark .type-preview-container {
+:root.dark-theme .type-preview-container {
   --preview-highlight-bg: rgba(86, 156, 214, 0.15);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
@@ -53,9 +53,89 @@
   font-weight: bold;
   font-size: 0.9em;
   background-color: var(--subtle-background);
+  color: var(--text-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.preview-heading .module-name {
+  color: var(--text-color);
+}
+
+.preview-heading .link-to-definition {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.preview-heading .link-to-definition:hover {
+  text-decoration: underline;
+}
+
+/* Comment container */
+.preview-comment-container {
+  padding: 12px;
+  background-color: var(--subtle-background);
+  border-bottom: 1px solid var(--preview-border-color);
+  font-family: var(--body-font);
+  font-size: 0.85em;
+  line-height: 1;
+  color: var(--text-color);
+}
+
+.preview-comment-block {
+  margin-bottom: 8px;
+}
+
+.preview-comment-block:last-child {
+  margin-bottom: 0;
+}
+
+.preview-comment-line {
+  margin-bottom: 2px;
+  color: var(--text-color);
+}
+
+.preview-comment-line:last-child {
+  margin-bottom: 0;
+}
+
+/* Make comment text slightly muted but still readable */
+:root.dark-theme .preview-comment-line {
+  color: rgba(230, 237, 243, 0.85);
+}
+
+:root:not(.dark-theme) .preview-comment-line {
+  color: rgba(27, 31, 35, 0.75);
+}
+
+/* Comment lists */
+.preview-comment-list {
+  margin: 4px 0 8px 0;
+  padding-left: 20px;
+}
+
+.preview-comment-list:last-child {
+  margin-bottom: 0;
+}
+
+.preview-comment-list-item {
+  margin-bottom: 2px;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.preview-comment-list-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Style list items consistently with comment lines */
+:root.dark-theme .preview-comment-list-item {
+  color: rgba(230, 237, 243, 0.85);
+}
+
+:root:not(.dark-theme) .preview-comment-list-item {
+  color: rgba(27, 31, 35, 0.75);
 }
 
 /* Override and adjust styles for preview context */
