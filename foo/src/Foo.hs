@@ -8,15 +8,24 @@
 module Foo (proposal) where
 
 import           Control.Monad (guard)
-import           Data.Foldable (foldl')
+import           Data.Foldable (foldl', toList)
 import           Data.Traversable (for)
+import           Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
+import           Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified System.Random as Rand
 import qualified System.Random.Shuffle as Rand
+
+-----
+
+first :: (a1 -> a2) -> (a1, b) -> (a2, b)
+first f = \ ~(x, y) -> (f x, y)
 
 -----
 
@@ -27,10 +36,10 @@ plus (Sl x) y = Sl $ x + y
 
 -- | This is a unique identifier for the part of the tx that is signed.
 --
--- If it was influence by anything else (eg it it was the hash of the /entire/
--- transaction, including witnesses etc), then the adversary could alter the
--- contents (eg the order of witnesses) in order to change the 'TxId' when
--- relaying the tx.
+-- If it were influenced by anything else (eg if it was the hash of the
+-- /entire/ transaction, including witnesses etc), then the adversary could
+-- alter the contents (eg the order of witnesses) in order to change the 'TxId'
+-- when relaying the tx.
 --
 -- Key invariant: two transactions with the same 'TxId' have the same inputs
 -- and outputs. But two transactions with the same 'TxId' do not necessarily
@@ -58,6 +67,11 @@ data TxIn u = MkTxIn (TxId u) Int                                               
 --
 -- These inputs correspond to /spending inputs/. TODO Should it also include
 -- withdrawals? TODO Confirm that it should exclude reference inputs.
+--
+-- * @a@ is metadata about each tx
+-- * @b@ is metadata about each tx outputs
+--
+-- TODO this model doesn't even represent witnesses (eg signatures)
 data TxBody u a b = MkTxBody (Set (TxIn u)) [(TxIn u, b)] a                     deriving (Eq, Ord, Read, Show)
 
 meta :: TxBody u a b -> a
@@ -65,50 +79,68 @@ meta (MkTxBody _ins _outs x) = x
 
 -----
 
-data LeiosState u a b l = MkLeiosState {
+type SlotMap u v = Map SlotNo (Map u v)
+
+type TxMempool u a b = Seq (TxId u, TxBody u a b)
+
+type IbMempool t u a b l = SlotMap u (Timestamped t (IbBody u a b, Ledger u b))
+
+type EbMempool t u = SlotMap u (Timestamped t (EbBody u))
+
+data Cert = MkCert
+
+data LeiosState t u a b l x = MkLeiosState {
     -- | The ledger state at the tip of the selected RB
     selection :: l
   ,
-    -- | Transactions that are cumulatively valid, starting from 'selection'
-    txMempool :: [(TxId u, TxBody u a b)]
+    -- | Transactions that are cumulatively valid, starting from 'selection',
+    -- in arrival order (oldest first)
+    txMempool :: TxMempool u a b
   ,
     -- | The ledger state at the tip of 'txMempool'
-    txCache   :: l
+    txMempoolLedger :: l
   ,
-    -- | IBs that have not yet expired, ordered by slot and then by arrival
-    -- time
-    ibMempool :: Map SlotNo [(u, IbBody u a b)]
+    -- | IBs that have not yet expired, ordered by slot (oldest first) and then
+    -- by some objective uniquifier
+    --
+    -- Annotated with their (oldest) arrival time and their resulting ledger
+    -- state in within their current order mempool starting from 'selection'.
+    ibMempool :: IbMempool t u a b l
   ,
-    -- | EBs that have not yet expired, ordered by 'EbId'
-    ebMempool :: Map SlotNo (Map u (EbBody u))
+    -- | Also includes IBs that were evicted from the 'ebMempool', in case
+    -- they're referenced by an RB selected later
+    allIbs :: SlotMap u (IbBody u a b)
   ,
-    -- | Includes IBs that were evicted from the 'ibMempool', in case an RB
-    -- selected later references them
-    allIbs    :: Map SlotNo (Map u (IbBody u a b))
+    -- | EBs that have not yet expired, ordered by slot (oldest first) and then
+    -- by some objective uniquifier
+    --
+    -- Annotated with their (oldest) arrival time.
+    ebMempool :: EbMempool t u
   ,
-    -- | Includes EBs that were evicted from the 'ebMempool', in case an RB
-    -- selected later references them
-    allEbs    :: Map SlotNo (Map u (EbBody u))
-{-
+    -- | Also includes EBs that were evicted from the 'ebMempool', in case
+    -- they're referenced by an RB selected later
+    allEbs :: SlotMap u (EbBody u)
   ,
-    cert1s    :: Map SlotNo (Set u)
+    certs :: SlotMap u (Timestamped t Cert)
   ,
-    cert2s    :: Map SlotNo (Set u)
--}
+    -- | Extensible state
+    extra :: x
   }
 
 dereferenceEbIds ::
     Ord u
  =>
-    LeiosState u a b l
+    SlotMap u (IbBody u a b)
+ ->
+    SlotMap u (EbBody u)
  ->
     [EbId u]
  ->
     [(IbId u, IbBody u a b)]
-dereferenceEbIds MkLeiosState{..} =
+dereferenceEbIds allIbs allEbs =
     \ebIds ->
-        -- TODO smartly defer the 'extendWithRb' handler until all of the RB's
-        -- EBs and IBs have arrived instead of assuming they already have.
+        -- TODO smartly defer the 'switchRbs' handler until all of the RB's EBs
+        -- and IBs have arrived instead of assuming they already have.
         fromMaybe (error "impossible!")
       $ go Set.empty Set.empty [] ebIds
   where
@@ -123,111 +155,251 @@ dereferenceEbIds MkLeiosState{..} =
                 ibBody <- Map.lookup sl' allIbs >>= Map.lookup u'
                 pure (ibId, ibBody)
             go
-                (flipflipfoldl' (Set.insert . fst) ibs stopIb)
+                (reduce ibs (Set.insert . fst) stopIb)
                 (Set.insert ebId stopEb)
                 (acc ++ ibs)
                 (ebIds' ++ ebIds)
 
+-- | This is merely to make some lines shorter in this file
+type LeiosEndo t u a b l x =
+    LeiosState t u a b l x -> LeiosState t u a b l x
+
 -- | This record captures key methods that are both needed by the Leios node
 -- and also dependent on the base ledger rules
-data LeiosMethods prng u a b l = MkLeiosMethods {
-    -- | The ledger state at the intersection of the old chain and the new
-    -- chain, the 'EbId's from all subsequent RBs on the new chain, and the tip
-    -- slot of the new chain.
+data LeiosMethods prng t u a b l x = MkLeiosMethods {
+    -- | Given the ledger state at the intersection of the old chain and the
+    -- new chain and the slot and included 'EbId's of all subsequent RBs on the
+    -- new chain.
     --
     -- (The real ledger also needs at least all of the new RBs' headers, but
     -- this model does not.)
-    switchRbs :: l -> [EbId u] -> SlotNo -> LeiosState u a b l -> LeiosState u a b l
+    switchRbs :: l -> NonEmpty (SlotNo, [EbId u]) -> LeiosEndo t u a b l x
   ,
-    receiveTx :: (TxId u, TxBody u a b) -> LeiosState u a b l -> LeiosState u a b l
+    receiveTx :: (TxId u, TxBody u a b) -> LeiosEndo t u a b l x
   ,
-    receiveIb :: (IbId u, IbBody u a b) -> LeiosState u a b l -> LeiosState u a b l
+    -- | Given the IB's arrival time
+    receiveIb :: t -> (IbId u, IbBody u a b) -> LeiosEndo t u a b l x
   ,
-    receiveEb :: (EbId u, EbBody u) -> LeiosState u a b l -> LeiosState u a b l
+    -- | Given the EB's arrival time
+    receiveEb :: t -> (EbId u, EbBody u) -> LeiosEndo t u a b l x
   ,
-    newIb     :: prng -> SlotNo -> LeiosState u a b l -> (IbBody u a b, prng)
-{-
+    -- | For convenience, the model does not receive each vote but rather
+    -- only the first cert
+    --
+    -- Given the cert's arrival time.
+    receiveCert :: t -> EbId u -> LeiosEndo t u a b l x
   ,
-    receiveCert1 :: EbId u -> LeiosState u a b l -> LeiosState u a b l
+    newIb :: prng -> SlotNo -> LeiosState t u a b l x -> (IbBody u a b, prng)
   ,
-    receiveCert2 :: EbId u -> LeiosState u a b l -> LeiosState u a b l
+    newEb :: SlotNo -> LeiosState t u a b l x -> EbBody u
   ,
-    newEb        :: SlotNo -> LeiosState u a b l -> EbBody u
+    -- | Given the slot and its onset
+    newVt :: (SlotNo, t) -> LeiosState t u a b l x -> Set (EbId u)
   ,
-    newVote1     :: SlotNo -> LeiosState u a b l -> Set (EbId u)
-  ,
-    newVote2     :: SlotNo -> LeiosState u a b l -> Set (EbId u)
-  ,
-    newRb        :: SlotNo -> LeiosState u a b l -> [EbId u]
--}
+    newRb :: SlotNo -> LeiosState t u a b l x -> [EbId u]
   }
+
+-----
+
+doubleMax ::
+    (Ord k1, Ord k2)
+ =>
+    Map k1 (Map k2 v)
+ ->
+    Maybe v
+doubleMax m1 = do
+    (m2, _rest) <- Map.maxView m1
+    (v, _rest) <- Map.maxView m2
+    pure v
+
+doubleSplit ::
+    (Ord k1, Ord k2)
+ =>
+    k1
+ ->
+    k2
+ ->
+    Map k1 (Map k2 v)
+ ->
+    Either v (Map k1 (Map k2 v), Map k1 (Map k2 v))
+doubleSplit k1 k2 m1 =
+    case mbEq1 of
+        Nothing -> Right (lt1, gt1)
+        Just m2 ->
+            let (lt2, mbEq2, gt2) = Map.splitLookup k2 m2
+            in
+            case mbEq2 of
+                Just v  -> Left v
+                Nothing -> Right (
+                    Map.insert k1 lt2 lt1
+                  ,
+                    Map.insert k1 gt2 gt1
+                  )
+  where
+    (lt1, mbEq1, gt1) = Map.splitLookup k1 m1
+
+reduce :: Foldable t => t a -> (a -> b -> b) -> b -> b
+reduce xs snoc nil = foldl' (flip snoc) nil xs
+
+enforceExpiry :: Int -> SlotNo -> (k -> a -> SlotNo) -> Map k a -> Map k a
+enforceExpiry expiry sl prj =
+    Map.filterWithKey $ \k x -> sl <= plus (prj k x) expiry
+
+add ::
+    (Ord k1, Ord k2)
+ =>
+    k1 -> k2 -> v -> Map k1 (Map k2 v) -> Map k1 (Map k2 v)
+add k1 k2 v =
+    Map.insertWith
+        (\new old -> Map.unionWith const old new)
+        k1
+        (Map.singleton k2 v)
+
+data Timestamped t a = MkTimestamped !t !a
+
+getTimestamped :: Timestamped t a -> a
+getTimestamped ~(MkTimestamped _t x) = x
+
+onTimestamped :: (a -> b) -> Timestamped t a -> Timestamped t b
+onTimestamped f ~(MkTimestamped t x) = MkTimestamped t (f x)
+
+insert ::
+    (Ord k1, Ord k2, Ord t)
+ =>
+    t
+ ->
+    k1
+ ->
+    k2
+ ->
+    v
+ ->
+    Map k1 (Map k2 (Timestamped t v))
+ ->
+    Map k1 (Map k2 (Timestamped t v))
+insert t k1 k2 v =
+    Map.insertWith
+        (\new old -> Map.unionWith f old new)
+        k1
+        (Map.singleton k2 (MkTimestamped t v))
+  where
+    f (MkTimestamped t1 x) (MkTimestamped t2 y) =
+      MkTimestamped (min t1 t2) (if t2 < t1 then y else x)
 
 -----
 
 -- | Just the UTxO + my penalization idea.
 --
 -- TODO does the staggering amount of additional logic in the real ledger
--- including anything that disrupts the overall idea of this small model?
+-- including anything that disrupts the overall idea of this small model? See
+-- 'Cache'.
 data Ledger u b = MkLedger {
     -- | A 'TxIn' that either was recently consumed by the recorded 'TxId' or
     -- else would have been recently created by the recorded 'TxId' if it
     -- hadn't been penalized
     offlimits :: Map (TxIn u) (SlotNo, TxId u)
   ,
-    utxo      :: Map (TxIn u) b
+    tipSlot :: SlotNo
+  ,
+    utxo :: Map (TxIn u) b
   }
 
-data Scrutiny = Apply | Reapply
+tick :: SlotNo -> Ledger u b -> Ledger u b
+tick sl l = l { tipSlot = sl }   -- TODO what else?
+
+-- | Whether a tx has been @Phase2Valid@
+--
+-- The intention of this cache is to avoid ever running the /scripts/ within a
+-- particular tx more than once, regardless of how many times that tx is
+-- applied. This reflects the assumption that executing scripts is much much
+-- more expensive than looking up UTxO etc.
+--
+-- A key property the base ledger must provide is that a tx determined to be
+-- Phase2Valid against some ledger state (which is impossible unless it's
+-- Phase1Valid in that same ledger state, since the Plutus interpreter must be
+-- given all /datum/s stored in the subset of the UTxO restricted to /all/ of
+-- the tx's inputs) will be Phase2Valid in any state in which its Phase1Valid
+-- (even if the ledger states are on different chains, in different slots,
+-- etc).
+--
+-- TODO also cache the "static" checks, eg checking signatures... but that
+-- requires a hash of the full tx's bytes, not just the hash of the part of the
+-- tx that people sign.
+--
+-- TODO some notion of age for entries in this cache so that it can be
+-- garbage-collected?
+newtype Cache u = Cache (Set (TxId u))
+
+cacheInsert :: Ord u => TxId u -> Cache u -> Cache u
+cacheInsert txId (Cache xs) = Cache $ Set.insert txId xs
 
 -- | Apply a tx while discarding it is still an option
-maybeApplyTx ::
+tryApplyTx ::
     Ord u
  =>
-    Scrutiny
+    (Ledger u b, Cache u)
  ->
-    Ledger u b
+    (TxId u, TxBody u a b)
  ->
-    (TxId u, TxBody u meta b)
- ->
-    Maybe (Ledger u b)
-maybeApplyTx _scenario MkLedger{..} (_txId, txBody) =
+    Maybe (Ledger u b, Cache u)
+tryApplyTx (MkLedger{..}, cache) (txId, txBody) =
     if Map.size hits /= Set.size ins then Nothing else
-    Just MkLedger {
+    Just $ flip (,) cache' $ MkLedger {
         -- not updated within the Mempool
         offlimits = offlimits
+      ,
+        tipSlot = tipSlot
       ,
         utxo = (utxo `Map.difference` hits) `Map.union` Map.fromList outs
       }
   where
     MkTxBody ins outs _ = txBody
 
-    -- TODO also run scripts, unless @_scenario@ is 'Reapply'
+    -- TODO also run scripts, unless found in @cache@
     hits = Map.restrictKeys utxo ins
 
+    -- TODO only insert if scripts run and pass
+    cache' = cacheInsert txId cache
+
 -- | How to apply a tx when it's too late to discard it
---
--- TODO should we have a 'Scrutiny' argument here too?
 applyTx ::
     Ord u
  =>
     Params
  ->
-    SlotNo
+    (TxId u, TxBody u a b)
  ->
-    (TxId u, TxBody u meta b)
+    (Ledger u b, Cache u)
  ->
-    Ledger u b
- ->
-    Ledger u b
-applyTx Params{..} sl (txId, txBody) MkLedger{..} =
-    MkLedger {
+    (Ledger u b, Cache u)
+    -- ^ whether the tx was fully validated
+applyTx Params{..} (txId, txBody) (MkLedger{..}, cache) =
+    (l', cache')
+  where
+    MkTxBody ins outs _ = txBody
+
+    hits = Map.restrictKeys utxo ins
+
+    -- TODO switch away from this to the High Collateral scheme
+    penalty = not $ Map.null $ Map.restrictKeys offlimits ins
+
+    -- TODO also run scripts, unless found in @cache@
+    success = not penalty && Map.size hits == Set.size ins
+
+    blame _ = (tipSlot, txId)
+
+    cache' = (if success then cacheInsert txId else id) cache
+
+    l' = MkLedger {
         offlimits =
-            enforceExpiry penaltyExpirySlots sl (\_txIn -> fst)
+            enforceExpiry penaltyExpirySlots tipSlot (\_txIn -> fst)
           $ Map.union offlimits
           $ Map.union (Map.fromSet blame ins)
           $ if not penalty then Map.empty else
             blame <$> Map.fromList outs
-       ,
+      ,
+        tipSlot = tipSlot
+      ,
         utxo =
           if
             | penalty ->
@@ -237,17 +409,6 @@ applyTx Params{..} sl (txId, txBody) MkLedger{..} =
             | otherwise ->
               utxo
       }
-  where
-    MkTxBody ins outs _ = txBody
-
-    hits = Map.restrictKeys utxo ins
-
-    penalty = not $ Map.null $ Map.restrictKeys offlimits ins
-
-    -- TODO also run scripts
-    success = not penalty && Map.size hits == Set.size ins
-
-    blame _ = (sl, txId)
 
 -----
 
@@ -261,111 +422,218 @@ data Params = Params {
     -- | How long the ledger remembers that the use of some 'TxIn' incurs a penalty
     penaltyExpirySlots :: Int
   ,
-    ibSizeLimit :: TxSize
+    ibSizeLimit :: TxBytes
   ,
     maxColor :: TxColor
   }
 
-newtype TxSize = TxSize Int
+newtype TxBytes = TxBytes Int
   deriving (Eq, Ord, Read, Show)
 
-instance Monoid TxSize where mempty = TxSize 0
-instance Semigroup TxSize where TxSize x <> TxSize y = TxSize $ x + y
+instance Monoid TxBytes where mempty = TxBytes 0
+instance Semigroup TxBytes where TxBytes x <> TxBytes y = TxBytes $ x + y
 
 newtype TxColor = TxColor Int
   deriving (Eq, Ord, Read, Show)
 
-flipflipfoldl' :: Foldable t => (a -> b -> b) -> t a -> b -> b
-flipflipfoldl' snoc xs nil = foldl' (\acc x -> snoc x acc) nil xs
-
-enforceExpiry :: Int -> SlotNo -> (k -> a -> SlotNo) -> Map k a -> Map k a
-enforceExpiry expiry sl prj =
-    Map.filterWithKey $ \k x -> sl <= plus (prj k x) expiry
-
-insertMappend :: (Ord k, Monoid m) => k -> m -> Map k m -> Map k m
-insertMappend = Map.insertWith (\new old -> old <> new)
-
 -----
 
-proposal ::
-    (Ord u, Rand.RandomGen prng)
+-- | Internal detail of 'extendIbMempool'
+data EIB t u a b l = EIB !(IbMempool t u a b l) !l !(Cache u)
+
+extendIbMempool ::
+ forall t u a b l x.
+    (
+        l ~ Ledger u b
+    ,
+        x ~ Cache u
+    ,
+        Ord t
+    ,
+        Ord u
+    )
  =>
     Params
  ->
-    LeiosMethods prng u (TxColor, TxSize) b (Ledger u b)
+    l
+    -- ^ anchor of the existing mempool
+ ->
+    x
+ ->
+    IbMempool t u a b l
+    -- ^ the existing mempool
+ ->
+    SlotMap u (Timestamped t (IbBody u a b))
+    -- ^ IBs to add
+ ->
+    (IbMempool t u a b l, x)
+extendIbMempool params selection extra0 acc0 ibs =
+    let EIB acc' _l' extra' =
+            reduce
+                (Map.toList $ Map.map Map.toList ibs)
+                (\(sl', ibBodies) ->
+                    reduce
+                        ibBodies
+                        (\(u', MkTimestamped t (MkIbBody txs)) ->
+                            snocIb t (IB sl' u', MkIbBody txs)
+                          .
+                            reduce txs appTx
+                        )
+                  .
+                    tickIfNecessary sl'
+                )
+                (EIB acc0 l0 extra0)
+    in
+    (acc', extra')
+  where
+    getSlot l = let MkLedger{tipSlot} = l in tipSlot
+
+    l0 = maybe selection (snd . getTimestamped) $ doubleMax acc0
+
+    tickIfNecessary sl' (EIB acc l extra) =
+        EIB acc `flip` extra
+      $ if getSlot l >= sl' then l else
+        tick sl' l
+
+    appTx tx (EIB acc l extra) =
+        EIB acc `uncurry` applyTx params tx (l, extra)
+
+    snocIb t (IB sl' u', ibBody') (EIB acc l extra) =
+        EIB
+            (insert t sl' u' (ibBody', l) acc)
+            l
+            extra
+
+proposal ::
+ forall prng t u a b.
+    (a ~ (TxColor, TxBytes), Ord t, Ord u, Rand.RandomGen prng)
+ =>
+    Params
+ ->
+    LeiosMethods prng t u a b (Ledger u b) (Cache u)
 proposal params@Params{..} =
     MkLeiosMethods {..}
   where
-    switchRbs isect ebIds sl st@MkLeiosState{..} =
-        let l =
-                flipflipfoldl'
-                    (\(IB sl' _u, MkIbBody txs) ->
-                        flipflipfoldl' (applyTx params sl') txs
-                    )
-                    (dereferenceEbIds st ebIds)
-                    isect
+    switchRbs isect rbs MkLeiosState{..} =
+        let tipSlot' = fst $ NE.last rbs :: SlotNo
 
+            -- apply the new RB's IB sequence
+            (selection', extra1) =
+                reduce
+                    rbs
+                    (\(sl, ebIds) ->
+                        reduce
+                            (dereferenceEbIds allIbs allEbs ebIds)
+                            (\(_ibId, MkIbBody txs) ->
+                                -- notice use of the RB slot instead of the IB slot
+                                reduce txs (applyTx params)
+                            )
+                      .
+                        first (tick sl)
+                    )
+                    (isect, extra)
+
+            -- rebuild the 'txMempool'
+            --
             -- evict txs that are no longer cumulatively valid starting from
             -- the new 'selection'
-            go acc1 !acc2 = \case
-                []     -> (reverse acc1, acc2)
-                tx:txs ->
-                    let scenario =
-                            Apply   -- TODO check 'txMempool' membership?
-                    in
-                    case maybeApplyTx scenario acc2 tx of
-                        Nothing    -> go       acc1  acc2  txs
-                        Just acc2' -> go (tx : acc1) acc2' txs
+            go !acc !accL !accCache = \case
+                Seq.Empty      ->
+                  (
+                    acc :: TxMempool u a b
+                  ,
+                    accL :: Ledger u b
+                  ,
+                    accCache :: Cache u
+                  )
+                tx Seq.:<| txs ->
+                    case tryApplyTx (accL, accCache) tx of
+                        Nothing                 -> go acc accL accCache txs
+                        Just (accL', accCache') ->
+                            go (acc Seq.:|> tx ) accL' accCache' txs
 
-            (txMempool', txCache') = go [] l txMempool
+            -- TODO which slot to assume? For example, tipSlot+1?
+            txMempool'       :: TxMempool u a b
+            txMempoolLedger' :: Ledger u b
+            extra2           :: Cache u
+            (txMempool', txMempoolLedger', extra2) =
+                go Seq.empty selection' extra1 txMempool
+
+            -- rebuild the 'ibMempool'
+            --
+            -- evict based on age wrt new RB tip (which is merely a lower bound
+            -- in this model for the wall clock)
+            (ibMempool', extra3) =
+                extendIbMempool
+                    params
+                    selection'
+                    extra2
+                    Map.empty
+                    (
+                        Map.map (Map.map (onTimestamped fst))
+                      $ enforceExpiry ibExpirySlots tipSlot' const ibMempool
+                    )
         in
         MkLeiosState {
-            selection = l
+            selection = selection'
           ,
             txMempool = txMempool'
           ,
-            txCache = txCache'
+            txMempoolLedger = txMempoolLedger'
           ,
-            ibMempool = enforceExpiry ibExpirySlots sl const ibMempool
-          ,
-            ebMempool = enforceExpiry ebExpirySlots sl const ebMempool
+            ibMempool = ibMempool'
           ,
             allIbs = allIbs   -- TODO garbage collect somehow
           ,
+            ebMempool = enforceExpiry ebExpirySlots tipSlot' const ebMempool
+          ,
             allEbs = allEbs   -- TODO garbage collect somehow
-{-
           ,
-            cert1s = enforceExpiry ebExpirySlots sl const cert1s
+            certs = enforceExpiry ebExpirySlots tipSlot' const certs
           ,
-            cert2s = enforceExpiry ebExpirySlots sl const cert2s
--}
+            extra = extra3   -- TODO garbage collect somehow
           }
 
     receiveTx tx st@MkLeiosState{..} =
-        let (txMempool', txCache') =
-                case maybeApplyTx Apply txCache tx of
-                    Nothing -> (txMempool        , txCache)
-                    Just l  -> (txMempool ++ [tx], l      )
-        in
+        case tryApplyTx (txMempoolLedger, extra) tx of
+            Nothing                         -> st
+            Just (txMempoolLedger', extra') -> st {
+                extra = extra'
+              ,
+                txMempool = txMempool Seq.:|> tx
+              ,
+                txMempoolLedger = txMempoolLedger'
+              }
+
+    receiveIb t (IB sl u, ibBody) st@MkLeiosState{..} =
+        case doubleSplit sl u ibMempool of
+            Left {}        -> st   -- IB already present
+            Right (lt, gt) ->
+                let gt' =
+                        insert t sl u ibBody
+                      $ Map.map (Map.map (onTimestamped fst)) gt
+
+                    (ibMempool', extra') =
+                        extendIbMempool params selection extra lt gt'
+                in
+                st {
+                    ibMempool = ibMempool'
+                  ,
+                    allIbs = add sl u ibBody allIbs
+                  ,
+                    extra = extra'
+                  }
+
+    receiveEb t (EB sl u, ebBody) st@MkLeiosState{..} =
         st {
-            txMempool = txMempool'
+            ebMempool = insert t sl u ebBody ebMempool
           ,
-            txCache = txCache'
+            allEbs = add sl u ebBody allEbs
           }
 
-    -- TODO do we need to be doing the CPU intensive work as IBs arrive?
-    receiveIb (IB sl u, ibBody) st@MkLeiosState{..} =
+    receiveCert t (EB sl u) st@MkLeiosState{..} =
         st {
-            ibMempool = insertMappend sl [(u, ibBody)] ibMempool
-          ,
-            allIbs = insertMappend sl (Map.singleton u ibBody) allIbs
-          }
-
-    receiveEb (EB sl u, ebBody) st@MkLeiosState{..} =
-        st {
-            ebMempool = insertMappend sl (Map.singleton u ebBody) ebMempool
-          ,
-            allEbs = insertMappend sl (Map.singleton u ebBody) allEbs
+            certs = insert t sl u MkCert certs
           }
 
     newIb prng _sl MkLeiosState{..} =
@@ -374,53 +642,36 @@ proposal params@Params{..} =
 
             (prng1, prng2) = Rand.split prng
 
-            -- reapply the entire 'ibMempool'
-            --
-            -- If IBs that arrived were simply added to the tip, it'd be cheap
-            -- to maintain. But that's not the case, so we just re-evaluate
-            -- them all. There are to do this as incrementally as possible even
-            -- with IBs arriving out of order, but this code suffices for a
-            -- specification.
-            l =
-                flipflipfoldl'
-                    (\(sl', ibBodies) ->
-                        flipflipfoldl'
-                            (\(_ibId, MkIbBody txs) ->
-                                flipflipfoldl' (applyTx params sl') txs
-                            )
-                            ibBodies
-                    )
-                    (Map.toList ibMempool)
-                    selection
+            l = maybe selection (snd . getTimestamped) $ doubleMax ibMempool
 
             -- keep the subsequence (not /substring/!) of 'txMempool' that
             -- matches the picked colors and is cumulatively valid starting
             -- from the tip of 'ibMempool'
-            goInner !accSz accTxs !acc !accColors remainingColors = \case
-                []       ->
+            goInner !accSz !accTxs !acc !accColors remainingColors = \case
+                Seq.Empty      ->
                     goOuter accTxs accColors remainingColors
-                tx : txs ->
+                tx Seq.:<| txs ->
                     let recur f = f accColors remainingColors txs
 
-                        (txColor, txSize) = meta $ snd tx
+                        (txColor, txBytes) = meta $ snd tx
 
                         hit = txColor `Set.member` accColors
 
-                        tooBig = accSz <> txSize > ibSizeLimit
+                        tooBig = accSz <> txBytes > ibSizeLimit
 
                         skip = goInner accSz accTxs acc
                     in
                     if
                       | not hit   -> recur skip
-                      | tooBig    -> reverse accTxs
+                      | tooBig    -> accTxs
                       | otherwise ->
                         recur
-                      $ case maybeApplyTx Reapply acc tx of
-                            Nothing   -> skip
-                            Just acc' ->
+                      $ case tryApplyTx (acc, extra) tx of
+                            Nothing              -> skip
+                            Just (acc', _extra') ->
                                 goInner
-                                    (accSz <> txSize)
-                                    (tx : accTxs)
+                                    (accSz <> txBytes)
+                                    (accTxs Seq.:|> tx)
                                     acc'
 
             -- add colors randomly until the IB is full or the 'txMempool' is
@@ -429,14 +680,14 @@ proposal params@Params{..} =
             -- If some red tx depends on a blue tx and red is added before
             -- blue, then 'goInner' will skip that red tx on the red pass but
             -- won't skip it on the red&blue pass. That's why each iteration of
-            -- 'goOuter' resets the tx-ish accumulators and works through the
-            -- whole 'txMempool' in its actual order.
+            -- 'goOuter' resets the tx accumulator and works through the
+            -- /whole/ 'txMempool' in /its/ actual order.
             goOuter accTxs accColors = \case
-                []             -> reverse accTxs
+                []             -> accTxs
                 color : colors ->
                     goInner
-                        (TxSize 0)
-                        []
+                        (TxBytes 0)
+                        Seq.empty
                         l
                         (Set.insert color accColors)
                         colors
@@ -448,24 +699,14 @@ proposal params@Params{..} =
                     (Set.size mempoolColors)
                     prng1
         in
-        (MkIbBody $ goOuter [] Set.empty shuffledColors, prng2)
+          (
+            MkIbBody $ toList $ goOuter Seq.empty Set.empty shuffledColors
+          ,
+            prng2
+          )
 
-{-
-    receiveCert1 (EB sl u) st@MkLeiosState{..} =
-        st {
-            cert1s = insertMappend sl (Set.singleton u) cert1s
-          }
+    newEb sl MkLeiosState{..} = error "TODO"
 
-    receiveCert2 (EB sl u) st@MkLeiosState{..} =
-        st {
-            cert2s = insertMappend sl (Set.singleton u) cert2s
-          }
+    newVt (sl, onset) MkLeiosState{..} = error "TODO"
 
-    newEb = undefined   -- TODO refer to spec
-
-    newVote1 = undefined   -- TODO refer to spec
-
-    newVote2 = undefined   -- TODO refer to spec
-
-    newRb = undefined   -- TODO refer to spec
--}
+    newRb sl MkLeiosState{..} = error "TODO"
