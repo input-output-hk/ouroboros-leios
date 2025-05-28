@@ -78,12 +78,6 @@ jobs:
             echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > formal-spec-html/index.html
           fi
 
-      # Prepare Docusaurus site with formal spec
-      - name: 📥 Checkout repository (again for site)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
       - name: 🛠️ Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -95,9 +89,12 @@ jobs:
         working-directory: site
         run: yarn install
 
-      - name: 📝 Update formal spec
+      - name: 📝 Prepare formal spec directory
         run: |
           mkdir -p site/static/formal-spec
+          # Clear existing formal spec files
+          rm -rf site/static/formal-spec/*
+
           if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
             cp -r formal-spec-html/* site/static/formal-spec/
           fi
@@ -108,26 +105,21 @@ jobs:
         run: |
           HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
           if [ "$HTML_COUNT" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
+            NODE_OPTIONS="--max-old-space-size=4096" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
           fi
 
-      - name: 🏗️ Build Docusaurus site
-        working-directory: site
+      - name: 🔧 Configure Git for deployment
         run: |
-          yarn build
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global http.postBuffer 52428800
+          git config --global core.compression 1
 
-      - name: Verify Docusaurus build
-        working-directory: site
-        run: |
-          if [ -z "$(ls -A build/)" ]; then
-            echo "Error: Docusaurus build directory is empty"
-            exit 1
-          fi
-          ls -la build/
-
-      - name: 🚀 Publish GitHub Pages
+      - name: 🚀 Deploy only formal-spec changes
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          publish_dir: site/build
+          publish_dir: site/static/formal-spec
+          destination_dir: formal-spec
           cname: leios.cardano-scaling.org
+          keep_files: true
