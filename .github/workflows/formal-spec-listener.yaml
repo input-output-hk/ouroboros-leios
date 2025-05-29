@@ -118,12 +118,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock
+          cache: "npm"
+          cache-dependency-path: ./site/package-lock.json
 
       - name: 📦 Install dependencies
         working-directory: site
-        run: yarn install
+        run: npm ci
 
       - name: 📝 Update formal spec directory
         run: |
@@ -139,7 +139,7 @@ jobs:
         with:
           input-dir: site/static/formal-spec
           config-file: site/agda-docs.config.json
-          node-options: '--max-old-space-size=4096'
+          node-options: "--max-old-space-size=4096"
 
       - name: 🔍 Check for changes
         id: check-changes
