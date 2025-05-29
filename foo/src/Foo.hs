@@ -7,7 +7,6 @@
 
 module Foo (proposal) where
 
-import           Control.Monad (guard)
 import           Data.Foldable (foldl', toList)
 import           Data.Traversable (for)
 import           Data.List.NonEmpty (NonEmpty)
@@ -136,29 +135,29 @@ dereferenceEbIds ::
  ->
     [EbId u]
  ->
-    [(IbId u, IbBody u a b)]
+    SlotMap u (IbBody u a b)
 dereferenceEbIds allIbs allEbs =
     \ebIds ->
         -- TODO smartly defer the 'switchRbs' handler until all of the RB's EBs
         -- and IBs have arrived instead of assuming they already have.
         fromMaybe (error "impossible!")
-      $ go Set.empty Set.empty [] ebIds
+      $ go Set.empty Map.empty ebIds
   where
-    go stopIb stopEb acc = \case
+    go stopEb acc = \case
         []           -> Just acc
-        ebId : ebIds -> do
-            let EB sl u = ebId
-            MkEbBody ibIds ebIds' <- Map.lookup sl allEbs >>= Map.lookup u
-            ibs <- for ibIds $ \ibId -> do
-                guard $ not $ ibId `Set.member` stopIb
-                let IB sl' u' = ibId
-                ibBody <- Map.lookup sl' allIbs >>= Map.lookup u'
-                pure (ibId, ibBody)
-            go
-                (reduce ibs (Set.insert . fst) stopIb)
-                (Set.insert ebId stopEb)
-                (acc ++ ibs)
-                (ebIds' ++ ebIds)
+        ebId : ebIds ->
+            if ebId `Set.member` stopEb then go stopEb acc ebIds else do
+                let EB sl u = ebId
+                MkEbBody ibIds ebIds' <- Map.lookup sl allEbs >>= Map.lookup u
+                ibs <- for ibIds $ \ibId -> do
+                    let IB sl' u' = ibId
+                    ibBody <- Map.lookup sl' allIbs >>= Map.lookup u'
+                    pure (ibId, ibBody)
+                let addIb (IB sl' u', ibBody) = add sl' u' ibBody
+                go
+                    (Set.insert ebId stopEb)
+                    (reduce ibs addIb acc)
+                    (ebIds' ++ ebIds)
 
 -- | This is merely to make some lines shorter in this file
 type LeiosEndo t u a b l x =
@@ -523,10 +522,15 @@ proposal params@Params{..} =
                     rbs
                     (\(sl, ebIds) ->
                         reduce
-                            (dereferenceEbIds allIbs allEbs ebIds)
-                            (\(_ibId, MkIbBody txs) ->
-                                -- notice use of the RB slot instead of the IB slot
-                                reduce txs (applyTx params)
+                            (Map.toList $ dereferenceEbIds allIbs allEbs ebIds)
+                            (\(_sl', m2) ->
+                                 reduce
+                                   (Map.toList m2)
+                                   (\(_u', MkIbBody txs) ->
+                                        -- notice use of the RB slot instead of
+                                        -- the IB slot
+                                        reduce txs (applyTx params)
+                                   )
                             )
                       .
                         first (tick sl)
