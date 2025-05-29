@@ -12,7 +12,7 @@
 
 | Transaction efficiency | Temporal efficiency | Spatial Efficiency |
 |---|---|---|
-| ![Transaction efficiency of Leios](analysis/sims/2025w22/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w22/plots/reach-rb-tx.svg) | ![Spatial efficiency of Leios](analysis/sims/2025w20/plots/spatial-efficiency.svg) |
+| ![Transaction efficiency of Leios](analysis/sims/2025w22/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w22/plots/reach-rb-tx.svg) | ![Spatial efficiency of Leios](analysis/sims/2025w22/plots/spatial-efficiency.svg) |
 
 ### Faster data processing of simulation results
 
