@@ -2,6 +2,18 @@
 
 ## 2025-05-29
 
+### Week 23 simulation results
+
+- The protocol performs well (i.e., essentially every tx makes it to the ledger) up to 300 TPS, where it breaks down early.
+    - The 100-node network is actually more stressful to the protocol than a realistic mainnet would be, so I'm eager to see what TPS we can achieve there.
+    - The TPS figures that are quoted for the design are about 10% lower than the actual results, so I going to recalibrate the experimental design before I run it again.
+- The space efficiency is above 80% for the moderate-throughput scenarios.
+- Transactions take about 100 seconds average (about 200 seconds for the 95th %ile) to reach the ledger.
+
+| Transaction efficiency | Temporal efficiency | Spatial Efficiency |
+|---|---|---|
+| ![Transaction efficiency of Leios](analysis/sims/2025w22/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w22/plots/reach-rb-tx.svg) | ![Spatial efficiency of Leios](analysis/sims/2025w20/plots3x/spatial-efficiency.svg) |
+
 ### Faster data processing of simulation results
 
 The new [`leios-trace-processor`](analysis/sim/trace-processor/) tool was developed to replace the previous script-based analyses of Leios simulator output. It runs far faster than the previous scripts and this will make it possible to analyzes much longer and larger simulation results.
