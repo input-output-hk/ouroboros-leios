@@ -1,5 +1,7 @@
 # Data processing tool for simulation traces
 
+The `leios-trace-processor` reads simulation trace log files from the Leios [Haskell](../../../simulation/) or [Rust](../../../sim-rs/) simulator, analyzes them, and formats the results as CSV files.
+
 
 ## Running the tool
 
@@ -8,13 +10,13 @@ $ nix run .#leios-trace-processor -- --help
 
 Process Leios trace logs into CSV file abstracts
 
-Usage: leios-trace-processor [--trace-file ARG] --lifecycle-file ARG
+Usage: leios-trace-processor [--trace-file FILE] --lifecycle-file FILE
 
   Leios trace processor
 
 Available options:
-  --trace-file ARG         Short Leios simulation trace log file
-  --lifecycle-file ARG     Output CSV file for transaction lifecycle data
+  --trace-file FILE        Short Leios simulation trace log file
+  --lifecycle-file FILE    Output CSV file for transaction lifecycle data
   -h,--help                Show this help text
 ```
 
@@ -25,9 +27,7 @@ Available options:
 $ nix run .#leios-trace-processor -- --trace-file sim.log --lifecycle-file lifecycle.csv
 
 $ head lifecycle.csv
-```
 
-```csv
 Kind,Item,Size [B],References,Created [s],To IB [s],To EB [s],To RB [s],In RB [s]
 EB,10-node-19,240,0,10.075,NA,NA,NA,NA
 EB,100-node-51,336,25,100.075,NA,130.075,129.091,NA
