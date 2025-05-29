@@ -9,6 +9,7 @@ module Leios.Tracing.Lifecycle (
   lifecycle,
 ) where
 
+import Control.Monad ((<=<))
 import Control.Monad.State.Strict (State, execState, gets, modify')
 import Data.Aeson (FromJSON (..), Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
@@ -161,7 +162,11 @@ parseMessage "RBGenerated" item created =
   withObject "RBGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      ebs <- fmap (maybe mempty (pure . (,mempty{toRB = created, references = Sum 1}) . ItemKey "EB")) . (.: "id") =<< (.: "eb") =<< message .: "endorsement"
+      ebs <-
+        maybe
+          (pure mempty)
+          (fmap (pure . (,mempty{toRB = created, references = Sum 1}) . ItemKey "EB") . (.: "id") <=< (.: "eb"))
+          =<< message .: "endorsement"
       txs <- fmap ((,mempty{inRB = created, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
       pure (ItemKey{kind = "RB", item}, mempty{size, created}, M.fromList $ ebs <> txs)
 parseMessage _ _ _ =
