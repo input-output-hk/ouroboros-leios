@@ -2,7 +2,7 @@
 
 ## 2025-05-29
 
-### Week 23 simulation results
+### Transaction lifecycle simulation results (week 23)
 
 - The protocol performs well (i.e., essentially every tx makes it to the ledger) up to 300 TPS, where it breaks down early.
     - The 100-node network is actually more stressful to the protocol than a realistic mainnet would be, so I'm eager to see what TPS we can achieve there.
