@@ -470,14 +470,46 @@ pre code {
 /* Highlighted line styles */
 .code-line.highlighted {
   background-color: var(--hover-bg);
-  border-radius: 0 3px 3px 0;
   display: block;
   width: 100%;
+}
+
+/* Range highlighting styles - more cohesive look for consecutive lines */
+.code-line.highlighted.range-start {
+  border-radius: 0 3px 0 0;
+}
+
+.code-line.highlighted.range-middle {
+  border-radius: 0;
+}
+
+.code-line.highlighted.range-end {
+  border-radius: 0 0 3px 0;
+}
+
+.code-line.highlighted.range-single {
+  border-radius: 0 3px 3px 0;
 }
 
 /* Add highlight to line numbers */
 .line-number.highlighted {
   background-color: var(--hover-bg);
+}
+
+/* Range highlighting for line numbers */
+.line-number.highlighted.range-start {
+  border-radius: 3px 0 0 0;
+}
+
+.line-number.highlighted.range-middle {
+  border-radius: 0;
+}
+
+.line-number.highlighted.range-end {
+  border-radius: 0 0 0 3px;
+}
+
+.line-number.highlighted.range-single {
   border-radius: 3px 0 0 3px;
 }
 

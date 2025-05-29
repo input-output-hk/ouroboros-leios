@@ -131,44 +131,26 @@
     while (idx > 0) {
       idx--;
       
-      // If we find an empty line, check what's before it
+      // If we find an empty line, this means any comments before it should NOT be included
       if (isEmptyLine(allLines[idx])) {
-        // Look further back to see if there are comments before this empty line
-        let commentIdx = idx - 1;
-        let foundComments = [];
-        
-        while (commentIdx >= 0 && (isComment(allLines[commentIdx]) || isEmptyLine(allLines[commentIdx]))) {
-          if (isComment(allLines[commentIdx])) {
-            foundComments.unshift({
-              line: allLines[commentIdx],
-              text: extractCommentText(allLines[commentIdx])
-            });
-          }
-          commentIdx--;
-        }
-        
-        if (foundComments.length > 0) {
-          commentLines = foundComments;
-        }
-        
         // The definition starts after the empty line
         definitionStartIndex = idx + 1;
+        // Don't include any comments that are separated by an empty line
+        commentLines = [];
         break;
       }
       
-      // If we find a comment line directly before the definition
+      // If we find a comment line directly before the definition (no empty line in between)
       if (isComment(allLines[idx])) {
-        // Collect all consecutive comment lines
+        // Collect all consecutive comment lines that are directly adjacent
         let commentIdx = idx;
         let foundComments = [];
         
-        while (commentIdx >= 0 && (isComment(allLines[commentIdx]) || isEmptyLine(allLines[commentIdx]))) {
-          if (isComment(allLines[commentIdx])) {
-            foundComments.unshift({
-              line: allLines[commentIdx],
-              text: extractCommentText(allLines[commentIdx])
-            });
-          }
+        while (commentIdx >= 0 && isComment(allLines[commentIdx])) {
+          foundComments.unshift({
+            line: allLines[commentIdx],
+            text: extractCommentText(allLines[commentIdx])
+          });
           commentIdx--;
         }
         
@@ -177,9 +159,9 @@
         }
         
         // The definition starts AFTER the comment lines
-        // Find the first non-comment, non-empty line after the comments
+        // Find the first non-comment line after the comments
         let nextIdx = idx;
-        while (nextIdx < allLines.length && (isComment(allLines[nextIdx]) || isEmptyLine(allLines[nextIdx]))) {
+        while (nextIdx < allLines.length && isComment(allLines[nextIdx])) {
           nextIdx++;
         }
         definitionStartIndex = nextIdx;
@@ -381,6 +363,7 @@
         let cleanText = commentText
           .replace(/^\{-\s*/, '')  // Remove opening {-
           .replace(/\s*-\}$/, '')  // Remove closing -}
+          .replace(/^--\s*/, '')   // Remove -- prefix for line comments
           .replace(/^\s*\*\s*/, '') // Remove leading asterisks
           .trim();
         
@@ -397,6 +380,7 @@
         const lines = allCommentText.split('\n').map(line => {
           // Remove common comment prefixes and clean up, but preserve list markers
           return line
+            .replace(/^\s*--\s*/, '') // Remove -- prefix for line comments
             .replace(/^\s*\*?\s*/, '') // Remove leading asterisks and whitespace
             .trim();
         }).filter(line => line.length > 0);
@@ -409,14 +393,92 @@
           let currentList = null;
           let currentListType = null;
           let currentListItem = null;
+          let inParametersSection = false;
+          let parametersTable = null;
           
           lines.forEach(line => {
+            // Check if this line indicates a parameters section
+            if (line.toLowerCase().match(/^\s*parameters?\s*:?\s*$/i)) {
+              // Close any existing list first
+              if (currentList) {
+                commentBlock.appendChild(currentList);
+                currentList = null;
+                currentListType = null;
+                currentListItem = null;
+              }
+              
+              // Add some spacing before parameters section
+              const spacer = document.createElement('div');
+              spacer.className = 'preview-comment-spacer';
+              commentBlock.appendChild(spacer);
+              
+              // Create parameters heading
+              const parametersHeading = document.createElement('div');
+              parametersHeading.className = 'preview-comment-line preview-parameters-heading';
+              parametersHeading.innerHTML = '<strong>Parameters:</strong>';
+              commentBlock.appendChild(parametersHeading);
+              
+              // Create parameters table
+              parametersTable = document.createElement('table');
+              parametersTable.className = 'preview-parameters-table';
+              inParametersSection = true;
+              return;
+            }
+            
             // Check if this line is a list item (be more specific about list detection)
             const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
             const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
             
-            if (bulletMatch) {
-              // This is a bullet list item
+            if (bulletMatch && inParametersSection) {
+              // This is a parameter item - parse it as "name: description"
+              const paramText = bulletMatch[1];
+              const colonIndex = paramText.indexOf(':');
+              
+              if (colonIndex > 0) {
+                const paramName = paramText.substring(0, colonIndex).trim();
+                const paramDesc = paramText.substring(colonIndex + 1).trim();
+                
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramName;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = paramDesc;
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              } else {
+                // No colon found, treat as regular parameter with no description
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramText;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = '';
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              }
+              
+            } else if (bulletMatch) {
+              // Regular bullet list item (not in parameters section)
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
               if (currentListType !== 'ul') {
                 // Close any existing list and start a new unordered list
                 if (currentList) {
@@ -433,7 +495,14 @@
               currentList.appendChild(currentListItem);
               
             } else if (numberedMatch) {
-              // This is a numbered list item
+              // Numbered list item
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
               if (currentListType !== 'ol') {
                 // Close any existing list and start a new ordered list
                 if (currentList) {
@@ -449,13 +518,31 @@
               currentListItem.textContent = numberedMatch[1]; // Use the first capture group for the text
               currentList.appendChild(currentListItem);
               
-            } else if (currentListItem && line.trim() !== '') {
-              // This is a continuation line for the current list item
+            } else if (currentListItem && line.trim() !== '' && !inParametersSection) {
+              // This is a continuation line for the current list item (but not in parameters section)
               // Add it to the current list item with a space
               currentListItem.textContent += ' ' + line;
               
+            } else if (inParametersSection && parametersTable && line.trim() !== '') {
+              // This is a continuation line for the last parameter description
+              const lastRow = parametersTable.lastElementChild;
+              if (lastRow) {
+                const descCell = lastRow.querySelector('.preview-parameter-desc');
+                if (descCell) {
+                  descCell.textContent += ' ' + line;
+                }
+              }
+              
             } else {
-              // This is a regular line or empty line - close any existing list first
+              // This is a regular line or empty line
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              // Close any existing list first
               if (currentList) {
                 commentBlock.appendChild(currentList);
                 currentList = null;
@@ -473,9 +560,12 @@
             }
           });
           
-          // Don't forget to append any remaining list
+          // Don't forget to append any remaining list or parameters table
           if (currentList) {
             commentBlock.appendChild(currentList);
+          }
+          if (inParametersSection && parametersTable) {
+            commentBlock.appendChild(parametersTable);
           }
           
           commentContainer.appendChild(commentBlock);
