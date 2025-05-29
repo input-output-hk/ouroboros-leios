@@ -1,6 +1,6 @@
 # Understanding Leios - A Look at Cost Estimates for Cardano’s Next Step
 
-At IOG, we’re thrilled about the Leios project, a major leap toward enhancing Cardano’s scalability and efficiency. During last month’s status meeting, we shared early cost estimates for running Leios nodes. Here’s a straightforward breakdown of those figures, showing what it might cost to operate Leios compared to the current Praos protocol and the potential revenue from transaction fees.
+At IOG, we’re thrilled about the Leios project, a major leap toward enhancing Cardano’s scalability and efficiency. During the April 2025 status meeting, we shared early cost estimates for running Leios nodes. Here’s a straightforward breakdown of those figures, showing what it might cost to operate Leios compared to the current Praos protocol and the potential revenue from transaction fees.
 
 ## What is Leios, and Why Does It Matter?
 
