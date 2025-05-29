@@ -274,4 +274,83 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .type-preview-container {
+    max-width: calc(100vw - 20px);
+    min-width: calc(100vw - 20px);
+    max-height: 60vh;
+    font-size: 0.8em;
+  }
+
+  .preview-heading {
+    padding: 6px 10px;
+    font-size: 0.85em;
+  }
+
+  .preview-comment-container {
+    padding: 10px;
+    font-size: 0.8em;
+  }
+
+  .type-preview-container .Agda {
+    padding: 6px;
+  }
+
+  .type-preview-container .preview-line-number {
+    padding: 0 4px 0 0;
+    font-size: 12px;
+  }
+
+  .type-preview-container .preview-code-content {
+    padding-left: 6px;
+  }
+
+  .preview-parameters-table {
+    font-size: 0.9em;
+  }
+
+  .preview-parameter-name {
+    padding: 4px 12px 4px 0;
+  }
+
+  .preview-parameter-desc {
+    padding: 4px 0 4px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .type-preview-container {
+    max-width: calc(100vw - 10px);
+    min-width: calc(100vw - 10px);
+    max-height: 50vh;
+    font-size: 0.75em;
+  }
+
+  .preview-heading {
+    padding: 4px 8px;
+    font-size: 0.8em;
+  }
+
+  .preview-comment-container {
+    padding: 8px;
+  }
+
+  .type-preview-container .Agda {
+    padding: 4px;
+  }
+
+  .preview-parameters-table {
+    font-size: 0.85em;
+  }
+
+  .preview-parameter-name {
+    padding: 3px 8px 3px 0;
+  }
+
+  .preview-parameter-desc {
+    padding: 3px 0 3px 8px;
+  }
 } 
