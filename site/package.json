@@ -19,7 +19,7 @@
     "@docusaurus/core": "3.4.0",
     "@docusaurus/preset-classic": "3.4.0",
     "@mdx-js/react": "^3.0.0",
-    "agda-web-docs-lib": "^0.6.0",
+    "agda-web-docs-lib": "^0.7.1",
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^18.0.0",
