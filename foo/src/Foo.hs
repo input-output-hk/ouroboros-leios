@@ -7,8 +7,7 @@
 
 module Foo (proposal) where
 
-import           Data.Foldable (foldl', toList)
-import           Data.Traversable (for)
+import           Data.Foldable (foldl')
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import           Data.Map (Map)
@@ -28,7 +27,7 @@ first f = \ ~(x, y) -> (f x, y)
 
 -----
 
-newtype SlotNo = Sl Int                                                          deriving (Eq, Ord, Read, Show)
+newtype SlotNo = Sl Int                                                         deriving (Eq, Ord, Read, Show)
 
 plus :: SlotNo -> Int -> SlotNo
 plus (Sl x) y = Sl $ x + y
@@ -44,19 +43,19 @@ plus (Sl x) y = Sl $ x + y
 -- and outputs. But two transactions with the same 'TxId' do not necessarily
 -- have the same validity (that's what the hash of the whole tx including
 -- witnesses might be used to record).
-newtype TxId u = TX u                                                            deriving (Eq, Ord, Read, Show)
+newtype TxId u = TX u                                                           deriving (Eq, Ord, Read, Show)
 
-data IbId u = IB SlotNo u                                                        deriving (Eq, Ord, Read, Show)
+data IbId u = IB SlotNo u                                                       deriving (Eq, Ord, Read, Show)
 
-data EbId u = EB SlotNo u                                                        deriving (Eq, Ord, Read, Show)
+data EbId u = EB SlotNo u                                                       deriving (Eq, Ord, Read, Show)
 
 -----
 
 -- | Assumed well-formed and non-equivocated in this simple model
-newtype IbBody u a b = MkIbBody [(TxId u, TxBody u a b)]                        deriving (Eq, Ord, Read, Show)
+newtype IbBody u a b = MkIbBody (Seq (TxId u, TxBody u a b))                    deriving (Eq, Ord, Read, Show)
 
 -- | Assumed well-formed and non-equivocated in this simple model
-data EbBody u = MkEbBody [IbId u] [EbId u]                                      deriving (Eq, Ord, Read, Show)
+data EbBody u = MkEbBody (SlotMap u (IbId u)) (SlotMap u (EbId u))              deriving (Eq, Ord, Read, Show)
 
 -----
 
@@ -133,7 +132,7 @@ dereferenceEbIds ::
  ->
     SlotMap u (EbBody u)
  ->
-    [EbId u]
+    SlotMap u (EbId u)
  ->
     SlotMap u (IbBody u a b)
 dereferenceEbIds allIbs allEbs =
@@ -141,23 +140,25 @@ dereferenceEbIds allIbs allEbs =
         -- TODO smartly defer the 'switchRbs' handler until all of the RB's EBs
         -- and IBs have arrived instead of assuming they already have.
         fromMaybe (error "impossible!")
-      $ go Set.empty Map.empty ebIds
+      $ goEb Set.empty Map.empty ebIds
   where
-    go stopEb acc = \case
-        []           -> Just acc
-        ebId : ebIds ->
-            if ebId `Set.member` stopEb then go stopEb acc ebIds else do
+    goEb !stopEb !acc = (. doubleMinView (\sl u _v -> EB sl u)) $ \case
+        Nothing            -> Just acc
+        Just (ebId, ebIds) ->
+            if ebId `Set.member` stopEb then goEb stopEb acc ebIds else do
                 let EB sl u = ebId
                 MkEbBody ibIds ebIds' <- Map.lookup sl allEbs >>= Map.lookup u
-                ibs <- for ibIds $ \ibId -> do
-                    let IB sl' u' = ibId
-                    ibBody <- Map.lookup sl' allIbs >>= Map.lookup u'
-                    pure (ibId, ibBody)
-                let addIb (IB sl' u', ibBody) = add sl' u' ibBody
-                go
+                acc' <- goIb acc ibIds
+                goEb
                     (Set.insert ebId stopEb)
-                    (reduce ibs addIb acc)
-                    (ebIds' ++ ebIds)
+                    acc'
+                    (union ebIds ebIds')
+
+    goIb !acc = (. doubleMinView (\sl u _v -> IB sl u)) $ \case
+        Nothing               -> Just acc
+        Just (IB sl u, ibIds) -> do
+            ibBody <- Map.lookup sl allIbs >>= Map.lookup u
+            goIb (add sl u ibBody acc) ibIds
 
 -- | This is merely to make some lines shorter in this file
 type LeiosEndo t u a b l x =
@@ -172,7 +173,8 @@ data LeiosMethods prng t u a b l x = MkLeiosMethods {
     --
     -- (The real ledger also needs at least all of the new RBs' headers, but
     -- this model does not.)
-    switchRbs :: l -> NonEmpty (SlotNo, [EbId u]) -> LeiosEndo t u a b l x
+    switchRbs ::
+        l -> NonEmpty (SlotNo, SlotMap u (EbId u)) -> LeiosEndo t u a b l x
   ,
     receiveTx :: (TxId u, TxBody u a b) -> LeiosEndo t u a b l x
   ,
@@ -192,8 +194,14 @@ data LeiosMethods prng t u a b l x = MkLeiosMethods {
   ,
     newEb :: SlotNo -> LeiosState t u a b l x -> EbBody u
   ,
-    -- | Given the slot and its onset
-    newVt :: (SlotNo, t) -> LeiosState t u a b l x -> Set (EbId u)
+    newVt ::
+        (SlotNo -> t -> Ordering)
+     ->
+        SlotNo
+     ->
+        LeiosState t u a b l x
+     ->
+        Set (EbId u)
   ,
     newRb :: SlotNo -> LeiosState t u a b l x -> [EbId u]
   }
@@ -210,6 +218,19 @@ doubleMax m1 = do
     (m2, _rest) <- Map.maxView m1
     (v, _rest) <- Map.maxView m2
     pure v
+
+doubleMinView ::
+    (Ord k1, Ord k2)
+ =>
+    (k1 -> k2 -> v -> a)
+ ->
+    Map k1 (Map k2 v)
+ ->
+    Maybe (a, Map k1 (Map k2 v))
+doubleMinView f m1 = do
+    ((k1, m2), rest1) <- Map.maxViewWithKey m1
+    ((k2, v), rest2) <- Map.maxViewWithKey m2
+    pure (f k1 k2 v, Map.insertWith Map.union k1 rest2 rest1)
 
 doubleSplit ::
     (Ord k1, Ord k2)
@@ -253,6 +274,18 @@ add k1 k2 v =
         (\new old -> Map.unionWith const old new)
         k1
         (Map.singleton k2 v)
+
+union ::
+    (Ord k1, Ord k2)
+ =>
+    Map k1 (Map k2 v) -> Map k1 (Map k2 v) -> Map k1 (Map k2 v)
+union = Map.unionWith (Map.unionWith const)
+
+mapWithKey ::
+    (Ord k1, Ord k2)
+ =>
+    (k1 -> k2 -> a -> b) -> Map k1 (Map k2 a) -> Map k1 (Map k2 b)
+mapWithKey f = Map.mapWithKey (\k1 m2 -> Map.mapWithKey (f k1) m2)
 
 data Timestamped t a = MkTimestamped !t !a
 
@@ -469,10 +502,10 @@ extendIbMempool ::
 extendIbMempool params selection extra0 acc0 ibs =
     let EIB acc' _l' extra' =
             reduce
-                (Map.toList $ Map.map Map.toList ibs)
-                (\(sl', ibBodies) ->
+                (Map.toList ibs)
+                (\(sl', m2) ->
                     reduce
-                        ibBodies
+                        (Map.toList m2)
                         (\(u', MkTimestamped t (MkIbBody txs)) ->
                             snocIb t (IB sl' u', MkIbBody txs)
                           .
@@ -561,7 +594,7 @@ proposal params@Params{..} =
             txMempoolLedger' :: Ledger u b
             extra2           :: Cache u
             (txMempool', txMempoolLedger', extra2) =
-                go Seq.empty selection' extra1 txMempool
+                go Seq.Empty selection' extra1 txMempool
 
             -- rebuild the 'ibMempool'
             --
@@ -704,13 +737,27 @@ proposal params@Params{..} =
                     prng1
         in
           (
-            MkIbBody $ toList $ goOuter Seq.empty Set.empty shuffledColors
+            MkIbBody $ goOuter Seq.empty Set.empty shuffledColors
           ,
             prng2
           )
 
-    newEb sl MkLeiosState{..} = error "TODO"
+    newEb sl MkLeiosState{..} =
+        MkEbBody ibIds ebIds
+      where
+        ibIds =
+            mapWithKey (\sl' u' _ibBody -> IB sl' u')
+          $ enforceExpiry ibExpirySlots sl const ibMempool
 
-    newVt (sl, onset) MkLeiosState{..} = error "TODO"
+        ebIds =
+            mapWithKey (\sl' u' _ebBody -> EB sl' u')
+          $ enforceExpiry ebExpirySlots sl const ebMempool
+
+    -- All referenced IBs have been received by the end of the Endorse stage
+    -- AND all IBs seen by the end of the Deliver 1 stage are referenced AND
+    -- all referenced IBs validate (wrt. script execution) AND only IBs from
+    -- this pipeline’s Propose stage are referenced (and not from other
+    -- pipelines).
+    newVt cmp sl MkLeiosState{..} = error "TODO"
 
     newRb sl MkLeiosState{..} = error "TODO"
