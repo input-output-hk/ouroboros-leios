@@ -81,13 +81,13 @@ type SlotMap u v = Map SlotNo (Map u v)
 
 type TxMempool u a b = Seq (TxId u, TxBody u a b)
 
-type IbMempool t u a b l = SlotMap u (Timestamped t (IbBody u a b, Ledger u b))
+type IbMempool u a b l = SlotMap u (IbBody u a b, Ledger u b)
 
-type EbMempool t u = SlotMap u (Timestamped t (EbBody u))
+type EbMempool u = SlotMap u (EbBody u)
 
 data Cert = MkCert
 
-data LeiosState t u a b l x = MkLeiosState {
+data LeiosState u a b l x = MkLeiosState {
     -- | The ledger state at the tip of the selected RB
     selection :: l
   ,
@@ -103,7 +103,7 @@ data LeiosState t u a b l x = MkLeiosState {
     --
     -- Annotated with their (oldest) arrival time and their resulting ledger
     -- state in within their current order mempool starting from 'selection'.
-    ibMempool :: IbMempool t u a b l
+    ibMempool :: IbMempool u a b l
   ,
     -- | Also includes IBs that were evicted from the 'ebMempool', in case
     -- they're referenced by an RB selected later
@@ -113,13 +113,13 @@ data LeiosState t u a b l x = MkLeiosState {
     -- by some objective uniquifier
     --
     -- Annotated with their (oldest) arrival time.
-    ebMempool :: EbMempool t u
+    ebMempool :: EbMempool u
   ,
     -- | Also includes EBs that were evicted from the 'ebMempool', in case
     -- they're referenced by an RB selected later
     allEbs :: SlotMap u (EbBody u)
   ,
-    certs :: SlotMap u (Timestamped t Cert)
+    certs :: SlotMap u Cert
   ,
     -- | Extensible state
     extra :: x
@@ -161,12 +161,12 @@ dereferenceEbIds allIbs allEbs =
             goIb (add sl u ibBody acc) ibIds
 
 -- | This is merely to make some lines shorter in this file
-type LeiosEndo t u a b l x =
-    LeiosState t u a b l x -> LeiosState t u a b l x
+type LeiosEndo u a b l x =
+    LeiosState u a b l x -> LeiosState u a b l x
 
 -- | This record captures key methods that are both needed by the Leios node
 -- and also dependent on the base ledger rules
-data LeiosMethods prng t u a b l x = MkLeiosMethods {
+data LeiosMethods prng u a b l x = MkLeiosMethods {
     -- | Given the ledger state at the intersection of the old chain and the
     -- new chain and the slot and included 'EbId's of all subsequent RBs on the
     -- new chain.
@@ -174,36 +174,34 @@ data LeiosMethods prng t u a b l x = MkLeiosMethods {
     -- (The real ledger also needs at least all of the new RBs' headers, but
     -- this model does not.)
     switchRbs ::
-        l -> NonEmpty (SlotNo, SlotMap u (EbId u)) -> LeiosEndo t u a b l x
+        l -> NonEmpty (SlotNo, SlotMap u (EbId u)) -> LeiosEndo u a b l x
   ,
-    receiveTx :: (TxId u, TxBody u a b) -> LeiosEndo t u a b l x
+    receiveTx :: (TxId u, TxBody u a b) -> LeiosEndo u a b l x
   ,
     -- | Given the IB's arrival time
-    receiveIb :: t -> (IbId u, IbBody u a b) -> LeiosEndo t u a b l x
+    receiveIb :: (IbId u, IbBody u a b) -> LeiosEndo u a b l x
   ,
     -- | Given the EB's arrival time
-    receiveEb :: t -> (EbId u, EbBody u) -> LeiosEndo t u a b l x
+    receiveEb :: (EbId u, EbBody u) -> LeiosEndo u a b l x
   ,
     -- | For convenience, the model does not receive each vote but rather
     -- only the first cert
     --
     -- Given the cert's arrival time.
-    receiveCert :: t -> EbId u -> LeiosEndo t u a b l x
+    receiveCert :: EbId u -> LeiosEndo u a b l x
   ,
-    newIb :: prng -> SlotNo -> LeiosState t u a b l x -> (IbBody u a b, prng)
+    newIb :: prng -> SlotNo -> LeiosState u a b l x -> (IbBody u a b, prng)
   ,
-    newEb :: SlotNo -> LeiosState t u a b l x -> EbBody u
+    newEb :: SlotNo -> LeiosState u a b l x -> EbBody u
   ,
     newVt ::
-        (SlotNo -> t -> Ordering)
-     ->
         SlotNo
      ->
-        LeiosState t u a b l x
+        LeiosState u a b l x
      ->
         Set (EbId u)
   ,
-    newRb :: SlotNo -> LeiosState t u a b l x -> [EbId u]
+    newRb :: SlotNo -> LeiosState u a b l x -> [EbId u]
   }
 
 -----
@@ -286,37 +284,6 @@ mapWithKey ::
  =>
     (k1 -> k2 -> a -> b) -> Map k1 (Map k2 a) -> Map k1 (Map k2 b)
 mapWithKey f = Map.mapWithKey (\k1 m2 -> Map.mapWithKey (f k1) m2)
-
-data Timestamped t a = MkTimestamped !t !a
-
-getTimestamped :: Timestamped t a -> a
-getTimestamped ~(MkTimestamped _t x) = x
-
-onTimestamped :: (a -> b) -> Timestamped t a -> Timestamped t b
-onTimestamped f ~(MkTimestamped t x) = MkTimestamped t (f x)
-
-insert ::
-    (Ord k1, Ord k2, Ord t)
- =>
-    t
- ->
-    k1
- ->
-    k2
- ->
-    v
- ->
-    Map k1 (Map k2 (Timestamped t v))
- ->
-    Map k1 (Map k2 (Timestamped t v))
-insert t k1 k2 v =
-    Map.insertWith
-        (\new old -> Map.unionWith f old new)
-        k1
-        (Map.singleton k2 (MkTimestamped t v))
-  where
-    f (MkTimestamped t1 x) (MkTimestamped t2 y) =
-      MkTimestamped (min t1 t2) (if t2 < t1 then y else x)
 
 -----
 
@@ -471,16 +438,14 @@ newtype TxColor = TxColor Int
 -----
 
 -- | Internal detail of 'extendIbMempool'
-data EIB t u a b l = EIB !(IbMempool t u a b l) !l !(Cache u)
+data EIB u a b l = EIB !(IbMempool u a b l) !l !(Cache u)
 
 extendIbMempool ::
- forall t u a b l x.
+ forall u a b l x.
     (
         l ~ Ledger u b
     ,
         x ~ Cache u
-    ,
-        Ord t
     ,
         Ord u
     )
@@ -492,13 +457,13 @@ extendIbMempool ::
  ->
     x
  ->
-    IbMempool t u a b l
+    IbMempool u a b l
     -- ^ the existing mempool
  ->
-    SlotMap u (Timestamped t (IbBody u a b))
+    SlotMap u (IbBody u a b)
     -- ^ IBs to add
  ->
-    (IbMempool t u a b l, x)
+    (IbMempool u a b l, x)
 extendIbMempool params selection extra0 acc0 ibs =
     let EIB acc' _l' extra' =
             reduce
@@ -506,8 +471,8 @@ extendIbMempool params selection extra0 acc0 ibs =
                 (\(sl', m2) ->
                     reduce
                         (Map.toList m2)
-                        (\(u', MkTimestamped t (MkIbBody txs)) ->
-                            snocIb t (IB sl' u', MkIbBody txs)
+                        (\(u', MkIbBody txs) ->
+                            snocIb (IB sl' u', MkIbBody txs)
                           .
                             reduce txs appTx
                         )
@@ -520,7 +485,7 @@ extendIbMempool params selection extra0 acc0 ibs =
   where
     getSlot l = let MkLedger{tipSlot} = l in tipSlot
 
-    l0 = maybe selection (snd . getTimestamped) $ doubleMax acc0
+    l0 = maybe selection snd $ doubleMax acc0
 
     tickIfNecessary sl' (EIB acc l extra) =
         EIB acc `flip` extra
@@ -530,19 +495,19 @@ extendIbMempool params selection extra0 acc0 ibs =
     appTx tx (EIB acc l extra) =
         EIB acc `uncurry` applyTx params tx (l, extra)
 
-    snocIb t (IB sl' u', ibBody') (EIB acc l extra) =
+    snocIb (IB sl' u', ibBody') (EIB acc l extra) =
         EIB
-            (insert t sl' u' (ibBody', l) acc)
+            (add sl' u' (ibBody', l) acc)
             l
             extra
 
 proposal ::
- forall prng t u a b.
-    (a ~ (TxColor, TxBytes), Ord t, Ord u, Rand.RandomGen prng)
+ forall prng u a b.
+    (a ~ (TxColor, TxBytes), Ord u, Rand.RandomGen prng)
  =>
     Params
  ->
-    LeiosMethods prng t u a b (Ledger u b) (Cache u)
+    LeiosMethods prng u a b (Ledger u b) (Cache u)
 proposal params@Params{..} =
     MkLeiosMethods {..}
   where
@@ -607,7 +572,7 @@ proposal params@Params{..} =
                     extra2
                     Map.empty
                     (
-                        Map.map (Map.map (onTimestamped fst))
+                        Map.map (Map.map fst)
                       $ enforceExpiry ibExpirySlots tipSlot' const ibMempool
                     )
         in
@@ -642,13 +607,13 @@ proposal params@Params{..} =
                 txMempoolLedger = txMempoolLedger'
               }
 
-    receiveIb t (IB sl u, ibBody) st@MkLeiosState{..} =
+    receiveIb (IB sl u, ibBody) st@MkLeiosState{..} =
         case doubleSplit sl u ibMempool of
             Left {}        -> st   -- IB already present
             Right (lt, gt) ->
                 let gt' =
-                        insert t sl u ibBody
-                      $ Map.map (Map.map (onTimestamped fst)) gt
+                        add sl u ibBody
+                      $ Map.map (Map.map fst) gt
 
                     (ibMempool', extra') =
                         extendIbMempool params selection extra lt gt'
@@ -661,16 +626,16 @@ proposal params@Params{..} =
                     extra = extra'
                   }
 
-    receiveEb t (EB sl u, ebBody) st@MkLeiosState{..} =
+    receiveEb (EB sl u, ebBody) st@MkLeiosState{..} =
         st {
-            ebMempool = insert t sl u ebBody ebMempool
+            ebMempool = add sl u ebBody ebMempool
           ,
             allEbs = add sl u ebBody allEbs
           }
 
-    receiveCert t (EB sl u) st@MkLeiosState{..} =
+    receiveCert (EB sl u) st@MkLeiosState{..} =
         st {
-            certs = insert t sl u MkCert certs
+            certs = add sl u MkCert certs
           }
 
     newIb prng _sl MkLeiosState{..} =
@@ -679,7 +644,7 @@ proposal params@Params{..} =
 
             (prng1, prng2) = Rand.split prng
 
-            l = maybe selection (snd . getTimestamped) $ doubleMax ibMempool
+            l = maybe selection snd $ doubleMax ibMempool
 
             -- keep the subsequence (not /substring/!) of 'txMempool' that
             -- matches the picked colors and is cumulatively valid starting
@@ -758,6 +723,6 @@ proposal params@Params{..} =
     -- all referenced IBs validate (wrt. script execution) AND only IBs from
     -- this pipeline’s Propose stage are referenced (and not from other
     -- pipelines).
-    newVt cmp sl MkLeiosState{..} = error "TODO"
+    newVt sl MkLeiosState{..} = error "TODO"
 
     newRb sl MkLeiosState{..} = error "TODO"
