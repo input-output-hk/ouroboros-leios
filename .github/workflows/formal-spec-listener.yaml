@@ -140,7 +140,7 @@ jobs:
           input-dir: site/static/formal-spec
           config-file: site/agda-docs.config.json
           cache-dependency-path: site/package-lock.json
-          node-options: "--max-old-space-size=4096"
+          node-options: "--max-old-space-size=8192"
 
       - name: 🔍 Check for changes
         id: check-changes
