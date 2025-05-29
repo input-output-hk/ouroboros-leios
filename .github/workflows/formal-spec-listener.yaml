@@ -135,13 +135,11 @@ jobs:
           fi
 
       - name: 🔄 Enhance Agda documentation
-        working-directory: site
-        timeout-minutes: 25
-        run: |
-          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
-          if [ "$HTML_COUNT" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=4096" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
-          fi
+        uses: will-break-it/agda-web-docs-lib@v1.0.0
+        with:
+          input-dir: site/static/formal-spec
+          config-file: site/agda-docs.config.json
+          node-options: '--max-old-space-size=4096'
 
       - name: 🔍 Check for changes
         id: check-changes
