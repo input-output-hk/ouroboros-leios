@@ -135,7 +135,7 @@ jobs:
           fi
 
       - name: 🔄 Enhance Agda documentation
-        uses: will-break-it/agda-web-docs-lib@v1.0.1
+        uses: will-break-it/agda-web-docs-lib@v1
         with:
           input-dir: site/static/formal-spec
           config-file: site/agda-docs.config.json
