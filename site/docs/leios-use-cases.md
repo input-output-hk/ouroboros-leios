@@ -14,7 +14,7 @@ Imagine tipping a content creator in Africa a few cents for a blog post, paying 
 
 From farm to table or factory to pharmacy, tracking goods like food or vaccines across global supply chains demands speed, trust, and transparency. Leios could make Cardano the go-to blockchain for this.
 
-- **Why Leios Shines** - Supply chains generate thousands of updates daily (e.g., IoT sensor pings, shipping scans). Leios’ 100 TPS handles this volume, unlike the current Cardano’s 10 TPS, which risks delays. Its elastic capacity ensures updates flow even during peak loads, vital for time-sensitive goods. With 3,000 stake pools, Cardano resists tampering, ensuring audit-ready records without a central authority.
+- **Why Leios Shines** - Supply chains generate thousands of updates daily (e.g., IoT sensor pings, shipping scans). Leios’ 100 TPS can handle this volume, unlike the current Cardano’s 10 TPS, which risks delays. Its elastic capacity ensures updates flow even during peak loads, vital for time-sensitive goods. With 3,000 stake pools, Cardano resists tampering, ensuring audit-ready records without a central authority.
 - **Why Others Fall Short** - Ethereum’s high fees and congestion make frequent updates pricey. Bitcoin’s low throughput can’t keep up with real-time tracking. Solana’s speed is offset by centralization risks, undermining trust for audits.
 - **Real-World Vision** - A pharmaceutical company tracks vaccine batches globally, recording each scan on-chain. Regulators verify every step, confident in Cardano’s tamper-proof, decentralized ledger.
 
@@ -30,7 +30,7 @@ Decentralized finance (DeFi) thrives on speed—think liquidating a loan to avoi
 
 Imagine giving millions in developing nations secure, self-sovereign digital IDs for voting, healthcare, or education. Leios could supercharge Cardano’s Atala PRISM to manage identities at population scale.
 
-- **Why Leios Shines** - Leios’ 100 TPS supports millions of daily identity updates (e.g., credential issuance, verifications), far beyond Praos’ 10 TPS. Lower fees make frequent updates affordable, unlike Ethereum’s costly gas. Cardano’s decentralization ensures no single entity controls sensitive data, a must for trust in identity systems.
+- **Why Leios Shines** - Leios’ 100 TPS can support millions of daily identity updates (e.g., credential issuance, verifications), far beyond Praos’ 10 TPS. Lower fees make frequent updates affordable, unlike Ethereum’s costly gas. Cardano’s decentralization ensures no single entity controls sensitive data, a must for trust in identity systems.
 - **Why Others Fall Short** - Ethereum’s fees and throughput limit mass adoption. Bitcoin lacks smart contract flexibility. Solana’s centralization risks data control by a few validators, problematic for sovereign IDs.
 - **Real-World Vision** - A government issues digital IDs to 10 million citizens, with daily verifications for healthcare or voting recorded on-chain, secure and low-cost.
 
@@ -38,7 +38,7 @@ Imagine giving millions in developing nations secure, self-sovereign digital IDs
 
 From national elections to Cardano’s own governance votes (like CIPs), secure, transparent voting needs speed and trust. Leios could make Cardano the backbone for real-time, tamper-proof voting.
 
-- **Why Leios Shines** - Leios’ 100 TPS handles thousands of votes per second (8.6 million daily), enabling instant results for millions, unlike Praos’ slower pace. Its censorship resistance ensures votes aren’t delayed during high turnout. Stake-based voting (used in Leios’ Endorsement Blocks) guarantees tamper-proof outcomes, unlike centralized systems.
+- **Why Leios Shines** - Leios’ 100 TPS can handle thousands of votes per second (8.6 million daily), enabling instant results for millions, unlike Praos’ slower pace. Its censorship resistance ensures votes aren’t delayed during high turnout. Stake-based voting (used in Leios’ Endorsement Blocks) guarantees tamper-proof outcomes, unlike centralized systems.
 - **Why Others Fall Short** - Ethereum’s congestion slows vote processing during peaks. Bitcoin’s throughput can’t scale. Solana’s centralization risks vote manipulation by validators.
 - **Real-World Vision** - Cardano’s DReps cast millions of governance votes in real-time, finalized in ~3–5 minutes, ensuring a transparent, secure process.
 
