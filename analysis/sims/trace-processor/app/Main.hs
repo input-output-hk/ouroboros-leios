@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Main (
-  main
+  main,
 ) where
 
 import Control.Applicative ((<**>))

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Leios.Tracing.Processor (
-  process
+  process,
 ) where
 
 import Leios.Tracing.Lifecycle (lifecycle)

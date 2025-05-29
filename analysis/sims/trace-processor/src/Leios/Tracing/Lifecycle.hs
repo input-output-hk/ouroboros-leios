@@ -5,19 +5,17 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TupleSections #-}
 
-
 module Leios.Tracing.Lifecycle (
-  lifecycle
+  lifecycle,
 ) where
 
-
 import Control.Monad.State.Strict (State, execState, gets, modify')
-import Data.Aeson (FromJSON(..), Value(Object), (.:), withObject)
+import Data.Aeson (FromJSON (..), Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
 import Data.List (intercalate)
 import Data.Map.Strict (Map)
-import Data.Monoid (Sum(..))
+import Data.Monoid (Sum (..))
 import Data.Set (Set)
 import Data.Text (Text)
 
@@ -25,9 +23,8 @@ import qualified Data.Map.Strict as M (elems, fromList, insertWith, restrictKeys
 import qualified Data.Set as S (map, singleton)
 import qualified Data.Text as T (unpack)
 
-
 newtype Earliest a = Earliest {getEarliest :: Maybe a}
-  deriving Show
+  deriving (Show)
 
 instance Eq a => Eq (Earliest a) where
   Earliest (Just x) == Earliest (Just y) = x == y
@@ -49,20 +46,16 @@ instance Ord a => Monoid (Earliest a) where
 instance FromJSON a => FromJSON (Earliest a) where
   parseJSON = fmap Earliest . parseJSON
 
-
-data ItemKey =
-  ItemKey
-  {
-    kind :: Text
+data ItemKey
+  = ItemKey
+  { kind :: Text
   , item :: Text
   }
-    deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show)
 
-
-data ItemInfo =
-  ItemInfo
-  {
-    size :: Earliest Int
+data ItemInfo
+  = ItemInfo
+  { size :: Earliest Int
   , references :: Sum Int
   , created :: Earliest Double
   , toIB :: Earliest Double
@@ -72,43 +65,41 @@ data ItemInfo =
   , inIBs :: Set Text
   , inEBs :: Set Text
   }
-    deriving Show
+  deriving (Show)
 
 instance Semigroup ItemInfo where
   x <> y =
     ItemInfo
-    {
-      size = on (<>) size x y
-    , references = on (<>) references x y
-    , created = on (<>) created x y
-    , toIB = on (<>) toIB x y
-    , toEB = on (<>) toEB x y
-    , toRB = on (<>) toRB x y
-    , inRB = on (<>) inRB x y
-    , inIBs = on (<>) inIBs x y
-    , inEBs = on (<>) inEBs x y
-    }
+      { size = on (<>) size x y
+      , references = on (<>) references x y
+      , created = on (<>) created x y
+      , toIB = on (<>) toIB x y
+      , toEB = on (<>) toEB x y
+      , toRB = on (<>) toRB x y
+      , inRB = on (<>) inRB x y
+      , inIBs = on (<>) inIBs x y
+      , inEBs = on (<>) inEBs x y
+      }
 
 instance Monoid ItemInfo where
   mempty =
     ItemInfo
-    {
-      size = mempty
-    , references = mempty
-    , created = mempty
-    , toIB = mempty
-    , toEB = mempty
-    , toRB = mempty
-    , inRB = mempty
-    , inIBs = mempty
-    , inEBs = mempty
-    }
+      { size = mempty
+      , references = mempty
+      , created = mempty
+      , toIB = mempty
+      , toEB = mempty
+      , toRB = mempty
+      , inRB = mempty
+      , inIBs = mempty
+      , inEBs = mempty
+      }
 
 toCSV :: ItemKey -> ItemInfo -> String
 toCSV ItemKey{..} ItemInfo{..} =
-  intercalate sep
-    [
-      T.unpack kind
+  intercalate
+    sep
+    [ T.unpack kind
     , T.unpack item
     , maybe "NA" show $ getEarliest size
     , show $ getSum references
@@ -121,9 +112,9 @@ toCSV ItemKey{..} ItemInfo{..} =
 
 itemHeader :: String
 itemHeader =
-  intercalate sep
-    [
-      "Kind"
+  intercalate
+    sep
+    [ "Kind"
     , "Item"
     , "Size [B]"
     , "References"
@@ -132,11 +123,10 @@ itemHeader =
     , "To EB [s]"
     , "To RB [s]"
     , "In RB [s]"
-    ] 
+    ]
 
 sep :: String
 sep = ","
-
 
 parseEvent :: Value -> Parser (ItemKey, ItemInfo, Index)
 parseEvent =
@@ -153,30 +143,29 @@ parseMessage "TXGenerated" item created =
   withObject "TXGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      pure (ItemKey {kind = "TX", item}, mempty {size, created}, mempty)
+      pure (ItemKey{kind = "TX", item}, mempty{size, created}, mempty)
 parseMessage "IBGenerated" item created =
   withObject "IBGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      txs <- fmap ((, mempty {toIB = created, inIBs = S.singleton item, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
-      pure (ItemKey {kind = "IB", item}, mempty {size, created}, M.fromList txs)
+      txs <- fmap ((,mempty{toIB = created, inIBs = S.singleton item, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
+      pure (ItemKey{kind = "IB", item}, mempty{size, created}, M.fromList txs)
 parseMessage "EBGenerated" item created =
   withObject "EBGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      ibs <- mapM (fmap ((, mempty {toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "IB") . (.: "id")) =<< message .: "input_blocks"
-      ebs <- mapM (fmap ((, mempty {toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "EB") . (.: "id")) =<< message .: "endorser_blocks"
-      pure (ItemKey {kind = "EB", item}, mempty {size, created}, M.fromList $ ibs <> ebs)
+      ibs <- mapM (fmap ((,mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "IB") . (.: "id")) =<< message .: "input_blocks"
+      ebs <- mapM (fmap ((,mempty{toEB = created, inEBs = S.singleton item, references = Sum 1}) . ItemKey "EB") . (.: "id")) =<< message .: "endorser_blocks"
+      pure (ItemKey{kind = "EB", item}, mempty{size, created}, M.fromList $ ibs <> ebs)
 parseMessage "RBGenerated" item created =
   withObject "RBGenerated" $ \message ->
     do
       size <- message .: "size_bytes"
-      ebs <- fmap (maybe mempty (pure . (, mempty {toRB = created, references = Sum 1}) . ItemKey "EB")) . (.: "id") =<< (.: "eb") =<< message .: "endorsement"
-      txs <- fmap ((, mempty {inRB = created, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
-      pure (ItemKey {kind = "RB", item}, mempty {size, created}, M.fromList $ ebs <> txs)
+      ebs <- fmap (maybe mempty (pure . (,mempty{toRB = created, references = Sum 1}) . ItemKey "EB")) . (.: "id") =<< (.: "eb") =<< message .: "endorsement"
+      txs <- fmap ((,mempty{inRB = created, references = Sum 1}) . ItemKey "TX") <$> message .: "transactions"
+      pure (ItemKey{kind = "RB", item}, mempty{size, created}, M.fromList $ ebs <> txs)
 parseMessage _ _ _ =
   const $ fail "Ignore"
-
 
 type Index = Map ItemKey ItemInfo
 
@@ -195,13 +184,14 @@ updateInclusions :: Text -> ItemKey -> Set Text -> State Index ()
 updateInclusions kind itemKey includers =
   do
     includers' <- gets $ M.elems . (`M.restrictKeys` S.map (ItemKey kind) includers)
-    modify'
-      $ M.insertWith
-      (<>) itemKey mempty
-      {
-        toEB = mconcat $ toEB <$> includers'
-      , toRB = mconcat $ toRB <$> includers'
-      }
+    modify' $
+      M.insertWith
+        (<>)
+        itemKey
+        mempty
+          { toEB = mconcat $ toEB <$> includers'
+          , toRB = mconcat $ toRB <$> includers'
+          }
 
 updateEBs :: ItemKey -> ItemInfo -> State Index ()
 updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
@@ -209,19 +199,18 @@ updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
 updateIBs :: ItemKey -> ItemInfo -> State Index ()
 updateIBs itemKey = updateInclusions "IB" itemKey . inIBs
 
-
 lifecycle :: FilePath -> [Value] -> IO ()
 lifecycle lifecycleFile events =
   let
     index =
-      (`execState` mempty)
-        $ do
+      (`execState` mempty) $
+        do
           -- Compute the direct metrics from the traces.
-          mapM_ tally events 
+          mapM_ tally events
           -- Update arrival in EBs and RBs for IBs.
           mapM_ (uncurry updateEBs) =<< gets M.toList
           -- Update arrival in EBs and RBs for TXs.
           mapM_ (uncurry updateIBs) =<< gets M.toList
-  in
-    writeFile lifecycleFile . unlines . (itemHeader :)
-      $ uncurry toCSV <$> M.toList index
+   in
+    writeFile lifecycleFile . unlines . (itemHeader :) $
+      uncurry toCSV <$> M.toList index
