@@ -218,6 +218,12 @@ pub enum NoVoteReason {
     UncertifiedEBReference,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub enum TransactionLostReason {
+    IBExpired,
+    EBExpired,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Endorsement<Node: Display = NodeId> {
     pub eb: EndorserBlockId<Node>,

@@ -1336,7 +1336,7 @@ impl Node {
                 .entry(votes.id.producer)
                 .or_default();
             *eb_votes += count;
-            if *eb_votes as u64 > self.sim_config.vote_threshold {
+            if *eb_votes as u64 >= self.sim_config.vote_threshold {
                 self.leios
                     .earliest_eb_cert_times_by_pipeline
                     .entry(eb.pipeline)

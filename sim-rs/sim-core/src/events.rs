@@ -9,7 +9,7 @@ use crate::{
     config::{NodeConfiguration, NodeId},
     model::{
         Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
-        TransactionId, VoteBundle, VoteBundleId,
+        TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
     },
 };
 
@@ -114,6 +114,10 @@ pub enum Event {
         id: TransactionId,
         sender: Node,
         recipient: Node,
+    },
+    TXLost {
+        id: TransactionId,
+        reason: TransactionLostReason,
     },
     RBLotteryWon {
         id: BlockId<Node>,
