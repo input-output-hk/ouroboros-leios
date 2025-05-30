@@ -18,6 +18,10 @@ Findings:
 8. The probabilistic computation of number of conflicts is about twenty percent lower than a naive estimate that multiplies the throughput by the concurrency period and the fraction of conflicts in the memory pool.
 9. At 100 TPS and with favorable settings of protocol parameters, an overcollateralization factor of nearly 400 is necessary.
 
+### Rust simulation
+
+Added "TXLost" events to simulation output, to detect various places where Leios can lose transactions with some choices of parameters.
+
 ## 2025-05-29
 
 ### Transaction lifecycle simulation results (week 23)
