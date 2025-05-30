@@ -42,7 +42,7 @@ interface CpuTaskFinishedEvent {
 
 type CpuTaskType = shared.CpuTaskType;
 
-type BlockEvent = shared.BlockEvent | LotteryWon | GeneratedTransaction;
+type BlockEvent = shared.BlockEvent | LotteryWon | GeneratedTransaction | LostTransaction;
 
 interface LotteryWon {
     type: "IBLotteryWon" | "EBLotteryWon" | "VTLotteryWon";
@@ -56,6 +56,12 @@ interface GeneratedTransaction {
     id: string;
     publisher: string;
     size_bytes: number;
+}
+
+interface LostTransaction {
+    type: "TXLost";
+    id: string;
+    reason: string;
 }
 
 interface NetworkEvent extends Omit<shared.NetworkEvent, "type"> {
