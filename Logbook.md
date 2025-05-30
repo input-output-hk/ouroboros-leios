@@ -1,5 +1,23 @@
 # Leios logbook
 
+## 2025-05-30
+
+### Analysis of an overcollateralization scheme
+
+We computed shardless overcollateratization where transactions are randomly sampled from the memory pool and nodes operate independently over the concurrency period. Details are in the [Jupyter notebook](analysis/overcollateralization-v1.ipynb).
+
+Findings:
+
+1. Probabilities of duplication and conflicts are minimized when the length of the concurrency period is as short as possible.
+2. The probability of conflict is always greater than the probability of duplication.
+3. For a given concurrency period, a longer transaction residence time corresponds to a lower probability of duplication or conflict.
+4. Spatial efficiency is also greater for longer residence times.
+5. The tradeoff between probabilities of duplication and conflict is insensitive to protocol parameters.
+6. The expected number of conflicts in IBs scales proportionately with (a) the fraction of conflicting transactions in the memory pool and (b) the transaction throughput, but its dependence upon the transaction residence time is weaker and nonlinear.
+7. At a given throughput, reducing the probability of duplicates or conflicts is at odds with reducing the total number of conflicts.
+8. The probabilistic computation of number of conflicts is about twenty percent lower than a naive estimate that multiplies the throughput by the concurrency period and the fraction of conflicts in the memory pool.
+9. At 100 TPS and with favorable settings of protocol parameters, an overcollateralization factor of nearly 400 is necessary.
+
 ## 2025-05-29
 
 ### Transaction lifecycle simulation results (week 23)
