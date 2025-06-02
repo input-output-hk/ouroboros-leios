@@ -62,6 +62,7 @@ pub struct RawParameters {
     pub leios_stage_active_voting_slots: u64,
     pub leios_late_ib_inclusion: bool,
     pub leios_header_diffusion_time_ms: f64,
+    pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
 
@@ -147,6 +148,13 @@ pub enum LeiosVariant {
 pub enum RelayStrategy {
     RequestFromAll,
     RequestFromFirst,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum MempoolSamplingStrategy {
+    OrderedById,
+    Random,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -439,6 +447,7 @@ pub struct SimConfiguration {
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
+    pub(crate) mempool_strategy: MempoolSamplingStrategy,
     pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -482,6 +491,7 @@ impl SimConfiguration {
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
+            mempool_strategy: params.leios_mempool_sampling_strategy,
             praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,

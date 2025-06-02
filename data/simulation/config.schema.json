@@ -91,6 +91,10 @@
       },
       "type": "object"
     },
+    "MempoolSamplingStrategy": {
+      "enum": ["ordered-by-id", "random"],
+      "type": "string"
+    },
     "NormalDistribution": {
       "properties": {
         "distribution": {
@@ -268,6 +272,10 @@
     "leios-late-ib-inclusion": {
       "description": "Extends Leios so that EB producers include IBs directly from previous pipelines\nwhere no certified EB was observed.\n\nOnly supported by Rust simulation.",
       "type": "boolean"
+    },
+    "leios-mempool-sampling-strategy": {
+      "$ref": "#/definitions/MempoolSamplingStrategy",
+      "description": "The strategy to use when selecting TXs from the Leios mempool."
     },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,

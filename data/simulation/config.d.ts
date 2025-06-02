@@ -46,6 +46,10 @@ export interface Config {
    * */
   "leios-header-diffusion-time-ms": number;
   /**
+   * The strategy to use when selecting TXs from the Leios mempool.
+   */
+  "leios-mempool-sampling-strategy": MempoolSamplingStrategy;
+  /**
    * Praos blockchain quality parameter.
    * This is η from the Leios paper.
    * Controls the pipelines EBs should reference in Full leios:
@@ -248,4 +252,11 @@ export enum LeiosVariant {
   Full = "full",
   /** Full Leios Without IBs: EBs reference TXs directly, as well as other EBs */
   FullWithoutIbs = "full-without-ibs",
+}
+
+export enum MempoolSamplingStrategy {
+  /** Include transactions in order by ID (corresponds to generation time). */
+  OrderedById = "ordered-by-id",
+  /** Include transactions in random order. */
+  Random = "random",
 }

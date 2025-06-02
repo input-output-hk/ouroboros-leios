@@ -9,7 +9,7 @@ use std::{
 use anyhow::Result;
 use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
-use rand::Rng as _;
+use rand::{seq::SliceRandom as _, Rng as _};
 use rand_chacha::ChaChaRng;
 use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
@@ -17,8 +17,8 @@ use tracing::{info, trace};
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{
-        DiffusionStrategy, LeiosVariant, NodeConfiguration, NodeId, RelayStrategy,
-        SimConfiguration, TransactionConfig,
+        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
+        RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -1392,7 +1392,7 @@ impl Node {
     where
         C: Fn(&SeenTransaction) -> bool,
     {
-        let candidate_txs: Vec<_> = self
+        let mut candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
@@ -1404,6 +1404,12 @@ impl Node {
                 }
             })
             .collect();
+        if matches!(
+            self.sim_config.mempool_strategy,
+            MempoolSamplingStrategy::Random
+        ) {
+            candidate_txs.shuffle(&mut self.rng);
+        }
         let mut txs = vec![];
         let mut size = 0;
         for (id, bytes) in candidate_txs {
