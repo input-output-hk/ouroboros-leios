@@ -73,7 +73,7 @@
       "type": "object"
     },
     "LeiosVariant": {
-      "enum": ["short", "full", "full-without-ibs"],
+      "enum": ["short", "full", "full-without-ibs", "full-with-tx-references"],
       "type": "string"
     },
     "LogNormalDistribution": {

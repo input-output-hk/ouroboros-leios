@@ -462,7 +462,7 @@ impl EventTracker {
 
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
         let header_bytes = block.header.bytes;
-        let tx_payload_bytes = block.transactions.iter().map(|tx| tx.bytes).sum();
+        let tx_payload_bytes = block.tx_payload_bytes;
         self.send(Event::IBGenerated {
             id: self.to_input_block(block.header.id),
             slot: block.header.id.slot,

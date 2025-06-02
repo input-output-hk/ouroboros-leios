@@ -1,4 +1,4 @@
-leios-variant: full-without-ibs
+leios-variant: full-with-tx-references
 leios-mempool-strategy: random
 leios-late-ib-inclusion: true
 praos-chain-quality: 100

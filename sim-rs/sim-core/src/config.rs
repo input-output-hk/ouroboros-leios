@@ -8,7 +8,11 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{clock::Timestamp, model::TransactionId, probability::FloatDistribution};
+use crate::{
+    clock::Timestamp,
+    model::{Transaction, TransactionId},
+    probability::FloatDistribution,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
@@ -141,6 +145,7 @@ pub enum LeiosVariant {
     Short,
     Full,
     FullWithoutIbs,
+    FullWithTxReferences,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -338,6 +343,7 @@ impl CpuTimeConfig {
 
 #[derive(Debug, Clone)]
 pub(crate) struct BlockSizeConfig {
+    variant: LeiosVariant,
     pub block_header: u64,
     cert_constant: u64,
     cert_per_node: u64,
@@ -351,6 +357,7 @@ pub(crate) struct BlockSizeConfig {
 impl BlockSizeConfig {
     fn new(params: &RawParameters) -> Self {
         Self {
+            variant: params.leios_variant,
             block_header: params.rb_head_size_bytes,
             cert_constant: params.cert_size_bytes_constant,
             cert_per_node: params.cert_size_bytes_per_node,
@@ -364,6 +371,13 @@ impl BlockSizeConfig {
 
     pub fn cert(&self, nodes: usize) -> u64 {
         self.cert_constant + self.cert_per_node * nodes as u64
+    }
+
+    pub fn ib_payload(&self, txs: &[Arc<Transaction>]) -> u64 {
+        match self.variant {
+            LeiosVariant::FullWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            _ => txs.iter().map(|tx| tx.bytes).sum(),
+        }
     }
 
     pub fn eb(&self, txs: usize, ibs: usize, ebs: usize) -> u64 {

@@ -723,6 +723,7 @@ impl Node {
             let transactions = self.select_txs_for_ib(header.shard);
             let ib = InputBlock {
                 header,
+                tx_payload_bytes: self.sim_config.sizes.ib_payload(&transactions),
                 transactions,
             };
             self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
@@ -828,7 +829,9 @@ impl Node {
         let (&block, _, _) = match self.sim_config.variant {
             LeiosVariant::Short => candidates
                 .max_by_key(|(eb, age, votes)| (*age, self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Full | LeiosVariant::FullWithoutIbs => candidates
+            LeiosVariant::Full
+            | LeiosVariant::FullWithoutIbs
+            | LeiosVariant::FullWithTxReferences => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
         };
 
@@ -1538,14 +1541,21 @@ impl Node {
             }
         }
 
-        for ib in &eb.ibs {
-            if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
+        for ib_id in &eb.ibs {
+            let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
                 return Err(NoVoteReason::MissingIB);
-            }
-            if !expected_ib_pipelines.contains(&ib.pipeline) {
+            };
+            if !expected_ib_pipelines.contains(&ib_id.pipeline) {
                 return Err(NoVoteReason::InvalidSlot);
             }
-            ib_set.insert(*ib);
+            if matches!(self.sim_config.variant, LeiosVariant::FullWithTxReferences) {
+                for tx in &ib.transactions {
+                    if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                        return Err(NoVoteReason::MissingTX);
+                    }
+                }
+            }
+            ib_set.insert(*ib_id);
         }
 
         if let Some(expected_eb_pipelines) = self.pipelines_for_eb_references(eb.pipeline) {

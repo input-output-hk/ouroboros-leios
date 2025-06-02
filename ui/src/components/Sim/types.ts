@@ -96,7 +96,8 @@ export interface IInputBlockGenerated {
   index: number;
   vrf: number;
   timestamp: number;
-  header_bytes: number
+  header_bytes: number;
+  size_bytes: number;
   transactions: number[];
 }
 
@@ -126,6 +127,7 @@ export interface IPraosBlockGenerated {
   slot: number;
   producer: string;
   header_bytes: number;
+  size_bytes: number;
   endorsement: IEndorsement | null;
   transactions: number[];
 }

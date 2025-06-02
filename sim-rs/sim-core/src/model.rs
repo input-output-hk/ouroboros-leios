@@ -133,11 +133,12 @@ pub struct InputBlockHeader {
 #[derive(Debug)]
 pub struct InputBlock {
     pub header: InputBlockHeader,
+    pub tx_payload_bytes: u64,
     pub transactions: Vec<Arc<Transaction>>,
 }
 impl InputBlock {
     pub fn bytes(&self) -> u64 {
-        self.header.bytes + self.transactions.iter().map(|tx| tx.bytes).sum::<u64>()
+        self.header.bytes + self.tx_payload_bytes
     }
 }
 
@@ -215,6 +216,7 @@ pub enum NoVoteReason {
     MissingIB,
     MissingEB,
     ExtraTX,
+    MissingTX,
     UncertifiedEBReference,
 }
 
