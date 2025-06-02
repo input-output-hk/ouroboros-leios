@@ -2,11 +2,64 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-05-19T00:00:00.000Z</updated>
+    <updated>2025-05-26T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – May 26, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary"/>
+        <updated>2025-05-26T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[The Leios team completed significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. The week focused on understanding transaction duplication and conflict probabilities in shardless scenarios, while also enhancing simulation tooling to better track transaction lifecycle events.]]></summary>
+        <content type="html"><![CDATA[<p>The Leios team completed significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. The week focused on understanding transaction duplication and conflict probabilities in shardless scenarios, while also enhancing simulation tooling to better track transaction lifecycle events.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="overcollateralization-analysis">Overcollateralization analysis<a class="hash-link" aria-label="Direct link to Overcollateralization analysis" title="Direct link to Overcollateralization analysis" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#overcollateralization-analysis">​</a></h2>
+<ul>
+<li>Completed comprehensive analysis of shardless overcollateralization where transactions are randomly sampled from the memory pool</li>
+<li>Found that probabilities of duplication and conflicts are minimized when the concurrency period is as short as possible</li>
+<li>Determined that conflict probability is always greater than duplication probability</li>
+<li>Identified that longer transaction residence times correspond to lower probabilities of duplication or conflict, where transaction residency time is defined as the average time a transaction stays in the memory pool before reaching an IB (calculated as memory pool size divided by transaction throughput)</li>
+<li>Discovered that spatial efficiency is greater for longer residence times</li>
+<li>Found the tradeoff between probabilities of duplication and conflict is insensitive to protocol parameters</li>
+<li>Showed that expected number of conflicts in IBs scales proportionately with the fraction of conflicting transactions and transaction throughput</li>
+<li>Identified that at a given throughput, reducing the probability of duplicates or conflicts conflicts with reducing the total number of conflicts</li>
+<li>Found that probabilistic computation of conflicts is about twenty percent lower than naive estimates</li>
+<li>Determined that at 100 TPS with favorable protocol parameters, an overcollateralization factor of nearly 400x is necessary in adversarial scenarios where the memory pool is filled with conflicting transactions</li>
+<li>Concluded that having successful transactions pay for all conflicting ones is too risky due to potential attacks on honest transactions using common UTXO inputs</li>
+<li>Identified that consuming collateral from conflicted transactions in IBs is more viable, though it breaks existing UX guarantees</li>
+<li>Noted ongoing discussions about the realism of creating 400 mutually conflicting transactions, given that individual mempools would not include conflicting transactions and attack scenarios would require coordination across multiple nodes</li>
+<li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/overcollateralization-v1.ipynb" target="_blank" rel="noopener noreferrer">overcollateralization analysis notebook</a>.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-development">Simulation development<a class="hash-link" aria-label="Direct link to Simulation development" title="Direct link to Simulation development" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#simulation-development">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="transaction-lifecycle-analysis">Transaction lifecycle analysis<a class="hash-link" aria-label="Direct link to Transaction lifecycle analysis" title="Direct link to Transaction lifecycle analysis" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#transaction-lifecycle-analysis">​</a></h3>
+<ul>
+<li>Analyzed protocol performance across transaction throughput scenarios up to 300 TPS</li>
+<li>Found that the protocol performs well with essentially every transaction reaching the ledger up to 300 TPS, where breakdown occurs</li>
+<li>Noted that the 100-node network is more stressful than a realistic mainnet would be</li>
+<li>Achieved space efficiency above 80% for moderate-throughput scenarios</li>
+<li>Measured average transaction latency of about 100 seconds (95th percentile at 200 seconds) to reach the ledger.</li>
+</ul>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-improvements">Rust simulation improvements<a class="hash-link" aria-label="Direct link to Rust simulation improvements" title="Direct link to Rust simulation improvements" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#rust-simulation-improvements">​</a></h3>
+<ul>
+<li>Added "TXLost" events to simulation output to detect transaction loss scenarios</li>
+<li>Enhanced ability to track where Leios can lose transactions with various parameter choices.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="data-processing-optimization">Data processing optimization<a class="hash-link" aria-label="Direct link to Data processing optimization" title="Direct link to Data processing optimization" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#data-processing-optimization">​</a></h2>
+<ul>
+<li>Developed new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/trace-processor/" target="_blank" rel="noopener noreferrer"><code>leios-trace-processor</code></a> tool to replace script-based analyses</li>
+<li>Achieved significantly faster processing of simulation results compared to previous scripts</li>
+<li>Enabled analysis of much longer and larger simulation datasets</li>
+<li>Created standardized CSV output format for transaction lifecycle data including creation, IB inclusion, EB inclusion, and RB inclusion timestamps.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – May 19, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/05/19/weekly-progress-summary</id>
@@ -1352,58 +1405,6 @@ interval</li>
 <li>Started consuming a new shared configuration file format</li>
 <li>Established a shared configuration format with default parameters in
 <code>data/simulation/default.yaml</code>.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – January 6, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary"/>
-        <updated>2025-01-06T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[Rust simulation]]></summary>
-        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#rust-simulation">​</a></h2>
-<ul>
-<li>Added a basic simulation of central processing unit (CPU) usage/latency</li>
-<li>Implemented 'lottery won' events to identify the start of CPU processing</li>
-<li>Configured each node with four simulated cores, adjustable per node</li>
-<li>Transaction validation and ranking block/input block/endorser block generation/validation each take one CPU task</li>
-<li>All virtual CPU costs were copied from the cost estimator.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-summary-update">DeltaQ summary update<a class="hash-link" aria-label="Direct link to DeltaQ summary update" title="Direct link to DeltaQ summary update" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#deltaq-summary-update">​</a></h2>
-<ul>
-<li>Added MIN/MAX combinators for best- and worst-case simulation results</li>
-<li>The Rust simulation best case does not match the analytically best behavior</li>
-<li>The Haskell simulation best case is too fast; the ΔQ expression must assume more than 200 peers per node.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cost-dashboard-updates">Cost dashboard updates<a class="hash-link" aria-label="Direct link to Cost dashboard updates" title="Direct link to Cost dashboard updates" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#cost-dashboard-updates">​</a></h2>
-<ul>
-<li>Improved input parameters and computations</li>
-<li>Lengthened phases and reduced endorser block rate</li>
-<li>Updated CPU costs for votes and certificates</li>
-<li>Revised input/output operations per second (IOPS) values based on empirical data from Cardano nodes.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="benchmarking-bls-signatures">Benchmarking BLS signatures<a class="hash-link" aria-label="Direct link to Benchmarking BLS signatures" title="Direct link to Benchmarking BLS signatures" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#benchmarking-bls-signatures">​</a></h2>
-<ul>
-<li>Benchmarked BLS votes using the Rust <code>bls-signatures</code> package</li>
-<li>Aggregate verification significantly speeds up the process</li>
-<li>Provided CPU time estimates for various operations.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="votes-and-certificates">Votes and certificates<a class="hash-link" aria-label="Direct link to Votes and certificates" title="Direct link to Votes and certificates" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#votes-and-certificates">​</a></h2>
-<ul>
-<li>Updated size estimates for votes</li>
-<li>Added CPU time estimates for BLS votes and certificates</li>
-<li>Drafted technical report sections on BLS and MUSEN certificates.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="sortition-analysis">Sortition analysis<a class="hash-link" aria-label="Direct link to Sortition analysis" title="Direct link to Sortition analysis" href="https://leios.cardano-scaling.org/news/2025/01/06/weekly-progress-summary#sortition-analysis">​</a></h2>
-<ul>
-<li>Analyzed sortition for input and endorser blocks and votes</li>
-<li>Added findings to the draft of the first technical report.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
