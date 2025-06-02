@@ -358,10 +358,13 @@ impl Node {
             }
             CpuTaskType::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
             CpuTaskType::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
-            CpuTaskType::IBBlockValidated(_, ib) => vec![
-                cpu_times.ib_body_validation_constant
-                    + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
-            ],
+            CpuTaskType::IBBlockValidated(_, ib) => {
+                let total_tx_bytes: u64 = ib.transactions.iter().map(|tx| tx.bytes).sum();
+                vec![
+                    cpu_times.ib_body_validation_constant
+                        + (cpu_times.ib_body_validation_per_byte * total_tx_bytes as u32),
+                ]
+            }
             CpuTaskType::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
             CpuTaskType::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
             CpuTaskType::VTBundleGenerated(votes) => votes
