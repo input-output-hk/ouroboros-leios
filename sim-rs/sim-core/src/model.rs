@@ -89,7 +89,7 @@ id_wrapper!(TransactionId, u64);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub id: TransactionId,
-    pub shard: Option<u64>,
+    pub shard: u64,
     pub bytes: u64,
 }
 

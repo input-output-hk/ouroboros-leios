@@ -748,7 +748,7 @@ impl Node {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = Transaction {
                     id: config.next_id(),
-                    shard: None,
+                    shard: 0,
                     bytes: config.rb_size,
                 };
                 self.tracker.track_transaction_generated(&tx, self.id);
@@ -1357,16 +1357,13 @@ impl Node {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
             let tx = Transaction {
                 id: config.next_id(),
-                shard: None,
+                shard,
                 bytes: config.ib_size,
             };
             self.tracker.track_transaction_generated(&tx, self.id);
             vec![Arc::new(tx)]
         } else {
-            self.select_txs(
-                |seen| seen.tx.shard.is_none_or(|s| s == shard),
-                self.sim_config.max_ib_size,
-            )
+            self.select_txs(|seen| seen.tx.shard == shard, self.sim_config.max_ib_size)
         }
     }
 

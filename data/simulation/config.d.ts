@@ -63,11 +63,6 @@ export interface Config {
   "tx-generation-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-size-bytes-distribution": Distribution;
-  /**
-   * What fraction of transactions have at least one sharded input?
-   * 
-   * Only supported by Rust simulation. */
-  "tx-sharded-fraction": number;
   /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */

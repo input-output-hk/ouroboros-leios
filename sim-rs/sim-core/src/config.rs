@@ -68,7 +68,6 @@ pub struct RawParameters {
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
-    pub tx_sharded_fraction: f64,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
     pub tx_start_time: Option<f64>,
@@ -379,7 +378,6 @@ impl TransactionConfig {
         if params.simulate_transactions {
             Self::Real(RealTransactionConfig {
                 max_size: params.tx_max_size_bytes,
-                sharded_fraction: params.tx_sharded_fraction,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
                 start_time: params
@@ -402,7 +400,6 @@ impl TransactionConfig {
 #[derive(Debug, Clone)]
 pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
-    pub sharded_fraction: f64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
     pub start_time: Option<Timestamp>,

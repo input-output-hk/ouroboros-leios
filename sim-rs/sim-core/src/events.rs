@@ -102,7 +102,7 @@ pub enum Event {
         id: TransactionId,
         publisher: Node,
         size_bytes: u64,
-        shard: Option<u64>,
+        shard: u64,
     },
     TXSent {
         id: TransactionId,

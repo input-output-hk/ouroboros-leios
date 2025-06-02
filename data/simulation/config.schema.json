@@ -353,10 +353,6 @@
       "properties": {},
       "type": "number"
     },
-    "tx-sharded-fraction": {
-      "description": "What fraction of transactions have at least one sharded input?\n\nOnly supported by Rust simulation.",
-      "type": "number"
-    },
     "tx-size-bytes-distribution": {
       "$ref": "#/definitions/Distribution",
       "description": "Only supported by Rust simulation."
