@@ -1,0 +1,50 @@
+cabal-version:      3.6
+name:               trace-processor
+version:            0.1.0.0
+synopsis:
+
+-- A longer description of the package.
+-- description:
+homepage:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+license:            NONE
+author:             Brian Bush
+maintainer:         brian.bush@iohk.io
+
+-- A copyright notice.
+-- copyright:
+-- category:
+
+common globalOptions
+    default-language: Haskell2010
+    build-depends:
+        base
+    default-extensions:
+    ghc-options:
+        -Wno-overlapping-patterns
+        -Wunused-packages
+        -Wall -Werror
+        -O3
+
+library
+    import: globalOptions
+    hs-source-dirs: src
+    exposed-modules: Leios.Tracing.Lifecycle
+                     Leios.Tracing.Processor
+    build-depends:
+      , aeson
+      , bytestring
+      , containers
+      , mtl
+      , text
+    other-modules:
+
+executable leios-trace-processor
+    import: globalOptions
+    main-is: app/Main.hs
+    build-depends:
+      , optparse-applicative
+      , trace-processor
+    default-language: Haskell2010

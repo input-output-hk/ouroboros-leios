@@ -15,7 +15,7 @@ technical papers, presentations, and videos.
 
 #### Summary:
 
-- Cardano’s mainnet periodically faces congestion, with block utilization
+- Cardano's mainnet periodically faces congestion, with block utilization
   exceeding 90%, delaying transactions and impacting user experience, especially
   for use cases like airdrops, DEXes, oracles, and DApps. As new applications
   and bridges (eg, Cardano-Midnight, Cardano-Bitcoin) increase demand, current
@@ -71,30 +71,12 @@ maintaining settlement guarantees and supporting dynamic participation.
   Panagiotakos, one of the paper's co-authors, provides a detailed explanation
   of the Leios protocol
 
-- **Monthly Leios meetings**:
-
-  - [October 2024](https://drive.google.com/file/d/12VE0__S0knHqXXpIVdXGWvDipK0g89p_/view?usp=sharing)
-
-  - [November 2024](https://drive.google.com/file/d/1W4iu4MwOXILXes1Zi43MeM505KAOHXso/view?usp=sharing)
-
-  - [December 2024](https://drive.google.com/file/d/1F07oKxBgdOEasGcstxEavkPCgr58sbIO/view?usp=sharing)
-
-  - [January 2025](https://www.youtube.com/live/6ovcWDCdqFU?si=-dgnvO7353tUyiDZ&t=120).
+- [Monthly review videos](./development/monthly-reviews.md) – recordings and presentations from our monthly public review meetings
 
 ## Presentations
 
 - [Leios overview slides](https://docs.google.com/presentation/d/1W_KHdvdLNDEStE99D7Af2SRiTqZNnVLQiEPqRHJySqI/edit?usp=sharing)
   – the presentation by Sandro Coretti-Drayton providing insights into Leios.
-
-- **Monthly Leios presentations**:
-
-  - [October 2024 slides](https://docs.google.com/presentation/d/1KgjJyP6yZyZKCGum3deoIyooYUOretA9W6dTtXv1fso/edit?usp=sharing)
-
-  - [November 2024 slides](https://docs.google.com/presentation/d/11LHQeUuv-TQfiy9GwXkrffSimFjSq8tdTB8qIB-Pk3U/edit?usp=sharing)
-
-  - [December 2024 slides](https://docs.google.com/presentation/d/1LwpcXnXLgrYTSDalJY1SfpeyU_4lIkYhyMy5Kv0Huzw/edit?usp=sharing)
-
-  - [January 2025 slides](https://docs.google.com/presentation/d/1qKXe3CvAvJGVWAssjrKpRrRABMT6I39E1FxUWQ_PZzo/edit?usp=sharing).
 
 ## Tools and simulations
 

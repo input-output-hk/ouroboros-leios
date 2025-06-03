@@ -1,6 +1,6 @@
 {
   "backButtonUrl": "/formal-spec/",
   "inputDir": "./static/formal-spec",
-  "modules": ["Leios", "Cardano", "Ouroboros"],
+  "modules": ["Leios", "Cardano", "Network", "Ouroboros"],
   "githubUrl": "https://github.com/input-output-hk/ouroboros-leios-formal-spec"
 } 

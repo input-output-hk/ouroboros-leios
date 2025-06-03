@@ -291,6 +291,22 @@
       ],
       "type": "object"
     },
+    "LostTransaction": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "type": {
+          "const": "TXLost",
+          "type": "string"
+        }
+      },
+      "required": ["id", "reason", "type"],
+      "type": "object"
+    },
     "LotteryWon": {
       "properties": {
         "id": {
@@ -402,6 +418,9 @@
         },
         {
           "$ref": "#/definitions/GeneratedTransaction"
+        },
+        {
+          "$ref": "#/definitions/LostTransaction"
         },
         {
           "$ref": "#/definitions/NetworkEvent"

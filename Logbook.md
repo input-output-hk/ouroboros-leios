@@ -1,5 +1,62 @@
 # Leios logbook
 
+## 2025-05-30
+
+### Analysis of an overcollateralization scheme
+
+We computed shardless overcollateratization where transactions are randomly sampled from the memory pool and nodes operate independently over the concurrency period. Details are in the [Jupyter notebook](analysis/overcollateralization-v1.ipynb).
+
+Findings:
+
+1. Probabilities of duplication and conflicts are minimized when the length of the concurrency period is as short as possible.
+2. The probability of conflict is always greater than the probability of duplication.
+3. For a given concurrency period, a longer transaction residence time corresponds to a lower probability of duplication or conflict.
+4. Spatial efficiency is also greater for longer residence times.
+5. The tradeoff between probabilities of duplication and conflict is insensitive to protocol parameters.
+6. The expected number of conflicts in IBs scales proportionately with (a) the fraction of conflicting transactions in the memory pool and (b) the transaction throughput, but its dependence upon the transaction residence time is weaker and nonlinear.
+7. At a given throughput, reducing the probability of duplicates or conflicts is at odds with reducing the total number of conflicts.
+8. The probabilistic computation of number of conflicts is about twenty percent lower than a naive estimate that multiplies the throughput by the concurrency period and the fraction of conflicts in the memory pool.
+9. At 100 TPS and with favorable settings of protocol parameters, an overcollateralization factor of nearly 400 is necessary.
+
+### Rust simulation
+
+Added "TXLost" events to simulation output, to detect various places where Leios can lose transactions with some choices of parameters.
+
+## 2025-05-29
+
+### Transaction lifecycle simulation results (week 23)
+
+- The protocol performs well (i.e., essentially every tx makes it to the ledger) up to 300 TPS, where it breaks down early.
+    - The 100-node network is actually more stressful to the protocol than a realistic mainnet would be, so I'm eager to see what TPS we can achieve there.
+    - The TPS figures that are quoted for the design are about 10% lower than the actual results, so we are going to recalibrate the experimental design before we run it again.
+- The space efficiency is above 80% for the moderate-throughput scenarios.
+- Transactions take about 100 seconds average (about 200 seconds for the 95th %ile) to reach the ledger.
+
+| Transaction efficiency | Temporal efficiency | Spatial Efficiency |
+|---|---|---|
+| ![Transaction efficiency of Leios](analysis/sims/2025w22/plots/temporal-efficiency-bar.svg) | ![Temporal efficiency of Leios](analysis/sims/2025w22/plots/reach-rb-tx.svg) | ![Spatial efficiency of Leios](analysis/sims/2025w22/plots/spatial-efficiency.svg) |
+
+### Faster data processing of simulation results
+
+The new [`leios-trace-processor`](analysis/sim/trace-processor/) tool was developed to replace the previous script-based analyses of Leios simulator output. It runs far faster than the previous scripts and this will make it possible to analyzes much longer and larger simulation results.
+
+```console
+$ nix run .#leios-trace-processor -- --trace-file sim.log --lifecycle-file lifecycle.csv
+
+$ head lifecycle.csv
+
+Kind,Item,Size [B],References,Created [s],To IB [s],To EB [s],To RB [s],In RB [s]
+EB,10-node-19,240,0,10.075,NA,NA,NA,NA
+EB,100-node-51,336,25,100.075,NA,130.075,129.091,NA
+EB,1000-node-27,976,20,1000.075,NA,1090.075,1127.091,NA
+EB,1000-node-59,976,19,1000.075,NA,1040.075,1084.091,NA
+EB,1010-node-70,1008,39,1010.075,NA,1040.075,1084.091,NA
+EB,1020-node-56,1008,24,1020.075,NA,1050.075,1127.091,NA
+EB,1020-node-90,1008,8,1020.075,NA,1080.075,1207.091,NA
+EB,1020-node-93,1008,5,1020.075,NA,1050.075,1084.091,NA
+EB,1040-node-19,944,28,1040.075,NA,1080.075,1104.091,NA
+```
+
 ## 2025-05-23
 
 ### Rust simulation

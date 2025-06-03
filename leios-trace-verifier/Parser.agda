@@ -347,9 +347,9 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     unquoteDecl Show-BlockType = derive-Show [ (quote BlockType , Show-BlockType) ]
 
     instance
-      Show-sum : Show (EndorserBlock ⊎ List Tx)
-      Show-sum .show (inj₁ x) = show x
-      Show-sum .show (inj₂ y) = show y
+      Show-⊎ : ∀ {ℓ} {A B : Type ℓ} → ⦃ Show A ⦄ → ⦃ Show B ⦄ → Show (A ⊎ B)
+      Show-⊎ .show (inj₁ x) = show x
+      Show-⊎ .show (inj₂ y) = show y
 
     unquoteDecl Show-FFDUpdate    = derive-Show [ (quote FFDUpdate , Show-FFDUpdate) ]
     unquoteDecl Show-Params       = derive-Show [ (quote Params , Show-Params) ]

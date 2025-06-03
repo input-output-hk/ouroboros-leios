@@ -1,7 +1,11 @@
 leios-variant: full
 
+# How to choose transactions from the mempool when producing IBs.
+# "Random" is meant to ensure that different producers include different TXs.
+leios-mempool-sampling-strategy: random
+
 # Allow EBs to include IBs from previous slots
 leios-late-ib-inclusion: true
 
 # Chain quality controls how far back EB recursion can reach.
-praos-chain-quality: 40
+praos-chain-quality: 100

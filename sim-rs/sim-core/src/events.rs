@@ -9,7 +9,7 @@ use crate::{
     config::{NodeConfiguration, NodeId},
     model::{
         Block, BlockId, CpuTaskId, EndorserBlockId, InputBlockId, NoVoteReason, Transaction,
-        TransactionId, VoteBundle, VoteBundleId,
+        TransactionId, TransactionLostReason, VoteBundle, VoteBundleId,
     },
 };
 
@@ -102,7 +102,7 @@ pub enum Event {
         id: TransactionId,
         publisher: Node,
         size_bytes: u64,
-        shard: Option<u64>,
+        shard: u64,
     },
     TXSent {
         id: TransactionId,
@@ -114,6 +114,10 @@ pub enum Event {
         id: TransactionId,
         sender: Node,
         recipient: Node,
+    },
+    TXLost {
+        id: TransactionId,
+        reason: TransactionLostReason,
     },
     RBLotteryWon {
         id: BlockId<Node>,
@@ -458,7 +462,7 @@ impl EventTracker {
 
     pub fn track_ib_generated(&self, block: &crate::model::InputBlock) {
         let header_bytes = block.header.bytes;
-        let tx_payload_bytes = block.transactions.iter().map(|tx| tx.bytes).sum();
+        let tx_payload_bytes = block.tx_payload_bytes;
         self.send(Event::IBGenerated {
             id: self.to_input_block(block.header.id),
             slot: block.header.id.slot,

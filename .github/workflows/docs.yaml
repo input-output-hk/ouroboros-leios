@@ -13,6 +13,7 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
+  workflow_dispatch: # Allow manual triggering for formal spec updates
 
 permissions:
   contents: write
@@ -99,7 +100,7 @@ jobs:
 
   viz-build:
     name: "Build Visualizer"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
@@ -133,7 +134,7 @@ jobs:
 
   build-docusaurus-site:
     name: "Build Docusaurus Site"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [viz-build]
     runs-on: ubuntu-latest
     steps:
@@ -146,12 +147,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock
+          cache: "npm"
+          cache-dependency-path: ./site/package-lock.json
 
       - name: 📦 Install dependencies
         working-directory: site
-        run: yarn install
+        run: npm ci
 
       - name: 👁️ Unpack visualizer
         uses: actions/download-artifact@v4
@@ -162,7 +163,7 @@ jobs:
       - name: 🏗️ Build Docusaurus site
         working-directory: site
         run: |
-          yarn build
+          npm run build
 
       - name: Verify Docusaurus build
         working-directory: site
@@ -183,7 +184,7 @@ jobs:
 
   docs-publish:
     name: "Publish Docs"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: [build-docusaurus-site]
     runs-on: ubuntu-latest
     steps:

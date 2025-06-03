@@ -89,7 +89,7 @@ id_wrapper!(TransactionId, u64);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub id: TransactionId,
-    pub shard: Option<u64>,
+    pub shard: u64,
     pub bytes: u64,
 }
 
@@ -133,11 +133,12 @@ pub struct InputBlockHeader {
 #[derive(Debug)]
 pub struct InputBlock {
     pub header: InputBlockHeader,
+    pub tx_payload_bytes: u64,
     pub transactions: Vec<Arc<Transaction>>,
 }
 impl InputBlock {
     pub fn bytes(&self) -> u64 {
-        self.header.bytes + self.transactions.iter().map(|tx| tx.bytes).sum::<u64>()
+        self.header.bytes + self.tx_payload_bytes
     }
 }
 
@@ -215,7 +216,14 @@ pub enum NoVoteReason {
     MissingIB,
     MissingEB,
     ExtraTX,
+    MissingTX,
     UncertifiedEBReference,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub enum TransactionLostReason {
+    IBExpired,
+    EBExpired,
 }
 
 #[derive(Clone, Debug, Serialize)]

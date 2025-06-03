@@ -29,6 +29,7 @@
   --header-border-color: var(--border-color);
   --header-button-padding: 8px;
   --header-button-border-radius: 6px;
+  --mobile-breakpoint: 768px;
 }
 
 :root.dark-theme {
@@ -99,7 +100,8 @@ header {
 .back-button,
 .github-link,
 .theme-toggle,
-.search-button {
+.search-button,
+.menu-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -113,7 +115,8 @@ header {
 .back-button:hover,
 .github-link:hover,
 .theme-toggle:hover,
-.search-button:hover {
+.search-button:hover,
+.menu-toggle:hover {
   background-color: var(--hover-bg);
   color: var(--link-hover-color);
   transform: var(--hover-transform);
@@ -123,7 +126,8 @@ header {
 .back-button:active,
 .github-link:active,
 .theme-toggle:active,
-.search-button:active {
+.search-button:active,
+.menu-toggle:active {
   transform: translateY(0);
   box-shadow: none;
 }
@@ -163,6 +167,21 @@ header {
   height: 20px;
 }
 
+/* Menu toggle button for mobile */
+.menu-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: none; /* Hidden by default, shown on mobile */
+}
+
+.menu-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
 :root:not(.dark-theme) .dark-icon {
   display: none;
 }
@@ -190,6 +209,19 @@ header {
   overflow-y: auto;
   padding: var(--sidebar-padding);
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+/* Mobile sidebar overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
 }
 
 .modules-header {
@@ -253,6 +285,111 @@ header {
   max-width: var(--content-max-width);
   scroll-padding-top: calc(var(--header-height) + var(--content-padding));
   scroll-margin-top: calc(var(--header-height) + var(--content-padding));
+  transition: margin-left 0.3s ease;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  /* Show menu toggle button on mobile */
+  .menu-toggle {
+    display: flex !important;
+  }
+
+  /* Hide sidebar by default on mobile */
+  .sidebar {
+    transform: translateX(-100%) !important;
+    z-index: 1001 !important;
+    width: 100vw !important;
+    padding: var(--sidebar-padding) !important;
+    box-shadow: none !important;
+    border-right: none !important;
+    position: fixed !important;
+    top: var(--header-height) !important;
+    left: 0 !important;
+    height: calc(100vh - var(--header-height)) !important;
+    background-color: var(--background-color) !important;
+    overflow-y: auto !important;
+    transition: transform 0.3s ease !important;
+  }
+
+  /* Show sidebar overlay when sidebar is open */
+  body.sidebar-open .sidebar-overlay {
+    display: block !important;
+  }
+
+  /* Show sidebar when body has sidebar-open class */
+  body.sidebar-open .sidebar {
+    transform: translateX(0) !important;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Make main content full width on mobile */
+  .main-content {
+    margin-left: 0 !important;
+    padding: 20px 16px !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  /* Adjust header padding on mobile */
+  header {
+    padding: 0 16px !important;
+  }
+
+  /* CSS variables for mobile */
+  :root {
+    --content-padding: 20px;
+  }
+
+  /* Adjust header elements on mobile */
+  .header-left {
+    gap: 8px !important;
+  }
+
+  .header-right {
+    gap: 8px !important;
+  }
+
+  .back-button {
+    font-size: 14px !important;
+    padding: 6px 10px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Improve mobile navigation */
+  .module-item {
+    padding: 2px 0 !important;
+  }
+
+  .module-group-header {
+    font-size: 14px !important;
+    margin: 16px 0 8px 0 !important;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  header {
+    padding: 0 12px;
+  }
+
+  .main-content {
+    padding: 16px 12px;
+  }
+
+  .header-left {
+    gap: 4px;
+  }
+
+  .header-right {
+    gap: 4px;
+  }
+
+  /* Simplify back button on very small screens */
+  .back-button {
+    padding: 6px 8px;
+    font-size: 14px;
+  }
 }
 
 /* Ensure anchors have proper scroll margin */
@@ -470,14 +607,46 @@ pre code {
 /* Highlighted line styles */
 .code-line.highlighted {
   background-color: var(--hover-bg);
-  border-radius: 0 3px 3px 0;
   display: block;
   width: 100%;
+}
+
+/* Range highlighting styles - more cohesive look for consecutive lines */
+.code-line.highlighted.range-start {
+  border-radius: 0 3px 0 0;
+}
+
+.code-line.highlighted.range-middle {
+  border-radius: 0;
+}
+
+.code-line.highlighted.range-end {
+  border-radius: 0 0 3px 0;
+}
+
+.code-line.highlighted.range-single {
+  border-radius: 0 3px 3px 0;
 }
 
 /* Add highlight to line numbers */
 .line-number.highlighted {
   background-color: var(--hover-bg);
+}
+
+/* Range highlighting for line numbers */
+.line-number.highlighted.range-start {
+  border-radius: 3px 0 0 0;
+}
+
+.line-number.highlighted.range-middle {
+  border-radius: 0;
+}
+
+.line-number.highlighted.range-end {
+  border-radius: 0 0 0 3px;
+}
+
+.line-number.highlighted.range-single {
   border-radius: 3px 0 0 3px;
 }
 
