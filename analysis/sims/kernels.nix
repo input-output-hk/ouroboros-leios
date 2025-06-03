@@ -16,6 +16,7 @@
       ggpattern
       ggplot2
       ggExtra
+      igraph
       lubridate
       mongolite
       RPostgres
