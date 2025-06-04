@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[2124],{2044:a=>{a.exports=JSON.parse('{"tag":{"label":"alba","permalink":"/news/tags/alba","allTagsPath":"/news/tags","count":1,"unlisted":false},"listMetadata":{"permalink":"/news/tags/alba","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

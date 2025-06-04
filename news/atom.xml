@@ -59,6 +59,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="overcollateralization" term="overcollateralization"/>
+        <category label="transaction-duplication" term="transaction-duplication"/>
+        <category label="conflict-analysis" term="conflict-analysis"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="transaction-lifecycle" term="transaction-lifecycle"/>
+        <category label="data-processing" term="data-processing"/>
+        <category label="optimization" term="optimization"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – May 19, 2025]]></title>
@@ -133,6 +140,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="transaction-inclusion" term="transaction-inclusion"/>
+        <category label="conformance-testing" term="conformance-testing"/>
+        <category label="formal-specification" term="formal-specification"/>
+        <category label="documentation" term="documentation"/>
+        <category label="transaction-lifecycle" term="transaction-lifecycle"/>
+        <category label="agda" term="agda"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – May 12, 2025]]></title>
@@ -192,6 +206,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="trace-verification" term="trace-verification"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="code-review" term="code-review"/>
+        <category label="transaction-processing" term="transaction-processing"/>
+        <category label="documentation" term="documentation"/>
+        <category label="conformance-testing" term="conformance-testing"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – May 5, 2025]]></title>
@@ -241,6 +262,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="high-throughput" term="high-throughput"/>
+        <category label="simulation-analysis" term="simulation-analysis"/>
+        <category label="efficiency-metrics" term="efficiency-metrics"/>
+        <category label="security" term="security"/>
+        <category label="profitability-analysis" term="profitability-analysis"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="visualization" term="visualization"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – April 28, 2025]]></title>
@@ -295,6 +323,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="cip" term="cip"/>
+        <category label="documentation" term="documentation"/>
+        <category label="transaction-lifecycle" term="transaction-lifecycle"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="visualization" term="visualization"/>
+        <category label="plutus" term="plutus"/>
+        <category label="benchmarking" term="benchmarking"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – April 21, 2025]]></title>
@@ -367,6 +402,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="simulation-analysis" term="simulation-analysis"/>
+        <category label="protocol-development" term="protocol-development"/>
+        <category label="economic-analysis" term="economic-analysis"/>
+        <category label="full-leios" term="full-leios"/>
+        <category label="mini-protocols" term="mini-protocols"/>
+        <category label="reward-sustainability" term="reward-sustainability"/>
+        <category label="visualization" term="visualization"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – April 14, 2025]]></title>
@@ -413,7 +455,7 @@
 <p>Potential next steps:</p>
 <ul>
 <li>Translate the model into Delta QSD to capture network effects</li>
-<li>Compare the model’s output with results from the Rust simulator</li>
+<li>Compare the model's output with results from the Rust simulator</li>
 <li>Extend the model to account for different memory pool and ledger variants under evaluation.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-and-analysis-of-full-leios">Simulation and analysis of Full Leios<a class="hash-link" aria-label="Direct link to Simulation and analysis of Full Leios" title="Direct link to Simulation and analysis of Full Leios" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-and-analysis-of-full-leios">​</a></h3>
@@ -445,6 +487,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="mini-protocols" term="mini-protocols"/>
+        <category label="cost-dashboard" term="cost-dashboard"/>
+        <category label="transaction-lifecycle" term="transaction-lifecycle"/>
+        <category label="full-leios" term="full-leios"/>
+        <category label="network-protocols" term="network-protocols"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – April 7, 2025]]></title>
@@ -526,6 +575,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="workflow" term="workflow"/>
+        <category label="optimization" term="optimization"/>
+        <category label="analysis" term="analysis"/>
+        <category label="workshop" term="workshop"/>
+        <category label="edinburgh" term="edinburgh"/>
+        <category label="conformance-testing" term="conformance-testing"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – March 31, 2025]]></title>
@@ -576,6 +633,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="workshop" term="workshop"/>
+        <category label="edinburgh" term="edinburgh"/>
+        <category label="ledger-design" term="ledger-design"/>
+        <category label="cost-analysis" term="cost-analysis"/>
+        <category label="optimistic-validation" term="optimistic-validation"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="adversarial" term="adversarial"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – March 24, 2025]]></title>
@@ -628,6 +693,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="full-leios" term="full-leios"/>
+        <category label="testing" term="testing"/>
+        <category label="visualization" term="visualization"/>
+        <category label="vite" term="vite"/>
+        <category label="monthly-review" term="monthly-review"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – March 17, 2025]]></title>
@@ -680,6 +752,13 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="simulation-comparison" term="simulation-comparison"/>
+        <category label="protocol-scaling" term="protocol-scaling"/>
+        <category label="congestion" term="congestion"/>
+        <category label="throughput" term="throughput"/>
+        <category label="full-leios" term="full-leios"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="trace-verification" term="trace-verification"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – March 10, 2025]]></title>
@@ -759,6 +838,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="simulation-comparison" term="simulation-comparison"/>
+        <category label="mainnet-scale" term="mainnet-scale"/>
+        <category label="analysis" term="analysis"/>
+        <category label="sharding" term="sharding"/>
+        <category label="performance" term="performance"/>
+        <category label="full-leios" term="full-leios"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="research" term="research"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – March 3, 2025]]></title>
@@ -844,6 +931,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="cross-simulation" term="cross-simulation"/>
+        <category label="analysis" term="analysis"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="trace-verification" term="trace-verification"/>
+        <category label="agda" term="agda"/>
+        <category label="technical-report" term="technical-report"/>
+        <category label="cip" term="cip"/>
+        <category label="documentation" term="documentation"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – February 24, 2025]]></title>
@@ -922,6 +1017,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="cross-simulation" term="cross-simulation"/>
+        <category label="analysis" term="analysis"/>
+        <category label="dashboard" term="dashboard"/>
+        <category label="protocol" term="protocol"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="trace-verification" term="trace-verification"/>
+        <category label="agda" term="agda"/>
+        <category label="rust-simulation" term="rust-simulation"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – February 17, 2025]]></title>
@@ -1021,6 +1124,14 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="cps-0018" term="cps-0018"/>
+        <category label="protocol" term="protocol"/>
+        <category label="cross-simulation" term="cross-simulation"/>
+        <category label="analysis" term="analysis"/>
+        <category label="docker" term="docker"/>
+        <category label="infrastructure" term="infrastructure"/>
+        <category label="throughput" term="throughput"/>
+        <category label="congestion" term="congestion"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – February 10, 2025]]></title>
@@ -1128,6 +1239,15 @@
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="deltaq" term="deltaq"/>
+        <category label="topology" term="topology"/>
+        <category label="analysis" term="analysis"/>
+        <category label="cryptography" term="cryptography"/>
+        <category label="bls" term="bls"/>
+        <category label="benchmarks" term="benchmarks"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – February 3, 2025]]></title>
@@ -1214,6 +1334,13 @@ lifecycle.</li>
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="cryptography" term="cryptography"/>
+        <category label="implementation" term="implementation"/>
+        <category label="cost-calculator" term="cost-calculator"/>
+        <category label="throughput" term="throughput"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="visualization" term="visualization"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – January 27, 2025]]></title>
@@ -1263,6 +1390,13 @@ lifecycle.</li>
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="standardization" term="standardization"/>
+        <category label="configuration" term="configuration"/>
+        <category label="topology" term="topology"/>
+        <category label="deltaq" term="deltaq"/>
+        <category label="formal-methods" term="formal-methods"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – January 20, 2025]]></title>
@@ -1344,6 +1478,13 @@ at 1MB/s)</li>
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="sortition" term="sortition"/>
+        <category label="downstream-impact" term="downstream-impact"/>
+        <category label="topology" term="topology"/>
+        <category label="visualization" term="visualization"/>
+        <category label="deltaq" term="deltaq"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – January 13, 2025]]></title>
@@ -1413,5 +1554,13 @@ interval</li>
         <category label="progress" term="progress"/>
         <category label="update" term="update"/>
         <category label="weekly" term="weekly"/>
+        <category label="cryptography" term="cryptography"/>
+        <category label="benchmarks" term="benchmarks"/>
+        <category label="vrf" term="vrf"/>
+        <category label="bls" term="bls"/>
+        <category label="haskell-simulation" term="haskell-simulation"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="visualization" term="visualization"/>
+        <category label="technical-report" term="technical-report"/>
     </entry>
 </feed>

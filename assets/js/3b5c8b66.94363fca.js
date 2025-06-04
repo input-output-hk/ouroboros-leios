@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[3946],{2911:e=>{e.exports=JSON.parse('{"tag":{"label":"peras","permalink":"/news/tags/peras","allTagsPath":"/news/tags","count":1,"unlisted":false},"listMetadata":{"permalink":"/news/tags/peras","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

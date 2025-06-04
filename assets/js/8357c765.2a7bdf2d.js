@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[2621],{312:e=>{e.exports=JSON.parse('{"tag":{"label":"security","permalink":"/news/tags/security","allTagsPath":"/news/tags","count":2,"unlisted":false},"listMetadata":{"permalink":"/news/tags/security","page":1,"postsPerPage":10,"totalPages":1,"totalCount":2,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

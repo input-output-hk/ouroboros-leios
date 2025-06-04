@@ -56,6 +56,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>overcollateralization</category>
+            <category>transaction-duplication</category>
+            <category>conflict-analysis</category>
+            <category>rust-simulation</category>
+            <category>transaction-lifecycle</category>
+            <category>data-processing</category>
+            <category>optimization</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – May 19, 2025]]></title>
@@ -126,6 +133,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>rust-simulation</category>
+            <category>transaction-inclusion</category>
+            <category>conformance-testing</category>
+            <category>formal-specification</category>
+            <category>documentation</category>
+            <category>transaction-lifecycle</category>
+            <category>agda</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – May 12, 2025]]></title>
@@ -181,6 +195,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>trace-verification</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>code-review</category>
+            <category>transaction-processing</category>
+            <category>documentation</category>
+            <category>conformance-testing</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – May 5, 2025]]></title>
@@ -226,6 +247,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>high-throughput</category>
+            <category>simulation-analysis</category>
+            <category>efficiency-metrics</category>
+            <category>security</category>
+            <category>profitability-analysis</category>
+            <category>rust-simulation</category>
+            <category>visualization</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – April 28, 2025]]></title>
@@ -276,6 +304,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>cip</category>
+            <category>documentation</category>
+            <category>transaction-lifecycle</category>
+            <category>rust-simulation</category>
+            <category>visualization</category>
+            <category>plutus</category>
+            <category>benchmarking</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – April 21, 2025]]></title>
@@ -344,6 +379,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>simulation-analysis</category>
+            <category>protocol-development</category>
+            <category>economic-analysis</category>
+            <category>full-leios</category>
+            <category>mini-protocols</category>
+            <category>reward-sustainability</category>
+            <category>visualization</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – April 14, 2025]]></title>
@@ -390,7 +432,7 @@
 <p>Potential next steps:</p>
 <ul>
 <li>Translate the model into Delta QSD to capture network effects</li>
-<li>Compare the model’s output with results from the Rust simulator</li>
+<li>Compare the model's output with results from the Rust simulator</li>
 <li>Extend the model to account for different memory pool and ledger variants under evaluation.</li>
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-and-analysis-of-full-leios">Simulation and analysis of Full Leios<a class="hash-link" aria-label="Direct link to Simulation and analysis of Full Leios" title="Direct link to Simulation and analysis of Full Leios" href="https://leios.cardano-scaling.org/news/2025/04/14/weekly-progress-summary#simulation-and-analysis-of-full-leios">​</a></h3>
@@ -418,6 +460,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>mini-protocols</category>
+            <category>cost-dashboard</category>
+            <category>transaction-lifecycle</category>
+            <category>full-leios</category>
+            <category>network-protocols</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – April 7, 2025]]></title>
@@ -495,6 +544,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>workflow</category>
+            <category>optimization</category>
+            <category>analysis</category>
+            <category>workshop</category>
+            <category>edinburgh</category>
+            <category>conformance-testing</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – March 31, 2025]]></title>
@@ -541,6 +598,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>workshop</category>
+            <category>edinburgh</category>
+            <category>ledger-design</category>
+            <category>cost-analysis</category>
+            <category>optimistic-validation</category>
+            <category>formal-methods</category>
+            <category>haskell-simulation</category>
+            <category>adversarial</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – March 24, 2025]]></title>
@@ -589,6 +654,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>full-leios</category>
+            <category>testing</category>
+            <category>visualization</category>
+            <category>vite</category>
+            <category>monthly-review</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – March 17, 2025]]></title>
@@ -637,6 +709,13 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>simulation-comparison</category>
+            <category>protocol-scaling</category>
+            <category>congestion</category>
+            <category>throughput</category>
+            <category>full-leios</category>
+            <category>formal-methods</category>
+            <category>trace-verification</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – March 10, 2025]]></title>
@@ -712,6 +791,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>simulation-comparison</category>
+            <category>mainnet-scale</category>
+            <category>analysis</category>
+            <category>sharding</category>
+            <category>performance</category>
+            <category>full-leios</category>
+            <category>formal-methods</category>
+            <category>research</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – March 3, 2025]]></title>
@@ -793,6 +880,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>cross-simulation</category>
+            <category>analysis</category>
+            <category>formal-methods</category>
+            <category>trace-verification</category>
+            <category>agda</category>
+            <category>technical-report</category>
+            <category>cip</category>
+            <category>documentation</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – February 24, 2025]]></title>
@@ -867,6 +962,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>cross-simulation</category>
+            <category>analysis</category>
+            <category>dashboard</category>
+            <category>protocol</category>
+            <category>formal-methods</category>
+            <category>trace-verification</category>
+            <category>agda</category>
+            <category>rust-simulation</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – February 17, 2025]]></title>
@@ -962,6 +1065,14 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>cps-0018</category>
+            <category>protocol</category>
+            <category>cross-simulation</category>
+            <category>analysis</category>
+            <category>docker</category>
+            <category>infrastructure</category>
+            <category>throughput</category>
+            <category>congestion</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – February 10, 2025]]></title>
@@ -1065,6 +1176,15 @@
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>deltaq</category>
+            <category>topology</category>
+            <category>analysis</category>
+            <category>cryptography</category>
+            <category>bls</category>
+            <category>benchmarks</category>
+            <category>formal-methods</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – February 3, 2025]]></title>
@@ -1147,6 +1267,13 @@ lifecycle.</li>
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>cryptography</category>
+            <category>implementation</category>
+            <category>cost-calculator</category>
+            <category>throughput</category>
+            <category>rust-simulation</category>
+            <category>visualization</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – January 27, 2025]]></title>
@@ -1192,6 +1319,13 @@ lifecycle.</li>
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>standardization</category>
+            <category>configuration</category>
+            <category>topology</category>
+            <category>deltaq</category>
+            <category>formal-methods</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – January 20, 2025]]></title>
@@ -1269,6 +1403,13 @@ at 1MB/s)</li>
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>sortition</category>
+            <category>downstream-impact</category>
+            <category>topology</category>
+            <category>visualization</category>
+            <category>deltaq</category>
         </item>
         <item>
             <title><![CDATA[Weekly Summary – January 13, 2025]]></title>
@@ -1334,6 +1475,14 @@ interval</li>
             <category>progress</category>
             <category>update</category>
             <category>weekly</category>
+            <category>cryptography</category>
+            <category>benchmarks</category>
+            <category>vrf</category>
+            <category>bls</category>
+            <category>haskell-simulation</category>
+            <category>rust-simulation</category>
+            <category>visualization</category>
+            <category>technical-report</category>
         </item>
     </channel>
 </rss>

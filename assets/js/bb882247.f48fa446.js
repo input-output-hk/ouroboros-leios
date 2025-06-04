@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[2172],{3986:e=>{e.exports=JSON.parse('{"tag":{"label":"latency","permalink":"/news/tags/latency","allTagsPath":"/news/tags","count":2,"unlisted":false},"listMetadata":{"permalink":"/news/tags/latency","page":1,"postsPerPage":10,"totalPages":1,"totalCount":2,"blogDescription":"Blog","blogTitle":"News"}}')}}]);

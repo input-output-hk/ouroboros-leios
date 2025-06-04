@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksite=self.webpackChunksite||[]).push([[707],{6922:e=>{e.exports=JSON.parse('{"tag":{"label":"workflow","permalink":"/news/tags/workflow","allTagsPath":"/news/tags","count":1,"unlisted":false},"listMetadata":{"permalink":"/news/tags/workflow","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"News"}}')}}]);
