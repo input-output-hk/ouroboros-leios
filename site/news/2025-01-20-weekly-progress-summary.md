@@ -2,7 +2,7 @@
 title: Weekly Summary – January 20, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, haskell-simulation, rust-simulation, sortition, downstream-impact, topology, visualization, deltaq]
 ---
 
 ## Simulation progress

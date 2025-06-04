@@ -2,7 +2,7 @@
 title: Weekly Summary – March 31, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, workshop, edinburgh, ledger-design, cost-analysis, optimistic-validation, formal-methods, haskell-simulation, adversarial]
 ---
 
 This week, the Leios team met for an in-person workshop in Edinburgh and continued their efforts in refining the protocol and its simulation capabilities. The team made significant progress in addressing various topics.

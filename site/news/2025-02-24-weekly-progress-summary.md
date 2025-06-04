@@ -2,7 +2,7 @@
 title: Weekly Summary – February 24, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, cross-simulation, analysis, dashboard, protocol, formal-methods, trace-verification, agda, rust-simulation]
 ---
 
 This week in Leios development, the team focused on simulation analysis and formal methods. Key accomplishments include detailed analyses of both Haskell and Rust simulations, initial work on a protocol dashboard, and advancements in formal methods through trace verification in Agda.

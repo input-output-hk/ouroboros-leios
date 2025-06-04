@@ -2,7 +2,7 @@
 title: Weekly Summary - November 11, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, network-simulation, presentation, governance, storage, incentives, filecoin]
 ---
 
 ## Network Simulation for Leios

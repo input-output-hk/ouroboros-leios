@@ -2,7 +2,7 @@
 title: Weekly Summary – April 14, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, haskell-simulation, rust-simulation, mini-protocols, cost-dashboard, transaction-lifecycle, full-leios, network-protocols]
 ---
 
 This week, the team made substantial progress in both the Haskell and Rust simulations, refined cost estimates, and carried out detailed analyses of the transaction lifecycle and Full Leios simulations.
@@ -40,7 +40,7 @@ Key findings from the analysis:
 
 Potential next steps:
 - Translate the model into Delta QSD to capture network effects
-- Compare the model’s output with results from the Rust simulator
+- Compare the model's output with results from the Rust simulator
 - Extend the model to account for different memory pool and ledger variants under evaluation.
 
 ### Simulation and analysis of Full Leios

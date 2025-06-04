@@ -2,7 +2,7 @@
 title: Weekly Summary – March 3, 2025 
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, cross-simulation, analysis, formal-methods, trace-verification, agda, technical-report, cip, documentation]
 ---
 
 This week in Leios development, the team focused on simulation analysis, formal methods, and documentation updates. Key accomplishments include in-depth analysis of simulations at tag `leios-2025w10`, advancements in formal methods through a working trace verifier, and the development of technical reports.

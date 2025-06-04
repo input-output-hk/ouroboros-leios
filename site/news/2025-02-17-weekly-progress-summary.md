@@ -2,7 +2,7 @@
 title: Weekly Summary – February 17, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, cps-0018, protocol, cross-simulation, analysis, docker, infrastructure, throughput, congestion]
 ---
 
 This week in Leios development, [CPS-0018](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) for transaction throughput was approved, along with improved Docker support for simulations and analysis of cross-simulation results. The team also examined input block (IB) production rates and their impact on network performance.

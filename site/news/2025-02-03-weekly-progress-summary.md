@@ -2,7 +2,7 @@
 title: Weekly Summary – February 3, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, haskell-simulation, cryptography, implementation, cost-calculator, throughput, rust-simulation, visualization]
 ---
 
 This week, the Leios team worked on cryptography benchmarking and cost calculator improvements. The team completed a reference implementation for Leios cryptography and enhanced the online cost calculator with user-requested features. They also updated both Haskell and Rust simulations to improve visualization and network modeling capabilities.

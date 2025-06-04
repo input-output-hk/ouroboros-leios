@@ -2,7 +2,7 @@
 title: Weekly Summary – January 13, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, cryptography, benchmarks, vrf, bls, haskell-simulation, rust-simulation, visualization, technical-report]
 ---
 
 ## Cryptography benchmarks

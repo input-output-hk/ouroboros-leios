@@ -2,7 +2,7 @@
 title: Weekly Summary – December 30, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, rust-simulation, graph-generation, haskell-simulation, parallelism, cryptography, bls, deltaq, jupyter]
 ---
 
 ## Rust simulation

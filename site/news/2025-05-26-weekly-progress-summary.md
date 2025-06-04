@@ -2,7 +2,7 @@
 title: Weekly Summary – May 26, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, overcollateralization, transaction-duplication, conflict-analysis, rust-simulation, transaction-lifecycle, data-processing, optimization]
 ---
 
 The Leios team completed significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. The week focused on understanding transaction duplication and conflict probabilities in shardless scenarios, while also enhancing simulation tooling to better track transaction lifecycle events.

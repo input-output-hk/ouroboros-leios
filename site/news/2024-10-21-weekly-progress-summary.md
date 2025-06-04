@@ -2,7 +2,7 @@
 title: Weekly Summary - October 21, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, testing, network-simulation, deltaq, latency, throughput, open-source]
 ---
 
 ## Designing Test Environment

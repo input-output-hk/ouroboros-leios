@@ -2,7 +2,7 @@
 title: Weekly Summary – March 17, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, simulation-comparison, protocol-scaling, congestion, throughput, full-leios, formal-methods, trace-verification]
 ---
 
 This week, the Leios team made significant progress in protocol development, focusing on improving simulation capabilities and analyzing protocol behavior under various network conditions. A comparison of Haskell and Rust simulations across [**18 scenarios**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w12/analysis.ipynb) demonstrated that the Leios protocol scales effectively to mainnet-sized networks. However, congestion occurs when the input block rate reaches 30 IB/s.

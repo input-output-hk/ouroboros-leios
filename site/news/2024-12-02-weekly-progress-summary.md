@@ -2,7 +2,7 @@
 title: Weekly Summary - December 2, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, nix, development, rust-simulation, virtual-clock, deltaq, haskell-simulation]
 ---
 
 ## Nix Development Environment

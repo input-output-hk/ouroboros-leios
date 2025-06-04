@@ -2,7 +2,7 @@
 title: Weekly Summary – April 28, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, cip, documentation, transaction-lifecycle, rust-simulation, visualization, plutus, benchmarking]
 ---
 
 This week, the Leios team made significant progress in protocol documentation, simulation improvements, and transaction lifecycle analysis. The team completed a draft of the Leios CIP, enhanced simulation visualization capabilities, and conducted detailed analysis of transaction processing times in Full Leios.

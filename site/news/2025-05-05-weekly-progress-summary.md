@@ -2,7 +2,7 @@
 title: Weekly Summary – May 5, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, high-throughput, simulation-analysis, efficiency-metrics, security, profitability-analysis, rust-simulation, visualization]
 ---
 
 This week, the team focused on simulation analysis, security improvements, and protocol documentation, making significant progress across multiple areas.

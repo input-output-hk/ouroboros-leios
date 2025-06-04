@@ -2,7 +2,7 @@
 title: Weekly Summary – January 6, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, rust-simulation, cpu-simulation, deltaq, cost-dashboard, cryptography, bls, benchmarks, sortition]
 ---
 
 ## Rust simulation
