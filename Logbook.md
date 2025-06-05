@@ -1,5 +1,42 @@
 # Leios logbook
 
+## 2025-06-05
+
+### Semi-realistic mainnet-scale topology
+
+The aim of [the pseudo-mainnet topology](data/simulation/pseudo-mainnet/) is to have a Leios network that is generally representative of the Cardano mainnet:
+
+- Realistic stake distribution
+- Realistic number of stake pools
+- Two relays for each block producer
+- Block producers only connected to their relays
+- 10,000 nodes total
+- Realistic latencies, generally consistent with the [RIPE Atlas](https://atlas.ripe.net/) `ping` dataset
+- Bandwidth consistent with the low end of what is generally available in cloud data centers
+- Node connectivity generally consistent with measurements by the [Cardano Foundation](https://cardanofoundation.org/)
+- Geographic distribution (countries and autonomous systems) consistent with measurements by the [Cardano Foundation](https://cardanofoundation.org/)
+
+| Metric | Value |
+|--------|------:|
+| Total nodes | 10000 |
+| Block producers | 2657 |
+| Relay nodes | 7343 |
+| Total connections | 298756 |
+| Network diameter | 6 hops |
+| Average connections per node | 29.88 |
+| Clustering coefficient | 0.122 |
+| Average latency | 77.0ms ms |
+| Maximum latency | 636.8ms ms |
+| Stake-weighted latency | 0.0ms ms |
+| Bidirectional connections | 10800 |
+| Asymmetry ratio | 92.77% |
+
+This is the first cut at a realistic mainnet-scale topology for Leios, but it likely contain imperfections because several compromises were made during its construction, so as to smooth out inconsistencies in source data. It does pass the topology checks, however, and approximately matches the marginal distributions of key network metrics.
+
+- Network: [topology-v1.yaml](data/simulation/pseudo-mainnet/topology-v1.yaml)
+- Results of [topology checker](topology-checker/): [topology-v1.md](data/simulation/pseudo-mainnet/topology-v1.md)
+- Jupyter notebook used for creating the network: [topology-v1.ipynb](data/simulation/pseudo-mainnet/topology-v1.ipynb)
+
 ## 2025-05-30
 
 ### Analysis of an overcollateralization scheme
