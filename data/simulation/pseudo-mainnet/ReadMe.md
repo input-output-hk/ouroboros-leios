@@ -21,4 +21,4 @@ The aim of the pseudo-mainnet topology is to have a Leios network that is genera
 
 > [!WARNING]
 > 
-> This is the first cut at a realistic mainnet-scale topology for Leios, but it likely contain imperfections. It does pass the topology checks, however, and approximately matches the marginal distributions of key network metrics.
+> This is the first cut at a realistic mainnet-scale topology for Leios, but it likely contain imperfections, but it likely contain imperfections because several compromises were made during its construction, so as to smooth out inconsistencies in source data. It does pass the topology checks, however, and approximately matches the marginal distributions of key network metrics.
