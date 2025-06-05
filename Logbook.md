@@ -4,7 +4,7 @@
 
 ### Semi-realistic mainnet-scale topology
 
-The aim of the pseudo-mainnet topology is to have a Leios network that is generally representative of the Cardano mainnet:
+The aim of [the pseudo-mainnet topology](data/simulation/pseudo-mainnet/) is to have a Leios network that is generally representative of the Cardano mainnet:
 
 - Realistic stake distribution
 - Realistic number of stake pools
@@ -34,8 +34,8 @@ The aim of the pseudo-mainnet topology is to have a Leios network that is genera
 This is the first cut at a realistic mainnet-scale topology for Leios, but it likely contain imperfections because several compromises were made during its construction, so as to smooth out inconsistencies in source data. It does pass the topology checks, however, and approximately matches the marginal distributions of key network metrics.
 
 - Network: [topology-v1.yaml](data/simulation/pseudo-mainnet/topology-v1.yaml)
-- Results of [topology checker](topology-checker/): [data/simulation/pseudo-mainnet/topology-v1.md](topology-v1.md)
-- Jupyter notebook used for creating the network: [data/simulation/pseudo-mainnet/topology-v1.ipynb](topology-v1.ipynb)
+- Results of [topology checker](topology-checker/): [topology-v1.md](data/simulation/pseudo-mainnet/topology-v1.md)
+- Jupyter notebook used for creating the network: [topology-v1.ipynb](data/simulation/pseudo-mainnet/topology-v1.ipynb)
 
 ## 2025-05-30
 
