@@ -104,13 +104,13 @@ requirements.
    - $\text{Size}_{\text{IB}}$ = Size of each IB in bytes (98,608)
 
 2. **EB Storage**:
-   $$S_{\text{EB}} = N_{\text{EB stage}} \times N_{\text{stages}} \times (\text{Size}_{\text{EB header}} + \text{Size}_{\text{EB body}} \times N_{\text{IB refs}})$$
+   $$S_{EB} = N_{EB\_stage} \times N_{stages} \times (Size_{EB\_header} + Size_{EB\_body} \times N_{IB\_refs})$$
    where:
-   - $N_{\text{EB stage}}$ = Number of EBs per stage (1.5)
-   - $N_{\text{stages}}$ = Number of stages per month (131,400)
-   - $\text{Size}_{\text{EB header}}$ = EB header size (240 bytes)
-   - $\text{Size}_{\text{EB body}}$ = EB body size per reference (32 bytes)
-   - $N_{\text{IB refs}}$ = Number of IB references per EB (varies by IB rate)
+   - $N_{EB\_stage}$ = Number of EBs per stage (1.5)
+   - $N_{stages}$ = Number of stages per month (131,400)
+   - $Size_{EB\_header}$ = EB header size (240 bytes)
+   - $Size_{EB\_body}$ = EB body size per reference (32 bytes)
+   - $N_{IB\_refs}$ = Number of IB references per EB (varies by IB rate)
 
 3. **RB Storage**: $$S_{\text{RB}} = N_{\text{RB\_stage}} \times N_{\text{stages}} \times \text{Size}_{\text{RB}}$$
    where:
