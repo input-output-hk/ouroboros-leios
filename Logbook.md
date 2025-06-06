@@ -7,6 +7,20 @@
 - Added Full-Short Leios as a special case of Short Leios to the formal spec. Currently in a [separate branch](https://github.com/input-output-hk/ouroboros-leios-formal-spec/tree/yveshauser/full-short-leios)
 - Added trace verification for Full-Short Leios
 
+### Simulation of the pseudo-mainnet topology
+
+[PR #389](https://github.com/input-output-hk/ouroboros-leios/pull/389) includes the design for the 1 through 300 TPS simulations that are being run on [the pseudo-mainnet topology](data/simulation/pseudo-mainnet/).
+
+Already, it is evident that the Rust simulation runs quite slowly on this 10,000-node network, even at low TPS.
+
+- At 1 TPS, an EC2 instance simulated 6 minutes of network time in 10 hours.
+- At 100 TPS, it simulated 2 minutes in 10 hours.
+- At 300 TPS, it simulated 1 minute in 10 hours.
+
+The Haskell simulator is so slow that it will be tricky to get any useful results without running for a more than a week. We'd definitely need to profile it and remove hot spots if we want to run large networks for realistic durations.
+
+Part of the problem is the voluminousness of the simulation log files, which (collectively) will exceed a terabyte for the experiments. To allievate this, the simulation scripts are filtering out minor events from the logs and compressing them as the simulation is run.
+
 ## 2025-06-05
 
 ### Semi-realistic mainnet-scale topology
