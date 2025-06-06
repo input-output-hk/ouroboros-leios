@@ -30,7 +30,7 @@ function HomepageHeader() {
                             className="button button--secondary button--lg"
                             to="/docs/faq"
                         >
-                            FAQ 💭
+                            FAQs 💭
                         </Link>
                     </div>
                 </div>
@@ -46,7 +46,7 @@ function VideoSection() {
                 <div className="row">
                     <div className="col col--8 col--offset-2">
                         <h2 className="text--center">
-                            Leios in Action
+                            Leios in action
                         </h2>
                         <p className={clsx("text--center", styles.subtitle)}>
                             Early simulation demonstrating the Leios protocol's
@@ -162,11 +162,11 @@ function MonthlyReviewsSection() {
                 <div className="row">
                     <div className="col col--8 col--offset-2">
                         <h2 className="text--center">
-                            Stay Up to Date
+                            Stay up to date
                         </h2>
                         <p className={clsx("text--center", styles.subtitle)}>
                             Catch up on the latest Leios progress, key
-                            decisions, and Q&A in our monthly review videos.
+                            decisions, and Q&A in our monthly review videos
                         </p>
                         <div
                             className="text--center"
@@ -236,7 +236,7 @@ function MonthlyReviewsSection() {
                                 className={clsx(styles.underlineLink)}
                                 to="/docs/development/monthly-reviews"
                             >
-                                Catch Up on Past Reviews
+                                Catch up on past reviews
                             </Link>
                         </div>
                     </div>
