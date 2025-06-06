@@ -103,7 +103,10 @@ requirements.
    - $T_{\text{month}}$ = Number of seconds in a month (2,628,000)
    - $\text{Size}_{\text{IB}}$ = Size of each IB in bytes (98,608)
 
-2. **EB Storage**: $$S_{\text{EB}} = N_{\text{EB\_stage}} \times N_{\text{stages}} \times (\text{Size}_{\text{EB\_header}} + \text{Size}_{\text{EB\_body}} \times N_{\text{IB\_refs}})$$
+2. **EB Storage**: 
+   
+   $$S_{\text{EB}} = N_{\text{EB\_stage}} \times N_{\text{stages}} \times (\text{Size}_{\text{EB\_header}} + \text{Size}_{\text{EB\_body}} \times N_{\text{IB\_refs}})$$
+
    where:
    - $N_{\text{EB\_stage}}$ = Number of EBs per stage (1.5)
    - $N_{\text{stages}}$ = Number of stages per month (131,400)
@@ -111,13 +114,13 @@ requirements.
    - $\text{Size}_{\text{EB\_body}}$ = EB body size per reference (32 bytes)
    - $N_{\text{IB\_refs}}$ = Number of IB references per EB (varies by IB rate)
 
-1. **RB Storage**: $$S_{\text{RB}} = N_{\text{RB\_stage}} \times N_{\text{stages}} \times \text{Size}_{\text{RB}}$$
+3. **RB Storage**: $$S_{\text{RB}} = N_{\text{RB\_stage}} \times N_{\text{stages}} \times \text{Size}_{\text{RB}}$$
    where:
    - $N_{\text{RB\_stage}}$ = Number of RBs per stage (1)
    - $N_{\text{stages}}$ = Number of stages per month (131,400)
    - $\text{Size}_{\text{RB}}$ = Size of each RB (8,192 bytes = header + certificate)
 
-2. **Total Chain State Storage**: $$S_{\text{total}} = S_{\text{IB}} + S_{\text{EB}} + S_{\text{RB}}$$
+4. **Total Chain State Storage**: $$S_{\text{total}} = S_{\text{IB}} + S_{\text{EB}} + S_{\text{RB}}$$
 
 ### Storage Calculation (0.05 IB/s)
 
