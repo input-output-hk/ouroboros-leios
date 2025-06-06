@@ -1,0 +1,97 @@
+...@styles
+
+title: {
+  label: "Leios Example"
+  near: top-center
+  style.font-size: 24
+  style.bold: true
+  style.fill: "#ffffff"
+  style.stroke: "#ffffff"
+}
+
+# Ranking Blocks
+RB1: {
+  class: rb
+  label: "RB1"
+}
+
+RB2: {
+  class: rb
+  label: "RB2"
+}
+
+RB3: {
+  class: rb
+  label: "RB3"
+}
+
+# Endorsement Blocks
+EB1: {
+  class: eb
+  label: "EB1"
+}
+
+EB2: {
+  class: eb
+  label: "EB2"
+}
+
+# Input Blocks
+IB1: {
+  class: ib
+  label: "IB1"
+}
+
+IB2: {
+  class: ib
+  label: "IB2"
+}
+
+IB3: {
+  class: ib
+  label: "IB3"
+}
+
+IB4: {
+  class: ib
+  label: "IB4"
+}
+
+# Links
+
+# RB chain connections
+RB1 -> RB2: {
+  class: to_rb_arrow
+}
+
+RB2 -> RB3: {
+  class: to_rb_arrow
+}
+
+# EB certificates in RBs
+RB2 -> EB1: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+RB3 -> EB2: "Contains\nEB Certificate" {
+  class: eb_cert
+}
+
+# EB to IB references
+EB1 -> IB1: "Ref" {
+  class: to_ib_arrow
+}
+
+EB1 -> IB2: "Ref" {
+  class: to_ib_arrow
+}
+
+EB2 -> IB3: "Ref" {
+  class: to_ib_arrow
+}
+
+EB2 -> IB4: "Ref" {
+  class: to_ib_arrow
+}
+
+direction: left
