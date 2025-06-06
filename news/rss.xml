@@ -13,23 +13,23 @@
             <link>https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary</link>
             <guid>https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary</guid>
             <pubDate>Mon, 26 May 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[The Leios team completed significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. The week focused on understanding transaction duplication and conflict probabilities in shardless scenarios, while also enhancing simulation tooling to better track transaction lifecycle events.]]></description>
-            <content:encoded><![CDATA[<p>The Leios team completed significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. The week focused on understanding transaction duplication and conflict probabilities in shardless scenarios, while also enhancing simulation tooling to better track transaction lifecycle events.</p>
+            <description><![CDATA[The Leios team completed a significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. They also focused on understanding transaction duplication and conflict probabilities in shardless scenarios while enhancing simulation tooling to better track transaction lifecycle events.]]></description>
+            <content:encoded><![CDATA[<p>The Leios team completed a significant analysis of overcollateralization schemes and continued advancing the Rust simulation infrastructure. They also focused on understanding transaction duplication and conflict probabilities in shardless scenarios while enhancing simulation tooling to better track transaction lifecycle events.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="overcollateralization-analysis">Overcollateralization analysis<a class="hash-link" aria-label="Direct link to Overcollateralization analysis" title="Direct link to Overcollateralization analysis" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#overcollateralization-analysis">​</a></h2>
 <ul>
-<li>Completed comprehensive analysis of shardless overcollateralization where transactions are randomly sampled from the memory pool</li>
+<li>Completed comprehensive analysis of shardless overcollateralization, where transactions are randomly sampled from the memory pool</li>
 <li>Found that probabilities of duplication and conflicts are minimized when the concurrency period is as short as possible</li>
 <li>Determined that conflict probability is always greater than duplication probability</li>
 <li>Identified that longer transaction residence times correspond to lower probabilities of duplication or conflict, where transaction residency time is defined as the average time a transaction stays in the memory pool before reaching an IB (calculated as memory pool size divided by transaction throughput)</li>
 <li>Discovered that spatial efficiency is greater for longer residence times</li>
-<li>Found the tradeoff between probabilities of duplication and conflict is insensitive to protocol parameters</li>
-<li>Showed that expected number of conflicts in IBs scales proportionately with the fraction of conflicting transactions and transaction throughput</li>
-<li>Identified that at a given throughput, reducing the probability of duplicates or conflicts conflicts with reducing the total number of conflicts</li>
-<li>Found that probabilistic computation of conflicts is about twenty percent lower than naive estimates</li>
+<li>Found that the tradeoff between probabilities of duplication and conflict is insensitive to protocol parameters</li>
+<li>Showed that the expected number of conflicts in IBs scales proportionately with the fraction of conflicting transactions and transaction throughput</li>
+<li>Identified that, at a given throughput, reducing the probability of duplicates or conflicts can be at odds with minimizing the total number of conflicts</li>
+<li>Found that probabilistic computation of conflicts is about 20% lower than naive estimates</li>
 <li>Determined that at 100 TPS with favorable protocol parameters, an overcollateralization factor of nearly 400x is necessary in adversarial scenarios where the memory pool is filled with conflicting transactions</li>
 <li>Concluded that having successful transactions pay for all conflicting ones is too risky due to potential attacks on honest transactions using common UTXO inputs</li>
 <li>Identified that consuming collateral from conflicted transactions in IBs is more viable, though it breaks existing UX guarantees</li>
-<li>Noted ongoing discussions about the realism of creating 400 mutually conflicting transactions, given that individual mempools would not include conflicting transactions and attack scenarios would require coordination across multiple nodes</li>
+<li>Noted ongoing discussions about the realism of creating 400 mutually conflicting transactions, given that individual mempools would not include conflicting transactions, and attack scenarios would require coordination across multiple nodes</li>
 <li>Documented detailed findings in the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/overcollateralization-v1.ipynb" target="_blank" rel="noopener noreferrer">overcollateralization analysis notebook</a>.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-development">Simulation development<a class="hash-link" aria-label="Direct link to Simulation development" title="Direct link to Simulation development" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#simulation-development">​</a></h2>
@@ -43,15 +43,15 @@
 </ul>
 <h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-improvements">Rust simulation improvements<a class="hash-link" aria-label="Direct link to Rust simulation improvements" title="Direct link to Rust simulation improvements" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#rust-simulation-improvements">​</a></h3>
 <ul>
-<li>Added "TXLost" events to simulation output to detect transaction loss scenarios</li>
-<li>Enhanced ability to track where Leios can lose transactions with various parameter choices.</li>
+<li>Added 'TXLost' events to the simulation output to detect transaction loss scenarios</li>
+<li>Enhanced the ability to track where Leios can lose transactions with various parameter choices.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="data-processing-optimization">Data processing optimization<a class="hash-link" aria-label="Direct link to Data processing optimization" title="Direct link to Data processing optimization" href="https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary#data-processing-optimization">​</a></h2>
 <ul>
-<li>Developed new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/trace-processor/" target="_blank" rel="noopener noreferrer"><code>leios-trace-processor</code></a> tool to replace script-based analyses</li>
+<li>Developed a new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/trace-processor/" target="_blank" rel="noopener noreferrer"><code>leios-trace-processor</code></a> tool to replace script-based analyses</li>
 <li>Achieved significantly faster processing of simulation results compared to previous scripts</li>
 <li>Enabled analysis of much longer and larger simulation datasets</li>
-<li>Created standardized CSV output format for transaction lifecycle data including creation, IB inclusion, EB inclusion, and RB inclusion timestamps.</li>
+<li>Created standardized CSV output format for transaction lifecycle data, including creation, IB inclusion, EB inclusion, and RB inclusion timestamps.</li>
 </ul>]]></content:encoded>
             <category>progress</category>
             <category>update</category>
