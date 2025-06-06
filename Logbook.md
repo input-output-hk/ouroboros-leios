@@ -1,5 +1,12 @@
 # Leios logbook
 
+## 2025-06-06
+
+### Formal methods
+
+- Added Full-Short Leios as a special case of Short Leios to the formal spec. Currently in a [separate branch](https://github.com/input-output-hk/ouroboros-leios-formal-spec/tree/yveshauser/full-short-leios)
+- Added trace verification for Full-Short Leios
+
 ## 2025-06-05
 
 ### Semi-realistic mainnet-scale topology
