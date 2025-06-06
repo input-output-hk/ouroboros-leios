@@ -100,8 +100,7 @@ export const processMessage = (
   } else if (message.type === EMessageType.TransactionReceived) {
     trackDataReceived(aggregatedData, intermediate, message.recipient, "tx", message.id);
   } else if (message.type === EMessageType.IBGenerated) {
-    const bytes = message.transactions.reduce((sum, tx) => sum + (intermediate.bytes.get(`tx-${tx}`) ?? 0), message.header_bytes);
-    trackDataGenerated(aggregatedData, intermediate, message.producer, "ib", message.id, bytes);
+    trackDataGenerated(aggregatedData, intermediate, message.producer, "ib", message.id, message.size_bytes);
     for (const id of message.transactions) {
       if (intermediate.txStatuses[id] === 'created') {
         intermediate.txStatuses[id] = 'inIb';
@@ -118,7 +117,6 @@ export const processMessage = (
   } else if (message.type === EMessageType.IBReceived) {
     trackDataReceived(aggregatedData, intermediate, message.recipient, "ib", message.id);
   } else if (message.type === EMessageType.RBGenerated) {
-    let bytes = message.transactions.reduce((sum, tx) => sum + (intermediate.bytes.get(`tx-${tx}`) ?? 0), message.header_bytes);
     const block: ISimulationBlock = {
       slot: message.slot,
       headerBytes: message.header_bytes,
@@ -130,14 +128,13 @@ export const processMessage = (
       intermediate.txStatuses[id] = 'onChain';
     }
     if (message.endorsement != null) {
-      bytes += message.endorsement.size_bytes;
       const ebId = message.endorsement.eb.id;
       block.cert = {
         bytes: message.endorsement.size_bytes,
         eb: extractEb(intermediate, ebId),
       }
     }
-    trackDataGenerated(aggregatedData, intermediate, message.producer, "pb", message.id, bytes);
+    trackDataGenerated(aggregatedData, intermediate, message.producer, "pb", message.id, message.size_bytes);
     aggregatedData.global.praosTxOnChain = intermediate.praosTxs.size;
     aggregatedData.global.leiosTxOnChain = intermediate.leiosTxs.size;
     aggregatedData.blocks.push(block);

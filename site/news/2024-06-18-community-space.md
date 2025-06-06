@@ -2,7 +2,7 @@
 title: Community Round-Table on Leios
 authors:
 - abailly
-tags: [education]
+tags: [education, community, outreach, presentation, throughput, diffusion, peras]
 ---
 
 On the 14th of June, 2024, along with [Pi Lanningham](https://x.com/Quantumplation), I was honoured to be invited to the very first _Round-Table_ organised by the [Cardano Community](https://x.com/Cardano) group. The discussion was facilitated by [Denicio Bernier](https://x.com/DenicioBernier) and [Rick McCracken](https://x.com/RichardMcCrackn), and was meant to provide a broad overview of _Leios_, the protocol and the R&D project we have just started working on.

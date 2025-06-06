@@ -103,36 +103,76 @@
     // Helper function to check if a line contains a comment
     const isComment = (line) => {
       const content = line.innerHTML || '';
-      return content.includes('Comment');
+      return content.includes('class="Comment"');
+    };
+
+    // Helper function to extract comment text from a line
+    const extractCommentText = (line) => {
+      const commentElements = line.querySelectorAll('.Comment');
+      if (commentElements.length === 0) return '';
+      
+      // Join all comment text and clean it up
+      return Array.from(commentElements)
+        .map(el => el.textContent || '')
+        .join(' ')
+        .trim();
     };
     
     // Start with basic context
     let startIndex = Math.max(0, targetIndex - defaultContextLines);
     let endIndex = Math.min(allLines.length - 1, targetIndex + defaultContextLines);
     
-    // Expand context to capture more meaningful content
+    // Look for comments that precede the definition
+    let commentLines = [];
+    let definitionStartIndex = targetIndex;
     
-    // Look backward for the start of a declaration/definition
+    // Look backward from the target to find comments and the start of the definition
     let idx = targetIndex;
     while (idx > 0) {
       idx--;
       
-      // If we find an empty line, check if we should stop including previous context
+      // If we find an empty line, this means any comments before it should NOT be included
       if (isEmptyLine(allLines[idx])) {
-        // If the empty line is directly before the definition, don't include any more previous lines
-        if (idx === targetIndex - 1) {
-          startIndex = idx + 1; // Start at the definition itself
-        }
+        // The definition starts after the empty line
+        definitionStartIndex = idx + 1;
+        // Don't include any comments that are separated by an empty line
+        commentLines = [];
         break;
       }
       
-      // If we find a comment line, stop
+      // If we find a comment line directly before the definition (no empty line in between)
       if (isComment(allLines[idx])) {
+        // Collect all consecutive comment lines that are directly adjacent
+        let commentIdx = idx;
+        let foundComments = [];
+        
+        while (commentIdx >= 0 && isComment(allLines[commentIdx])) {
+          foundComments.unshift({
+            line: allLines[commentIdx],
+            text: extractCommentText(allLines[commentIdx])
+          });
+          commentIdx--;
+        }
+        
+        if (foundComments.length > 0) {
+          commentLines = foundComments;
+        }
+        
+        // The definition starts AFTER the comment lines
+        // Find the first non-comment line after the comments
+        let nextIdx = idx;
+        while (nextIdx < allLines.length && isComment(allLines[nextIdx])) {
+          nextIdx++;
+        }
+        definitionStartIndex = nextIdx;
         break;
       }
       
-      startIndex = idx;
+      definitionStartIndex = idx;
     }
+    
+    // Set the start index to the beginning of the definition (excluding comments)
+    startIndex = definitionStartIndex;
     
     // Look forward to capture the entire declaration
     idx = targetIndex;
@@ -170,7 +210,7 @@
     startIndex = Math.max(0, startIndex);
     endIndex = Math.min(allLines.length - 1, endIndex);
     
-    return { startIndex, endIndex };
+    return { startIndex, endIndex, commentLines };
   }
   
   /**
@@ -226,7 +266,7 @@
         if (targetIndex === -1) return;
         
         // Determine context-aware start and end indexes
-        const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+        const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
         
         // Create a new container with the context lines
         const contextLines = allLines.slice(startIndex, endIndex + 1);
@@ -235,7 +275,7 @@
         const moduleName = document.title || window.location.pathname.split('/').pop().replace('.html', '');
         
         // Build HTML for the code preview
-        codeBlock = buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId);
+        codeBlock = buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId, commentLines);
         
         // Cache the result
         codeCache.set(cacheKey, codeBlock);
@@ -271,7 +311,7 @@
   /**
    * Build a code preview element with the given context lines
    */
-  function buildCodePreview(contextLines, highlightLineNumber, startLineIndex, moduleName = '', blockId = 'B1') {
+  function buildCodePreview(contextLines, highlightLineNumber, startLineIndex, moduleName = '', blockId = 'B1', commentLines = []) {
     const container = document.createElement('div');
     container.className = 'code-preview-container';
     
@@ -308,6 +348,232 @@
     heading.appendChild(linkToDefinition);
     
     container.appendChild(heading);
+    
+    // Add comment section if we have comments
+    if (commentLines.length > 0) {
+      const commentContainer = document.createElement('div');
+      commentContainer.className = 'preview-comment-container';
+      
+      // Combine all comment text into one block for proper list processing
+      let allCommentText = '';
+      commentLines.forEach((comment, index) => {
+        const commentText = comment.text;
+        
+        // Clean up the comment text - remove comment delimiters and extra whitespace
+        let cleanText = commentText
+          .replace(/^\{-\s*/, '')  // Remove opening {-
+          .replace(/\s*-\}$/, '')  // Remove closing -}
+          .replace(/^--\s*/, '')   // Remove -- prefix for line comments
+          .replace(/^\s*\*\s*/, '') // Remove leading asterisks
+          .trim();
+        
+        // Add to combined text with proper spacing
+        if (allCommentText && cleanText) {
+          allCommentText += '\n' + cleanText;
+        } else if (cleanText) {
+          allCommentText = cleanText;
+        }
+      });
+      
+      if (allCommentText) {
+        // Split into lines and clean each line
+        const lines = allCommentText.split('\n').map(line => {
+          // Remove common comment prefixes and clean up, but preserve list markers
+          return line
+            .replace(/^\s*--\s*/, '') // Remove -- prefix for line comments
+            .replace(/^\s*\*?\s*/, '') // Remove leading asterisks and whitespace
+            .trim();
+        }).filter(line => line.length > 0);
+        
+        if (lines.length > 0) {
+          const commentBlock = document.createElement('div');
+          commentBlock.className = 'preview-comment-block';
+          
+          // Process lines to detect lists and format them properly
+          let currentList = null;
+          let currentListType = null;
+          let currentListItem = null;
+          let inParametersSection = false;
+          let parametersTable = null;
+          
+          lines.forEach(line => {
+            // Check if this line indicates a parameters section
+            if (line.toLowerCase().match(/^\s*parameters?\s*:?\s*$/i)) {
+              // Close any existing list first
+              if (currentList) {
+                commentBlock.appendChild(currentList);
+                currentList = null;
+                currentListType = null;
+                currentListItem = null;
+              }
+              
+              // Add some spacing before parameters section
+              const spacer = document.createElement('div');
+              spacer.className = 'preview-comment-spacer';
+              commentBlock.appendChild(spacer);
+              
+              // Create parameters heading
+              const parametersHeading = document.createElement('div');
+              parametersHeading.className = 'preview-comment-line preview-parameters-heading';
+              parametersHeading.innerHTML = '<strong>Parameters:</strong>';
+              commentBlock.appendChild(parametersHeading);
+              
+              // Create parameters table
+              parametersTable = document.createElement('table');
+              parametersTable.className = 'preview-parameters-table';
+              inParametersSection = true;
+              return;
+            }
+            
+            // Check if this line is a list item (be more specific about list detection)
+            const bulletMatch = line.match(/^[-*+]\s+(.+)$/);
+            const numberedMatch = line.match(/^\d+\.\s+(.+)$/);
+            
+            if (bulletMatch && inParametersSection) {
+              // This is a parameter item - parse it as "name: description"
+              const paramText = bulletMatch[1];
+              const colonIndex = paramText.indexOf(':');
+              
+              if (colonIndex > 0) {
+                const paramName = paramText.substring(0, colonIndex).trim();
+                const paramDesc = paramText.substring(colonIndex + 1).trim();
+                
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramName;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = paramDesc;
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              } else {
+                // No colon found, treat as regular parameter with no description
+                const row = document.createElement('tr');
+                row.className = 'preview-parameter-row';
+                
+                const nameCell = document.createElement('td');
+                nameCell.className = 'preview-parameter-name';
+                nameCell.textContent = paramText;
+                
+                const descCell = document.createElement('td');
+                descCell.className = 'preview-parameter-desc';
+                descCell.textContent = '';
+                
+                row.appendChild(nameCell);
+                row.appendChild(descCell);
+                parametersTable.appendChild(row);
+              }
+              
+            } else if (bulletMatch) {
+              // Regular bullet list item (not in parameters section)
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              if (currentListType !== 'ul') {
+                // Close any existing list and start a new unordered list
+                if (currentList) {
+                  commentBlock.appendChild(currentList);
+                }
+                currentList = document.createElement('ul');
+                currentList.className = 'preview-comment-list';
+                currentListType = 'ul';
+              }
+              
+              currentListItem = document.createElement('li');
+              currentListItem.className = 'preview-comment-list-item';
+              currentListItem.textContent = bulletMatch[1];
+              currentList.appendChild(currentListItem);
+              
+            } else if (numberedMatch) {
+              // Numbered list item
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              if (currentListType !== 'ol') {
+                // Close any existing list and start a new ordered list
+                if (currentList) {
+                  commentBlock.appendChild(currentList);
+                }
+                currentList = document.createElement('ol');
+                currentList.className = 'preview-comment-list';
+                currentListType = 'ol';
+              }
+              
+              currentListItem = document.createElement('li');
+              currentListItem.className = 'preview-comment-list-item';
+              currentListItem.textContent = numberedMatch[1]; // Use the first capture group for the text
+              currentList.appendChild(currentListItem);
+              
+            } else if (currentListItem && line.trim() !== '' && !inParametersSection) {
+              // This is a continuation line for the current list item (but not in parameters section)
+              // Add it to the current list item with a space
+              currentListItem.textContent += ' ' + line;
+              
+            } else if (inParametersSection && parametersTable && line.trim() !== '') {
+              // This is a continuation line for the last parameter description
+              const lastRow = parametersTable.lastElementChild;
+              if (lastRow) {
+                const descCell = lastRow.querySelector('.preview-parameter-desc');
+                if (descCell) {
+                  descCell.textContent += ' ' + line;
+                }
+              }
+              
+            } else {
+              // This is a regular line or empty line
+              // End parameters section if we were in one
+              if (inParametersSection && parametersTable) {
+                commentBlock.appendChild(parametersTable);
+                parametersTable = null;
+                inParametersSection = false;
+              }
+              
+              // Close any existing list first
+              if (currentList) {
+                commentBlock.appendChild(currentList);
+                currentList = null;
+                currentListType = null;
+                currentListItem = null;
+              }
+              
+              // Only add non-empty lines as regular comment lines
+              if (line.trim() !== '') {
+                const commentLine = document.createElement('div');
+                commentLine.className = 'preview-comment-line';
+                commentLine.textContent = line;
+                commentBlock.appendChild(commentLine);
+              }
+            }
+          });
+          
+          // Don't forget to append any remaining list or parameters table
+          if (currentList) {
+            commentBlock.appendChild(currentList);
+          }
+          if (inParametersSection && parametersTable) {
+            commentBlock.appendChild(parametersTable);
+          }
+          
+          commentContainer.appendChild(commentBlock);
+        }
+      }
+      
+      container.appendChild(commentContainer);
+    }
     
     // Create line numbers container
     const lineNumbers = document.createElement('div');
@@ -397,9 +663,9 @@
             const targetIndex = allLines.indexOf(legacyTarget);
             
             if (targetIndex !== -1) {
-              const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+              const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
               const contextLines = allLines.slice(startIndex, endIndex + 1);
-              return buildCodePreview(contextLines, lineNumber, startIndex, moduleName);
+              return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, 'B1', commentLines);
             }
           }
         }
@@ -417,13 +683,13 @@
       if (targetIndex === -1) return null;
       
       // Determine context-aware start and end indexes
-      const { startIndex, endIndex } = determineContextLines(allLines, targetIndex);
+      const { startIndex, endIndex, commentLines } = determineContextLines(allLines, targetIndex);
       
       // Create a new container with the context lines
       const contextLines = allLines.slice(startIndex, endIndex + 1);
       
       // Build HTML for the code preview
-      return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId);
+      return buildCodePreview(contextLines, lineNumber, startIndex, moduleName, blockId, commentLines);
     } catch (error) {
       console.error('Error fetching preview:', error);
       return null;

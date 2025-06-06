@@ -6,17 +6,17 @@ on:
   workflow_dispatch: # Allow manual triggering for testing
 
 jobs:
-  process-formal-spec:
-    name: "Process Formal Spec Update"
+  download-artifacts:
+    name: "Download Formal Spec Artifacts"
     runs-on: ubuntu-latest
     outputs:
-      spec_updated: "true"
+      artifacts-available: ${{ steps.check-artifacts.outputs.available }}
+      download-successful: ${{ steps.validate-download.outputs.successful }}
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # Try to download directly from GitHub API to see artifacts in the formal-spec repo
-      - name: List available artifacts in formal-spec repo
+      - name: 🔍 List available artifacts in formal-spec repo
         id: list_artifacts
         run: |
           echo "Checking for artifacts in formal-spec repo..."
@@ -64,7 +64,8 @@ jobs:
           search_artifacts: true
           if_no_artifact_found: warn
 
-      - name: Check download and create placeholder if needed
+      - name: ✅ Validate download and create placeholder if needed
+        id: validate-download
         run: |
           mkdir -p formal-spec-html
 
@@ -73,23 +74,94 @@ jobs:
             echo "Using downloaded formal spec HTML"
             echo "Files in formal-spec-html directory:"
             ls -la formal-spec-html/
+            echo "successful=true" >> $GITHUB_OUTPUT
           else
             echo "No formal spec HTML available, creating placeholder"
             echo "<html><body><h1>Formal Specification</h1><p>Formal specification documentation is being updated. Please check back later.</p></body></html>" > formal-spec-html/index.html
+            echo "successful=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: 🚢 Upload formal spec files
+      - name: 🔍 Check artifacts availability
+        id: check-artifacts
+        run: |
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📤 Upload artifacts for next job
         uses: actions/upload-artifact@v4
         with:
-          name: formal-spec-html
-          path: formal-spec-html
+          name: formal-spec-html-processed
+          path: formal-spec-html/
           retention-days: 1
-          compression-level: 9
-          if-no-files-found: error
 
-      - name: Verify artifact upload
+  update-formal-spec:
+    name: "Update Formal Spec in Repository"
+    runs-on: ubuntu-latest
+    needs: download-artifacts
+    if: needs.download-artifacts.outputs.artifacts-available == 'true'
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN || github.token }}
+
+      - name: 📥 Download artifacts from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: formal-spec-html-processed
+          path: formal-spec-html
+
+      - name: 🛠️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: ./site/package-lock.json
+
+      - name: 📦 Install dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: 📝 Update formal spec directory
         run: |
-          echo "Verifying artifact upload..."
-          curl -s -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
-          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | \
-          jq '.artifacts[] | {name: .name, id: .id, created_at: .created_at, expired: .expired}'
+          # Clear existing formal spec files
+          rm -rf site/static/formal-spec/*
+
+          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
+            cp -r formal-spec-html/* site/static/formal-spec/
+          fi
+
+      - name: 🔄 Enhance Agda documentation
+        uses: will-break-it/agda-web-docs-lib@v1
+        with:
+          input-dir: site/static/formal-spec
+          config-file: site/agda-docs.config.json
+          cache-dependency-path: site/package-lock.json
+          node-options: "--max-old-space-size=8192"
+
+      - name: 🔍 Check for changes
+        id: check-changes
+        run: |
+          git add site/static/formal-spec/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected in formal spec"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 💾 Commit and push changes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git commit -m "Update formal specification documentation
+
+          - Updated from ouroboros-leios-formal-spec repository
+          - Run ID: ${{ github.event.client_payload.run_id || 'manual' }}
+          - Triggered by: ${{ github.event_name }}"
+          git push

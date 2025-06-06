@@ -2,7 +2,7 @@
 title: Weekly Summary – December 16, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, rust-simulation, optimization, haskell-simulation, visualization, cryptography, alba]
 ---
 
 ## Rust simulation

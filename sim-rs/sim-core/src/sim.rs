@@ -178,7 +178,7 @@ impl HasBytesSize for SimulationMessage {
 
             Self::AnnounceVotes(_) => 8,
             Self::RequestVotes(_) => 8,
-            Self::Votes(v) => 8 * v.ebs.len() as u64,
+            Self::Votes(v) => v.bytes,
         }
     }
 }

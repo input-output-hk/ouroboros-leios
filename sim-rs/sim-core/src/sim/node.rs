@@ -9,7 +9,7 @@ use std::{
 use anyhow::Result;
 use netsim_async::HasBytesSize as _;
 use priority_queue::PriorityQueue;
-use rand::Rng as _;
+use rand::{seq::SliceRandom as _, Rng as _};
 use rand_chacha::ChaChaRng;
 use tokio::{select, sync::mpsc};
 use tracing::{info, trace};
@@ -17,8 +17,8 @@ use tracing::{info, trace};
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{
-        DiffusionStrategy, LeiosVariant, NodeConfiguration, NodeId, RelayStrategy,
-        SimConfiguration, TransactionConfig,
+        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
+        RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -358,10 +358,13 @@ impl Node {
             }
             CpuTaskType::IBBlockGenerated(_) => vec![cpu_times.ib_generation],
             CpuTaskType::IBHeaderValidated(_, _, _) => vec![cpu_times.ib_head_validation],
-            CpuTaskType::IBBlockValidated(_, ib) => vec![
-                cpu_times.ib_body_validation_constant
-                    + (cpu_times.ib_body_validation_per_byte * ib.bytes() as u32),
-            ],
+            CpuTaskType::IBBlockValidated(_, ib) => {
+                let total_tx_bytes: u64 = ib.transactions.iter().map(|tx| tx.bytes).sum();
+                vec![
+                    cpu_times.ib_body_validation_constant
+                        + (cpu_times.ib_body_validation_per_byte * total_tx_bytes as u32),
+                ]
+            }
             CpuTaskType::EBBlockGenerated(_) => vec![cpu_times.eb_generation],
             CpuTaskType::EBBlockValidated(_, _) => vec![cpu_times.eb_validation],
             CpuTaskType::VTBundleGenerated(votes) => votes
@@ -723,6 +726,7 @@ impl Node {
             let transactions = self.select_txs_for_ib(header.shard);
             let ib = InputBlock {
                 header,
+                tx_payload_bytes: self.sim_config.sizes.ib_payload(&transactions),
                 transactions,
             };
             self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
@@ -748,7 +752,7 @@ impl Node {
                 // Add one transaction, the right size for the extra RB payload
                 let tx = Transaction {
                     id: config.next_id(),
-                    shard: None,
+                    shard: 0,
                     bytes: config.rb_size,
                 };
                 self.tracker.track_transaction_generated(&tx, self.id);
@@ -828,7 +832,9 @@ impl Node {
         let (&block, _, _) = match self.sim_config.variant {
             LeiosVariant::Short => candidates
                 .max_by_key(|(eb, age, votes)| (*age, self.count_txs_in_eb(eb), *votes))?,
-            LeiosVariant::Full | LeiosVariant::FullWithoutIbs => candidates
+            LeiosVariant::Full
+            | LeiosVariant::FullWithoutIbs
+            | LeiosVariant::FullWithTxReferences => candidates
                 .max_by_key(|(eb, age, votes)| (Reverse(*age), self.count_txs_in_eb(eb), *votes))?,
         };
 
@@ -1336,7 +1342,7 @@ impl Node {
                 .entry(votes.id.producer)
                 .or_default();
             *eb_votes += count;
-            if *eb_votes as u64 > self.sim_config.vote_threshold {
+            if *eb_votes as u64 >= self.sim_config.vote_threshold {
                 self.leios
                     .earliest_eb_cert_times_by_pipeline
                     .entry(eb.pipeline)
@@ -1357,16 +1363,13 @@ impl Node {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
             let tx = Transaction {
                 id: config.next_id(),
-                shard: None,
+                shard,
                 bytes: config.ib_size,
             };
             self.tracker.track_transaction_generated(&tx, self.id);
             vec![Arc::new(tx)]
         } else {
-            self.select_txs(
-                |seen| seen.tx.shard.is_none_or(|s| s == shard),
-                self.sim_config.max_ib_size,
-            )
+            self.select_txs(|seen| seen.tx.shard == shard, self.sim_config.max_ib_size)
         }
     }
 
@@ -1395,7 +1398,7 @@ impl Node {
     where
         C: Fn(&SeenTransaction) -> bool,
     {
-        let candidate_txs: Vec<_> = self
+        let mut candidate_txs: Vec<_> = self
             .leios
             .mempool
             .values()
@@ -1407,6 +1410,12 @@ impl Node {
                 }
             })
             .collect();
+        if matches!(
+            self.sim_config.mempool_strategy,
+            MempoolSamplingStrategy::Random
+        ) {
+            candidate_txs.shuffle(&mut self.rng);
+        }
         let mut txs = vec![];
         let mut size = 0;
         for (id, bytes) in candidate_txs {
@@ -1535,14 +1544,21 @@ impl Node {
             }
         }
 
-        for ib in &eb.ibs {
-            if !matches!(self.leios.ibs.get(ib), Some(InputBlockState::Received(_))) {
+        for ib_id in &eb.ibs {
+            let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
                 return Err(NoVoteReason::MissingIB);
-            }
-            if !expected_ib_pipelines.contains(&ib.pipeline) {
+            };
+            if !expected_ib_pipelines.contains(&ib_id.pipeline) {
                 return Err(NoVoteReason::InvalidSlot);
             }
-            ib_set.insert(*ib);
+            if matches!(self.sim_config.variant, LeiosVariant::FullWithTxReferences) {
+                for tx in &ib.transactions {
+                    if !matches!(self.txs.get(&tx.id), Some(TransactionView::Received(_))) {
+                        return Err(NoVoteReason::MissingTX);
+                    }
+                }
+            }
+            ib_set.insert(*ib_id);
         }
 
         if let Some(expected_eb_pipelines) = self.pipelines_for_eb_references(eb.pipeline) {

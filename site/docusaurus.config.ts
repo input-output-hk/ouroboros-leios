@@ -1,7 +1,6 @@
 import type * as Preset from "@docusaurus/preset-classic";
 import type { Config } from "@docusaurus/types";
 import { themes as prismThemes } from "prism-react-renderer";
-import path from 'path';
 
 const config: Config = {
     title: "Ouroboros Leios",
@@ -39,11 +38,10 @@ const config: Config = {
     ],
 
     // Configure static file serving
-    staticDirectories: ['static', 'public'],
+    staticDirectories: ["static", "public"],
 
     // Configure plugins
-    plugins: [
-    ],
+    plugins: [],
 
     presets: [
         [
@@ -121,8 +119,8 @@ const config: Config = {
                         },
                         {
                             to: "https://leios.cardano-scaling.org/visualizer",
-                            label: "Visualizer"
-                        }
+                            label: "Visualizer",
+                        },
                     ],
                 },
                 {
@@ -183,7 +181,7 @@ const config: Config = {
                     items: [
                         {
                             label: "Discord",
-                            href: "https://discord.gg/83aXYxy9",
+                            href: "https://discord.gg/jm3WxeYT",
                         },
                         {
                             label: "GitHub Discussions",
@@ -227,8 +225,9 @@ const config: Config = {
                     ],
                 },
             ],
-            copyright: `Copyright © ${new Date().getFullYear()
-                } <strong>Input Output Global</strong> <br/> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br/> <small>Built with Docusaurus</small>`,
+            copyright: `Copyright © ${
+                new Date().getFullYear()
+            } <strong>Input Output Global</strong> <br/> <a href="https://static.iohk.io/terms/iog-privacy-policy.pdf" target="_blank" class="footer__link-item">Privacy Policy</a> | <a href="https://static.iohk.io/terms/iohktermsandconditions.pdf" target="_blank" class="footer__link-item">Terms & Conditions</a> <br/> <small>Built with Docusaurus</small>`,
         },
         prism: {
             theme: prismThemes.github,

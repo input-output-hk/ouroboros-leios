@@ -2,7 +2,7 @@
 title: Weekly Summary – March 24, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, haskell-simulation, rust-simulation, full-leios, testing, visualization, vite, monthly-review]
 ---
 
 This week, the Leios team continued working on various aspects of the protocol and its simulation capabilities. They made progress in implementing and testing the Haskell and Rust simulators, focusing on protocol behavior under different network conditions.

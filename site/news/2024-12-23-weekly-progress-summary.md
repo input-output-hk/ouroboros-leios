@@ -2,7 +2,7 @@
 title: Weekly Summary – December 23, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, ci, github-actions, rust-simulation, visualization, throughput, haskell-simulation, public-meeting]
 ---
 
 ## GitHub actions

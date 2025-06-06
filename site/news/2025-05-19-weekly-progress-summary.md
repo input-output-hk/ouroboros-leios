@@ -2,7 +2,7 @@
 title: Weekly Summary – May 19, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, rust-simulation, transaction-inclusion, conformance-testing, formal-specification, documentation, transaction-lifecycle, agda]
 ---
 
 This week, the Leios team focused on improving simulation capabilities, enhancing transaction processing, and expanding the test coverage. The team also made significant progress in addressing transaction inclusion rates and developing a comprehensive conformance testing framework.

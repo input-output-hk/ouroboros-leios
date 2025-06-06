@@ -2,7 +2,7 @@
 title: Weekly Summary - November 18, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, open-source, testing, network-simulation, deltaq, latency, throughput]
 ---
 
 ## Structuring Repository for Open-source

@@ -13,20 +13,7 @@ on:
       - "**/*.d2"
       - "site/**"
       - "ui/**"
-
-  workflow_run:
-    workflows: ["Formal Spec Listener"]
-    types:
-      - completed
-    branches:
-      - main
-
-  workflow_dispatch: # Allow manual triggering or via API
-    inputs:
-      source:
-        description: "Source of the workflow dispatch"
-        required: false
-        default: "manual"
+  workflow_dispatch: # Allow manual triggering for formal spec updates
 
 permissions:
   contents: write
@@ -113,7 +100,7 @@ jobs:
 
   viz-build:
     name: "Build Visualizer"
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
@@ -147,8 +134,9 @@ jobs:
 
   build-docusaurus-site:
     name: "Build Docusaurus Site"
-    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [viz-build]
+    runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -159,12 +147,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "yarn"
-          cache-dependency-path: ./site/yarn.lock
+          cache: "npm"
+          cache-dependency-path: ./site/package-lock.json
 
       - name: 📦 Install dependencies
         working-directory: site
-        run: yarn install
+        run: npm ci
 
       - name: 👁️ Unpack visualizer
         uses: actions/download-artifact@v4
@@ -172,39 +160,10 @@ jobs:
           name: visualizer
           path: site/static/visualizer
 
-      # Only for workflow_run: Download formal spec HTML
-      - name: 📥 Download formal spec HTML
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: formal-spec-html
-          path: formal-spec-html
-
-      # Only for workflow_run: Update formal spec
-      - name: 📝 Update formal spec
-        if: github.event_name == 'workflow_run'
-        run: |
-          mkdir -p site/static/formal-spec
-          if [ -d "formal-spec-html" ] && [ -n "$(ls -A formal-spec-html/ 2>/dev/null)" ]; then
-            cp -r formal-spec-html/* site/static/formal-spec/
-          fi
-
-      # Only for workflow_run: Enhance Agda documentation
-      - name: 🔄 Enhance Agda documentation
-        if: github.event_name == 'workflow_run'
-        working-directory: site
-        timeout-minutes: 25
-        run: |
-          HTML_COUNT=$(find ./static/formal-spec -name '*.html' | wc -l)
-          if [ "$HTML_COUNT" -gt "0" ]; then
-            NODE_OPTIONS="--max-old-space-size=6144" npx agda-web-docs-lib process ./static/formal-spec ./agda-docs.config.json
-          fi
-
       - name: 🏗️ Build Docusaurus site
         working-directory: site
         run: |
-          yarn build
+          npm run build
 
       - name: Verify Docusaurus build
         working-directory: site
@@ -224,10 +183,10 @@ jobs:
             site/build/*
 
   docs-publish:
-    name: "Publish"
-    runs-on: ubuntu-latest
+    name: "Publish Docs"
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: [build-docusaurus-site]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
     steps:
       - name: 📥 Download Docusaurus build
         uses: actions/download-artifact@v4

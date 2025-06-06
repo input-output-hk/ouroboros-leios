@@ -2,7 +2,7 @@
 title: Weekly Summary – December 9, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, node-engineering, threat-model, security, cost-calculator, rust-simulation]
 ---
 
 ## Node discussions with IOG site reliability engineering

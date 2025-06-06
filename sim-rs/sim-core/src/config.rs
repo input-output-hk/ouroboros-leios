@@ -8,7 +8,11 @@ use std::{
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::{clock::Timestamp, model::TransactionId, probability::FloatDistribution};
+use crate::{
+    clock::Timestamp,
+    model::{Transaction, TransactionId},
+    probability::FloatDistribution,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NodeId(usize);
@@ -62,13 +66,13 @@ pub struct RawParameters {
     pub leios_stage_active_voting_slots: u64,
     pub leios_late_ib_inclusion: bool,
     pub leios_header_diffusion_time_ms: f64,
+    pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
 
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
-    pub tx_sharded_fraction: f64,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
     pub tx_start_time: Option<f64>,
@@ -141,6 +145,7 @@ pub enum LeiosVariant {
     Short,
     Full,
     FullWithoutIbs,
+    FullWithTxReferences,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
@@ -148,6 +153,13 @@ pub enum LeiosVariant {
 pub enum RelayStrategy {
     RequestFromAll,
     RequestFromFirst,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum MempoolSamplingStrategy {
+    OrderedById,
+    Random,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -331,6 +343,7 @@ impl CpuTimeConfig {
 
 #[derive(Debug, Clone)]
 pub(crate) struct BlockSizeConfig {
+    variant: LeiosVariant,
     pub block_header: u64,
     cert_constant: u64,
     cert_per_node: u64,
@@ -344,6 +357,7 @@ pub(crate) struct BlockSizeConfig {
 impl BlockSizeConfig {
     fn new(params: &RawParameters) -> Self {
         Self {
+            variant: params.leios_variant,
             block_header: params.rb_head_size_bytes,
             cert_constant: params.cert_size_bytes_constant,
             cert_per_node: params.cert_size_bytes_per_node,
@@ -357,6 +371,13 @@ impl BlockSizeConfig {
 
     pub fn cert(&self, nodes: usize) -> u64 {
         self.cert_constant + self.cert_per_node * nodes as u64
+    }
+
+    pub fn ib_payload(&self, txs: &[Arc<Transaction>]) -> u64 {
+        match self.variant {
+            LeiosVariant::FullWithTxReferences => txs.len() as u64 * self.eb_per_ib,
+            _ => txs.iter().map(|tx| tx.bytes).sum(),
+        }
     }
 
     pub fn eb(&self, txs: usize, ibs: usize, ebs: usize) -> u64 {
@@ -379,7 +400,6 @@ impl TransactionConfig {
         if params.simulate_transactions {
             Self::Real(RealTransactionConfig {
                 max_size: params.tx_max_size_bytes,
-                sharded_fraction: params.tx_sharded_fraction,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
                 start_time: params
@@ -402,7 +422,6 @@ impl TransactionConfig {
 #[derive(Debug, Clone)]
 pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
-    pub sharded_fraction: f64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
     pub start_time: Option<Timestamp>,
@@ -438,15 +457,16 @@ pub struct SimConfiguration {
     pub max_eb_age: u64,
     pub late_ib_inclusion: bool,
     pub variant: LeiosVariant,
+    pub vote_threshold: u64,
     pub(crate) praos_fallback: bool,
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
+    pub(crate) mempool_strategy: MempoolSamplingStrategy,
     pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
     pub(crate) eb_generation_probability: f64,
     pub(crate) vote_probability: f64,
-    pub(crate) vote_threshold: u64,
     pub(crate) vote_slot_length: u64,
     pub(crate) max_block_size: u64,
     pub(crate) max_ib_size: u64,
@@ -485,6 +505,7 @@ impl SimConfiguration {
             praos_fallback: params.praos_fallback_enabled,
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
+            mempool_strategy: params.leios_mempool_sampling_strategy,
             praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,

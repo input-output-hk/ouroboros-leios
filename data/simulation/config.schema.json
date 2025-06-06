@@ -73,7 +73,7 @@
       "type": "object"
     },
     "LeiosVariant": {
-      "enum": ["short", "full", "full-without-ibs"],
+      "enum": ["short", "full", "full-without-ibs", "full-with-tx-references"],
       "type": "string"
     },
     "LogNormalDistribution": {
@@ -90,6 +90,10 @@
         }
       },
       "type": "object"
+    },
+    "MempoolSamplingStrategy": {
+      "enum": ["ordered-by-id", "random"],
+      "type": "string"
     },
     "NormalDistribution": {
       "properties": {
@@ -269,6 +273,10 @@
       "description": "Extends Leios so that EB producers include IBs directly from previous pipelines\nwhere no certified EB was observed.\n\nOnly supported by Rust simulation.",
       "type": "boolean"
     },
+    "leios-mempool-sampling-strategy": {
+      "$ref": "#/definitions/MempoolSamplingStrategy",
+      "description": "The strategy to use when selecting TXs from the Leios mempool."
+    },
     "leios-stage-active-voting-slots": {
       "additionalProperties": false,
       "properties": {},
@@ -351,10 +359,6 @@
       "additionalProperties": false,
       "description": "Only supported by Rust simulation.",
       "properties": {},
-      "type": "number"
-    },
-    "tx-sharded-fraction": {
-      "description": "What fraction of transactions have at least one sharded input?\n\nOnly supported by Rust simulation.",
       "type": "number"
     },
     "tx-size-bytes-distribution": {

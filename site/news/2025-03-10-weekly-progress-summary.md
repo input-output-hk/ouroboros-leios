@@ -2,7 +2,7 @@
 title: Weekly Summary – March 10, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, simulation-comparison, mainnet-scale, analysis, sharding, performance, full-leios, formal-methods, research]
 ---
 
 This week, the Leios team made significant progress in simulation capabilities, with a successful comparison of Rust and Haskell simulations across [**90 scenarios**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11/analysis.ipynb). A [**mainnet-scale analysis**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w11xl/analysis.ipynb) of Leios on a [**realistic 3,000-node network**](https://github.com/input-output-hk/ouroboros-leios/blob/leios-2025w11/sim-rs/test_data/realistic.yaml) revealed unexpected performance benefits from network topology. Insights from [**sharding performance analysis**](https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/shard-performance.ipynb) provided important optimization strategies. Finally, the team refined both simulation implementations for greater realism and comparability, while the formal methods team developed initial trace verification tools for Short Leios.

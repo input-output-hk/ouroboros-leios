@@ -41,7 +41,7 @@
   --preview-border-color: var(--border-color);
 }
 
-.theme-dark .type-preview-container {
+:root.dark-theme .type-preview-container {
   --preview-highlight-bg: rgba(86, 156, 214, 0.15);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
@@ -53,9 +53,148 @@
   font-weight: bold;
   font-size: 0.9em;
   background-color: var(--subtle-background);
+  color: var(--text-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.preview-heading .module-name {
+  color: var(--text-color);
+}
+
+.preview-heading .link-to-definition {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.preview-heading .link-to-definition:hover {
+  text-decoration: underline;
+}
+
+/* Comment container */
+.preview-comment-container {
+  padding: 12px;
+  background-color: var(--subtle-background);
+  border-bottom: 1px solid var(--preview-border-color);
+  font-family: var(--body-font);
+  font-size: 0.85em;
+  line-height: 1;
+  color: var(--text-color);
+}
+
+.preview-comment-block {
+  margin-bottom: 8px;
+}
+
+.preview-comment-block:last-child {
+  margin-bottom: 0;
+}
+
+.preview-comment-line {
+  margin-bottom: 2px;
+  color: var(--text-color);
+}
+
+.preview-comment-line:last-child {
+  margin-bottom: 0;
+}
+
+/* Make comment text slightly muted but still readable */
+:root.dark-theme .preview-comment-line {
+  color: rgba(230, 237, 243, 0.85);
+}
+
+:root:not(.dark-theme) .preview-comment-line {
+  color: rgba(27, 31, 35, 0.75);
+}
+
+/* Comment lists */
+.preview-comment-list {
+  margin: 4px 0 8px 0;
+  padding-left: 20px;
+}
+
+.preview-comment-list:last-child {
+  margin-bottom: 0;
+}
+
+.preview-comment-list-item {
+  margin-bottom: 2px;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.preview-comment-list-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Style list items consistently with comment lines */
+:root.dark-theme .preview-comment-list-item {
+  color: rgba(230, 237, 243, 0.85);
+}
+
+:root:not(.dark-theme) .preview-comment-list-item {
+  color: rgba(27, 31, 35, 0.75);
+}
+
+/* Parameters table */
+.preview-comment-spacer {
+  height: 8px;
+}
+
+.preview-parameters-heading {
+  margin-bottom: 6px !important;
+}
+
+.preview-parameters-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 8px 0;
+  font-size: 0.95em;
+}
+
+.preview-parameters-table:last-child {
+  margin-bottom: 0;
+}
+
+.preview-parameter-row {
+  border: none;
+}
+
+.preview-parameter-name {
+  padding: 6px 16px 6px 0;
+  vertical-align: middle;
+  font-family: var(--mono-font, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+  font-size: 1em;
+  color: var(--text-color);
+  white-space: nowrap;
+  width: 1%;
+  font-weight: 500;
+}
+
+.preview-parameter-desc {
+  padding: 6px 0 6px 16px;
+  vertical-align: middle;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+/* Dark theme adjustments for parameters table */
+:root.dark-theme .preview-parameter-name {
+  color: rgba(230, 237, 243, 0.9);
+}
+
+:root.dark-theme .preview-parameter-desc {
+  color: rgba(230, 237, 243, 0.85);
+}
+
+:root:not(.dark-theme) .preview-parameter-name {
+  color: rgba(27, 31, 35, 0.9);
+}
+
+:root:not(.dark-theme) .preview-parameter-desc {
+  color: rgba(27, 31, 35, 0.75);
 }
 
 /* Override and adjust styles for preview context */
@@ -134,5 +273,84 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .type-preview-container {
+    max-width: calc(100vw - 20px);
+    min-width: calc(100vw - 20px);
+    max-height: 60vh;
+    font-size: 0.8em;
+  }
+
+  .preview-heading {
+    padding: 6px 10px;
+    font-size: 0.85em;
+  }
+
+  .preview-comment-container {
+    padding: 10px;
+    font-size: 0.8em;
+  }
+
+  .type-preview-container .Agda {
+    padding: 6px;
+  }
+
+  .type-preview-container .preview-line-number {
+    padding: 0 4px 0 0;
+    font-size: 12px;
+  }
+
+  .type-preview-container .preview-code-content {
+    padding-left: 6px;
+  }
+
+  .preview-parameters-table {
+    font-size: 0.9em;
+  }
+
+  .preview-parameter-name {
+    padding: 4px 12px 4px 0;
+  }
+
+  .preview-parameter-desc {
+    padding: 4px 0 4px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .type-preview-container {
+    max-width: calc(100vw - 10px);
+    min-width: calc(100vw - 10px);
+    max-height: 50vh;
+    font-size: 0.75em;
+  }
+
+  .preview-heading {
+    padding: 4px 8px;
+    font-size: 0.8em;
+  }
+
+  .preview-comment-container {
+    padding: 8px;
+  }
+
+  .type-preview-container .Agda {
+    padding: 4px;
+  }
+
+  .preview-parameters-table {
+    font-size: 0.85em;
+  }
+
+  .preview-parameter-name {
+    padding: 3px 8px 3px 0;
+  }
+
+  .preview-parameter-desc {
+    padding: 3px 0 3px 8px;
   }
 } 

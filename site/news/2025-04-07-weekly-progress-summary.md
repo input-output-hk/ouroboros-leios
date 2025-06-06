@@ -2,7 +2,7 @@
 title: Weekly Summary – April 7, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, haskell-simulation, rust-simulation, workflow, optimization, analysis, workshop, edinburgh, conformance-testing]
 ---
 
 This week, the team continued refining the protocol and its simulation capabilities, making significant progress in addressing various topics.

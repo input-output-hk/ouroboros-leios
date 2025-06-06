@@ -5,6 +5,7 @@ use anyhow::Result;
 use async_compression::tokio::write::GzipEncoder;
 use average::Variance;
 use itertools::Itertools as _;
+use liveness::LivenessMonitor;
 use pretty_bytes_rust::{pretty_bytes, PrettyBytesOptions};
 use serde::Serialize;
 use sim_core::{
@@ -21,6 +22,7 @@ use tokio::{
 use tracing::{info, info_span};
 
 mod aggregate;
+mod liveness;
 
 type InputBlockId = sim_core::model::InputBlockId<Node>;
 type EndorserBlockId = sim_core::model::EndorserBlockId<Node>;
@@ -46,7 +48,7 @@ pub struct EventMonitor {
     pool_ids: Vec<NodeId>,
     maximum_ib_age: u64,
     maximum_eb_age: u64,
-    events_source: mpsc::UnboundedReceiver<(Event, Timestamp)>,
+    events_source: LivenessMonitor,
     output_path: Option<PathBuf>,
     aggregate: bool,
 }
@@ -71,7 +73,7 @@ impl EventMonitor {
             pool_ids,
             maximum_ib_age,
             maximum_eb_age: config.max_eb_age,
-            events_source,
+            events_source: LivenessMonitor::new(config, events_source),
             output_path,
             aggregate: config.aggregate_events,
         }
@@ -185,6 +187,7 @@ impl EventMonitor {
                 Event::TXReceived { .. } => {
                     tx_messages.received += 1;
                 }
+                Event::TXLost { .. } => {}
                 Event::RBLotteryWon { .. } => {}
                 Event::RBGenerated {
                     id: BlockId { slot, producer },

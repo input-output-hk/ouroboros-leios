@@ -17,6 +17,7 @@ index-state:
 packages:
   simulation
   leios-trace-hs
+  analysis/sims/trace-processor
 
 tests: True
 

@@ -2,7 +2,7 @@
 title: Weekly Summary - November 4, 2024
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, network-simulation, ethereum, blobs, open-source, peernet, bandwidth]
 ---
 
 ## Weekly Meeting

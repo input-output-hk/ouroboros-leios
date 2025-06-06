@@ -2,10 +2,7 @@
 CIP: "?"
 Title: Ouroboros Leios - Greater transaction throughput
 Status: Active
-Category:
-    - Consensus
-    - Ledger
-    - Network
+Category: Consensus
 Authors:
     - William Wolff <william.wolff@iohk.io>
     - Brian W Bush <brian.bush@iohk.io>
@@ -24,9 +21,13 @@ License: Apache-2.0
 
 > [!NOTE]
 >
-> A short (\~200 word) description of the proposed solution and the technical issue being addressed.
+> A short (~200 word) description of the proposed solution and the technical issue being addressed.
 
-The anticipated growth of the Cardano ecosystem necessitates a fundamental enhancement of network throughput to accommodate increasing transaction volumes and support complex decentralized applications. To address this, we propose a transition to Ouroboros Leios, a novel consensus protocol within the Ouroboros family specifically designed for high-throughput operation while preserving Ouroboros Praos's rigorous security properties. Leios achieves this via a decoupled block production and aggregation mechanism, allowing for a higher rate of input-block generation followed by efficient endorsement and anchoring onto the main chain. This document specifies the Leios protocol formally using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
+The anticipated growth of the Cardano ecosystem necessitates a fundamental enhancement of network throughput to accommodate increasing transaction volumes and support complex decentralized applications.
+
+To address this challenge, we propose a transition to Ouroboros Leios — a novel consensus protocol within the Ouroboros family. Leios is specifically designed for high-throughput operation while preserving the rigorous security properties established by Ouroboros Praos.
+
+Leios achieves its scalability through a decoupled block production and aggregation mechanism. This allows for a higher rate of input-block generation, followed by efficient endorsement and anchoring onto the main chain. This document formally specifies the Leios protocol using Agda and provides a detailed rationale and supporting evidence demonstrating its efficacy in overcoming the throughput limitations inherent in the current Ouroboros Praos protocol.
 
 <details>
   <summary><h2>Table of contents</h2></summary>
@@ -43,7 +44,9 @@ While Cardano's current transaction processing capabilities often meet the immed
 
 However, the dynamic growth of the Cardano ecosystem is increasingly revealing the practical consequences of these inherent limitations. The Cardano mainnet periodically experiences periods of significant congestion, where the volume of transactions awaiting processing surpasses the network's ability to include them in a timely manner. This congestion can lead to a tangible degradation in the user experience, manifesting as delays in transaction confirmation. Moreover, it poses substantial obstacles for specific use cases that rely on the efficient processing of large volumes of transactions, such as the distribution of tokens via airdrops, or the rapid and consistent updating of data by decentralized oracles or partner chains.
 
-The semi-sequential nature of block propagation in Ouroboros Praos, where blocks are relayed from one block producer to the next across potentially geographically distant nodes, is a key factor contributing to these limitations. The necessity of completing this global dissemination within the few-second period places a fundamental constraint on the rate at which new blocks, and consequently the transactions they contain, can be added to the blockchain. This architectural characteristic stands in contrast to the largely untapped potential of the network's underlying infrastructure, where the computational and bandwidth resources of individual nodes often remain significantly underutilized. To transcend these inherent scaling barriers and unlock the latent capacity of the Cardano network, a fundamental evolution of the core consensus algorithm is imperative. Ouroboros Leios represents a departure from the sequential processing model of Praos, aiming to introduce mechanisms for parallel transaction processing and more efficient aggregation of transaction data. By reorganizing how transactions are proposed, validated, and ultimately recorded on the blockchain, this protocol upgrade seeks to achieve a substantial increase in the network's overall throughput, enabling it to handle a significantly greater volume of transactions within a given timeframe.
+The semi-sequential nature of block propagation in Ouroboros Praos, where blocks are relayed from one block producer to the next across potentially geographically distant nodes, is a key factor contributing to these limitations. The necessity of completing this global dissemination within the few-second period places a fundamental constraint on the rate at which new blocks, and consequently the transactions they contain, can be added to the blockchain. This architectural characteristic stands in contrast to the largely untapped potential of the network's underlying infrastructure, where the computational and bandwidth resources of individual nodes often remain significantly underutilized.
+
+To transcend these inherent scaling barriers and unlock the latent capacity of the Cardano network, a fundamental evolution of the core consensus algorithm is imperative. Ouroboros Leios represents a departure from the sequential processing model of Praos, aiming to introduce mechanisms for parallel transaction processing and more efficient aggregation of transaction data. By reorganizing how transactions are proposed, validated, and ultimately recorded on the blockchain, this protocol upgrade seeks to achieve a substantial increase in the network's overall throughput, enabling it to handle a significantly greater volume of transactions within a given timeframe.
 
 The Cardano Problem Statement [CPS-18 Greater Transaction Throughput](https://github.com/cardano-foundation/CIPs/blob/master/CPS-0018/README.md) further motivates the need for higher transaction throughput and marshals quantitative evidence of existing mainnet bottlenecks. Realizing higher transaction rates is also necessary for long-term Cardano techo-economic viability as rewards contributions from the Reserve pot diminish: fees from more transactions will be needed to make up that deficit and keep sound the finances of stakepool operations. (Currently, the Reserve contributes more than 85% of the reward of a typical epoch, with less than 15% of the reward coming from the collection of transaction fees. In five years, however, the Reserve contribution will be much diminished.) Because a major protocol upgrade like Leios will take significant time to implement, test, and audit, it is important to began implementation well before transaction demand on mainnet exceeds the capabilities of Ouroboros Praos. The plot below shows the historically diminishing rewards and a forecast of their continued reduction: the forecast is mildly uncertain because the future pattern of staking behavior, transaction fees, and node efficiency might vary considerably.
 
@@ -238,7 +241,9 @@ but not including any minor overhead arising from CBOR serialization. As noted p
 
 ### How Leios increases throughput
 
-The throughput of a Nakamoto consensus like Ouroboros Praos is intrinsically limited by the strict requirement for rapid global propagation of each block approximately before the next leader produces a block. Leios escapes that limitation by producing input blocks at a higher rate and then voting on aggregations of them (i.e., voting on endorser blocks) by a dynamically selected representative committee of stake pools, ensuring broad participation in the aggregation process. The voting process on these aggregations occurs in a more relaxed and extended manner over a multi-slot stage, allowing for greater network latency tolerance. When a quorum is reached, that quorum is recorded in a Praos block. The majority voting by this committee ensures consensus on the endorser block while inheriting and maintaining Praos's robust resistance to adversarial activity, as the final commitment is anchored in the secure Praos chain. As a result of this decoupled approach, Leios can utilize nearly the full bandwidth available to the network of nodes without requiring unrealistically fast propagation of blocks: Leios employs a structured, multi-stage process where input blocks are produced rapidly and then aggregated and voted upon in subsequent stages before being referenced by a Praos block. Think of Praos as a single-lane highway where every car (block) needs to travel the entire length before the next can start. Leios, in contrast, is like having many local roads (input blocks) feeding into a larger, slower-moving but higher-capacity highway (endorser block aggregation and Praos anchoring).
+The throughput of a Nakamoto consensus like Ouroboros Praos is intrinsically limited by the strict requirement for rapid global propagation of each block approximately before the next leader produces a block. Leios escapes that limitation by producing input blocks at a higher rate and then voting on aggregations of them (i.e., voting on endorser blocks) by a dynamically selected representative committee of stake pools, ensuring broad participation in the aggregation process. The voting process on these aggregations occurs in a more relaxed and extended manner over a multi-slot stage, allowing for greater network latency tolerance. When a quorum is reached, that quorum is recorded in a Praos block. The majority voting by this committee ensures consensus on the endorser block while inheriting and maintaining Praos's robust resistance to adversarial activity, as the final commitment is anchored in the secure Praos chain.
+
+As a result of this decoupled approach, Leios can utilize nearly the full bandwidth available to the network of nodes without requiring unrealistically fast propagation of blocks: Leios employs a structured, multi-stage process where input blocks are produced rapidly and then aggregated and voted upon in subsequent stages before being referenced by a Praos block. Think of Praos as a single-lane highway where every car (block) needs to travel the entire length before the next can start. Leios, in contrast, is like having many local roads (input blocks) feeding into a larger, slower-moving but higher-capacity highway (endorser block aggregation and Praos anchoring).
 
 In analogy, imagine Praos as a single courier diligently collecting and delivering individual letters one by one, limiting the delivery speed to their individual capacity. Ouroboros Leios, however, operates like a mail sorting office where numerous local branches rapidly collect and bundle letters (input blocks) before a central team efficiently processes and dispatches these aggregated bundles (endorser blocks), achieving a significantly higher delivery volume.
 
@@ -347,7 +352,7 @@ The table below documents a set of Leios protocol parameters that provided high 
 | . . .                                      |                  |          |                                                                             |                |                                                                                                                           |
 | Praos active slot coefficient              | $f_\text{RB}$    | 1/slot   | The probability that a party will be the slot leader for a particular slot. |           0.05 | This is the current value on mainnet, but it may become feasible to reduce it if Praos blocks are made smaller.           |
 
-The analysis [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement) in the first Leios Technical Report indicates that the Leios committee size should be no smaller than 500 votes and the quorum should be at least 60% of those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger as the number of voters increases, so larger committee sizes might be permitted for broader SPO participation and higher security. The committee size should be large enough that fluctuations in committee membership do not create an appreciable probability of an adversarial quorum when the adversarial stake is just under 50%. The quorum size should be kept large enough above 50% so that those same fluctuations do not prevent an honest quorum, but not so large that a minority adversary can prevent the honest quorum. Larger committees require more network traffic, of course.
+The analysis [Committee size and quorum requirement](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md#committee-size-and-quorum-requirement) in the first Leios Technical Report indicates that the Leios committee size should be no smaller than 500 votes and the quorum should be at least 60% of those votes. However, the proposed Fait Accompli[^1] scheme wFA<sup>LS</sup> achieves compact certificates that do not become larger as the number of voters increases, so larger committee sizes might be permitted for broader SPO participation and higher security. The committee size should be large enough that fluctuations in committee membership do not create an appreciable probability of an adversarial quorum when the adversarial stake is just under 50%. The quorum size should be kept large enough above 50% so that those same fluctuations do not prevent an honest quorum. Larger committees require more network traffic, of course.
 
 ### Attack and mitigation
 
@@ -467,10 +472,10 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 > 
 > This sub-section must define a list of criteria by which the proposal can become active. Criteria must relate to observable metrics or deliverables and be reviewed by editors and project maintainers when applicable. For example: "The changes to the ledger rules are implemented and deployed on Cardano mainnet by a majority of the network", or "The following key projects have implemented support for this standard".
 
-- [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
-- [ ]  Audit.
-- [ ]  Successful operation in testnet environments.
-- [ ]  Community agreement on the settings for the Leios protocol parameters.
+- [ ] The revised `cardano-node` implementations pass the node-level conformance test suites.
+- [ ]  Audit.
+- [ ]  Successful operation in testnet environments.
+- [ ]  Community agreement on the settings for the Leios protocol parameters.
 
 ### Implementation plan
 
@@ -481,8 +486,8 @@ Note that by 2029, to compensate for Reserve depletion, the network would need t
 > 
 > In particular, an implementation that requires a hard-fork should explicitly mention it in its _'Implementation Plan'_.
 
-- [ ]  Detailed node-level (as opposed to this protocol-level) specification.
-- [ ]  Develop node-level conformance test suite.
+- [ ]  Detailed node-level (as opposed to this protocol-level) specification.
+- [ ]  Develop node-level conformance test suite.
 - Consider developing a "quick and dirty" implementation for large scale experiments.
 - Coordinate with related activities on other protocol enhancements.
     - Compatibility between Peras, Leios, and Genesis.
@@ -525,35 +530,56 @@ Leios will be versioned via the major and minor version numbers of the Cardano p
 
 The following benchmarks for Leios cryptographic operations were computed with Rust code[^3] that uses a reference implementation for BLS operations. A variety of optimizations are possible, so the measurements below should be considered worst-case bounds.
 
-> [!WARNING]
-> 
-> - [ ] Could the following bulleted list be better formatted as a table?
+**Sortition Benchmarks**
 
-- Sortition
-    - *Input blocks:* 230 µs
-    - *Endorser blocks:* 230 µs
-    - *Persistent voters:* 5.5 ms (once per epoch)
-    - *Non-persistent voters:* 230 µs (once per pipeline)
-- Vote
-    - *Verify the proof of key possession:* 1.5 ms/key
-    - *Generate vote:*
-	    - *Persistent:* 135 µs/vote
-	    - *Non-persistent:* 280 µs/vote
-    - *Verify vote:*
-	    - *Persistent:* 670 µs/vote
-	    - *Non-persistent:* 1.4 ms/vote
-- Certificate (for a realistic number of pools, stake distribution, and committee size)
-    - *Generate certificate:* 90 ms/cert
-    - *Verify certificate:* 130 ms/cert
-    - *Determine weight (i.e., total stake voted for) in certificate:* 5.9 ms/cert
-- Serialization
-	- *Key registration:* 1.1 µs
-	- *Vote:* 630 ns
-	- *Certificate:* 65 µs 
-- Deserialization
-	- *Key registration:* 52 µs
-	- *Vote:* 19 µs
-	- *Certificate:* 2.7 ms
+| Operation                | Timing        |
+|--------------------------|---------------|
+| Input blocks             | 230 µs        |
+| Endorser blocks          | 230 µs        |
+| Persistent voters        | 5.5 ms        |
+| Non-persistent voters    | 230 µs        |
+
+> [!NOTE]
+> 
+> Persistent voters are computed once per epoch, non-persistent voters once per pipeline.
+
+**Vote Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Verify proof of key possession          | 1.5 ms/key    |
+| Generate vote (persistent)              | 135 µs/vote   |
+| Generate vote (non-persistent)          | 280 µs/vote   |
+| Verify vote (persistent)                | 670 µs/vote   |
+| Verify vote (non-persistent)            | 1.4 ms/vote   |
+
+**Certificate Benchmarks**
+
+> [!NOTE]
+> 
+> For realistic number of pools, stake distribution, and committee size
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Generate certificate                    | 90 ms/cert    |
+| Verify certificate                      | 130 ms/cert   |
+| Determine weight in certificate         | 5.9 ms/cert   |
+
+**Serialization Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Key registration                        | 1.1 µs        |
+| Vote                                    | 630 ns        |
+| Certificate                             | 65 µs         |
+
+**Deserialization Benchmarks**
+
+| Operation                              | Timing         |
+|-----------------------------------------|---------------|
+| Key registration                        | 52 µs         |
+| Vote                                    | 19 µs         |
+| Certificate                             | 2.7 ms        |
 
 As a general rule of thumb, assume that 80% of votes are persistent and 20% are non-persistent. Here are details for how certificate operations vary with committee size, given a realistic stake distribution similar to that on Cardano mainnet.
 
@@ -584,4 +610,4 @@ The following plots show number of persistent votes and votes, along with certif
 > 
 > CIPs are licensed in the public domain. More so, they must be licensed under one of the following licenses. Each new CIP must identify at least one acceptable license in its preamble. In addition, each license must be referenced by its respective abbreviation below in the _"Copyright"_ section.
 
-This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).
+This CIP is licensed under [Apache-2.0](http://www.apache.org/licenses/LICENSE-2.0).

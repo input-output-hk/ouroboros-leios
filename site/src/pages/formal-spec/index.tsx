@@ -1,34 +1,35 @@
-import React from 'react';
-import Layout from '@theme/Layout';
-import styles from './styles.module.css';
+import Layout from "@theme/Layout";
+import React from "react";
+import styles from "./styles.module.css";
 
 // List of available Agda modules with their actual file paths
 const AGDA_MODULES = [
-  { 
-    name: 'Leios.Base',
-    path: 'Leios.Base.html',
-    description: 'Core definitions and types'
+  {
+    name: "Leios Protocol",
+    path: "Leios.Protocol.html",
+    description: "Protocol state and transitions",
   },
-  { 
-    name: 'Leios.Voting',
-    path: 'Leios.Voting.html',
-    description: 'Voting mechanism and rules'
+  {
+    name: "Leios Blocks",
+    path: "Leios.Blocks.html",
+    description: "Block structure and validation",
   },
-  { 
-    name: 'Leios.Protocol',
-    path: 'Leios.Protocol.html',
-    description: 'Protocol state and transitions'
+  {
+    name: "Leios Network",
+    path: "Leios.Network.html",
+    description: "Network communication and messages",
   },
-  { 
-    name: 'Leios.Blocks',
-    path: 'Leios.Blocks.html',
-    description: 'Block structure and validation'
+  {
+    name: "Short Leios Variant",
+    path: "Leios.Short.html",
+    description:
+      "A specific variant of the Leios protocol with fewer stages per pipeline.",
   },
-  { 
-    name: 'Leios.Network',
-    path: 'Leios.Network.html',
-    description: 'Network communication and messages'
-  }
+  {
+    name: "Network Basic Broadcast",
+    path: "Network.BasicBroadcast.html",
+    description: "Basic broadcast network primitives",
+  },
 ];
 
 export default function FormalSpecPage(): React.ReactElement {
@@ -41,14 +42,15 @@ export default function FormalSpecPage(): React.ReactElement {
         <div className={styles.container}>
           <h1>Ouroboros Leios formal specification</h1>
           <p>
-            This section contains the formal specification of the Ouroboros Leios protocol,
-            written in Agda. The specification provides a mathematical foundation for the
-            protocol's properties and guarantees.
+            This section contains the formal specification of the Ouroboros
+            Leios protocol, written in Agda. The specification provides a
+            mathematical foundation for the protocol's properties and
+            guarantees.
           </p>
-          
+
           <h2>Modules</h2>
           <div className={styles.fileGrid}>
-            {AGDA_MODULES.map(module => (
+            {AGDA_MODULES.map((module) => (
               <a
                 key={module.name}
                 href={`/formal-spec/${module.path}`}
@@ -57,7 +59,9 @@ export default function FormalSpecPage(): React.ReactElement {
                 rel="noopener noreferrer"
               >
                 <div className={styles.moduleName}>{module.name}</div>
-                <div className={styles.moduleDescription}>{module.description}</div>
+                <div className={styles.moduleDescription}>
+                  {module.description}
+                </div>
               </a>
             ))}
           </div>
@@ -65,4 +69,4 @@ export default function FormalSpecPage(): React.ReactElement {
       </main>
     </Layout>
   );
-} 
+}

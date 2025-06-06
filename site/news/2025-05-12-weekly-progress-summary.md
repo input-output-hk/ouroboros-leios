@@ -2,7 +2,7 @@
 title: Weekly Summary – May 12, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, trace-verification, haskell-simulation, rust-simulation, code-review, transaction-processing, documentation, conformance-testing]
 ---
 
 This week, the team made significant progress on simulation improvements, trace verification, and a comprehensive analysis of Leios' transaction processing capacity.

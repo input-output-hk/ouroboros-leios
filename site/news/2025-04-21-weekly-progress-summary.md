@@ -2,7 +2,7 @@
 title: Weekly Summary – April 21, 2025
 authors:
 - will
-tags: [progress, update, weekly]
+tags: [progress, update, weekly, simulation-analysis, protocol-development, economic-analysis, full-leios, mini-protocols, reward-sustainability, visualization]
 ---
 
 This week, the Leios team made significant progress in protocol development, focusing on simulation improvements, network protocol design, and economic analysis. The team completed extensive simulations across 648 scenarios, implemented new mini-protocols for Leios diffusion, and conducted important economic analysis regarding future reward sustainability.

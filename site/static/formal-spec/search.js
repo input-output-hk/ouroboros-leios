@@ -48,9 +48,10 @@
   // Load search index asynchronously
   function loadSearchIndex() {
     // Check for chunked index first
-    const basePath = window.location.pathname.includes('/formal-spec/') 
-      ? '/formal-spec/' 
-      : '/';
+    // Use current directory as base path instead of hardcoded paths
+    const basePath = window.location.pathname.endsWith('/') 
+      ? window.location.pathname 
+      : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
     
     const metadataPath = basePath + 'search-index-metadata.json';
     
