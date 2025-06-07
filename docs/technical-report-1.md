@@ -1811,21 +1811,23 @@ small degree.
 ### Denial of service
 
 Transaction-based denial of service attacks on Leios would involve submitting
-numerous invalid, duplicate, or conflicting transactions to different nodes so
+numerous duplicate, invalid or conflicting transactions to different nodes so
 that they would all make their way into the memory pool and then to IBs, only to
 be invalidated when transaction reconciliation occurs after those IBs are
 indirectly referenced by a certificate on a Praos ranking block. Such a denial
 of service would result in extra computation by the nodes and wasted permanent
 storage in the IBs. (Plutus transactions may be especially burdensome in this
 respect.) Ongoing research will mitigate such denial of service via sharding
-techniques and Leios's fee structure. Sharding will prevent duplicate
+techniques and Leios's fee structure. Sharding will prevent conflicting
 transactions from reaching IBs and the fee structure will enforce payment for
 intentionally conflicted transactions, even though only one of the transactions
 would make it onto the ledger.
 
-|   # | Actor  | Method                                                 | Effect                                                                                          | Resources | Mitigation | Notes             |
-| --: | ------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | --------- | ---------- | ----------------- |
-|  25 | Client | Submit invalid, duplicate, or conflicting transactions | Fills memory pool; increases tx duplication in RBs; lowers throughput; resource burden on nodes | ada       | Sharding   | Research underway |
+|  # | Actor  | Method                          | Effect                                      | Resources | Mitigation                 | Notes             |
+|---:|--------|---------------------------------|---------------------------------------------|-----------|----------------------------|-------------------|
+| 25 | Client | Submit duplicate transactions   | lowers throughput; resource burden on nodes | ?         | Pull-based tx diffusion    |                   |
+| 26 | Client | Submit invalid transactions     | lowers throughput; resource burden on nodes | ?         | Validation in tx diffusion |                   |
+| 27 | Client | Submit conflicting transactions | lowers throughput; resource burden on nodes | ?         | Sharding                   | Research underway |
 
 ### Insights regarding threats
 
