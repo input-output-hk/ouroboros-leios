@@ -172,7 +172,7 @@ instance Default Config where
       , leiosVoteSendRecvStages = False
       , leiosVariant = Short
       , leiosHeaderDiffusionTimeMs = 1000
-      , praosChainQuality = 20
+      , praosChainQuality = 40
       , txGenerationDistribution = Exp{lambda = 0.85, scale = Just 1000}
       , txSizeBytesDistribution = LogNormal{mu = 6.833, sigma = 1.127}
       , txValidationCpuTimeMs = 1.5
