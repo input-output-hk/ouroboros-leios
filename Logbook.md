@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-06-09
+
+### Fixes to CI
+
+Outstanding bugs in the CI, [#368](https://github.com/input-output-hk/ouroboros-leios/issues/368) and [#379](https://github.com/input-output-hk/ouroboros-leios/issues/379), have been fixes, so now all of the CI checks pass!
+
 ## 2025-06-06
 
 ### Formal methods
