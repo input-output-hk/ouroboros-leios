@@ -289,7 +289,7 @@ impl<Node: Display> Serialize for Votes<Node> {
 pub struct EventTracker {
     sender: mpsc::UnboundedSender<(Event, Timestamp)>,
     clock: Clock,
-    node_names: BTreeMap<NodeId, Arc<String>>,
+    node_names: Arc<BTreeMap<NodeId, Arc<String>>>,
 }
 
 impl EventTracker {
@@ -298,10 +298,12 @@ impl EventTracker {
         clock: Clock,
         nodes: &[NodeConfiguration],
     ) -> Self {
-        let node_names = nodes
-            .iter()
-            .map(|n| (n.id, Arc::new(n.name.clone())))
-            .collect();
+        let node_names = Arc::new(
+            nodes
+                .iter()
+                .map(|n| (n.id, Arc::new(n.name.clone())))
+                .collect(),
+        );
         Self {
             sender,
             clock,
