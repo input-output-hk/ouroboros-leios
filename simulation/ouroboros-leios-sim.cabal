@@ -21,7 +21,9 @@ build-type:         Simple
 extra-source-files: CHANGELOG.md
 data-files:
   test/data/BenchTopology/topology-dense-52.json
+  test/data/BenchTopology/topology-dense-52.json
   test/data/BenchTopology/latency.sqlite3.gz
+  test/data/simulation/config.default.yaml
 
 flag perf
   description: Ghc options for improved performance, disables asserts.
