@@ -47,6 +47,12 @@ Here are a few personal (@bwbush) observations, reflections, and conclusions on 
  5. It appears that front running can best be eliminated (at the ledger level, but not at the mempool level) by strictly ordering transactions by their IB's slot and VRF.
      - Other IB and EB ordering proposals create complexity in the ledger rules and would be difficult to fully analyze for vulnerabilities.
 
+## Rust simulation
+
+Implemented random sampling of transactions from the Leios mempool. When transaction traffic is high enough that IBs are completely full, it should ensure that different IBs contain different transactions when possible.
+
+Simulated a Leios variant where IBs contain references to transactions, rather than transaction bodies themselves. This variant assumes that transactions are propagated and stored independently of Leios.
+
 ## 2025-06-05
 
 ### Semi-realistic mainnet-scale topology
