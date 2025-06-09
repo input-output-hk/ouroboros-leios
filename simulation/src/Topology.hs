@@ -70,9 +70,9 @@ import ModelTCP (Bytes, kilobytes)
 import P2P (Latency, Link, Link' (..), P2PTopography (..), P2PTopographyCharacteristics (..), genArbitraryP2PTopography, pattern (:<-))
 import SimTypes (NodeId (..), NumCores (..), Path (..), Point (..), StakeFraction (StakeFraction), World (..), WorldDimensions)
 import System.Exit (exitFailure)
-import System.FilePath (dropExtension, takeDirectory, takeExtension, takeExtensions, takeFileName)
+import System.FilePath (dropExtension, takeExtension, takeExtensions, takeFileName)
 import System.IO (hClose, hPutStrLn, stderr)
-import System.IO.Temp (withTempFile)
+import System.IO.Temp (withSystemTempFile)
 import System.Random (RandomGen)
 import Text.Printf (printf)
 
@@ -563,9 +563,8 @@ readLatencies topology latencyFile =
 readLatenciesSqlite3Gz :: BenchTopology -> FilePath -> IO LatenciesMs
 readLatenciesSqlite3Gz topology latencySqliteGzFile =
   assert (takeExtension latencySqliteGzFile == ".gz") $ do
-    let latencySqliteDirectory = takeDirectory latencySqliteGzFile
     let latencySqliteFileName = takeFileName (dropExtension latencySqliteGzFile)
-    withTempFile latencySqliteDirectory latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
+    withSystemTempFile latencySqliteFileName $ \latencySqliteFile latencySqliteHandle -> do
       latencySqliteGzContent <- BSL.readFile latencySqliteGzFile
       let latencySqliteContent = GZip.decompress latencySqliteGzContent
       BSL.hPut latencySqliteHandle latencySqliteContent
