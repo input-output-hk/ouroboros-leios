@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -9,8 +10,10 @@ module Leios.Tracing.Lifecycle (
   lifecycle,
 ) where
 
+import Control.Concurrent.Chan (Chan, readChan)
 import Control.Monad ((<=<))
-import Control.Monad.State.Strict (State, execState, gets, modify')
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State.Strict (StateT, execStateT, gets, modify')
 import Data.Aeson (FromJSON (..), Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
@@ -174,7 +177,7 @@ parseMessage _ _ _ =
 
 type Index = Map ItemKey ItemInfo
 
-tally :: Value -> State Index ()
+tally :: Monad m => Value -> StateT Index m ()
 tally event =
   case parseMaybe parseEvent event of
     Just (itemKey, itemInfo, updates) ->
@@ -185,7 +188,7 @@ tally event =
         modify' $ M.unionWith (<>) updates
     Nothing -> pure ()
 
-updateInclusions :: Text -> ItemKey -> Set Text -> State Index ()
+updateInclusions :: Monad m => Text -> ItemKey -> Set Text -> StateT Index m ()
 updateInclusions kind itemKey includers =
   do
     includers' <- gets $ M.elems . (`M.restrictKeys` S.map (ItemKey kind) includers)
@@ -198,24 +201,30 @@ updateInclusions kind itemKey includers =
           , toRB = mconcat $ toRB <$> includers'
           }
 
-updateEBs :: ItemKey -> ItemInfo -> State Index ()
+updateEBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
 
-updateIBs :: ItemKey -> ItemInfo -> State Index ()
+updateIBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateIBs itemKey = updateInclusions "IB" itemKey . inIBs
 
-lifecycle :: FilePath -> [Value] -> IO ()
+lifecycle :: FilePath -> Chan (Maybe Value) -> IO ()
 lifecycle lifecycleFile events =
-  let
-    index =
-      (`execState` mempty) $
+  do
+    let
+      go =
+        do
+          liftIO (readChan events) >>=
+            \case
+              Nothing -> pure ()
+              Just event -> tally event >> go
+    index <-
+      (`execStateT` mempty) $
         do
           -- Compute the direct metrics from the traces.
-          mapM_ tally events
+          go
           -- Update arrival in EBs and RBs for IBs.
           mapM_ (uncurry updateEBs) =<< gets M.toList
           -- Update arrival in EBs and RBs for TXs.
           mapM_ (uncurry updateIBs) =<< gets M.toList
-   in
     writeFile lifecycleFile . unlines . (itemHeader :) $
       uncurry toCSV <$> M.toList index
