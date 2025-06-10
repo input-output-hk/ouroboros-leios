@@ -2,11 +2,81 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-05-26T00:00:00.000Z</updated>
+    <updated>2025-06-03T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – June 3, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary"/>
+        <updated>2025-06-03T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team focused on infrastructure improvements, formal methods advancement, and large-scale network simulation. The team successfully resolved outstanding CI issues, enhanced the formal specification with Full-Short Leios support, and began simulating a realistic 10,000-node pseudo-mainnet topology.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team focused on infrastructure improvements, formal methods advancement, and large-scale network simulation. The team successfully resolved outstanding CI issues, enhanced the formal specification with Full-Short Leios support, and began simulating a realistic 10,000-node pseudo-mainnet topology.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="infrastructure-improvements">Infrastructure improvements<a class="hash-link" aria-label="Direct link to Infrastructure improvements" title="Direct link to Infrastructure improvements" href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary#infrastructure-improvements">​</a></h2>
+<ul>
+<li>Fixed outstanding CI bugs <a href="https://github.com/input-output-hk/ouroboros-leios/issues/368" target="_blank" rel="noopener noreferrer">#368</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/issues/379" target="_blank" rel="noopener noreferrer">#379</a>, enabling all CI checks to pass.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods-advancement">Formal methods advancement<a class="hash-link" aria-label="Direct link to Formal methods advancement" title="Direct link to Formal methods advancement" href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary#formal-methods-advancement">​</a></h2>
+<ul>
+<li>Added Full-Short Leios as a special case of Short Leios to the <a href="https://github.com/input-output-hk/ouroboros-leios-formal-spec/tree/yveshauser/full-short-leios" target="_blank" rel="noopener noreferrer">formal specification</a></li>
+<li>Implemented trace verification capabilities for Full-Short Leios.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="pseudo-mainnet-topology-simulation">Pseudo-mainnet topology simulation<a class="hash-link" aria-label="Direct link to Pseudo-mainnet topology simulation" title="Direct link to Pseudo-mainnet topology simulation" href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary#pseudo-mainnet-topology-simulation">​</a></h2>
+<ul>
+<li>Designed and initiated comprehensive simulations for 1 through 300 TPS using the new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/" target="_blank" rel="noopener noreferrer">pseudo-mainnet topology</a></li>
+<li>Created a realistic 10,000-node network with:<!-- -->
+<ul>
+<li>2,657 block producers and 7,343 relay nodes</li>
+<li>Realistic stake distribution and geographic distribution</li>
+<li>Two relays per block producer with realistic latencies</li>
+<li>298,756 total connections with 6-hop network diameter</li>
+</ul>
+</li>
+<li>Observed significant performance challenges with large-scale simulation:<!-- -->
+<ul>
+<li>Rust simulation: 6 minutes of network time in 10 hours at 1 TPS</li>
+<li>Performance degradation at higher TPS rates (1 minute network time in 10 hours at 300 TPS)</li>
+<li>Haskell simulation requires optimization for practical large-network analysis.</li>
+</ul>
+</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-enhancements">Rust simulation enhancements<a class="hash-link" aria-label="Direct link to Rust simulation enhancements" title="Direct link to Rust simulation enhancements" href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary#rust-simulation-enhancements">​</a></h2>
+<ul>
+<li>Implemented random sampling of transactions from the Leios memory pool to ensure different IBs contain different transactions when possible</li>
+<li>Added simulation support for Leios variant where IBs contain transaction references rather than full transaction bodies</li>
+<li>Enhanced transaction handling for high-traffic scenarios.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-conflicts-and-incentives">Analysis of conflicts and incentives<a class="hash-link" aria-label="Direct link to Analysis of conflicts and incentives" title="Direct link to Analysis of conflicts and incentives" href="https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary#analysis-of-conflicts-and-incentives">​</a></h2>
+<ul>
+<li>Completed comprehensive analysis of transaction conflicts, ledger design, and fee incentives</li>
+<li>Key findings on conflict management:<!-- -->
+<ul>
+<li>Honest duplicates and conflicts are unavoidable with local sortition</li>
+<li>Memory pool rules can minimize conflicts through prompt transaction removal</li>
+<li>Collateral requirements for failed transactions conflict with Cardano's guarantees</li>
+</ul>
+</li>
+<li>Identified block producer compensation strategies for handling conflicting transactions</li>
+<li>Proposed EB-level optimization through bitmap-based transaction validation to reduce persistent storage of duplicates and conflicts.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="ci" term="ci"/>
+        <category label="formal-methods" term="formal-methods"/>
+        <category label="pseudo-mainnet" term="pseudo-mainnet"/>
+        <category label="topology" term="topology"/>
+        <category label="rust-simulation" term="rust-simulation"/>
+        <category label="conflicts" term="conflicts"/>
+        <category label="incentives" term="incentives"/>
+        <category label="mainnet-scale" term="mainnet-scale"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – May 26, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/05/26/weekly-progress-summary</id>
@@ -1485,82 +1555,5 @@ at 1MB/s)</li>
         <category label="topology" term="topology"/>
         <category label="visualization" term="visualization"/>
         <category label="deltaq" term="deltaq"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – January 13, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary"/>
-        <updated>2025-01-13T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[Cryptography benchmarks]]></summary>
-        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-benchmarks">Cryptography benchmarks<a class="hash-link" aria-label="Direct link to Cryptography benchmarks" title="Direct link to Cryptography benchmarks" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#cryptography-benchmarks">​</a></h2>
-<ul>
-<li>Implemented and benchmarked the complete Leios cryptography suite in the
-<code>leios_crypto_benchmarks</code> Rust crate</li>
-<li>Key VRF performance metrics:<!-- -->
-<ul>
-<li>Proving: 240 µs</li>
-<li>Verifying: 390 µs</li>
-</ul>
-</li>
-<li>Sortition performance (excluding VRF):<!-- -->
-<ul>
-<li>Leadership checks (RB/IB/EB): 0.17 µs per slot/pipeline</li>
-<li>Vote number calculation: 3.8 µs per pipeline</li>
-</ul>
-</li>
-<li>BLS operations benchmarked:<!-- -->
-<ul>
-<li>Key possession proof verification: 1.5 ms per key</li>
-<li>Vote generation/verification: 280 µs / 1.4 ms per vote</li>
-<li>Certificate operations (300-vote quorum): 50 ms generation, 90 ms
-verification.</li>
-</ul>
-</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="cryptography-design-progress">Cryptography design progress<a class="hash-link" aria-label="Direct link to Cryptography design progress" title="Direct link to Cryptography design progress" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#cryptography-design-progress">​</a></h2>
-<ul>
-<li>Optimized vote signature size to potentially as small as 192 bytes</li>
-<li>Determined that 500-vote committee certificates (60% quorum) would fit within
-Praos blocks at ~58 kB</li>
-<li>Explored potential synergies with KES rotation and Praos VRF BLS keys</li>
-<li>Completed cryptography sections for the first technical report</li>
-<li>Decision made to freeze current report content and move new findings to future
-documents.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-development">Simulation development<a class="hash-link" aria-label="Direct link to Simulation development" title="Direct link to Simulation development" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#simulation-development">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-simulation">Haskell simulation<a class="hash-link" aria-label="Direct link to Haskell simulation" title="Direct link to Haskell simulation" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#haskell-simulation">​</a></h3>
-<ul>
-<li>Achieved diffusion latency comparable to benchmark cluster data for Praos
-blocks</li>
-<li>Integrated agreed-upon simulation parameters with the Rust team</li>
-<li>Added event log output functionality with JSON support</li>
-<li>Implemented 'short-leios' simulation variant matching mainnet ranking block
-interval</li>
-<li>Fixed coordination issues in Relay mini-protocol consumers</li>
-<li>Completed the PI goal by adding total data transmitted per node visualization.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation">Rust simulation<a class="hash-link" aria-label="Direct link to Rust simulation" title="Direct link to Rust simulation" href="https://leios.cardano-scaling.org/news/2025/01/13/weekly-progress-summary#rust-simulation">​</a></h3>
-<ul>
-<li>Implemented more granular CPU simulation times</li>
-<li>Fixed race condition in the simulated clock</li>
-<li>Started consuming a new shared configuration file format</li>
-<li>Established a shared configuration format with default parameters in
-<code>data/simulation/default.yaml</code>.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="cryptography" term="cryptography"/>
-        <category label="benchmarks" term="benchmarks"/>
-        <category label="vrf" term="vrf"/>
-        <category label="bls" term="bls"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
-        <category label="visualization" term="visualization"/>
-        <category label="technical-report" term="technical-report"/>
     </entry>
 </feed>
