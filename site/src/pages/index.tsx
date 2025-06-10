@@ -189,7 +189,7 @@ function MonthlyReviewsSection() {
                             >
                                 <Link
                                     className="button button--primary button--lg"
-                                    to="https://www.youtube.com/watch?v=wXqKpQT2H3Y&list=PLnPTB0CuBOBzWWpnojAK3ZaFy9RdofP6l&index=2"
+                                    to="https://www.youtube.com/live/NEqeyS_WYjk"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{
