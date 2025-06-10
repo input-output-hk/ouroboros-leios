@@ -23,7 +23,7 @@ We scored each blockchain on a 0–10 scale, with higher scores indicating bette
 - **Throughput** - Transactions per second (TPS). 10 = 1,000+ TPS, 0 = ~1 TPS.
 - **Fee Predictability** - Fee consistency. 10 = fully deterministic, 0 = highly volatile.
 - **Fee Loss Protection** - Protection against fees for unprocessed transactions. 10 = no fees for failed/rejected Txs, 0 = frequent loss.
-- **Latency** - Time to final confirmation. 10 = <30s, 0 = >30min.
+- **Latency** - Time to final confirmation.
 - **Decentralization** - Validator/node count and governance. 10 = 1,000+ independent nodes, 0 = centralized.
 - **Security** - Attack resistance (e.g., 51% attack). 10 = proven secure, 0 = vulnerable.
 - **Scalability** - Growth without centralization. 10 = scales to 1,000+ TPS natively, 0 = no growth.
