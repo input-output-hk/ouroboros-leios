@@ -13,12 +13,13 @@ main :: IO ()
 main =
   do
     Command{..} <- O.execParser commandParser
-    process logFile lifecycleFile cpuFile
+    process logFile lifecycleFile cpuFile resourceFile
 
 data Command = Command
   { logFile :: FilePath
   , lifecycleFile :: FilePath
   , cpuFile :: FilePath
+  , resourceFile :: FilePath
   }
   deriving (Eq, Ord, Read, Show)
 
@@ -34,3 +35,4 @@ commandParser =
       <$> O.strOption (O.long "trace-file" <> O.metavar "FILE" <> O.value "/dev/stdin" <> O.help "Input Leios simulation trace log file")
       <*> O.strOption (O.long "lifecycle-file" <> O.metavar "FILE" <> O.help "Output CSV file for transaction lifecycle data")
       <*> O.strOption (O.long "cpu-file" <> O.metavar "FILE" <> O.help "Output CSV file for CPU data")
+      <*> O.strOption (O.long "resource-file" <> O.metavar "FILE" <> O.help "Output CSV file for resource data")

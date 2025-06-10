@@ -13,7 +13,7 @@ module Leios.Tracing.Cpu (
 import Control.Concurrent.Chan (Chan, readChan)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (StateT, execStateT, modify')
-import Data.Aeson (FromJSON (..), Value (Object), withObject, (.:))
+import Data.Aeson (Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
 import Data.List (intercalate)
@@ -23,29 +23,6 @@ import Data.Text (Text)
 
 import qualified Data.Map.Strict as M (insertWith, toList)
 import qualified Data.Text as T (unpack)
-
-newtype Earliest a = Earliest {getEarliest :: Maybe a}
-  deriving (Show)
-
-instance Eq a => Eq (Earliest a) where
-  Earliest (Just x) == Earliest (Just y) = x == y
-  Earliest Nothing == Earliest Nothing = True
-  _ == _ = False
-
-instance Ord a => Ord (Earliest a) where
-  Earliest (Just x) `compare` Earliest (Just y) = x `compare` y
-  Earliest (Just _) `compare` Earliest Nothing = LT
-  Earliest Nothing `compare` Earliest (Just _) = GT
-  Earliest Nothing `compare` Earliest Nothing = EQ
-
-instance Ord a => Semigroup (Earliest a) where
-  x <> y = if x < y then x else y
-
-instance Ord a => Monoid (Earliest a) where
-  mempty = Earliest Nothing
-
-instance FromJSON a => FromJSON (Earliest a) where
-  parseJSON = fmap Earliest . parseJSON
 
 data ItemKey
   = ItemKey
@@ -65,10 +42,7 @@ instance Semigroup ItemInfo where
       }
 
 instance Monoid ItemInfo where
-  mempty =
-    ItemInfo
-      { duration = mempty
-      }
+  mempty = ItemInfo { duration = mempty }
 
 toCSV :: ItemKey -> ItemInfo -> String
 toCSV ItemKey{..} ItemInfo{..} =
@@ -126,7 +100,7 @@ tally event =
     Nothing -> pure ()
 
 cpu :: FilePath -> Chan (Maybe Value) -> IO ()
-cpu lifecycleFile events =
+cpu cpuFile events =
   do
     let
       go =
@@ -135,9 +109,6 @@ cpu lifecycleFile events =
             \case
               Nothing -> pure ()
               Just event -> tally event >> go
-    index <-
-      (`execStateT` mempty) $
-        do
-          go
-    writeFile lifecycleFile . unlines . (itemHeader :) $
+    index <- go `execStateT` mempty
+    writeFile cpuFile . unlines . (itemHeader :) $
       uncurry toCSV <$> M.toList index

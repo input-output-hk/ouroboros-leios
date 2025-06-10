@@ -9,13 +9,14 @@ import Control.Concurrent.MVar (newEmptyMVar, putMVar, readMVar)
 import Control.Concurrent.Async (concurrently_, mapConcurrently_)
 import Leios.Tracing.Cpu (cpu)
 import Leios.Tracing.Lifecycle (lifecycle)
+import Leios.Tracing.Resource (resource)
 
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.Char8 as LBS8
 
-process :: FilePath -> FilePath -> FilePath -> IO ()
-process logFile lifecycleFile cpuFile =
+process :: FilePath -> FilePath -> FilePath -> FilePath -> IO ()
+process logFile lifecycleFile cpuFile resourceFile=
   do
     done <- newEmptyMVar
     chan <- newChan
@@ -29,6 +30,7 @@ process logFile lifecycleFile cpuFile =
         [
           lifecycle lifecycleFile chan
         , dupChan chan >>= cpu cpuFile
+        , dupChan chan >>= resource resourceFile
         ]
       >> putMVar done ()
 
