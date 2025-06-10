@@ -59,7 +59,7 @@ impl ClockCoordinator {
         while let Some(event) = self.rx.recv().await {
             match event {
                 ClockEvent::Wait { actor, until, done } => {
-                    assert!(until.is_none_or(|t| t > self.time.load(Ordering::Acquire)));
+                    assert!(until.is_none_or(|t| t >= self.time.load(Ordering::Acquire)));
                     if waiters[actor].replace(Waiter { until, done }).is_some() {
                         panic!("An actor has somehow managed to wait twice");
                     }
