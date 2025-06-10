@@ -30,6 +30,9 @@ instance Ord a => Ord (Minimum a) where
   Minimum Nothing `compare` Minimum (Just _) = GT
   Minimum Nothing `compare` Minimum Nothing = EQ
 
+instance Functor Minimum where
+  fmap f = Minimum . fmap f . getMinimum
+
 instance Ord a => Semigroup (Minimum a) where
   x <> y = if x < y then x else y
 
@@ -55,6 +58,9 @@ instance Ord a => Ord (Maximum a) where
   Maximum (Just _) `compare` Maximum Nothing = LT
   Maximum Nothing `compare` Maximum (Just _) = GT
   Maximum Nothing `compare` Maximum Nothing = EQ
+
+instance Functor Maximum where
+  fmap f = Maximum . fmap f . getMaximum
 
 instance Ord a => Semigroup (Maximum a) where
   x <> y = if x > y then x else y

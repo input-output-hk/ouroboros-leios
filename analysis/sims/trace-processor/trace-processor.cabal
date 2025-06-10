@@ -34,6 +34,7 @@ library
     exposed-modules: Leios.Tracing.Cpu
                      Leios.Tracing.Lifecycle
                      Leios.Tracing.Processor
+                     Leios.Tracing.Receipt
                      Leios.Tracing.Resource
                      Leios.Tracing.Util
     build-depends:
