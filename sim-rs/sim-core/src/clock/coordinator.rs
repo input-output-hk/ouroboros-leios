@@ -218,6 +218,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn should_allow_time_to_stand_still() {
+        let mut coordinator = ClockCoordinator::new();
+        let clock = coordinator.clock();
+        let t0 = clock.now();
+        let t1 = t0 + Duration::from_millis(5);
+        let t2 = t0 + Duration::from_millis(10);
+        let mut actor = clock.barrier();
+
+        let run_future = coordinator.run();
+        pin!(run_future);
+
+        // The actor waits until t1, then cancels that wait,
+        // before the coordinator has a chance to run
+        {
+            let wait1 = actor.wait_until(t1);
+            assert_eq!(poll!(wait1), Poll::Pending);
+        }
+
+        // The actor should be able to wait until t1 without issue,
+        // even though it has already cancelled a wait for t1.
+        let mut wait1 = actor.wait_until(t1);
+        assert_eq!(poll!(&mut wait1), Poll::Pending);
+        assert_eq!(poll!(&mut run_future), Poll::Pending);
+        assert_eq!(poll!(&mut wait1), Poll::Ready(()));
+        drop(wait1);
+
+        // Test waiting for another few moments just for good measure
+        let mut wait2 = actor.wait_until(t2);
+        assert_eq!(poll!(&mut wait2), Poll::Pending);
+        assert_eq!(poll!(&mut run_future), Poll::Pending);
+        assert_eq!(poll!(&mut wait2), Poll::Ready(()));
+    }
+
+    #[tokio::test]
     async fn should_allow_waiting_forever() {
         let mut coordinator = ClockCoordinator::new();
         let clock = coordinator.clock();
