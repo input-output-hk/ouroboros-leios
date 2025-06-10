@@ -100,7 +100,7 @@ maintaining settlement guarantees and supporting dynamic participation.
 
 - [Leios Node Cost Analysis](leios-cost-analysis.md) – During the April 2025 status meeting, we shared early cost estimates for running Leios nodes. Here’s a straightforward breakdown of those figures, showing what it might cost to operate Leios compared to the current Praos protocol and the potential revenue from transaction fees.
 
-## Leios Comparisons and Analyses
+## Leios Monthy Meeting Recaps
 
 Want to catch up on the latest Leios news but can't make the monthly status meeting? No problem! Take a look at our brief meeting recaps to see what was discussed and where the team is headed next!
 
