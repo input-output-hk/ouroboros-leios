@@ -9,7 +9,7 @@
 
 
 <script src="https://plausible.io/js/script.js" defer="defer" data-domain="leios.cardano-scaling.org"></script><link rel="stylesheet" href="/assets/css/styles.1f1100a0.css">
-<script src="/assets/js/runtime~main.d4312298.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.b485164e.js" defer="defer"></script>
 <script src="/assets/js/main.04b5bad1.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -25,7 +25,7 @@
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="pseudo-mainnet-topology-simulation">Pseudo-mainnet topology simulation<a class="hash-link" aria-label="Direct link to Pseudo-mainnet topology simulation" title="Direct link to Pseudo-mainnet topology simulation" href="/news/tags/topology#pseudo-mainnet-topology-simulation">​</a></h2>
 <ul>
-<li>Designed and initiated comprehensive simulations for 1 through 300 TPS using the new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/" target="_blank" rel="noopener noreferrer">pseudo-mainnet topology</a></li>
+<li>Designed and initiated comprehensive simulations from 1 to 300 TPS using the new <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/" target="_blank" rel="noopener noreferrer">pseudo-mainnet topology</a></li>
 <li>Created a realistic 10,000-node network with:<!-- -->
 <ul>
 <li>2,657 block producers and 7,343 relay nodes</li>
@@ -34,10 +34,10 @@
 <li>298,756 total connections with 6-hop network diameter</li>
 </ul>
 </li>
-<li>Observed significant performance challenges with large-scale simulation:<!-- -->
+<li>Observed significant performance challenges within the large-scale simulation:<!-- -->
 <ul>
-<li>Rust simulation: 6 minutes of network time in 10 hours at 1 TPS</li>
-<li>Performance degradation at higher TPS rates (1 minute network time in 10 hours at 300 TPS)</li>
+<li>Rust simulation: six minutes of network time in 10 hours at one TPS</li>
+<li>Performance degradation at higher TPS rates (one minute network time in 10 hours at 300 TPS)</li>
 <li>Haskell simulation requires optimization for practical large-network analysis.</li>
 </ul>
 </li>
@@ -45,7 +45,7 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="rust-simulation-enhancements">Rust simulation enhancements<a class="hash-link" aria-label="Direct link to Rust simulation enhancements" title="Direct link to Rust simulation enhancements" href="/news/tags/topology#rust-simulation-enhancements">​</a></h2>
 <ul>
 <li>Implemented random sampling of transactions from the Leios memory pool to ensure different IBs contain different transactions when possible</li>
-<li>Added simulation support for Leios variant where IBs contain transaction references rather than full transaction bodies</li>
+<li>Added simulation support for the Leios variant, where IBs contain transaction references rather than full transaction bodies</li>
 <li>Enhanced transaction handling for high-traffic scenarios.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-of-conflicts-and-incentives">Analysis of conflicts and incentives<a class="hash-link" aria-label="Direct link to Analysis of conflicts and incentives" title="Direct link to Analysis of conflicts and incentives" href="/news/tags/topology#analysis-of-conflicts-and-incentives">​</a></h2>
