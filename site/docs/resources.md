@@ -90,3 +90,12 @@ maintaining settlement guarantees and supporting dynamic participation.
 
 - [Cost estimator](https://leios.cardano-scaling.org/cost-estimator/) – the tool
   for estimating resource costs in Leios.
+
+
+## Leios Comparisons and Analyses
+
+- [Leios Scorecard Comparison](leios-comparison.md) – How does Cardano’s Ouroboros Leios stack up against Solana, Ethereum, and Bitcoin? This scorecard compares throughput, fees, decentralization, and more.
+
+- [Leios Use Cases](leios-use-cases.md) – Discover how Ouroboros Leios, Cardano’s next-gen protocol, could enable unique use cases like global microtransactions, supply chain tracking, and more, outshining other blockchains.
+
+- [Leios Node Cost Analysis](leios-cost-analysis.md) – During the April 2025 status meeting, we shared early cost estimates for running Leios nodes. Here’s a straightforward breakdown of those figures, showing what it might cost to operate Leios compared to the current Praos protocol and the potential revenue from transaction fees.
