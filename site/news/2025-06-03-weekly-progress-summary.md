@@ -18,21 +18,21 @@ This week, the Leios team focused on infrastructure improvements, formal methods
 
 ## Pseudo-mainnet topology simulation
 
-- Designed and initiated comprehensive simulations for 1 through 300 TPS using the new [pseudo-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/)
+- Designed and initiated comprehensive simulations from 1 to 300 TPS using the new [pseudo-mainnet topology](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/)
 - Created a realistic 10,000-node network with:
   - 2,657 block producers and 7,343 relay nodes
   - Realistic stake distribution and geographic distribution
   - Two relays per block producer with realistic latencies
   - 298,756 total connections with 6-hop network diameter
-- Observed significant performance challenges with large-scale simulation:
-  - Rust simulation: 6 minutes of network time in 10 hours at 1 TPS
-  - Performance degradation at higher TPS rates (1 minute network time in 10 hours at 300 TPS)
+- Observed significant performance challenges within the large-scale simulation:
+  - Rust simulation: six minutes of network time in 10 hours at one TPS
+  - Performance degradation at higher TPS rates (one minute network time in 10 hours at 300 TPS)
   - Haskell simulation requires optimization for practical large-network analysis.
 
 ## Rust simulation enhancements
 
 - Implemented random sampling of transactions from the Leios memory pool to ensure different IBs contain different transactions when possible
-- Added simulation support for Leios variant where IBs contain transaction references rather than full transaction bodies
+- Added simulation support for the Leios variant, where IBs contain transaction references rather than full transaction bodies
 - Enhanced transaction handling for high-traffic scenarios.
 
 ## Analysis of conflicts and incentives
