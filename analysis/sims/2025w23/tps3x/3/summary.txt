@@ -1,0 +1,65 @@
+praos: 1923 transactions(s) were generated in total.
+praos: 33 naive praos block(s) were published.
+praos: 687 slot(s) had no naive praos blocks.
+praos: 1782 transaction(s) (3.07 MB) finalized in a naive praos block.
+praos: 141 transaction(s) (245.99 kB) did not reach a naive praos block.
+praos: Pool 1 published 1 naive praos block(s)
+praos: Pool 148 published 1 naive praos block(s)
+praos: Pool 229 published 1 naive praos block(s)
+praos: Pool 1113 published 1 naive praos block(s)
+praos: Pool 1446 published 1 naive praos block(s)
+praos: Pool 5853 published 1 naive praos block(s)
+praos: Pool 5866 published 1 naive praos block(s)
+praos: Pool 5999 published 1 naive praos block(s)
+praos: Pool 6003 published 1 naive praos block(s)
+praos: Pool 6007 published 1 naive praos block(s)
+praos: Pool 6020 published 1 naive praos block(s)
+praos: Pool 6257 published 1 naive praos block(s)
+praos: Pool 6274 published 1 naive praos block(s)
+praos: Pool 6357 published 1 naive praos block(s)
+praos: Pool 6415 published 1 naive praos block(s)
+praos: Pool 6434 published 1 naive praos block(s)
+praos: Pool 6797 published 1 naive praos block(s)
+praos: Pool 6803 published 1 naive praos block(s)
+praos: Pool 6804 published 1 naive praos block(s)
+praos: Pool 6829 published 2 naive praos block(s)
+praos: Pool 6833 published 1 naive praos block(s)
+praos: Pool 6843 published 1 naive praos block(s)
+praos: Pool 6866 published 1 naive praos block(s)
+praos: Pool 6869 published 1 naive praos block(s)
+praos: Pool 6877 published 1 naive praos block(s)
+praos: Pool 6887 published 1 naive praos block(s)
+praos: Pool 6893 published 1 naive praos block(s)
+praos: Pool 7512 published 1 naive praos block(s)
+praos: Pool 7734 published 2 naive praos block(s)
+praos: Pool 7735 published 1 naive praos block(s)
+praos: Pool 7778 published 1 naive praos block(s)
+leios: 217 IB(s) were generated, on average 0.301 IB(s) per slot.
+leios: 1903 out of 1923 transaction(s) were included in at least one IB.
+leios: The average age of the pending transactions is 84.644s (stddev 17.705).
+leios: Each transaction was included in an average of 1.101 IB(s) (stddev 0.305).
+leios: Each IB contained an average of 9.654 transaction(s) (stddev 9.641) and an average of 16.87 kB (stddev 18.). 39 IB(s) were empty.
+leios: Each node received an average of 217.000 IB(s) (stddev 0.010).
+leios: 90 EB(s) were generated; on average there were 0.125 EB(s) per slot.
+leios: Each EB contained an average of 11.911 IB(s) (stddev 3.906). 0 EB(s) were empty.
+leios: Each IB was included in an average of 5.179 EB(s) (stddev 2.485).
+leios: 207 out of 217 IBs were included in at least one EB.
+leios: 0 out of 217 IBs expired before they reached an EB.
+leios: 17 out of 90 EBs expired before an EB from their stage reached an RB.
+leios: 1867 out of 1923 transaction(s) were included in at least one EB.
+leios: 103474 total votes were generated.
+leios: Each stake pool produced an average of 38.944 vote(s) (stddev 80.652).
+leios: Each EB received an average of 1189.356 vote(s) (stddev 424.094).
+leios: There were 14368 bundle(s) of votes. Each bundle contained 7.202 vote(s) (stddev 7.649).
+leios: 29 L1 block(s) had a Leios endorsement.
+leios: 1782 tx(s) (3.07 MB) were referenced by a Leios endorsement.
+leios: 0 tx(s) (0 B) were included directly in a Praos block.
+leios: Spatial efficiency: 3.07 MB/3.96 MB (77.468%) of Leios bytes were unique transactions.
+leios: 4961 tx(s) (73.573%) referenced by a Leios endorsement were redundant.
+leios: Each transaction took an average of 27.419s (stddev 23.572) to be included in an IB.
+leios: Each transaction took an average of 57.381s (stddev 22.907) to be included in an EB.
+leios: Each transaction took an average of 95.972s (stddev 27.984) to be included in a block.
+network: 19228077 TX message(s) were sent. 19228077 of them were received (100.000%).
+network: 2169783 IB message(s) were sent. 2169782 of them were received (100.000%).
+network: 899910 EB message(s) were sent. 899910 of them were received (100.000%).
+network: 143665632 Vote message(s) were sent. 143665632 of them were received (100.000%).
