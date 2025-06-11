@@ -1,0 +1,604 @@
+<html>
+<header>
+<style>
+#paths {
+  z-index: -1;
+  position: absolute;
+}
+
+td.nonempty {
+    border-right: 1px solid gray;
+}
+
+td.iteration {
+    text-align: right;
+}
+
+.blocks {
+   display: flex;
+   flex-wrap: wrap;
+}
+
+path.highlighted1 {
+    stroke: red;
+    stroke-width: 4px;
+    z-index: 1000000;
+}
+
+path.highlighted2 {
+    stroke: green;
+    stroke-width: 4px;
+    z-index: 1000000;
+}
+
+.eb-ib {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+}
+
+.eb-recent-ib {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+  stroke-dasharray: 1 1;
+}
+
+.eb-recent-cert {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+  stroke-dasharray: 10 10;
+}
+
+.cert-eb {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+}
+
+.rb-rb {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+}
+.rb-cert {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+}
+
+.IB {
+    width: 2em;
+    background-color: gold;
+    margin: 0.3em;
+    border: 2px solid transparent;
+}
+
+.EB {
+    width: 2em;
+    background-color: lightgreen;
+    margin: 0.3em;
+    border: 2px solid transparent;
+}
+
+.CERT {
+    width: 2em;
+    background-color: lightblue;
+    margin: 0.3em;
+    border: 2px solid transparent;
+}
+
+.RB {
+    width: 2em;
+    background-color: tomato;
+    margin: 0.3em;
+    border: 2px solid transparent;
+}
+
+.IB.highlighted1 {
+    border-color: fuchsia;
+}
+
+.IB.highlighted2 {
+    border-color: fuchsia;
+    border-style: dashed;
+}
+
+.EB.highlighted1 {
+    border-color: fuchsia;
+}
+
+.EB.highlighted2 {
+    border-color: fuchsia;
+    border-style: dashed;
+}
+
+.CERT.highlighted1 {
+    border-color: fuchsia;
+}
+
+.CERT.highlighted2 {
+    border-color: fuchsia;
+    border-style: dashed;
+}
+
+.RB.highlighted1 {
+    border-color: black;
+}
+
+.RB.highlighted2 {
+    border-color: black;
+    border-style: dashed;
+}
+
+</style>
+<script>
+var nPool;
+
+var fIb;
+var fEb;
+var fRb;
+
+var EbRecentIbsDepth;
+var EbRecentCertsDepth;
+var EbRecentCertsRecursive;
+
+var L;
+
+var pIb;   // chance a specific IB is referenced by a specific EB
+var pEb;   // chance a specific EB is certified
+var pCert;   // chance a specific recent Cert is referenced by a specific EB
+
+var vspacing;
+var hspacing;
+
+function phi(f, a) {
+    return 1 - (1 - f) ** a;
+}
+
+function Propose(i) {
+    var ibs = [];
+    for (let j = 0; j < nPool * L; ++j) {
+        if (Math.random() >= phi(fIb, 1 / nPool)) continue;
+
+        let e = document.createElement("div");
+        e.appendChild(document.createTextNode(j));
+        e.classList.add("IB");
+        (function (e) {
+            e.addEventListener("click", function (ev) { highlight(e) });
+        }(e));
+        ibs.push(["IB", i, j, e]);
+    }
+
+    return ibs;
+}
+
+function Endorse(i, ibss, certss) {
+    var ebs = [];
+    for (let j = 0; j < nPool * L; ++j) {
+        if (Math.random() >= phi(fEb, 1 / nPool)) continue;
+
+        var myIbs = [];
+        (function () {
+            let eligibleIbs = ibss.flat();
+            for (let idx in eligibleIbs) {
+                // Whether I've seen that IB
+                if (Math.random() < pIb) myIbs.push(eligibleIbs[idx]);
+            }
+        })();
+
+        var recentCerts = [];
+        (function () {
+            var eligibleCerts = certss.slice(0, certss.length - 2).flat();
+            for (let idx in eligibleCerts) {
+                // Whether I've seen that cert
+                if (Math.random() < pCert) recentCerts.push(eligibleCerts[idx]);
+            }
+        })();
+
+        if (EbRecentCertsRecursive) {
+            // If I see a cert for a recent EB, then that retroactively certifies
+            // any EBs that EB references, even if I never saw that older cert.
+
+            var stop = new Set(recentCerts);
+            var prevSize = 0;
+            while (prevSize < stop.size) {
+                prevSize = stop.size;
+                let newCerts = recentCerts.slice(prevSize);
+                for (let idx1 in newCerts) {
+                    let theirCerts = newCerts[idx1][4][5];
+                    for (let idx2 in theirCerts) {
+                        let theirCert = theirCerts[idx2];
+                        if (i <= theirCert[1] + EbRecentCertsDepth && !stop.has(theirCert)) {
+                            recentCerts.push(theirCert);
+                            stop.add(theirCert);
+                        }
+                    }
+                }
+            }
+        }
+
+        let e = document.createElement("div");
+        e.appendChild(document.createTextNode(j));
+        e.classList.add("EB");
+        (function (e) {
+            e.addEventListener("click", function (ev) { highlight(e) });
+        }(e));
+        ebs.push(["EB", i, j, e, myIbs, recentCerts]);
+    }
+
+    return ebs;
+}
+
+function Vote(i, ebs) {
+    var certs = [];
+    var certs1 = [];
+    var certs2 = [];
+    for (j in ebs) {
+        let eb = ebs[j];
+        if (Math.random() >= pEb) continue;
+
+        let e = document.createElement("div");
+        e.appendChild(document.createTextNode(j));
+        e.classList.add("CERT");
+        (function (e) {
+            e.addEventListener("click", function (ev) { highlight(e) });
+        }(e));
+
+        let cert = ["CERT", i, j, e, eb];
+        certs.push(cert);
+        (Math.random() > 0.5 ? certs1 : certs2).push(cert);
+    }
+
+    return [certs, certs1, certs2];
+}
+
+function getRandomInt(max) {
+    return Math.floor(Math.random() * max);
+}
+
+function Base(i, certs, prevRb) {
+    var j = 0;
+    for (; j < nPool * L; ++j) if (Math.random() < phi(fRb, 1 / nPool)) break;
+
+    var rb = [];
+
+    if (j < nPool * L) {
+        let e = document.createElement("div");
+        e.appendChild(document.createTextNode(j));
+        e.classList.add("RB");
+        (function (e) {
+            e.addEventListener("click", function (ev) { highlight(e) });
+        }(e));
+        rb.push(["RB", i, j, e, prevRb, certs.length <= 0 ? [] : [certs[getRandomInt(certs.length)]]]);
+    }
+
+    return rb;
+}
+
+function createChild(parent, tag) {
+    const child = document.createElement(tag);
+    parent.appendChild(child);
+    return child;
+}
+
+function createChildText(parent, text) {
+    const child = document.createTextNode(text);
+    parent.appendChild(child);
+    return child;
+}
+
+function drawBlocks(blocks) {
+    const newCell = document.createElement("td");
+    newCell.classList.add("nonempty");
+
+    const spacer = createChild(newCell, "div");
+    spacer.style = "height: " + vspacing + "em;";
+
+    const flow = createChild(newCell, "div");
+    flow.classList.add("blocks");
+    flow.style = "width: " + 3 * hspacing + "em;";
+
+    for (i in blocks) flow.appendChild(blocks[i][3]);
+
+    return newCell;
+}
+
+function drawIteration(table, i, ibs, ebs, certs, certs1, certs2, rbs) {
+    const row = document.createElement("tr");
+    table.appendChild(row);
+
+    for (let j = 0; j < i; ++j) row.appendChild(document.createElement("td"));
+    let iCell = createChild(row, "td");
+    createChildText(iCell, i);
+    iCell.classList.add("nonempty");
+    iCell.classList.add("iteration");
+    row.appendChild(drawBlocks(ibs));
+    createChild(row, "td").classList.add("nonempty");
+    createChild(row, "td").classList.add("nonempty");
+    row.appendChild(drawBlocks(ebs));
+    row.appendChild(drawBlocks(certs1));
+    row.appendChild(drawBlocks(certs2));
+//    row.appendChild(drawBlocks(rbs));
+
+    for (j in ebs) {
+        let eb          = ebs[j];
+        let me          = eb[3];
+        let ibs         = eb[4];
+        let recentCerts = eb[5];
+        for (k in ibs) {
+            let ib = ibs[k];
+            connections2.push({src: me, dst: ib[3], class: (ib[1] == eb[1]) ? "eb-ib" : "eb-recent-ib"});
+        }
+        for (k in recentCerts) {
+            let recentCert = recentCerts[k];
+            let recentEb = recentCert[4];
+            connections2.push({src: me, dst: recentEb[3], class: "eb-recent-cert"});
+        }
+    }
+
+    for (j in certs) {
+        let cert = certs[j];
+        let me   = cert[3];
+        let eb   = cert[4];
+        connections2.push({src: me, dst: eb[3], class: "cert-eb"});
+    }
+
+    let rbcell = createChild(table.firstChild, "td");
+    for (j in rbs) {
+        let rb    = rbs[j];
+        let me    = rb[3];
+        rbcell.appendChild(me);
+        let prev = rb[4];
+        if (prev) connections2.push({src: me, dst: prev[3], class: "rb-rb"});
+        let certs = rb[5];
+        for (k in certs) {
+            let cert = certs[k];
+            connections2.push({src: me, dst: cert[3], class: "rb-cert"});
+        }
+    }
+}
+
+function readCountParameter(id) {
+    const e = document.getElementById(id);
+    return parseInt(e.value);
+}
+
+function readPercentParameter(id) {
+    return readCountParameter(id) / 100;
+}
+
+function main() {
+    nPool = readCountParameter("nPool");
+
+    fIb = readPercentParameter("fIb");
+    fEb = readPercentParameter("fEb");
+    fRb = readPercentParameter("fRb");
+
+    EbRecentIbsDepth = readCountParameter("EbRecentIbsDepth");
+    EbRecentCertsDepth = readCountParameter("EbRecentCertsDepth");
+    EbRecentCertsRecursive = readCountParameter("EbRecentCertsRecursive");
+
+    vspacing = readCountParameter("vspacing");
+    hspacing = readCountParameter("hspacing");
+
+    L = readCountParameter("L");
+
+    pIb = readPercentParameter("pIb");
+    pCert = readPercentParameter("pCert");
+    pEb = readPercentParameter("pEb");
+
+    // ----------
+
+    var prevRb = null;
+
+    var accIbs = [];
+    var accCerts = [[], [], []];
+
+    var latestCerts = [];
+
+    const table = createChild(document.getElementById("main"), "table");
+    (function () {
+        const rbRow = createChild(table, "tr");
+        for (let stage = 0; stage < 6+1; ++stage) createChild(rbRow, "td");
+    }());
+
+    for (let i = 0; i < readCountParameter("duration"); ++i) {
+        let ibs = Propose(i);
+        accIbs.push(ibs);
+        accIbs = accIbs.slice(accIbs.length - Math.min(accIbs.length, 1+EbRecentIbsDepth));
+
+        let ebs = Endorse(i, accIbs, accCerts);
+
+        let [certs, certs1, certs2] = Vote(i, ebs);
+        if (0 < certs.length) latestCerts = certs;
+        accCerts.push(certs);
+        accCerts = accCerts.slice(accCerts.length - Math.min(accCerts.length, EbRecentCertsDepth));
+
+        let rbs = Base(i, latestCerts, prevRb);
+
+        if (0 < rbs.length) { latestCerts = []; prevRb = rbs[0]; }
+
+        drawIteration(table, i, ibs, ebs, certs, certs1, certs2, rbs);
+    }
+
+  coordinates();
+}
+
+var highlighted = null;
+function highlight(e) {
+    clearHighlighted();
+    if (highlighted == e) {
+        highlighted = null;
+    } else {
+        highlighted = e;
+        const dsts = [];
+        const srcs = [];
+        const paths = document.querySelectorAll("path");
+        for (idx = 0; idx < paths.length; ++idx) {
+            let path = paths[idx];
+            if (path.src != e && path.dst != e) continue;
+            path.classList.add("highlighted1");
+            if (path.src == e) { dsts.push(path.dst); path.dst.classList.add("highlighted1"); }
+            if (path.dst == e) { srcs.push(path.src); path.src.classList.add("highlighted1"); }
+        }
+        e.classList.add("highlighted1");
+        highlight2(srcs, dsts);
+    }
+}
+function clearHighlighted() {
+    var es = null;
+
+    es = document.querySelectorAll(".highlighted1");
+    for (idx = 0; idx < es.length; ++idx) {
+        let e = es[idx];
+        e.classList.remove("highlighted1");
+    }
+
+    es = document.querySelectorAll(".highlighted2");
+    for (idx = 0; idx < es.length; ++idx) {
+        let e = es[idx];
+        e.classList.remove("highlighted2");
+    }
+}
+function highlight2(srcs, dsts) {
+    for (i = 0; i < srcs.length; ++i) {
+        let e = srcs[i];
+        const paths = document.querySelectorAll("path");
+        for (idx = 0; idx < paths.length; ++idx) {
+            let path = paths[idx];
+            if (path.dst != e) continue;
+            let e2 = path.src;
+            path.classList.add("highlighted2");
+            if (!e2.classList.contains("highlighted1")) e2.classList.add("highlighted2");
+        }
+    }
+
+    for (i = 0; i < dsts.length; ++i) {
+        let e = dsts[i];
+        const paths = document.querySelectorAll("path");
+        for (idx = 0; idx < paths.length; ++idx) {
+            let path = paths[idx];
+            if (path.src != e) continue;
+            let e2 = path.dst;
+            path.classList.add("highlighted2");
+            if (!e2.classList.contains("highlighted1")) e2.classList.add("highlighted2");
+        }
+    }
+}
+
+function getScreenCoords(element) {
+    const rect = element.getBoundingClientRect();
+
+    // Get coordinates relative to the viewport
+    const viewportTop = rect.top;
+    const viewportLeft = rect.left;
+
+    // Get coordinates relative to the document
+    const documentTop = rect.top + window.scrollY;
+    const documentLeft = rect.left + window.scrollX;
+
+    return {top: documentTop, left: documentLeft, width: element.offsetWidth, height: element.offsetHeight};
+}
+
+let connections2 = [];
+
+// Adapted from https://stackoverflow.com/a/64681208
+function coordinates() {
+  let paths = document.getElementById("paths");
+  let padding = 5;
+  let bezierWeight = 0.5;
+  let oldPaths = paths.children;
+  for (let a = oldPaths.length - 1; a >= 0; a--) {
+    paths.removeChild(oldPaths[a]);
+  }
+
+  let x1, y1, x4, y4, dx, x2, x3, path, start, end;
+
+  for (let a = 0; a < connections2.length; a++) {
+    start = getScreenCoords(connections2[a].src);
+    end = getScreenCoords(connections2[a].dst);
+
+    x1 = start.left + start.width / 2 - padding;
+    y1 = start.top + start.height / 2 - padding;
+    x4 = end.left + start.width / 2 - padding;
+    y4 = end.top + start.height / 2 - padding;
+    dx = Math.abs(x4 - x1) * bezierWeight;
+
+    if (x4 < x1) {
+      x2 = x1 - dx;
+      x3 = x4 + dx;
+    } else {
+      x2 = x1 + dx;
+      x3 = x4 - dx;
+    }
+
+    data = `M${x1} ${y1} C ${x2} ${y1} ${x3} ${y4} ${x4} ${y4}`;
+
+    path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", data);
+    path.setAttribute("class", connections2[a].class);
+    path.src = connections2[a].src;
+    path.dst = connections2[a].dst;
+    paths.appendChild(path);
+  }
+}
+
+function writeSlider(id, text, min, value, max) {
+    document.write(`<tr><td><label for="${id}">${text}</label></td><td><input id="${id}" type="range" min=${min} max=${max} value=${value} oninput="this.nextElementSibling.value = this.value"><input type="text" value=${value} readonly></td></tr>\n`);
+}
+</script>
+</header>
+<body onLoad="main()">
+<svg height="10000" width="20000" id="paths"></svg>
+<div style="width: 50em;">
+<table id="parameters">
+<tr><td colspan=2><p>This page generates and renders a chain schema that is plausible according to Short Leios and its Short-To-Full extensions. Refresh the page to regenerate with the visible parameter values.</p><p>Yellow is an Input Block (IB), green is an Endorsement Block (EB), blue is a Leios certificate (leios votes are not shown), and red is a Ranking Block (RB).</p><p>Click on a block to highlight its one- and two-hop directed neighbors; click again to un-highlight.</td></tr>
+<tr><td colspan=2><hr><h3>Generator</h3></td></tr>
+<script>writeSlider("duration", "duration (iterations)", 1, 20, 100);</script>
+<script>writeSlider("vspacing", "vspacing (em)", 0, 0, 10);</script>
+<script>writeSlider("hspacing", "hspacing (blocks)", 1, 2, 10);</script>
+<tr><td colspan=2><hr><h3>Short Leios</h3></td></tr>
+<script>writeSlider("L", "L (slots)", 1, 10, 30);</script>
+<script>writeSlider("fIb", "f<sub>I</sub> (%)", 1, 15, 99);</script>
+<script>writeSlider("fEb", "f<sub>E</sub> (%)", 1, 10, 99);</script>
+<script>writeSlider("fRb", "f<sub>R</sub> (%)", 1, 5, 99);</script>
+<tr><td colspan=2><hr><h3>Short-to-Full Extensions</h3></td></tr>
+<tr><td><label for="EbRecentIbsDepth">EbRecentIbsDepth (iterations) [dotted lines]</label></td><td><input id="EbRecentIbsDepth" type="textbox" value=3></td></tr>
+<tr><td><label for="EbRecentCertsDepth">EbRecentCertsDepth (iterations) [dashed lines]</label></td><td><input id="EbRecentCertsDepth" type="textbox" value=10></td></tr>
+<tr><td><label for="EbRecentCertsRecursive">EbRecentCertsRecursive</label></td><td><input id="EbRecentCertsRecursive" type="checkbox" checked></td></tr>
+<tr><td colspan=2><p>EbRecentCertsRecursive means EbRecentCerts should also include EBs that were indirectly certified via EbRecentCerts, rather than directly certified during the contemporary pipeline.</p></td></tr>
+<tr><td colspan=2><hr><h3>Toy Stake Distribution</h3></td></tr>
+<script>writeSlider("nPool", "uniform pools", 1, 10, 100);</script>
+<tr><td colspan=2><p>Only affects how many of each block there are.</p></td></tr>
+<tr><td colspan=2><hr><h3>Toy Network</h3></td></tr>
+<script>writeSlider("pIb", "p<sub>I</sub> (%)", 0, 90, 100);</script>
+<script>writeSlider("pCert", "p<sub>cert</sub> (%)", 0, 90, 100);</script>
+<script>writeSlider("pEb", "p<sub>quorum</sub> (%)", 0, 90, 100);</script>
+<tr><td colspan=2><p>No messages actually modeled; merely the ludic probability of having received an object before some deadline, which suffices for this illustrative tool.</p></td></tr>
+</table>
+</div>
+<div id="main"></div>
+</body>
+</html>
+<!--
+
+leios-stage-length-slots: 10
+ib-generation-probability: 0.1
+eb-generation-probability: 2.5
+
+More aggressive, but perhaps better performing:
+leios-stage-length-slots: 5
+ib-generation-probability: 0.2
+eb-generation-probability: 2.5
+
+Erm. How do I interpret an eb-generation-probability > 1, eg?
+
+
+There is an average of 2.5 EBs generated per stage.
+
+f_EB = (/ 2.5 10)0.25
+f_EB = (/ 2.5 5)0.5
+
+-->
