@@ -22,6 +22,10 @@ export interface Config {
   "treat-blocks-as-full": boolean;
   /** Only supported by Haskell simulation. */
   "cleanup-policies": CleanupPolicies;
+  /**
+   * The smallest unit of time to simulate, in fractions of a millisecond.
+   * Only supported by Rust simulation. */
+  "timestamp-resolution-ms": number;
 
   // Leios Protocol Configuration
   "leios-variant": LeiosVariant;
