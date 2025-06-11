@@ -19,7 +19,7 @@ import Data.Function (on)
 import Data.List (intercalate)
 import Data.Map.Strict (Map)
 import Data.Text (Text)
-import Leios.Tracing.Util (Maximum(..), Minimum(..))
+import Leios.Tracing.Util (Maximum (..), Minimum (..))
 
 import qualified Data.Map.Strict as M (insertWith, singleton, toAscList, toList)
 import qualified Data.Text as T (unpack)
@@ -32,9 +32,9 @@ data ItemKey
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo =
-  ItemInfo {
-    sent :: Minimum Double
+data ItemInfo
+  = ItemInfo
+  { sent :: Minimum Double
   , size :: Maximum Double
   , receipts :: Map Text Double
   }
@@ -45,39 +45,36 @@ instance Semigroup ItemInfo where
     ItemInfo
       { sent = on (<>) sent x y
       , size = on (<>) size x y
-      , receipts = on (<>) receipts x y 
+      , receipts = on (<>) receipts x y
       }
 
 instance Monoid ItemInfo where
   mempty =
-     ItemInfo
-     {
-       sent = mempty
-     , size = mempty
-     , receipts = mempty
-     }
+    ItemInfo
+      { sent = mempty
+      , size = mempty
+      , receipts = mempty
+      }
 
 toCSV :: ItemKey -> ItemInfo -> [String]
 toCSV ItemKey{..} ItemInfo{..} =
   let
     common =
-      [
-        T.unpack kind
+      [ T.unpack kind
       , T.unpack item
       , T.unpack producer
       , show sent
       ]
     receive :: Text -> Double -> String
     receive recipient received =
-      intercalate sep 
-        $ common
-        ++ [
-          T.unpack recipient
-        , show received
-        , show $ (received -) <$> sent
-        ]
-  in
-   uncurry receive <$> M.toAscList receipts
+      intercalate sep $
+        common
+          ++ [ T.unpack recipient
+             , show received
+             , show $ (received -) <$> sent
+             ]
+   in
+    uncurry receive <$> M.toAscList receipts
 
 itemHeader :: String
 itemHeader =
@@ -196,8 +193,8 @@ receipt cpuFile events =
     let
       go =
         do
-          liftIO (readChan events) >>=
-            \case
+          liftIO (readChan events)
+            >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go
     index <- go `execStateT` mempty

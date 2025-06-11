@@ -20,7 +20,7 @@ import Data.List (intercalate)
 import Data.Map.Strict (Map)
 import Data.Monoid (Sum (..))
 import Data.Text (Text)
-import Leios.Tracing.Util (Maximum(..))
+import Leios.Tracing.Util (Maximum (..))
 
 import qualified Data.Map.Strict as M (insertWith, map, mapKeysWith, toList)
 import qualified Data.Text as T (unpack)
@@ -32,10 +32,9 @@ data ItemKey'
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo' =
-  ItemInfo'
-  {
-    egress' :: Sum Double
+data ItemInfo'
+  = ItemInfo'
+  { egress' :: Sum Double
   , disk' :: Sum Double
   , cpu' :: Sum Double
   }
@@ -65,10 +64,9 @@ newtype ItemKey
   }
   deriving (Eq, Ord, Show)
 
-data ItemInfo =
-  ItemInfo
-  {
-    egress :: Sum Double
+data ItemInfo
+  = ItemInfo
+  { egress :: Sum Double
   , disk :: Sum Double
   , totalCpu :: Sum Double
   , maximumCpu :: Maximum Double
@@ -209,8 +207,8 @@ resource resourceFile events =
     let
       go =
         do
-          liftIO (readChan events) >>=
-            \case
+          liftIO (readChan events)
+            >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go
     index' <- go `execStateT` mempty
@@ -218,7 +216,7 @@ resource resourceFile events =
       reKey :: ItemKey' -> ItemKey
       reKey ItemKey'{node'} = ItemKey{node = node'}
       reValue :: ItemInfo' -> ItemInfo
-      reValue ItemInfo'{..} = ItemInfo {egress = egress', disk = disk', totalCpu = cpu', maximumCpu = Maximum . pure $ getSum cpu'}
+      reValue ItemInfo'{..} = ItemInfo{egress = egress', disk = disk', totalCpu = cpu', maximumCpu = Maximum . pure $ getSum cpu'}
       index = M.mapKeysWith (<>) reKey $ M.map reValue index'
     writeFile resourceFile . unlines . (itemHeader :) $
       uncurry toCSV <$> M.toList index

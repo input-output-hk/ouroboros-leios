@@ -22,7 +22,7 @@ import Data.Map.Strict (Map)
 import Data.Monoid (Sum (..))
 import Data.Set (Set)
 import Data.Text (Text)
-import Leios.Tracing.Util (Minimum(..))
+import Leios.Tracing.Util (Minimum (..))
 
 import qualified Data.Map.Strict as M (elems, fromList, insertWith, restrictKeys, toList, unionWith)
 import qualified Data.Set as S (map, singleton)
@@ -191,8 +191,8 @@ lifecycle lifecycleFile events =
     let
       go =
         do
-          liftIO (readChan events) >>=
-            \case
+          liftIO (readChan events)
+            >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go
     index <-

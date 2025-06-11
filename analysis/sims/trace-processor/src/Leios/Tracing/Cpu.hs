@@ -32,7 +32,7 @@ data ItemKey
   }
   deriving (Eq, Ord, Show)
 
-newtype ItemInfo = ItemInfo { duration :: Sum Double }
+newtype ItemInfo = ItemInfo {duration :: Sum Double}
   deriving (Show)
 
 instance Semigroup ItemInfo where
@@ -42,7 +42,7 @@ instance Semigroup ItemInfo where
       }
 
 instance Monoid ItemInfo where
-  mempty = ItemInfo { duration = mempty }
+  mempty = ItemInfo{duration = mempty}
 
 toCSV :: ItemKey -> ItemInfo -> String
 toCSV ItemKey{..} ItemInfo{..} =
@@ -105,8 +105,8 @@ cpu cpuFile events =
     let
       go =
         do
-          liftIO (readChan events) >>=
-            \case
+          liftIO (readChan events)
+            >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go
     index <- go `execStateT` mempty

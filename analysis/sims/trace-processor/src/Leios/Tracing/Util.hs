@@ -7,8 +7,8 @@
 {-# LANGUAGE TupleSections #-}
 
 module Leios.Tracing.Util (
-  Minimum(..),
-  Maximum(..),
+  Minimum (..),
+  Maximum (..),
 ) where
 
 import Data.Aeson (FromJSON (..))
