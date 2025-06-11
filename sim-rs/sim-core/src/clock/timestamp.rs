@@ -6,27 +6,27 @@ use std::{
 
 use serde::Serialize;
 
+const NANOS_PER_SEC: u64 = 1_000_000_000;
+
 /// A timestamp tracks the time from the start of the simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub struct Timestamp(Duration);
+pub struct Timestamp(u64);
 
 impl Timestamp {
     pub fn zero() -> Self {
-        Self(Duration::from_secs(0))
+        Self(0)
     }
 
     pub fn from_secs(secs: u64) -> Self {
-        Self(Duration::from_secs(secs))
+        Self(secs * NANOS_PER_SEC)
     }
 
     pub fn checked_sub_duration(self, rhs: Duration) -> Option<Self> {
-        Some(Self(self.0.checked_sub(rhs)?))
+        Some(Self(self.0.checked_sub(rhs.as_nanos() as u64)?))
     }
-}
 
-impl From<Duration> for Timestamp {
-    fn from(value: Duration) -> Self {
-        Self(value)
+    pub fn with_resolution(self, delta: Duration) -> Self {
+        Self(self.0.next_multiple_of(delta.as_nanos() as u64))
     }
 }
 
@@ -34,13 +34,13 @@ impl Add<Duration> for Timestamp {
     type Output = Timestamp;
 
     fn add(self, rhs: Duration) -> Self::Output {
-        Timestamp(self.0 + rhs)
+        Self(self.0 + rhs.as_nanos() as u64)
     }
 }
 
 impl AddAssign<Duration> for Timestamp {
     fn add_assign(&mut self, rhs: Duration) {
-        self.0 += rhs;
+        self.0 += rhs.as_nanos() as u64;
     }
 }
 
@@ -48,7 +48,7 @@ impl Sub<Timestamp> for Timestamp {
     type Output = Duration;
 
     fn sub(self, rhs: Timestamp) -> Self::Output {
-        self.0 - rhs.0
+        Duration::from_nanos(self.0 - rhs.0)
     }
 }
 
@@ -56,7 +56,7 @@ impl Sub<Duration> for Timestamp {
     type Output = Timestamp;
 
     fn sub(self, rhs: Duration) -> Self::Output {
-        Self(self.0 - rhs)
+        Self(self.0 - rhs.as_nanos() as u64)
     }
 }
 
@@ -65,30 +65,20 @@ impl Serialize for Timestamp {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_f32(self.0.as_secs_f32())
+        serializer.serialize_f32(self.0 as f32 / NANOS_PER_SEC as f32)
     }
 }
 
 pub struct AtomicTimestamp(AtomicU64);
 impl AtomicTimestamp {
     pub fn new(val: Timestamp) -> Self {
-        Self(AtomicU64::new(duration_to_u64(val.0)))
+        Self(AtomicU64::new(val.0))
     }
     pub fn load(&self, order: Ordering) -> Timestamp {
-        let val = self.0.load(order);
-        Timestamp(u64_to_duration(val))
+        Timestamp(self.0.load(order))
     }
 
     pub fn store(&self, val: Timestamp, order: Ordering) {
-        let val = duration_to_u64(val.0);
-        self.0.store(val, order);
+        self.0.store(val.0, order);
     }
-}
-
-fn u64_to_duration(val: u64) -> Duration {
-    Duration::from_nanos(val)
-}
-
-fn duration_to_u64(val: Duration) -> u64 {
-    val.as_nanos() as u64
 }
