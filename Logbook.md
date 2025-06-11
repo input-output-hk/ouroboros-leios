@@ -1,5 +1,31 @@
 # Leios logbook
 
+## 2025-06-11
+
+### Additional data analyses in Leios trace processor
+
+The [`leios-trace-processor`](analysis/sims/trace-processor/) now extracts CPU, resource, and message-receipt data from simulation trace files. This eliminates the need for using the old, lower performance, scripts for analyzing simulation results.
+
+```console
+$ cabal run exe:leios-trace-processor -- --help
+
+Process Leios trace logs into CSV file abstracts
+
+Usage: leios-trace-processor [--trace-file FILE] --lifecycle-file FILE
+                             --cpu-file FILE --resource-file FILE
+                             --receipt-file FILE
+
+  Leios trace processor
+
+Available options:
+  --trace-file FILE        Input Leios simulation trace log file
+  --lifecycle-file FILE    Output CSV file for transaction lifecycle data
+  --cpu-file FILE          Output CSV file for CPU data
+  --resource-file FILE     Output CSV file for resource data
+  --receipt-file FILE      Output CSV file for receipt data
+  -h,--help                Show this help text
+```
+
 ## 2025-06-09
 
 ### Fixes to CI
