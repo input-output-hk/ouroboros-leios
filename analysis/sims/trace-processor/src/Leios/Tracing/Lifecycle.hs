@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -9,9 +10,11 @@ module Leios.Tracing.Lifecycle (
   lifecycle,
 ) where
 
+import Control.Concurrent.Chan (Chan, readChan)
 import Control.Monad ((<=<))
-import Control.Monad.State.Strict (State, execState, gets, modify')
-import Data.Aeson (FromJSON (..), Value (Object), withObject, (.:))
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State.Strict (StateT, execStateT, gets, modify')
+import Data.Aeson (Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
 import Data.List (intercalate)
@@ -19,33 +22,11 @@ import Data.Map.Strict (Map)
 import Data.Monoid (Sum (..))
 import Data.Set (Set)
 import Data.Text (Text)
+import Leios.Tracing.Util (Minimum (..))
 
 import qualified Data.Map.Strict as M (elems, fromList, insertWith, restrictKeys, toList, unionWith)
 import qualified Data.Set as S (map, singleton)
 import qualified Data.Text as T (unpack)
-
-newtype Earliest a = Earliest {getEarliest :: Maybe a}
-  deriving (Show)
-
-instance Eq a => Eq (Earliest a) where
-  Earliest (Just x) == Earliest (Just y) = x == y
-  Earliest Nothing == Earliest Nothing = True
-  _ == _ = False
-
-instance Ord a => Ord (Earliest a) where
-  Earliest (Just x) `compare` Earliest (Just y) = x `compare` y
-  Earliest (Just _) `compare` Earliest Nothing = LT
-  Earliest Nothing `compare` Earliest (Just _) = GT
-  Earliest Nothing `compare` Earliest Nothing = EQ
-
-instance Ord a => Semigroup (Earliest a) where
-  x <> y = if x < y then x else y
-
-instance Ord a => Monoid (Earliest a) where
-  mempty = Earliest Nothing
-
-instance FromJSON a => FromJSON (Earliest a) where
-  parseJSON = fmap Earliest . parseJSON
 
 data ItemKey
   = ItemKey
@@ -56,13 +37,13 @@ data ItemKey
 
 data ItemInfo
   = ItemInfo
-  { size :: Earliest Int
+  { size :: Minimum Int
   , references :: Sum Int
-  , created :: Earliest Double
-  , toIB :: Earliest Double
-  , toEB :: Earliest Double
-  , toRB :: Earliest Double
-  , inRB :: Earliest Double
+  , created :: Minimum Double
+  , toIB :: Minimum Double
+  , toEB :: Minimum Double
+  , toRB :: Minimum Double
+  , inRB :: Minimum Double
   , inIBs :: Set Text
   , inEBs :: Set Text
   }
@@ -102,13 +83,13 @@ toCSV ItemKey{..} ItemInfo{..} =
     sep
     [ T.unpack kind
     , T.unpack item
-    , maybe "NA" show $ getEarliest size
+    , show size
     , show $ getSum references
-    , maybe "NA" show $ getEarliest created
-    , maybe "NA" show $ getEarliest toIB
-    , maybe "NA" show $ getEarliest toEB
-    , maybe "NA" show $ getEarliest toRB
-    , maybe "NA" show $ getEarliest inRB
+    , show created
+    , show toIB
+    , show toEB
+    , show toRB
+    , show inRB
     ]
 
 itemHeader :: String
@@ -133,13 +114,13 @@ parseEvent :: Value -> Parser (ItemKey, ItemInfo, Index)
 parseEvent =
   withObject "TraceEvent" $ \event ->
     do
-      time <- Earliest <$> event .: "time_s"
+      time <- Minimum <$> event .: "time_s"
       message <- event .: "message"
       typ <- message .: "type"
       ident <- message .: "id"
       parseMessage typ ident time $ Object message
 
-parseMessage :: Text -> Text -> Earliest Double -> Value -> Parser (ItemKey, ItemInfo, Index)
+parseMessage :: Text -> Text -> Minimum Double -> Value -> Parser (ItemKey, ItemInfo, Index)
 parseMessage "TXGenerated" item created =
   withObject "TXGenerated" $ \message ->
     do
@@ -174,7 +155,7 @@ parseMessage _ _ _ =
 
 type Index = Map ItemKey ItemInfo
 
-tally :: Value -> State Index ()
+tally :: Monad m => Value -> StateT Index m ()
 tally event =
   case parseMaybe parseEvent event of
     Just (itemKey, itemInfo, updates) ->
@@ -185,7 +166,7 @@ tally event =
         modify' $ M.unionWith (<>) updates
     Nothing -> pure ()
 
-updateInclusions :: Text -> ItemKey -> Set Text -> State Index ()
+updateInclusions :: Monad m => Text -> ItemKey -> Set Text -> StateT Index m ()
 updateInclusions kind itemKey includers =
   do
     includers' <- gets $ M.elems . (`M.restrictKeys` S.map (ItemKey kind) includers)
@@ -198,24 +179,30 @@ updateInclusions kind itemKey includers =
           , toRB = mconcat $ toRB <$> includers'
           }
 
-updateEBs :: ItemKey -> ItemInfo -> State Index ()
+updateEBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
 
-updateIBs :: ItemKey -> ItemInfo -> State Index ()
+updateIBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateIBs itemKey = updateInclusions "IB" itemKey . inIBs
 
-lifecycle :: FilePath -> [Value] -> IO ()
+lifecycle :: FilePath -> Chan (Maybe Value) -> IO ()
 lifecycle lifecycleFile events =
-  let
-    index =
-      (`execState` mempty) $
+  do
+    let
+      go =
+        do
+          liftIO (readChan events)
+            >>= \case
+              Nothing -> pure ()
+              Just event -> tally event >> go
+    index <-
+      (`execStateT` mempty) $
         do
           -- Compute the direct metrics from the traces.
-          mapM_ tally events
+          go
           -- Update arrival in EBs and RBs for IBs.
           mapM_ (uncurry updateEBs) =<< gets M.toList
           -- Update arrival in EBs and RBs for TXs.
           mapM_ (uncurry updateIBs) =<< gets M.toList
-   in
     writeFile lifecycleFile . unlines . (itemHeader :) $
       uncurry toCSV <$> M.toList index

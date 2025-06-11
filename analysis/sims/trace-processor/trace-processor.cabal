@@ -26,15 +26,20 @@ common globalOptions
         -Wno-overlapping-patterns
         -Wunused-packages
         -Wall -Werror
-        -O3
+        -threaded -O3
 
 library
     import: globalOptions
     hs-source-dirs: src
-    exposed-modules: Leios.Tracing.Lifecycle
+    exposed-modules: Leios.Tracing.Cpu
+                     Leios.Tracing.Lifecycle
                      Leios.Tracing.Processor
+                     Leios.Tracing.Receipt
+                     Leios.Tracing.Resource
+                     Leios.Tracing.Util
     build-depends:
       , aeson
+      , async
       , bytestring
       , containers
       , mtl
