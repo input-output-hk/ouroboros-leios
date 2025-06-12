@@ -65,7 +65,7 @@ impl Serialize for Timestamp {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_f32(self.0 as f32 / NANOS_PER_SEC as f32)
+        serializer.serialize_f64(self.0 as f64 / NANOS_PER_SEC as f64)
     }
 }
 

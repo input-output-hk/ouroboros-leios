@@ -4,6 +4,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use tokio::sync::{mpsc, oneshot};
@@ -11,6 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use super::{timestamp::AtomicTimestamp, Clock, Timestamp};
 
 pub struct ClockCoordinator {
+    timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
     tx: mpsc::UnboundedSender<ClockEvent>,
     rx: mpsc::UnboundedReceiver<ClockEvent>,
@@ -18,19 +20,14 @@ pub struct ClockCoordinator {
     tasks: Arc<AtomicUsize>,
 }
 
-impl Default for ClockCoordinator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ClockCoordinator {
-    pub fn new() -> Self {
+    pub fn new(timestamp_resolution: Duration) -> Self {
         let time = Arc::new(AtomicTimestamp::new(Timestamp::zero()));
         let (tx, rx) = mpsc::unbounded_channel();
         let waiter_count = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(AtomicUsize::new(0));
         Self {
+            timestamp_resolution,
             time,
             tx,
             rx,
@@ -41,6 +38,7 @@ impl ClockCoordinator {
 
     pub fn clock(&self) -> Clock {
         Clock::new(
+            self.timestamp_resolution,
             self.time.clone(),
             self.waiter_count.clone(),
             self.tasks.clone(),
@@ -129,9 +127,11 @@ mod tests {
 
     use super::ClockCoordinator;
 
+    const TIMESTAMP_RESOLUTION: Duration = Duration::from_nanos(1);
+
     #[tokio::test]
     async fn should_wait_once_all_workers_are_waiting() {
-        let mut coordinator = ClockCoordinator::new();
+        let mut coordinator = ClockCoordinator::new(TIMESTAMP_RESOLUTION);
         let clock = coordinator.clock();
         let t0 = clock.now();
         let t1 = t0 + Duration::from_millis(5);
@@ -158,7 +158,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_cancel_wait_when_wait_future_is_dropped() {
-        let mut coordinator = ClockCoordinator::new();
+        let mut coordinator = ClockCoordinator::new(TIMESTAMP_RESOLUTION);
         let clock = coordinator.clock();
         let t0 = clock.now();
         let t1 = t0 + Duration::from_millis(5);
@@ -186,7 +186,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_avoid_race_condition() {
-        let mut coordinator = ClockCoordinator::new();
+        let mut coordinator = ClockCoordinator::new(TIMESTAMP_RESOLUTION);
         let clock = coordinator.clock();
         let t0 = clock.now();
         let t1 = t0 + Duration::from_millis(5);
@@ -219,7 +219,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_allow_time_to_stand_still() {
-        let mut coordinator = ClockCoordinator::new();
+        let mut coordinator = ClockCoordinator::new(TIMESTAMP_RESOLUTION);
         let clock = coordinator.clock();
         let t0 = clock.now();
         let t1 = t0 + Duration::from_millis(5);
@@ -253,7 +253,7 @@ mod tests {
 
     #[tokio::test]
     async fn should_allow_waiting_forever() {
-        let mut coordinator = ClockCoordinator::new();
+        let mut coordinator = ClockCoordinator::new(TIMESTAMP_RESOLUTION);
         let clock = coordinator.clock();
         let t0 = clock.now();
         let t1 = t0 + Duration::from_millis(5);
