@@ -8,7 +8,7 @@ mkfifo sim.log
 
 grep -E -v '(Slot|No.*Generated|CpuTask|Sent|Lottery)' sim.log | xz -9c > sim.log.xz &
 
-../../sim-cli --parameters config.yaml network.yaml --slots 840 --conformance-events sim.log > stdout 2> stderr
+../../ols sim leios --leios-config-file config.yaml --topology-file network.yaml --shared-log-format JSON --conformance-events --output-file sim.log --output-seconds 300 > stdout 2> stderr
 
 wait
 rm sim.log
