@@ -1383,7 +1383,7 @@ impl Node {
         else {
             return vec![];
         };
-        let max_seen_at = Timestamp::zero() + Duration::from_secs(last_legal_slot);
+        let max_seen_at = Timestamp::from_secs(last_legal_slot);
 
         self.select_txs(
             |seen| seen.seen_at <= max_seen_at,

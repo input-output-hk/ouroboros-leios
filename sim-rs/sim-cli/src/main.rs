@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
     let monitor = tokio::spawn(EventMonitor::new(&config, events_source, args.output).run());
     pin!(monitor);
 
-    let clock_coordinator = ClockCoordinator::new();
+    let clock_coordinator = ClockCoordinator::new(config.timestamp_resolution);
     let clock = clock_coordinator.clock();
     let tracker = EventTracker::new(events_sink, clock.clone(), &config.nodes);
     let mut simulation = Simulation::new(config, tracker, clock_coordinator).await?;

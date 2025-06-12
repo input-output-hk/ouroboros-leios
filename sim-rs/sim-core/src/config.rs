@@ -60,6 +60,7 @@ pub struct RawParameters {
     pub leios_variant: LeiosVariant,
     pub relay_strategy: RelayStrategy,
     pub simulate_transactions: bool,
+    pub timestamp_resolution_ms: f64,
 
     // Leios protocol configuration
     pub leios_stage_length_slots: u64,
@@ -447,6 +448,7 @@ impl MockTransactionConfig {
 #[derive(Debug, Clone)]
 pub struct SimConfiguration {
     pub seed: u64,
+    pub timestamp_resolution: Duration,
     pub slots: Option<u64>,
     pub emit_conformance_events: bool,
     pub aggregate_events: bool,
@@ -492,6 +494,7 @@ impl SimConfiguration {
         }
         Ok(Self {
             seed: 0,
+            timestamp_resolution: duration_ms(params.timestamp_resolution_ms),
             slots: None,
             emit_conformance_events: false,
             aggregate_events: false,

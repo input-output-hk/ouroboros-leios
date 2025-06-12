@@ -108,15 +108,13 @@ where
         )
     }
 
-    pub fn recv(&mut self, now: Timestamp) -> TMessage {
+    pub fn recv_many(&mut self, now: Timestamp) -> Vec<(TMessage, Timestamp)> {
         self.update_bandwidth_queues(now);
-
-        let (next_message, next_timestamp) = self
-            .latency_queue
-            .pop_front()
-            .expect("Tried receiving too early");
-        assert_eq!(next_timestamp, now);
-        next_message
+        let mut results = vec![];
+        while self.latency_queue.front().is_some_and(|(_, t)| t <= &now) {
+            results.push(self.latency_queue.pop_front().unwrap());
+        }
+        results
     }
 
     fn update_bandwidth_queues(&mut self, now: Timestamp) {
@@ -226,7 +224,7 @@ mod tests {
         conn.send("message 1", 8, MiniProtocol::One, start);
 
         assert_eq!(conn.next_arrival_time(), Some(start));
-        assert_eq!(conn.recv(start), "message 1");
+        assert_eq!(conn.recv_many(start), vec![("message 1", start)]);
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -242,7 +240,10 @@ mod tests {
 
         let arrival_time = start + latency;
         assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(arrival_time),
+            vec![("message 1", arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -258,7 +259,10 @@ mod tests {
 
         let arrival_time = start + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(arrival_time),
+            vec![("message 1", arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -274,7 +278,10 @@ mod tests {
 
         let arrival_time = start + Duration::from_millis(2337);
         assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(arrival_time),
+            vec![("message 1", arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -291,10 +298,16 @@ mod tests {
 
         let first_arrival_time = start + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![("message 1", first_arrival_time)]
+        );
         let second_arrival_time = first_arrival_time + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 2", second_arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -311,9 +324,10 @@ mod tests {
 
         let arrival_time = start + Duration::from_secs(2);
         assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 1");
-        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(arrival_time),
+            vec![("message 1", arrival_time), ("message 2", arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -331,11 +345,14 @@ mod tests {
 
         let arrival_time = start + Duration::from_secs_f32(7.5);
         assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 1");
-        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 2");
-        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
-        assert_eq!(conn.recv(arrival_time), "message 3");
+        assert_eq!(
+            conn.recv_many(arrival_time),
+            vec![
+                ("message 1", arrival_time),
+                ("message 2", arrival_time),
+                ("message 3", arrival_time)
+            ]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -355,10 +372,16 @@ mod tests {
         conn.send("message 2", 1000, MiniProtocol::One, second_start);
 
         assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![("message 1", first_arrival_time)]
+        );
         let second_arrival_time = first_arrival_time + Duration::from_millis(1000);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 2", second_arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -375,10 +398,16 @@ mod tests {
 
         let first_arrival_time = start + Duration::from_secs(2);
         assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![("message 1", first_arrival_time)]
+        );
         let second_arrival_time = first_arrival_time + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 2", second_arrival_time)]
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -395,13 +424,19 @@ mod tests {
         conn.send("message 3", 2000, MiniProtocol::Three, start);
 
         let first_arrival_time = start + Duration::from_secs(3);
-        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
-        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![
+                ("message 1", first_arrival_time),
+                ("message 2", first_arrival_time),
+            ]
+        );
         let second_arrival_time = first_arrival_time + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 3");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 3", second_arrival_time)],
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -422,10 +457,16 @@ mod tests {
 
         let first_arrival_time = start + Duration::from_millis(1500);
         assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![("message 1", first_arrival_time)],
+        );
         let second_arrival_time = first_arrival_time + Duration::from_millis(500);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 2", second_arrival_time)],
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 
@@ -443,12 +484,46 @@ mod tests {
 
         let first_arrival_time = start + Duration::from_secs(2);
         assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 1");
-        assert_eq!(conn.next_arrival_time(), Some(first_arrival_time));
-        assert_eq!(conn.recv(first_arrival_time), "message 2");
+        assert_eq!(
+            conn.recv_many(first_arrival_time),
+            vec![
+                ("message 1", first_arrival_time),
+                ("message 2", first_arrival_time),
+            ],
+        );
         let second_arrival_time = first_arrival_time + Duration::from_secs(1);
         assert_eq!(conn.next_arrival_time(), Some(second_arrival_time));
-        assert_eq!(conn.recv(second_arrival_time), "message 3");
+        assert_eq!(
+            conn.recv_many(second_arrival_time),
+            vec![("message 3", second_arrival_time)],
+        );
+        assert_eq!(conn.next_arrival_time(), None);
+    }
+
+    #[test]
+    fn should_accept_timestamps_from_later_than_next_event() {
+        let latency = Duration::ZERO;
+        let bandwidth_bps = Some(4);
+        let mut conn = Connection::new(latency, bandwidth_bps);
+        assert_eq!(conn.next_arrival_time(), None);
+
+        let start = Timestamp::zero() + Duration::from_secs(1);
+        conn.send("message 1", 10, MiniProtocol::One, start);
+        conn.send("message 2", 10, MiniProtocol::Two, start);
+        conn.send("message 3", 10, MiniProtocol::Three, start);
+
+        let arrival_time = start + Duration::from_secs_f32(7.5);
+        let future_arrival_time = start + Duration::from_secs(10);
+
+        assert_eq!(conn.next_arrival_time(), Some(arrival_time));
+        assert_eq!(
+            conn.recv_many(future_arrival_time),
+            vec![
+                ("message 1", arrival_time),
+                ("message 2", arrival_time),
+                ("message 3", arrival_time),
+            ],
+        );
         assert_eq!(conn.next_arrival_time(), None);
     }
 }
