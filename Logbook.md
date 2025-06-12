@@ -1,5 +1,30 @@
 # Leios logbook
 
+## 2025-06-12
+
+### "Miniature mainnet" topology
+
+Because the 10,000 [pseudo-mainnet](data/simulation/pseudo-mainnet/topology-v1.ipynb) runs so slowly and consumes so much memory in the Rust and Haskell simulations, thus making it impractical for repeated use and for large experiments, we created a smaller 750-node topology that faithfully mimics mainnet. It has nearly the same diameter as mainnet and have very similar stake distribution and edge degree.
+
+- Methodology: [topology-v2.ipynb](data/simulation/pseudo-mainnet/topology-v2.ipynb)
+- Network: [topology-v2.yaml](data/simulation/pseudo-mainnet/topology-v2.yaml)
+- Metrics: [topology-v2.md](data/simulation/pseudo-mainnet/topology-v2.md)
+
+| Metric | Value |
+|--------|-------|
+| Total nodes | 750 |
+| Block producers | 216 |
+| Relay nodes | 534 |
+| Total connections | 19314 |
+| Network diameter | 5 hops |
+| Average connections per node | 25.75 |
+| Clustering coefficient | 0.332 |
+| Average latency | 64.8ms ms |
+| Maximum latency | 578.3ms ms |
+| Stake-weighted latency | 0.0ms ms |
+| Bidirectional connections | 1463 |
+| Asymmetry ratio | 84.85% |
+
 ## 2025-06-11
 
 ### Additional data analyses in Leios trace processor
@@ -79,7 +104,7 @@ Here are a few personal (@bwbush) observations, reflections, and conclusions on 
  5. It appears that front running can best be eliminated (at the ledger level, but not at the mempool level) by strictly ordering transactions by their IB's slot and VRF.
      - Other IB and EB ordering proposals create complexity in the ledger rules and would be difficult to fully analyze for vulnerabilities.
 
-## Rust simulation
+### Rust simulation
 
 Implemented random sampling of transactions from the Leios mempool. When transaction traffic is high enough that IBs are completely full, it should ensure that different IBs contain different transactions when possible.
 
