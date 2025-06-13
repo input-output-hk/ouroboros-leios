@@ -29,8 +29,9 @@ main =
     let stakes = Prelude.map (toInteger . stake . nodeInfo) (elems $ nodes top)
     let stakeDistribution = Prelude.zip nodeNames stakes
     let stageLength = toInteger (leiosStageLengthSlots config)
+    let tau = 0 -- TODO: get tau from config
     result <-
-      verifyTrace nrNodes idSut stakeDistribution stageLength
+      verifyTrace nrNodes idSut stakeDistribution stageLength tau
         . decodeJSONL
         <$> BSL.readFile logFile
     hPutStrLn stderr $ "Applying " <> show (fst result) <> " actions"
