@@ -10,7 +10,7 @@ module Leios.Tracing.Lifecycle (
   lifecycle,
 ) where
 
-import Control.Concurrent.Chan (Chan, readChan)
+import Control.Concurrent.MVar (MVar, takeMVar)
 import Control.Monad ((<=<))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (StateT, execStateT, gets, modify')
@@ -185,13 +185,13 @@ updateEBs itemKey = updateInclusions "EB" itemKey . inEBs
 updateIBs :: Monad m => ItemKey -> ItemInfo -> StateT Index m ()
 updateIBs itemKey = updateInclusions "IB" itemKey . inIBs
 
-lifecycle :: FilePath -> Chan (Maybe Value) -> IO ()
+lifecycle :: FilePath -> MVar (Maybe Value) -> IO ()
 lifecycle lifecycleFile events =
   do
     let
       go =
         do
-          liftIO (readChan events)
+          liftIO (takeMVar events)
             >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go

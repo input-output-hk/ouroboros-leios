@@ -10,7 +10,7 @@ module Leios.Tracing.Receipt (
   receipt,
 ) where
 
-import Control.Concurrent.Chan (Chan, readChan)
+import Control.Concurrent.MVar (MVar, takeMVar)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (StateT, execStateT, modify')
 import Data.Aeson (Value (Object), withObject, (.:))
@@ -187,13 +187,13 @@ tally event =
         modify' $ M.insertWith (<>) itemKey itemInfo
     Nothing -> pure ()
 
-receipt :: FilePath -> Chan (Maybe Value) -> IO ()
+receipt :: FilePath -> MVar (Maybe Value) -> IO ()
 receipt cpuFile events =
   do
     let
       go =
         do
-          liftIO (readChan events)
+          liftIO (takeMVar events)
             >>= \case
               Nothing -> pure ()
               Just event -> tally event >> go
