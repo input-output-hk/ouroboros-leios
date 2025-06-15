@@ -120,7 +120,7 @@
 {"message":{"slot":7,"type":"IBGenerated","producer":"node-0","id":"0-7","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":7.01}
 #
 # ∷ inj₁ (VT-Role-Action 7    , SLOT)
-{"message":{"slot":7,"type":"VTBundleGenerated","producer":"node-0","id":"0-7","votes":{},"pipeline":0,"size_bytes":105},"time_s":7.02}
+#{"message":{"slot":7,"type":"VTBundleGenerated","producer":"node-0","id":"0-7","votes":{},"pipeline":0,"size_bytes":105},"time_s":7.02}
 #
 # ∷ inj₁ (Base₂b-Action  7    , SLOT)
 # ∷ inj₁ (Slot-Action    7    , SLOT)
