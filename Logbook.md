@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-06-15
+
+### Reduced memory footprint for analyzing simulation traces
+
+The [`leios-trace-processor`](analysis/sims/trace-processor/) was refactored in order to dramatically reduce the memory footprint of analyzing large simulation traces.
+
 ## 2025-06-12
 
 ### "Miniature mainnet" topology
