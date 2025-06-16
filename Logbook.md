@@ -31,6 +31,11 @@ Because the 10,000 [pseudo-mainnet](data/simulation/pseudo-mainnet/topology-v1.i
 | Bidirectional connections | 1463 |
 | Asymmetry ratio | 84.85% |
 
+### Rust simulation
+
+- Fixed bad assertion triggered by extreme load of 10k node network
+- Added support for configurable timestamp resolution
+
 ## 2025-06-11
 
 ### Additional data analyses in Leios trace processor
