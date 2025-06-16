@@ -2,11 +2,63 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://leios.cardano-scaling.org/news</id>
     <title>Ouroboros Leios Blog</title>
-    <updated>2025-06-03T00:00:00.000Z</updated>
+    <updated>2025-06-10T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://leios.cardano-scaling.org/news"/>
     <subtitle>Ouroboros Leios Blog</subtitle>
     <icon>https://leios.cardano-scaling.org/img/wave-logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly Summary – June 10, 2025]]></title>
+        <id>https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary</id>
+        <link href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary"/>
+        <updated>2025-06-10T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient "miniature mainnet" topology for repeated experimentation.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient "miniature mainnet" topology for repeated experimentation.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="trace-processor-enhancements">Trace processor enhancements<a class="hash-link" aria-label="Direct link to Trace processor enhancements" title="Direct link to Trace processor enhancements" href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary#trace-processor-enhancements">​</a></h2>
+<ul>
+<li>Enhanced the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/trace-processor/" target="_blank" rel="noopener noreferrer"><code>leios-trace-processor</code></a> to extract CPU, resource, and message-receipt data from simulation trace files</li>
+<li>Eliminated the need for using older, lower-performance scripts for analyzing simulation results</li>
+<li>Added comprehensive data output options:<!-- -->
+<ul>
+<li>Transaction lifecycle data</li>
+<li>CPU utilization metrics</li>
+<li>Resource consumption data</li>
+<li>Message receipt tracking</li>
+</ul>
+</li>
+<li>Improved analysis efficiency for large simulation datasets.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="miniature-mainnet-topology">Miniature mainnet topology<a class="hash-link" aria-label="Direct link to Miniature mainnet topology" title="Direct link to Miniature mainnet topology" href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary#miniature-mainnet-topology">​</a></h2>
+<ul>
+<li>Created a more practical 750-node topology that faithfully mimics mainnet characteristics while addressing performance limitations of the 10,000-node pseudo-mainnet</li>
+<li>Achieved nearly identical network diameter and similar stake distribution and edge degree as mainnet</li>
+<li>Key network metrics:<!-- -->
+<ul>
+<li>216 block producers and 534 relay nodes</li>
+<li>19,314 total connections with 5-hop network diameter</li>
+<li>Average of 25.75 connections per node</li>
+<li>Clustering coefficient of 0.332</li>
+<li>Average latency of 64.8ms with maximum of 578.3ms</li>
+<li>84.85% asymmetry ratio</li>
+</ul>
+</li>
+<li>Documented methodology and results in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.ipynb" target="_blank" rel="noopener noreferrer">topology-v2.ipynb</a></li>
+<li>Deployed network configuration as <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.yaml" target="_blank" rel="noopener noreferrer">topology-v2.yaml</a></li>
+<li>Enables more practical repeated experimentation with realistic network characteristics.</li>
+</ul>]]></content>
+        <author>
+            <name>William Wolff</name>
+            <uri>https://github.com/will-break-it</uri>
+        </author>
+        <category label="progress" term="progress"/>
+        <category label="update" term="update"/>
+        <category label="weekly" term="weekly"/>
+        <category label="trace-processor" term="trace-processor"/>
+        <category label="miniature-mainnet" term="miniature-mainnet"/>
+        <category label="topology" term="topology"/>
+        <category label="data-analysis" term="data-analysis"/>
+        <category label="memory-optimization" term="memory-optimization"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Weekly Summary – June 3, 2025]]></title>
         <id>https://leios.cardano-scaling.org/news/2025/06/03/weekly-progress-summary</id>
@@ -1467,93 +1519,5 @@ lifecycle.</li>
         <category label="topology" term="topology"/>
         <category label="deltaq" term="deltaq"/>
         <category label="formal-methods" term="formal-methods"/>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[Weekly Summary – January 20, 2025]]></title>
-        <id>https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary</id>
-        <link href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary"/>
-        <updated>2025-01-20T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[Simulation progress]]></summary>
-        <content type="html"><![CDATA[<h2 class="anchor anchorWithStickyNavbar_LWe7" id="simulation-progress">Simulation progress<a class="hash-link" aria-label="Direct link to Simulation progress" title="Direct link to Simulation progress" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#simulation-progress">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="haskell-implementation">Haskell implementation<a class="hash-link" aria-label="Direct link to Haskell implementation" title="Direct link to Haskell implementation" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#haskell-implementation">​</a></h3>
-<ul>
-<li>Enhanced parameter handling with support for reading configurations and
-topologies from disk</li>
-<li>Added a new <code>generate-topology</code> command for random topology generation</li>
-<li>Aligned Leios sortition with algorithms from sortition benchmarks and the
-technical report</li>
-<li>Completed analysis comparing the Praos simulation with the benchmark cluster<!-- -->
-<ul>
-<li>Adoption times within 10% of measured values</li>
-<li>Review of simulation parameters pending</li>
-</ul>
-</li>
-<li>Next steps identified:<!-- -->
-<ul>
-<li>Generate topologies with block producers behind relays</li>
-<li>Begin comparison with the idealized diffusion model</li>
-<li>Configure and run simulations for higher throughput.</li>
-</ul>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="rust-implementation">Rust implementation<a class="hash-link" aria-label="Direct link to Rust implementation" title="Direct link to Rust implementation" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#rust-implementation">​</a></h3>
-<ul>
-<li>Completed the first pass of block-level visualization</li>
-<li>Updated topology files to include baked-in latencies</li>
-<li>Improved output with human-readable names from the shared topology format</li>
-<li>Enhanced simulation output comparability across different simulations.</li>
-</ul>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="analysis-and-research">Analysis and research<a class="hash-link" aria-label="Direct link to Analysis and research" title="Direct link to Analysis and research" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#analysis-and-research">​</a></h2>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="sortition-analysis">Sortition analysis<a class="hash-link" aria-label="Direct link to Sortition analysis" title="Direct link to Sortition analysis" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#sortition-analysis">​</a></h3>
-<ul>
-<li>Completed a detailed analysis of the 'Fiat Accompli' sortition scheme using mainnet
-stake distribution (Epoch 535)</li>
-<li>Key findings for 500-vote committees:<!-- -->
-<ul>
-<li>406 largest stake block-producers would be deterministic voters</li>
-<li>~88 voters would be randomly selected</li>
-<li>Significant certificate size reduction achieved through deterministic voter
-selection.</li>
-</ul>
-</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="downstream-impact-assessment">Downstream impact assessment<a class="hash-link" aria-label="Direct link to Downstream impact assessment" title="Direct link to Downstream impact assessment" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#downstream-impact-assessment">​</a></h3>
-<p>Started comprehensive analysis of Leios's impact on the ecosystem:</p>
-<ul>
-<li>Identified impacts on indexers, explorers, SDKs, and APIs resulting from ledger and
-node changes</li>
-<li>Transaction construction and memory-pool sharding effects on DApps and wallets</li>
-<li>Physical layer visibility considerations for sophisticated use cases</li>
-<li>High throughput implications for event filtering efficiency</li>
-<li>Transaction journey time considerations from memory pool to Praos block
-reference.</li>
-</ul>
-<h3 class="anchor anchorWithStickyNavbar_LWe7" id="deltaq-analysis">DeltaQ analysis<a class="hash-link" aria-label="Direct link to DeltaQ analysis" title="Direct link to DeltaQ analysis" href="https://leios.cardano-scaling.org/news/2025/01/20/weekly-progress-summary#deltaq-analysis">​</a></h3>
-<ul>
-<li>Successfully matched ΔQ model for IB diffusion across both simulations and
-implementations</li>
-<li>Identified key differences in simulation approaches:<!-- -->
-<ul>
-<li>Haskell simulation includes bandwidth effects (328ms network delay per hop
-at 1MB/s)</li>
-<li>Rust simulation currently excludes bandwidth effects</li>
-</ul>
-</li>
-<li>Enabled cross-simulation topology sharing for consistent testing.</li>
-</ul>]]></content>
-        <author>
-            <name>William Wolff</name>
-            <uri>https://github.com/will-break-it</uri>
-        </author>
-        <category label="progress" term="progress"/>
-        <category label="update" term="update"/>
-        <category label="weekly" term="weekly"/>
-        <category label="haskell-simulation" term="haskell-simulation"/>
-        <category label="rust-simulation" term="rust-simulation"/>
-        <category label="sortition" term="sortition"/>
-        <category label="downstream-impact" term="downstream-impact"/>
-        <category label="topology" term="topology"/>
-        <category label="visualization" term="visualization"/>
-        <category label="deltaq" term="deltaq"/>
     </entry>
 </feed>
