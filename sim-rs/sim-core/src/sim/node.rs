@@ -733,7 +733,7 @@ impl Node {
         };
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
-            let rb_ref = self.praos.blocks.last_key_value().map(|(_, b)| b.id);
+            let rb_ref = self.latest_rb_ref();
             let transactions = self.select_txs_for_ib(header.shard, rb_ref);
             let ib = InputBlock {
                 header,
@@ -780,11 +780,7 @@ impl Node {
             }
         }
 
-        let parent = self
-            .praos
-            .blocks
-            .last_key_value()
-            .map(|(_, block)| block.id);
+        let parent = self.latest_rb_ref();
 
         let block = Block {
             id: BlockId {
@@ -1024,6 +1020,21 @@ impl Node {
         }
         if self.trace {
             info!("node {} saw tx {id}", self.name);
+        }
+        let rb_ref = self.latest_rb_ref();
+        let ledger_state = self.resolve_ledger_state(rb_ref);
+        if ledger_state.spent_inputs.contains(&tx.input_id) {
+            // Ignoring a TX which conflicts with something already onchain
+            return Ok(());
+        }
+        if self
+            .praos
+            .mempool
+            .values()
+            .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
+        {
+            // Ignoring a TX which conflicts with the current mempool contents.
+            return Ok(());
         }
         self.praos.mempool.insert(tx.id, tx.clone());
         for peer in &self.consumers {
@@ -1447,6 +1458,10 @@ impl Node {
             txs.push(tx);
         }
         txs
+    }
+
+    fn latest_rb_ref(&self) -> Option<BlockId> {
+        self.praos.blocks.last_key_value().map(|(k, _)| *k)
     }
 
     fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
