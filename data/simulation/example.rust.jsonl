@@ -7,7 +7,7 @@
 {"time_s":0.0,"message":{"type":"CpuTaskScheduled","task":{"node":"node-0","index":1},"task_type":"GenIB","subtasks":1}}
 {"time_s":0.0,"message":{"type":"Cpu","task":{"node":"node-0","index":1},"node":"node-0","cpu_time_s":0.13,"task_label":"GenIB: node-0-1-0","task_type":"GenIB","id":"node-0-1-0"}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-1","slot":0,"pipeline":0,"producer":"node-1"}}
-{"time_s":0.0,"message":{"type":"TXGenerated","id":"0","publisher":"node-11","size_bytes":156}}
+{"time_s":0.0,"message":{"type":"TXGenerated","id":"0","publisher":"node-11","size_bytes":156,"input_id":0}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-3","slot":0,"pipeline":0,"producer":"node-3"}}
 {"time_s":0.0,"message":{"type":"VTLotteryWon","id":"0-node-4","slot":0,"pipeline":0,"producer":"node-4"}}
 {"time_s":0.0,"message":{"type":"EBLotteryWon","id":"0-node-4","slot":0,"pipeline":1,"producer":"node-4"}}

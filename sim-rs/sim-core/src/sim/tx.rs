@@ -46,6 +46,7 @@ impl TransactionProducer {
         let node_count = self.node_tx_sinks.len();
         let mut next_tx_id = 0;
         let mut next_tx_at = Timestamp::zero();
+        let mut next_input_id = 0;
         let mut rng = &mut self.rng;
 
         if let Some(start) = config.start_time {
@@ -57,7 +58,13 @@ impl TransactionProducer {
             let id = TransactionId::new(next_tx_id);
             let shard = rng.random_range(0..self.ib_shards);
             let bytes = (config.size_bytes.sample(&mut rng) as u64).min(config.max_size);
-            let tx = Transaction { id, shard, bytes };
+            let input_id = next_input_id;
+            let tx = Transaction {
+                id,
+                shard,
+                bytes,
+                input_id,
+            };
 
             let node_index = rng.random_range(0..node_count);
             let node_id = NodeId::new(node_index);
@@ -68,6 +75,7 @@ impl TransactionProducer {
                 .send(Arc::new(tx))?;
 
             next_tx_id += 1;
+            next_input_id += 1;
             let millis_until_tx = config.frequency_ms.sample(&mut rng) as u64;
             next_tx_at += Duration::from_millis(millis_until_tx);
 

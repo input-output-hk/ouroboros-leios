@@ -91,6 +91,7 @@ pub struct Transaction {
     pub id: TransactionId,
     pub shard: u64,
     pub bytes: u64,
+    pub input_id: u64,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

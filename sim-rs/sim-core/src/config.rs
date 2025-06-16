@@ -437,11 +437,16 @@ pub(crate) struct MockTransactionConfig {
 }
 
 impl MockTransactionConfig {
-    pub fn next_id(&self) -> TransactionId {
+    pub fn mock_tx(&self, bytes: u64) -> Transaction {
         let id = self
             .next_id
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        TransactionId::new(id)
+        Transaction {
+            id: TransactionId::new(id),
+            shard: 0,
+            bytes,
+            input_id: id,
+        }
     }
 }
 

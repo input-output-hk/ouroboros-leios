@@ -750,11 +750,7 @@ impl Node {
         if self.sim_config.praos_fallback {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
-                let tx = Transaction {
-                    id: config.next_id(),
-                    shard: 0,
-                    bytes: config.rb_size,
-                };
+                let tx = config.mock_tx(config.rb_size);
                 self.tracker.track_transaction_generated(&tx, self.id);
                 transactions.push(Arc::new(tx));
             } else {
@@ -1361,11 +1357,7 @@ impl Node {
 
     fn select_txs_for_ib(&mut self, shard: u64) -> Vec<Arc<Transaction>> {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
-            let tx = Transaction {
-                id: config.next_id(),
-                shard,
-                bytes: config.ib_size,
-            };
+            let tx = config.mock_tx(config.ib_size);
             self.tracker.track_transaction_generated(&tx, self.id);
             vec![Arc::new(tx)]
         } else {
