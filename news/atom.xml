@@ -12,8 +12,8 @@
         <id>https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary</id>
         <link href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary"/>
         <updated>2025-06-10T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient "miniature mainnet" topology for repeated experimentation.]]></summary>
-        <content type="html"><![CDATA[<p>This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient "miniature mainnet" topology for repeated experimentation.</p>
+        <summary type="html"><![CDATA[This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient 'miniature mainnet' topology for repeated experimentation.]]></summary>
+        <content type="html"><![CDATA[<p>This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient 'miniature mainnet' topology for repeated experimentation.</p>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="trace-processor-enhancements">Trace processor enhancements<a class="hash-link" aria-label="Direct link to Trace processor enhancements" title="Direct link to Trace processor enhancements" href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary#trace-processor-enhancements">​</a></h2>
 <ul>
 <li>Enhanced the <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/trace-processor/" target="_blank" rel="noopener noreferrer"><code>leios-trace-processor</code></a> to extract CPU, resource, and message-receipt data from simulation trace files</li>
@@ -31,7 +31,7 @@
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="miniature-mainnet-topology">Miniature mainnet topology<a class="hash-link" aria-label="Direct link to Miniature mainnet topology" title="Direct link to Miniature mainnet topology" href="https://leios.cardano-scaling.org/news/2025/06/10/weekly-progress-summary#miniature-mainnet-topology">​</a></h2>
 <ul>
 <li>Created a more practical 750-node topology that faithfully mimics mainnet characteristics while addressing performance limitations of the 10,000-node pseudo-mainnet</li>
-<li>Achieved nearly identical network diameter and similar stake distribution and edge degree as mainnet</li>
+<li>Achieved a network diameter, stake distribution, and edge degree closely matching those of the mainnet</li>
 <li>Key network metrics:<!-- -->
 <ul>
 <li>216 block producers and 534 relay nodes</li>
@@ -42,9 +42,9 @@
 <li>84.85% asymmetry ratio</li>
 </ul>
 </li>
-<li>Documented methodology and results in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.ipynb" target="_blank" rel="noopener noreferrer">topology-v2.ipynb</a></li>
-<li>Deployed network configuration as <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.yaml" target="_blank" rel="noopener noreferrer">topology-v2.yaml</a></li>
-<li>Enables more practical repeated experimentation with realistic network characteristics.</li>
+<li>Documented the methodology and results in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.ipynb" target="_blank" rel="noopener noreferrer">topology-v2.ipynb</a></li>
+<li>Deployed the network configuration in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.yaml" target="_blank" rel="noopener noreferrer">topology-v2.yaml</a></li>
+<li>Enabled more practical, repeatable experimentation with realistic network characteristics.</li>
 </ul>]]></content>
         <author>
             <name>William Wolff</name>
