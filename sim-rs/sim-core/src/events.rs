@@ -169,6 +169,7 @@ pub enum Event {
         tx_payload_bytes: u64,
         size_bytes: u64,
         transactions: Vec<TransactionId>,
+        rb_ref: Option<BlockId<Node>>,
     },
     NoIBGenerated {
         node: Node,
@@ -478,6 +479,7 @@ impl EventTracker {
             tx_payload_bytes,
             size_bytes: header_bytes + tx_payload_bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
+            rb_ref: block.rb_ref.map(|b| self.to_block(b)),
         });
     }
 

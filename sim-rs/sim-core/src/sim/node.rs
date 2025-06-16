@@ -723,11 +723,13 @@ impl Node {
         };
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
+            let rb_ref = self.praos.blocks.last_key_value().map(|(_, b)| b.id);
             let transactions = self.select_txs_for_ib(header.shard);
             let ib = InputBlock {
                 header,
                 tx_payload_bytes: self.sim_config.sizes.ib_payload(&transactions),
                 transactions,
+                rb_ref,
             };
             self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
         }
