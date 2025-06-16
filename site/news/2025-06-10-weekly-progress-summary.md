@@ -5,7 +5,7 @@ authors:
 tags: [progress, update, weekly, trace-processor, miniature-mainnet, topology, data-analysis, memory-optimization]
 ---
 
-This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient "miniature mainnet" topology for repeated experimentation.
+This week, the Leios team focused on improving simulation analysis tools and creating more practical network topologies. Key achievements include enhancing the trace processor with additional data extraction capabilities and developing a smaller, more efficient 'miniature mainnet' topology for repeated experimentation.
 
 ## Trace processor enhancements
 
@@ -21,7 +21,7 @@ This week, the Leios team focused on improving simulation analysis tools and cre
 ## Miniature mainnet topology
 
 - Created a more practical 750-node topology that faithfully mimics mainnet characteristics while addressing performance limitations of the 10,000-node pseudo-mainnet
-- Achieved nearly identical network diameter and similar stake distribution and edge degree as mainnet
+- Achieved a network diameter, stake distribution, and edge degree closely matching those of the mainnet
 - Key network metrics:
   - 216 block producers and 534 relay nodes
   - 19,314 total connections with 5-hop network diameter
@@ -29,6 +29,6 @@ This week, the Leios team focused on improving simulation analysis tools and cre
   - Clustering coefficient of 0.332
   - Average latency of 64.8ms with maximum of 578.3ms
   - 84.85% asymmetry ratio
-- Documented methodology and results in [topology-v2.ipynb](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.ipynb)
-- Deployed network configuration as [topology-v2.yaml](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.yaml)
-- Enables more practical repeated experimentation with realistic network characteristics.
+- Documented the methodology and results in [topology-v2.ipynb](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.ipynb)
+- Deployed the network configuration in [topology-v2.yaml](https://github.com/input-output-hk/ouroboros-leios/blob/main/data/simulation/pseudo-mainnet/topology-v2.yaml)
+- Enabled more practical, repeatable experimentation with realistic network characteristics.
