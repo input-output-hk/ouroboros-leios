@@ -111,6 +111,10 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , variant :: LeiosVariant
   , headerDiffusionTime :: NominalDiffTime
   -- ^ Δ_{hdr}.
+  , lateIbInclusion :: Bool
+  -- ^ Whether an EB also includes IBs from the two previous iterations.
+  --
+  -- TODO Merely one previous iteration if 'pipeline' is 'SingleVote'?
   , pipelinesToReferenceFromEB :: Int
   -- ^ how many older pipelines to reference from an EB when `variant = Full`.
   , votingFrequencyPerStage :: Double
@@ -147,6 +151,7 @@ convertConfig disk =
           , cleanupPolicies = disk.cleanupPolicies
           , variant = disk.leiosVariant
           , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
+          , lateIbInclusion = disk.leiosLateIbInclusion
           , pipelinesToReferenceFromEB =
               if disk.leiosVariant == Full
                 then
@@ -285,6 +290,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , cleanupPolicies = cfg.cleanupPolicies
     , variant = cfg.variant
     , headerDiffusionTime = cfg.headerDiffusionTime
+    , lateIbInclusion = cfg.lateIbInclusion
     , pipelinesToReferenceFromEB = cfg.pipelinesToReferenceFromEB
     , activeVotingStageLength = cfg.activeVotingStageLength
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
@@ -664,13 +670,13 @@ data InputBlocksQuery = InputBlocksQuery
   -- ^ This is checked against time the body is downloaded, before validation.
   }
 
-inputBlocksToEndorse ::
+inputBlocksToEndorse1 ::
   LeiosConfig ->
   -- | current slot
   SlotNo ->
   InputBlocksSnapshot ->
   [InputBlockId]
-inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buffer = fromMaybe [] $ do
+inputBlocksToEndorse1 cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buffer = fromMaybe [] $ do
   generatedBetween <- stageRange @p cfg Endorse current Propose
   receivedBy <- stageEnd @p cfg Endorse current Deliver2
   pure $
@@ -679,6 +685,26 @@ inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buf
         { generatedBetween
         , receivedBy
         }
+
+-- | Invokes 'inputBlocksToEndorse1' as many times as 'lateIbInclusion'
+-- requires
+inputBlocksToEndorse ::
+  LeiosConfig ->
+  -- | current slot
+  SlotNo ->
+  InputBlocksSnapshot ->
+  [InputBlockId]
+inputBlocksToEndorse cfg current buffer =
+  concatMap each iterations
+ where
+  each sl = inputBlocksToEndorse1 cfg sl buffer
+  capL = fromIntegral cfg.sliceLength
+  iterations =
+    if not cfg.lateIbInclusion
+      then [current]
+      else
+        -- discard underflows
+        dropWhile (> current) [current - 2 * capL, current - capL, current]
 
 -- | Returns possible EBs to reference from current pipeline EB.
 endorseBlocksToReference ::
