@@ -59,7 +59,8 @@ instance Monoid ItemInfo where
 
 toCSV :: ItemKey -> ItemInfo -> Text -> Double -> String
 toCSV ItemKey{..} ItemInfo{..} recipient received =
-  intercalate sep
+  intercalate
+    sep
     [ T.unpack kind
     , T.unpack item
     , T.unpack producer
