@@ -6,6 +6,18 @@
 
 The [`leios-trace-processor`](analysis/sims/trace-processor/) now reports message sizes for bandwidth-usage analysis.
 
+### Pseudo-mainnet experiments
+
+The 10,000-node [pseudo-mainnet](data/simulation/pseudo-mainnet/ReadMe.md) network was used in Rust experiments to study the limits of transaction and IB throughput for realistic scenarios up to 300 TPS and 32 IB/s.
+
+- [Analysis results](analysis/sims/2025w23/analysis.ipynb)
+- [Slides](analysis/sims/2025w23/summary.pdf)
+- Findings:
+    - Transactions took an average of 100 seconds to travel from the memory pool to the ledger.
+    - Disk and network usage was approximately 80% efficient.
+    - Even at high TPS, six CPU cores were sufficient to handle peak load.
+    - Block propagation time averaged under one second.
+
 ## 2025-06-15
 
 ### Reduced memory footprint for analyzing simulation traces
