@@ -1,5 +1,11 @@
 # Leios logbook
 
+## 2025-06-17
+
+### Added features to simulation trace processor
+
+The [`leios-trace-processor`](analysis/sims/trace-processor/) now reports message sizes for bandwidth-usage analysis.
+
 ## 2025-06-15
 
 ### Reduced memory footprint for analyzing simulation traces
