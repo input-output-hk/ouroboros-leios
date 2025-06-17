@@ -20,6 +20,7 @@ EOI
 
 xzcat sim.log.xz \
 | ../../leios-trace-processor \
+  +RTS -N5 -RTS \
   --trace-file /dev/stdin \
   --lifecycle-file lifecycle.csv \
   --cpu-file cpus.csv \
