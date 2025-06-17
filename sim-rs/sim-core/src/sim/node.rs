@@ -155,6 +155,7 @@ struct SeenTransaction {
 #[derive(Default)]
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, SeenTransaction>,
+    input_ids_from_ibs: HashSet<u64>,
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
@@ -1043,6 +1044,13 @@ impl Node {
             }
             self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
         }
+        if self.sim_config.mempool_aggressive_pruning
+            && self.leios.input_ids_from_ibs.contains(&tx.input_id)
+        {
+            // Ignoring a TX which conflicts with TXs we've seen in input blocks.
+            // This only affects the Leios mempool; these TXs should still be able to reach the chain through Praos.
+            return Ok(());
+        }
         self.leios.mempool.insert(
             tx.id,
             SeenTransaction {
@@ -1204,6 +1212,15 @@ impl Node {
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
+        }
+        if self.sim_config.mempool_aggressive_pruning {
+            // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this IB
+            self.leios
+                .input_ids_from_ibs
+                .extend(ib.transactions.iter().map(|tx| tx.input_id));
+            self.leios
+                .mempool
+                .retain(|_, seen| !self.leios.input_ids_from_ibs.contains(&seen.tx.input_id));
         }
         if self
             .leios

@@ -54,6 +54,10 @@ export interface Config {
    */
   "leios-mempool-sampling-strategy": MempoolSamplingStrategy;
   /**
+   * If true, transactions will be removed from the Leios mempool if they conflict with in-flight IBs.
+   */
+  "leios-mempool-aggressive-pruning": boolean;
+  /**
    * Praos blockchain quality parameter.
    * This is η from the Leios paper.
    * Controls the pipelines EBs should reference in Full leios:
