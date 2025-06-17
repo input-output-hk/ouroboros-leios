@@ -2,6 +2,23 @@
 
 ## 2025-06-17
 
+### Mini-mainnet experiments
+
+The 750-node [pseudo-mainnet](data/simulation/pseudo-mainnet/topology-v2.yaml) network was used in Haskell and Rust experiments to study the limits of transaction and IB throughput for realistic scenarios up to 300 TPS and 32 IB/s.
+
+- [Analysis results](analysis/sims/2025w24/analysis.ipynb)
+- [Slides](analysis/sims/2025w24/summary.pdf)
+- Findings:
+    - The 750 node mini-mainnet is a suitable replacement for the 10,000-node pseudo mainnet, in that either topology would result in similar performance measurements and resource recommendations.
+    - The Haskell and Rust simulations substantially agree for mini-mainnet simulations.
+    - Key metrics from these simulations:
+        - Block propagation less than 1 second, which is consistent with empirical observations from pooltool.io. Note that this has implications for our discussion of the IB-concurrency period.
+        - With 1 Gb/s links/NICs, the protocol can support 25 MB/s throughput before it starts degrading.
+        - Mean time from mempool to ledger is about 150 seconds for transactions.
+        - Disk-space efficiency is about 80%.
+        - About 20% of network traffic is wasted.
+        - Even at 300 ts/x, a 6-core VM is sufficient for peak demand, but average demand is less than 2 cores.
+
 ### Added features to simulation trace processor
 
 The [`leios-trace-processor`](analysis/sims/trace-processor/) now reports message sizes for bandwidth-usage analysis.
