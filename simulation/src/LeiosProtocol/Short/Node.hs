@@ -19,7 +19,7 @@ import Control.Category ((>>>))
 import Control.Concurrent.Class.MonadMVar
 import Control.Concurrent.Class.MonadSTM.TSem
 import Control.Exception (assert)
-import Control.Monad (forever, guard, replicateM, when)
+import Control.Monad (forever, guard, replicateM, unless, when)
 import Control.Monad.Class.MonadAsync
 import Control.Monad.Class.MonadFork
 import Control.Monad.Class.MonadThrow
@@ -122,16 +122,29 @@ data LeiosNodeConfig = LeiosNodeConfig
 data LeiosNodeState m = LeiosNodeState
   { praosState :: !(PraosNode.PraosNodeState RankingBlockBody m)
   , relayIBState :: !(RelayIBState m)
-  , prunedIBStateToVar :: !(TVar m SlotNo)
+  -- ^ validated IBs that are still young enough to be diffusing
+  , iBsForEBsAndVotesVar :: !(TVar m (Map PipelineNo (Map InputBlockId IbDeliveryStage)))
+  -- ^ IBs that are relevant to an EB or Vote this node might need to issue
+  --
+  -- Each of these IBs arrived during its contemporary Propose, Deliver1,
+  -- Deliver2, or Endorse stages, has been validated, and is not too old.
+  --
+  -- INVARIANT: In basic Short Leios, none of these IBs are older than
+  -- @4*'sliceLength'@. With the @leios-late-ib-inclusion@ extension enabled,
+  -- none of these IBs are older than @(4+2)*'sliceLength'@.
+  --
+  -- Note that some IBs that are too old to be included in this variable
+  -- might still be needed in order to apply some RB.
+  --
+  -- INVARIANT: @all (\_k v -> not $ null v)@.
+  --
+  -- INVARIANT: @all (\k v -> all ((k ==) . pipelineOf cfg Propose) v)@.
   , relayEBState :: !(RelayEBState m)
   , prunedUnadoptedEBStateToVar :: !(TVar m SlotNo)
   , prunedUncertifiedEBStateToVar :: !(TVar m SlotNo)
   , relayVoteState :: !(RelayVoteState m)
   , prunedVoteStateToVar :: !(TVar m SlotNo)
   -- ^ TODO: refactor into RelayState.
-  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId (SlotNo, UTCTime)))
-  -- ^ records time we received the input block.
-  --   Also stores the SlotNo of the IB to ease pruning.
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
   , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
   -- ^ waiting for RB block itself to be validated.
@@ -186,7 +199,7 @@ data LedgerState = LedgerState
 
 data ValidationRequest m
   = ValidateRB !RankingBlock !(m ())
-  | ValidateIBS ![(InputBlockHeader, InputBlockBody)] !UTCTime !([(InputBlockHeader, InputBlockBody)] -> STM m ())
+  | ValidateIBs ![((InputBlockHeader, InputBlockBody), IbDeliveryStage)] !([(InputBlockHeader, InputBlockBody)] -> STM m ())
   | ValidateEBS ![EndorseBlock] !([EndorseBlock] -> STM m ())
   | ValidateVotes ![VoteMsg] !UTCTime !([VoteMsg] -> STM m ())
 
@@ -296,10 +309,10 @@ relayIBConfig _tracer cfg validateHeaders submitBlocks st =
     , maxHeadersToRequest = cfg.leios.ibDiffusion.maxHeadersToRequest
     , maxBodiesToRequest = cfg.leios.ibDiffusion.maxBodiesToRequest
     , submitBlocks
-    , shouldIgnore = atomically $ do
-        prunedTo <- readTVar st.prunedIBStateToVar
+    , shouldNotRequest = (getCurrentTime >>=) $ \deliveryTime -> atomically $ do
+        let late h = ibWasDeliveredLate cfg.leios cfg.slotConfig h.slot deliveryTime
         buff <- readTVar st.relayIBState.relayBufferVar
-        return $ \h -> h.slot < prunedTo || h.id `RB.member` buff
+        return $ \h -> late h || h.id `RB.member` buff
     }
 
 relayEBConfig ::
@@ -321,7 +334,7 @@ relayEBConfig _tracer cfg@LeiosNodeConfig{leios = LeiosConfig{pipeline = (_ :: S
     , maxBodiesToRequest = cfg.leios.ebDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
-    , shouldIgnore = do
+    , shouldNotRequest = do
         -- We possibly prune certified EBs (not referenced in the
         -- chain) after maxEndorseBlockAgeSlots, so we should not end
         -- up asking for their bodies again, in the remote possibility
@@ -362,7 +375,7 @@ relayVoteConfig _tracer cfg submitBlocks _ leiosState =
     , maxBodiesToRequest = cfg.leios.voteDiffusion.maxBodiesToRequest
     , submitBlocks = \hbs t k ->
         submitBlocks (map (first (.id)) hbs) t (k . map (\(i, b) -> (RelayHeader i b.slot, b)))
-    , shouldIgnore = atomically $ do
+    , shouldNotRequest = atomically $ do
         buffer <- readTVar leiosState.relayVoteState.relayBufferVar
         prunedTo <- readTVar leiosState.prunedVoteStateToVar
         return $ \hd ->
@@ -389,13 +402,12 @@ newLeiosNodeState ::
 newLeiosNodeState cfg = do
   praosState <- PraosNode.newPraosNodeState cfg.baseChain
   relayIBState <- newRelayState
-  prunedIBStateToVar <- newTVarIO (toEnum 0)
+  iBsForEBsAndVotesVar <- newTVarIO Map.empty
   relayEBState <- newRelayState
   prunedUnadoptedEBStateToVar <- newTVarIO (toEnum 0)
   prunedUncertifiedEBStateToVar <- newTVarIO (toEnum 0)
   relayVoteState <- newRelayState
   prunedVoteStateToVar <- newTVarIO (toEnum 0)
-  ibDeliveryTimesVar <- newTVarIO Map.empty
   ibsNeededForEBVar <- newTVarIO Map.empty
   ledgerStateVar <- newTVarIO Map.empty
   waitingForRBVar <- newTVarIO Map.empty
@@ -432,7 +444,9 @@ leiosNode tracer cfg followers peers = do
   let submitRB rb completion = dispatch $! ValidateRB rb completion
   let submitIB xs deliveryTime completion = do
         traceReceived xs $ EventIB . uncurry InputBlock
-        dispatch $! ValidateIBS xs deliveryTime completion
+        let annotate x = (,) x <$> ibDeliveryStage cfg.leios cfg.slotConfig (fst x).slot deliveryTime
+        let xs' = mapMaybe annotate xs -- TODO what to do with early/late arrivals?
+        unless (null xs') $ dispatch $! ValidateIBs xs' completion
   let submitVote (map snd -> xs) deliveryTime completion = do
         traceReceived xs EventVote
         dispatch $! ValidateVotes xs deliveryTime $ completion . map (\v -> (v.id, v))
@@ -516,7 +530,10 @@ leiosNode tracer cfg followers peers = do
             -- TODO: could expire EBs not referenced by young enough EBs.
             cfg.leios.variant /= Full
             ]
-          , [ pruneExpiredIBs tracer cfg leiosState
+          , [ pruneRelayIBState tracer cfg leiosState
+            | CleanupExpiredIb `isEnabledIn` cfg.leios.cleanupPolicies
+            ]
+          , [ pruneIBsForEBsAndVotesVar tracer cfg leiosState
             | CleanupExpiredIb `isEnabledIn` cfg.leios.cleanupPolicies
             ]
           ]
@@ -533,22 +550,33 @@ leiosNode tracer cfg followers peers = do
       , pruningThreads
       ]
 
--- Actually prunes IBs we should stop delivering.
-pruneExpiredIBs :: (Monad m, MonadDelay m, MonadSTM m, MonadTime m) => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
-pruneExpiredIBs _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+-- Prunes 'relayIBState'
+pruneRelayIBState :: (Monad m, MonadDelay m, MonadSTM m, MonadTime m) => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
+pruneRelayIBState _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
  where
   go p = do
-    -- TODO: could end when Endorse ends, but we want them around for voting.
-    let endOfIBDiffusion = succ $ lastVoteSend leios p
+    let expiry = succ $ lastEndorse leios p
     let pruneTo = succ $ snd $ proposeRange leios p
-    _ <- waitNextSlot slotConfig endOfIBDiffusion
+    _ <- waitNextSlot slotConfig expiry
     _ibsPruned <- atomically $ do
-      writeTVar st.prunedIBStateToVar $! pruneTo
       partitionRBVar st.relayIBState.relayBufferVar $
         \ibEntry -> (fst ibEntry.value).slot < pruneTo
     -- TODO: batch these, too many events
     -- for_ ibsPruned $ \(uncurry InputBlock -> ib) ->
     --   traceWith tracer $! LeiosNodeEvent Pruned (EventIB ib)
+    go (succ p)
+
+pruneIBsForEBsAndVotesVar :: (Monad m, MonadDelay m, MonadSTM m, MonadTime m) => Tracer m LeiosNodeEvent -> LeiosNodeConfig -> LeiosNodeState m -> m ()
+pruneIBsForEBsAndVotesVar _tracer LeiosNodeConfig{leios, slotConfig} st = go (toEnum 0)
+ where
+  go p = do
+    let expiry = succ $ lastVoteSend leios $ (if leios.lateIbInclusion then succ . succ else id) $ p
+    _ <- waitNextSlot slotConfig expiry
+    _ibsPruned <- atomically $ do
+      modifyTVar'
+        st.iBsForEBsAndVotesVar
+        (snd . Map.split p)
+    -- TODO Pruned events
     go (succ p)
 
 -- rEB slots after the end of Endorse,
@@ -665,13 +693,10 @@ pruneExpiredVotes ::
 pruneExpiredVotes _tracer LeiosNodeConfig{leios = leios@LeiosConfig{pipeline = _ :: SingPipeline p}, slotConfig} st = go (toEnum 0)
  where
   go p = do
-    let pruneIBDeliveryTo = succ $ snd (stageRangeOf @p leios p Short.Propose)
     let pruneTo = succ (lastVoteSend leios p)
     _ <- waitNextSlot slotConfig (succ (lastVoteRecv leios p))
     _votesPruned <- atomically $ do
       writeTVar st.prunedVoteStateToVar $! pruneTo
-      -- delivery times for IBs are only needed to vote, so they can be pruned too.
-      modifyTVar' st.ibDeliveryTimesVar $ Map.filter $ \(slot, _) -> slot >= pruneIBDeliveryTo
       partitionRBVar st.relayVoteState.relayBufferVar $
         \voteEntry ->
           let voteSlot = (snd voteEntry.value).slot
@@ -782,20 +807,27 @@ validateIBsOfCertifiedEBs _trace _cfg st = forever . atomically $ do
     modifyTVar' st.ibsValidationActionsVar $ Map.delete ibId
     m
 
-adoptIB :: MonadSTM m => LeiosNodeState m -> InputBlock -> UTCTime -> STM m ()
-adoptIB leiosState ib deliveryTime = do
+-- | This is called once the IB has been validated
+--
+-- An IB might be validated a long while after it arrived.
+--
+-- An IB that arrived later than it should have will not even be validated.
+adoptIB :: MonadSTM m => LeiosConfig -> LeiosNodeState m -> InputBlock -> IbDeliveryStage -> STM m ()
+adoptIB cfg leiosState ib deliveryStage = do
   let !ibSlot = ib.header.slot
-  -- NOTE: voting relies on delivery times for IBs
+      !p = case cfg of
+        LeiosConfig{pipeline = _ :: SingPipeline p} ->
+          pipelineOf @p cfg Short.Propose ibSlot
   modifyTVar'
-    leiosState.ibDeliveryTimesVar
-    (Map.insertWith (\(_, x) (s, y) -> (,) s $! min x y) ib.id (ibSlot, deliveryTime))
+    leiosState.iBsForEBsAndVotesVar
+    (Map.insertWith (Map.unionWith min) p $ Map.singleton ib.id deliveryStage)
 
   -- TODO: likely needs optimization, although EBs also grow slowly.
   modifyTVar' leiosState.ibsNeededForEBVar (Map.map (Set.delete ib.id))
 
 adoptEB :: MonadSTM m => LeiosNodeState m -> EndorseBlock -> STM m ()
 adoptEB leiosState eb = do
-  ibs <- RB.keySet <$> readTVar leiosState.relayIBState.relayBufferVar
+  ibs <- Set.unions . Map.map Map.keysSet <$> readTVar leiosState.iBsForEBsAndVotesVar
   let ibsNeeded = Map.fromList [(eb.id, Set.fromList eb.inputBlocks Set.\\ ibs)]
   modifyTVar' leiosState.ibsNeededForEBVar (`Map.union` ibsNeeded)
 
@@ -821,12 +853,12 @@ dispatchValidation tracer cfg leiosState req =
   valRB rb m = do
     let task prefix = cpuTask prefix cfg.leios.praos.blockValidationDelay rb
     labelTask (ValRB, (task, m))
-  valIB x@(uncurry InputBlock -> ib) deliveryTime completion =
+  valIB x@(uncurry InputBlock -> ib) deliveryStage completion =
     let
       delay prefix = cpuTask prefix cfg.leios.delays.inputBlockValidation ib
       task = atomically $ do
         completion [x]
-        adoptIB leiosState ib deliveryTime
+        adoptIB cfg.leios leiosState ib deliveryStage
      in
       labelTask (ValIB, (delay, task >> traceEnterState [uncurry InputBlock x] EventIB))
   valEB eb completion = labelTask . (ValEB,) . (\p -> cpuTask p cfg.leios.delays.endorseBlockValidation eb,) $ do
@@ -856,7 +888,7 @@ dispatchValidation tracer cfg leiosState req =
                     else leiosState.waitingForLedgerStateVar
           waitFor var [(prev, [queue [task]])]
           return []
-    ValidateIBS ibs deliveryTime completion -> do
+    ValidateIBs ibs completion -> do
       -- NOTE: IBs with an RB reference have to wait for ledger state of that RB.
       --       However, if they get referenced by the chain they should be validated anyway.
       --       We use a map to store the validation logic, so we can force it happening in the latter case.
@@ -868,14 +900,14 @@ dispatchValidation tracer cfg leiosState req =
                   Map.delete ibId
                 m
               Nothing -> pure ()
-      let storeAction rbHash ib@(h, _) = do
+      let storeAction rbHash ib@(h, _) deliveryStage = do
             modifyTVar' leiosState.ibsValidationActionsVar $
-              Map.insert h.id (queue [valIB ib deliveryTime completion])
+              Map.insert h.id (queue [valIB ib deliveryStage completion])
             return (rbHash, [lookupValAction $ (fst ib).id])
       waitingLedgerState <-
         sequence $
-          [ storeAction rbHash ib
-          | ib <- ibs
+          [ storeAction rbHash ib deliveryStage
+          | (ib, deliveryStage) <- ibs
           , BlockHash rbHash <- [(fst ib).rankingBlock]
           ]
 
@@ -884,7 +916,7 @@ dispatchValidation tracer cfg leiosState req =
         leiosState.waitingForLedgerStateVar
         waitingLedgerState
 
-      return [valIB ib deliveryTime completion | ib@(h, _) <- ibs, GenesisHash <- [h.rankingBlock]]
+      return [valIB ib deliveryStage completion | (ib@(h, _), deliveryStage) <- ibs, GenesisHash <- [h.rankingBlock]]
     ValidateEBS ebs completion -> do
       -- NOTE: block references are only inspected during voting.
       return [valEB eb completion | eb <- ebs]
@@ -922,10 +954,10 @@ generator tracer cfg st = do
           traceWith tracer (PraosNodeEvent (PraosNodeEventGenerate rb))
           traceWith tracer (PraosNodeEvent (PraosNodeEventNewTip newChain))
         SomeAction Generate.Propose{} ib -> (GenIB,) $ do
-          now <- getCurrentTime
           atomically $ do
+            -- TODO should not be added to 'relayIBState' before it's validated
             modifyTVar' st.relayIBState.relayBufferVar (RB.snocIfNew ib.header.id (ib.header, ib.body))
-            adoptIB st ib now
+            adoptIB cfg.leios st ib IbDuringProposeOrDeliver1
           traceWith tracer (LeiosNodeEvent Generate (EventIB ib))
         SomeAction Generate.Endorse eb -> (GenEB,) $ do
           atomically $ do
@@ -952,7 +984,6 @@ mkBuffersView cfg st = BuffersView{..}
     chain <- PraosNode.preferredChain st.praosState
     bufferEB <- readTVar st.relayEBState.relayBufferVar
     votesForEB <- readTVar st.votesForEBVar
-    ibsNeededForEB <- readTVar st.ibsNeededForEBVar
     -- RBs in the same chain should not contain certificates for the same pipeline.
     let pipelinesInChain =
           Set.fromList $
@@ -964,9 +995,6 @@ mkBuffersView cfg st = BuffersView{..}
     let tryCertify eb = do
           Certified{cert} <- Map.lookup eb.id votesForEB
           guard (not $ Set.member (endorseBlockPipeline cfg.leios eb) pipelinesInChain)
-          -- Note: we expect to have received the IBs for any
-          -- certified EB, but degraded network could mean we do not.
-          guard (Map.lookup eb.id ibsNeededForEB == Just Set.empty)
           return $! (eb.id,) $! cert
 
     -- TODO: cache index of EBs ordered by .slot?
@@ -995,20 +1023,25 @@ mkBuffersView cfg st = BuffersView{..}
     let txsPayload = cfg.leios.sizes.inputBlockBodyAvgSize
     return $ NewInputBlockData{referenceRankingBlock, txsPayload}
   ibs = do
-    buffer <- readTVar st.relayIBState.relayBufferVar
-    times <- readTVar st.ibDeliveryTimesVar
-    let generatedCheck r =
-          map (.id)
-            . filter (\ib -> ib.slot `inRange` r)
-            . map fst
-            . RB.values
-            $ buffer
-        receivedByCheck slot =
-          filter
-            ( maybe False ((<= slotTime cfg.slotConfig slot) . snd)
-                . flip Map.lookup times
-            )
-        validInputBlocks q = receivedByCheck q.receivedBy $ generatedCheck q.generatedBetween
+    let splitLE k m =
+          let (lt, mbEq, _gt) = Map.splitLookup k m
+           in case mbEq of
+                Nothing -> lt
+                Just eq -> Map.insert k eq lt
+        splitGE k m =
+          let (_lt, mbEq, gt) = Map.splitLookup k m
+           in case mbEq of
+                Nothing -> gt
+                Just eq -> Map.insert k eq gt
+        generatedCheck (lo, hi) =
+          Map.unions
+            . splitGE lo
+            . splitLE hi
+        receivedByCheck hi =
+          mapMaybe (\(ibId, deliveryStage) -> do guard (deliveryStage <= hi); Just ibId)
+            . Map.toList
+    xs <- readTVar st.iBsForEBsAndVotesVar
+    let validInputBlocks q = receivedByCheck q.receivedBy . generatedCheck q.generatedBetween $ xs
     return InputBlocksSnapshot{..}
   ebs = do
     buffer <- readTVar st.relayEBState.relayBufferVar

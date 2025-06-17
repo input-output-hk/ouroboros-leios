@@ -111,6 +111,10 @@ data LeiosConfig = forall p. IsPipeline p => LeiosConfig
   , variant :: LeiosVariant
   , headerDiffusionTime :: NominalDiffTime
   -- ^ Δ_{hdr}.
+  , lateIbInclusion :: Bool
+  -- ^ Whether an EB also includes IBs from the two previous iterations.
+  --
+  -- TODO Merely one previous iteration if 'pipeline' is 'SingleVote'?
   , pipelinesToReferenceFromEB :: Int
   -- ^ how many older pipelines to reference from an EB when `variant = Full`.
   , votingFrequencyPerStage :: Double
@@ -147,6 +151,7 @@ convertConfig disk =
           , cleanupPolicies = disk.cleanupPolicies
           , variant = disk.leiosVariant
           , headerDiffusionTime = realToFrac $ durationMsToDiffTime disk.leiosHeaderDiffusionTimeMs
+          , lateIbInclusion = disk.leiosLateIbInclusion
           , pipelinesToReferenceFromEB =
               if disk.leiosVariant == Full
                 then
@@ -285,6 +290,7 @@ delaysAndSizesAsFull cfg@LeiosConfig{pipeline, voteSendStage} =
     , cleanupPolicies = cfg.cleanupPolicies
     , variant = cfg.variant
     , headerDiffusionTime = cfg.headerDiffusionTime
+    , lateIbInclusion = cfg.lateIbInclusion
     , pipelinesToReferenceFromEB = cfg.pipelinesToReferenceFromEB
     , activeVotingStageLength = cfg.activeVotingStageLength
     , votingFrequencyPerStage = cfg.votingFrequencyPerStage
@@ -461,20 +467,37 @@ isStage cfg stage slot = fromEnum slot >= cfg.sliceLength * fromEnum stage
 newtype PipelineNo = PipelineNo Word64
   deriving (Bounded, Enum, Show, Eq, Ord)
 
+pipelineMonus :: PipelineNo -> Word64 -> PipelineNo
+pipelineMonus (PipelineNo w) i = PipelineNo $ w - min w i
+
 stageRangeOf :: forall p. IsPipeline p => LeiosConfig -> PipelineNo -> Stage p -> (SlotNo, SlotNo)
 stageRangeOf cfg pl stage =
   fromMaybe
     undefined
     (stageRange cfg minBound (toEnum (fromEnum pl * cfg.sliceLength)) stage)
 
+-- | WARNING This fails if the slot is earlier than the beginning of the stage
+-- in the first iteration (ie @'PipelineNo' 0@)
 pipelineOf :: forall p. IsPipeline p => LeiosConfig -> Stage p -> SlotNo -> PipelineNo
 pipelineOf cfg stage sl =
-  toEnum $
-    fromMaybe undefined (fromEnum <$> stageStart cfg stage sl minBound)
-      `div` cfg.sliceLength
+  maybe err cnv $ stageStart cfg stage sl minBound
+ where
+  cnv = toEnum . (`div` cfg.sliceLength) . fromEnum
+
+  err = error $ show (cfg.sliceLength, x, stage, sl)
+
+  x :: String
+  x = case cfg of
+    LeiosConfig{pipeline} -> case pipeline of
+      SingSingleVote -> "SingleVote"
+      SingSplitVote -> "SplitVote"
 
 forEachPipeline :: (forall p. Stage p) -> (forall p. IsPipeline p => Stage p -> a) -> [a]
 forEachPipeline s k = [k @SingleVote s, k @SplitVote s]
+
+lastEndorse :: LeiosConfig -> PipelineNo -> SlotNo
+lastEndorse leios@LeiosConfig{pipeline = _ :: SingPipeline p} pipelineNo =
+  snd $ stageRangeOf @p leios pipelineNo Endorse
 
 lastVoteSend :: LeiosConfig -> PipelineNo -> SlotNo
 lastVoteSend leios@LeiosConfig{pipeline} pipelineNo = case pipeline of
@@ -657,12 +680,60 @@ data EndorseBlocksSnapshot = EndorseBlocksSnapshot
   , certifiedEndorseBlocks :: (PipelineNo, PipelineNo) -> [(PipelineNo, [(EndorseBlock, Certificate, UTCTime)])]
   }
 
+-- | In which contemporary stage was an IB delivered
+--
+-- IBs cannot be deliver earlier than any of these options, due to the
+-- 'LeiosProtocol.Relay.shouldNotRequest' logic of the
+-- 'LeiosProtocol.Short.Node.relayIBState'.
+--
+-- IBs that are delivered later than any of these options are discarded,
+-- ignored.
+data IbDeliveryStage
+  = -- | The node will not vote for an EB that excludes IBs that arrived during
+    -- Propose or Deliver1.
+    --
+    -- The node will include IBs that arrived during Propose or Deliver1 in an
+    -- EB it makes.
+    IbDuringProposeOrDeliver1
+  | -- | The node will include IBs that arrived during Deliver2 in an EB it makes.
+    IbDuringDeliver2
+  | -- | The node will not vote for an EB that includes IBs that arrived later
+    -- than Endorse.
+    IbDuringEndorse
+  deriving (Bounded, Enum, Eq, Ord, Show)
+
 -- | Both constraints are inclusive.
 data InputBlocksQuery = InputBlocksQuery
-  { generatedBetween :: (SlotNo, SlotNo)
-  , receivedBy :: SlotNo
+  { generatedBetween :: (PipelineNo, PipelineNo)
+  , receivedBy :: IbDeliveryStage
   -- ^ This is checked against time the body is downloaded, before validation.
   }
+
+ibWasDeliveredLate :: LeiosConfig -> SlotConfig -> SlotNo -> UTCTime -> Bool
+ibWasDeliveredLate cfg slotCfg sl deliveryTime =
+  case ibDeliveryStage cfg slotCfg sl deliveryTime of
+    Nothing -> True
+    Just{} -> False
+
+ibDeliveryStage :: LeiosConfig -> SlotConfig -> SlotNo -> UTCTime -> Maybe IbDeliveryStage
+ibDeliveryStage
+  cfg@LeiosConfig{pipeline = _ :: SingPipeline p}
+  slotCfg
+  ibSlot
+  deliveryTime
+    | before loPropose = Nothing -- TODO future blocks?
+    | before loDeliver2 = Just IbDuringProposeOrDeliver1
+    | before loEndorse = Just IbDuringDeliver2
+    | before (succ hiEndorse) = Just IbDuringEndorse
+    | otherwise = Nothing -- TODO late blocks?
+   where
+    p = pipelineOf @p cfg Propose ibSlot
+
+    before sl = deliveryTime < slotTime slotCfg sl
+
+    (loPropose, _) = stageRangeOf @p cfg p Propose
+    (loDeliver2, _) = stageRangeOf @p cfg p Deliver2
+    (loEndorse, hiEndorse) = stageRangeOf @p cfg p Endorse
 
 inputBlocksToEndorse ::
   LeiosConfig ->
@@ -670,15 +741,15 @@ inputBlocksToEndorse ::
   SlotNo ->
   InputBlocksSnapshot ->
   [InputBlockId]
-inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buffer = fromMaybe [] $ do
-  generatedBetween <- stageRange @p cfg Endorse current Propose
-  receivedBy <- stageEnd @p cfg Endorse current Deliver2
-  pure $
-    buffer.validInputBlocks
-      InputBlocksQuery
-        { generatedBetween
-        , receivedBy
-        }
+inputBlocksToEndorse cfg@LeiosConfig{pipeline = _ :: SingPipeline p} current buffer =
+  buffer.validInputBlocks
+    InputBlocksQuery
+      { generatedBetween = (lo, hi)
+      , receivedBy = IbDuringDeliver2
+      }
+ where
+  hi = pipelineOf @p cfg Endorse current
+  lo = if cfg.lateIbInclusion then pipelineMonus hi 2 else hi
 
 -- | Returns possible EBs to reference from current pipeline EB.
 endorseBlocksToReference ::
@@ -734,21 +805,24 @@ shouldVoteOnEB ::
 shouldVoteOnEB cfg@LeiosConfig{voteSendStage} _ slot _buffers _
   -- checks whether a pipeline has been started before.
   | Nothing <- stageRange cfg voteSendStage slot Propose = const False
-shouldVoteOnEB cfg@LeiosConfig{voteSendStage} slotConfig slot buffers ebuffers = cond
+shouldVoteOnEB cfg@LeiosConfig{voteSendStage = voteSendStage :: Stage p} slotConfig slot buffers ebuffers = cond
  where
-  generatedBetween = fromMaybe (error "impossible") $ stageRange cfg voteSendStage slot Propose
+  generatedBetween = (lo, hi)
+   where
+    hi = pipelineOf @p cfg voteSendStage slot
+    lo = if cfg.lateIbInclusion then pipelineMonus hi 2 else hi
   receivedByEndorse =
     buffers.validInputBlocks
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg voteSendStage slot Endorse
+        , receivedBy = IbDuringEndorse
         }
   receivedByDeliver1 = buffers.validInputBlocks q
    where
     q =
       InputBlocksQuery
         { generatedBetween
-        , receivedBy = fromMaybe (error "impossible") $ stageEnd cfg voteSendStage slot Deliver1
+        , receivedBy = IbDuringProposeOrDeliver1
         }
   -- Order of references in EndorseBlock matters for ledger state, so we stick to lists.
   -- Note: maybe order on (slot, subSlot, vrf proof) should be used instead?

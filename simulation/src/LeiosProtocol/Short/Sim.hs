@@ -427,6 +427,7 @@ traceRelayLink1 connectionOptions =
               , cleanupPolicies = def
               , variant = Short
               , headerDiffusionTime = 1
+              , lateIbInclusion = False
               , pipelinesToReferenceFromEB = 0
               , activeVotingStageLength = 1
               , pipeline = SingSingleVote
