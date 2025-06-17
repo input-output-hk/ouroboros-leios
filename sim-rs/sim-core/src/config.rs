@@ -76,6 +76,7 @@ pub struct RawParameters {
     pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
+    pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
     pub tx_stop_time: Option<f64>,
 
@@ -177,6 +178,8 @@ pub struct RawNode {
     pub location: RawNodeLocation,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_core_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_conflict_fraction: Option<f64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
 }
 
@@ -254,6 +257,7 @@ impl From<RawTopology> for Topology {
                     stake: node.stake.unwrap_or_default(),
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
+                    tx_conflict_fraction: node.tx_conflict_fraction,
                     consumers: vec![],
                 },
             );
@@ -403,6 +407,7 @@ impl TransactionConfig {
                 max_size: params.tx_max_size_bytes,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
+                conflict_fraction: params.tx_conflict_fraction.unwrap_or_default(),
                 start_time: params
                     .tx_start_time
                     .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
@@ -425,6 +430,7 @@ pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
+    pub conflict_fraction: f64,
     pub start_time: Option<Timestamp>,
     pub stop_time: Option<Timestamp>,
 }
@@ -547,6 +553,7 @@ pub struct NodeConfiguration {
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
+    pub tx_conflict_fraction: Option<f64>,
     pub consumers: Vec<NodeId>,
 }
 

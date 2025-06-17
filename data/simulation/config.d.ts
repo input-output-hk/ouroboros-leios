@@ -76,6 +76,10 @@ export interface Config {
   /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
   /**
+   * What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?
+   * Only supported by Rust simulation.  */
+  "tx-conflict-fraction": number | null;
+  /**
    * When the first transaction should appear.
    * Only supported by Rust simulation.  */
   "tx-start-time"?: number | null;
