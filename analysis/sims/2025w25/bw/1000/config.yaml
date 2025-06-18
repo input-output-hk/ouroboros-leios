@@ -39,7 +39,7 @@ praos-fallback-enabled: false
 tx-generation-distribution:
   distribution: exp
   lambda: 0.85
-  scale: 10.00
+  scale:  8.891
 tx-size-bytes-distribution:
   distribution: log-normal
   mu: 6.833
@@ -48,7 +48,7 @@ tx-sharded-percentage: 1.0
 tx-validation-cpu-time-ms: 1.5
 tx-max-size-bytes: 16384
 tx-start-time: 60
-tx-stop-time: 360
+tx-stop-time: 660
 
 ################################################################################
 # Ranking Block Configuration
