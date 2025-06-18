@@ -110,7 +110,7 @@ itemHeader =
     , "Egress [B]"
     , "Disk [B]"
     , "Total CPU [s]"
-    , "Maximmum CPU [s/s]"
+    , "Maximum CPU [s/s]"
     ]
 
 sep :: String

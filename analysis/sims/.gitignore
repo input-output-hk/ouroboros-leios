@@ -2,6 +2,7 @@
 .ipynb_checkpoints/
 ols
 sim-cli
+leios-trace-processor
 tmp/
 plots/
 results/
@@ -9,4 +10,5 @@ stdout
 stderr
 *.csv.gz
 *.log.gz
+*.log.xz
 index.html

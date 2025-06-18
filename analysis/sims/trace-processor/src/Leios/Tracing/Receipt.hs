@@ -30,13 +30,13 @@ data ItemKey
   = ItemKey
   { kind :: Text
   , item :: Text
-  , producer :: Text
   }
   deriving (Eq, Ord, Show)
 
 data ItemInfo
   = ItemInfo
-  { sent :: Minimum Double
+  { producer :: Text
+  , sent :: Minimum Double
   , size :: Maximum Double
   }
   deriving (Show)
@@ -44,24 +44,28 @@ data ItemInfo
 instance Semigroup ItemInfo where
   x <> y =
     ItemInfo
-      { sent = on (<>) sent x y
+      { producer = on ((maximum .) . (. pure) . (:)) producer x y
+      , sent = on (<>) sent x y
       , size = on (<>) size x y
       }
 
 instance Monoid ItemInfo where
   mempty =
     ItemInfo
-      { sent = mempty
+      { producer = mempty
+      , sent = mempty
       , size = mempty
       }
 
 toCSV :: ItemKey -> ItemInfo -> Text -> Double -> String
 toCSV ItemKey{..} ItemInfo{..} recipient received =
-  intercalate sep $
+  intercalate
+    sep
     [ T.unpack kind
     , T.unpack item
     , T.unpack producer
     , show sent
+    , show size
     , T.unpack recipient
     , show received
     , show $ (received -) <$> sent
@@ -74,7 +78,8 @@ itemHeader =
     [ "Kind"
     , "Item"
     , "Producer"
-    , "Sent [s]"
+    , "Generated [s]"
+    , "Size [B]"
     , "Recipient"
     , "Received [s]"
     , "Elapsed [s]"
@@ -100,68 +105,63 @@ parseMessage "TXGenerated" item sent =
       let kind = "TX"
       producer <- message .: "publisher"
       size <- message .: "size_bytes"
-      pure (ItemKey{..}, mempty{size, sent = Minimum $ Just sent}, Nothing)
+      pure (ItemKey{..}, mempty{producer, size, sent = Minimum $ Just sent}, Nothing)
 parseMessage "IBGenerated" item sent =
   withObject "IBGenerated" $ \message ->
     do
       let kind = "IB"
       producer <- message .: "producer"
       size <- message .: "size_bytes"
-      pure (ItemKey{..}, mempty{size, sent = Minimum $ Just sent}, Nothing)
+      pure (ItemKey{..}, mempty{producer, size, sent = Minimum $ Just sent}, Nothing)
 parseMessage "EBGenerated" item sent =
   withObject "EBGenerated" $ \message ->
     do
       let kind = "EB"
       producer <- message .: "producer"
       size <- message .: "size_bytes"
-      pure (ItemKey{..}, mempty{size, sent = Minimum $ Just sent}, Nothing)
+      pure (ItemKey{..}, mempty{producer, size, sent = Minimum $ Just sent}, Nothing)
 parseMessage "RBGenerated" item sent =
   withObject "RBGenerated" $ \message ->
     do
       let kind = "RB"
       producer <- message .: "producer"
       size <- message .: "size_bytes"
-      pure (ItemKey{..}, mempty{size, sent = Minimum $ Just sent}, Nothing)
+      pure (ItemKey{..}, mempty{producer, size, sent = Minimum $ Just sent}, Nothing)
 parseMessage "VTBundleGenerated" item sent =
   withObject "VTBundleGenerated" $ \message ->
     do
       let kind = "VT"
       producer <- message .: "producer"
       size <- message .: "size_bytes"
-      pure (ItemKey{..}, mempty{size, sent = Minimum $ Just sent}, Nothing)
+      pure (ItemKey{..}, mempty{producer, size, sent = Minimum $ Just sent}, Nothing)
 parseMessage "TXReceived" item received =
   withObject "TXReceived" $ \message ->
     do
       let kind = "TX"
-      producer <- message .: "producer"
       recipient <- message .: "recipient"
       pure (ItemKey{..}, mempty, Just (recipient, received))
 parseMessage "IBReceived" item received =
   withObject "IBReceived" $ \message ->
     do
       let kind = "IB"
-      producer <- message .: "producer"
       recipient <- message .: "recipient"
       pure (ItemKey{..}, mempty, Just (recipient, received))
 parseMessage "EBReceived" item received =
   withObject "EBReceived" $ \message ->
     do
       let kind = "EB"
-      producer <- message .: "producer"
       recipient <- message .: "recipient"
       pure (ItemKey{..}, mempty, Just (recipient, received))
 parseMessage "RBReceived" item received =
   withObject "RBReceived" $ \message ->
     do
       let kind = "RB"
-      producer <- message .: "producer"
       recipient <- message .: "recipient"
       pure (ItemKey{..}, mempty, Just (recipient, received))
 parseMessage "VTBundleReceived" item received =
   withObject "VTBundleReceived" $ \message ->
     do
       let kind = "VT"
-      producer <- message .: "producer"
       recipient <- message .: "recipient"
       pure (ItemKey{..}, mempty, Just (recipient, received))
 parseMessage _ _ _ =
