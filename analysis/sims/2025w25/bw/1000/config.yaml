@@ -77,7 +77,7 @@ rb-body-legacy-praos-payload-validation-cpu-time-ms-per-byte: 0.0005
 # Input Block Configuration
 ################################################################################
 
-ib-generation-probability: 1.00
+ib-generation-probability: 2.00
 ib-shards: 60
 ib-shard-period-length-slots: 1
 ib-shard-group-count: 6
