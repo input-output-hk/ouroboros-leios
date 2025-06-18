@@ -1,5 +1,30 @@
 # Leios logbook
 
+## 2025-06-18
+
+### Bandwidth experiment
+
+Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
+
+| Client                   | Server         | Send Mbps | Receive Mbps |
+|-------------------------:|---------------:|----------:|-------------:|
+| OVH Canada               | OVH Poland     |       219 |          217 |
+| OVH Canada               | OVH Oregon USA |       363 |          360 |
+| OVH Oregon USA           | OVH Poland     |       142 |          144 |
+| CenturyLink Colorado USA | OVH Poland     |       147 |          145 |
+| CenturyLink Colorado USA | OVH Oregon USA |       418 |          412 |
+| CenturyLink Colorado USA | OVH Canada     |        97 |           95 |
+| CenturyLink Colorado USA | OVH Virginia   |       311 |          309 |
+| CenturyLink Colorado USA | AWS Oregon USA |       826 |          824 |
+| AWS Oregon USA           | OVH Oregon USA |       973 |          972 |
+| AWS Oregon USA           | OVH Poland     |       141 |          138 |
+| AWS Oregon USA           | OVH Canada     |       329 |          327 |
+| OVH Virginia USA         | OVH Oregon USA |       369 |          367 |
+| OVH Virginia USA         | OVH Poland     |       231 |          229 |
+| OVH Virginia USA         | OVH Canada     |       469 |          467 |
+
+The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
+
 ## 2025-06-17
 
 ### Mini-mainnet experiments
