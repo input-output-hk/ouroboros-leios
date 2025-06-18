@@ -62,8 +62,8 @@ impl GraphBuilder {
             let loc1 = to_netsim_location(self.location_of(node));
             let loc2 = to_netsim_location(self.location_of(producer));
             latency_between_locations(loc1, loc2, 1.)
-                .unwrap()
-                .to_duration()
+                .map(|d| d.to_duration())
+                .unwrap_or_default()
                 .max(Duration::from_millis(1))
         });
         self.links.push(RawLinkConfig {
