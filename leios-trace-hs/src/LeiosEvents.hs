@@ -119,6 +119,7 @@ data Event where
     , pipeline :: !PipelineNo
     , bytes :: !Word64
     , input_blocks :: ![BlockRef]
+    , endorser_blocks :: ![BlockRef]
     } ->
     Event
   RBGenerated ::

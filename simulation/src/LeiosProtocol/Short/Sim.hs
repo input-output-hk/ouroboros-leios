@@ -355,6 +355,7 @@ sharedEvent leios nodeNames e = case e of
         Shared.EBGenerated
           { bytes = fromIntegral (messageSizeBytes eb)
           , input_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.inputBlocks
+          , endorser_blocks = map (Shared.BlockRef . T.pack . mkStringId) eb.endorseBlocksEarlierPipeline
           , pipeline = coerce $ endorseBlockPipeline leios eb
           , ..
           }
