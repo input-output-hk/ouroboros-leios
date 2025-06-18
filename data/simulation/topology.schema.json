@@ -48,6 +48,10 @@
           "additionalProperties": false,
           "properties": {},
           "type": "number"
+        },
+        "tx-conflict-fraction": {
+          "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
+          "type": "number"
         }
       },
       "type": "object"
@@ -86,6 +90,10 @@
         "stake": {
           "additionalProperties": false,
           "properties": {},
+          "type": "number"
+        },
+        "tx-conflict-fraction": {
+          "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
           "type": "number"
         }
       },

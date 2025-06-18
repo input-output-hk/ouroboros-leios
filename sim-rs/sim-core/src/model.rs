@@ -91,6 +91,7 @@ pub struct Transaction {
     pub id: TransactionId,
     pub shard: u64,
     pub bytes: u64,
+    pub input_id: u64,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -135,6 +136,7 @@ pub struct InputBlock {
     pub header: InputBlockHeader,
     pub tx_payload_bytes: u64,
     pub transactions: Vec<Arc<Transaction>>,
+    pub rb_ref: Option<BlockId>,
 }
 impl InputBlock {
     pub fn bytes(&self) -> u64 {

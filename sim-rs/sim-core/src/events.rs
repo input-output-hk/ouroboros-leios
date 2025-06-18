@@ -103,6 +103,7 @@ pub enum Event {
         publisher: Node,
         size_bytes: u64,
         shard: u64,
+        input_id: u64,
     },
     TXSent {
         id: TransactionId,
@@ -168,6 +169,7 @@ pub enum Event {
         tx_payload_bytes: u64,
         size_bytes: u64,
         transactions: Vec<TransactionId>,
+        rb_ref: Option<BlockId<Node>>,
     },
     NoIBGenerated {
         node: Node,
@@ -427,6 +429,7 @@ impl EventTracker {
             publisher: self.to_node(publisher),
             size_bytes: transaction.bytes,
             shard: transaction.shard,
+            input_id: transaction.input_id,
         });
     }
 
@@ -476,6 +479,7 @@ impl EventTracker {
             tx_payload_bytes,
             size_bytes: header_bytes + tx_payload_bytes,
             transactions: block.transactions.iter().map(|tx| tx.id).collect(),
+            rb_ref: block.rb_ref.map(|b| self.to_block(b)),
         });
     }
 

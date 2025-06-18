@@ -239,6 +239,9 @@
         "id": {
           "type": "string"
         },
+        "input_id": {
+          "type": "number"
+        },
         "publisher": {
           "type": "string"
         },
@@ -250,7 +253,7 @@
           "type": "string"
         }
       },
-      "required": ["id", "publisher", "size_bytes", "type"],
+      "required": ["id", "input_id", "publisher", "size_bytes", "type"],
       "type": "object"
     },
     "GeneratedVote": {

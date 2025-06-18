@@ -56,6 +56,7 @@ interface GeneratedTransaction {
     id: string;
     publisher: string;
     size_bytes: number;
+    input_id: number;
 }
 
 interface LostTransaction {

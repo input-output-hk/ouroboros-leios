@@ -68,6 +68,7 @@ pub struct RawParameters {
     pub leios_late_ib_inclusion: bool,
     pub leios_header_diffusion_time_ms: f64,
     pub leios_mempool_sampling_strategy: MempoolSamplingStrategy,
+    pub leios_mempool_aggressive_pruning: bool,
     pub praos_chain_quality: u64,
     pub praos_fallback_enabled: bool,
 
@@ -76,6 +77,7 @@ pub struct RawParameters {
     pub tx_size_bytes_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
+    pub tx_conflict_fraction: Option<f64>,
     pub tx_start_time: Option<f64>,
     pub tx_stop_time: Option<f64>,
 
@@ -177,6 +179,8 @@ pub struct RawNode {
     pub location: RawNodeLocation,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cpu_core_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_conflict_fraction: Option<f64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
 }
 
@@ -254,6 +258,7 @@ impl From<RawTopology> for Topology {
                     stake: node.stake.unwrap_or_default(),
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
+                    tx_conflict_fraction: node.tx_conflict_fraction,
                     consumers: vec![],
                 },
             );
@@ -403,6 +408,7 @@ impl TransactionConfig {
                 max_size: params.tx_max_size_bytes,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
+                conflict_fraction: params.tx_conflict_fraction.unwrap_or_default(),
                 start_time: params
                     .tx_start_time
                     .map(|t| Timestamp::zero() + Duration::from_secs_f64(t)),
@@ -425,6 +431,7 @@ pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
+    pub conflict_fraction: f64,
     pub start_time: Option<Timestamp>,
     pub stop_time: Option<Timestamp>,
 }
@@ -437,11 +444,16 @@ pub(crate) struct MockTransactionConfig {
 }
 
 impl MockTransactionConfig {
-    pub fn next_id(&self) -> TransactionId {
+    pub fn mock_tx(&self, bytes: u64) -> Transaction {
         let id = self
             .next_id
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        TransactionId::new(id)
+        Transaction {
+            id: TransactionId::new(id),
+            shard: 0,
+            bytes,
+            input_id: id,
+        }
     }
 }
 
@@ -464,6 +476,7 @@ pub struct SimConfiguration {
     pub(crate) header_diffusion_time: Duration,
     pub(crate) relay_strategy: RelayStrategy,
     pub(crate) mempool_strategy: MempoolSamplingStrategy,
+    pub(crate) mempool_aggressive_pruning: bool,
     pub(crate) praos_chain_quality: u64,
     pub(crate) block_generation_probability: f64,
     pub(crate) ib_generation_probability: f64,
@@ -509,6 +522,7 @@ impl SimConfiguration {
             header_diffusion_time: duration_ms(params.leios_header_diffusion_time_ms),
             relay_strategy: params.relay_strategy,
             mempool_strategy: params.leios_mempool_sampling_strategy,
+            mempool_aggressive_pruning: params.leios_mempool_aggressive_pruning,
             praos_chain_quality: params.praos_chain_quality,
             block_generation_probability: params.rb_generation_probability,
             ib_generation_probability: params.ib_generation_probability,
@@ -542,6 +556,7 @@ pub struct NodeConfiguration {
     pub stake: u64,
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
+    pub tx_conflict_fraction: Option<f64>,
     pub consumers: Vec<NodeId>,
 }
 

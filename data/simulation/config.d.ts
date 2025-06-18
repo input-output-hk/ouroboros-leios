@@ -54,6 +54,10 @@ export interface Config {
    */
   "leios-mempool-sampling-strategy": MempoolSamplingStrategy;
   /**
+   * If true, transactions will be removed from the Leios mempool if they conflict with in-flight IBs.
+   */
+  "leios-mempool-aggressive-pruning": boolean;
+  /**
    * Praos blockchain quality parameter.
    * This is η from the Leios paper.
    * Controls the pipelines EBs should reference in Full leios:
@@ -75,6 +79,10 @@ export interface Config {
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
+  /**
+   * What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?
+   * Only supported by Rust simulation.  */
+  "tx-conflict-fraction": number | null;
   /**
    * When the first transaction should appear.
    * Only supported by Rust simulation.  */
