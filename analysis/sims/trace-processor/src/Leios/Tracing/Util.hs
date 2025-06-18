@@ -34,7 +34,9 @@ instance Functor Minimum where
   fmap f = Minimum . fmap f . getMinimum
 
 instance Ord a => Semigroup (Minimum a) where
-  x <> y = if x < y then x else y
+  Minimum (Just x) <> Minimum (Just y) = Minimum . Just $ min x y
+  x <> Minimum Nothing = x
+  _ <> y = y
 
 instance Ord a => Monoid (Minimum a) where
   mempty = Minimum Nothing
@@ -63,7 +65,9 @@ instance Functor Maximum where
   fmap f = Maximum . fmap f . getMaximum
 
 instance Ord a => Semigroup (Maximum a) where
-  x <> y = if x > y then x else y
+  Maximum (Just x) <> Maximum (Just y) = Maximum . Just $ max x y
+  x <> Maximum Nothing = x
+  _ <> y = y
 
 instance Ord a => Monoid (Maximum a) where
   mempty = Maximum Nothing
