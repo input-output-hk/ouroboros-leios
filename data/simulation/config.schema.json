@@ -273,6 +273,10 @@
       "description": "Extends Leios so that EB producers include IBs directly from previous pipelines\nwhere no certified EB was observed.\n\nOnly supported by Rust simulation.",
       "type": "boolean"
     },
+    "leios-mempool-aggressive-pruning": {
+      "description": "If true, transactions will be removed from the Leios mempool if they conflict with in-flight IBs.",
+      "type": "boolean"
+    },
     "leios-mempool-sampling-strategy": {
       "$ref": "#/definitions/MempoolSamplingStrategy",
       "description": "The strategy to use when selecting TXs from the Leios mempool."
@@ -368,6 +372,10 @@
       "description": "Only supported by Rust simulation.",
       "properties": {},
       "type": "number"
+    },
+    "tx-overcollateralization-factor-distribution": {
+      "$ref": "#/definitions/Distribution",
+      "description": "Distribution used to choose the \"over-collateralization factor\" for a transaction.\n0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.\nOnly supported by Rust simulation."
     },
     "tx-size-bytes-distribution": {
       "$ref": "#/definitions/Distribution",

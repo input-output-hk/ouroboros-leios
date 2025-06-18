@@ -75,6 +75,11 @@ export interface Config {
   "tx-generation-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-size-bytes-distribution": Distribution;
+  /**
+   * Distribution used to choose the "over-collateralization factor" for a transaction.
+   * 0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.
+   * Only supported by Rust simulation.  */
+  "tx-overcollateralization-factor-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */

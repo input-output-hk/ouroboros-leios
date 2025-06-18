@@ -92,6 +92,7 @@ pub struct Transaction {
     pub shard: u64,
     pub bytes: u64,
     pub input_id: u64,
+    pub overcollateralization_factor: u64,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
