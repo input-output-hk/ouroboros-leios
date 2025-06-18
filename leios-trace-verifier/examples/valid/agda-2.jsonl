@@ -131,7 +131,7 @@
 {"message":{"slot":8,"type":"IBGenerated","producer":"node-0","id":"0-8","rb_ref":"-7674734470404649268","pipeline":0,"size_bytes":98608,"tx_payload_bytes":98304},"time_s":8.01}
 #
 # ∷ inj₁ (EB-Role-Action 8 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
-{"message":{"slot":8,"type":"EBGenerated","producer":"node-0","id":"0-8","input_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":8.02}
+{"message":{"slot":8,"type":"EBGenerated","producer":"node-0","id":"0-8","input_blocks":[],"endorser_blocks":[],"pipeline":0,"size_bytes":1616},"time_s":8.02}
 #
 # ∷ inj₁ (VT-Role-Action 8    , SLOT)
 {"message":{"slot":8,"type":"VTBundleGenerated","producer":"node-0","id":"0-8","votes":{},"pipeline":0,"size_bytes":105},"time_s":8.03}
