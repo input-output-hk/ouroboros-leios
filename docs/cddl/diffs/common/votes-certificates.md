@@ -13,7 +13,7 @@ leios_certificate =
   , endorser_block_hash    : hash32                                  ; Hash of the endorsed block (EB)  
   , persistent_voters      : [* persistent_voter_id]                 ; Set of persistent voter IDs
   , nonpersistent_voters   : {* pool_id => bls_signature}            ; Non-persistent voters with eligibility proofs
-  , ? aggregate_elig_sig   : bls_signature                           ; Optional aggregate eligibility signature
+  , ? aggregate_elig_sig   : bls_signature                           ; Aggregate eligibility signature (present when non-persistent voters exist)
   , aggregate_vote_sig     : bls_signature                           ; Aggregate BLS signature on (election_id || endorser_block_hash)
   ]
 ```
@@ -23,30 +23,31 @@ leios_certificate =
 
 The Leios voting system supports two types of voters: persistent voters (selected per epoch) and non-persistent voters (selected per election via local sortition).
 
-```cddl
-; Vote cast in a Leios election
-leios_vote = persistent_vote / non_persistent_vote
+> [!Note]
+> Individual votes are ephemeral data structures used during the voting process. They are aggregated into certificates and do not appear on the ledger or persistent storage. Only the resulting certificates are stored permanently.
 
-; Vote cast by a persistent voter (90 bytes)
-persistent_vote =
+```cddl
+; Vote bundle containing votes for multiple endorser blocks from same voter
+leios_vote_bundle = persistent_vote_bundle / non_persistent_vote_bundle
+
+persistent_vote_bundle =
   [ 0                        ; Vote type identifier for persistent voter
   , election_id              ; 8-byte election identifier  
-  , endorser_block_hash      ; 32-byte hash of the endorser block being voted on
   , persistent_voter_id      ; 2-byte epoch-specific pool identifier
-  , vote_signature           ; 48-byte BLS signature on (election_id || endorser_block_hash)
+  , vote_entries             ; Map of endorser blocks to signatures
   ]
 
-; Vote cast by a non-persistent voter (164 bytes)  
-non_persistent_vote =
+non_persistent_vote_bundle =
   [ 1                        ; Vote type identifier for non-persistent voter
   , election_id              ; 8-byte election identifier
-  , endorser_block_hash      ; 32-byte hash of the endorser block being voted on  
   , pool_id                  ; 28-byte pool identifier
-  , eligibility_signature    ; 48-byte BLS signature proving eligibility to vote
-  , vote_signature           ; 48-byte BLS signature on (election_id || endorser_block_hash)
+  , eligibility_signature    ; 48-byte BLS signature proving eligibility
+  , vote_entries             ; Map of endorser blocks to signatures
   ]
+
+vote_entries = {* endorser_block_hash => vote_signature}
 ```
-<sub>[1] [Vote Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/vote.rs#L13-L27), [2] [Formal Specification - Vote Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Abstract.agda#L24-L27)</sub>
+<sub>[1] [Vote Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/vote.rs#L13-L27), [2] [Formal Specification - Vote Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Abstract.agda#L24-L27), [3] [Haskell Bundle Usage](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Short.hs#L231-L234), [4] [Rust Vote Bundle](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L208-L212)</sub>
 
 ## BLS Key Registration
 
