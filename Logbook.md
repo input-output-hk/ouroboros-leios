@@ -1,13 +1,37 @@
 # Leios logbook
 
+## 2025-06-19
+
+### Metrics section in CIP
+
+The performance of a protocol like Leios can be characterized in terms of its efficient use of resources, its total use of resources, the probabilities of negative outcomes due to the protocol's design, and the resilience to adverse conditions. Metrics measuring such performance depend upon the selection of protocol parameters, the network topology, and the submission of transactions. The table below summarizes key metrics for evaluating Leios as a protocol and individual scenarios (parameters, network, and load). A discussion of these metrics was added to [the draft Leios CIP](docs/cip/README.md#metrics).
+
+| Category   | Metric                                                    | Measurement                                                                                                     |
+| ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
+|            | Temporal efficiency, $`\epsilon_\text{temporal}(s)`$      | Time to include transaction on ledger                                                                           |
+|            | Network efficiency, $`\epsilon_\text{network}`$           | Ratio of total transaction size to node-averaged network usage                                                  |
+| Protocol   | TX collision, $`p_\text{collision}`$                      | Probability of a transaction being included in two IBs                                                          |
+|            | TX inclusion, $`\tau_\text{inclusion}`$                   | Mean number of slots for a transaction being included in any IB                                                 |
+|            | Voting failure, $`p_\text{noquorum}`$                     | Probability of sortition failure to elect sufficient voters for a quorum                                        |
+| Resource   | Network egress, $`q_\text{egress}`$                       | Rate of bytes transmitted by a node                                                                             |
+|            | Disk usage, $`q_\text{disk}`$                             | Rate of persistent bytes stored by a node                                                                       |
+|            | I/O operations, $`\bar{q}_\text{iops}(b)`$                | Mean number of I/O operations per second, where each operation writes a filesystem block of $`b`$ bytes         |
+|            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
+|            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
+| Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
+|            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
+| Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
+|            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+
 ## 2025-06-18
 
-### Bandwidth experiment
+### Bandwidth measurements
 
 Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
 
 | Client                   | Server         | Send Mbps | Receive Mbps |
-|-------------------------:|---------------:|----------:|-------------:|
+|:-------------------------|:---------------|----------:|-------------:|
 | OVH Canada               | OVH Poland     |       219 |          217 |
 | OVH Canada               | OVH Oregon USA |       363 |          360 |
 | OVH Oregon USA           | OVH Poland     |       142 |          144 |
@@ -24,6 +48,8 @@ Because bandwidth between nodes has been identified as a critical resource that 
 | OVH Virginia USA         | OVH Canada     |       469 |          467 |
 
 The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
+
+We also made some empirical measurements where a machine in one data center connects to four others to measure simultaneous bandwidth. It looks like there is a 5-20% reduction in individual link speed, as compared to only one connection at a time. (For most of the pairs, it is closer to 5%, and the 20% is an outlier.) However, we don't know what would happen if we measured with 25 simultaneous connections.
 
 ## 2025-06-17
 
