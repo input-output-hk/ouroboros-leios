@@ -265,7 +265,6 @@ The performance of a protocol like Leios can be characterized in terms of its ef
 |            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
 |            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
 | Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
-|            | Message loss, $`\eta_\text{message}(\ell)`$               | Fractional loss in throughput due to a fraction $`\ell`$ of all transmitted messages being lost                 |
 | Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
 |            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
 |            | Extra work due to conflicts, $`w_\text{conflict}(c)`$     | Average additional CPU load caused by transaction conflicts where a fraction $`c`$ of the memory pool conflicts |
@@ -320,12 +319,6 @@ p_\text{noquorum} = \text{probability of sufficient voters to achieve a quorum i
 
 $$`
 \eta_\text{bandwidth}(b) = \frac{\text{bytes of transactions reaching the ledger if links have bandwidth } b}{\text{bytes of transactions reaching the ledger if bandwidth were infinite}}
-`$$
-
-***Message loss:*** Using the same metric $`\eta`$, one can also measure the loss in throughput due to unreliable network infrastructure where the fraction $`\ell`$ of messages sent from a node are lost before reaching their destination node.
-
-$$`
-\eta_\text{message}(\ell) = \frac{\text{bytes of transactions reaching the ledger if } \ell \text{ fraction of messages are lost}}{\text{bytes of transactions reaching the ledger if no messages are lost}}
 `$$
 
 ### Evidence that Leios provides high throughput
