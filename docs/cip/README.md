@@ -249,6 +249,10 @@ In analogy, imagine Praos as a single courier diligently collecting and deliveri
 
 ### Metrics
 
+> [!NOTE]
+> 
+> This is a preliminary set of metrics that will be finalized when the Leios protocol variants are finalized and the simulation studies are complete.
+
 The performance of a protocol like Leios can be characterized in terms of its efficient use of resources, its total use of resources, the probabilities of negative outcomes due to the protocol's design, and the resilience to adverse conditions. Metrics measuring such performance depend upon the selection of protocol parameters, the network topology, and the submission of transactions. The table below summarizes key metrics for evaluating Leios as a protocol and individual scenarios (parameters, network, and load).
 
 | Category   | Metric                                                    | Measurement                                                                                                     |
