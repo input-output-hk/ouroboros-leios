@@ -265,9 +265,9 @@ The performance of a protocol like Leios can be characterized in terms of its ef
 |            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
 |            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
 | Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
+|            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
 | Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
 |            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
-|            | Extra work due to conflicts, $`w_\text{conflict}(c)`$     | Average additional CPU load caused by transaction conflicts where a fraction $`c`$ of the memory pool conflicts |
 
 ***Spatial efficiency:*** Leios necessarily imposes some disk overhead beyond the raw bytes needed to store transactions themselves. This overhead includes the IBs, EBs, and RBs associated with storing transactions. The concurrency inherent in Leios also opens the possibility that duplicate or conflicting transactions are stored in IBs, with the consequence that some space is the IBs is wasted. The spatial efficiency metric is defined as the ratio of the total bytes of transactions included in the ledger to the total persistent storage required by the protocol.
 
@@ -319,6 +319,22 @@ p_\text{noquorum} = \text{probability of sufficient voters to achieve a quorum i
 
 $$`
 \eta_\text{bandwidth}(b) = \frac{\text{bytes of transactions reaching the ledger if links have bandwidth } b}{\text{bytes of transactions reaching the ledger if bandwidth were infinite}}
+`$$
+
+***Adversarial stake:*** Similarly, when adversarial stake is appreciable and active, the throughput of Leios might be drop.
+
+$$`
+\eta_\text{adversary}(s) = \frac{\text{bytes of transactions reaching the ledger without adversarial activity}}{\text{bytes of transactions reaching the ledger with adversarial activity given fraction } s \text{ of the total stake}}
+`$$
+
+***Fees:*** Two fee metrics relate to consumption of collateral. Some Leios variants may consume collateral for successful transactions when conflicts are present in IBs and EBs; others may consume collateral for failed transactions.
+
+$$`
+\kappa_\text{success}(c) = \text{average collateral paid for a successful transaction when it conflicts with a fraction } c \text{ of the memory pool}
+`$$
+
+$$`
+\kappa_\text{failure}(c) = \text{average collateral paid for a failed transaction when it conflicts with a fraction } c \text{ of the memory pool}
 `$$
 
 ### Evidence that Leios provides high throughput
