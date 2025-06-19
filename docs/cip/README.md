@@ -267,6 +267,9 @@ The performance of a protocol like Leios can be characterized in terms of its ef
 | Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
 |            | Conflict, $`\eta_\text{conflict}`$                        | Fractional loss in throughput due to a globally conflicted memory pool                                          |
 |            | Message loss, $`\eta_\text{message}(\ell)`$               | Fractional loss in throughput due to a fraction $`\ell`$ of all transmitted messages being lost                 |
+| Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
+|            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+|            | Extra work due to conflicts, $`w_\text{conflict}(c)`$     | Average additional CPU load caused by transaction conflicts where a fraction $`c`$ of the memory pool conflicts |
 
 ***Spatial efficiency:*** Leios necessarily imposes some disk overhead beyond the raw bytes needed to store transactions themselves. This overhead includes the IBs, EBs, and RBs associated with storing transactions. The concurrency inherent in Leios also opens the possibility that duplicate or conflicting transactions are stored in IBs, with the consequence that some space is the IBs is wasted. The spatial efficiency metric is defined as the ratio of the total bytes of transactions included in the ledger to the total persistent storage required by the protocol.
 
