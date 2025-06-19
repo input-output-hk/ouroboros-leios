@@ -2,6 +2,23 @@
 
 Leios introduces a new BLS-based voting system with certificates for endorser block validation.
 
+## Certificate Structure
+
+Leios certificates are embedded in Ranking Blocks as described in [Ranking Blocks - CDDL Changes](ranking-blocks.md). Here is the complete certificate structure:
+
+```cddl
+; Complete Leios certificate structure (from crypto-benchmarks implementation)
+leios_certificate =
+  [ election_id            : election_id                             ; 8-byte election identifier (EID)
+  , endorser_block_hash    : hash32                                  ; Hash of the endorsed block (EB)  
+  , persistent_voters      : [* persistent_voter_id]                 ; Set of persistent voter IDs
+  , nonpersistent_voters   : {* pool_id => bls_signature}            ; Non-persistent voters with eligibility proofs
+  , ? aggregate_elig_sig   : bls_signature                           ; Optional aggregate eligibility signature
+  , aggregate_vote_sig     : bls_signature                           ; Aggregate BLS signature on (election_id || endorser_block_hash)
+  ]
+```
+<sub>[1] [Certificate Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/cert.rs#L13-L21), [2] [Certificate Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Base.agda#L24-L28)</sub>
+
 ## Vote Structure
 
 The Leios voting system supports two types of voters: persistent voters (selected per epoch) and non-persistent voters (selected per election via local sortition).
@@ -30,23 +47,6 @@ non_persistent_vote =
   ]
 ```
 <sub>[1] [Vote Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/vote.rs#L13-L27), [2] [Formal Specification - Vote Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Abstract.agda#L24-L27)</sub>
-
-## Certificate Structure
-
-Leios certificates are embedded in Ranking Blocks as described in [Ranking Blocks - CDDL Changes](ranking-blocks.md). Here is the complete certificate structure:
-
-```cddl
-; Complete Leios certificate structure (from crypto-benchmarks implementation)
-leios_certificate =
-  [ election_id            : election_id                             ; 8-byte election identifier (EID)
-  , endorser_block_hash    : hash32                                  ; Hash of the endorsed block (EB)  
-  , persistent_voters      : [* persistent_voter_id]                 ; Set of persistent voter IDs
-  , nonpersistent_voters   : {* pool_id => bls_signature}            ; Non-persistent voters with eligibility proofs
-  , ? aggregate_elig_sig   : bls_signature                           ; Optional aggregate eligibility signature
-  , aggregate_vote_sig     : bls_signature                           ; Aggregate BLS signature on (election_id || endorser_block_hash)
-  ]
-```
-<sub>[1] [Certificate Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/cert.rs#L13-L21), [2] [Certificate Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Base.agda#L24-L28)</sub>
 
 ## BLS Key Registration
 
