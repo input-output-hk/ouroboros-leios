@@ -75,6 +75,7 @@ pub struct RawParameters {
     // Transaction configuration
     pub tx_generation_distribution: DistributionConfig,
     pub tx_size_bytes_distribution: DistributionConfig,
+    pub tx_overcollateralization_factor_distribution: DistributionConfig,
     pub tx_validation_cpu_time_ms: f64,
     pub tx_max_size_bytes: u64,
     pub tx_conflict_fraction: Option<f64>,
@@ -408,6 +409,9 @@ impl TransactionConfig {
                 max_size: params.tx_max_size_bytes,
                 frequency_ms: params.tx_generation_distribution.into(),
                 size_bytes: params.tx_size_bytes_distribution.into(),
+                overcollateralization_factor: params
+                    .tx_overcollateralization_factor_distribution
+                    .into(),
                 conflict_fraction: params.tx_conflict_fraction.unwrap_or_default(),
                 start_time: params
                     .tx_start_time
@@ -431,6 +435,7 @@ pub(crate) struct RealTransactionConfig {
     pub max_size: u64,
     pub frequency_ms: FloatDistribution,
     pub size_bytes: FloatDistribution,
+    pub overcollateralization_factor: FloatDistribution,
     pub conflict_fraction: f64,
     pub start_time: Option<Timestamp>,
     pub stop_time: Option<Timestamp>,
@@ -453,6 +458,7 @@ impl MockTransactionConfig {
             shard: 0,
             bytes,
             input_id: id,
+            overcollateralization_factor: 0,
         }
     }
 }

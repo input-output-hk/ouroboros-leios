@@ -1407,9 +1407,20 @@ impl Node {
             vec![Arc::new(tx)]
         } else {
             let ledger_state = self.resolve_ledger_state(rb_ref);
+            let ib_shards = self.sim_config.ib_shards;
+            let tx_may_use_shard = |tx: &Transaction, ib_shard: u64| {
+                for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
+                    let shard = shard % ib_shards;
+                    if shard == ib_shard {
+                        return true;
+                    }
+                }
+                false
+            };
             self.select_txs(
                 |seen| {
-                    seen.tx.shard == shard && !ledger_state.spent_inputs.contains(&seen.tx.input_id)
+                    tx_may_use_shard(&seen.tx, shard)
+                        && !ledger_state.spent_inputs.contains(&seen.tx.input_id)
                 },
                 self.sim_config.max_ib_size,
             )

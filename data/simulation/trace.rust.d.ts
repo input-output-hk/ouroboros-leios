@@ -57,6 +57,8 @@ interface GeneratedTransaction {
     publisher: string;
     size_bytes: number;
     input_id: number;
+    shard: number;
+    overcollateralization_factor: number;
 }
 
 interface LostTransaction {

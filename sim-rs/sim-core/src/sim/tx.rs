@@ -90,12 +90,15 @@ impl TransactionProducer {
                 next_input_id += 1;
                 id
             };
+            let overcollateralization_factor =
+                config.overcollateralization_factor.sample(&mut rng) as u64;
 
             let tx = Transaction {
                 id,
                 shard,
                 bytes,
                 input_id,
+                overcollateralization_factor,
             };
 
             node.sink.send(Arc::new(tx))?;

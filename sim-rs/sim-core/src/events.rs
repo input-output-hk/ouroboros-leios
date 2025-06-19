@@ -104,6 +104,7 @@ pub enum Event {
         size_bytes: u64,
         shard: u64,
         input_id: u64,
+        overcollateralization_factor: u64,
     },
     TXSent {
         id: TransactionId,
@@ -430,6 +431,7 @@ impl EventTracker {
             size_bytes: transaction.bytes,
             shard: transaction.shard,
             input_id: transaction.input_id,
+            overcollateralization_factor: transaction.overcollateralization_factor,
         });
     }
 
