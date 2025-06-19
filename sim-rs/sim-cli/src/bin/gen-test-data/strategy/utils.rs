@@ -171,6 +171,7 @@ impl GraphBuilder {
                     location: RawNodeLocation::Coords(n.location),
                     cpu_core_count: n.cores,
                     tx_conflict_fraction: None,
+                    tx_generation_weight: None,
                     producers: BTreeMap::new(),
                 };
                 (name, node)

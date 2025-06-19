@@ -52,6 +52,10 @@
         "tx-conflict-fraction": {
           "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
           "type": "number"
+        },
+        "tx-generation-weight": {
+          "description": "How likely is this node to generate transactions, compared to its peers?\nDefault is 0 for nodes with stake, 1 for nodes with no stake.\nOnly supported by Rust simulation.",
+          "type": "number"
         }
       },
       "type": "object"
@@ -94,6 +98,10 @@
         },
         "tx-conflict-fraction": {
           "description": "What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?\nOnly supported by Rust simulation.",
+          "type": "number"
+        },
+        "tx-generation-weight": {
+          "description": "How likely is this node to generate transactions, compared to its peers?\nDefault is 0 for nodes with stake, 1 for nodes with no stake.\nOnly supported by Rust simulation.",
           "type": "number"
         }
       },

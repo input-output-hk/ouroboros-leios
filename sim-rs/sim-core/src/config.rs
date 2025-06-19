@@ -182,6 +182,8 @@ pub struct RawNode {
     pub cpu_core_count: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_conflict_fraction: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_generation_weight: Option<u64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
 }
 
@@ -260,6 +262,7 @@ impl From<RawTopology> for Topology {
                     cpu_multiplier: 1.0,
                     cores: node.cpu_core_count,
                     tx_conflict_fraction: node.tx_conflict_fraction,
+                    tx_generation_weight: node.tx_generation_weight,
                     consumers: vec![],
                 },
             );
@@ -563,6 +566,7 @@ pub struct NodeConfiguration {
     pub cpu_multiplier: f64,
     pub cores: Option<u64>,
     pub tx_conflict_fraction: Option<f64>,
+    pub tx_generation_weight: Option<u64>,
     pub consumers: Vec<NodeId>,
 }
 

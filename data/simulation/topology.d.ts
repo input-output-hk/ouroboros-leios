@@ -27,6 +27,12 @@ export interface Node<Location> {
    * What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?
    * Only supported by Rust simulation.  */
   "tx-conflict-fraction"?: number | null;
+  /**
+   * How likely is this node to generate transactions, compared to its peers?
+   * Default is 0 for nodes with stake, 1 for nodes with no stake.
+   * Only supported by Rust simulation.
+   */
+  "tx-generation-weight"?: number | null;
   /** If not null, the node will behave according to the given Behaviour.
   *
   * Only supported by Haskell simulation.
