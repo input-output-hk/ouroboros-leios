@@ -256,7 +256,7 @@ The performance of a protocol like Leios can be characterized in terms of its ef
 | Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
 |            | Temporal efficiency, $`\epsilon_\text{temporal}(s)`$      | Time to include transaction on ledger                                                                           |
 |            | Network efficiency, $`\epsilon_\text{network}`$           | Ratio of total transaction size to node-averaged network usage                                                  |
-| Protocol   | TX collision, $`p_\text{collision}`$                      | Probability of a transaction being included two IBs                                                             |
+| Protocol   | TX collision, $`p_\text{collision}`$                      | Probability of a transaction being included in two IBs                                                          |
 |            | TX inclusion, $`\tau_\text{inclusion}`$                   | Mean number of slots for a transaction being included in any IB                                                 |
 |            | Voting failure, $`p_\text{noquorum}`$                     | Probability of sortition failure to elect sufficient voters for a quorum                                        |
 | Resource   | Network egress, $`q_\text{egress}`$                       | Rate of bytes transmitted by a node                                                                             |
