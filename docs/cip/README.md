@@ -283,7 +283,7 @@ $$`
 \epsilon_\text{temporal}(s) = \text{fraction of transactions included in the ledger within } s \text{ slots of their inclusion in a local memory pool}
 `$$
 
-***Network efficiency:*** Effective utilization of the network can be characterized by the ratio of bytes of transactions reaching the ledger to the average network traffic per node.
+***Network efficiency:*** Effective utilization of the network can be characterized by the ratio of bytes of transactions reaching the ledger to the average network traffic per node. (This could also be computed individually for each node and used as a local metric.)
 
 $$`
 \epsilon_\text{network} = \frac{(\text{bytes of valid transactions reaching the ledger}) \cdot (\text{number of nodes in the network})}{\text{total bytes of network traffic}}
