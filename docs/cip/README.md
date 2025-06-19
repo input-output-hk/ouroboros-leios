@@ -289,10 +289,10 @@ $$`
 \epsilon_\text{network} = \frac{(\text{bytes of valid transactions reaching the ledger}) \cdot (\text{number of nodes in the network})}{\text{total bytes of network traffic}}
 `$$
 
-***TX collision:*** Because Leios uses local sortition for electing which nodes produce IBs, there is a finite chance that a transaction will be included in more than one IB during the concurrency period when nodes are not aware of which transactions other nodes are including in their new IBs. The transaction collision probability is simply the fraction of transactions that appear multiple times in IBs.
+***TX duplicate:*** Because Leios uses local sortition for electing which nodes produce IBs, there is a finite chance that a transaction will be included in more than one IB during the concurrency period when nodes are not aware of which transactions other nodes are including in their new IBs. The transaction collision probability is simply the fraction of transactions that appear multiple times in IBs.
 
 $$`
-p_\text{collision} = \text{fraction of transactions that appear multiple times in IBs}
+p_\text{duplicate} = \text{fraction of transactions that appear multiple times in IBs}
 `$$
 
 ***TX inclusion:*** Similarly to the case of a transaction being included multiple times in IBs, it is possible that a transaction might have to wait for many pipelines to progress before being included in an IB. The characteristic time for such inclusion in an IB is inversely proportional to the probability of it being included in a pipeline. This is strongly correlated with how long the transaction waits in the memory pool: some of the proposed Leios variants draw txs randomly from the memory pool or wait for the correct shard.
