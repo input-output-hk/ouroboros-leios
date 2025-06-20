@@ -36,4 +36,6 @@ shard_id = uint .size 2                                             ; 16-bit sha
 slot_no = uint64                                                    ; Slot number
 ```
 
+## Next
+
 **→ [Sharded Transactions - CDDL](transactions.md)** 
