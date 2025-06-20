@@ -10,6 +10,8 @@ Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's
 
 <sub>[1] [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md?plain=1#L64), [2] [Rust Simulation IB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L561-L597)</sub>
 
+## Block Structure
+
 ```cddl
  input_block =
    [ ib_header                  : ib_header

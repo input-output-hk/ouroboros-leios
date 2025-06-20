@@ -2,7 +2,7 @@
 
 Ranking Blocks (RBs) are extended Praos blocks that include optional Leios certificates.
 
-## Praos Block Structure (Conway) Extension
+## Block Structure - (Conway) Extension
 
 ```diff
  ranking_block =

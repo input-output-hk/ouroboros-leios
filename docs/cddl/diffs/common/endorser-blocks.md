@@ -14,6 +14,8 @@ Where $f_{EB}$ is the per-pipeline EB generation rate and $\sigma$ is the produc
 
 <sub>[1] [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [2] [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641)</sub>
 
+## Block Structure
+
 ```cddl
 endorser_block =
   [ eb_header         : eb_header
