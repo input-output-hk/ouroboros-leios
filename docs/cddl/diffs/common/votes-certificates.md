@@ -137,4 +137,5 @@ vote_count                = uint8                                     ; Number o
 ```
 <sub>[1] [FaSortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/fait_accompli.rs#L9-L17)</sub>
 
+## Next
 **→ [Endorser Blocks - Detailed CDDL Specification](endorser-blocks.md)**

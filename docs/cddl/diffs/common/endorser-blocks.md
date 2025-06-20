@@ -14,8 +14,6 @@ Where $f_{EB}$ is the per-pipeline EB generation rate and $\sigma$ is the produc
 
 <sub>[1] [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [2] [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641)</sub>
 
-## New Block Type
-
 ```cddl
 endorser_block =
   [ eb_header         : eb_header
@@ -71,7 +69,7 @@ eb_id                 = hash32                                      ; Endorser b
 ```
 <sub>[1] [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L161-L163), [2] [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L148-L152), [3] [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L34)</sub>
 
-## Common Supporting Types
+## Supporting Types
 
 ```cddl
 node_id               = uint32                                      ; Node identifier (simulation)
@@ -79,3 +77,5 @@ slot_no               = uint64                                      ; Slot numbe
 hash32                = bytes .size 32                              ; 32-byte hash
 ```
 
+## Next
+**→ [Input Blocks - Detailed CDDL Specification](input-blocks.md)**
