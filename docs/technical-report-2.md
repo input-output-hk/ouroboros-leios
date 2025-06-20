@@ -1,3 +1,5 @@
+<strong><font color="red">DRAFT: WORK IN PROGRESS</font></strong>
+
 # Leios technical report #2
 
 ## Executive summary
@@ -9,9 +11,7 @@
 
 Ouroboros Leios introduces new types of blocks with novel diffusion patterns and requirements. In this document we provide a technical specification of mini protocols for the on-the-fly relay of recent blocks and for the availability of older blocks referenced by the blockchain.
 
-### Mini Protocols
-
-#### Mini protocols
+### Mini protocols
 
 For background information on mini protocols see sections 3.1-3.4 of the *Ouroboros Network Specification*[^3], and rest of that chapter for the mini protocols already in use. Here we will present the additional node-to-node mini protocols needed for Leios.
 
@@ -21,7 +21,7 @@ The `Relay` protocol presented here is a generalization of the tx submission pro
 
 The protocol follows a pull-based strategy where the consumer asks for new ids/datums and the producer sends them back. It is designed to be suitable for a trustless setting where both sides need to guard against resource consumption attacks from the other side.
 
-##### Options and Parameters
+##### Options and parameters
 
 A instance is specified by these options and parameters.
 
@@ -40,7 +40,7 @@ A instance is specified by these options and parameters.
 > [!NOTE]
 > For IB, EB, and Vote the info could actually be unit as we do not need to apply prioritization to headers. How- ever the slot might provide useful filtering, such as avoid downloading any more votes of a pipeline once we have a certificate for a seen EB
 
-> Table of `Relay` mini-protocol instances.
+> Table: `Relay` mini-protocol instances.
 
 | `instance`    | `BoundedWindow` | `Announcements` | `id` | `info` | `datum`     | `Ann. Condition` | `ann` |
 | :------------ | :-------------- | :-------------- | :--- | :----- | :---------- | :--------------- | :---- |
@@ -63,7 +63,7 @@ $$`
 \end{array}
 `$$
 
-> Table of Relay state agencies
+> Table: Relay state agencies
 
 | state              | agency   |
 | ------------------ | -------- |
@@ -83,7 +83,7 @@ $$`
 - **`MsgReplyData`**`([datum])`:  The producer replies with a list of the requested datums, some may be missing if no longer available for relay.
 - **`MsgDone`**  The producer terminates the mini protocol.
 
-> Table of mini-protocol messages
+> Table: mini-protocol messages
 
 | from state         | message                        | parameters                  | to state           |
 | :----------------- | :----------------------------- | :-------------------------- | :----------------- |
@@ -100,7 +100,7 @@ $$`
 | `StIdsNonBlocking` | **`MsgReplyIdsAndAnns`**\*     | `[(id, info)], [(id, ann)]` | `StIdle`           |
 \* If Announcements is set, **`MsgReplyIds`** messages are replaced with **`MsgReplyIdsAndAnns`**:
 
-##### Producer and Consumer Implementation
+##### Producer and consumer implementation
 
 The protocol has two design goals: It must diffuse datums with high efficiency and, at the same time, it must rule out asymmetric resource attacks from the consumer against the provider.
 
@@ -138,7 +138,7 @@ A instance is specified by these parameters
 
 `Fetch` instances are listed in Table below. The descriptions included here are for illustration, in particular to clarify what we mean by of an Endorse block. A is a pair of and , the allows for better indexing. A is a pair of two of $\text{point}{} \mid \text{origin}$. The IB-fetch and EB-fetch instances are intended for on-the-fly block diffusion, complementing the corresponding mini protocols.
 
-> Table of `Fetch` mini-protocol instances
+> Table: `Fetch` mini-protocol instances
 
 | instance   | request   | body                 |
 | :--------- | :-------- | :------------------- |
@@ -150,7 +150,7 @@ A instance is specified by these parameters
 
 ![State machine of the Fetch mini-protocol](technical-report-2/fetch-mini-protocol-state-machine.svg)
 
-> Table of `Fetch` state agencies
+> Table: `Fetch` state agencies
 
 | state         | agency   |
 | ------------- | -------- |
@@ -167,7 +167,7 @@ A instance is specified by these parameters
 - **`MsgBatchDone`**: The producer ends block streaming.
 - **`MsgConsumerDone`**: The consumer terminates the protocol.
 
-> Table of `Fetch` mini-protocol messages
+> Table: `Fetch` mini-protocol messages
 
 | from state    | message                | parameters | to state      |
 | :------------ | :--------------------- | :--------- | :------------ |
@@ -182,7 +182,7 @@ A instance is specified by these parameters
 
 The high-level description of the Leios protocol specifies freshest-first delivery for IB bodies, to circumvent attacks where a large amount of old IBs gets released by an adversary. The mini protocol already takes a parameter that specifies which IBs are still new enough to be diffused, so older IBs are already deprioritized to only be accessible through the `CatchUp` protocol, and only if referenced by other blocks. Nevertheless consumers should take care to send approximately just enough body requests to utilize the available bandwidth, so that they have more choices, and more up to date information, when deciding which blocks to request from which peers.
 
-####  CatchUp mini-protocol
+####  `CatchUp` mini-protocol
 
 
 The `CatchUp` mini protocol allows for nodes to obtain IB and EB blocks referenced by the chain. These will typically be too old to be diffused by the `Relay` and `Fetch` mini protocols, but are still relevant to reconstruct the ledger state. Additionally it covers certified EBs not yet in the chain but which are still recent enough for inclusion in a future ranking block, and any blocks they reference. 
@@ -227,6 +227,311 @@ alternatively there could be separate mini protocols for IB, EB, and Certificate
 ##### Implementation
 
 To fulfill the higher-level freshest-first delivery goal, we might need to stipulate that producers should prioritize serving requests for the {IB,EB,Vote}- and {IB,EB}- mini protocols over requests for `CatchUp`.
+
+## Haskell simulation realism
+
+Most idealized setting for the simulation:
+
+- Nodes request block bodies from every peer.
+- Mini-protocols are each run on a dedicated connection.
+- The network model is a simplified one where packets are sent in-order and limited only by latency and bandwidth.
+- An unbounded number of CPU intensive tasks, like validation, are simulated to run in parallel.
+- Delays and sizes for blocks are kept uniform.
+
+Scenarios proceed from most idealized and gradually turn one more realism feature:
+
+1. most idealized.
+2. nodes request block bodies from first peer available.
+3. mini-protocols are multiplexed over one connection.
+4. network layer more closely models TCP, in particular acks and congestion window collapse/restart.
+5. nodes simulate CPU tasks with a finite number of worker threads.
+6. request IB bodies in oldest-first order.
+
+> [!NOTE]
+> move Scenario 6 out of ordered list and into a “variants” list
+
+The last scenario is not strictly about realism, but we rather want to investigate the impact of deviating from the freshest-first default.
+
+### Scenario 1
+
+The least realistic scenario. Config:
+
+```yaml
+relay-strategy: "request-from-all"
+tcp-congestion-control: false
+multiplex-mini-protocols: false
+treat-blocks-as-full: true
+```
+
+In the figure below we compute ideal times two ways:
+
+- **ideal** – Uses 3 latencies for every communication.
+- **ideal-fitted** – Uses 3 latencies for RB and EB, but 4 for IB
+  and 3.5 for Votes.
+
+we see that ideal-fitted better matches the simulation.
+
+> Figure: Scenario 1 *baseline*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                              |                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario1/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario1/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario1/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario1/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario1/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario1/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario1/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario1/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+The Relay mini-protocol involves the consumer first requesting new headers, so it can take 4 latencies to receive the body. When blocks are more sporadic, like for EBs and RBs, the consumer has likely already sent a blocking request for more headers, so 3 latencies are enough. Votes all get sent at the start of the slice, with default configuration at least, so we can expect consumers to reach the blocking stage again by the next burst. However, due to the large traffic, the 4 latencies path likely sees some use too. This mix of behaviours can explain the better fit using 3.5 latencies.
+
+#### Uniform Voting stage
+
+The diffusion latencies, in the figure below, stay very similar when the simulation is set to generate votes across the whole stage rather than only in the first slot. From second 80 to 300 we have ~1100 vote messages, for an average of ~5 VT/s, same as IBs. The traffic pattern then does not seem a factor in the observed behaviour.
+
+> Figure: Scenario 1 with *uniform voting*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                              |                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario1/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario1/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+
+#### Large votes
+
+The diffusion latencies, in the next two figures, are collected for votes set to the size of input blocks. With start-of-stage voting (the default) we see diffusion running slightly slower than ideal with 4 latencies, while uniform voting has a very close fit. The delay in the former is possibly due to the ~0.05 seconds serialization time causing blocks to queue behind each other when they are all generated at once: the volume of data, $`102400 \times 100`$, is 5 times the bandwidth of any given link, and nodes are requesting bodies from everyone.
+
+> Figure: Scenario 1 with *large votes and start-of-stage voting*, diffusion latencies from slot start (300s run with default seed).
+
+|   |   |
+|---|---|
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario1-big-votes/VT-0.5-vs-ideal-4-hops-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario1-big-votes/VT-0.98-vs-ideal-4-hops-fig.svg)<br/>VT diffusion to 0.98 stake |
+
+> Figure: Scenario 1 with *large votes and uniform voting*, diffusion latencies from slot start (300s run with default seed).
+
+|   |   |
+|---|---|
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario1-big-votes-send-recv/VT-0.5-vs-ideal-4-hops-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario1-big-votes-send-recv/VT-0.98-vs-ideal-4-hops-fig.svg)<br/>VT diffusion to 0.98 stake. |
+
+### Scenario 2
+
+> [!NOTE]
+> compare to previous plot rather than ideal? Same for later sections.
+
+Figure below illustrate the effect of nodes request block bodies from first peer available.
+
+> Figure: Scenario 2, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                               |                                                                                                                               |
+| ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario2/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake  | ![IB diffusion to 0.98 stake](technical-report-2/scenario2/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario2/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/> EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario2/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario2/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/> VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario2/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario2/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake  | ![RB diffusion to 0.98 stake](technical-report-2/scenario2/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+### Scenario 3
+
+The figure below shows the result of multiplexing all the mini-protocols onto the same connection. We do not see a significant difference with Scenario 2.
+
+Note that multiplexing in the simulation happens at the level of whole mini-protocol messages, without specific attempts to share the bandwidth fairly between them. This is not as realistic as breaking messages into same-size chunks and interleave those in a round-robin fashion.
+
+> Figure: Scenario 3, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                              |                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario3/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario3/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario3/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario3/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario3/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario3/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario3/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario3/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+### Scenario 4
+
+The figure below shows the introduction of the tcp congestion window having a quite dramatic effect on diffusion times.
+
+> [!NOTE]
+> do IBs which do not reference RBs do better?
+
+> Figure: Scenario 4 *baseline*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                              |                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+As the bounded CPU scenario does better (see next section), we want to rule out the unbounded cpu task handler as problematic, but bounding cpu in the figure below is no better. So it seems actually limiting parallelism is what improves diffusion.
+
+> Figure: Scenario 4 *bounded cpu*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                      |                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-100-cpu/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-100-cpu/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-100-cpu/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-100-cpu/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-100-cpu/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-100-cpu/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-100-cpu/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-100-cpu/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+From other simulations we noticed there is a sweet spot of traffic for diffusion to do best, which makes sense with regard to keeping the congestion window open without overwhelming other resources. In particular from the figure below we see IBs do slightly better with these parameters:
+
+``` yaml
+ib-body-avg-size-bytes: 163840
+leios-stage-length-slots: 60
+ib-generation-probability: 10
+```
+
+and a topology where link bandwidth is set to 1,024,000 bps, half of previous scenarios.
+
+> Figure: Scenario 4 *best IB rate*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                           |                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-best-IB-rate/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-best-IB-rate/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-best-IB-rate/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-best-IB-rate/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-best-IB-rate/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-best-IB-rate/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-best-IB-rate/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-best-IB-rate/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+The next figure shows 15 IBs per slot, rather than the 10 of the previous figure, which flattens the curve even more, though we keep a substantial tail. On the other hand Vote diffusion is negatively affected, possibly crowded out by the IB volume.
+
+> Figure: Scenario 4 *higher IB rate*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                             |                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake  |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake  |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake  |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/> RB diffusion to 0.98 stake |
+
+In the next figure we turn on uniform voting for the whole 60-second slot of the voting stage, which does appear to improve diffusion.
+
+> Figure: Scenario 4 *higher IB rate with uniform voting*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                                       |                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+In the next figure we bring stage length back to the default 20, and we see diffusion degrade again, though not to the original levels. About a tenth of IBs do not reach 0.98 stake distribution, and the curve flexes earlier than in the previous figure. Vote diffusion is also affected but not as much.
+
+> Figure: Scenario 4 *higher IB rate with uniform voting and short stages*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                                                   |                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+A possibility is that IBs are not fully diffusing because nodes are unable to reconstruct the ledger state to validate them in. In the next figure we try to see what happens when we require too many votes for EBs to certify, so the actual ledger state stays at Genesis. However IBs will still reference the most recent RB with a ledger state on the generating node, so other nodes will have to have adopted the same RB at some point.
+
+> [!NOTE]
+> try setting the reference RB as always Genesis
+
+> Figure: Scenario 4 *higher IB rate with uniform voting and short stages but no certificate*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                                                           |                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+Even with that caveat we see IB diffusion improve, getting quite close to the one with 60 slot stage length. Ledger state reconstruction does seem a significant factor, since when EBs are 3 times rarer (two figure previous), or here where they do not get certified, diffusion does better. Inspecting the logs we can further note that most IBs are validated immediately upon reception, meaning the ledger state was already available, and only a tiny fraction waits up to 3 seconds, meaning that the real impediment is that EBs can get certified even if a good percentage of nodes has not and will not validate some of the referenced IBs, because they lack the corresponding RB/ledger state.
+
+> [!NOTE]
+> Keep ledger-state only for the preferred chain
+
+
+The next figure confirms the above with the bounded cpu worker pool, with a much larger than needed bound.
+
+> Figure: Scenario 4 *higher IB rate with uniform voting, short stages, no certificate, and bounded CPU*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                                                                   |                                                                                                                                                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-higher-IB-rate-send-recv-short-stage-no-cert-100-cpu/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+In the next figure we show that shorter stage length (20 slots) negatively affects even the case with 10 IBs per slot, even when we try to compensate with a shorter validation time.
+
+> Figure: Scenario 4, *shorter stage length* diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                                 |                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-lower-stage-length/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-lower-stage-length/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-lower-stage-length/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-lower-stage-length/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-lower-stage-length/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-lower-stage-length/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-lower-stage-length/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-lower-stage-length/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+In the next figure we see that 15 IB per second do not diffuse quite as well when they are only 96 kB, even with stage length of 60.
+
+> Figure: Scenario 4 *small IBs*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                                                         |                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario4-20IB-small/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario4-20IB-small/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+### Scenario 5
+
+As mentioned before, we see in the next figure that just using 5 cores per node, instead of unbounded, improves diffusion by a good amount, without need for higher traffic. Presumably the limits on CPU make it so traffic is more spread out and keeps the tcp window open.
+
+> Figure: Scenario 5 *baseline*, diffusion latencies from slot start (300s run with default seed).
+
+|   |   |
+|---|---|
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario5/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario5/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario5/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario5/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario5/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario5/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario5/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario5/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+> [!NOTE]
+> try the higher traffic variations above, the sweet spot presumably shifted
+
+In the next figure we show results for 10 cpu cores per node. Here we see all IBs making it to 0.98 stake diffusion.
+
+> Figure: Scenario 5 *with bounded CPU*, diffusion latencies from slot start (300s run with default seed).
+
+|   |   |
+|---|---|
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario5-10-cpus/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario5-10-cpus/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario5-10-cpus/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario5-10-cpus/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario5-10-cpus/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario5-10-cpus/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario5-10-cpus/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario5-10-cpus/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+### Scenario 6
+
+The next figure shows the effect of oldest-first diffusion for IBs, which is null with these parameters. Trace debugging shows most of the time there is only one available body to request.
+
+> Figure: Scenario 6 *baseline*, diffusion latencies from slot start (300s run with default seed).
+
+|   |   |
+|---|---|
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario6/IB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario6/IB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>IB diffusion to 0.98 stake |
+| ![EB diffusion to 0.50 stake](technical-report-2/scenario6/EB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.50 stake | ![EB diffusion to 0.98 stake](technical-report-2/scenario6/EB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>EB diffusion to 0.98 stake |
+| ![VT diffusion to 0.50 stake](technical-report-2/scenario6/VT-0.5-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.50 stake | ![VT diffusion to 0.98 stake](technical-report-2/scenario6/VT-0.98-vs-ideal-vs-fitted-fig.svg)<br/>VT diffusion to 0.98 stake |
+| ![RB diffusion to 0.50 stake](technical-report-2/scenario6/RB-0.5-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.50 stake | ![RB diffusion to 0.98 stake](technical-report-2/scenario6/RB-0.98-vs-ideal-vs-fitted-fig.svg)<br/>RB diffusion to 0.98 stake |
+
+> [!NOTE]
+> try with higher traffic
+
+As we will be mostly looking at IB diffusion, the next figure shows adoption for only IBs but for more stake fractions.
+
+> Figure: Scenario 6 *IB adoption*, diffusion latencies from slot start (300s run with default seed).
+
+|                                                                                                       |                                                                                                        |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| ![IB diffusion to 0.50 stake](scenario6/IB-0.5-oldest-vs-freshest.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.60 stake](scenario6/IB-0.6-oldest-vs-freshest.svg)<br/>IB diffusion to 0.60 stake  |
+| ![IB diffusion to 0.70 stake](scenario6/IB-0.7-oldest-vs-freshest.svg)<br/>IB diffusion to 0.70 stake | ![IB diffusion to 0.80 stake](scenario6/IB-0.8-oldest-vs-freshest.svg)<br/>IB diffusion to 0.80 stake  |
+| ![IB diffusion to 0.90 stake](scenario6/IB-0.9-oldest-vs-freshest.svg)<br/>IB diffusion to 0.90 stake | ![IB diffusion to 0.98 stake](scenario6/IB-0.98-oldest-vs-freshest.svg)<br/>IB diffusion to 0.98 stake |
+
+The next figure shows same comparison but with 10 cpus per node. Diffusion for the 0.98 stake fraction improves, but we still see no differences between the diffusion strategies.
+
+> Figure: Scenario 6 *IB adoption with bounded CPU*, diffusion latencies from slot start (300s run with default seed).
+
+|     |     |
+| --- | --- |
+| ![IB diffusion to 0.50 stake](technical-report-2/scenario6-10-cpus/IB-0.5-oldest-vs-freshest.svg)<br/>IB diffusion to 0.50 stake | ![IB diffusion to 0.60 stake](technical-report-2/scenario6-10-cpus/IB-0.6-oldest-vs-freshest.svg)<br/>IB diffusion to 0.60 stake |
+| ![IB diffusion to 0.70 stake](technical-report-2/scenario6-10-cpus/IB-0.7-oldest-vs-freshest.svg)<br/>IB diffusion to 0.70 stake | ![IB diffusion to 0.80 stake](technical-report-2/scenario6-10-cpus/IB-0.8-oldest-vs-freshest.svg)<br/>IB diffusion to 0.80 stake |
+| ![IB diffusion to 0.90 stake](technical-report-2/scenario6-10-cpus/IB-0.9-oldest-vs-freshest.svg)<br/>IB diffusion to 0.90 stake | ![IB diffusion to 0.98 stake](technical-report-2/scenario6-10-cpus/IB-0.98-oldest-vs-freshest.svg)<br/>IB diffusion to 0.98 stake |
 
 ## Footnotes
 
