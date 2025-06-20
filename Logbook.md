@@ -1,5 +1,14 @@
 # Leios logbook
 
+## 2025-06-20
+
+### Rust simulation
+
+- Added support for generating conflicting transactions. The probability of conflicts is controlled with the `tx-conflict-fraction` setting, at a global or per-node level.
+- Added support for overcollateralization: transactions will randomly be generated with enough extra collateral to be included in multiple IB shards, controlled by the `tx-overcollateralization-factor-distribution` setting.
+- Added support for explicitly-weighted TX production. The `tx-generation-weight` setting can be used to make specific relays generate more transactions than others.
+- Stake pools no longer generate transactions (by default)
+
 ## 2025-06-19
 
 ### Metrics section in CIP
