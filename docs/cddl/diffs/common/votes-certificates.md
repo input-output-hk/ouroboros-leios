@@ -4,7 +4,7 @@ Leios introduces a new BLS-based voting system with certificates for endorser bl
 
 ## Certificate Structure
 
-Leios certificates are embedded in Ranking Blocks as described in [Ranking Blocks - CDDL Changes](ranking-blocks.md). These certificates attest to the validity of Endorser Blocks as described in [Endorser Blocks - CDDL Changes](endorser-blocks.md). Here is the complete certificate structure:
+Leios certificates are embedded in Ranking Blocks as described in [Ranking Block - CDDL](ranking-blocks.md). These certificates attest to the validity of Endorser Blocks as described in [Endorser Block - CDDL](endorser-blocks.md). Here is the complete certificate structure:
 
 ```cddl
 ; Complete Leios certificate structure (from crypto-benchmarks implementation)
