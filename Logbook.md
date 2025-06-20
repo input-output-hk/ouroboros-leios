@@ -9,6 +9,17 @@
 - Added support for explicitly-weighted TX production. The `tx-generation-weight` setting can be used to make specific relays generate more transactions than others.
 - Stake pools no longer generate transactions (by default)
 
+### Draft of second technical report
+
+The initial draft of the [Leios Technical Report 2](docs/technical-report-2.md) now contains two major sections on the Leios mini protocols and the realism of the Haskell simulator.
+
+1. Network specification
+    1. Relay mini protocol
+    2. Fetch mini protocol
+    3. CatchUp mini protocol
+2. Haskell simulation realism
+    * Six scenarios are analyzed
+
 ## 2025-06-19
 
 ### Metrics section in CIP
