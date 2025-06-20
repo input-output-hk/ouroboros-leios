@@ -80,4 +80,4 @@ hash32                = bytes .size 32                              ; 32-byte ha
 ```
 
 ## Next
-**→ [Input Blocks - Detailed CDDL Specification](input-blocks.md)**
+**→ [Input Block - CDDL](input-blocks.md)**

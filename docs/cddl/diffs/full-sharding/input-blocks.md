@@ -35,3 +35,5 @@ shard_id = uint .size 2
 shard_id = uint .size 2                                             ; 16-bit shard identifier (current range: 1-900)
 slot_no = uint64                                                    ; Slot number
 ```
+
+**→ [Sharded Transactions - CDDL](transactions.md)** 

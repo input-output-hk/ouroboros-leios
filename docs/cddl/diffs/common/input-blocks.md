@@ -55,4 +55,4 @@ Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's
  kes_signature = bytes                                               ; KES signature
 ``` 
 
-**→ [Endorser Blocks - Detailed CDDL Specification](endorser-blocks.md)** 
+**→ [Endorser Block - CDDL](endorser-blocks.md)**

@@ -17,4 +17,4 @@ Ranking Blocks (RBs) are extended Praos blocks that include optional Leios certi
 <sub>[1] [Conway Base](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L8-L14), [2] [Leios Base](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Base.agda#L21-L22)</sub>
 
 ## Next
-**→ [Votes and Certificates - Detailed CDDL Specification](votes-certificates.md)**
+**→ [Votes and Certificates - CDDL](votes-certificates.md)**
