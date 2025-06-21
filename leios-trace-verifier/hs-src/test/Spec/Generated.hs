@@ -28,8 +28,9 @@ verify =
     stakes = toInteger . stake . nodeInfo <$> (M.elems $ nodes Scenario.topology)
     stakeDistribution = zip nodeNames stakes
     stageLength' = toInteger $ leiosStageLengthSlots Scenario.config
+    tau = 0 -- TODO: get tau from config
    in
-    verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength'
+    verifyTrace nrNodes Scenario.idSut stakeDistribution stageLength' tau
 
 data Check
   = MustBeOkay
