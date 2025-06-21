@@ -214,6 +214,7 @@ transition GenerateEB =
     pipeline <- uses stageLength $ (slot `div`) . fromIntegral
     bytes <- lift arbitrary
     input_blocks <- lift . sublistOf =<< uses ibs (fmap BlockRef . S.toList)
+    endorser_blocks <- lift . sublistOf =<< uses ebs (fmap BlockRef . S.toList)
     pure [EBGenerated{..}]
 transition ReceiveEB =
   do
