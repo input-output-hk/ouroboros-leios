@@ -2,6 +2,11 @@
 
 ## 2025-06-20
 
+### Formal methods
+
+- Added support for `Late IB inclusion` to the formal spec of Full-Short Leios
+- Profiled leios-trace-verifier: About 60% of the time is spent in garbage collection. Switching to `--nonmoving-gc` improves the performance significantly
+
 ### Rust simulation
 
 - Added support for generating conflicting transactions. The probability of conflicts is controlled with the `tx-conflict-fraction` setting, at a global or per-node level.
