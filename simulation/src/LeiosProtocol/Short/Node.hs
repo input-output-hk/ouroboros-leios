@@ -122,25 +122,93 @@ data LeiosNodeConfig = LeiosNodeConfig
 data LeiosNodeState m = LeiosNodeState
   { praosState :: !(PraosNode.PraosNodeState RankingBlockBody m)
   , relayIBState :: !(RelayIBState m)
-  , prunedIBStateToVar :: !(TVar m SlotNo)
+  -- ^ the IBs still being diffused
+  --
+  -- An IB is evicted at the end of its pipeline.
+  --
+  -- TODO LateIbInclusion needs to keep it for longer than that.
+  --
+  -- TODO IBs /should/ stop diffusing sooner, at the end of Endorse, but that
+  -- would require adding another piece of state to remember IBs for longer
+  -- than they diffuse, since they're used for voting. ... I suspect
+  -- 'ibDeliveryTimesVar' is actually sufficient for this.
   , relayEBState :: !(RelayEBState m)
+  -- ^ the EBs still being diffused
+  --
+  -- An uncertified EB is evicted at the end of its pipeline. A certified EB is
+  -- evicted once it's too old to be /directly/ included in an RB. TODO what
+  -- about /indirect/ inclusion via Short-To-Full Leios?
+  , relayVoteState :: !(RelayVoteState m)
+  -- ^ the votes still being diffused
+  --
+  -- A vote is evicted at the end of its VoteRecv stage.
+  , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
+  -- ^ the IBs that some EBs include but the node has not yet adopted
+  --
+  -- Used in the compute threads and to decide which certificate to include
+  -- when building an RB.
+  --
+  -- Pruned in the same way as the 'relayEBState'.
+  --
+  -- TODO why isn't there an analogous variable for missing EBs?
+  , ibsValidationActionsVar :: !(TVar m (Map InputBlockId (STM m ())))
+  -- ^ how to validate each IB that hasn't already been validated
+  --
+  -- Used in the compute threads. Populated when an IB arrives, even if the
+  -- necessary ledger state is already available---it'll be validated as soon
+  -- as the scheduler permits.
+  --
+  -- Never pruned; entries are only deleted when the IB is validated, which is
+  -- when its required RB is validated or when it's included on chain,
+  -- whichever happens first. (TODO that second one is nonsensical---I'm
+  -- guessing it's the lightweight alternative to actually explicitly
+  -- requesting&fetching any missing RBs/EBs/IBs/etc.)
+  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId (SlotNo, UTCTime)))
+  -- ^ when the IB arrived (before attempting to validate it)
+  --
+  -- The 'SlotNo' of the IB is to ease pruning.
+  --
+  -- Used when generating EBs and votes.
+  --
+  -- Pruned alongside votes.
+  , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
+  -- ^ progress of each EB towards a certificate
+  --
+  -- Used when generating EBs, votes, and RBs.
+  --
+  -- Evicted when the EB is evicted from 'relayEBState'.
+  , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
+  -- ^ what to do when some RB is validated (without necessarily yielding its
+  -- ledger state)
+  --
+  -- Populated when validating RBs.
+  --
+  -- Never pruned.
+  , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
+  -- ^ what to do when some RB's ledger state becomes available
+  --
+  -- Populated when validating IBs and RBs.
+  --
+  -- Never pruned.
+  , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
+  -- ^ available ledger states
+  --
+  -- Used by the compute threads and when generating IBs. Populated by the
+  -- compute threads.
+  --
+  -- Never pruned.
+  --
+  -- TODO not used when validating IBs, which is suspicious. My worry is: if
+  -- the necessary RB's ledger state is available before an IB arrives, then
+  -- that IB will be needlessly scheduled for validation (via
+  -- 'ibsValidationActionsVar') *AND ALSO* never be validated.
+  , prunedIBStateToVar :: !(TVar m SlotNo)
   , prunedUnadoptedEBStateToVar :: !(TVar m SlotNo)
   , prunedUncertifiedEBStateToVar :: !(TVar m SlotNo)
-  , relayVoteState :: !(RelayVoteState m)
   , prunedVoteStateToVar :: !(TVar m SlotNo)
-  -- ^ TODO: refactor into RelayState.
-  , ibDeliveryTimesVar :: !(TVar m (Map InputBlockId (SlotNo, UTCTime)))
-  -- ^ records time we received the input block.
-  --   Also stores the SlotNo of the IB to ease pruning.
+  -- ^ TODO refactor these variables into the RelayState, which seems trivial
+  -- except for the double pruning logic for EBs
   , taskQueue :: !(TaskMultiQueue LeiosNodeTask m)
-  , waitingForRBVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
-  -- ^ waiting for RB block itself to be validated.
-  , waitingForLedgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) [STM m ()]))
-  -- ^ waiting for ledger state of RB block to be validated.
-  , ledgerStateVar :: !(TVar m (Map (HeaderHash RankingBlock) LedgerState))
-  , ibsNeededForEBVar :: !(TVar m (Map EndorseBlockId (Set InputBlockId)))
-  , ibsValidationActionsVar :: !(TVar m (Map InputBlockId (STM m ())))
-  , votesForEBVar :: !(TVar m (Map EndorseBlockId CertificateProgress))
   }
 
 type CertificatesProgress = Map EndorseBlockId CertificateProgress
