@@ -39,10 +39,10 @@ export interface Config {
    * Only supported by Haskell simulation. */
   "leios-vote-send-recv-stages": boolean;
   /**
-   * Extends Leios so that EB producers include IBs directly from previous pipelines
-   * where no certified EB was observed.
-   * 
-   * Only supported by Rust simulation. */
+   * Extends Leios so that EB producers include IBs directly from previous pipelines.
+   * Due to casuality, the EB must always include them, even if those IBs end up being
+   * certified in their own pipeline.
+   */
   "leios-late-ib-inclusion": boolean;
   /**
    * The expected time it takes a header to fully diffuse across the network.
