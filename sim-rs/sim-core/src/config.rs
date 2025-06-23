@@ -185,6 +185,14 @@ pub struct RawNode {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_generation_weight: Option<u64>,
     pub producers: BTreeMap<String, RawLinkInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub behaviours: Vec<RawNodeBehaviour>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case", tag = "behaviour")]
+pub enum RawNodeBehaviour {
+    IbEquivocation,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -253,6 +261,7 @@ impl From<RawTopology> for Topology {
         for (index, (name, node)) in value.nodes.iter().enumerate() {
             let id = NodeId::new(index);
             node_ids.insert(name.clone(), id);
+            let behaviours = NodeBehaviours::parse(&node.behaviours);
             nodes.insert(
                 id,
                 NodeConfiguration {
@@ -264,6 +273,7 @@ impl From<RawTopology> for Topology {
                     tx_conflict_fraction: node.tx_conflict_fraction,
                     tx_generation_weight: node.tx_generation_weight,
                     consumers: vec![],
+                    behaviours,
                 },
             );
         }
@@ -579,6 +589,7 @@ pub struct NodeConfiguration {
     pub tx_conflict_fraction: Option<f64>,
     pub tx_generation_weight: Option<u64>,
     pub consumers: Vec<NodeId>,
+    pub behaviours: NodeBehaviours,
 }
 
 #[derive(Debug, Clone)]
@@ -586,4 +597,23 @@ pub struct LinkConfiguration {
     pub nodes: (NodeId, NodeId),
     pub latency: Duration,
     pub bandwidth_bps: Option<u64>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NodeBehaviours {
+    pub ib_equivocation: bool,
+}
+
+impl NodeBehaviours {
+    fn parse(behaviours: &[RawNodeBehaviour]) -> Self {
+        let mut result = NodeBehaviours::default();
+        for behaviour in behaviours {
+            match behaviour {
+                RawNodeBehaviour::IbEquivocation => {
+                    result.ib_equivocation = true;
+                }
+            }
+        }
+        result
+    }
 }

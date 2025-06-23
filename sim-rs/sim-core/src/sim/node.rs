@@ -17,8 +17,8 @@ use tracing::{info, trace};
 use crate::{
     clock::{ClockBarrier, FutureEvent, Timestamp},
     config::{
-        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeConfiguration, NodeId,
-        RelayStrategy, SimConfiguration, TransactionConfig,
+        DiffusionStrategy, LeiosVariant, MempoolSamplingStrategy, NodeBehaviours,
+        NodeConfiguration, NodeId, RelayStrategy, SimConfiguration, TransactionConfig,
     },
     events::EventTracker,
     model::{
@@ -132,6 +132,7 @@ pub struct Node {
     total_stake: u64,
     cpu: CpuTaskQueue<CpuTask>,
     consumers: Vec<NodeId>,
+    behaviours: NodeBehaviours,
     txs: HashMap<TransactionId, TransactionView>,
     ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
@@ -156,7 +157,7 @@ struct SeenTransaction {
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, SeenTransaction>,
     input_ids_from_ibs: HashSet<u64>,
-    ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
+    ibs_to_generate: BTreeMap<u64, Vec<u64>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
     ibs_by_pipeline: BTreeMap<u64, Vec<InputBlockId>>,
@@ -269,6 +270,7 @@ impl Node {
         let stake = config.stake;
         let cpu = CpuTaskQueue::new(config.cores, config.cpu_multiplier);
         let consumers = config.consumers.clone();
+        let behaviours = config.behaviours.clone();
         let mut events = BinaryHeap::new();
         events.push(FutureEvent(clock.now(), NodeEvent::NewSlot(0)));
 
@@ -288,6 +290,7 @@ impl Node {
             total_stake,
             cpu,
             consumers,
+            behaviours,
             txs: HashMap::new(),
             ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
@@ -574,25 +577,7 @@ impl Node {
             }
         }
         for (slot, vrfs) in slot_vrfs {
-            let shards = self.find_available_ib_shards(slot);
-            assert!(!shards.is_empty());
-            let headers = vrfs
-                .into_iter()
-                .enumerate()
-                .map(|(index, vrf)| InputBlockHeader {
-                    id: InputBlockId {
-                        slot,
-                        pipeline: self.slot_to_pipeline(slot) + 4,
-                        producer: self.id,
-                        index: index as u64,
-                    },
-                    vrf,
-                    shard: shards[vrf as usize % shards.len()],
-                    timestamp: self.clock.now(),
-                    bytes: self.sim_config.sizes.ib_header,
-                })
-                .collect();
-            self.leios.ibs_to_generate.insert(slot, headers);
+            self.leios.ibs_to_generate.insert(slot, vrfs);
         }
     }
 
@@ -737,12 +722,50 @@ impl Node {
     }
 
     fn generate_input_blocks(&mut self, slot: u64) {
-        let Some(headers) = self.leios.ibs_to_generate.remove(&slot) else {
+        let pipeline = self.slot_to_pipeline(slot) + 4;
+        let Some(vrfs) = self.leios.ibs_to_generate.remove(&slot) else {
             if self.sim_config.emit_conformance_events {
                 self.tracker.track_no_ib_generated(self.id, slot);
             }
             return;
         };
+        let shards = self.find_available_ib_shards(slot);
+        assert!(!shards.is_empty());
+        let mut headers = vec![];
+        let mut index = 0;
+        for vrf in vrfs {
+            let id = InputBlockId {
+                slot,
+                pipeline,
+                producer: self.id,
+                index,
+            };
+            self.tracker.track_ib_lottery_won(id);
+            index += 1;
+            headers.push(InputBlockHeader {
+                id,
+                vrf,
+                shard: shards[vrf as usize % shards.len()],
+                timestamp: self.clock.now(),
+                bytes: self.sim_config.sizes.ib_header,
+            });
+            if self.behaviours.ib_equivocation {
+                let equivocated_id = InputBlockId {
+                    slot,
+                    pipeline,
+                    producer: self.id,
+                    index,
+                };
+                index += 1;
+                headers.push(InputBlockHeader {
+                    id: equivocated_id,
+                    vrf,
+                    shard: shards[vrf as usize % shards.len()],
+                    timestamp: self.clock.now(),
+                    bytes: self.sim_config.sizes.ib_header,
+                });
+            }
+        }
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
             let rb_ref = self.latest_rb_ref();

@@ -173,6 +173,7 @@ impl GraphBuilder {
                     tx_conflict_fraction: None,
                     tx_generation_weight: None,
                     producers: BTreeMap::new(),
+                    behaviours: vec![],
                 };
                 (name, node)
             })
