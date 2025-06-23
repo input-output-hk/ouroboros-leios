@@ -19,7 +19,7 @@ Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ourobo
 ```diff
 + endorser_block =
 +   [ eb_header         : eb_header
-+   , ib_references     : [* ib_reference]                            ; References to input blocks
++   , eb_body           : eb_body
 +   ]
 ```
 
@@ -34,12 +34,22 @@ Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ourobo
 + eb_header_body =
 +   [ slot                 : slot_no                                  ; Slot when EB was created
 +   , producer             : pool_id                                  ; Block producer identifier
-+   , input_blocks         : [* ib_reference]                         ; References to input blocks
-+   , ? endorser_blocks    : [* eb_reference]                         ; References to earlier endorser blocks (Full Leios)
 +   , ? vrf_proof          : vrf_cert                                 ; VRF proof of eligibility to produce EB
 +   ]
 ```
 Sources: [Haskell Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L160-L171), [Rust Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L167-L176), [Formal Spec EndorserBlockOSig](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L97-L106)
+
+## Body Structure
+
+**Design Rationale**: The block references are separated into the body to align with the network protocol design. At high TPS, the combined size of IB and EB references could exceed TCP MTU, making separate header/body transmission essential for efficient network diffusion.
+
+```diff
++ eb_body =
++   [ input_blocks         : [* ib_reference]                         ; References to input blocks
++   , ? endorser_blocks    : [* eb_reference]                         ; References to earlier endorser blocks (Full Leios)
++   ]
+```
+Sources: [Network Specification - Relay Protocol](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#relay-mini-protocol), [Network Specification - Fetch Protocol](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-2.md#fetch-mini-protocol)
 
 ## Input Block Reference Structure
 
