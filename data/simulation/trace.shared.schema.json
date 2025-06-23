@@ -108,6 +108,12 @@
           },
           "type": "array"
         },
+        "endorser_blocks": {
+          "items": {
+            "$ref": "#/definitions/BlockRef"
+          },
+          "type": "array"
+        },
         "pipeline": {
           "type": "number"
         },
@@ -127,6 +133,7 @@
       "required": [
         "id",
         "input_blocks",
+        "endorser_blocks",
         "pipeline",
         "producer",
         "size_bytes",
