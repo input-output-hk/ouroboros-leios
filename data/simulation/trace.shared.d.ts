@@ -71,6 +71,7 @@ interface GeneratedEndorserBlock extends GeneratedBlockEvent {
     id: string;
     pipeline: number;
     input_blocks: BlockRef[];
+    endorser_blocks: BlockRef[];
 }
 
 interface GeneratedVote extends GeneratedBlockEvent {
