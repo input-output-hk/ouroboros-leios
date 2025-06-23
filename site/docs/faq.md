@@ -11,7 +11,8 @@ make Cardano faster and more scalable. It improves transaction throughput and
 reduces latency by splitting the work of processing transactions into a
 streamlined, parallel process. Building on the core Ouroboros principles (as
 used by Cardano), Leios introduces separate input blocks (IBs) for transactions
-and endorser blocks (EBs) that validate them, enhancing the network’s capacity.
+and endorser blocks (EBs) that validate them, enhancing the network’s capacity. 
+To learn more see [this simple explainer](simple-explainer.md).
 
 ## What are the key benefits of Leios over other Ouroboros protocols?
 

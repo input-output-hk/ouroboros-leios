@@ -10,18 +10,15 @@ module Leios.Tracing.Cpu (
   cpu,
 ) where
 
-import Control.Concurrent.Chan (Chan, readChan)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.State.Strict (StateT, execStateT, modify')
+import Control.Concurrent.MVar (MVar, takeMVar)
 import Data.Aeson (Value (Object), withObject, (.:))
 import Data.Aeson.Types (Parser, parseMaybe)
 import Data.Function (on)
 import Data.List (intercalate)
-import Data.Map.Strict (Map)
 import Data.Monoid (Sum (..))
 import Data.Text (Text)
+import System.IO (IOMode (WriteMode), hClose, hPutStrLn, openFile)
 
-import qualified Data.Map.Strict as M (insertWith, toList)
 import qualified Data.Text as T (unpack)
 
 data ItemKey
@@ -88,27 +85,21 @@ parseMessage "Cpu" created =
 parseMessage _ _ =
   const $ fail "Ignore"
 
-type Index = Map ItemKey ItemInfo
-
-tally :: Monad m => Value -> StateT Index m ()
+tally :: Value -> Maybe String
 tally event =
-  case parseMaybe parseEvent event of
-    Just (itemKey, itemInfo) ->
-      do
-        -- Insert the generated items.
-        modify' $ M.insertWith (<>) itemKey itemInfo
-    Nothing -> pure ()
+  uncurry toCSV <$> parseMaybe parseEvent event
 
-cpu :: FilePath -> Chan (Maybe Value) -> IO ()
+cpu :: FilePath -> MVar (Maybe Value) -> IO ()
 cpu cpuFile events =
   do
+    h <- openFile cpuFile WriteMode
+    hPutStrLn h itemHeader
     let
       go =
         do
-          liftIO (readChan events)
+          takeMVar events
             >>= \case
               Nothing -> pure ()
-              Just event -> tally event >> go
-    index <- go `execStateT` mempty
-    writeFile cpuFile . unlines . (itemHeader :) $
-      uncurry toCSV <$> M.toList index
+              Just event -> maybe (pure ()) (hPutStrLn h) (tally event) >> go
+    go
+    hClose h

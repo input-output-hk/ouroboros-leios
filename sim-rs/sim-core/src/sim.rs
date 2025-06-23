@@ -15,7 +15,7 @@ use crate::{
     config::SimConfiguration,
     events::EventTracker,
     model::{
-        Block, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
+        Block, BlockId, EndorserBlock, EndorserBlockId, InputBlock, InputBlockHeader, InputBlockId,
         Transaction, TransactionId, VoteBundle, VoteBundleId,
     },
     network::Network,
@@ -132,8 +132,8 @@ enum SimulationMessage {
     RequestTx(TransactionId),
     Tx(Arc<Transaction>),
     // praos block propagation
-    RollForward(u64),
-    RequestBlock(u64),
+    RollForward(BlockId),
+    RequestBlock(BlockId),
     Block(Arc<Block>),
     // IB header propagation
     AnnounceIBHeader(InputBlockId),

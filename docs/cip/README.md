@@ -345,6 +345,100 @@ As a result of this decoupled approach, Leios can utilize nearly the full bandwi
 
 In analogy, imagine Praos as a single courier diligently collecting and delivering individual letters one by one, limiting the delivery speed to their individual capacity. Ouroboros Leios, however, operates like a mail sorting office where numerous local branches rapidly collect and bundle letters (input blocks) before a central team efficiently processes and dispatches these aggregated bundles (endorser blocks), achieving a significantly higher delivery volume.
 
+### Metrics
+
+> [!NOTE]
+> 
+> This is a preliminary set of metrics that will be finalized when the Leios protocol variants are finalized and the simulation studies are complete.
+
+The performance of a protocol like Leios can be characterized in terms of its efficient use of resources, its total use of resources, the probabilities of negative outcomes due to the protocol's design, and the resilience to adverse conditions. Metrics measuring such performance depend upon the selection of protocol parameters, the network topology, and the submission of transactions. The table below summarizes key metrics for evaluating Leios as a protocol and individual scenarios (parameters, network, and load).
+
+| Category   | Metric                                                    | Measurement                                                                                                     |
+| ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
+|            | Temporal efficiency, $`\epsilon_\text{temporal}(s)`$      | Time to include transaction on ledger                                                                           |
+|            | Network efficiency, $`\epsilon_\text{network}`$           | Ratio of total transaction size to node-averaged network usage                                                  |
+| Protocol   | TX collision, $`p_\text{collision}`$                      | Probability of a transaction being included in two IBs                                                          |
+|            | TX inclusion, $`\tau_\text{inclusion}`$                   | Mean number of slots for a transaction being included in any IB                                                 |
+|            | Voting failure, $`p_\text{noquorum}`$                     | Probability of sortition failure to elect sufficient voters for a quorum                                        |
+| Resource   | Network egress, $`q_\text{egress}`$                       | Rate of bytes transmitted by a node                                                                             |
+|            | Disk usage, $`q_\text{disk}`$                             | Rate of persistent bytes stored by a node                                                                       |
+|            | I/O operations, $`\bar{q}_\text{iops}(b)`$                | Mean number of I/O operations per second, where each operation writes a filesystem block of $`b`$ bytes         |
+|            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
+|            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
+| Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
+|            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
+| Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
+|            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+
+***Spatial efficiency:*** Leios necessarily imposes some disk overhead beyond the raw bytes needed to store transactions themselves. This overhead includes the IBs, EBs, and RBs associated with storing transactions. The concurrency inherent in Leios also opens the possibility that duplicate or conflicting transactions are stored in IBs, with the consequence that some space is the IBs is wasted. The spatial efficiency metric is defined as the ratio of the total bytes of transactions included in the ledger to the total persistent storage required by the protocol.
+
+$$`
+\epsilon_\text{spatial} = \frac{\text{total bytes of transactions included in the ledger}}{\text{total bytes of IBs, EBs, and RBs}}
+`$$
+
+***Temporal efficiency:*** As is true for Praos, there is a delay between submitting a transaction and its being included in the ledger and there is a finite chance that it never is included in the ledger. Before a transaction is eligible to be included in a new IB, it must be validated and placed in the memory pool. It is cleanest to measure the time from the transaction reaching the local memory pool of the node where it was submitted to the time when it is included in the ledger, via a Praos block. The same metric applies both to Praos and to Leios. In aggregate, we measure the temporal efficiency as the fraction of transactions that reach the ledger, as function of the number of slots elapsed. The quantity $`\epsilon_\text{temporal}(\infty)`$ is the fraction of submitted transactions that ever reach the ledger.
+
+$$`
+\epsilon_\text{temporal}(s) = \text{fraction of transactions included in the ledger within } s \text{ slots of their inclusion in a local memory pool}
+`$$
+
+***Network efficiency:*** Effective utilization of the network can be characterized by the ratio of bytes of transactions reaching the ledger to the average network traffic per node. (This could also be computed individually for each node and used as a local metric.)
+
+$$`
+\epsilon_\text{network} = \frac{(\text{bytes of valid transactions reaching the ledger}) \cdot (\text{number of nodes in the network})}{\text{total bytes of network traffic}}
+`$$
+
+***TX duplicate:*** Because Leios uses local sortition for electing which nodes produce IBs, there is a finite chance that a transaction will be included in more than one IB during the concurrency period when nodes are not aware of which transactions other nodes are including in their new IBs. The transaction collision probability is simply the fraction of transactions that appear multiple times in IBs.
+
+$$`
+p_\text{duplicate} = \text{fraction of transactions that appear multiple times in IBs}
+`$$
+
+***TX inclusion:*** Similarly to the case of a transaction being included multiple times in IBs, it is possible that a transaction might have to wait for many pipelines to progress before being included in an IB. The characteristic time for such inclusion in an IB is inversely proportional to the probability of it being included in a pipeline. This is strongly correlated with how long the transaction waits in the memory pool: some of the proposed Leios variants draw txs randomly from the memory pool or wait for the correct shard.
+
+$$`
+\tau_\text{inclusion} = \text{mean number of slots for a transaction to be included in any IB}
+`$$
+
+***Voting failure:*** An unlucky set of VRF evaluations might result in insufficient voters being selected in a given pipeline, thus making it impossible to certify an EB in that pipeline.
+
+$$`
+p_\text{noquorum} = \text{probability of sufficient voters to achieve a quorum in a given pipeline}
+`$$
+
+***Network egress:*** Cloud service providers typically charge for network egress rather than for network ingress. The quantity $`q_\text{egress}`$ is simply the number of bytes sent from a node per unit time.
+
+***Disk usage:*** Leios requires that IBs, EBs, and RBs be stored permanently; votes need not be stored permanently, however. The quantity $`q_\text{disk}`$ is the total number of IB, EB, and RB bytes generated per unit time.
+
+***I/O operations:*** Some cloud service providers limit or bill input/output operations on a per-second capacity basis. The number of I/O operations depends upon the filesystem's block size $`b`$, not on the logical number of writes to disk by the protocol: e.g., writing an IB of 32,768 bytes might consist of 64 I/O operations on a filesystem having a 512-byte block size. We assume that disk caching and delayed writes smooth out the unevenness in I/O operations, so that the mean $`\bar{q}_\text{iops}`$ is the best metric here.
+
+***Mean CPU usage:*** Computation resources consumed by the number are quantified as $`\bar{q}_\text{vcpu}`$, which is the mean number of virtual CPU cores utilized by the protocol.
+
+***Peak CPU usage:*** Because CPU usage varies depending upon the node's activity, the maximum number of virtual CPU cores utilized by the protocol during any slot, $`\hat{q}_\text{vcpu}`$, provides a useful indication of computational burstiness and of how a virtual machine should be sized for Leios.
+
+***Bandwidth:*** If the bandwidth for inter-node communication drops below a given value, then the throughput of Leios (at a given level of demand) will be drop, as network congesting occurs.
+
+$$`
+\eta_\text{bandwidth}(b) = \frac{\text{bytes of transactions reaching the ledger if links have bandwidth } b}{\text{bytes of transactions reaching the ledger if bandwidth were infinite}}
+`$$
+
+***Adversarial stake:*** Similarly, when adversarial stake is appreciable and active, the throughput of Leios might be drop.
+
+$$`
+\eta_\text{adversary}(s) = \frac{\text{bytes of transactions reaching the ledger without adversarial activity}}{\text{bytes of transactions reaching the ledger with adversarial activity given fraction } s \text{ of the total stake}}
+`$$
+
+***Fees:*** Two fee metrics relate to consumption of collateral. Some Leios variants may consume collateral for successful transactions when conflicts are present in IBs and EBs; others may consume collateral for failed transactions.
+
+$$`
+\kappa_\text{success}(c) = \text{average collateral paid for a successful transaction when it conflicts with a fraction } c \text{ of the memory pool}
+`$$
+
+$$`
+\kappa_\text{failure}(c) = \text{average collateral paid for a failed transaction when it conflicts with a fraction } c \text{ of the memory pool}
+`$$
+
 ### Evidence that Leios provides high throughput
 
 The Leios paper[^2] provides a rigorous theoretical analysis of the safety and throughput of the protocol. That has been reinforced and demonstrated by prototype simulations written in Haskell and Rust.

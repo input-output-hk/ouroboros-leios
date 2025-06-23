@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    time::Duration,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 use sim_core::{
@@ -236,7 +233,7 @@ impl TraceAggregator {
         self.current_time = event.time_s;
         if current_chunk != new_chunk {
             if new_chunk % 4 == 0 {
-                let timestamp = Duration::from_secs((new_chunk / 4) as u64).into();
+                let timestamp = Timestamp::from_secs((new_chunk / 4) as u64);
                 self.tx_counts.push(self.produce_tx_counts(timestamp));
             }
             Some(self.produce_message())

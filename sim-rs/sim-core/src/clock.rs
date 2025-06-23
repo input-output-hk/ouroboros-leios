@@ -4,6 +4,7 @@ use std::{
     pin::Pin,
     sync::{atomic::AtomicUsize, Arc},
     task::{Context, Poll},
+    time::Duration,
 };
 
 pub use coordinator::ClockCoordinator;
@@ -48,6 +49,7 @@ impl<T> Ord for FutureEvent<T> {
 
 #[derive(Clone)]
 pub struct Clock {
+    timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
     waiters: Arc<AtomicUsize>,
     tasks: Arc<AtomicUsize>,
@@ -56,12 +58,14 @@ pub struct Clock {
 
 impl Clock {
     fn new(
+        timestamp_resolution: Duration,
         time: Arc<AtomicTimestamp>,
         waiters: Arc<AtomicUsize>,
         tasks: Arc<AtomicUsize>,
         tx: mpsc::UnboundedSender<ClockEvent>,
     ) -> Self {
         Self {
+            timestamp_resolution,
             time,
             waiters,
             tasks,
@@ -79,6 +83,7 @@ impl Clock {
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         ClockBarrier {
             id,
+            timestamp_resolution: self.timestamp_resolution,
             time: self.time.clone(),
             tasks: self.tasks.clone(),
             tx: self.tx.clone(),
@@ -88,6 +93,7 @@ impl Clock {
 
 pub struct ClockBarrier {
     id: usize,
+    timestamp_resolution: Duration,
     time: Arc<AtomicTimestamp>,
     tasks: Arc<AtomicUsize>,
     tx: mpsc::UnboundedSender<ClockEvent>,
@@ -107,7 +113,7 @@ impl ClockBarrier {
     }
 
     pub fn wait_until(&mut self, timestamp: Timestamp) -> Waiter {
-        self.wait(Some(timestamp))
+        self.wait(Some(timestamp.with_resolution(self.timestamp_resolution)))
     }
 
     pub fn wait_forever(&mut self) -> Waiter {

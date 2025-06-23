@@ -5,8 +5,8 @@ module Leios.Tracing.Processor (
 ) where
 
 import Control.Concurrent.Async (concurrently_, mapConcurrently_)
-import Control.Concurrent.Chan (Chan, dupChan, newChan, writeChan)
-import Control.Concurrent.MVar (newEmptyMVar, putMVar, readMVar)
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar)
+import Control.Monad (forM_)
 import Leios.Tracing.Cpu (cpu)
 import Leios.Tracing.Lifecycle (lifecycle)
 import Leios.Tracing.Receipt (receipt)
@@ -20,25 +20,28 @@ process :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> IO ()
 process logFile lifecycleFile cpuFile resourceFile receiptFile =
   do
     done <- newEmptyMVar
-    chan <- newChan
+    cpuMVar <- newEmptyMVar
+    lifecycleMVar <- newEmptyMVar
+    receiptMVar <- newEmptyMVar
+    resourceMVar <- newEmptyMVar
     let reader =
           do
             logEntries <- LBS8.lines <$> LBS.readFile logFile
-            nextEntry chan logEntries
+            nextEntry [cpuMVar, lifecycleMVar, receiptMVar, resourceMVar] logEntries
             readMVar done
     concurrently_ reader $
       mapConcurrently_
         id
-        [ lifecycle lifecycleFile chan
-        , dupChan chan >>= cpu cpuFile
-        , dupChan chan >>= resource resourceFile
-        , dupChan chan >>= receipt receiptFile
+        [ cpu cpuFile cpuMVar
+        , lifecycle lifecycleFile lifecycleMVar
+        , receipt receiptFile receiptMVar
+        , resource resourceFile resourceMVar
         ]
         >> putMVar done ()
 
-nextEntry :: Chan (Maybe A.Value) -> [LBS8.ByteString] -> IO ()
-nextEntry eventChan [] = writeChan eventChan Nothing >> pure ()
-nextEntry eventChan (event : events) =
+nextEntry :: [MVar (Maybe A.Value)] -> [LBS8.ByteString] -> IO ()
+nextEntry eventMVars [] = forM_ eventMVars (`putMVar` Nothing) >> pure ()
+nextEntry eventMVars (event : events) =
   case A.eitherDecode event of
-    Right event' -> writeChan eventChan (Just event') >> nextEntry eventChan events
+    Right event' -> forM_ eventMVars (`putMVar` Just event') >> nextEntry eventMVars events
     Left message -> error $ "[" <> LBS8.unpack event <> "|" <> message <> "]"

@@ -1,5 +1,164 @@
 # Leios logbook
 
+## 2025-06-20
+
+### CDDL Specification Draft
+
+Created initial CDDL specifications for core Leios components:
+
+- Input Blocks with VRF lottery and single IB/slot limits
+- Endorser Blocks as new aggregation block type
+- Ranking Blocks as Conway extension with optional certificates
+- BLS voting system with persistent/non-persistent voters and key registration
+- Follows crypto-benchmarks implementation approach, maintains Conway CDDL compatibility
+- First draft establishing foundational structures - incomplete but covers common base components
+- Upcoming iterations will add detailed specifications for design variants (full sharding, overcollateralization, protocol extensions)
+
+### Formal methods
+
+- Added support for `Late IB inclusion` to the formal spec of Full-Short Leios
+- Profiled leios-trace-verifier: About 60% of the time is spent in garbage collection. Switching to `--nonmoving-gc` improves the performance significantly
+
+### Rust simulation
+
+- Added support for generating conflicting transactions. The probability of conflicts is controlled with the `tx-conflict-fraction` setting, at a global or per-node level.
+- Added support for overcollateralization: transactions will randomly be generated with enough extra collateral to be included in multiple IB shards, controlled by the `tx-overcollateralization-factor-distribution` setting.
+- Added support for explicitly-weighted TX production. The `tx-generation-weight` setting can be used to make specific relays generate more transactions than others.
+- Stake pools no longer generate transactions (by default)
+
+### Draft of second technical report
+
+The initial draft of the [Leios Technical Report 2](docs/technical-report-2.md) now contains two major sections on the Leios mini protocols and the realism of the Haskell simulator.
+
+1. Network specification
+    1. Relay mini protocol
+    2. Fetch mini protocol
+    3. CatchUp mini protocol
+2. Haskell simulation realism
+    * Six scenarios are analyzed
+
+## 2025-06-19
+
+### Metrics section in CIP
+
+The performance of a protocol like Leios can be characterized in terms of its efficient use of resources, its total use of resources, the probabilities of negative outcomes due to the protocol's design, and the resilience to adverse conditions. Metrics measuring such performance depend upon the selection of protocol parameters, the network topology, and the submission of transactions. The table below summarizes key metrics for evaluating Leios as a protocol and individual scenarios (parameters, network, and load). A discussion of these metrics was added to [the draft Leios CIP](docs/cip/README.md#metrics).
+
+| Category   | Metric                                                    | Measurement                                                                                                     |
+| ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Efficiency | Spatial efficiency, $`\epsilon_\text{spatial}`$           | Ratio of total transactions size to persistent storage                                                          |
+|            | Temporal efficiency, $`\epsilon_\text{temporal}(s)`$      | Time to include transaction on ledger                                                                           |
+|            | Network efficiency, $`\epsilon_\text{network}`$           | Ratio of total transaction size to node-averaged network usage                                                  |
+| Protocol   | TX collision, $`p_\text{collision}`$                      | Probability of a transaction being included in two IBs                                                          |
+|            | TX inclusion, $`\tau_\text{inclusion}`$                   | Mean number of slots for a transaction being included in any IB                                                 |
+|            | Voting failure, $`p_\text{noquorum}`$                     | Probability of sortition failure to elect sufficient voters for a quorum                                        |
+| Resource   | Network egress, $`q_\text{egress}`$                       | Rate of bytes transmitted by a node                                                                             |
+|            | Disk usage, $`q_\text{disk}`$                             | Rate of persistent bytes stored by a node                                                                       |
+|            | I/O operations, $`\bar{q}_\text{iops}(b)`$                | Mean number of I/O operations per second, where each operation writes a filesystem block of $`b`$ bytes         |
+|            | Mean CPU usage, $`\bar{q}_\text{vcpu}`$                   | Mean virtual CPU cores used by a node                                                                           |
+|            | Peak CPU usage, $`\hat{q}_\text{vcpu}`$                   | Maximum virtual CPU cores used by a node over a one-slot window                                                 |
+| Resilience | Bandwidth, $`\eta_\text{bandwidth}(b)`$                   | Fractional loss in throughput at finite bandwidth $`b`$                                                         |
+|            | Adversarial stake, $`\eta_\text{adversary}(s)`$           | Fractional loss in throughput due to adversial stake of $`s`$                                                   |
+| Fees       | Collateral paid for success, $`\kappa_\text{success}(c)`$ | Average collateral paid for a successful transaction when it conflicts with a fraction $`c`$ of the memory pool |
+|            | Collateral paid for failure, $`\kappa_\text{failure}(c)`$ | Average collateral paid for a failed transaction when it conflicts with a fraction $`c`$ of the memory pool     |
+
+## 2025-06-18
+
+### Bandwidth measurements
+
+Because bandwidth between nodes has been identified as a critical resource that limits Leios throughput, we conducted an unscientific experiment, using `iperf3` for bidirectional measurements between locations in North America and Europe:
+
+| Client                   | Server         | Send Mbps | Receive Mbps |
+|:-------------------------|:---------------|----------:|-------------:|
+| OVH Canada               | OVH Poland     |       219 |          217 |
+| OVH Canada               | OVH Oregon USA |       363 |          360 |
+| OVH Oregon USA           | OVH Poland     |       142 |          144 |
+| CenturyLink Colorado USA | OVH Poland     |       147 |          145 |
+| CenturyLink Colorado USA | OVH Oregon USA |       418 |          412 |
+| CenturyLink Colorado USA | OVH Canada     |        97 |           95 |
+| CenturyLink Colorado USA | OVH Virginia   |       311 |          309 |
+| CenturyLink Colorado USA | AWS Oregon USA |       826 |          824 |
+| AWS Oregon USA           | OVH Oregon USA |       973 |          972 |
+| AWS Oregon USA           | OVH Poland     |       141 |          138 |
+| AWS Oregon USA           | OVH Canada     |       329 |          327 |
+| OVH Virginia USA         | OVH Oregon USA |       369 |          367 |
+| OVH Virginia USA         | OVH Poland     |       231 |          229 |
+| OVH Virginia USA         | OVH Canada     |       469 |          467 |
+
+The OVH machines are inexpensive instances, the AWS is a `r5a.4xlarge`, and CenturyLink is a local ISP. Overall, it looks like 100 Mbps is a conservative lower bound.
+
+We also made some empirical measurements where a machine in one data center connects to four others to measure simultaneous bandwidth. It looks like there is a 5-20% reduction in individual link speed, as compared to only one connection at a time. (For most of the pairs, it is closer to 5%, and the 20% is an outlier.) However, we don't know what would happen if we measured with 25 simultaneous connections.
+
+## 2025-06-17
+
+### Mini-mainnet experiments
+
+The 750-node [pseudo-mainnet](data/simulation/pseudo-mainnet/topology-v2.yaml) network was used in Haskell and Rust experiments to study the limits of transaction and IB throughput for realistic scenarios up to 300 TPS and 32 IB/s.
+
+- [Analysis results](analysis/sims/2025w24/analysis.ipynb)
+- [Slides](analysis/sims/2025w24/summary.pdf)
+- Findings:
+    - The 750 node mini-mainnet is a suitable replacement for the 10,000-node pseudo mainnet, in that either topology would result in similar performance measurements and resource recommendations.
+    - The Haskell and Rust simulations substantially agree for mini-mainnet simulations.
+    - Key metrics from these simulations:
+        - Block propagation less than 1 second, which is consistent with empirical observations from pooltool.io. Note that this has implications for our discussion of the IB-concurrency period.
+        - With 1 Gb/s links/NICs, the protocol can support 25 MB/s throughput before it starts degrading.
+        - Mean time from mempool to ledger is about 150 seconds for transactions.
+        - Disk-space efficiency is about 80%.
+        - About 20% of network traffic is wasted.
+        - Even at 300 ts/x, a 6-core VM is sufficient for peak demand, but average demand is less than 2 cores.
+
+### Added features to simulation trace processor
+
+The [`leios-trace-processor`](analysis/sims/trace-processor/) now reports message sizes for bandwidth-usage analysis.
+
+### Pseudo-mainnet experiments
+
+The 10,000-node [pseudo-mainnet](data/simulation/pseudo-mainnet/ReadMe.md) network was used in Rust experiments to study the limits of transaction and IB throughput for realistic scenarios up to 300 TPS and 32 IB/s.
+
+- [Analysis results](analysis/sims/2025w23/analysis.ipynb)
+- [Slides](analysis/sims/2025w23/summary.pdf)
+- Findings:
+    - Transactions took an average of 100 seconds to travel from the memory pool to the ledger.
+    - Disk and network usage was approximately 80% efficient.
+    - Even at high TPS, six CPU cores were sufficient to handle peak load.
+    - Block propagation time averaged under one second.
+
+## 2025-06-15
+
+### Reduced memory footprint for analyzing simulation traces
+
+The [`leios-trace-processor`](analysis/sims/trace-processor/) was refactored in order to dramatically reduce the memory footprint of analyzing large simulation traces.
+
+## 2025-06-12
+
+### "Miniature mainnet" topology
+
+Because the 10,000 [pseudo-mainnet](data/simulation/pseudo-mainnet/topology-v1.ipynb) runs so slowly and consumes so much memory in the Rust and Haskell simulations, thus making it impractical for repeated use and for large experiments, we created a smaller 750-node topology that faithfully mimics mainnet. It has nearly the same diameter as mainnet and have very similar stake distribution and edge degree.
+
+- Methodology: [topology-v2.ipynb](data/simulation/pseudo-mainnet/topology-v2.ipynb)
+- Network: [topology-v2.yaml](data/simulation/pseudo-mainnet/topology-v2.yaml)
+- Metrics: [topology-v2.md](data/simulation/pseudo-mainnet/topology-v2.md)
+
+| Metric | Value |
+|--------|-------|
+| Total nodes | 750 |
+| Block producers | 216 |
+| Relay nodes | 534 |
+| Total connections | 19314 |
+| Network diameter | 5 hops |
+| Average connections per node | 25.75 |
+| Clustering coefficient | 0.332 |
+| Average latency | 64.8ms ms |
+| Maximum latency | 578.3ms ms |
+| Stake-weighted latency | 0.0ms ms |
+| Bidirectional connections | 1463 |
+| Asymmetry ratio | 84.85% |
+
+### Rust simulation
+
+- Fixed bad assertion triggered by extreme load of 10k node network
+- Added support for configurable timestamp resolution
+
 ## 2025-06-11
 
 ### Additional data analyses in Leios trace processor
@@ -79,7 +238,7 @@ Here are a few personal (@bwbush) observations, reflections, and conclusions on 
  5. It appears that front running can best be eliminated (at the ledger level, but not at the mempool level) by strictly ordering transactions by their IB's slot and VRF.
      - Other IB and EB ordering proposals create complexity in the ledger rules and would be difficult to fully analyze for vulnerabilities.
 
-## Rust simulation
+### Rust simulation
 
 Implemented random sampling of transactions from the Leios mempool. When transaction traffic is high enough that IBs are completely full, it should ensure that different IBs contain different transactions when possible.
 

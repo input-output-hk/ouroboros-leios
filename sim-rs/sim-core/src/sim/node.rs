@@ -109,6 +109,13 @@ enum NodeEvent {
     CpuSubtaskCompleted(Subtask),
 }
 
+#[derive(Clone, Default)]
+struct LedgerState {
+    spent_inputs: HashSet<u64>,
+    seen_blocks: HashSet<BlockId>,
+    seen_ebs: HashSet<EndorserBlockId>,
+}
+
 pub struct Node {
     id: NodeId,
     name: String,
@@ -126,6 +133,7 @@ pub struct Node {
     cpu: CpuTaskQueue<CpuTask>,
     consumers: Vec<NodeId>,
     txs: HashMap<TransactionId, TransactionView>,
+    ledger_states: BTreeMap<BlockId, Arc<LedgerState>>,
     praos: NodePraosState,
     leios: NodeLeiosState,
 }
@@ -134,8 +142,9 @@ pub struct Node {
 struct NodePraosState {
     mempool: BTreeMap<TransactionId, Arc<Transaction>>,
     peer_heads: BTreeMap<NodeId, u64>,
-    blocks_seen: BTreeSet<u64>,
-    blocks: BTreeMap<u64, Arc<Block>>,
+    blocks_seen: BTreeSet<BlockId>,
+    blocks: BTreeMap<BlockId, Arc<Block>>,
+    block_ids_by_slot: BTreeMap<u64, BlockId>,
 }
 
 struct SeenTransaction {
@@ -146,6 +155,7 @@ struct SeenTransaction {
 #[derive(Default)]
 struct NodeLeiosState {
     mempool: BTreeMap<TransactionId, SeenTransaction>,
+    input_ids_from_ibs: HashSet<u64>,
     ibs_to_generate: BTreeMap<u64, Vec<InputBlockHeader>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
@@ -279,6 +289,7 @@ impl Node {
             cpu,
             consumers,
             txs: HashMap::new(),
+            ledger_states: BTreeMap::new(),
             praos: NodePraosState::default(),
             leios: NodeLeiosState::default(),
         }
@@ -457,11 +468,11 @@ impl Node {
             }
 
             // Block propagation
-            SimulationMessage::RollForward(slot) => {
-                self.receive_roll_forward(from, slot)?;
+            SimulationMessage::RollForward(id) => {
+                self.receive_roll_forward(from, id)?;
             }
-            SimulationMessage::RequestBlock(slot) => {
-                self.receive_request_block(from, slot)?;
+            SimulationMessage::RequestBlock(id) => {
+                self.receive_request_block(from, id)?;
             }
             SimulationMessage::Block(block) => {
                 self.receive_block(from, block);
@@ -723,11 +734,13 @@ impl Node {
         };
         for header in headers {
             self.tracker.track_ib_lottery_won(header.id);
-            let transactions = self.select_txs_for_ib(header.shard);
+            let rb_ref = self.latest_rb_ref();
+            let transactions = self.select_txs_for_ib(header.shard, rb_ref);
             let ib = InputBlock {
                 header,
                 tx_payload_bytes: self.sim_config.sizes.ib_payload(&transactions),
                 transactions,
+                rb_ref,
             };
             self.schedule_cpu_task(CpuTaskType::IBBlockGenerated(ib));
         }
@@ -750,11 +763,7 @@ impl Node {
         if self.sim_config.praos_fallback {
             if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
                 // Add one transaction, the right size for the extra RB payload
-                let tx = Transaction {
-                    id: config.next_id(),
-                    shard: 0,
-                    bytes: config.rb_size,
-                };
+                let tx = config.mock_tx(config.rb_size);
                 self.tracker.track_transaction_generated(&tx, self.id);
                 transactions.push(Arc::new(tx));
             } else {
@@ -772,11 +781,7 @@ impl Node {
             }
         }
 
-        let parent = self
-            .praos
-            .blocks
-            .last_key_value()
-            .map(|(_, block)| block.id);
+        let parent = self.latest_rb_ref();
 
         let block = Block {
             id: BlockId {
@@ -966,11 +971,12 @@ impl Node {
                 .get(peer)
                 .is_none_or(|&s| s < block.id.slot)
             {
-                self.send_to(*peer, SimulationMessage::RollForward(block.id.slot))?;
+                self.send_to(*peer, SimulationMessage::RollForward(block.id))?;
                 self.praos.peer_heads.insert(*peer, block.id.slot);
             }
         }
-        self.praos.blocks.insert(block.id.slot, block);
+        self.praos.block_ids_by_slot.insert(block.id.slot, block.id);
+        self.praos.blocks.insert(block.id, block);
         Ok(())
     }
 
@@ -1016,12 +1022,34 @@ impl Node {
         if self.trace {
             info!("node {} saw tx {id}", self.name);
         }
+        let rb_ref = self.latest_rb_ref();
+        let ledger_state = self.resolve_ledger_state(rb_ref);
+        if ledger_state.spent_inputs.contains(&tx.input_id) {
+            // Ignoring a TX which conflicts with something already onchain
+            return Ok(());
+        }
+        if self
+            .praos
+            .mempool
+            .values()
+            .any(|mempool_tx| mempool_tx.input_id == tx.input_id)
+        {
+            // Ignoring a TX which conflicts with the current mempool contents.
+            return Ok(());
+        }
         self.praos.mempool.insert(tx.id, tx.clone());
         for peer in &self.consumers {
             if *peer == from {
                 continue;
             }
             self.send_to(*peer, SimulationMessage::AnnounceTx(id))?;
+        }
+        if self.sim_config.mempool_aggressive_pruning
+            && self.leios.input_ids_from_ibs.contains(&tx.input_id)
+        {
+            // Ignoring a TX which conflicts with TXs we've seen in input blocks.
+            // This only affects the Leios mempool; these TXs should still be able to reach the chain through Praos.
+            return Ok(());
         }
         self.leios.mempool.insert(
             tx.id,
@@ -1033,15 +1061,15 @@ impl Node {
         Ok(())
     }
 
-    fn receive_roll_forward(&mut self, from: NodeId, slot: u64) -> Result<()> {
-        if self.praos.blocks_seen.insert(slot) {
-            self.send_to(from, SimulationMessage::RequestBlock(slot))?;
+    fn receive_roll_forward(&mut self, from: NodeId, id: BlockId) -> Result<()> {
+        if self.praos.blocks_seen.insert(id) {
+            self.send_to(from, SimulationMessage::RequestBlock(id))?;
         }
         Ok(())
     }
 
-    fn receive_request_block(&mut self, from: NodeId, slot: u64) -> Result<()> {
-        if let Some(block) = self.praos.blocks.get(&slot) {
+    fn receive_request_block(&mut self, from: NodeId, id: BlockId) -> Result<()> {
+        if let Some(block) = self.praos.blocks.get(&id) {
             self.tracker.track_praos_block_sent(block, self.id, from);
             self.send_to(from, SimulationMessage::Block(block.clone()))?;
         }
@@ -1055,14 +1083,18 @@ impl Node {
     }
 
     fn finish_validating_block(&mut self, from: NodeId, block: Arc<Block>) -> Result<()> {
-        if let Some(old_block) = self.praos.blocks.get(&block.id.slot) {
+        if let Some(old_block_id) = self.praos.block_ids_by_slot.get(&block.id.slot) {
             // SLOT BATTLE!!! lower VRF wins
-            if old_block.vrf <= block.vrf {
-                // We like our block better than this new one.
-                return Ok(());
+            if let Some(old_block) = self.praos.blocks.get(old_block_id) {
+                if old_block.vrf <= block.vrf {
+                    // We like our block better than this new one.
+                    return Ok(());
+                }
+                self.praos.blocks.remove(old_block_id);
             }
         }
-        self.praos.blocks.insert(block.id.slot, block.clone());
+        self.praos.block_ids_by_slot.insert(block.id.slot, block.id);
+        self.praos.blocks.insert(block.id, block.clone());
 
         let head = self.praos.peer_heads.entry(from).or_default();
         if *head < block.id.slot {
@@ -1180,6 +1212,15 @@ impl Node {
         for transaction in &ib.transactions {
             // Do not include transactions from this IB in any IBs we produce ourselves.
             self.leios.mempool.remove(&transaction.id);
+        }
+        if self.sim_config.mempool_aggressive_pruning {
+            // If we're using aggressive pruning, remove transactions from the mempool if they conflict with transactions in this IB
+            self.leios
+                .input_ids_from_ibs
+                .extend(ib.transactions.iter().map(|tx| tx.input_id));
+            self.leios
+                .mempool
+                .retain(|_, seen| !self.leios.input_ids_from_ibs.contains(&seen.tx.input_id));
         }
         if self
             .leios
@@ -1359,17 +1400,30 @@ impl Node {
         Ok(())
     }
 
-    fn select_txs_for_ib(&mut self, shard: u64) -> Vec<Arc<Transaction>> {
+    fn select_txs_for_ib(&mut self, shard: u64, rb_ref: Option<BlockId>) -> Vec<Arc<Transaction>> {
         if let TransactionConfig::Mock(config) = &self.sim_config.transactions {
-            let tx = Transaction {
-                id: config.next_id(),
-                shard,
-                bytes: config.ib_size,
-            };
+            let tx = config.mock_tx(config.ib_size);
             self.tracker.track_transaction_generated(&tx, self.id);
             vec![Arc::new(tx)]
         } else {
-            self.select_txs(|seen| seen.tx.shard == shard, self.sim_config.max_ib_size)
+            let ledger_state = self.resolve_ledger_state(rb_ref);
+            let ib_shards = self.sim_config.ib_shards;
+            let tx_may_use_shard = |tx: &Transaction, ib_shard: u64| {
+                for shard in tx.shard..=tx.shard + tx.overcollateralization_factor {
+                    let shard = shard % ib_shards;
+                    if shard == ib_shard {
+                        return true;
+                    }
+                }
+                false
+            };
+            self.select_txs(
+                |seen| {
+                    tx_may_use_shard(&seen.tx, shard)
+                        && !ledger_state.spent_inputs.contains(&seen.tx.input_id)
+                },
+                self.sim_config.max_ib_size,
+            )
         }
     }
 
@@ -1383,7 +1437,7 @@ impl Node {
         else {
             return vec![];
         };
-        let max_seen_at = Timestamp::zero() + Duration::from_secs(last_legal_slot);
+        let max_seen_at = Timestamp::from_secs(last_legal_slot);
 
         self.select_txs(
             |seen| seen.seen_at <= max_seen_at,
@@ -1404,7 +1458,7 @@ impl Node {
             .values()
             .filter_map(|seen| {
                 if condition(seen) {
-                    Some((seen.tx.id, seen.tx.bytes))
+                    Some((seen.tx.id, seen.tx.bytes, seen.tx.input_id))
                 } else {
                     None
                 }
@@ -1418,9 +1472,13 @@ impl Node {
         }
         let mut txs = vec![];
         let mut size = 0;
-        for (id, bytes) in candidate_txs {
+        let mut spent_inputs = HashSet::new();
+        for (id, bytes, input_id) in candidate_txs {
             let remaining_capacity = max_size - size;
             if remaining_capacity < bytes {
+                continue;
+            }
+            if !spent_inputs.insert(input_id) {
                 continue;
             }
             let tx = self.leios.mempool.remove(&id).unwrap().tx;
@@ -1428,6 +1486,76 @@ impl Node {
             txs.push(tx);
         }
         txs
+    }
+
+    fn latest_rb_ref(&self) -> Option<BlockId> {
+        self.praos.blocks.last_key_value().map(|(k, _)| *k)
+    }
+
+    fn resolve_ledger_state(&mut self, rb_ref: Option<BlockId>) -> Arc<LedgerState> {
+        let Some(block_id) = rb_ref else {
+            return Arc::new(LedgerState::default());
+        };
+        if let Some(state) = self.ledger_states.get(&block_id) {
+            return state.clone();
+        };
+
+        let mut state = self
+            .ledger_states
+            .last_key_value()
+            .map(|(_, v)| v.as_ref().clone())
+            .unwrap_or_default();
+
+        let mut block_queue = vec![block_id];
+        while let Some(block_id) = block_queue.pop() {
+            if !state.seen_blocks.insert(block_id) {
+                continue;
+            }
+            let Some(block) = self.praos.blocks.get(&block_id) else {
+                continue;
+            };
+            if let Some(parent) = block.parent {
+                block_queue.push(parent);
+            }
+            for tx in &block.transactions {
+                state.spent_inputs.insert(tx.input_id);
+            }
+
+            let mut eb_queue = vec![];
+            if let Some(endorsement) = &block.endorsement {
+                eb_queue.push(endorsement.eb);
+            }
+            while let Some(eb_id) = eb_queue.pop() {
+                if !state.seen_ebs.insert(eb_id) {
+                    continue;
+                }
+                let Some(EndorserBlockState::Received { eb, .. }) = self.leios.ebs.get(&eb_id)
+                else {
+                    continue;
+                };
+                for tx_id in &eb.txs {
+                    let Some(TransactionView::Received(tx)) = self.txs.get(tx_id) else {
+                        continue;
+                    };
+                    state.spent_inputs.insert(tx.input_id);
+                }
+                for ib_id in &eb.ibs {
+                    let Some(InputBlockState::Received(ib)) = self.leios.ibs.get(ib_id) else {
+                        continue;
+                    };
+                    for tx in &ib.transactions {
+                        state.spent_inputs.insert(tx.input_id);
+                    }
+                }
+                for eb_id in &eb.ebs {
+                    eb_queue.push(*eb_id);
+                }
+            }
+        }
+
+        let state = Arc::new(state);
+        self.ledger_states.insert(block_id, state.clone());
+        state
     }
 
     fn finish_generating_ib(&mut self, mut ib: InputBlock) -> Result<()> {

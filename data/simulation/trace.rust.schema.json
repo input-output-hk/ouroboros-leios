@@ -239,8 +239,17 @@
         "id": {
           "type": "string"
         },
+        "input_id": {
+          "type": "number"
+        },
+        "overcollateralization_factor": {
+          "type": "number"
+        },
         "publisher": {
           "type": "string"
+        },
+        "shard": {
+          "type": "number"
         },
         "size_bytes": {
           "type": "number"
@@ -250,7 +259,15 @@
           "type": "string"
         }
       },
-      "required": ["id", "publisher", "size_bytes", "type"],
+      "required": [
+        "id",
+        "input_id",
+        "overcollateralization_factor",
+        "publisher",
+        "shard",
+        "size_bytes",
+        "type"
+      ],
       "type": "object"
     },
     "GeneratedVote": {

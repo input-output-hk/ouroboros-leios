@@ -22,6 +22,10 @@ export interface Config {
   "treat-blocks-as-full": boolean;
   /** Only supported by Haskell simulation. */
   "cleanup-policies": CleanupPolicies;
+  /**
+   * The smallest unit of time to simulate, in fractions of a millisecond.
+   * Only supported by Rust simulation. */
+  "timestamp-resolution-ms": number;
 
   // Leios Protocol Configuration
   "leios-variant": LeiosVariant;
@@ -50,6 +54,10 @@ export interface Config {
    */
   "leios-mempool-sampling-strategy": MempoolSamplingStrategy;
   /**
+   * If true, transactions will be removed from the Leios mempool if they conflict with in-flight IBs.
+   */
+  "leios-mempool-aggressive-pruning": boolean;
+  /**
    * Praos blockchain quality parameter.
    * This is η from the Leios paper.
    * Controls the pipelines EBs should reference in Full leios:
@@ -67,10 +75,19 @@ export interface Config {
   "tx-generation-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-size-bytes-distribution": Distribution;
+  /**
+   * Distribution used to choose the "over-collateralization factor" for a transaction.
+   * 0 means the transaction is not over-collateralized, n means it has enough extra collateral to be included in n shards.
+   * Only supported by Rust simulation.  */
+  "tx-overcollateralization-factor-distribution": Distribution;
   /** Only supported by Rust simulation. */
   "tx-validation-cpu-time-ms": number;
   /** Only supported by Rust simulation. */
   "tx-max-size-bytes": bigint;
+  /**
+   * What fraction of TXs (from 0 to 1) should introduce conflicts with transactions which were produced before?
+   * Only supported by Rust simulation.  */
+  "tx-conflict-fraction": number | null;
   /**
    * When the first transaction should appear.
    * Only supported by Rust simulation.  */

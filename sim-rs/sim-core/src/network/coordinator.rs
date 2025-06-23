@@ -65,15 +65,16 @@ impl<TProtocol: Clone + Eq + Hash, TMessage: Debug> NetworkCoordinator<TProtocol
             select! {
                 () = waiter => {
                     let (link, Reverse(timestamp)) = self.events.pop().unwrap();
-                    assert_eq!(clock.now(), timestamp);
+                    assert!(clock.now() >= timestamp);
                     let connection = self.connections.get_mut(&link).unwrap();
-                    let body = connection.recv(timestamp);
-                    clock.start_task();
-                    let _ = self
-                        .sinks
-                        .get(&link.to)
-                        .unwrap()
-                        .send((link.from, body));
+                    for (body, _) in connection.recv_many(timestamp) {
+                        clock.start_task();
+                        let _ = self
+                            .sinks
+                            .get(&link.to)
+                            .unwrap()
+                            .send((link.from, body));
+                    };
                     if let Some(timestamp) = connection.next_arrival_time() {
                         self.events.push(link, Reverse(timestamp));
                     }
