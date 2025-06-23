@@ -2,6 +2,18 @@
 
 ## 2025-06-20
 
+### CDDL Specification Draft
+
+Created initial CDDL specifications for core Leios components:
+
+- Input Blocks with VRF lottery and single IB/slot limits
+- Endorser Blocks as new aggregation block type
+- Ranking Blocks as Conway extension with optional certificates
+- BLS voting system with persistent/non-persistent voters and key registration
+- Follows crypto-benchmarks implementation approach, maintains Conway CDDL compatibility
+- First draft establishing foundational structures - incomplete but covers common base components
+- Upcoming iterations will add detailed specifications for design variants (full sharding, overcollateralization, protocol extensions)
+
 ### Formal methods
 
 - Added support for `Late IB inclusion` to the formal spec of Full-Short Leios
