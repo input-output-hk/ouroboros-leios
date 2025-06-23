@@ -4,17 +4,11 @@ The common [`input_block`](../common/input-blocks.md#block-structure) structure 
 
 ## Sharded IB Header
 
-```diff
-; Common IB header body from leios-common.cddl
- ib_header_body =
-   [ slot                  : slot_no
-   , producer              : node_id
-   , ib_certificate        : ib_cert
-   , ? vrf_proof           : vrf_cert
-+  , shard                 : shard_id                              ; Shard assignment from VRF
-   ]
-```
-Sources: [Common CDDL](../common/input-blocks.md#block-structure), [Rust simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L130)
+Stays the same as [common input block](../common/input-blocks.md).
+
+
+> [!Important]
+> It was specifically no `shard` id added to the `ib_header_body` as it can be derived from the VRF. This keeps the CDDL the same for both ledger designs (sharded & collateralized).
 
 ## Shard Assignment
 
