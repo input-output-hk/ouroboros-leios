@@ -35,7 +35,6 @@ Sources: [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal
 +   [ slot                 : slot_no                                  ; Slot when IB was created
 +   , producer_id          : pool_id                                  ; Block producer identifier
 +   , vrf_proof            : vrf_cert                                 ; VRF proof of eligibility to produce IB
-+   , block_body_hash      : hash32                                   ; Hash of the block body
 +   , ranking_block_ref    : hash32                                   ; Reference to ranking block for ledger state
 +   ]
 ```
