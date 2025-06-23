@@ -9,7 +9,7 @@
 
 
 <script src="https://plausible.io/js/script.js" defer="defer" data-domain="leios.cardano-scaling.org"></script><link rel="stylesheet" href="/assets/css/styles.1f1100a0.css">
-<script src="/assets/js/runtime~main.556605d6.js" defer="defer"></script>
+<script src="/assets/js/runtime~main.9e4a7a49.js" defer="defer"></script>
 <script src="/assets/js/main.8fa22242.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
@@ -18,15 +18,15 @@
 <ul>
 <li>Created initial CDDL specifications for core Leios components:<!-- -->
 <ul>
-<li>Input Blocks with VRF lottery and single IB/slot limits</li>
-<li>Endorser Blocks as new aggregation block type</li>
-<li>Ranking Blocks as Conway extension with optional certificates</li>
+<li>Input blocks with VRF lottery and single IB/slot limits</li>
+<li>Endorser blocks as a new aggregation block type</li>
+<li>Ranking blocks as Conway extension with optional certificates</li>
 <li>BLS voting system with persistent/non-persistent voters and key registration</li>
 </ul>
 </li>
-<li>Follows crypto-benchmarks implementation approach while maintaining Conway CDDL compatibility</li>
-<li>Established foundational structures in first draft covering common base components</li>
-<li>Future iterations will add detailed specifications for design variants including full sharding, overcollateralization, and protocol extensions.</li>
+<li>Followed crypto-benchmarks implementation approach while maintaining Conway CDDL compatibility</li>
+<li>Established foundational structures in the first draft covering common base components</li>
+<li>Future iterations will add detailed specifications for design variants, including full sharding, overcollateralization, and protocol extensions.</li>
 </ul>
 <h2 class="anchor anchorWithStickyNavbar_LWe7" id="formal-methods">Formal methods<a class="hash-link" aria-label="Direct link to Formal methods" title="Direct link to Formal methods" href="/news/tags/update#formal-methods">​</a></h2>
 <ul>
@@ -38,7 +38,7 @@
 <ul>
 <li>Conducted empirical bandwidth measurements using <code>iperf3</code> between data centers in North America and Europe</li>
 <li>Measured bidirectional connections across multiple cloud providers (OVH, AWS, CenturyLink)</li>
-<li>Results ranged from 95 Mbps to 973 Mbps depending on geographic distance and provider</li>
+<li>Results ranged from 95 Mbps to 973 Mbps, depending on geographic distance and the provider</li>
 <li>Identified 100 Mbps as a conservative lower bound for inter-datacenter connections</li>
 <li>Observed 5-20% reduction in individual link speeds when multiple simultaneous connections are active.</li>
 </ul>
@@ -46,22 +46,22 @@
 <ul>
 <li>Conducted comprehensive experiments using both the 750-node and 10,000-node network topologies with Haskell and Rust simulations</li>
 <li>Studied transaction and IB throughput limits for realistic scenarios up to 300 TPS and 32 IB/s</li>
-<li>Key findings from the 750-node mini-mainnet experiments documented in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w24/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis results</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w24/summary.pdf" target="_blank" rel="noopener noreferrer">summary slides</a>:<!-- -->
+<li>Key findings from the 750-node mini-mainnet experiments are documented in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w24/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis results</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w24/summary.pdf" target="_blank" rel="noopener noreferrer">summary slides</a>:<!-- -->
 <ul>
 <li>The 750-node mini-mainnet serves as a suitable replacement for the 10,000-node pseudo mainnet for performance measurements</li>
 <li>Substantial agreement between Haskell and Rust simulations for mini-mainnet scenarios</li>
 <li>Block propagation times under one second, consistent with empirical observations from pooltool.io</li>
 <li>Protocol can support 25 MB/s throughput with 1 Gb/s links before degradation</li>
-<li>Mean transaction time from mempool to ledger approximately 150 seconds</li>
+<li>Mean transaction time from mempool to ledger is approximately 150 seconds</li>
 <li>Achieved 80% disk-space efficiency with ~20% network traffic overhead</li>
-<li>Six-core VM sufficient for peak demand at 300 TPS, with average demand under two cores</li>
+<li>Six-core VM is sufficient for peak demand at 300 TPS, with average demand under two cores</li>
 </ul>
 </li>
-<li>Results from 10,000-node pseudo-mainnet experiments available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w23/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis documentation</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w23/summary.pdf" target="_blank" rel="noopener noreferrer">presentation slides</a>:<!-- -->
+<li>Results from 10,000-node pseudo-mainnet experiments are available in <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w23/analysis.ipynb" target="_blank" rel="noopener noreferrer">analysis documentation</a> and <a href="https://github.com/input-output-hk/ouroboros-leios/blob/main/analysis/sims/2025w23/summary.pdf" target="_blank" rel="noopener noreferrer">presentation slides</a>:<!-- -->
 <ul>
 <li>Average transaction lifecycle of 100 seconds from mempool to ledger</li>
 <li>Approximately 80% efficiency for both disk and network usage</li>
-<li>Six CPU cores sufficient for peak load handling even at high TPS rates</li>
+<li>Six CPU cores are sufficient for peak load handling even at high TPS rates</li>
 <li>Block propagation time averaged under one second across the large network.</li>
 </ul>
 </li>
