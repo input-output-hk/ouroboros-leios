@@ -12,7 +12,10 @@ $$P = 1 - e^{-f_{EB} \cdot \sigma}$$
 
 Where $f_{EB}$ is the per-pipeline EB generation rate and $\sigma$ is the producer's stake fraction.
 
-Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641)
+> [!Important]
+> **Precision Requirements**: This computation MUST be performed using machine precision-independent arithmetic to ensure deterministic results across all implementations. The exponential function SHALL be computed using rational arithmetic (e.g., `num_rational::Ratio<BigInt>`) with a Taylor series expansion to a predefined precision (minimum 34 decimal places as implemented in crypto-benchmarks). This prevents floating-point precision variations between different hardware architectures and ensures consensus consistency.
+
+Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641), [Rational Arithmetic Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/sortition.rs#L1-L25), [Technical Report - Deterministic Computation](https://github.com/input-output-hk/ouroboros-leios/blob/main/docs/technical-report-1.md?plain=1#L510-L513)
 
 ## Block Structure
 
