@@ -1,4 +1,4 @@
-# Transactions - Over-Collateralization CDDL Changes
+# Transactions - Over-Collateralization CDDL
 
 The over-collateralization approach extends Conway transactions with Leios-specific collateral mechanisms for conflict resolution in concurrent Input Blocks.
 
