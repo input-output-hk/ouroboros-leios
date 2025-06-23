@@ -54,5 +54,3 @@ Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's
  vrf_cert = bytes                                                    ; VRF certificate/proof
  kes_signature = bytes                                               ; KES signature
 ``` 
-
-**→ [Endorser Block - CDDL](endorser-blocks.md)**
