@@ -12,7 +12,7 @@ $$P = 1 - e^{-f_{EB} \cdot \sigma}$$
 
 Where $f_{EB}$ is the per-pipeline EB generation rate and $\sigma$ is the producer's stake fraction.
 
-<sub>[1] [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [2] [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641)</sub>
+Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md#L63-L65), [Rust Simulation EB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L606-L641)
 
 ## Block Structure
 
@@ -39,7 +39,7 @@ eb_header_body =
   , ? vrf_proof          : vrf_cert                                 ; VRF proof of eligibility to produce EB
   ]
 ```
-<sub>[1] [Haskell Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L160-L171), [2] [Rust Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L167-L176), [3] [Formal Spec EndorserBlockOSig](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L97-L106)</sub>
+Sources: [Haskell Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L160-L171), [Rust Simulation EndorserBlock](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L167-L176), [Formal Spec EndorserBlockOSig](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L97-L106)
 
 ## Input Block Reference Structure
 
@@ -54,7 +54,7 @@ ib_reference = [
 ; Supporting types
 ib_id                 = hash32                                      ; Input block identifier
 ```
-<sub>[1] [Haskell Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L100-L105), [2] [Rust Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L98-L105), [3] [Formal Spec - IBRef](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L33), [4] [Formal Spec - ibRefs](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L101)</sub>
+Sources: [Haskell Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L100-L105), [Rust Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L98-L105), [Formal Spec - IBRef](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L33), [Formal Spec - ibRefs](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L101)
 
 ## Endorser Block Reference Structure
 
@@ -69,7 +69,7 @@ eb_reference = [
 ; Supporting types
 eb_id                 = hash32                                      ; Endorser block identifier
 ```
-<sub>[1] [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L161-L163), [2] [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L148-L152), [3] [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L34)</sub>
+Sources: [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L161-L163), [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L148-L152), [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L34)
 
 ## Supporting Types
 

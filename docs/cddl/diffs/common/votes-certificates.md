@@ -17,7 +17,7 @@ leios_certificate =
   , aggregate_vote_sig     : bls_signature                           ; Aggregate BLS signature on (election_id || endorser_block_hash)
   ]
 ```
-<sub>[1] [Certificate Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/cert.rs#L13-L21), [2] [Certificate Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Base.agda#L24-L28)</sub>
+Sources: [Certificate Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/cert.rs#L13-L21), [Certificate Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Base.agda#L24-L28)
 
 ## Vote Structure
 
@@ -47,7 +47,7 @@ non_persistent_vote_bundle =
 
 vote_entries = {* endorser_block_hash => vote_signature}
 ```
-<sub>[1] [Vote Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/vote.rs#L13-L27), [2] [Formal Specification - Vote Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Abstract.agda#L24-L27), [3] [Haskell Bundle Usage](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Short.hs#L231-L234), [4] [Rust Vote Bundle](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L208-L212)</sub>
+Sources: [Vote Reference Implementation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/vote.rs#L13-L27), [Formal Specification - Vote Abstract Interface](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Abstract.agda#L24-L27), [Haskell Bundle Usage](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Short.hs#L231-L234), [Rust Vote Bundle](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L208-L212)
 
 ## BLS Key Registration
 
@@ -62,7 +62,7 @@ For pools to participate in Leios voting, they must register BLS keys in their o
 +  , ? bls_key_reg     : bls_key_registration
    ]
 ```
-<sub>[1] [Conway Base](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L114-L119)</sub>
+Sources: [Conway Base](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L114-L119)
 
 ```cddl
 ; BLS key registration for voting (included in operational certificates)
@@ -75,7 +75,7 @@ bls_key_registration =
 
 ; Total size: 28 + 96 + 96 + 448 = 668 bytes
 ```
-<sub>[1] [Registration Struct](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L156-L162), [2] [Proof Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/bls_vote.rs#L19-L23)</sub>
+Sources: [Registration Struct](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L156-L162), [Proof Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/bls_vote.rs#L19-L23)
 
 ## Cryptographic Types
 
@@ -98,7 +98,7 @@ endorser_block_hash     = bytes .size 32                             ; Hash of e
 kes_signature           = bytes .size 448                            ; KES signature
 hash32                  = bytes .size 32                             ; 32-byte hash (used for endorser_block_hash)
 ```
-<sub>[1] [Sig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L100), [2] [PubKey](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L62), [3] [PoP](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L139-L143), [4] [Eid](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L76), [5] [PersistentId](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/registry.rs#L14), [6] [PoolKeyhash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L14), [7] [EbHash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L117), [8] [KesSig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L170)</sub>
+Sources: [Sig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L100), [PubKey](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L62), [PoP](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L139-L143), [Eid](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L76), [PersistentId](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/registry.rs#L14), [PoolKeyhash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L14), [EbHash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L117), [KesSig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L170)
 
 ## Committee Selection
 
@@ -135,7 +135,7 @@ stake_weight              = uint64                                    ; Stake am
 vrf_cert                  = bytes                                     ; VRF certificate from existing Cardano types
 vote_count                = uint8                                     ; Number of votes (typically 0 or 1)
 ```
-<sub>[1] [FaSortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/fait_accompli.rs#L9-L17)</sub>
+Sources: [FaSortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/fait_accompli.rs#L9-L17)
 
 ## Next
 **→ [Endorser Block - CDDL](endorser-blocks.md)**

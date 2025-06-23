@@ -8,7 +8,7 @@ $$P = 1 - e^{-f_{IB} \cdot \sigma}$$
 
 Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's stake fraction.
 
-<sub>[1] [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md?plain=1#L64), [2] [Rust Simulation IB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L561-L597)</sub>
+Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/Specification.md?plain=1#L64), [Rust Simulation IB Generation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L561-L597)
 
 ## Block Structure
 
@@ -21,7 +21,7 @@ Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's
    , invalid_transactions       : [* transaction_index]
    ]
 ```
-<sub>[1] [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L40-L57), [2] [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L138-L142), [3] [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L136-L141)</sub>
+Sources: [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L40-L57), [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L138-L142), [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L136-L141)
 
 ## Header Structure
 
@@ -39,7 +39,7 @@ Where $f_{IB}$ is the per-slot IB generation rate and $\sigma$ is the producer's
    , ? ranking_block_ref  : hash32                                   ; Reference to ranking block for ledger state
    ]
 ```
-<sub>[1] [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L40-L45), [2] [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L114-L124), [3] [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L127-L133)</sub>
+Sources: [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L40-L45), [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L114-L124), [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L127-L133)
 
 ## Supporting Types
 

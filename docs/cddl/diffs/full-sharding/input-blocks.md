@@ -14,7 +14,7 @@ The common [`input_block`](../common/input-blocks.md#block-structure) structure 
 +  , shard                 : shard_id                              ; Shard assignment from VRF
    ]
 ```
-<sub>[1] [Common CDDL](../common/input-blocks.md#block-structure), [2] [Rust simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L130)</sub>
+Sources: [Common CDDL](../common/input-blocks.md#block-structure), [Rust simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L130)
 
 ## Shard Assignment
 
@@ -26,7 +26,7 @@ shard_id = uint .size 2
 ; Shard assignment based on VRF value
 ; Implementation: shard = vrf_value mod total_shards
 ```
-<sub>[1] Ledger v0.2: "each IB has a shard id (determined through its VRF value)", [2] [Rust Shard Assignment](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L599-L604)</sub>
+Sources: Ledger v0.2: "each IB has a shard id (determined through its VRF value)", [Rust Shard Assignment](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/sim/node.rs#L599-L604)
 
 ## Supporting Types
 

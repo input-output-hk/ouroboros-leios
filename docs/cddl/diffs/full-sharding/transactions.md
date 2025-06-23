@@ -22,11 +22,11 @@ The transaction extensions implement the following design principles from Ledger
 +  , ? shard_label : shard_id                                      ; Optional explicit shard labeling
    ]
 ```
-<sub>[1] [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#162), [2] Ledger v0.2: "UTxOs can be explicitly labelled with a shard id"</sub>
+Sources: [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#162), Ledger v0.2: "UTxOs can be explicitly labelled with a shard id"
 
 ## Reward Account Sharding
 
-<sub>[1] Ledger v0.2: "Reward accounts are implicitly assigned a shard id based on their hash"</sub>
+Sources: Ledger v0.2: "Reward accounts are implicitly assigned a shard id based on their hash"
 
 > [!Important]
 > **TODO**: Missing details.
@@ -50,4 +50,4 @@ hash32 = bytes .size 32                                                      ; 3
 hash28 = bytes .size 28                                                      ; 28-byte hash
 uint64 = uint .size 8                                                        ; 64-bit unsigned integer
 ```
-<sub>[1] [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L156)</sub> 
+Sources: [Conway CDDL](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L156) 
