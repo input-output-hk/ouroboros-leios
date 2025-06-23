@@ -33,7 +33,7 @@ Sources: [Crypto-benchmarks Sortition](https://github.com/input-output-hk/ourobo
 + 
 + eb_header_body =
 +   [ slot                 : slot_no                                  ; Slot when EB was created
-+   , producer             : node_id                                  ; Block producer identifier
++   , producer             : pool_id                                  ; Block producer identifier
 +   , input_blocks         : [* ib_reference]                         ; References to input blocks
 +   , ? endorser_blocks    : [* eb_reference]                         ; References to earlier endorser blocks (Full Leios)
 +   , ? vrf_proof          : vrf_cert                                 ; VRF proof of eligibility to produce EB
@@ -45,38 +45,29 @@ Sources: [Haskell Simulation EndorserBlock](https://github.com/input-output-hk/o
 
 ```diff
 + ; References to input blocks within endorser blocks
-+ ib_reference = [
-+   ib_id               : ib_id,                                      ; Hash identifier of the input block
-+   slot                : slot_no,                                    ; Slot when IB was created
-+   producer            : node_id                                     ; IB producer identifier
-+ ]
-+ 
-+ ; Supporting types
-+ ib_id                 = hash32                                      ; Input block identifier
++ ib_reference             = hash32                                               ; Hash identifier of the input block
 ```
+
+**Design Rationale**: IB references contain only the hash identifier, following the principle that references should include only what's needed for unique identification. Producer and slot information can be obtained by fetching the block header when needed. This aligns with the formal specification's `IBRef = Hash` approach.
+
 Sources: [Haskell Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L100-L105), [Rust Simulation - InputBlockId](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L98-L105), [Formal Spec - IBRef](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L33), [Formal Spec - ibRefs](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L101)
 
 ## Endorser Block Reference Structure
 
 ```diff
 + ; References to earlier endorser blocks (for Full Leios)
-+ eb_reference = [
-+   eb_id               : eb_id,                                      ; Hash identifier of the endorser block  
-+   slot                : slot_no,                                    ; Slot when EB was created
-+   producer            : node_id                                     ; EB producer identifier
-+ ]
-+ 
-+ ; Supporting types
-+ eb_id                 = hash32                                      ; Endorser block identifier
++ eb_reference             = hash32                                               ; Hash identifier of the endorser block
 ```
 Sources: [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L161-L163), [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L148-L152), [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L34)
 
 ## Supporting Types
 
 ```diff
-+ node_id               = uint32                                      ; Node identifier (simulation)
++ pool_id               = bytes .size 28                              ; Stake pool identifier (28 bytes)
 + slot_no               = uint64                                      ; Slot number
 + hash32                = bytes .size 32                              ; 32-byte hash
++ vrf_cert              = bytes                                       ; VRF certificate/proof
++ kes_signature         = bytes                                       ; KES signature
 ```
 
 ## Next
