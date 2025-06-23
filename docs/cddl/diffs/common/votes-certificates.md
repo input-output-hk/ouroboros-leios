@@ -100,42 +100,7 @@ hash32                  = bytes .size 32                             ; 32-byte h
 ```
 Sources: [Sig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L100), [PubKey](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L62), [PoP](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/key.rs#L139-L143), [Eid](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L76), [PersistentId](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/registry.rs#L14), [PoolKeyhash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L14), [EbHash](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L117), [KesSig](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/primitive.rs#L170)
 
-## Committee Selection
 
-The Fait Accompli algorithm determines persistent voters for each epoch, while local sortition selects non-persistent voters for each election.
-
-```cddl
-; Result of Fait Accompli committee selection for an epoch
-fait_accompli_result =
-  [ epoch                 : epoch                                     ; Epoch this applies to
-  , persistent_voters     : [* persistent_voter_designation]          ; Designated persistent voters  
-  , total_persistent_stake : stake_weight                             ; Total stake of persistent voters
-  , non_persistent_stake  : stake_weight                              ; Remaining stake for local sortition
-  ]
-
-; Persistent voter designation
-persistent_voter_designation =
-  [ pool_id               : pool_id                                   ; Pool identifier  
-  , persistent_voter_id   : persistent_voter_id                       ; Epoch-specific short identifier
-  , stake_weight          : stake_weight                              ; Stake weight of this voter
-  ]
-
-; Local sortition result for non-persistent voters
-local_sortition_result =
-  [ pool_id               : pool_id                                   ; Pool identifier
-  , election_id           : election_id                               ; Election identifier  
-  , vrf_proof             : vrf_cert                                  ; VRF proof of eligibility
-  , vote_count            : vote_count                                ; Number of votes awarded (usually 0 or 1)
-  , stake_weight          : stake_weight                              ; Stake weight for this election
-  ]
-
-; Supporting types
-epoch                     = uint64                                    ; Epoch number
-stake_weight              = uint64                                    ; Stake amount in lovelace
-vrf_cert                  = bytes                                     ; VRF certificate from existing Cardano types
-vote_count                = uint8                                     ; Number of votes (typically 0 or 1)
-```
-Sources: [FaSortition](https://github.com/input-output-hk/ouroboros-leios/blob/main/crypto-benchmarks.rs/src/fait_accompli.rs#L9-L17)
 
 ## Next
 **→ [Endorser Block - CDDL](endorser-blocks.md)**
