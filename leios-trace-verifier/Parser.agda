@@ -86,7 +86,7 @@ data Event : Type where
   RBReceived : Maybe Node → Node → Maybe Bytes → Maybe Time → String → Maybe (List String) → Event
   IBEnteredState EBEnteredState VTBundleEnteredState RBEnteredState : String → String → Word64 → Event
   IBGenerated : String → String → SlotNo → PipelineNo → Bytes → Bytes → Maybe String → Event
-  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → Event
+  EBGenerated : String → String → Word64 → PipelineNo → Word64 → List BlockRef → List BlockRef → Event
   RBGenerated : String → String → Word64 → Word64 → Nullable Endorsement → Maybe (List Endorsement) → Word64 → Nullable BlockRef → Event
   VTBundleGenerated : String → String → Word64 → PipelineNo → Word64 → Map String Word64 → Event
 
@@ -160,7 +160,7 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
     with p ≟ SUT
   ... | yes _ = just (IB , primWord64ToNat s)
   ... | no _  = nothing
-  winningSlot record { message = EBGenerated p _ s _ _ _ }
+  winningSlot record { message = EBGenerated p _ s _ _ _ _ }
     with p ≟ SUT
   ... | yes _ = just (EB , primWord64ToNat s)
   ... | no _  = nothing
@@ -279,13 +279,13 @@ module _ (numberOfParties : ℕ) (sutId : ℕ) (stakeDistr : List (Pair String �
         actions with p ≟ SUT
         ... | yes _ = (inj₁ (IB-Role-Action (primWord64ToNat s) , SLOT)) ∷ []
         ... | no _ = []
-    traceEvent→action l record { message = EBGenerated p i s _ _ ibs } =
+    traceEvent→action l record { message = EBGenerated p i s _ _ ibs ebs } =
       let eb = record
                  { slotNumber = primWord64ToNat s
                  ; producerID = nodeId p
                  ; lotteryPf  = tt
                  ; ibRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ibs
-                 ; ebRefs     = []
+                 ; ebRefs     = map (blockRefToNat (refs l) ∘ BlockRef.id) ebs
                  ; signature  = tt
                  }
       in record l { refs = (i , EB-Blk eb) ∷ refs l } , actions
