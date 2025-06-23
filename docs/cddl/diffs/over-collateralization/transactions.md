@@ -62,7 +62,7 @@ nonempty_set<a0> = #6.258([+ a0]) / [+ a0]
 transaction_id = hash32
 hash32 = bytes .size 32
 ```
-Sources: [Conway Transaction Input](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L137), [Conway Transaction Output](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L142-L143), [Conway Sets](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L373), [Conway Hash Types](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L100)
+Sources: [Conway Transaction Input](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L156), [Conway Transaction Output](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L162)
 
 > [!Warning]
 > The conflict resolution policies (whether winner-pays-all or loser-pays-all) are **not yet clarified** and require further iteration.
