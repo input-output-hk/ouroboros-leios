@@ -160,6 +160,7 @@ struct NodeLeiosState {
     ibs_to_generate: BTreeMap<u64, Vec<u64>>,
     ibs: BTreeMap<InputBlockId, InputBlockState>,
     ib_requests: BTreeMap<NodeId, PeerInputBlockRequests>,
+    ibs_by_vrf: BTreeMap<u64, Vec<InputBlockId>>,
     ibs_by_pipeline: BTreeMap<u64, Vec<InputBlockId>>,
     ebs: BTreeMap<EndorserBlockId, EndorserBlockState>,
     ebs_by_pipeline: BTreeMap<u64, Vec<EndorserBlockId>>,
@@ -1169,9 +1170,18 @@ impl Node {
         {
             return;
         }
+        if !self.behaviours.ib_equivocation && self.leios.ibs_by_vrf.contains_key(&header.vrf) {
+            // Equivocation detected
+            return;
+        }
         self.leios
             .ibs
             .insert(id, InputBlockState::Pending(header.clone()));
+        self.leios
+            .ibs_by_vrf
+            .entry(header.vrf)
+            .or_default()
+            .push(id);
         self.schedule_cpu_task(CpuTaskType::IBHeaderValidated(from, header, has_body));
     }
 
