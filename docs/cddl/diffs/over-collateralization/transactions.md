@@ -2,7 +2,10 @@
 
 The over-collateralization approach extends Conway transactions with Leios-specific collateral mechanisms for conflict resolution in concurrent Input Blocks.
 
-**Design Rationale**: Conway's existing collateral mechanism (`collateral_inputs` and `collateral_return`) is specifically designed for Plutus script execution failures. Leios requires a separate collateral system for covering costs when concurrent Input Blocks contain conflicting transactions. These are fundamentally different use cases and must not be conflated.
+> [!Note]
+> **Design Rationale**: Leios requires a separate collateral system for conflict resolution in concurrent Input Blocks, distinct from Conway's existing collateral mechanism which handles Plutus script execution failures.
+>
+> **TODO:** Check if both collateral system could be merged.
 
 ## Transaction Body Extensions
 
@@ -48,9 +51,8 @@ Sources: [Conway Transaction Body](https://github.com/IntersectMBO/cardano-ledge
 ```
 Sources: [Conway Collateral Pattern](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L108-L120), [Conway Transaction Types](https://github.com/IntersectMBO/cardano-ledger/blob/master/eras/conway/impl/cddl-files/conway.cddl#L137-L145)
 
-**Design Rationale**: 
-- **Separate from Conway collateral**: Leios collateral serves a different purpose (conflict resolution) than Conway collateral (script execution failures)
-- **Proportional to concurrency**: Users post collateral proportional to the concurrency level of the protocol to cover wasted resources when conflicts occur
+> [!Note]
+> **Design Rationale**: Users post collateral proportional to the concurrency level of the protocol to cover wasted resources when conflicts occur.
 
 ## Supporting Types
 
