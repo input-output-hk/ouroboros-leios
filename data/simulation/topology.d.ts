@@ -38,6 +38,12 @@ export interface Node<Location> {
   * Only supported by Haskell simulation.
   */
   adversarial?: Behaviour | null;
+  /** If not null, the node will follow the given behaviours.
+   * 
+   * 
+   * Only supported by Rust simulation.
+   */
+  behaviours?: Behaviour[] | null;
 }
 
 /** Link information. */
@@ -69,4 +75,9 @@ export interface UnboundedIbs {
   "starting-at-slot": number;
   "slot-of-generated-ibs": number;
   "ibs-per-slot": number;
+}
+
+/** A node which generates equivocated IBs at any possible opportunity. */
+export interface IbEquivocation {
+  behaviour: "ib-equivocation";
 }
