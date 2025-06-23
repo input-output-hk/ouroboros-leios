@@ -30,6 +30,13 @@
           "$ref": "#/definitions/UnboundedIbs",
           "description": "If not null, the node will behave according to the given Behaviour.\n\nOnly supported by Haskell simulation."
         },
+        "behaviours": {
+          "description": "If not null, the node will follow the given behaviours.\n\n\nOnly supported by Rust simulation.",
+          "items": {
+            "$ref": "#/definitions/UnboundedIbs"
+          },
+          "type": "array"
+        },
         "cpu-core-count": {
           "additionalProperties": false,
           "properties": {},
@@ -66,6 +73,13 @@
         "adversarial": {
           "$ref": "#/definitions/UnboundedIbs",
           "description": "If not null, the node will behave according to the given Behaviour.\n\nOnly supported by Haskell simulation."
+        },
+        "behaviours": {
+          "description": "If not null, the node will follow the given behaviours.\n\n\nOnly supported by Rust simulation.",
+          "items": {
+            "$ref": "#/definitions/UnboundedIbs"
+          },
+          "type": "array"
         },
         "cpu-core-count": {
           "additionalProperties": false,
