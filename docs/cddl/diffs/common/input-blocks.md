@@ -36,7 +36,7 @@ Sources: [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal
 +   , producer_id          : pool_id                                  ; Block producer identifier
 +   , vrf_proof            : vrf_cert                                 ; VRF proof of eligibility to produce IB
 +   , block_body_hash      : hash32                                   ; Hash of the block body
-+   , ? ranking_block_ref  : hash32                                   ; Reference to ranking block for ledger state
++   , ranking_block_ref    : hash32                                   ; Reference to ranking block for ledger state
 +   ]
 ```
 Sources: [Formal Spec](https://github.com/input-output-hk/ouroboros-leios-formal-spec/blob/main/formal-spec/Leios/Blocks.agda#L40-L45), [Haskell Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/simulation/src/LeiosProtocol/Common.hs#L114-L124), [Rust Simulation](https://github.com/input-output-hk/ouroboros-leios/blob/main/sim-rs/sim-core/src/model.rs#L127-L133)
